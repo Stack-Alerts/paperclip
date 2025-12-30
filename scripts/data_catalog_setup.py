@@ -35,17 +35,20 @@ class BTC_DataLoader:
         
     def load_btc_30m(self) -> pd.DataFrame:
         """
-        Load BTC 30m data from pickle file
+        Load BTC 30m data from pickle file (2024-2025 only)
         
         Returns:
-            pd.DataFrame: OHLCV data with timestamp index
+            pd.DataFrame: OHLCV data with timestamp index (filtered to 2024+)
         """
         file_path = self.project_root / self.data_path / "BTC_USDT_PERP_30m.pkl"
         
         print(f"📂 Loading: {file_path}")
         df = pd.read_pickle(file_path)
         
-        print(f"✅ Loaded: {len(df):,} bars")
+        # Filter to 2024-2025 where we have tick data
+        df = df[df.index >= '2024-01-01']
+        
+        print(f"✅ Loaded: {len(df):,} bars (2024-2025 only)")
         print(f"   Period: {df.index[0]} → {df.index[-1]}")
         print(f"   Columns: {df.columns.tolist()}")
         

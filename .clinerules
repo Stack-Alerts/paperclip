@@ -8,6 +8,7 @@
 ║ 📖 Documentation: MANDATORY (All methods must reference official docs) ║
 ║ 🎯 Efficiency: NO REBUILDING (Reference existing code) ║
 ║ 🔬 RESEARCH: NAUTILUS EXPERT (Must know every detail of NautilusTrader) ║
+║ ⭐ EXPERT MODE: Trade & Data Science Analysis (Institutional Grade) ║
 ║ ║
 ║ Start each session by reading this file completely. ║
 ║ Location: ~/projects/BTC_Engine_v3/.clinerules ║
@@ -56,6 +57,8 @@ TEST ALWAYS - Unit tests, backtests, edge cases
 RESEARCH EXPERT - Master NautilusTrader for any discovery session
 
 DOCS AUTHORITY - Always reference official NautilusTrader documentation
+
+EXPERT MODE - For institutional-grade backtest analysis & trade verification
 
 READ: CLINE_INSTITUTIONAL_RULES.md
 """
@@ -252,7 +255,6 @@ RESEARCH_PATTERNS = {
 "pattern_detection": """
 For technical pattern research (M patterns, W patterns, triangles, etc.):
 
-text
 1. Create ResearchStrategy(Strategy)
 2. Store bars in list/array
 3. Check pattern conditions on each bar
@@ -298,6 +300,125 @@ For parameter optimization discovery:
 Reference: https://nautilustrader.io/docs/latest/guide/backtesting/
 """,
 }
+
+============================================================================
+EXPERT TRADER & DATA SCIENTIST MODE (EXPERT MODE) ⭐
+============================================================================
+EXPERT_MODE = """
+ACTIVATION PHRASE: "EXPERT MODE: [Your request]"
+
+When activated, Cline becomes expert trader + data scientist
+and provides institutional-grade analysis of backtests/trades.
+
+EXAMPLES:
+"EXPERT MODE: Run backtest on MA crossover and provide expert assessment"
+"EXPERT MODE: Verify this order before submission"
+"EXPERT MODE: Is this strategy ready for live trading?"
+
+CLINE DELIVERABLES (5 Complete Reports):
+
+1️⃣ TRADE VERIFICATION REPORT
+   ✓ Verify order structure (type, side, quantity, price, time in force)
+   ✓ Verify risk parameters (position size, stop loss, daily limit, leverage)
+   ✓ Verify account state (balance, position tracking, PnL)
+   └─ APPROVED FOR EXECUTION or REJECTED with reasons
+
+2️⃣ INSTITUTIONAL BACKTEST ANALYSIS REPORT
+   ✓ Primary metrics: Return%, Sharpe, Drawdown%, Win Rate, Profit Factor
+   ✓ Trade analysis: Total trades, duration, largest win/loss, consecutive streaks
+   ✓ Drawdown analysis: Max underwater%, recovery time, frequency
+   ✓ Return distribution: Best/worst months, volatility, skewness
+   ✓ Statistical validity: Data period, data quality, bias checks
+   └─ Complete assessment of backtest quality
+
+3️⃣ EXPERT TRADER ASSESSMENT
+   ✓ Reality check: Would I trade this? Does return justify risk?
+   ✓ Red flags: Overfitting detection (>100% annual, Sharpe>3, <10% drawdown)
+   ✓ Robustness: Parameter sensitivity, market regime performance
+   ✓ Liquidity: Can I realistically execute at these prices?
+   ✓ Expectations: Backtest vs live (typically 30-50% worse)
+   └─ Expert trader perspective and assessment
+
+4️⃣ EXPERT IMPROVEMENT RECOMMENDATIONS (Prioritized)
+   ✓ Priority 1: Critical issues blocking deployment
+   ✓ Priority 2: Quick wins and enhancements
+   ✓ Priority 3: Research projects and deep dives
+   ✓ Priority 4: Robustness testing and validation
+   ✓ Implementation roadmap with timeline
+   └─ Actionable improvements with effort estimates
+
+5️⃣ FINAL EXPERT RECOMMENDATION
+   ✓ Ready for live trading? YES / NO / CONDITIONAL
+   ✓ Confidence level: LOW / MEDIUM / HIGH
+   ✓ Top 3 issues if NO
+   ✓ Deployment plan if YES
+   ✓ Next steps and action items
+   └─ Clear GO/NO-GO decision
+
+WHAT EXPERT MODE VERIFIES:
+
+TRADE VERIFICATION CHECKLIST:
+✅ Order type correct (MARKET, LIMIT, STOP_MARKET)
+✅ Order side is enum (OrderSide.BUY, never string)
+✅ Quantity is Quantity(X) not float
+✅ Price is Price('X.XX') not float
+✅ Time in force valid
+✅ Position size ≤ MAX_POSITION_SIZE
+✅ Stop loss set for entry
+✅ Daily loss limit configured
+✅ Sufficient balance
+✅ No risk violations
+
+RED FLAGS EXPERT MODE CATCHES:
+❌ Return > 100% annually (unrealistic)
+❌ Sharpe ratio > 3.0 (too good to be true)
+❌ Max drawdown < 10% (suspiciously low)
+❌ Win rate > 75% (likely curve fit)
+❌ No losing streaks > 3 (unrealistic)
+❌ Perfect monthly returns (not real)
+❌ Float used for prices (precision error)
+❌ Strings used for enums (type error)
+❌ No stop losses (unmanaged risk)
+❌ No daily loss limit (catastrophic risk)
+
+EXAMPLE USAGE:
+
+Scenario 1: Backtest Assessment
+  You: "EXPERT MODE: Backtest MA 10/20 on BTC 15min for 90 days"
+  Cline: 5 complete reports + improvement roadmap
+
+Scenario 2: Trade Verification
+  You: "EXPERT MODE: Verify this order before submission"
+  Cline: Verification report + approval/rejection + fixes
+
+Scenario 3: Live Trading Decision
+  You: "EXPERT MODE: Is this strategy ready for live trading?"
+  Cline: Complete assessment + GO/NO-GO recommendation
+
+Scenario 4: Improvement Suggestions
+  You: "EXPERT MODE: How can I improve this backtest?"
+  Cline: Prioritized improvements + implementation roadmap
+
+Scenario 5: Strategy Optimization
+  You: "EXPERT MODE: Analyze walk-forward and recommend parameters"
+  Cline: Analysis + robustness assessment + parameter recommendations
+
+VALUE OF EXPERT MODE:
+- Per backtest: ~$5,000+ consulting fee equivalent
+- Time saved: 2-4 hours per strategy
+- Risk reduction: Catches 90%+ of critical flaws
+- Quality: Institutional-grade assessment
+
+CRITICAL REQUIREMENTS FOR EXPERT MODE:
+✅ Verify everything - No assumptions, all values checked
+✅ Be data scientist - Statistical rigor, not just metrics
+✅ Be expert trader - Practical experience perspective
+✅ Assess reality - Will this actually work live?
+✅ Suggest improvements - Concrete, prioritized, actionable
+✅ Provide recommendation - Clear go/no-go decision
+✅ Use professional reports - Formatted, complete, detailed
+✅ No shortcuts - Complete analysis every time
+"""
 
 ============================================================================
 CORE TYPES (MUST KNOW THESE)
@@ -363,7 +484,6 @@ MAX_LEVERAGE: 1.0 (no margin)
 
 ENFORCEMENT PATTERN:
 
-text
 # 1. Check position sizing
 if quantity > Quantity(self.MAX_POSITION_SIZE):
     self.log.error(f"Position {quantity} exceeds {self.MAX_POSITION_SIZE}")
@@ -429,7 +549,6 @@ CREATING AN ORDER:
 from nautilus_trader.model.orders import MarketOrder
 from nautilus_trader.model.enums import OrderSide
 
-text
 order = MarketOrder(
     instrument_id=self.instrument_id,
     client_order_id=self.order_factory.client_order_id(),
@@ -438,12 +557,13 @@ order = MarketOrder(
     time_in_force=TimeInForce.IOC,
 )
 self.submit_order(order)
+
 CHECKING POSITION:
 position = self.portfolio.net_position(self.instrument)
 if position is None:
-size = 0
+    size = 0
 else:
-size = position.quantity
+    size = position.quantity
 
 CALCULATING PnL:
 unrealized = self.portfolio.unrealized_pnl(self.instrument)
@@ -460,19 +580,18 @@ self.log.error(f"Order rejected: {reason}")
 
 RESEARCH PATTERN DETECTION:
 def check_m_pattern(self, bars):
-'''Check if last 3 bars form M pattern'''
-if len(bars) < 3:
-return False
-# Down-Up-Down
-down_1 = bars[-3].close > bars[-2].close
-up = bars[-2].close < bars[-1].close
-down_2_pending = True # Wait for next bar
-return down_1 and up
+    '''Check if last 3 bars form M pattern'''
+    if len(bars) < 3:
+        return False
+    # Down-Up-Down
+    down_1 = bars[-3].close > bars[-2].close
+    up = bars[-2].close < bars[-1].close
+    down_2_pending = True # Wait for next bar
+    return down_1 and up
 
 RESEARCH STORAGE:
 self.patterns_found = []
 
-text
 def on_bar(self, bar: Bar):
     if self.check_m_pattern(self.bars):
         self.patterns_found.append({
@@ -496,89 +615,88 @@ import pandas as pd
 from datetime import datetime
 
 class PatternDiscoveryStrategy(Strategy):
-"""Discovery strategy to find M patterns on 15min BTC"""
+    """Discovery strategy to find M patterns on 15min BTC"""
 
-text
-def __init__(self, config):
-    super().__init__(config)
-    self.bars = []
-    self.patterns = []
-    self.m_pattern_count = 0
+    def __init__(self, config):
+        super().__init__(config)
+        self.bars = []
+        self.patterns = []
+        self.m_pattern_count = 0
 
-def on_start(self):
-    """Called when strategy starts"""
-    # Subscribe to 15min bars
-    bar_type = BarType(
-        self.instrument_id,
-        BarAggregation.MINUTE,
-        15,
-    )
-    self.subscribe_bars(bar_type)
-    self.log.info(f"M Pattern Discovery started for {self.instrument}")
+    def on_start(self):
+        """Called when strategy starts"""
+        # Subscribe to 15min bars
+        bar_type = BarType(
+            self.instrument_id,
+            BarAggregation.MINUTE,
+            15,
+        )
+        self.subscribe_bars(bar_type)
+        self.log.info(f"M Pattern Discovery started for {self.instrument}")
 
-def on_bar(self, bar: Bar) -> None:
-    """Called on each 15min bar"""
-    
-    # Store bar for pattern detection
-    self.bars.append(bar)
-    
-    # Keep only last 3 bars for memory efficiency
-    if len(self.bars) > 3:
-        self.bars.pop(0)
-    
-    # Check for M pattern (only when we have 3+ bars)
-    if len(self.bars) >= 3:
-        if self.is_m_pattern():
-            self.m_pattern_count += 1
-            self.patterns.append({
-                'timestamp': bar.ts_event,
-                'price': float(bar.close),
-                'high': float(bar.high),
-                'low': float(bar.low),
-                'pattern_id': self.m_pattern_count,
-            })
-            self.log.info(f"M Pattern #{self.m_pattern_count} found at {bar.ts_event}")
+    def on_bar(self, bar: Bar) -> None:
+        """Called on each 15min bar"""
+        
+        # Store bar for pattern detection
+        self.bars.append(bar)
+        
+        # Keep only last 3 bars for memory efficiency
+        if len(self.bars) > 3:
+            self.bars.pop(0)
+        
+        # Check for M pattern (only when we have 3+ bars)
+        if len(self.bars) >= 3:
+            if self.is_m_pattern():
+                self.m_pattern_count += 1
+                self.patterns.append({
+                    'timestamp': bar.ts_event,
+                    'price': float(bar.close),
+                    'high': float(bar.high),
+                    'low': float(bar.low),
+                    'pattern_id': self.m_pattern_count,
+                })
+                self.log.info(f"M Pattern #{self.m_pattern_count} found at {bar.ts_event}")
 
-def is_m_pattern(self) -> bool:
-    """
-    Detect M pattern: Down-Up-Down
-    bar > bar (down)
-    bar < bar (up)
-    Next bar would complete the pattern
-    """
-    if len(self.bars) < 3:
-        return False
-    
-    bar_0_close = float(self.bars.close)
-    bar_1_close = float(self.bars.close)
-    bar_2_close = float(self.bars.close)
-    
-    # Down-Up-Down pattern
-    down_1 = bar_0_close > bar_1_close
-    up = bar_1_close < bar_2_close
-    
-    return down_1 and up
+    def is_m_pattern(self) -> bool:
+        """
+        Detect M pattern: Down-Up-Down
+        bar > bar (down)
+        bar < bar (up)
+        Next bar would complete the pattern
+        """
+        if len(self.bars) < 3:
+            return False
+        
+        bar_0_close = float(self.bars[-3].close)
+        bar_1_close = float(self.bars[-2].close)
+        bar_2_close = float(self.bars[-1].close)
+        
+        # Down-Up-Down pattern
+        down_1 = bar_0_close > bar_1_close
+        up = bar_1_close < bar_2_close
+        
+        return down_1 and up
 
-def on_end(self):
-    """Called when backtest ends"""
-    self.log.info(f"Discovery complete: Found {self.m_pattern_count} M patterns")
-    
-    # Save results
-    df = pd.DataFrame(self.patterns)
-    if len(df) > 0:
-        df.to_csv('m_patterns_found.csv', index=False)
-        self.log.info(f"Results saved to m_patterns_found.csv")
-    
-    # Print summary
-    print("\\n" + "="*60)
-    print("M PATTERN DISCOVERY RESULTS")
-    print("="*60)
-    print(f"Total M Patterns Found: {self.m_pattern_count}")
-    if len(df) > 0:
-        print(f"First Pattern: {df.iloc['timestamp']}")
-        print(f"Last Pattern: {df.iloc[-1]['timestamp']}")
-        print(f"Patterns per day: {len(df) / 90:.2f}")
-    print("="*60)
+    def on_end(self):
+        """Called when backtest ends"""
+        self.log.info(f"Discovery complete: Found {self.m_pattern_count} M patterns")
+        
+        # Save results
+        df = pd.DataFrame(self.patterns)
+        if len(df) > 0:
+            df.to_csv('m_patterns_found.csv', index=False)
+            self.log.info(f"Results saved to m_patterns_found.csv")
+        
+        # Print summary
+        print("\\n" + "="*60)
+        print("M PATTERN DISCOVERY RESULTS")
+        print("="*60)
+        print(f"Total M Patterns Found: {self.m_pattern_count}")
+        if len(df) > 0:
+            print(f"First Pattern: {df.iloc[0]['timestamp']}")
+            print(f"Last Pattern: {df.iloc[-1]['timestamp']}")
+            print(f"Patterns per day: {len(df) / 90:.2f}")
+        print("="*60)
 '''
 
 ============================================================================
@@ -586,29 +704,28 @@ DATA VALIDATION (ALWAYS DO THIS)
 ============================================================================
 DATA_VALIDATION = """
 def validate_ohlcv_data(df):
-'''Validate data before using'''
-
-text
-# Check for missing values
-assert not df.isnull().any().any(), "Contains NaN values"
-
-# Check OHLC logic
-assert (df['high'] >= df['low']).all(), "High < Low error"
-assert (df['open'] <= df['high']).all(), "Open > High error"
-assert (df['close'] <= df['high']).all(), "Close > High error"
-
-# Check volume
-assert (df['volume'] > 0).all(), "Zero volume found"
-
-# Check time continuity
-time_diffs = df.index.to_series().diff()
-expected_diff = pd.Timedelta(minutes=15)
-gaps = time_diffs[time_diffs > expected_diff * 2]
-if len(gaps) > 0:
-    print(f"Warning: {len(gaps)} time gaps found")
-
-print(f"✓ Data validation passed")
-return True
+    '''Validate data before using'''
+    
+    # Check for missing values
+    assert not df.isnull().any().any(), "Contains NaN values"
+    
+    # Check OHLC logic
+    assert (df['high'] >= df['low']).all(), "High < Low error"
+    assert (df['open'] <= df['high']).all(), "Open > High error"
+    assert (df['close'] <= df['high']).all(), "Close > High error"
+    
+    # Check volume
+    assert (df['volume'] > 0).all(), "Zero volume found"
+    
+    # Check time continuity
+    time_diffs = df.index.to_series().diff()
+    expected_diff = pd.Timedelta(minutes=15)
+    gaps = time_diffs[time_diffs > expected_diff * 2]
+    if len(gaps) > 0:
+        print(f"Warning: {len(gaps)} time gaps found")
+    
+    print(f"✓ Data validation passed")
+    return True
 """
 
 ============================================================================
@@ -723,6 +840,8 @@ Test before deploying - Unit, integration, edge cases
 
 RESEARCH EXPERT - Master NautilusTrader for discoveries
 
+EXPERT MODE - For institutional-grade backtest analysis
+
 READ DOCS - All discovery work begins with official docs
 """
 
@@ -756,6 +875,18 @@ Implement using official examples
 Test thoroughly
 
 Report findings
+
+FOR EXPERT MODE:
+
+Say: "EXPERT MODE: [Your request]"
+
+Cline provides 5 complete institutional-grade reports
+
+Trade verification + backtest analysis + expert assessment
+
++ improvement recommendations + final recommendation
+
+Value: ~$5,000+ consulting fee equivalent
 """
 
 ============================================================================
@@ -770,6 +901,7 @@ print("""
 ║ 📖 DOCUMENTATION FIRST, ALWAYS ║
 ║ 🔒 RISK MANAGEMENT ABSOLUTE ║
 ║ 🔬 NAUTILUS EXPERT FOR RESEARCH ║
+║ ⭐ EXPERT MODE FOR BACKTEST ANALYSIS ║
 ║ ║
 ║ When in doubt, read: ║
 ║ - .clinerules (this file) ║
@@ -778,5 +910,6 @@ print("""
 ║ ║
 ║ Remember: Every line of code. Every type. Every validation. Matters. ║
 ║ For research: Master NautilusTrader. Know every detail. Use official docs.║
+║ For analysis: EXPERT MODE for institutional-grade backtest assessment. ║
 ╚════════════════════════════════════════════════════════════════════════════╝
 """)

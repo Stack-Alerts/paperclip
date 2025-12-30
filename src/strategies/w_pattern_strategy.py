@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-BTC_Engine_v3 - M-Pattern Strategy
-Day 4: NautilusTrader strategy using M-pattern detector
+BTC_Engine_v3 - W-Pattern Strategy
+Day 5: NautilusTrader strategy using W-pattern detector
 
 This strategy:
-1. Detects M-patterns using PatternAdapter
-2. Enters SHORT positions on confirmed M-patterns
+1. Detects W-patterns using PatternAdapter
+2. Enters LONG positions on confirmed W-patterns
 3. Manages risk with stop loss and take profit levels
 4. Follows institutional-grade risk management
 """
@@ -26,16 +26,16 @@ from nautilus_trader.model.objects import Price, Quantity
 from src.indicators.pattern_adapter import PatternAdapter, PatternSignal
 
 
-class MPatternStrategyConfig:
-    """Configuration for M-Pattern strategy"""
+class WPatternStrategyConfig:
+    """Configuration for W-Pattern strategy"""
     
     # Pattern detection
     lookback: int = 50
     min_confidence: float = 0.70  # Minimum 70% confidence to trade
     
     # Position sizing
-    position_size_btc: float = 0.01  # 0.01 BTC per trade
-    max_positions: int = 5  # Allow up to 5 concurrent positions
+    position_size_btc: float = 0.001  # 0.001 BTC per trade (conservative)
+    max_positions: int = 1  # Only 1 position at a time
     
     # Risk management (from .clinerules)
     max_position_size_btc: float = 1.0  # Absolute maximum
@@ -52,19 +52,19 @@ class MPatternStrategyConfig:
                 setattr(self, key, value)
 
 
-class MPatternStrategy(Strategy):
+class WPatternStrategy(Strategy):
     """
-    M-Pattern trading strategy for NautilusTrader
+    W-Pattern trading strategy for NautilusTrader
     
-    Detects M-patterns and enters SHORT positions when:
-    - M-pattern detected with sufficient confidence
+    Detects W-patterns and enters LONG positions when:
+    - W-pattern detected with sufficient confidence
     - No existing position
     - Risk limits not exceeded
     """
     
-    def __init__(self, config: Optional[MPatternStrategyConfig] = None):
+    def __init__(self, config: Optional[WPatternStrategyConfig] = None):
         """
-        Initialize M-pattern strategy
+        Initialize W-pattern strategy
         
         Args:
             config: Strategy configuration
@@ -72,11 +72,11 @@ class MPatternStrategy(Strategy):
         super().__init__()
         
         # Configuration (use strategy_config to avoid conflict with base class)
-        self.strategy_config = config or MPatternStrategyConfig()
+        self.strategy_config = config or WPatternStrategyConfig()
         
         # Pattern detector
         self.pattern_adapter = PatternAdapter(
-            pattern_type='m_pattern',
+            pattern_type='w_pattern',
             lookback=self.strategy_config.lookback
         )
         
@@ -87,9 +87,6 @@ class MPatternStrategy(Strategy):
         self.daily_pnl = 0.0
         self.last_signal: Optional[PatternSignal] = None
         
-        # Track signals per order (key: order_id, value: signal)
-        self.order_signals = {}
-        
         # Performance tracking
         self.patterns_detected = 0
         self.patterns_traded = 0
@@ -98,7 +95,7 @@ class MPatternStrategy(Strategy):
     def on_start(self):
         """Called when strategy starts"""
         self.log.info("=" * 70)
-        self.log.info("M-PATTERN STRATEGY STARTING")
+        self.log.info("W-PATTERN STRATEGY STARTING")
         self.log.info("=" * 70)
         self.log.info(f"Configuration:")
         self.log.info(f"  Lookback: {self.strategy_config.lookback} bars")
@@ -134,13 +131,13 @@ class MPatternStrategy(Strategy):
         # Detect pattern
         signal = self.pattern_adapter.detect_pattern()
         
-        # Check if M-pattern detected
-        if signal.pattern_type == 'M':
+        # Check if W-pattern detected
+        if signal.pattern_type == 'W':
             self.patterns_detected += 1
             self.last_signal = signal
             
             self.log.info("=" * 70)
-            self.log.info(f"M-PATTERN DETECTED (#{self.patterns_detected})")
+            self.log.info(f"W-PATTERN DETECTED (#{self.patterns_detected})")
             self.log.info(f"  Bar: {self.bar_count}")
             self.log.info(f"  Confidence: {signal.confidence:.1%}")
             self.log.info(f"  Entry: ${signal.entry_price:.2f}")
@@ -148,8 +145,8 @@ class MPatternStrategy(Strategy):
             self.log.info(f"  Take Profit 1: ${signal.take_profit_1:.2f}")
             
             if signal.metadata:
-                self.log.info(f"  Peak 1: ${signal.metadata.get('peak1_price', 0):.2f}")
-                self.log.info(f"  Peak 2: ${signal.metadata.get('peak2_price', 0):.2f}")
+                self.log.info(f"  Trough 1: ${signal.metadata.get('trough1_price', 0):.2f}")
+                self.log.info(f"  Trough 2: ${signal.metadata.get('trough2_price', 0):.2f}")
                 self.log.info(f"  Neckline: ${signal.metadata.get('neckline', 0):.2f}")
                 rr = signal.metadata.get('risk_reward', 0)
                 self.log.info(f"  Risk/Reward: {rr:.2f}x")
@@ -171,15 +168,10 @@ class MPatternStrategy(Strategy):
             self.patterns_skipped += 1
             return
         
-        # Check if we have room for another position
-        # net_position returns a Decimal quantity (negative for SHORT)
-        # Allow multiple SHORT positions up to max_positions limit
-        position_qty = self.portfolio.net_position(self.instrument_id)
-        current_short_size = abs(float(position_qty)) if position_qty < 0 else 0.0
-        max_total_size = self.strategy_config.max_positions * self.strategy_config.position_size_btc
-        
-        if current_short_size >= max_total_size:
-            self.log.info(f"  ❌ SKIPPED: Max position limit reached ({current_short_size:.6f}/{max_total_size:.6f} BTC)")
+        # Check if we already have a position
+        position = self.portfolio.net_position(self.instrument_id)
+        if position is not None and position.quantity != 0:
+            self.log.info(f"  ❌ SKIPPED: Already have position")
             self.patterns_skipped += 1
             return
         
@@ -201,30 +193,26 @@ class MPatternStrategy(Strategy):
             return
         
         # All checks passed - execute trade
-        self._execute_short_entry(signal, bar)
+        self._execute_long_entry(signal, bar)
         
-    def _execute_short_entry(self, signal: PatternSignal, bar: Bar):
+    def _execute_long_entry(self, signal: PatternSignal, bar: Bar):
         """
-        Execute SHORT entry based on M-pattern signal
+        Execute LONG entry based on W-pattern signal
         
         Args:
             signal: Pattern signal
             bar: Current bar
         """
         try:
-            # Create market order for SHORT entry
-            # Use 6 decimal precision to match instrument size_precision
+            # Create market order for LONG entry
             order = self.order_factory.market(
                 instrument_id=self.instrument_id,
-                order_side=OrderSide.SELL,
-                quantity=Quantity.from_str(f"{self.strategy_config.position_size_btc:.6f}"),
+                order_side=OrderSide.BUY,
+                quantity=Quantity.from_str(f"{self.strategy_config.position_size_btc:.8f}"),
             )
             
             # Submit order
             self.submit_order(order)
-            
-            # Store signal for this order
-            self.order_signals[str(order.client_order_id)] = signal
             
             self.trade_count += 1
             self.patterns_traded += 1
@@ -257,70 +245,10 @@ class MPatternStrategy(Strategy):
         self.log.info(f"  Commission: {event.commission if hasattr(event, 'commission') else 'N/A'}")
         self.log.info("=" * 70)
         
-        # Only submit exit orders for ENTRY fills (not exit fills!)
-        # Entry fills for SHORT = SELL side
-        # Exit fills for SHORT = BUY side
-        if event.order_side == OrderSide.SELL:
-            # This is an entry fill - submit exit orders
-            order_id_str = str(event.client_order_id)
-            if order_id_str in self.order_signals:
-                signal = self.order_signals[order_id_str]
-                position_qty = self.portfolio.net_position(self.instrument_id)
-                if position_qty != 0:
-                    self.log.info(f"Position: {position_qty} BTC")
-                    self._submit_exit_orders(event, signal)
-        else:
-            # This is an exit fill (BUY side for closing SHORT)
-            self.log.info("  ✅ POSITION CLOSED")
-    
-    def _submit_exit_orders(self, fill_event, signal: PatternSignal):
-        """
-        Submit stop loss and take profit orders after entry fill
-        
-        Args:
-            fill_event: Order filled event
-            signal: Pattern signal for this trade
-        """
-        if not signal:
-            return
-        
-        try:
-            from nautilus_trader.model.enums import OrderSide, TriggerType
-            from nautilus_trader.model.orders import StopMarketOrder
-            
-            # Get current position
-            position_qty = self.portfolio.net_position(self.instrument_id)
-            if position_qty == 0:
-                return
-            
-            # For SHORT positions (negative qty), we need BUY orders to close
-            exit_side = OrderSide.BUY if position_qty < 0 else OrderSide.SELL
-            qty = abs(float(position_qty))
-            
-            # Stop Loss Order (if price goes against us)
-            if self.strategy_config.use_stop_loss:
-                sl_order = self.order_factory.stop_market(
-                    instrument_id=self.instrument_id,
-                    order_side=exit_side,
-                    quantity=Quantity.from_str(f"{qty:.6f}"),
-                    trigger_price=Price.from_str(f"{signal.stop_loss:.2f}"),
-                )
-                self.submit_order(sl_order)
-                self.log.info(f"  📍 STOP LOSS: ${signal.stop_loss:.2f}")
-            
-            # Take Profit Order (if price moves in our favor)
-            if self.strategy_config.use_take_profit:
-                tp_order = self.order_factory.stop_market(
-                    instrument_id=self.instrument_id,
-                    order_side=exit_side,
-                    quantity=Quantity.from_str(f"{qty:.6f}"),
-                    trigger_price=Price.from_str(f"{signal.take_profit_1:.2f}"),
-                )
-                self.submit_order(tp_order)
-                self.log.info(f"  🎯 TAKE PROFIT: ${signal.take_profit_1:.2f}")
-                
-        except Exception as e:
-            self.log.error(f"  ❌ EXIT ORDER FAILED: {e}")
+        # Log position status
+        position = self.portfolio.net_position(self.instrument_id)
+        if position:
+            self.log.info(f"Position: {position.quantity} BTC @ avg ${position.avg_px_open}")
     
     def on_order_rejected(self, event):
         """
@@ -338,7 +266,7 @@ class MPatternStrategy(Strategy):
     def on_stop(self):
         """Called when strategy stops"""
         self.log.info("=" * 70)
-        self.log.info("M-PATTERN STRATEGY STOPPING")
+        self.log.info("W-PATTERN STRATEGY STOPPING")
         self.log.info("=" * 70)
         self.log.info(f"Performance Summary:")
         self.log.info(f"  Total Bars: {self.bar_count}")
@@ -355,14 +283,14 @@ class MPatternStrategy(Strategy):
 
 
 # Factory function
-def create_m_pattern_strategy(config: Optional[MPatternStrategyConfig] = None) -> MPatternStrategy:
+def create_w_pattern_strategy(config: Optional[WPatternStrategyConfig] = None) -> WPatternStrategy:
     """
-    Create M-pattern strategy instance
+    Create W-pattern strategy instance
     
     Args:
         config: Strategy configuration
         
     Returns:
-        MPatternStrategy instance
+        WPatternStrategy instance
     """
-    return MPatternStrategy(config)
+    return WPatternStrategy(config)
