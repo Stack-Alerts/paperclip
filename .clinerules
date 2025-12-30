@@ -1,0 +1,782 @@
+"""
+╔════════════════════════════════════════════════════════════════════════════╗
+║ BTC_ENGINE_V3 - CLINE INSTITUTIONAL RULES ║
+║ ║
+║ ⚠️ CRITICAL: REAL MONEY AT RISK ║
+║ 📋 Code Quality: INSTITUTIONAL GRADE (100% accuracy required) ║
+║ 🔒 Risk Management: ABSOLUTE (No approximations) ║
+║ 📖 Documentation: MANDATORY (All methods must reference official docs) ║
+║ 🎯 Efficiency: NO REBUILDING (Reference existing code) ║
+║ 🔬 RESEARCH: NAUTILUS EXPERT (Must know every detail of NautilusTrader) ║
+║ ║
+║ Start each session by reading this file completely. ║
+║ Location: ~/projects/BTC_Engine_v3/.clinerules ║
+║ Full Documentation: CLINE_INSTITUTIONAL_RULES.md ║
+╚════════════════════════════════════════════════════════════════════════════╝
+"""
+
+============================================================================
+SESSION START CHECKLIST (DO THIS FIRST)
+============================================================================
+SESSION_START = """
+☐ 1. Read this file completely
+☐ 2. Activate environment: source venv/bin/activate
+☐ 3. Navigate: cd ~/projects/BTC_Engine_v3
+☐ 4. Verify NautilusTrader: poetry run python -c "import nautilus_trader"
+☐ 5. Check existing code: git log --oneline | head -5
+☐ 6. Review recent changes: git diff HEAD~1
+☐ 7. Review NautilusTrader docs: https://nautilustrader.io/docs/latest/
+"""
+
+============================================================================
+CRITICAL RULES (NON-NEGOTIABLE)
+============================================================================
+ABSOLUTE_RULES = """
+
+REAL MONEY IS AT RISK - Every decision matters
+
+INSTITUTIONAL GRADE - No approximations, no shortcuts
+
+NAUTILUS TRADER ONLY - No alternatives (PFund, Backtesting.py rejected)
+
+DOCUMENTATION FIRST - Read official docs before writing code
+
+TYPES MATTER - Use Quantity, Price, Money (NEVER float)
+
+ENUMS ONLY - Use OrderSide.BUY not "BUY"
+
+NO REBUILDING - Check existing code first
+
+VALIDATE EVERYTHING - All inputs, all data, all trades
+
+RISK FIRST - Position limits, stop losses, daily limits (MANDATORY)
+
+TEST ALWAYS - Unit tests, backtests, edge cases
+
+RESEARCH EXPERT - Master NautilusTrader for any discovery session
+
+DOCS AUTHORITY - Always reference official NautilusTrader documentation
+
+READ: CLINE_INSTITUTIONAL_RULES.md
+"""
+
+============================================================================
+RESEARCH & DISCOVERY SESSION RULES
+============================================================================
+RESEARCH_PROTOCOL = """
+When user asks: "Run discovery on [X]" or "Research [X]"
+
+MANDATORY STEPS:
+
+READ: CLINE_RESEARCH_RULES.md
+
+CHECK NautilusTrader DOCS FIRST
+
+https://nautilustrader.io/docs/latest/
+
+Understand exact methods and classes needed
+
+IDENTIFY REQUIRED COMPONENTS
+
+Data structures (Bar, QuoteTick, TradeTick)
+
+Strategy base classes
+
+Portfolio/Position tracking
+
+Event handling
+
+BUILD RESEARCH FRAMEWORK
+
+Create temporary research strategy
+
+Use NautilusTrader's native data structures
+
+Implement exact discovery logic
+
+DOCUMENT FINDINGS
+
+What data was analyzed
+
+What patterns found
+
+Statistical metrics
+
+Code for reproduction
+
+EXAMPLE RESEARCH SESSION:
+User: "How many M patterns are on BTC 15min in last 90 days?"
+
+CLINE MUST:
+
+Read NautilusTrader Strategy docs
+https://nautilustrader.io/docs/latest/guide/strategies/
+
+Understand Bar handling
+https://nautilustrader.io/docs/latest/api/model/data/
+
+Create ResearchStrategy(Strategy):
+
+on_bar() processes each 15min bar
+
+Detects M pattern (down-up-down)
+
+Counts occurrences
+
+Tracks dates and prices
+
+Use BacktestEngine
+
+Load 90 days of BTC 15min data
+
+Run strategy
+
+Report findings with statistics
+
+Document:
+
+Total M patterns found
+
+Success rate after M
+
+Average size of M pattern
+
+Code for reproduction
+"""
+
+============================================================================
+NAUTILUS TRADER EXPERT MODE
+============================================================================
+NAUTILUS_EXPERT_REQUIREMENTS = """
+CLINE MUST BE AN EXPERT ON:
+
+ARCHITECTURE (Know these inside out)
+
+Clock: Nanosecond timing
+
+DataEngine: Market data flow
+
+ExecutionEngine: Order lifecycle
+
+Portfolio: Position tracking
+
+MessageBus: Event system
+
+Strategy: User code base
+
+Reference: https://nautilustrader.io/docs/latest/guide/architecture/
+
+DATA STRUCTURES (Know exact usage)
+
+Bar: OHLCV data
+
+QuoteTick: Bid/ask data
+
+TradeTick: Trade data
+
+BarType: Bar specification
+
+InstrumentId: Instrument identification
+
+Reference: https://nautilustrader.io/docs/latest/api/model/data/
+
+ORDER MANAGEMENT (Know complete lifecycle)
+
+MarketOrder, LimitOrder, StopMarketOrder, StopLimitOrder
+
+OrderStatus: SUBMITTED → ACCEPTED → FILLED → CLOSED
+
+Order modification, cancellation
+
+Partial fills handling
+
+Reference: https://nautilustrader.io/docs/latest/api/model/orders/
+
+STRATEGY DEVELOPMENT (Know all methods)
+
+on_start(): Initialization
+
+on_bar(): Bar events
+
+on_quote(): Quote events
+
+on_trade(): Trade events
+
+on_order_filled(): Fill handling
+
+on_order_rejected(): Rejection handling
+
+Reference: https://nautilustrader.io/docs/latest/guide/strategies/
+
+BACKTESTING (Know end-to-end process)
+
+BacktestEngine setup
+
+Data loading
+
+Strategy instantiation
+
+Results analysis
+
+Edge case handling
+
+Reference: https://nautilustrader.io/docs/latest/guide/backtesting/
+
+TYPE SYSTEM (Know exact precision)
+
+Quantity: Discrete size units
+
+Price: Decimal precision
+
+Money: Currency + amount
+
+Never use float - exact decimal handling
+
+Reference: https://nautilustrader.io/docs/latest/api/types/
+
+ENUMS & CONSTANTS (Know all variations)
+
+OrderType, OrderSide, TimeInForce, OrderStatus
+
+BarAggregation, AggregationSource
+
+PositionStatus, AccountStatus
+
+Reference: https://nautilustrader.io/docs/latest/api/enums/
+"""
+
+============================================================================
+RESEARCH DISCOVERY PATTERNS
+============================================================================
+RESEARCH_PATTERNS = {
+"pattern_detection": """
+For technical pattern research (M patterns, W patterns, triangles, etc.):
+
+text
+1. Create ResearchStrategy(Strategy)
+2. Store bars in list/array
+3. Check pattern conditions on each bar
+4. Count matches and record context
+5. Report with statistics
+
+Reference: https://nautilustrader.io/docs/latest/guide/strategies/
+""",
+
+"statistical_analysis": """
+For statistical analysis (win rate, average duration, etc.):
+
+1. Create AnalysisStrategy(Strategy)
+2. Implement entry/exit logic
+3. Track all trades with details
+4. Calculate metrics on completion
+5. Export results as DataFrame
+
+Reference: https://nautilustrader.io/docs/latest/api/core/portfolio/
+""",
+
+"correlation_analysis": """
+For correlation studies (BTC vs altcoin, BTC vs macro, etc.):
+
+1. Create MultiInstrumentStrategy(Strategy)
+2. Subscribe to multiple instruments
+3. Synchronize bar handling
+4. Calculate correlations
+5. Report findings with periods
+
+Reference: https://nautilustrader.io/docs/latest/guide/strategies/
+""",
+
+"optimization_research": """
+For parameter optimization discovery:
+
+1. Use BacktestEngine with multiple configs
+2. Run optimization grid
+3. Track all parameter combinations
+4. Find optimal parameters
+5. Report sensitivity analysis
+
+Reference: https://nautilustrader.io/docs/latest/guide/backtesting/
+""",
+}
+
+============================================================================
+CORE TYPES (MUST KNOW THESE)
+============================================================================
+TYPES = """
+Quantity: Order size/volume
+Usage: Quantity(0.1)
+Never: float
+Docs: https://nautilustrader.io/docs/latest/api/types/
+
+Price: Bid/ask/last prices
+Usage: Price('45000.50')
+Never: float or Decimal
+Docs: https://nautilustrader.io/docs/latest/api/types/
+
+Money: Monetary amounts (PnL, fees, balance)
+Usage: Money('500.75', USD)
+Always include currency
+Docs: https://nautilustrader.io/docs/latest/api/types/
+
+InstrumentId: Unique instrument identifier
+Usage: InstrumentId(Symbol('BTC'), Venue('CCXT'))
+Never: strings like 'BTC/USDT'
+Docs: https://nautilustrader.io/docs/latest/api/model/
+
+BarType: Bar specification
+Usage: BarType(instrument_id, BarAggregation.MINUTE, 15)
+Docs: https://nautilustrader.io/docs/latest/api/model/
+"""
+
+============================================================================
+CRITICAL ENUMS (USE THESE ONLY)
+============================================================================
+ENUMS = """
+OrderSide: BUY, SELL
+OrderType: MARKET, LIMIT, STOP_MARKET, STOP_LIMIT
+TimeInForce: GTC, IOC, FOK, DAY
+OrderStatus: SUBMITTED, ACCEPTED, FILLED, CANCELED, REJECTED
+BarAggregation: MINUTE, HOUR, DAY
+Venue: CCXT, IB, FTX, etc.
+PositionStatus: OPENED, CLOSED, CLOSING
+AccountStatus: READY, ACTIVE, CLOSING
+
+IMPORTANT: Always import from nautilus_trader
+Never use strings
+Always use module.ENUM format
+
+Example: order = MarketOrder(..., order_side=OrderSide.BUY)
+NOT: order = MarketOrder(..., order_side="BUY")
+
+Docs: https://nautilustrader.io/docs/latest/api/enums/
+"""
+
+============================================================================
+RISK MANAGEMENT (ENFORCE ALWAYS)
+============================================================================
+RISK_MANAGEMENT = """
+MAX_POSITION_SIZE: 1.0 BTC
+MIN_POSITION_SIZE: 0.001 BTC
+STOP_LOSS_PERCENT: 2.0% below entry
+DAILY_LOSS_LIMIT: $500
+MAX_LEVERAGE: 1.0 (no margin)
+
+ENFORCEMENT PATTERN:
+
+text
+# 1. Check position sizing
+if quantity > Quantity(self.MAX_POSITION_SIZE):
+    self.log.error(f"Position {quantity} exceeds {self.MAX_POSITION_SIZE}")
+    return
+
+# 2. Check daily loss limit
+daily_pnl = self.calculate_daily_pnl()
+if daily_pnl < -self.DAILY_LOSS_LIMIT:
+    self.close_all_positions()
+    self.log.warning(f"Daily loss limit hit: {daily_pnl}")
+    return
+
+# 3. Place order with stop loss
+self.submit_order(buy_order)
+self.submit_order(stop_order)
+
+# 4. Log everything
+self.log.info(f"Order: {quantity} BTC @ {price}")
+"""
+
+============================================================================
+NAUTILUS TRADER DOCUMENTATION (REFERENCE THESE)
+============================================================================
+DOCUMENTATION = """
+Official Docs: https://nautilustrader.io/docs/latest/
+Getting Started: https://nautilustrader.io/docs/latest/guide/getting_started/
+Architecture Overview: https://nautilustrader.io/docs/latest/guide/architecture/
+Strategies: https://nautilustrader.io/docs/latest/guide/strategies/
+Backtesting: https://nautilustrader.io/docs/latest/guide/backtesting/
+Live Trading: https://nautilustrader.io/docs/latest/guide/trading/
+Risk Management: https://nautilustrader.io/docs/latest/guide/risk/
+API Reference: https://nautilustrader.io/docs/latest/api/
+Type System: https://nautilustrader.io/docs/latest/api/types/
+Enums: https://nautilustrader.io/docs/latest/api/enums/
+Models: https://nautilustrader.io/docs/latest/api/model/
+Data: https://nautilustrader.io/docs/latest/api/model/data/
+Orders: https://nautilustrader.io/docs/latest/api/model/orders/
+Identifiers: https://nautilustrader.io/docs/latest/api/model/identifiers/
+Core Components: https://nautilustrader.io/docs/latest/api/core/
+Clock: https://nautilustrader.io/docs/latest/api/core/clock/
+Portfolio: https://nautilustrader.io/docs/latest/api/core/portfolio/
+Engines: https://nautilustrader.io/docs/latest/api/core/engines/
+MessageBus: https://nautilustrader.io/docs/latest/api/core/message_bus/
+
+RESEARCH DISCOVERY WORKFLOW:
+
+Identify what you want to discover
+
+Go to appropriate NautilusTrader docs section
+
+Understand the exact classes/methods needed
+
+Implement using those exact components
+
+Test and report findings
+"""
+
+============================================================================
+COMMON OPERATIONS (COPY THESE PATTERNS)
+============================================================================
+COMMON_PATTERNS = """
+CREATING AN ORDER:
+from nautilus_trader.model.orders import MarketOrder
+from nautilus_trader.model.enums import OrderSide
+
+text
+order = MarketOrder(
+    instrument_id=self.instrument_id,
+    client_order_id=self.order_factory.client_order_id(),
+    order_side=OrderSide.BUY,
+    quantity=Quantity(0.1),
+    time_in_force=TimeInForce.IOC,
+)
+self.submit_order(order)
+CHECKING POSITION:
+position = self.portfolio.net_position(self.instrument)
+if position is None:
+size = 0
+else:
+size = position.quantity
+
+CALCULATING PnL:
+unrealized = self.portfolio.unrealized_pnl(self.instrument)
+realized = self.portfolio.realized_pnl(self.instrument)
+
+SUBSCRIBING TO DATA:
+bar_type = BarType(self.instrument_id, BarAggregation.MINUTE, 15)
+self.subscribe_bars(bar_type)
+
+LOGGING:
+self.log.info(f"Buying {quantity} BTC at ${price}")
+self.log.warning(f"Drawdown: {drawdown:.2%}")
+self.log.error(f"Order rejected: {reason}")
+
+RESEARCH PATTERN DETECTION:
+def check_m_pattern(self, bars):
+'''Check if last 3 bars form M pattern'''
+if len(bars) < 3:
+return False
+# Down-Up-Down
+down_1 = bars[-3].close > bars[-2].close
+up = bars[-2].close < bars[-1].close
+down_2_pending = True # Wait for next bar
+return down_1 and up
+
+RESEARCH STORAGE:
+self.patterns_found = []
+
+text
+def on_bar(self, bar: Bar):
+    if self.check_m_pattern(self.bars):
+        self.patterns_found.append({
+            'timestamp': bar.ts_event,
+            'price': bar.close,
+            'high': bar.high,
+            'low': bar.low,
+        })
+"""
+
+============================================================================
+RESEARCH STRATEGY TEMPLATE
+============================================================================
+RESEARCH_STRATEGY_TEMPLATE = '''
+from nautilus_trader.trading.strategy import Strategy
+from nautilus_trader.core.data import Bar
+from nautilus_trader.model.enums import BarAggregation
+from nautilus_trader.model.identifiers import InstrumentId
+from nautilus_trader.model.types import Price, Quantity
+import pandas as pd
+from datetime import datetime
+
+class PatternDiscoveryStrategy(Strategy):
+"""Discovery strategy to find M patterns on 15min BTC"""
+
+text
+def __init__(self, config):
+    super().__init__(config)
+    self.bars = []
+    self.patterns = []
+    self.m_pattern_count = 0
+
+def on_start(self):
+    """Called when strategy starts"""
+    # Subscribe to 15min bars
+    bar_type = BarType(
+        self.instrument_id,
+        BarAggregation.MINUTE,
+        15,
+    )
+    self.subscribe_bars(bar_type)
+    self.log.info(f"M Pattern Discovery started for {self.instrument}")
+
+def on_bar(self, bar: Bar) -> None:
+    """Called on each 15min bar"""
+    
+    # Store bar for pattern detection
+    self.bars.append(bar)
+    
+    # Keep only last 3 bars for memory efficiency
+    if len(self.bars) > 3:
+        self.bars.pop(0)
+    
+    # Check for M pattern (only when we have 3+ bars)
+    if len(self.bars) >= 3:
+        if self.is_m_pattern():
+            self.m_pattern_count += 1
+            self.patterns.append({
+                'timestamp': bar.ts_event,
+                'price': float(bar.close),
+                'high': float(bar.high),
+                'low': float(bar.low),
+                'pattern_id': self.m_pattern_count,
+            })
+            self.log.info(f"M Pattern #{self.m_pattern_count} found at {bar.ts_event}")
+
+def is_m_pattern(self) -> bool:
+    """
+    Detect M pattern: Down-Up-Down
+    bar > bar (down)
+    bar < bar (up)
+    Next bar would complete the pattern
+    """
+    if len(self.bars) < 3:
+        return False
+    
+    bar_0_close = float(self.bars.close)
+    bar_1_close = float(self.bars.close)
+    bar_2_close = float(self.bars.close)
+    
+    # Down-Up-Down pattern
+    down_1 = bar_0_close > bar_1_close
+    up = bar_1_close < bar_2_close
+    
+    return down_1 and up
+
+def on_end(self):
+    """Called when backtest ends"""
+    self.log.info(f"Discovery complete: Found {self.m_pattern_count} M patterns")
+    
+    # Save results
+    df = pd.DataFrame(self.patterns)
+    if len(df) > 0:
+        df.to_csv('m_patterns_found.csv', index=False)
+        self.log.info(f"Results saved to m_patterns_found.csv")
+    
+    # Print summary
+    print("\\n" + "="*60)
+    print("M PATTERN DISCOVERY RESULTS")
+    print("="*60)
+    print(f"Total M Patterns Found: {self.m_pattern_count}")
+    if len(df) > 0:
+        print(f"First Pattern: {df.iloc['timestamp']}")
+        print(f"Last Pattern: {df.iloc[-1]['timestamp']}")
+        print(f"Patterns per day: {len(df) / 90:.2f}")
+    print("="*60)
+'''
+
+============================================================================
+DATA VALIDATION (ALWAYS DO THIS)
+============================================================================
+DATA_VALIDATION = """
+def validate_ohlcv_data(df):
+'''Validate data before using'''
+
+text
+# Check for missing values
+assert not df.isnull().any().any(), "Contains NaN values"
+
+# Check OHLC logic
+assert (df['high'] >= df['low']).all(), "High < Low error"
+assert (df['open'] <= df['high']).all(), "Open > High error"
+assert (df['close'] <= df['high']).all(), "Close > High error"
+
+# Check volume
+assert (df['volume'] > 0).all(), "Zero volume found"
+
+# Check time continuity
+time_diffs = df.index.to_series().diff()
+expected_diff = pd.Timedelta(minutes=15)
+gaps = time_diffs[time_diffs > expected_diff * 2]
+if len(gaps) > 0:
+    print(f"Warning: {len(gaps)} time gaps found")
+
+print(f"✓ Data validation passed")
+return True
+"""
+
+============================================================================
+TESTING CHECKLIST
+============================================================================
+TESTING = """
+Before ANY deployment:
+
+☐ Unit Tests Pass
+pytest tests/
+
+☐ Research Runs Successfully
+
+Discovery strategy initializes
+
+Processes all data
+
+Finds patterns
+
+Exports results
+
+☐ Results Validated
+
+Pattern count reasonable
+
+Timestamps are correct
+
+Statistics make sense
+
+☐ Data Validation Passes
+
+No NaN values
+
+No zero volumes
+
+Continuous timestamps
+
+OHLC logic correct
+
+☐ Code Reviewed
+
+All types correct
+
+All enums correct
+
+Error handling complete
+
+Logging comprehensive
+"""
+
+============================================================================
+PRE-DEPLOYMENT CHECKLIST
+============================================================================
+PRE_DEPLOYMENT = """
+BEFORE GOING LIVE:
+
+Code Quality:
+☐ All types: Quantity, Price, Money (no float)
+☐ All enums from nautilus_trader (no strings)
+☐ Risk checks before every trade
+☐ Position limits enforced
+☐ Stop losses configured
+☐ Error handling for all paths
+
+Testing:
+☐ Unit tests pass
+☐ Backtest runs without errors
+☐ Results manually validated
+☐ Edge cases tested
+☐ Data validation passes
+☐ Risk limits work in simulation
+
+Documentation:
+☐ All functions documented
+☐ Parameters documented
+☐ Return values documented
+☐ Complex logic explained
+☐ Docs referenced in comments
+
+Approval:
+☐ Code reviewed by human
+☐ Risk parameters reviewed
+☐ Position sizes verified
+☐ Stop losses verified
+☐ EXPLICIT HUMAN APPROVAL FOR LIVE
+"""
+
+============================================================================
+MEMORY AIDS (REMEMBER THESE)
+============================================================================
+REMEMBER = """
+
+REAL MONEY IS AT RISK - Every decision matters
+
+NautilusTrader ONLY - No alternatives
+
+Check docs FIRST - https://nautilustrader.io/docs/latest/
+
+Check existing code - Don't rebuild
+
+Use exact types - Quantity, Price, Money
+
+Use exact enums - OrderSide.BUY not "BUY"
+
+Validate all data - No NaN, no gaps
+
+Enforce risk limits - Position size, stop loss, daily limit
+
+Log everything - With context and reasoning
+
+Test before deploying - Unit, integration, edge cases
+
+RESEARCH EXPERT - Master NautilusTrader for discoveries
+
+READ DOCS - All discovery work begins with official docs
+"""
+
+============================================================================
+WHEN IN DOUBT
+============================================================================
+WHEN_UNSURE = """
+
+Check .clinerules (this file)
+
+Check CLINE_INSTITUTIONAL_RULES.md (full guide)
+
+Check NautilusTrader docs: https://nautilustrader.io/docs/latest/
+
+Search existing code in project
+
+Ask for clarification rather than guess
+
+Default to institutional-grade caution
+
+FOR RESEARCH/DISCOVERY:
+
+Go directly to NautilusTrader docs
+
+Find the exact class/method needed
+
+Understand complete API
+
+Implement using official examples
+
+Test thoroughly
+
+Report findings
+"""
+
+============================================================================
+END OF RULES
+============================================================================
+print("""
+╔════════════════════════════════════════════════════════════════════════════╗
+║ INSTITUTIONAL TRADING RULES LOADED ║
+║ ║
+║ ⚠️ REAL MONEY IS AT RISK ║
+║ 🎯 INSTITUTIONAL GRADE CODE ONLY ║
+║ 📖 DOCUMENTATION FIRST, ALWAYS ║
+║ 🔒 RISK MANAGEMENT ABSOLUTE ║
+║ 🔬 NAUTILUS EXPERT FOR RESEARCH ║
+║ ║
+║ When in doubt, read: ║
+║ - .clinerules (this file) ║
+║ - CLINE_INSTITUTIONAL_RULES.md (full guide) ║
+║ - https://nautilustrader.io/docs/latest/ (official docs) ║
+║ ║
+║ Remember: Every line of code. Every type. Every validation. Matters. ║
+║ For research: Master NautilusTrader. Know every detail. Use official docs.║
+╚════════════════════════════════════════════════════════════════════════════╝
+""")
