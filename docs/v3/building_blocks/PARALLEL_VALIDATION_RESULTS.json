@@ -1,0 +1,308 @@
+[
+  {
+    "block_id": 1,
+    "block_name": "50 EMA Vector",
+    "status": "\u26a0\ufe0f TOO_MANY_SIGNALS",
+    "total_signals": 636,
+    "avg_confidence": 82.06761006289308,
+    "confidence_level": 75,
+    "error": null
+  },
+  {
+    "block_id": 2,
+    "block_name": "200 EMA Vector",
+    "status": "\u26a0\ufe0f NO_SIGNALS",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 50,
+    "error": null
+  },
+  {
+    "block_id": 3,
+    "block_name": "55 EMA Vector",
+    "status": "\u274c ERROR",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 0,
+    "error": "module 'detectors.building_blocks.moving_averages.ema_55_vector' has no attribute 'EMA55Vector'"
+  },
+  {
+    "block_id": 4,
+    "block_name": "255 EMA Vector",
+    "status": "\u274c ERROR",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 0,
+    "error": "module 'detectors.building_blocks.moving_averages.ema_255_vector' has no attribute 'EMA255Vector'"
+  },
+  {
+    "block_id": 5,
+    "block_name": "800 EMA Vector",
+    "status": "\u274c ERROR",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 0,
+    "error": "module 'detectors.building_blocks.moving_averages.ema_800_vector' has no attribute 'EMA800Vector'"
+  },
+  {
+    "block_id": 6,
+    "block_name": "MACD Signal",
+    "status": "\u26a0\ufe0f TOO_MANY_SIGNALS",
+    "total_signals": 900,
+    "avg_confidence": 72.86666666666666,
+    "confidence_level": 75,
+    "error": null
+  },
+  {
+    "block_id": 7,
+    "block_name": "RSI Divergence",
+    "status": "\u2705 VALIDATED",
+    "total_signals": 178,
+    "avg_confidence": 83.53932584269663,
+    "confidence_level": 85,
+    "error": null
+  },
+  {
+    "block_id": 8,
+    "block_name": "Stochastic RSI",
+    "status": "\u2705 VALIDATED",
+    "total_signals": 333,
+    "avg_confidence": 91.15615615615616,
+    "confidence_level": 85,
+    "error": null
+  },
+  {
+    "block_id": 9,
+    "block_name": "HOD",
+    "status": "\u2705 VALIDATED",
+    "total_signals": 358,
+    "avg_confidence": 85.0,
+    "confidence_level": 85,
+    "error": null
+  },
+  {
+    "block_id": 10,
+    "block_name": "LOD",
+    "status": "\u2705 VALIDATED",
+    "total_signals": 334,
+    "avg_confidence": 85.0,
+    "confidence_level": 85,
+    "error": null
+  },
+  {
+    "block_id": 11,
+    "block_name": "HOW",
+    "status": "\u2705 VALIDATED",
+    "total_signals": 269,
+    "avg_confidence": 90.0,
+    "confidence_level": 85,
+    "error": null
+  },
+  {
+    "block_id": 12,
+    "block_name": "LOW",
+    "status": "\u2705 VALIDATED",
+    "total_signals": 439,
+    "avg_confidence": 90.0,
+    "confidence_level": 85,
+    "error": null
+  },
+  {
+    "block_id": 13,
+    "block_name": "US Settlement",
+    "status": "\u26a0\ufe0f NO_SIGNALS",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 50,
+    "error": null
+  },
+  {
+    "block_id": 14,
+    "block_name": "Asia 50%",
+    "status": "\u274c ERROR",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 0,
+    "error": "module 'detectors.building_blocks.price_levels.asia_session_50_percent' has no attribute 'AsiaSession50Percent'"
+  },
+  {
+    "block_id": 15,
+    "block_name": "Session Time",
+    "status": "\u26a0\ufe0f TOO_MANY_SIGNALS",
+    "total_signals": 900,
+    "avg_confidence": 90.0,
+    "confidence_level": 75,
+    "error": null
+  },
+  {
+    "block_id": 16,
+    "block_name": "Kill Zones",
+    "status": "\u26a0\ufe0f LOW_CONFIDENCE",
+    "total_signals": 900,
+    "avg_confidence": 55.666666666666664,
+    "confidence_level": 70,
+    "error": null
+  },
+  {
+    "block_id": 17,
+    "block_name": "ATR",
+    "status": "\u26a0\ufe0f TOO_MANY_SIGNALS",
+    "total_signals": 900,
+    "avg_confidence": 100.0,
+    "confidence_level": 75,
+    "error": null
+  },
+  {
+    "block_id": 18,
+    "block_name": "ADR",
+    "status": "\u26a0\ufe0f LOW_CONFIDENCE",
+    "total_signals": 900,
+    "avg_confidence": 14.607333333333328,
+    "confidence_level": 70,
+    "error": null
+  },
+  {
+    "block_id": 19,
+    "block_name": "Bollinger Bands",
+    "status": "\u26a0\ufe0f TOO_MANY_SIGNALS",
+    "total_signals": 900,
+    "avg_confidence": 100.0,
+    "confidence_level": 75,
+    "error": null
+  },
+  {
+    "block_id": 20,
+    "block_name": "Order Block",
+    "status": "\u2705 VALIDATED",
+    "total_signals": 194,
+    "avg_confidence": 70.0,
+    "confidence_level": 85,
+    "error": null
+  },
+  {
+    "block_id": 21,
+    "block_name": "Fair Value Gap",
+    "status": "\u26a0\ufe0f LOW_CONFIDENCE",
+    "total_signals": 390,
+    "avg_confidence": 15.384615384615385,
+    "confidence_level": 70,
+    "error": null
+  },
+  {
+    "block_id": 22,
+    "block_name": "Volume Profile",
+    "status": "\u274c ERROR",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 0,
+    "error": "No module named 'detectors.building_blocks.price_action.volume_profile'"
+  },
+  {
+    "block_id": 23,
+    "block_name": "Pivot Points",
+    "status": "\u274c ERROR",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 0,
+    "error": "No module named 'detectors.building_blocks.price_action.pivot_points'"
+  },
+  {
+    "block_id": 24,
+    "block_name": "Liquidity Sweep",
+    "status": "\u274c ERROR",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 0,
+    "error": "No module named 'detectors.building_blocks.smc_ict.liquidity_sweep'"
+  },
+  {
+    "block_id": 25,
+    "block_name": "Breaker Block",
+    "status": "\u274c ERROR",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 0,
+    "error": "No module named 'detectors.building_blocks.smc_ict.breaker_block'"
+  },
+  {
+    "block_id": 26,
+    "block_name": "OTE",
+    "status": "\u274c ERROR",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 0,
+    "error": "No module named 'detectors.building_blocks.smc_ict.ote'"
+  },
+  {
+    "block_id": 27,
+    "block_name": "MSS",
+    "status": "\u26a0\ufe0f TOO_MANY_SIGNALS",
+    "total_signals": 900,
+    "avg_confidence": 86.42222222222222,
+    "confidence_level": 75,
+    "error": null
+  },
+  {
+    "block_id": 28,
+    "block_name": "BOS",
+    "status": "\u26a0\ufe0f TOO_MANY_SIGNALS",
+    "total_signals": 796,
+    "avg_confidence": 81.63316582914572,
+    "confidence_level": 75,
+    "error": null
+  },
+  {
+    "block_id": 29,
+    "block_name": "CHoCH",
+    "status": "\u26a0\ufe0f LOW_CONFIDENCE",
+    "total_signals": 789,
+    "avg_confidence": 0.0,
+    "confidence_level": 70,
+    "error": null
+  },
+  {
+    "block_id": 30,
+    "block_name": "Displacement",
+    "status": "\u26a0\ufe0f LOW_CONFIDENCE",
+    "total_signals": 900,
+    "avg_confidence": 3.827777777777778,
+    "confidence_level": 70,
+    "error": null
+  },
+  {
+    "block_id": 31,
+    "block_name": "Liquidity Pool",
+    "status": "\u274c ERROR",
+    "total_signals": 0,
+    "avg_confidence": 0,
+    "confidence_level": 0,
+    "error": "No module named 'detectors.building_blocks.smc_ict.liquidity_pool'"
+  },
+  {
+    "block_id": 32,
+    "block_name": "Inducement",
+    "status": "\u26a0\ufe0f LOW_CONFIDENCE",
+    "total_signals": 900,
+    "avg_confidence": 9.022222222222222,
+    "confidence_level": 70,
+    "error": null
+  },
+  {
+    "block_id": 33,
+    "block_name": "Mitigation Block",
+    "status": "\u26a0\ufe0f LOW_CONFIDENCE",
+    "total_signals": 900,
+    "avg_confidence": 0.0,
+    "confidence_level": 70,
+    "error": null
+  },
+  {
+    "block_id": 50,
+    "block_name": "ADX",
+    "status": "\u26a0\ufe0f LOW_CONFIDENCE",
+    "total_signals": 900,
+    "avg_confidence": 31.725866666666665,
+    "confidence_level": 70,
+    "error": null
+  }
+]
