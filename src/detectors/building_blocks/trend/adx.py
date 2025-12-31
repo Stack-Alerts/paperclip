@@ -66,8 +66,10 @@ class ADX:
         smooth_minus_dm = self._wilder_smooth(minus_dm, self.period)
         
         # Calculate +DI and -DI (protect against divide by zero)
-        plus_di = np.where(atr > 0, 100 * smooth_plus_dm / atr, 0)
-        minus_di = np.where(atr > 0, 100 * smooth_minus_dm / atr, 0)
+        # Add small epsilon to prevent division warnings
+        with np.errstate(divide='ignore', invalid='ignore'):
+            plus_di = np.where(atr > 0, 100 * smooth_plus_dm / (atr + 1e-10), 0)
+            minus_di = np.where(atr > 0, 100 * smooth_minus_dm / (atr + 1e-10), 0)
         
         # Calculate DX and ADX
         dx = 100 * np.abs(plus_di - minus_di) / (plus_di + minus_di + 1e-10)
