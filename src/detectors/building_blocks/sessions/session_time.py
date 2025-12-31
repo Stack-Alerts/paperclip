@@ -90,23 +90,30 @@ class SessionTime:
                 'confluence_factors': []
             }
         
-        if len(df) < 1:
+        if len(df) < 2:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': 'No data provided'},
+                'metadata': {'error': 'Need at least 2 periods for session change detection'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
         
         current_time = df['timestamp'].iloc[-1]
+        previous_time = df['timestamp'].iloc[-2]
+        
         current_session = self.identify_session(current_time)
+        previous_session = self.identify_session(previous_time)
+        
         characteristics = self.get_session_characteristics(current_session)
         is_high_vol = self.is_high_volatility_session(current_session)
         
+        # Detect session change
+        session_changed = current_session != previous_session
+        
         # Calculate confidence based on session
-        confidence = 90  # High confidence in session identification
+        confidence = 90 if session_changed else 70
         
         # Build confluence factors
         confluence_factors = []
@@ -115,6 +122,9 @@ class SessionTime:
         confluence_factors.append(f'Volume: {characteristics["volume"]}')
         confluence_factors.append(f'Expected Range: {characteristics["typical_range"]}')
         
+        if session_changed:
+            confluence_factors.append(f'Session change: {previous_session} → {current_session}')
+        
         if current_session == 'LONDON_NY_OVERLAP':
             confluence_factors.append('Peak trading hours - highest activity')
         elif current_session == 'ASIA':
@@ -122,11 +132,15 @@ class SessionTime:
         elif current_session == 'SYDNEY':
             confluence_factors.append('Sydney session - minimal activity')
         
-        # Signal based on session
-        if is_high_vol:
-            signal = 'ACTIVE'  # Active trading recommended
+        # Signal ONLY on session changes, not continuously
+        # This prevents signaling on every bar (reduces noise)
+        if session_changed:
+            if is_high_vol:
+                signal = 'SESSION_ACTIVE'  # Entering active session
+            else:
+                signal = 'SESSION_QUIET'  # Entering quiet session
         else:
-            signal = 'QUIET'  # Quiet session
+            signal = 'NEUTRAL'  # No session change
         
         # Metadata
         metadata = {
