@@ -198,14 +198,14 @@ class ATR:
                 'confluence_factors': []
             }
         
-        # Need minimum periods for ATR calculation
-        if len(df) < self.period + 1:
+        # Need minimum periods for ATR calculation (need extra period for change detection)
+        if len(df) < self.period + 2:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
                 'metadata': {
-                    'error': f'Need at least {self.period + 1} periods, got {len(df)}',
-                    'required_periods': self.period + 1,
+                    'error': f'Need at least {self.period + 2} periods, got {len(df)}',
+                    'required_periods': self.period + 2,
                     'provided_periods': len(df)
                 },
                 'timestamp': datetime.now(),
@@ -216,13 +216,18 @@ class ATR:
         # Calculate ATR
         atr_series = self.calculate_atr(df)
         current_atr = float(atr_series.iloc[-1])
+        previous_atr = float(atr_series.iloc[-2])
         
         # Get parameters
         stop_multiplier = kwargs.get('stop_multiplier', 2.0)
         lookback = kwargs.get('lookback', 5)
         
-        # Classify volatility
+        # Classify volatility (current and previous)
         volatility_level = self.classify_volatility(current_atr)
+        previous_volatility_level = self.classify_volatility(previous_atr)
+        
+        # Detect volatility level change
+        volatility_changed = volatility_level != previous_volatility_level
         
         # Detect ATR trend
         atr_trend = self.detect_atr_trend(atr_series, lookback)
@@ -297,8 +302,15 @@ class ATR:
             'position_sizing_factor': round(1.0 / max(atr_percent / 100, 0.01), 2)  # Inverse of volatility
         }
         
+        # Signal ONLY on volatility level changes, not continuously
+        # This prevents signaling on every bar (reduces noise)
+        if volatility_changed:
+            signal = f'VOLATILITY_{volatility_level}'  # e.g., VOLATILITY_HIGH
+        else:
+            signal = 'NEUTRAL'  # No change in volatility level
+        
         return {
-            'signal': volatility_level,
+            'signal': signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),
