@@ -237,10 +237,11 @@ class EMA50Vector:
         confluence_factors.append(f'Price {position.lower().replace("_", " ")} ({distance_pct:+.2f}%)')
         confluence_factors.append(f'Distance classification: {distance_class}')
         
-        # Determine signal
-        if vector_break == 'BULLISH_BREAK' or (position == 'ABOVE_EMA' and slope == 'RISING'):
+        # Determine signal - ONLY on vector breaks, not continuous above/below
+        # This prevents signaling on every bar (reduces noise)
+        if vector_break == 'BULLISH_BREAK':
             signal = 'BULLISH'
-        elif vector_break == 'BEARISH_BREAK' or (position == 'BELOW_EMA' and slope == 'FALLING'):
+        elif vector_break == 'BEARISH_BREAK':
             signal = 'BEARISH'
         else:
             signal = 'NEUTRAL'
