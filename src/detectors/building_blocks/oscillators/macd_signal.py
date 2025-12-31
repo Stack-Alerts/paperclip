@@ -362,15 +362,12 @@ class MACDSignal:
         confluence_factors.append(f'Trend: {trend}')
         confluence_factors.append(f'Signal strength: {strength}')
         
-        # Determine primary signal
+        # Determine primary signal - ONLY on crosses, not continuous momentum
+        # This prevents signaling on every bar (reduces noise)
         if crossover == 'BULLISH_CROSS' or divergences['bullish_divergence']:
             signal = 'BULLISH'
         elif crossover == 'BEARISH_CROSS' or divergences['bearish_divergence']:
             signal = 'BEARISH'
-        elif current_macd > current_signal:
-            signal = 'BULLISH_MOMENTUM'
-        elif current_macd < current_signal:
-            signal = 'BEARISH_MOMENTUM'
         else:
             signal = 'NEUTRAL'
         
