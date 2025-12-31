@@ -11,7 +11,7 @@ from src.detectors.building_blocks.moving_averages.ema_800_vector import EMA800V
 @pytest.fixture
 def macro_trending_data():
     """Create very long-term trending data that crosses 800 EMA"""
-    dates = pd.date_range(start='2024-01-01', periods=850, freq='1H')  # ~35 days hourly
+    dates = pd.date_range(start='2024-01-01', periods=850, freq='1h')  # ~35 days hourly
     np.random.seed(42)
     
     # Create very long uptrend for macro analysis
@@ -75,7 +75,7 @@ class TestValidation:
     def test_insufficient_data(self):
         ema = EMA800VectorBreak()
         df = pd.DataFrame({
-            'timestamp': pd.date_range('2024-01-01', periods=400, freq='1H'),
+            'timestamp': pd.date_range('2024-01-01', periods=400, freq='1h'),
             'open': [45000]*400, 'high': [45100]*400,
             'low': [44900]*400, 'close': [45000]*400,
             'volume': [100]*400
