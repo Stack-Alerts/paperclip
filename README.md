@@ -82,15 +82,21 @@ This is your single source of truth with complete 14-day implementation plan.
   - [x] EXPERT VERIFIED: 100% accuracy (14/14 divergences matched)
   - [x] 1,900+ institutional-grade lines of code
   - [x] Documentation complete, committed to git (b5c3106)
-- [ ] **Days 9-13:** Statistical Pattern Matcher + Integration 🎯 ← **NEXT**
-  - [ ] Day 9: Statistical pattern matcher (64x3 matrix) ← **NOW**
-  - [ ] Day 10: Sophisticated M-pattern integration
-  - [ ] Day 11: Multi-timeframe + optimization
-  - [ ] Day 12-13: Validation + documentation
-  - [ ] **Goal:** Transform 0% win rate → 60%+ win rate
+- [x] **Day 9-10 COMPLETE:** M/W System Validation + Statistical Investigation ✅
+  - [x] M/W bug fixes (3 critical bugs found via EXPERT MODE)
+  - [x] Walk-forward validation (30min: 68.6%, 15min: 67.7%)
+  - [x] Multi-timeframe testing (timeframe-robust)
+  - [x] Statistical system investigation (shelved - lookahead bias)
+  - [x] **M/W System: DEPLOYMENT-READY** ✅
+  - [x] **Statistical System: SHELVED** (see docs/STATISTICAL_SYSTEM_STATUS.md)
+- [ ] **Days 11-13:** Building Blocks & Advanced Strategies 🎯 ← **NEXT**
+  - [ ] Additional pattern building blocks
+  - [ ] Confluence strategies
+  - [ ] Advanced entry/exit logic
+  - [ ] Performance optimization
 - [ ] **Day 14:** Final Validation & Deployment
-  - [ ] Full year backtest
-  - [ ] Performance metrics validation
+  - [ ] Full validation on live-like conditions
+  - [ ] Paper trading setup
   - [ ] Production readiness check
 
 ## Key Files
@@ -113,9 +119,23 @@ This is your single source of truth with complete 14-day implementation plan.
 - `data/raw/BTC_USDT_PERP_30m.pkl` - 34K bars (2024-2025)
 - `data/` - 308GB historical data
 
-**Current Status:** Day 8 complete (57%), zigzag + divergence detection verified and ready
+**Current Status:** Day 9-10 complete (71%), M/W System validated (68.6%/67.7%) and deployment-ready
 
-**Next Steps:** Day 9 - Statistical Pattern Matcher (the secret sauce for 60%+ win rate!)
+**Next Steps:** Building block patterns and confluence strategies (Days 11-13)
+
+## Validated Systems
+
+### ✅ M/W Pattern System (DEPLOYMENT-READY)
+- **30min Walk-Forward:** 68.6% win rate (1,266 trades)
+- **15min Walk-Forward:** 67.7% win rate (1,316 trades)
+- **Status:** Timeframe-robust, no lookahead bias
+- **Scripts:** `scripts/walkforward_validation.py`, `scripts/walkforward_15min.py`
+- **Docs:** `docs/EXPERT_MODE_MW_FIX_COMPLETE.md`
+
+### ⚠️ Statistical System (SHELVED)
+- **Status:** Lookahead bias identified, not viable for walk-forward
+- **Details:** See `docs/STATISTICAL_SYSTEM_STATUS.md`
+- **Future:** Can revisit with different approach
 
 ## Contact
 

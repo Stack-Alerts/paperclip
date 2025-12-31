@@ -217,13 +217,18 @@ class PatternAdapter:
             # Calculate trading parameters
             pattern_height = max(peak1_price, peak2_price) - neckline
             
-            # Stop loss above peaks
-            stop_loss = max(peak1_price, peak2_price) * 1.01
+            # FIXED: Stop loss relative to entry (not peaks) for balanced risk/reward
+            # For SHORT: Use 1.5x the target distance for stop
+            # This creates risk/reward ratio of ~0.67 (acceptable)
+            target_distance = pattern_height * 0.5  # Our first target distance
+            stop_loss = current_price + (target_distance * 1.5)  # Stop 1.5x above entry
             
-            # Targets below neckline (using Fibonacci ratios)
-            tp1 = neckline - (pattern_height * 0.5)  # 0.5x projection
-            tp2 = neckline - (pattern_height * 1.0)  # 1.0x projection
-            tp3 = neckline - (pattern_height * 1.618)  # 1.618x projection (golden ratio)
+            # Targets below entry (SHORT expects price to go DOWN from entry)
+            # FIXED: Was using neckline, but entry can be below neckline!
+            # For SHORT: target must be below entry price
+            tp1 = current_price - (pattern_height * 0.5)  # 0.5x projection
+            tp2 = current_price - (pattern_height * 1.0)  # 1.0x projection
+            tp3 = current_price - (pattern_height * 1.618)  # 1.618x projection (golden ratio)
             
             # Confidence based on pattern quality
             base_confidence = 0.65
@@ -336,13 +341,18 @@ class PatternAdapter:
             # Calculate trading parameters
             pattern_height = neckline - min(trough1_price, trough2_price)
             
-            # Stop loss below troughs
-            stop_loss = min(trough1_price, trough2_price) * 0.99
+            # FIXED: Stop loss relative to entry (not troughs) for balanced risk/reward
+            # For LONG: Use 1.5x the target distance for stop
+            # This creates risk/reward ratio of ~0.67 (acceptable)
+            target_distance = pattern_height * 0.5  # Our first target distance
+            stop_loss = current_price - (target_distance * 1.5)  # Stop 1.5x below entry
             
-            # Targets above neckline
-            tp1 = neckline + (pattern_height * 0.5)
-            tp2 = neckline + (pattern_height * 1.0)
-            tp3 = neckline + (pattern_height * 1.618)
+            # Targets above entry (LONG expects price to go UP from entry)
+            # FIXED: Was using neckline, but entry can be above neckline!
+            # For LONG: target must be above entry price
+            tp1 = current_price + (pattern_height * 0.5)
+            tp2 = current_price + (pattern_height * 1.0)
+            tp3 = current_price + (pattern_height * 1.618)
             
             # Confidence
             base_confidence = 0.65
