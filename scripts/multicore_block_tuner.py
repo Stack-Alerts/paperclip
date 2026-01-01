@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: CHANGE OF CHARACTER PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: VWAP PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,24 +363,23 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'smc_ict' / 'change_of_character.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'institutional' / 'vwap.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='change_of_character',
+        block_name='vwap',
         data=df,
-        cache_file='change_of_character_tuning_cache.pkl'
+        cache_file='vwap_tuning_cache.pkl'
     )
     
-    # Define parameter grid - CHANGE OF CHARACTER
+    # Define parameter grid - VWAP
     param_grid = {
-        'swing_lookback': [3, 5, 7],  # Swing detection lookback
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - CHANGE OF CHARACTER):") 
-    print("   swing_lookback: 3-7 (3 values around classic 5)")
-    print("   Total combinations: 3")
-    print("   NOTE: Change of Character = ICT early reversal signal (CHOCH)")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - VWAP):") 
+    print("   timeframe: 15min")
+    print("   Total combinations: 1")
+    print("   NOTE: VWAP = Volume Weighted Average Price (institutional anchor)")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
