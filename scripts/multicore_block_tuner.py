@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: BREAK OF STRUCTURE PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: FAIR VALUE GAP PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,26 +363,24 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'smc_ict' / 'break_of_structure.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'price_action' / 'fair_value_gap.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='break_of_structure',
+        block_name='fair_value_gap',
         data=df,
-        cache_file='break_of_structure_tuning_cache.pkl'
+        cache_file='fair_value_gap_tuning_cache.pkl'
     )
     
-    # Define parameter grid - BOS
+    # Define parameter grid - FAIR VALUE GAP
     param_grid = {
-        'swing_lookback': [8, 10, 12],  # Swing detection
-        'min_break_pct': [0.05, 0.1, 0.15],  # Break confirmation
+        'lookback': [3, 5, 7],  # Gap detection lookback
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - BREAK OF STRUCTURE):") 
-    print("   swing_lookback: 8-12 (3 values around classic 10)")
-    print("   min_break_pct: 0.05-0.15 (3 values)")
-    print("   Total combinations: 9 (3×3)")
-    print("   NOTE: BOS detects trend continuation breaks")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - FAIR VALUE GAP):") 
+    print("   lookback: 3-7 (3 values around classic 5)")
+    print("   Total combinations: 3 (quick test)")
+    print("   NOTE: FVG = Critical ICT price action concept")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
