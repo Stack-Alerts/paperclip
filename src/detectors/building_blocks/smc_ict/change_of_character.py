@@ -120,7 +120,7 @@ class ChangeOfCharacter:
         if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
-                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
+                'confidence': 0,
                 'metadata': {'error': 'Missing required columns'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
@@ -130,7 +130,7 @@ class ChangeOfCharacter:
         if len(df) < 15:
             return {
                 'signal': 'INSUFFICIENT_DATA',
-                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
+                'confidence': 0,
                 'metadata': {'error': 'Need at least 15 bars'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
@@ -143,8 +143,8 @@ class ChangeOfCharacter:
         if trend == 'NEUTRAL':
             return {
                 'signal': 'NEUTRAL',
-                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
-                'metadata': {'trend': 'NEUTRAL', 'error': 'No clear trend for CHOCH detection'},
+                'confidence': 0,
+                'metadata': {'trend': 'NEUTRAL', 'message': 'No clear trend for CHOCH detection'},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['No clear trend - CHOCH requires established trend']
@@ -159,16 +159,16 @@ class ChangeOfCharacter:
         
         if not choch:
             return {
-                'signal': 'NO_CHOCH',
-                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
-                'metadata': {'trend': trend, 'error': 'No change of character detected'},
+                'signal': 'NEUTRAL',
+                'confidence': 0,
+                'metadata': {'trend': trend, 'message': 'No change of character detected'},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': [f'Trend: {trend}', 'No CHOCH - trend character stable']
             }
         
-        # Determine signal
-        signal = 'BULLISH'  # confidence = 60 for valid signal if choch['type'] == 'BULLISH_CHOCH' else 'BEARISH'
+        # Determine signal (CRITICAL FIX: Was broken conditional)
+        signal = 'BULLISH' if choch['type'] == 'BULLISH_CHOCH' else 'BEARISH'
         
         # Calculate confidence
         confidence = 70  # Moderate - CHOCH is early signal

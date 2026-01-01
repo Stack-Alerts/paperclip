@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: ADX PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: MITIGATION BLOCK PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,24 +363,24 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'trend' / 'adx.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'smc_ict' / 'mitigation_block.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='adx',
+        block_name='mitigation_block',
         data=df,
-        cache_file='adx_tuning_cache.pkl'
+        cache_file='mitigation_block_tuning_cache.pkl'
     )
     
-    # Define parameter grid - ADX
+    # Define parameter grid - MITIGATION BLOCK
     param_grid = {
-        'period': [12, 14, 16],  # ADX period
+        'lookback': [15, 20, 25],  # Gap detection lookback
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ADX):") 
-    print("   period: 12-16 (3 values around classic 14)")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - MITIGATION BLOCK):") 
+    print("   lookback: 15-25 (3 values around classic 20)")
     print("   Total combinations: 3")
-    print("   NOTE: ADX = Trend strength indicator")
+    print("   NOTE: Mitigation Block = ICT unfilled orders/gaps")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     

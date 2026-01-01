@@ -125,7 +125,7 @@ class MitigationBlock:
         if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
-                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
+                'confidence': 0,
                 'metadata': {'error': 'Missing required columns'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
@@ -135,7 +135,7 @@ class MitigationBlock:
         if len(df) < self.lookback + 5:
             return {
                 'signal': 'INSUFFICIENT_DATA',
-                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
+                'confidence': 0,
                 'metadata': {'error': f'Need at least {self.lookback + 5} bars'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
@@ -167,9 +167,9 @@ class MitigationBlock:
         
         if not active_mit:
             return {
-                'signal': 'NO_MITIGATION',
-                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
-                'metadata': {'error': 'No mitigation zones detected'},
+                'signal': 'NEUTRAL',
+                'confidence': 0,
+                'metadata': {'message': 'No mitigation zones detected'},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['No unfilled gaps - clean price action']
