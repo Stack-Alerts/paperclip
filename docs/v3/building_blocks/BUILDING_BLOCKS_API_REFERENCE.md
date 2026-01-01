@@ -40,7 +40,7 @@ This document catalogs the **exact return signatures** of all building blocks. U
 
 ---
 
-## ✅ PRODUCTION READY BLOCKS (24/67)
+## ✅ PRODUCTION READY BLOCKS (26/67)
 
 ### MOVING AVERAGES (6/6 - 100%)
 
@@ -195,7 +195,7 @@ This document catalogs the **exact return signatures** of all building blocks. U
 
 ---
 
-### ICT/SMC (8/10 - 80%)
+### ICT/SMC (10/10 - 100%) 🎉 COMPLETE!
 
 #### 16. Break of Structure (BOS)
 **File:** `smc_ict/break_of_structure.py`  
@@ -269,12 +269,37 @@ This document catalogs the **exact return signatures** of all building blocks. U
 - **Metadata:** `choch_type`, `swing_point_broken`, `break_pct`
 - **Optimization:** swing_lookback=3, lookback_window=50
 - **Quality:** 80/100, Accuracy: 55.8%
+- **NOTE:** Fixed 3 critical bugs - swing detection, pattern logic, lookback window
+
+#### 24. Mitigation Block
+**File:** `smc_ict/mitigation_block.py`  
+**Function:** `analyze(df)`  
+**Returns:**
+- **Signals:** `BULLISH`, `BEARISH`, `NEUTRAL`
+- **Metadata:** `mitigation_type`, `mitigation_high`, `mitigation_low`, `gap_size`, `gap_pct`, `distance_pct`
+- **Optimization:** lookback=20
+- **Quality:** 90/100, Accuracy: 60.2% ⭐
+- **Signals:** 11,088 in 180 days (61.6/day)
+- **R/R:** 7.89 (excellent)
+- **NOTE:** Bitcoin-adapted - detects impulse candles approaching mitigation zones (not traditional gaps)
+
+#### 25. Balanced Price Range
+**File:** `smc_ict/balanced_price_range.py`  
+**Function:** `analyze(df)`  
+**Returns:**
+- **Signals:** `BULLISH`, `BEARISH` (based on position in range)
+- **Metadata:** `range_type`, `range_high`, `range_low`, `range_mid`, `range_size`, `position_in_range`, `avg_deviation`, `is_compressing`
+- **Optimization:** lookback=20, balance_threshold=15.0
+- **Quality:** 80/100, Accuracy: 56.3%
+- **Signals:** 1,749 in 180 days (9.7/day)
+- **R/R:** 7.25 (excellent)
+- **NOTE:** Bitcoin-adapted - 15% threshold vs traditional 5% (volatility adjustment), always directional signal
 
 ---
 
 ### INSTITUTIONAL (1/5 - 20%)
 
-#### 24. VWAP
+#### 26. VWAP
 **File:** `institutional/vwap.py`  
 **Function:** `analyze(df)`  
 **Returns:**
@@ -395,10 +420,16 @@ All blocks MUST return dictionary with:
 
 ## Revision History
 
-**2026-01-01:** Initial creation with 24 production-ready blocks  
+**2026-01-01 (Initial):** Created with 24 production-ready blocks  
 - Documented all BULLISH/BEARISH blocks
 - Identified Bollinger Bands incompatibility
 - Established testing framework requirements
+
+**2026-01-01 (Update):** Added 2 ICT blocks - ICT category 100% complete!  
+- Added Mitigation Block (90/100, 60.2%)
+- Added Balanced Price Range (80/100, 56.3%)
+- ICT/SMC category now 10/10 (100%) ✅
+- Total blocks: 26/67 (38.8%)
 
 ---
 
