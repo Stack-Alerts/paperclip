@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: ORDER BLOCK PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: ICHIMOKU CLOUD PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,24 +363,23 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'price_action' / 'order_block.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'trend' / 'ichimoku_cloud.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='order_block',
+        block_name='ichimoku_cloud',
         data=df,
-        cache_file='order_block_tuning_cache.pkl'
+        cache_file='ichimoku_cloud_tuning_cache.pkl'
     )
     
-    # Define parameter grid - ORDER BLOCK
+    # Define parameter grid - ICHIMOKU CLOUD
     param_grid = {
-        'lookback': [15, 20, 25],  # Order block detection
-        'timeframe': ['15min'],
+        'timeframe': ['15min'],  # Ichimoku is fixed parameters traditionally
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ORDER BLOCK):") 
-    print("   lookback: 15-25 (3 values around classic 20)")
-    print("   Total combinations: 3")
-    print("   NOTE: Order Block = Critical ICT institutional zones")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ICHIMOKU CLOUD):") 
+    print("   timeframe: 15min (classic Ichimoku parameters)")
+    print("   Total combinations: 1 (validate classic)")
+    print("   NOTE: Ichimoku = Traditional trend system (80/100 baseline)")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
