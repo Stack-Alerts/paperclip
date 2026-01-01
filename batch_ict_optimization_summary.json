@@ -1,0 +1,87 @@
+{
+  "start_time": "2026-01-01 12:15:03",
+  "total_blocks": 8,
+  "successful": 5,
+  "failed": 3,
+  "results": [
+    {
+      "block": "market_structure_shift",
+      "status": "SUCCESS",
+      "best_params": {
+        "swing_lookback": 8,
+        "min_break_pct": 0.05,
+        "timeframe": "15min"
+      },
+      "quality": 80,
+      "accuracy": 55.66916194997261,
+      "signals": 16431,
+      "reward_risk": 7.926991947331464
+    },
+    {
+      "block": "displacement",
+      "status": "SUCCESS",
+      "best_params": {
+        "lookback": 5,
+        "min_displacement_pct": 0.5,
+        "timeframe": "15min"
+      },
+      "quality": 80,
+      "accuracy": 55.76540755467197,
+      "signals": 1006,
+      "reward_risk": 5.341883328198937
+    },
+    {
+      "block": "inducement",
+      "status": "SUCCESS",
+      "best_params": {
+        "lookback": 20,
+        "trap_threshold_pct": 0.3,
+        "timeframe": "15min"
+      },
+      "quality": 90,
+      "accuracy": 62.59946949602122,
+      "signals": 1131,
+      "reward_risk": 7.661621432591374
+    },
+    {
+      "block": "optimal_trade_entry",
+      "status": "SUCCESS",
+      "best_params": {
+        "lookback": 15,
+        "timeframe": "15min"
+      },
+      "quality": 70,
+      "accuracy": 55.447154471544714,
+      "signals": 2460,
+      "reward_risk": 5.338216666406781
+    },
+    {
+      "block": "mitigation_block",
+      "status": "FAILED",
+      "reason": "No successful configurations"
+    },
+    {
+      "block": "balanced_price_range",
+      "status": "FAILED",
+      "reason": "No successful configurations"
+    },
+    {
+      "block": "change_of_character",
+      "status": "FAILED",
+      "reason": "No successful configurations"
+    },
+    {
+      "block": "swing_failure_pattern",
+      "status": "SUCCESS",
+      "best_params": {
+        "lookback": 10,
+        "failure_threshold_pct": 0.3,
+        "timeframe": "15min"
+      },
+      "quality": 80,
+      "accuracy": 62.2839969947408,
+      "signals": 1331,
+      "reward_risk": 6.8060797937315956
+    }
+  ]
+}

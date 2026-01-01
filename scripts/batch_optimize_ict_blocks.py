@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 import json
+from multiprocessing import Pool, cpu_count
 
 # Add project to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -95,8 +96,13 @@ ICT_BLOCKS = [
 ]
 
 
-def optimize_single_block(block_config: dict, df):
-    """Optimize a single block"""
+def optimize_single_block(args):
+    """Optimize a single block (wrapper for multiprocessing)"""
+    block_config, df_path = args
+    
+    # Load data in each process
+    import pandas as pd
+    df = pd.read_pickle(df_path)
     print(f"\n{'='*80}")
     print(f"🎯 OPTIMIZING: {block_config['name'].upper()}")
     print(f"{'='*80}\n")
@@ -159,29 +165,47 @@ def optimize_single_block(block_config: dict, df):
 def main():
     """Main batch optimization function"""
     print(f"\n{'='*80}")
-    print(f"🌙 OVERNIGHT BATCH OPTIMIZER - ICT/SMC BLOCKS")
+    print(f"🌙 OVERNIGHT BATCH OPTIMIZER - ICT/SMC BLOCKS (MULTICORE)")
     print(f"{'='*80}")
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Blocks to optimize: {len(ICT_BLOCKS)}")
-    print(f"Estimated time: 3-4 hours")
+    print(f"CPU cores available: {cpu_count()}")
+    print(f"Parallel blocks: {min(len(ICT_BLOCKS), max(1, cpu_count() // 4))}")
+    print(f"Estimated time: 2-3 hours (parallel processing)")
     print(f"{'='*80}\n")
     
-    # Load data once
+    # Load data once and save to temp file for multiprocessing
     print("📊 Loading BTC 15min data (180 days)...")
     df = load_btc_data(days=180)
     print(f"✅ Loaded {len(df)} bars\n")
     
-    # Process each block
+    # Save data to temp pickle for multiprocessing
+    import tempfile
+    temp_data_path = tempfile.NamedTemporaryFile(delete=False, suffix='.pkl').name
+    df.to_pickle(temp_data_path)
+    print(f"💾 Data cached for multiprocessing: {temp_data_path}\n")
+    
+    # Prepare arguments for multiprocessing
+    args_list = [(block_config, temp_data_path) for block_config in ICT_BLOCKS]
+    
+    # Determine parallel blocks (use 1/4 of cores, each block uses multiple cores internally)
+    n_parallel = min(len(ICT_BLOCKS), max(1, cpu_count() // 4))
+    
+    print(f"🚀 Starting parallel optimization ({n_parallel} blocks at a time)...\n")
+    
+    # Process blocks in parallel
     results_summary = []
     successful = 0
     failed = 0
     
-    for i, block_config in enumerate(ICT_BLOCKS, 1):
-        print(f"\n{'#'*80}")
-        print(f"# BLOCK {i}/{len(ICT_BLOCKS)}: {block_config['name'].upper()}")
-        print(f"{'#'*80}")
-        
-        result = optimize_single_block(block_config, df)
+    with Pool(n_parallel) as pool:
+        results = pool.map(optimize_single_block, args_list)
+    
+    # Cleanup temp file
+    os.unlink(temp_data_path)
+    
+    # Process results
+    for result in results:
         if result:
             results_summary.append(result)
             if result['status'] == 'SUCCESS':
