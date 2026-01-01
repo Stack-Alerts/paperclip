@@ -1,0 +1,62 @@
+{
+  "CupAndHandle": {
+    "error": "No validated signals",
+    "name": "CupAndHandle"
+  },
+  "InverseHeadAndShoulders": {
+    "error": "No validated signals",
+    "name": "InverseHeadAndShoulders"
+  },
+  "FallingWedge": {
+    "error": "No validated signals",
+    "name": "FallingWedge"
+  },
+  "DescendingTriangle": {
+    "error": "No validated signals",
+    "name": "DescendingTriangle"
+  },
+  "RisingWedge": {
+    "error": "No validated signals",
+    "name": "RisingWedge"
+  },
+  "TripleTop": {
+    "error": "No validated signals",
+    "name": "TripleTop"
+  },
+  "DoubleBottom": {
+    "error": "No validated signals",
+    "name": "DoubleBottom"
+  },
+  "FlagPattern": {
+    "error": "No validated signals",
+    "name": "FlagPattern"
+  },
+  "TripleBottom": {
+    "error": "No validated signals",
+    "name": "TripleBottom"
+  },
+  "AscendingTriangle": {
+    "error": "No validated signals",
+    "name": "AscendingTriangle"
+  },
+  "HeadAndShoulders": {
+    "error": "No validated signals",
+    "name": "HeadAndShoulders"
+  },
+  "RoundingBottom": {
+    "error": "No validated signals",
+    "name": "RoundingBottom"
+  },
+  "PennantPattern": {
+    "error": "No validated signals",
+    "name": "PennantPattern"
+  },
+  "SymmetricalTriangle": {
+    "error": "No validated signals",
+    "name": "SymmetricalTriangle"
+  },
+  "DoubleTop": {
+    "error": "No validated signals",
+    "name": "DoubleTop"
+  }
+}
