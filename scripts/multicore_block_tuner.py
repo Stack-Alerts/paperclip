@@ -437,7 +437,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: ADR (AVERAGE DAILY RANGE) OPTIMIZATION")
+    print(f"🎯 EXPERT MODE: BOLLINGER BANDS OPTIMIZATION")
     print(f"{'='*80}\n")
     
     # Load data
@@ -446,24 +446,26 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'volatility' / 'adr.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'volatility' / 'bollinger_bands.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='adr',
+        block_name='bollinger_bands',
         data=df,
-        cache_file='adr_tuning_cache.pkl'
+        cache_file='bollinger_bands_tuning_cache.pkl'
     )
     
-    # Define parameter grid - ADR
+    # Define parameter grid - Bollinger Bands
     param_grid = {
-        'period': [10, 20, 30],  # ADR calculation period
+        'period': [20, 30],  # BB period
+        'std_dev': [2.0, 2.5],  # Standard deviations
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ADR):") 
-    print("   period: 10-30 (3 values)")
-    print("   Total combinations: 3")
-    print("   NOTE: ADR = Average Daily Range (volatility indicator)")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - BOLLINGER BANDS):") 
+    print("   period: 20-30 (2 values)")
+    print("   std_dev: 2.0-2.5 (2 values)")
+    print("   Total combinations: 4")
+    print("   NOTE: Bollinger Bands = volatility + overbought/oversold")
     print("   🔬 Uses volatility validator (auto-detected)")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
