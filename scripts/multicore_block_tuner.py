@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: ICHIMOKU CLOUD PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: ADX PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,23 +363,24 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'trend' / 'ichimoku_cloud.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'trend' / 'adx.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='ichimoku_cloud',
+        block_name='adx',
         data=df,
-        cache_file='ichimoku_cloud_tuning_cache.pkl'
+        cache_file='adx_tuning_cache.pkl'
     )
     
-    # Define parameter grid - ICHIMOKU CLOUD
+    # Define parameter grid - ADX
     param_grid = {
-        'timeframe': ['15min'],  # Ichimoku is fixed parameters traditionally
+        'period': [12, 14, 16],  # ADX period
+        'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ICHIMOKU CLOUD):") 
-    print("   timeframe: 15min (classic Ichimoku parameters)")
-    print("   Total combinations: 1 (validate classic)")
-    print("   NOTE: Ichimoku = Traditional trend system (80/100 baseline)")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ADX):") 
+    print("   period: 12-16 (3 values around classic 14)")
+    print("   Total combinations: 3")
+    print("   NOTE: ADX = Trend strength indicator")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
