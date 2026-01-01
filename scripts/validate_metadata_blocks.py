@@ -160,7 +160,7 @@ class MetadataBlockValidator:
     
     def validate_price_level_metadata(self, metadata: Dict, current_price: float) -> Dict[str, Any]:
         """
-        Validate price level metadata (HOD, LOD, support/resistance)
+        Validate price level metadata (HOD, LOD, HOW, LOW, support/resistance)
         
         Checks:
         - Level value present and reasonable
@@ -177,8 +177,10 @@ class MetadataBlockValidator:
         issues = []
         warnings = []
         
-        # Check for price level
-        level_price = metadata.get('hod') or metadata.get('lod') or metadata.get('level')
+        # Check for price level (support all field names)
+        level_price = (metadata.get('hod') or metadata.get('lod') or 
+                      metadata.get('how') or metadata.get('low') or 
+                      metadata.get('level'))
         if level_price is None:
             issues.append('No price level found in metadata')
         elif level_price <= 0:
