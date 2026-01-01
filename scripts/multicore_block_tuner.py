@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: STOCHASTIC RSI PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: ATR PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,31 +363,25 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'oscillators' / 'stochastic_rsi.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'volatility' / 'atr.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='stochastic_rsi',
+        block_name='atr',
         data=df,
-        cache_file='stochastic_rsi_tuning_cache.pkl'
+        cache_file='atr_tuning_cache.pkl'
     )
     
-    # Define parameter grid - INSTITUTIONAL GRADE FOR STOCHASTIC RSI
-    # Test around classic 14/14/3/3 settings
+    # Define parameter grid - QUICK TEST FOR ATR
+    # ATR is simple, just test period
     param_grid = {
-        'rsi_period': [12, 14, 16],  # RSI period
-        'stoch_period': [12, 14, 16],  # Stochastic period
-        'k_smooth': [3],  # Keep constant (3 is standard)
-        'd_smooth': [3],  # Keep constant (3 is standard)
+        'period': [12, 14, 16],  # ATR period around classic 14
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - STOCHASTIC RSI):")
-    print("   rsi_period: 12-16 (3 values)")
-    print("   stoch_period: 12-16 (3 values)")
-    print("   k_smooth: 3 (standard)")
-    print("   d_smooth: 3 (standard)")
-    print("   Total combinations: 9 (3×3)")
-    print("   NOTE: StochRSI signals on K/D crossovers + extreme levels")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ATR):")
+    print("   period: 12-16 (3 values around classic 14)")
+    print("   Total combinations: 3 (quick test)")
+    print("   NOTE: ATR signals on volatility level changes only")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
