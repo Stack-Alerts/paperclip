@@ -1,0 +1,83 @@
+{
+  "start_time": "2026-01-01 12:33:46",
+  "total_blocks": 15,
+  "successful": 0,
+  "failed": 15,
+  "results": [
+    {
+      "block": "ascending_triangle",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "descending_triangle",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "symmetrical_triangle",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "head_and_shoulders",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "inverse_head_and_shoulders",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "double_top",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "double_bottom",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "triple_top",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "triple_bottom",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "rising_wedge",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "falling_wedge",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "flag_pattern",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "pennant_pattern",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "cup_and_handle",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    },
+    {
+      "block": "rounding_bottom",
+      "status": "ERROR",
+      "error": "daemonic processes are not allowed to have children"
+    }
+  ]
+}

@@ -179,7 +179,7 @@ def optimize_single_block(args):
         results = tuner.run_grid_search(
             param_grid=block_config['param_grid'],
             max_combinations=None,
-            n_cores=None
+            n_cores=None  # Use all cores within each block (blocks run sequentially)
         )
         
         if len(results) > 0:
@@ -241,8 +241,9 @@ def main():
     # Prepare arguments for multiprocessing
     args_list = [(block_config, temp_data_path) for block_config in PATTERN_BLOCKS]
     
-    # Determine parallel blocks (use 1/4 of cores, each block uses multiple cores internally)
-    n_parallel = min(len(PATTERN_BLOCKS), max(1, cpu_count() // 4))
+    # Run blocks sequentially (no nested multiprocessing)
+    # Each block will use all cores internally
+    n_parallel = 1
     
     print(f"🚀 Starting parallel optimization ({n_parallel} blocks at a time)...\n")
     
