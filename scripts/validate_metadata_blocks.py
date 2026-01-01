@@ -128,20 +128,28 @@ class MetadataBlockValidator:
         issues = []
         warnings = []
         
-        # Check ADX value
-        adx_value = metadata.get('adx_value')
+        # Check ADX value (ADX returns 'adx' not 'adx_value')
+        adx_value = metadata.get('adx') or metadata.get('adx_value')
         if adx_value is None:
             issues.append('Missing ADX value')
         elif not (0 <= adx_value <= 100):
             issues.append(f'ADX must be 0-100, got {adx_value}')
         
-        # Check trend classification matches value
-        trend_class = metadata.get('trend_classification', '')
-        if adx_value is not None:
+        # Check trend classification matches value (ADX returns 'trend_strength' not 'trend_classification')
+        trend_class = metadata.get('trend_strength') or metadata.get('trend_classification', '')
+        if adx_value is not None and trend_class:
             if adx_value >= 50 and 'strong' not in trend_class.lower():
                 warnings.append(f'ADX {adx_value} should classify as strong trend')
             elif adx_value < 20 and 'weak' not in trend_class.lower() and 'range' not in trend_class.lower():
                 warnings.append(f'ADX {adx_value} should classify as weak/ranging')
+        
+        # Check DI values present
+        plus_di = metadata.get('plus_di')
+        minus_di = metadata.get('minus_di')
+        if plus_di is None:
+            warnings.append('Missing +DI value')
+        if minus_di is None:
+            warnings.append('Missing -DI value')
         
         return {
             'valid': len(issues) == 0,
