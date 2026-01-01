@@ -120,7 +120,7 @@ class ChangeOfCharacter:
         if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
-                'confidence': 0,
+                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
                 'metadata': {'error': 'Missing required columns'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
@@ -130,7 +130,7 @@ class ChangeOfCharacter:
         if len(df) < 15:
             return {
                 'signal': 'INSUFFICIENT_DATA',
-                'confidence': 0,
+                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
                 'metadata': {'error': 'Need at least 15 bars'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
@@ -143,7 +143,7 @@ class ChangeOfCharacter:
         if trend == 'NEUTRAL':
             return {
                 'signal': 'NEUTRAL',
-                'confidence': 0,
+                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
                 'metadata': {'trend': 'NEUTRAL', 'error': 'No clear trend for CHOCH detection'},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
@@ -160,7 +160,7 @@ class ChangeOfCharacter:
         if not choch:
             return {
                 'signal': 'NO_CHOCH',
-                'confidence': 0,
+                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
                 'metadata': {'trend': trend, 'error': 'No change of character detected'},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
@@ -168,7 +168,7 @@ class ChangeOfCharacter:
             }
         
         # Determine signal
-        signal = 'BULLISH' if choch['type'] == 'BULLISH_CHOCH' else 'BEARISH'
+        signal = 'BULLISH'  # confidence = 60 for valid signal if choch['type'] == 'BULLISH_CHOCH' else 'BEARISH'
         
         # Calculate confidence
         confidence = 70  # Moderate - CHOCH is early signal

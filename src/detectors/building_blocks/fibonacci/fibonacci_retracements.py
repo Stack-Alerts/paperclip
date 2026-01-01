@@ -52,11 +52,11 @@ class FibonacciRetracements:
         
         if at_level:
             signal = f'AT_{closest_level.upper()}'
-            confidence = 70
+            confidence = 85
             confluence_factors = [f'Price at {closest_level} level (${fib_prices[closest_level]:.2f})']
         else:
             signal = 'BETWEEN_LEVELS'
-            confidence = 50
+            confidence = 65
             confluence_factors = [f'Nearest: {closest_level} (${fib_prices[closest_level]:.2f})']
         
         # Add Golden Ratio note

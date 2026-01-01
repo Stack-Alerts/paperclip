@@ -31,17 +31,17 @@ class PremiumDiscountZones:
         if current_price > equilibrium:
             zone = 'PREMIUM'
             signal = 'PRICE_IN_PREMIUM'
-            confidence = 55
+            confidence = 70
             confluence_factors = [f'Price in premium zone (above ${equilibrium:.2f})']
         elif current_price < equilibrium:
             zone = 'DISCOUNT'
             signal = 'PRICE_IN_DISCOUNT'
-            confidence = 55
+            confidence = 70
             confluence_factors = [f'Price in discount zone (below ${equilibrium:.2f})']
         else:
             zone = 'EQUILIBRIUM'
             signal = 'PRICE_AT_EQUILIBRIUM'
-            confidence = 50
+            confidence = 65
             confluence_factors = ['Price at equilibrium']
         
         return {

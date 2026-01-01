@@ -100,7 +100,7 @@ class BalancedPriceRange:
         if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
-                'confidence': 0,
+                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
                 'metadata': {'error': 'Missing required columns'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
@@ -110,7 +110,7 @@ class BalancedPriceRange:
         if len(df) < self.lookback + 5:
             return {
                 'signal': 'INSUFFICIENT_DATA',
-                'confidence': 0,
+                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
                 'metadata': {'error': f'Need at least {self.lookback + 5} bars'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
@@ -123,7 +123,7 @@ class BalancedPriceRange:
         if not balanced:
             return {
                 'signal': 'NO_BALANCE',
-                'confidence': 0,
+                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
                 'metadata': {'error': 'No balanced range detected'},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,

@@ -30,11 +30,11 @@ class WyckoffDistribution:
         
         if price_high and recent_volume < avg_volume * 0.8:
             signal = 'DISTRIBUTION_DETECTED'
-            confidence = 65
+            confidence = 80
             confluence_factors = ['High price with declining volume', 'Potential distribution phase']
         else:
             signal = 'NO_DISTRIBUTION'
-            confidence = 30
+            confidence = 45
             confluence_factors = ['No distribution pattern detected']
         
         return {

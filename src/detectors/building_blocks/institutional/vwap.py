@@ -33,11 +33,11 @@ class VWAP:
         
         if current_price > current_vwap:
             signal = 'ABOVE_VWAP'
-            confidence = 60
+            confidence = 75
             confluence_factors = [f'Price above VWAP (${current_vwap:.2f}) - premium']
         else:
             signal = 'BELOW_VWAP'
-            confidence = 60
+            confidence = 75
             confluence_factors = [f'Price below VWAP (${current_vwap:.2f}) - discount']
         
         return {

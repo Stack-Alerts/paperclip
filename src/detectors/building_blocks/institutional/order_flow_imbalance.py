@@ -29,15 +29,15 @@ class OrderFlowImbalance:
         
         if up_volume > down_volume * 1.5:
             signal = 'BUY_IMBALANCE'
-            confidence = 65
+            confidence = 80
             confluence_factors = ['Strong buy pressure detected']
         elif down_volume > up_volume * 1.5:
             signal = 'SELL_IMBALANCE'
-            confidence = 65
+            confidence = 80
             confluence_factors = ['Strong sell pressure detected']
         else:
             signal = 'BALANCED'
-            confidence = 50
+            confidence = 65
             confluence_factors = ['Order flow balanced']
         
         return {

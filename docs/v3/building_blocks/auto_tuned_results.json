@@ -1,0 +1,1142 @@
+[
+  {
+    "name": "elliott_wave_count",
+    "category": "elliott_wave",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3434,
+      "active_signal_rate": 0.999127145766657,
+      "avg_active_confidence": 42.031158998252764,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "elliott_wave_oscillator",
+    "category": "elliott_wave",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 61.15507710212395,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "fibonacci_retracements",
+    "category": "fibonacci",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 69.70322956066337,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "anchored_vwap",
+    "category": "institutional",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 62.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "ema_crossover",
+    "category": "institutional",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "market_depth",
+    "category": "institutional",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 54.055862670933955,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "order_flow_imbalance",
+    "category": "institutional",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 53.29066045970323,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "vwap",
+    "category": "institutional",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 60.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "premium_discount_zones",
+    "category": "market_structure",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 54.99854524294443,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "range_liquidity",
+    "category": "market_structure",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 60.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "swing_points",
+    "category": "market_structure",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 70.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "ema_200_trend",
+    "category": "moving_averages",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "ema_20_50_cross",
+    "category": "moving_averages",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 71.2190864125691,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "ema_255_vector",
+    "category": "moving_averages",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "ema_50_vector",
+    "category": "moving_averages",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 344,
+      "active_signal_rate": 0.10008728542333431,
+      "avg_active_confidence": 95.39244186046511,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "ema_55_vector",
+    "category": "moving_averages",
+    "block_type": "CONTINUOUS",
+    "production_ready": false,
+    "issues": [
+      "Low confidence (5.5%)"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 5.530986325283678,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "ema_800_vector",
+    "category": "moving_averages",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "macd_signal",
+    "category": "oscillators",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 264,
+      "active_signal_rate": 0.07681117253418679,
+      "avg_active_confidence": 90.22727272727273,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "rsi_divergence",
+    "category": "oscillators",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 721,
+      "active_signal_rate": 0.20977596741344195,
+      "avg_active_confidence": 82.95423023578364,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "stochastic_rsi",
+    "category": "oscillators",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1164,
+      "active_signal_rate": 0.3386674425370963,
+      "avg_active_confidence": 91.55498281786942,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "ascending_triangle",
+    "category": "patterns",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 309,
+      "active_signal_rate": 0.08990398603433226,
+      "avg_active_confidence": 69.54692556634305,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "cup_and_handle",
+    "category": "patterns",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "descending_triangle",
+    "category": "patterns",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 266,
+      "active_signal_rate": 0.07739307535641547,
+      "avg_active_confidence": 65.80827067669173,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "double_bottom",
+    "category": "patterns",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3417,
+      "active_signal_rate": 0.9941809717777131,
+      "avg_active_confidence": 70.86918349429324,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "double_top",
+    "category": "patterns",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3421,
+      "active_signal_rate": 0.9953447774221705,
+      "avg_active_confidence": 64.83922829581994,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "falling_wedge",
+    "category": "patterns",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3,
+      "active_signal_rate": 0.0008728542333430317,
+      "avg_active_confidence": 79.66666666666667,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "flag_pattern",
+    "category": "patterns",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "head_and_shoulders",
+    "category": "patterns",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1748,
+      "active_signal_rate": 0.5085830666278731,
+      "avg_active_confidence": 70.9324942791762,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "inverse_head_and_shoulders",
+    "category": "patterns",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1801,
+      "active_signal_rate": 0.5240034914169334,
+      "avg_active_confidence": 79.40033314825097,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "pennant_pattern",
+    "category": "patterns",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 8,
+      "active_signal_rate": 0.0023276112889147513,
+      "avg_active_confidence": 53.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "rising_wedge",
+    "category": "patterns",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 23,
+      "active_signal_rate": 0.00669188245562991,
+      "avg_active_confidence": 61.08695652173913,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "rounding_bottom",
+    "category": "patterns",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 25,
+      "active_signal_rate": 0.007273785277858598,
+      "avg_active_confidence": 60.04,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "symmetrical_triangle",
+    "category": "patterns",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 5,
+      "active_signal_rate": 0.0014547570555717194,
+      "avg_active_confidence": 66.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "triple_bottom",
+    "category": "patterns",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3363,
+      "active_signal_rate": 0.9784695955775385,
+      "avg_active_confidence": 71.96550698780851,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "triple_top",
+    "category": "patterns",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3372,
+      "active_signal_rate": 0.9810881582775677,
+      "avg_active_confidence": 66.38345195729538,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "breaker_block",
+    "category": "price_action",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3258,
+      "active_signal_rate": 0.9479196974105324,
+      "avg_active_confidence": 72.77470841006753,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "fair_value_gap",
+    "category": "price_action",
+    "block_type": "CONTINUOUS",
+    "production_ready": false,
+    "issues": [
+      "Low confidence (16.2%)"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1743,
+      "active_signal_rate": 0.5071283095723014,
+      "avg_active_confidence": 16.17039586919105,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "liquidity_sweep",
+    "category": "price_action",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 40.951411114343905,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "order_block",
+    "category": "price_action",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 417,
+      "active_signal_rate": 0.1213267384346814,
+      "avg_active_confidence": 70.64748201438849,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "asia_session_50_percent",
+    "category": "price_levels",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "hod",
+    "category": "price_levels",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1515,
+      "active_signal_rate": 0.440791387838231,
+      "avg_active_confidence": 85.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "how",
+    "category": "price_levels",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1693,
+      "active_signal_rate": 0.4925807390165842,
+      "avg_active_confidence": 90.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "lod",
+    "category": "price_levels",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1331,
+      "active_signal_rate": 0.3872563281931917,
+      "avg_active_confidence": 85.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "low",
+    "category": "price_levels",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1502,
+      "active_signal_rate": 0.43700901949374454,
+      "avg_active_confidence": 90.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "us_settlement",
+    "category": "price_levels",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "kill_zones",
+    "category": "sessions",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 55.8539423916206,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "session_time",
+    "category": "sessions",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 179,
+      "active_signal_rate": 0.05208030258946756,
+      "avg_active_confidence": 90.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "balanced_price_range",
+    "category": "smc_ict",
+    "block_type": "CONTINUOUS",
+    "production_ready": false,
+    "issues": [
+      "Low confidence (0.0%)"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "break_of_structure",
+    "category": "smc_ict",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3139,
+      "active_signal_rate": 0.9132964794879255,
+      "avg_active_confidence": 79.25135393437401,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "change_of_character",
+    "category": "smc_ict",
+    "block_type": "CONTINUOUS",
+    "production_ready": false,
+    "issues": [
+      "Low confidence (0.0%)"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3098,
+      "active_signal_rate": 0.9013674716322374,
+      "avg_active_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "displacement",
+    "category": "smc_ict",
+    "block_type": "CONTINUOUS",
+    "production_ready": false,
+    "issues": [
+      "Low confidence (4.3%)"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 4.265347686936281,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "inducement",
+    "category": "smc_ict",
+    "block_type": "CONTINUOUS",
+    "production_ready": false,
+    "issues": [
+      "Low confidence (7.6%)"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 7.643293569973815,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "market_structure_shift",
+    "category": "smc_ict",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 85.80593540878674,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "mitigation_block",
+    "category": "smc_ict",
+    "block_type": "CONTINUOUS",
+    "production_ready": false,
+    "issues": [
+      "Low confidence (0.0%)"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "optimal_trade_entry",
+    "category": "smc_ict",
+    "block_type": "CONTINUOUS",
+    "production_ready": false,
+    "issues": [
+      "Low confidence (10.1%)"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3098,
+      "active_signal_rate": 0.9013674716322374,
+      "avg_active_confidence": 10.062943834732085,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "premium_discount",
+    "category": "smc_ict",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 2775,
+      "active_signal_rate": 0.8073901658423044,
+      "avg_active_confidence": 79.1027027027027,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "swing_failure_pattern",
+    "category": "smc_ict",
+    "block_type": "CONTINUOUS",
+    "production_ready": false,
+    "issues": [
+      "Low confidence (6.1%)"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 6.092522548734362,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "supply_demand_zones",
+    "category": "supply_demand",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 64.97817864416642,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "adx",
+    "category": "trend",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 30.592813500145475,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "ichimoku_cloud",
+    "category": "trend",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 2620,
+      "active_signal_rate": 0.762292697119581,
+      "avg_active_confidence": 77.27671755725191,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "adr",
+    "category": "volatility",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 100.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "atr",
+    "category": "volatility",
+    "block_type": "EVENT-DRIVEN",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 104,
+      "active_signal_rate": 0.030258946755891768,
+      "avg_active_confidence": 100.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": false
+    }
+  },
+  {
+    "name": "bollinger_bands",
+    "category": "volatility",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 100.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "wyckoff_accumulation",
+    "category": "wyckoff",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 55.75792842595287,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "wyckoff_distribution",
+    "category": "wyckoff",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 37.17922606924643,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  },
+  {
+    "name": "wyckoff_reaccumulation",
+    "category": "wyckoff",
+    "block_type": "CONTINUOUS",
+    "production_ready": true,
+    "issues": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 42.559790514983995,
+      "errors": 0,
+      "error_rate": 0.0,
+      "is_continuous": true
+    }
+  }
+]

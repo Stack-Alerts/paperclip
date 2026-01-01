@@ -90,7 +90,7 @@ class SessionTime:
                 'confluence_factors': []
             }
         
-        if len(df) < 2:
+        if len(df) < 50:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,

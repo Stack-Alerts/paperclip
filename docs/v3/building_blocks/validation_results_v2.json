@@ -1,0 +1,1669 @@
+[
+  {
+    "name": "elliott_wave_count",
+    "category": "elliott_wave",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (99.9%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3434,
+      "active_signal_rate": 0.999127145766657,
+      "avg_active_confidence": 42.031158998252764,
+      "std_confidence": 6.939257945488411,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 3,
+        "WAVE_5_FORMING": 279,
+        "PATTERN_IN_PROGRESS": 3155
+      }
+    }
+  },
+  {
+    "name": "elliott_wave_oscillator",
+    "category": "elliott_wave",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 61.15507710212395,
+      "std_confidence": 9.271772634885297,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH_MOMENTUM_INCREASING": 884,
+        "BULLISH_MOMENTUM_WEAKENING": 869,
+        "BEARISH_MOMENTUM_INCREASING": 880,
+        "BEARISH_MOMENTUM_WEAKENING": 804
+      }
+    }
+  },
+  {
+    "name": "fibonacci_retracements",
+    "category": "fibonacci",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 69.70322956066337,
+      "std_confidence": 2.418126566800952,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BETWEEN_LEVELS": 51,
+        "AT_FIB_50": 412,
+        "AT_FIB_23": 1115,
+        "AT_FIB_38": 466,
+        "AT_FIB_61": 462,
+        "AT_FIB_78": 931
+      }
+    }
+  },
+  {
+    "name": "anchored_vwap",
+    "category": "institutional",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 62.0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "ABOVE_ANCHORED_VWAP": 1799,
+        "BELOW_ANCHORED_VWAP": 1638
+      }
+    }
+  },
+  {
+    "name": "ema_crossover",
+    "category": "institutional",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "INSUFFICIENT_DATA": 3437
+      }
+    },
+    "notes": "Block is functional but found no patterns in test period"
+  },
+  {
+    "name": "market_depth",
+    "category": "institutional",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 54.055862670933955,
+      "std_confidence": 4.910051395236513,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NORMAL_LIQUIDITY": 2043,
+        "HIGH_LIQUIDITY": 601,
+        "LOW_LIQUIDITY": 793
+      }
+    }
+  },
+  {
+    "name": "order_flow_imbalance",
+    "category": "institutional",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 53.29066045970323,
+      "std_confidence": 6.207371475471254,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "SELL_IMBALANCE": 373,
+        "BALANCED": 2683,
+        "BUY_IMBALANCE": 381
+      }
+    }
+  },
+  {
+    "name": "vwap",
+    "category": "institutional",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 60.0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BELOW_VWAP": 1638,
+        "ABOVE_VWAP": 1799
+      }
+    }
+  },
+  {
+    "name": "premium_discount_zones",
+    "category": "market_structure",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 54.99854524294443,
+      "std_confidence": 0.08527408140676661,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "PRICE_IN_DISCOUNT": 1646,
+        "PRICE_IN_PREMIUM": 1790,
+        "PRICE_AT_EQUILIBRIUM": 1
+      }
+    }
+  },
+  {
+    "name": "range_liquidity",
+    "category": "market_structure",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 60.0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NEAR_BUY_SIDE_LIQUIDITY": 1790,
+        "NEAR_SELL_SIDE_LIQUIDITY": 1647
+      }
+    }
+  },
+  {
+    "name": "swing_points",
+    "category": "market_structure",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 70.0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "SWING_HIGH_DETECTED": 1774,
+        "SWING_LOW_DETECTED": 1663
+      }
+    }
+  },
+  {
+    "name": "ema_200_trend",
+    "category": "moving_averages",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "INSUFFICIENT_DATA": 3437
+      }
+    },
+    "notes": "Block is functional but found no patterns in test period"
+  },
+  {
+    "name": "ema_20_50_cross",
+    "category": "moving_averages",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 71.2190864125691,
+      "std_confidence": 5.010667350217976,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 1753,
+        "BEARISH": 1684
+      }
+    }
+  },
+  {
+    "name": "ema_255_vector",
+    "category": "moving_averages",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "INSUFFICIENT_DATA": 3437
+      }
+    },
+    "notes": "Block is functional but found no patterns in test period"
+  },
+  {
+    "name": "ema_50_vector",
+    "category": "moving_averages",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 344,
+      "active_signal_rate": 0.10008728542333431,
+      "avg_active_confidence": 95.39244186046511,
+      "std_confidence": 7.261676858046944,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 167,
+        "NEUTRAL": 3093,
+        "BEARISH": 177
+      }
+    }
+  },
+  {
+    "name": "ema_55_vector",
+    "category": "moving_averages",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 5.530986325283678,
+      "std_confidence": 16.369283222363563,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_BREAK": 3136,
+        "BEARISH_CROSS": 143,
+        "BEARISH_BREAK": 31,
+        "BULLISH_BREAK": 14,
+        "BULLISH_CROSS": 113
+      }
+    }
+  },
+  {
+    "name": "ema_800_vector",
+    "category": "moving_averages",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "INSUFFICIENT_DATA": 3437
+      }
+    },
+    "notes": "Block is functional but found no patterns in test period"
+  },
+  {
+    "name": "macd_signal",
+    "category": "oscillators",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 264,
+      "active_signal_rate": 0.07681117253418679,
+      "avg_active_confidence": 90.22727272727273,
+      "std_confidence": 5.909483162289629,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 128,
+        "NEUTRAL": 3173,
+        "BEARISH": 136
+      }
+    }
+  },
+  {
+    "name": "rsi_divergence",
+    "category": "oscillators",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 721,
+      "active_signal_rate": 0.20977596741344195,
+      "avg_active_confidence": 82.95423023578364,
+      "std_confidence": 5.673152630954279,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 359,
+        "NEUTRAL": 2716,
+        "BEARISH": 362
+      }
+    }
+  },
+  {
+    "name": "stochastic_rsi",
+    "category": "oscillators",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1164,
+      "active_signal_rate": 0.3386674425370963,
+      "avg_active_confidence": 91.55498281786942,
+      "std_confidence": 10.274714379468241,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 591,
+        "NEUTRAL": 2273,
+        "BEARISH": 573
+      }
+    }
+  },
+  {
+    "name": "ascending_triangle",
+    "category": "patterns",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 309,
+      "active_signal_rate": 0.08990398603433226,
+      "avg_active_confidence": 69.54692556634305,
+      "std_confidence": 20.22410656953582,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 3128,
+        "BREAKOUT_CONFIRMED": 118,
+        "PATTERN_FORMING": 191
+      }
+    }
+  },
+  {
+    "name": "cup_and_handle",
+    "category": "patterns",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 3437
+      }
+    },
+    "notes": "Block is functional but found no patterns in test period"
+  },
+  {
+    "name": "descending_triangle",
+    "category": "patterns",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 266,
+      "active_signal_rate": 0.07739307535641547,
+      "avg_active_confidence": 65.80827067669173,
+      "std_confidence": 17.91925937190056,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 3171,
+        "BREAKDOWN_CONFIRMED": 115,
+        "PATTERN_FORMING": 151
+      }
+    }
+  },
+  {
+    "name": "double_bottom",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (99.4%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3417,
+      "active_signal_rate": 0.9941809717777131,
+      "avg_active_confidence": 70.86918349429324,
+      "std_confidence": 15.355195506940646,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 20,
+        "PATTERN_CONFIRMED": 1238,
+        "PATTERN_FORMING": 2179
+      }
+    }
+  },
+  {
+    "name": "double_top",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (99.5%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3421,
+      "active_signal_rate": 0.9953447774221705,
+      "avg_active_confidence": 64.83922829581994,
+      "std_confidence": 14.72830701621973,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 16,
+        "PATTERN_CONFIRMED": 1122,
+        "PATTERN_FORMING": 2299
+      }
+    }
+  },
+  {
+    "name": "falling_wedge",
+    "category": "patterns",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3,
+      "active_signal_rate": 0.0008728542333430317,
+      "avg_active_confidence": 79.66666666666667,
+      "std_confidence": 2.378277981613031,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 3434,
+        "BREAKOUT_CONFIRMED": 2,
+        "PATTERN_FORMING": 1
+      }
+    }
+  },
+  {
+    "name": "flag_pattern",
+    "category": "patterns",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 3437
+      }
+    },
+    "notes": "Block is functional but found no patterns in test period"
+  },
+  {
+    "name": "head_and_shoulders",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (50.9%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1748,
+      "active_signal_rate": 0.5085830666278731,
+      "avg_active_confidence": 70.9324942791762,
+      "std_confidence": 37.30015172777224,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 1689,
+        "PATTERN_CONFIRMED": 546,
+        "PATTERN_FORMING": 1202
+      }
+    }
+  },
+  {
+    "name": "inverse_head_and_shoulders",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (52.4%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1801,
+      "active_signal_rate": 0.5240034914169334,
+      "avg_active_confidence": 79.40033314825097,
+      "std_confidence": 41.568164567787996,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 1636,
+        "PATTERN_CONFIRMED": 741,
+        "PATTERN_FORMING": 1060
+      }
+    }
+  },
+  {
+    "name": "pennant_pattern",
+    "category": "patterns",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 8,
+      "active_signal_rate": 0.0023276112889147513,
+      "avg_active_confidence": 53.0,
+      "std_confidence": 2.554024585339446,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 3429,
+        "PATTERN_FORMING": 8
+      }
+    }
+  },
+  {
+    "name": "rising_wedge",
+    "category": "patterns",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 23,
+      "active_signal_rate": 0.00669188245562991,
+      "avg_active_confidence": 61.08695652173913,
+      "std_confidence": 4.997836443181648,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 3414,
+        "BREAKDOWN_CONFIRMED": 1,
+        "PATTERN_FORMING": 22
+      }
+    }
+  },
+  {
+    "name": "rounding_bottom",
+    "category": "patterns",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 25,
+      "active_signal_rate": 0.007273785277858598,
+      "avg_active_confidence": 60.04,
+      "std_confidence": 5.176475013375311,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 3412,
+        "BREAKOUT_CONFIRMED": 8,
+        "PATTERN_FORMING": 17
+      }
+    }
+  },
+  {
+    "name": "symmetrical_triangle",
+    "category": "patterns",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 5,
+      "active_signal_rate": 0.0014547570555717194,
+      "avg_active_confidence": 66.0,
+      "std_confidence": 2.5339312350621825,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 3432,
+        "BREAKOUT_DOWN": 2,
+        "BREAKOUT_UP": 2,
+        "PATTERN_FORMING": 1
+      }
+    }
+  },
+  {
+    "name": "triple_bottom",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (97.8%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3363,
+      "active_signal_rate": 0.9784695955775385,
+      "avg_active_confidence": 71.96550698780851,
+      "std_confidence": 15.232224633495015,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 74,
+        "PATTERN_CONFIRMED": 937,
+        "PATTERN_FORMING": 2426
+      }
+    }
+  },
+  {
+    "name": "triple_top",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (98.1%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3372,
+      "active_signal_rate": 0.9810881582775677,
+      "avg_active_confidence": 66.38345195729538,
+      "std_confidence": 14.083830563112615,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_PATTERN": 65,
+        "PATTERN_CONFIRMED": 861,
+        "PATTERN_FORMING": 2511
+      }
+    }
+  },
+  {
+    "name": "breaker_block",
+    "category": "price_action",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (94.8%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3258,
+      "active_signal_rate": 0.9479196974105324,
+      "avg_active_confidence": 72.77470841006753,
+      "std_confidence": 15.366437160434987,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 1616,
+        "NO_BREAKER": 138,
+        "NEUTRAL": 179,
+        "BEARISH": 1504
+      }
+    }
+  },
+  {
+    "name": "fair_value_gap",
+    "category": "price_action",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (50.7%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1743,
+      "active_signal_rate": 0.5071283095723014,
+      "avg_active_confidence": 16.17039586919105,
+      "std_confidence": 37.77114858356933,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 198,
+        "NEUTRAL": 1694,
+        "BEARISH": 169,
+        "NO_FVG": 1376
+      }
+    }
+  },
+  {
+    "name": "liquidity_sweep",
+    "category": "price_action",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 40.951411114343905,
+      "std_confidence": 42.2153094223356,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 845,
+        "NO_SWEEP": 1765,
+        "BEARISH": 827
+      }
+    }
+  },
+  {
+    "name": "order_block",
+    "category": "price_action",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 417,
+      "active_signal_rate": 0.1213267384346814,
+      "avg_active_confidence": 70.64748201438849,
+      "std_confidence": 26.548324380338066,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_ORDER_BLOCK": 2864,
+        "NEUTRAL": 156,
+        "BEARISH": 203,
+        "BULLISH": 214
+      }
+    }
+  },
+  {
+    "name": "asia_session_50_percent",
+    "category": "price_levels",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "std_confidence": 12.426171670197249,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NEUTRAL": 3437
+      }
+    },
+    "notes": "Block is functional but found no patterns in test period"
+  },
+  {
+    "name": "hod",
+    "category": "price_levels",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1515,
+      "active_signal_rate": 0.440791387838231,
+      "avg_active_confidence": 85.0,
+      "std_confidence": 7.449799376465369,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NEUTRAL": 1922,
+        "BEARISH": 1515
+      }
+    }
+  },
+  {
+    "name": "how",
+    "category": "price_levels",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1693,
+      "active_signal_rate": 0.4925807390165842,
+      "avg_active_confidence": 90.0,
+      "std_confidence": 7.499237769306579,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NEUTRAL": 1744,
+        "BEARISH": 1693
+      }
+    }
+  },
+  {
+    "name": "lod",
+    "category": "price_levels",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1331,
+      "active_signal_rate": 0.3872563281931917,
+      "avg_active_confidence": 85.0,
+      "std_confidence": 7.311861932985039,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 1331,
+        "NEUTRAL": 2106
+      }
+    }
+  },
+  {
+    "name": "low",
+    "category": "price_levels",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 1502,
+      "active_signal_rate": 0.43700901949374454,
+      "avg_active_confidence": 90.0,
+      "std_confidence": 7.440796928359246,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 1502,
+        "NEUTRAL": 1935
+      }
+    }
+  },
+  {
+    "name": "us_settlement",
+    "category": "price_levels",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 0,
+      "active_signal_rate": 0.0,
+      "avg_active_confidence": 0,
+      "std_confidence": 9.854084034835095,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NEUTRAL": 3437
+      }
+    },
+    "notes": "Block is functional but found no patterns in test period"
+  },
+  {
+    "name": "kill_zones",
+    "category": "sessions",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 55.8539423916206,
+      "std_confidence": 24.946370636574116,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "PRIME_TIME": 860,
+        "WAIT": 1431,
+        "ACTIVE": 1146
+      }
+    }
+  },
+  {
+    "name": "session_time",
+    "category": "sessions",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 179,
+      "active_signal_rate": 0.05208030258946756,
+      "avg_active_confidence": 90.0,
+      "std_confidence": 4.443779682732125,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "SESSION_ACTIVE": 108,
+        "NEUTRAL": 3258,
+        "SESSION_QUIET": 71
+      }
+    }
+  },
+  {
+    "name": "balanced_price_range",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_BALANCE": 3437
+      }
+    }
+  },
+  {
+    "name": "break_of_structure",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (91.3%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3139,
+      "active_signal_rate": 0.9132964794879255,
+      "avg_active_confidence": 79.25135393437401,
+      "std_confidence": 25.355957263560644,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 1580,
+        "NEUTRAL": 298,
+        "BEARISH": 1486,
+        "NO_BOS": 73
+      }
+    }
+  },
+  {
+    "name": "change_of_character",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (90.1%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3098,
+      "active_signal_rate": 0.9013674716322374,
+      "avg_active_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NEUTRAL": 339,
+        "NO_CHOCH": 3098
+      }
+    }
+  },
+  {
+    "name": "displacement",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 4.265347686936281,
+      "std_confidence": 18.538544351782654,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 74,
+        "BEARISH": 100,
+        "NO_DISPLACEMENT": 3263
+      }
+    }
+  },
+  {
+    "name": "inducement",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 7.643293569973815,
+      "std_confidence": 23.697741937098314,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 173,
+        "NO_INDUCEMENT": 3111,
+        "BEARISH": 153
+      }
+    }
+  },
+  {
+    "name": "market_structure_shift",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 85.80593540878674,
+      "std_confidence": 5.119109625971855,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 1756,
+        "BEARISH": 1673,
+        "NO_MSS": 8
+      }
+    }
+  },
+  {
+    "name": "mitigation_block",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_MITIGATION": 3437
+      }
+    }
+  },
+  {
+    "name": "optimal_trade_entry",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (90.1%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3098,
+      "active_signal_rate": 0.9013674716322374,
+      "avg_active_confidence": 10.062943834732085,
+      "std_confidence": 25.01995107733036,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 158,
+        "NEUTRAL": 339,
+        "NO_OTE": 2697,
+        "BEARISH": 243
+      }
+    }
+  },
+  {
+    "name": "premium_discount",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (80.7%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 2775,
+      "active_signal_rate": 0.8073901658423044,
+      "avg_active_confidence": 79.1027027027027,
+      "std_confidence": 13.23082627666292,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 1310,
+        "NEUTRAL": 662,
+        "BEARISH": 1465
+      }
+    }
+  },
+  {
+    "name": "swing_failure_pattern",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 6.092522548734362,
+      "std_confidence": 21.453053655645917,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 145,
+        "BEARISH": 112,
+        "NO_SFP": 3180
+      }
+    }
+  },
+  {
+    "name": "supply_demand_zones",
+    "category": "supply_demand",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 64.97817864416642,
+      "std_confidence": 0.7382802477846603,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "DEMAND_ZONE": 3377,
+        "SUPPLY_ZONE": 57,
+        "NO_ZONE": 3
+      }
+    }
+  },
+  {
+    "name": "adx",
+    "category": "trend",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 30.592813500145475,
+      "std_confidence": 13.499365992218634,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "TRENDING": 1366,
+        "VERY_STRONG_TREND": 2,
+        "STRONG_TREND": 124,
+        "RANGING": 1945
+      }
+    }
+  },
+  {
+    "name": "ichimoku_cloud",
+    "category": "trend",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (76.2%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 2620,
+      "active_signal_rate": 0.762292697119581,
+      "avg_active_confidence": 77.27671755725191,
+      "std_confidence": 15.651749076613163,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH": 1282,
+        "NEUTRAL": 817,
+        "BEARISH": 1338
+      }
+    }
+  },
+  {
+    "name": "adr",
+    "category": "volatility",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 100.0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "CALM": 3431,
+        "NORMAL": 6
+      }
+    }
+  },
+  {
+    "name": "atr",
+    "category": "volatility",
+    "production_ready": true,
+    "confidence_level": "HIGH",
+    "issues": [],
+    "recommendations": [],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 104,
+      "active_signal_rate": 0.030258946755891768,
+      "avg_active_confidence": 100.0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "VOLATILITY_CALM": 34,
+        "NEUTRAL": 3333,
+        "VOLATILITY_NORMAL": 48,
+        "VOLATILITY_HIGH": 22
+      }
+    }
+  },
+  {
+    "name": "bollinger_bands",
+    "category": "volatility",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 100.0,
+      "std_confidence": 0.0,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "BULLISH_REVERSAL": 3284,
+        "SQUEEZE_BREAKOUT_BEAR": 40,
+        "LOWER_HALF": 1,
+        "SQUEEZE_BREAKOUT_BULL": 33,
+        "BEARISH_REVERSAL": 79
+      }
+    }
+  },
+  {
+    "name": "wyckoff_accumulation",
+    "category": "wyckoff",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 55.75792842595287,
+      "std_confidence": 10.453084519990991,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "ACCUMULATION_DETECTED": 2951,
+        "NO_ACCUMULATION": 486
+      }
+    }
+  },
+  {
+    "name": "wyckoff_distribution",
+    "category": "wyckoff",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 37.17922606924643,
+      "std_confidence": 14.132643966019861,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_DISTRIBUTION": 2732,
+        "DISTRIBUTION_DETECTED": 705
+      }
+    }
+  },
+  {
+    "name": "wyckoff_reaccumulation",
+    "category": "wyckoff",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Signals too frequent (100.0%)"
+    ],
+    "recommendations": [
+      "Review and fix block implementation"
+    ],
+    "metrics": {
+      "total_bars_sampled": 3456,
+      "valid_results": 3437,
+      "active_signals": 3437,
+      "active_signal_rate": 1.0,
+      "avg_active_confidence": 42.559790514983995,
+      "std_confidence": 15.625778658972676,
+      "errors": 0,
+      "error_rate": 0.0,
+      "signal_distribution": {
+        "NO_REACCUMULATION": 2088,
+        "REACCUMULATION_DETECTED": 1349
+      }
+    }
+  }
+]

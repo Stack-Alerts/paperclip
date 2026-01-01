@@ -1,0 +1,33 @@
+{
+  "validation_timestamp": "2026-01-01T10:55:41.527477",
+  "lookback_bars": 20,
+  "lookforward_bars": 50,
+  "total_signals": 237,
+  "correct_signals": 134,
+  "accuracy": 56.540084388185655,
+  "overall_metrics": {
+    "avg_max_favorable_excursion": 0.9536662246223185,
+    "avg_max_adverse_excursion": 0.993391997683024,
+    "avg_reward_risk_ratio": 4.7735409685650465,
+    "avg_consecutive_favorable_bars": 7.071729957805907,
+    "avg_bars_to_max_favorable": 22.514767932489452
+  },
+  "bullish_signals": {
+    "count": 106,
+    "accuracy": 64.15094339622641,
+    "avg_move": 1.0339474871339385,
+    "avg_reward_risk": 4.097710592699001
+  },
+  "bearish_signals": {
+    "count": 131,
+    "accuracy": 50.38167938931297,
+    "avg_move": 0.8887058137350532,
+    "avg_reward_risk": 5.320396081861234
+  },
+  "quality_score": 80,
+  "max_quality_score": 100,
+  "quality_percentage": 80.0,
+  "recommendation": "\u2705 APPROVED WITH MONITORING",
+  "confidence_level": "MEDIUM-HIGH",
+  "notes": "Signals show good quality but should be monitored closely in production."
+}

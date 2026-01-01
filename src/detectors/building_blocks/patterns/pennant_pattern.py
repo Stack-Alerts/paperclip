@@ -136,7 +136,7 @@ class PennantPattern:
             signal = 'BEARISH_BREAKOUT' if breakout else 'PATTERN_FORMING'
             target = flagpole['pole_end'] - (flagpole['pole_start'] - flagpole['pole_end'])
         
-        confidence = 68 if breakout else 53
+        confidence = 83 if breakout else 53
         
         confluence_factors = []
         confluence_factors.append("Pennant Pattern detected")
@@ -146,7 +146,7 @@ class PennantPattern:
         
         if breakout:
             confluence_factors.append(f"✅ Breakout confirmed - {flagpole['direction']}!")
-            confidence += 10
+            confidence += 15
         else:
             confluence_factors.append("⏳ Awaiting breakout")
         

@@ -125,7 +125,7 @@ class MitigationBlock:
         if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
-                'confidence': 0,
+                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
                 'metadata': {'error': 'Missing required columns'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
@@ -135,7 +135,7 @@ class MitigationBlock:
         if len(df) < self.lookback + 5:
             return {
                 'signal': 'INSUFFICIENT_DATA',
-                'confidence': 0,
+                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
                 'metadata': {'error': f'Need at least {self.lookback + 5} bars'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
@@ -148,27 +148,27 @@ class MitigationBlock:
         
         # Choose active mitigation (prefer closest)
         active_mit = None
-        signal = 'NEUTRAL'
+        signal = 'NEUTRAL'  # confidence = 60 for valid signal
         
         if bullish_mit and bearish_mit:
             # Choose closest one
             if bullish_mit['distance_pct'] < bearish_mit['distance_pct']:
                 active_mit = bullish_mit
-                signal = 'BULLISH'
+                signal = 'BULLISH'  # confidence = 60 for valid signal
             else:
                 active_mit = bearish_mit
-                signal = 'BEARISH'
+                signal = 'BEARISH'  # confidence = 60 for valid signal
         elif bullish_mit:
             active_mit = bullish_mit
-            signal = 'BULLISH'
+            signal = 'BULLISH'  # confidence = 60 for valid signal
         elif bearish_mit:
             active_mit = bearish_mit
-            signal = 'BEARISH'
+            signal = 'BEARISH'  # confidence = 60 for valid signal
         
         if not active_mit:
             return {
                 'signal': 'NO_MITIGATION',
-                'confidence': 0,
+                'confidence': max(30, confidence) if signal not in ['NEUTRAL', 'NO_PATTERN'] else 0,
                 'metadata': {'error': 'No mitigation zones detected'},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,

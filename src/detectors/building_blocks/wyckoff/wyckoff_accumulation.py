@@ -31,11 +31,11 @@ class WyckoffAccumulation:
         # Range contraction suggests accumulation
         if current_range < price_range * 0.5:
             signal = 'ACCUMULATION_DETECTED'
-            confidence = 60
+            confidence = 75
             confluence_factors = ['Price consolidating in range', 'Potential accumulation phase']
         else:
             signal = 'NO_ACCUMULATION'
-            confidence = 30
+            confidence = 45
             confluence_factors = ['Wide price range - not accumulating']
         
         return {

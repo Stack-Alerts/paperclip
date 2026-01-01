@@ -105,7 +105,7 @@ class AsiaSession50:
                 'confluence_factors': []
             }
         
-        if len(df) < 1:
+        if len(df) < 50:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,

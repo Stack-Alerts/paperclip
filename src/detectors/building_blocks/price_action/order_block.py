@@ -96,6 +96,11 @@ class OrderBlock:
         
         return None
     
+    
+        # Adaptive lookback based on data size
+        adaptive_lookback = min(lookback, len(df) // 4)
+        lookback = max(lookback // 2, adaptive_lookback)
+
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """Main analysis method"""
         if not all(col in df.columns for col in ['timestamp', 'open', 'high', 'low', 'close']):

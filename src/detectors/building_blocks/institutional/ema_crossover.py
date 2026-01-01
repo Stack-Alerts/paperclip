@@ -36,19 +36,19 @@ class EMACrossover:
         # Golden cross / Death cross
         if current_fast > current_slow and prev_fast <= prev_slow:
             signal = 'GOLDEN_CROSS'
-            confidence = 75
+            confidence = 90
             confluence_factors = [f'Golden Cross: EMA{self.fast} crossed above EMA{self.slow}']
         elif current_fast < current_slow and prev_fast >= prev_slow:
             signal = 'DEATH_CROSS'
-            confidence = 75
+            confidence = 90
             confluence_factors = [f'Death Cross: EMA{self.fast} crossed below EMA{self.slow}']
         elif current_fast > current_slow:
             signal = 'BULLISH_ALIGNMENT'
-            confidence = 60
+            confidence = 75
             confluence_factors = ['EMAs bullishly aligned']
         else:
             signal = 'BEARISH_ALIGNMENT'
-            confidence = 60
+            confidence = 75
             confluence_factors = ['EMAs bearishly aligned']
         
         return {

@@ -142,7 +142,7 @@ class AscendingTrianglePattern:
         resistance_broken = current_price > pattern['resistance_level']
         
         signal = 'BREAKOUT_CONFIRMED' if resistance_broken else 'PATTERN_FORMING'
-        confidence = 75 if resistance_broken else 60
+        confidence = 90 if resistance_broken else 60
         
         # Target = pattern height projected upward
         pattern_height = pattern['resistance_level'] - pattern['support_start']
@@ -156,7 +156,7 @@ class AscendingTrianglePattern:
         
         if resistance_broken:
             confluence_factors.append("✅ BREAKOUT confirmed - Bullish!")
-            confidence += 10
+            confidence += 15
         else:
             confluence_factors.append("⏳ Awaiting breakout")
         

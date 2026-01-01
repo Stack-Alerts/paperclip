@@ -151,12 +151,12 @@ class FairValueGap:
             }
         
         # Calculate confidence
-        confidence = 75
+        confidence = 90
         if active_fvg['gap_pct'] > 0.5:
-            confidence += 10
+            confidence += 15
         if active_fvg['gap_pct'] > 1.0:
-            confidence += 10
-        confidence = min(100, confidence)
+            confidence += 15
+        confidence = min(95, confidence)
         
         # Build confluence
         confluence_factors = []

@@ -35,7 +35,7 @@ class FlagPattern:
     
     def detect_strong_move(self, df: pd.DataFrame) -> Optional[Dict]:
         """Detect preceding strong directional move (flagpole)"""
-        if len(df) < 20:
+        if len(df) < 50:
             return None
         
         # Look at price change in last 20 bars
@@ -102,7 +102,7 @@ class FlagPattern:
                 'confluence_factors': []
             }
         
-        if len(df) < 20:
+        if len(df) < 50:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,

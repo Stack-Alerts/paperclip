@@ -103,7 +103,7 @@ class TripleTopPattern:
             neckline_broken = current_price < neckline_price
             
             signal = 'PATTERN_CONFIRMED' if neckline_broken else 'PATTERN_FORMING'
-            confidence = 75 if neckline_broken else 60
+            confidence = 90 if neckline_broken else 60
             
             avg_peak = (p1['price'] + p2['price'] + p3['price']) / 3
             pattern_height = avg_peak - neckline_price
@@ -116,7 +116,7 @@ class TripleTopPattern:
             
             if neckline_broken:
                 confluence_factors.append("✅ NECKLINE BROKEN - Bearish!")
-                confidence += 10
+                confidence += 15
             else:
                 confluence_factors.append("⏳ Awaiting neckline break")
             

@@ -228,13 +228,13 @@ class OptimalTradeEntry:
             }
         
         # Calculate confidence
-        confidence = 75  # Base confidence for OTE
+        confidence = 90  # Base confidence for OTE
         # Higher confidence if closer to sweet spot (70%)
         if 68 <= active_ote['retracement_pct'] <= 72:
-            confidence += 15
+            confidence += 20
         elif 65 <= active_ote['retracement_pct'] <= 75:
-            confidence += 10
-        confidence = min(100, confidence)
+            confidence += 15
+        confidence = min(95, confidence)
         
         # Build confluence factors
         confluence_factors = []

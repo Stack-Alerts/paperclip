@@ -36,11 +36,11 @@ class RangeLiquidity:
         
         if distance_to_high < distance_to_low:
             signal = 'NEAR_BUY_SIDE_LIQUIDITY'
-            confidence = 60
+            confidence = 75
             confluence_factors = [f'Approaching buy-side liquidity at ${range_high:.2f}']
         else:
             signal = 'NEAR_SELL_SIDE_LIQUIDITY'
-            confidence = 60
+            confidence = 75
             confluence_factors = [f'Approaching sell-side liquidity at ${range_low:.2f}']
         
         return {

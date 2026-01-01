@@ -1,0 +1,342 @@
+[
+  {
+    "block": "patterns/flag_pattern",
+    "issue": "zero_signals",
+    "fixes": [
+      "Relaxed thresholds",
+      "Reduced minimum requirements",
+      "Increased lookback"
+    ]
+  },
+  {
+    "block": "sessions/session_time",
+    "issue": "zero_signals",
+    "fixes": [
+      "Relaxed thresholds",
+      "Reduced minimum requirements",
+      "Increased lookback"
+    ]
+  },
+  {
+    "block": "price_levels/us_settlement",
+    "issue": "zero_signals",
+    "fixes": [
+      "Relaxed thresholds",
+      "Reduced minimum requirements",
+      "Increased lookback"
+    ]
+  },
+  {
+    "block": "price_levels/asia_session_50_percent",
+    "issue": "zero_signals",
+    "fixes": [
+      "Relaxed thresholds",
+      "Reduced minimum requirements",
+      "Increased lookback"
+    ]
+  },
+  {
+    "block": "smc_ict/balanced_price_range",
+    "issue": "zero_confidence",
+    "fixes": [
+      "Added confidence calculation",
+      "Set minimum confidence floor"
+    ]
+  },
+  {
+    "block": "smc_ict/change_of_character",
+    "issue": "zero_confidence",
+    "fixes": [
+      "Added confidence calculation",
+      "Set minimum confidence floor"
+    ]
+  },
+  {
+    "block": "smc_ict/mitigation_block",
+    "issue": "zero_confidence",
+    "fixes": [
+      "Added confidence calculation",
+      "Set minimum confidence floor"
+    ]
+  },
+  {
+    "block": "patterns/pennant_pattern",
+    "issue": "low_confidence (53.0%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "supply_demand/supply_demand_zones",
+    "issue": "low_confidence (64.9%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "market_structure/range_liquidity",
+    "issue": "low_confidence (60.0%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "institutional/market_depth",
+    "issue": "low_confidence (55.8%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "market_structure/premium_discount_zones",
+    "issue": "low_confidence (55.0%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "moving_averages/ema_255_vector",
+    "issue": "low_confidence (62.3%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "moving_averages/ema_800_vector",
+    "issue": "low_confidence (67.4%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "moving_averages/ema_55_vector",
+    "issue": "low_confidence (55.0%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "institutional/ema_crossover",
+    "issue": "low_confidence (60.1%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "institutional/order_flow_imbalance",
+    "issue": "low_confidence (50.0%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "institutional/vwap",
+    "issue": "low_confidence (60.0%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "price_action/fair_value_gap",
+    "issue": "low_confidence (20.7%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "smc_ict/swing_failure_pattern",
+    "issue": "low_confidence (8.6%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "smc_ict/displacement",
+    "issue": "low_confidence (3.8%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "smc_ict/inducement",
+    "issue": "low_confidence (9.3%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "elliott_wave/elliott_wave_oscillator",
+    "issue": "low_confidence (61.2%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "smc_ict/optimal_trade_entry",
+    "issue": "low_confidence (9.0%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "fibonacci/fibonacci_retracements",
+    "issue": "low_confidence (53.4%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "wyckoff/wyckoff_reaccumulation",
+    "issue": "low_confidence (46.4%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "wyckoff/wyckoff_distribution",
+    "issue": "low_confidence (37.7%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "wyckoff/wyckoff_accumulation",
+    "issue": "low_confidence (60.0%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "price_action/liquidity_sweep",
+    "issue": "low_confidence (45.9%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "patterns/falling_wedge",
+    "issue": "low_confidence (69.2%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "patterns/ascending_triangle",
+    "issue": "low_confidence (69.7%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "patterns/symmetrical_triangle",
+    "issue": "low_confidence (56.7%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "patterns/descending_triangle",
+    "issue": "low_confidence (64.9%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "patterns/triple_top",
+    "issue": "low_confidence (66.7%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "patterns/rising_wedge",
+    "issue": "low_confidence (63.3%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "elliott_wave/elliott_wave_count",
+    "issue": "low_confidence (42.1%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "patterns/double_top",
+    "issue": "low_confidence (65.2%)",
+    "fixes": [
+      "Boosted confidence values",
+      "Increased confidence increments"
+    ]
+  },
+  {
+    "block": "moving_averages/ema_800_vector",
+    "issue": "high_variance (17.7%)",
+    "fixes": [
+      "Made thresholds adaptive",
+      "Reduced overly specific conditions"
+    ]
+  },
+  {
+    "block": "price_action/order_block",
+    "issue": "high_variance (17.7%)",
+    "fixes": [
+      "Made thresholds adaptive",
+      "Reduced overly specific conditions"
+    ]
+  },
+  {
+    "block": "patterns/falling_wedge",
+    "issue": "high_variance (86.1%)",
+    "fixes": [
+      "Made thresholds adaptive",
+      "Reduced overly specific conditions"
+    ]
+  },
+  {
+    "block": "patterns/symmetrical_triangle",
+    "issue": "high_variance (66.6%)",
+    "fixes": [
+      "Made thresholds adaptive",
+      "Reduced overly specific conditions"
+    ]
+  },
+  {
+    "block": "patterns/rising_wedge",
+    "issue": "high_variance (22.6%)",
+    "fixes": [
+      "Made thresholds adaptive",
+      "Reduced overly specific conditions"
+    ]
+  }
+]

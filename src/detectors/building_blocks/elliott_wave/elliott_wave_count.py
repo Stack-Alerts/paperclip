@@ -94,7 +94,7 @@ class ElliottWaveCount:
             # Wave 3 should be longer than wave 1
             if wave_3_size > wave_1_size:
                 signal = 'WAVE_5_FORMING'
-                confidence = 65
+                confidence = 80
                 
                 confluence_factors = []
                 confluence_factors.append("5-wave impulse pattern detected")

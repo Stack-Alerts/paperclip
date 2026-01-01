@@ -1,0 +1,5018 @@
+[
+  {
+    "block": "moving_averages/ema_200_trend",
+    "category": "moving_averages",
+    "name": "ema_200_trend",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "moving_averages/ema_800_vector",
+    "category": "moving_averages",
+    "name": "ema_800_vector",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "moving_averages/ema_255_vector",
+    "category": "moving_averages",
+    "name": "ema_255_vector",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/pennant_pattern",
+    "category": "patterns",
+    "name": "pennant_pattern",
+    "avg_score": 0.021850297398319726,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.036792780284623385,
+        "metrics": {
+          "score": 0.036792780284623385,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.37992831541218636,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.024534197430852906,
+        "metrics": {
+          "score": 0.024534197430852906,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.247953216374269,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.015334760719865746,
+        "metrics": {
+          "score": 0.015334760719865746,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.15415939499709133,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.011501236925480662,
+        "metrics": {
+          "score": 0.011501236925480662,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.11546840958605664,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.018402245305402035,
+        "metrics": {
+          "score": 0.018402245305402035,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.18450826805918188,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.024536563723693592,
+        "metrics": {
+          "score": 0.024536563723693592,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.24579710144927536,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/rounding_bottom",
+    "category": "patterns",
+    "name": "rounding_bottom",
+    "avg_score": 0.09922837480163967,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.12252690038181185,
+        "metrics": {
+          "score": 0.12252690038181185,
+          "signal_rate": 1.0,
+          "avg_confidence": 1.2652329749103943,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0776530494155769,
+        "metrics": {
+          "score": 0.0776530494155769,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.7847953216374269,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.038828771483131755,
+        "metrics": {
+          "score": 0.038828771483131755,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.3903432228039558,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.029121999913198207,
+        "metrics": {
+          "score": 0.029121999913198207,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.2923747276688453,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.1512977055062064,
+        "metrics": {
+          "score": 0.1512977055062064,
+          "signal_rate": 1.0,
+          "avg_confidence": 1.516971279373368,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.17594182210991297,
+        "metrics": {
+          "score": 0.17594182210991297,
+          "signal_rate": 1.0,
+          "avg_confidence": 1.762512077294686,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/flag_pattern",
+    "category": "patterns",
+    "name": "flag_pattern",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/cup_and_handle",
+    "category": "patterns",
+    "name": "cup_and_handle",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "institutional/market_depth",
+    "category": "institutional",
+    "name": "market_depth",
+    "avg_score": 5.379477779843024,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 5.317598056230474,
+        "metrics": {
+          "score": 5.317598056230474,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.91039426523297,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 5.370906145122091,
+        "metrics": {
+          "score": 5.370906145122091,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.280701754385966,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 5.38452635842833,
+        "metrics": {
+          "score": 5.38452635842833,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.13030831878999,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 5.383880907946702,
+        "metrics": {
+          "score": 5.383880907946702,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.052287581699346,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 5.403778825844158,
+        "metrics": {
+          "score": 5.403778825844158,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.18044676530316,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 5.41617638548639,
+        "metrics": {
+          "score": 5.41617638548639,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.25700483091787,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "supply_demand/supply_demand_zones",
+    "category": "supply_demand",
+    "name": "supply_demand_zones",
+    "avg_score": 6.435396164598999,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 6.286011801457826,
+        "metrics": {
+          "score": 6.286011801457826,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.91039426523298,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 6.428654090961692,
+        "metrics": {
+          "score": 6.428654090961692,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.97076023391813,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 6.464324981193217,
+        "metrics": {
+          "score": 6.464324981193217,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.98545666084934,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 6.473243348812985,
+        "metrics": {
+          "score": 6.473243348812985,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.98910675381264,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 6.477821822285233,
+        "metrics": {
+          "score": 6.477821822285233,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.94923121554976,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 6.482320942883044,
+        "metrics": {
+          "score": 6.482320942883044,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.93719806763285,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "institutional/ema_crossover",
+    "category": "institutional",
+    "name": "ema_crossover",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "market_structure/premium_discount_zones",
+    "category": "market_structure",
+    "name": "premium_discount_zones",
+    "avg_score": 5.448411950515321,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 5.32454009024644,
+        "metrics": {
+          "score": 5.32454009024644,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.982078853046595,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 5.441499826408979,
+        "metrics": {
+          "score": 5.441499826408979,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.994152046783626,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 5.470748220589085,
+        "metrics": {
+          "score": 5.470748220589085,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.997091332169866,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 5.4780608480534685,
+        "metrics": {
+          "score": 5.4780608480534685,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.99782135076253,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 5.4853736871039604,
+        "metrics": {
+          "score": 5.4853736871039604,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.99854946330142,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 5.490249030689992,
+        "metrics": {
+          "score": 5.490249030689992,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.99903381642512,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "market_structure/range_liquidity",
+    "category": "market_structure",
+    "name": "range_liquidity",
+    "avg_score": 5.944278783345926,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 5.810482471364108,
+        "metrics": {
+          "score": 5.810482471364108,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 5.9368128688809145,
+        "metrics": {
+          "score": 5.9368128688809145,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 5.968404606214917,
+        "metrics": {
+          "score": 5.968404606214917,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 5.976303111844103,
+        "metrics": {
+          "score": 5.976303111844103,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 5.984201846011398,
+        "metrics": {
+          "score": 5.984201846011398,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 5.989467795760111,
+        "metrics": {
+          "score": 5.989467795760111,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "moving_averages/ema_55_vector",
+    "category": "moving_averages",
+    "name": "ema_55_vector",
+    "avg_score": 0.5199482089526357,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.5970149253731342,
+        "metrics": {
+          "score": 0.5970149253731342,
+          "signal_rate": 1.0,
+          "avg_confidence": 6.164874551971326,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.5346603402383983,
+        "metrics": {
+          "score": 0.5346603402383983,
+          "signal_rate": 1.0,
+          "avg_confidence": 5.4035087719298245,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.48897633238817184,
+        "metrics": {
+          "score": 0.48897633238817184,
+          "signal_rate": 1.0,
+          "avg_confidence": 4.9156486329261195,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.5151686124734168,
+        "metrics": {
+          "score": 0.5151686124734168,
+          "signal_rate": 1.0,
+          "avg_confidence": 5.172113289760349,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.4898585110384536,
+        "metrics": {
+          "score": 0.4898585110384536,
+          "signal_rate": 1.0,
+          "avg_confidence": 4.911517261386713,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.49401053220423974,
+        "metrics": {
+          "score": 0.49401053220423974,
+          "signal_rate": 1.0,
+          "avg_confidence": 4.948792270531401,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "moving_averages/ema_20_50_cross",
+    "category": "moving_averages",
+    "name": "ema_20_50_cross",
+    "avg_score": 7.067720147462282,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 6.957653592502601,
+        "metrics": {
+          "score": 6.957653592502601,
+          "signal_rate": 1.0,
+          "avg_confidence": 71.84587813620071,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 7.064575859275545,
+        "metrics": {
+          "score": 7.064575859275545,
+          "signal_rate": 1.0,
+          "avg_confidence": 71.39766081871345,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 7.079740755743301,
+        "metrics": {
+          "score": 7.079740755743301,
+          "signal_rate": 1.0,
+          "avg_confidence": 71.17219313554392,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 7.082374896922876,
+        "metrics": {
+          "score": 7.082374896922876,
+          "signal_rate": 1.0,
+          "avg_confidence": 71.10457516339869,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 7.107143890512425,
+        "metrics": {
+          "score": 7.107143890512425,
+          "signal_rate": 1.0,
+          "avg_confidence": 71.25906585436611,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 7.114831889816938,
+        "metrics": {
+          "score": 7.114831889816938,
+          "signal_rate": 1.0,
+          "avg_confidence": 71.27342995169082,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "moving_averages/ema_50_vector",
+    "category": "moving_averages",
+    "name": "ema_50_vector",
+    "avg_score": 94.19149667336102,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 91.78740020826102,
+        "metrics": {
+          "score": 91.78740020826102,
+          "signal_rate": 0.10752688172043011,
+          "avg_confidence": 95.5,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 93.88641360953594,
+        "metrics": {
+          "score": 93.88641360953594,
+          "signal_rate": 0.0935672514619883,
+          "avg_confidence": 95.5,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 94.85725119464944,
+        "metrics": {
+          "score": 94.85725119464944,
+          "signal_rate": 0.09947643979057591,
+          "avg_confidence": 95.4093567251462,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 94.41454605075977,
+        "metrics": {
+          "score": 94.41454605075977,
+          "signal_rate": 0.10588235294117647,
+          "avg_confidence": 95.34979423868313,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 94.9101205659623,
+        "metrics": {
+          "score": 94.9101205659623,
+          "signal_rate": 0.10414853495793444,
+          "avg_confidence": 95.55710306406685,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 95.29324841099756,
+        "metrics": {
+          "score": 95.29324841099756,
+          "signal_rate": 0.10164251207729469,
+          "avg_confidence": 95.61787072243347,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "True"
+  },
+  {
+    "block": "institutional/order_flow_imbalance",
+    "category": "institutional",
+    "name": "order_flow_imbalance",
+    "avg_score": 5.25714748004263,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 5.170079833391183,
+        "metrics": {
+          "score": 5.170079833391183,
+          "signal_rate": 1.0,
+          "avg_confidence": 53.38709677419355,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 5.2650156231917595,
+        "metrics": {
+          "score": 5.2650156231917595,
+          "signal_rate": 1.0,
+          "avg_confidence": 53.21052631578947,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 5.308720560152768,
+        "metrics": {
+          "score": 5.308720560152768,
+          "signal_rate": 1.0,
+          "avg_confidence": 53.36823734729494,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 5.272557614686862,
+        "metrics": {
+          "score": 5.272557614686862,
+          "signal_rate": 1.0,
+          "avg_confidence": 52.93464052287582,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 5.260698475159861,
+        "metrics": {
+          "score": 5.260698475159861,
+          "signal_rate": 1.0,
+          "avg_confidence": 52.74586597040905,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 5.265812773673345,
+        "metrics": {
+          "score": 5.265812773673345,
+          "signal_rate": 1.0,
+          "avg_confidence": 52.75072463768116,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "smc_ict/balanced_price_range",
+    "category": "smc_ict",
+    "name": "balanced_price_range",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "institutional/vwap",
+    "category": "institutional",
+    "name": "vwap",
+    "avg_score": 5.944278783345926,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 5.810482471364108,
+        "metrics": {
+          "score": 5.810482471364108,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 5.9368128688809145,
+        "metrics": {
+          "score": 5.9368128688809145,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 5.968404606214917,
+        "metrics": {
+          "score": 5.968404606214917,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 5.976303111844103,
+        "metrics": {
+          "score": 5.976303111844103,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 5.984201846011398,
+        "metrics": {
+          "score": 5.984201846011398,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 5.989467795760111,
+        "metrics": {
+          "score": 5.989467795760111,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "institutional/anchored_vwap",
+    "category": "institutional",
+    "name": "anchored_vwap",
+    "avg_score": 6.142421409457456,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 6.004165220409578,
+        "metrics": {
+          "score": 6.004165220409578,
+          "signal_rate": 1.0,
+          "avg_confidence": 62.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 6.134706631176946,
+        "metrics": {
+          "score": 6.134706631176946,
+          "signal_rate": 1.0,
+          "avg_confidence": 62.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 6.167351426422081,
+        "metrics": {
+          "score": 6.167351426422081,
+          "signal_rate": 1.0,
+          "avg_confidence": 62.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 6.17551321557224,
+        "metrics": {
+          "score": 6.17551321557224,
+          "signal_rate": 1.0,
+          "avg_confidence": 62.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 6.183675240878445,
+        "metrics": {
+          "score": 6.183675240878445,
+          "signal_rate": 1.0,
+          "avg_confidence": 62.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 6.189116722285448,
+        "metrics": {
+          "score": 6.189116722285448,
+          "signal_rate": 1.0,
+          "avg_confidence": 62.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "smc_ict/premium_discount",
+    "category": "smc_ict",
+    "name": "premium_discount",
+    "avg_score": 23.515138675772192,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 24.890662964248524,
+        "metrics": {
+          "score": 24.890662964248524,
+          "signal_rate": 0.7741935483870968,
+          "avg_confidence": 78.88888888888889,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 23.2748135902762,
+        "metrics": {
+          "score": 23.2748135902762,
+          "signal_rate": 0.8011695906432749,
+          "avg_confidence": 78.71532846715328,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 23.203320613049,
+        "metrics": {
+          "score": 23.203320613049,
+          "signal_rate": 0.8045375218150087,
+          "avg_confidence": 78.94793926247289,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 23.088068756764986,
+        "metrics": {
+          "score": 23.088068756764986,
+          "signal_rate": 0.8069716775599128,
+          "avg_confidence": 79.1036717062635,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 23.20970280213734,
+        "metrics": {
+          "score": 23.20970280213734,
+          "signal_rate": 0.8053379750507688,
+          "avg_confidence": 78.97514409221903,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 23.424263328157107,
+        "metrics": {
+          "score": 23.424263328157107,
+          "signal_rate": 0.8027053140096618,
+          "avg_confidence": 78.92994703899855,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "elliott_wave/elliott_wave_oscillator",
+    "category": "elliott_wave",
+    "name": "elliott_wave_oscillator",
+    "avg_score": 6.052922102128424,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 5.862547726483859,
+        "metrics": {
+          "score": 5.862547726483859,
+          "signal_rate": 1.0,
+          "avg_confidence": 60.53763440860215,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 6.054854762180302,
+        "metrics": {
+          "score": 6.054854762180302,
+          "signal_rate": 1.0,
+          "avg_confidence": 61.19298245614035,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 6.092529367513452,
+        "metrics": {
+          "score": 6.092529367513452,
+          "signal_rate": 1.0,
+          "avg_confidence": 61.2478184991274,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 6.092183498980078,
+        "metrics": {
+          "score": 6.092183498980078,
+          "signal_rate": 1.0,
+          "avg_confidence": 61.16339869281046,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 6.107896183559502,
+        "metrics": {
+          "score": 6.107896183559502,
+          "signal_rate": 1.0,
+          "avg_confidence": 61.240208877284594,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 6.107521074053353,
+        "metrics": {
+          "score": 6.107521074053353,
+          "signal_rate": 1.0,
+          "avg_confidence": 61.18260869565217,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "smc_ict/change_of_character",
+    "category": "smc_ict",
+    "name": "change_of_character",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.8960573476702509,
+          "avg_confidence": 0.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.9029239766081871,
+          "avg_confidence": 0.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.9040139616055847,
+          "avg_confidence": 0.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.9084967320261438,
+          "avg_confidence": 0.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.9007832898172323,
+          "avg_confidence": 0.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.903768115942029,
+          "avg_confidence": 0.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "sessions/session_time",
+    "category": "sessions",
+    "name": "session_time",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "price_action/fair_value_gap",
+    "category": "price_action",
+    "name": "fair_value_gap",
+    "avg_score": 12.141731293375186,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 16.4187038230773,
+        "metrics": {
+          "score": 16.4187038230773,
+          "signal_rate": 0.3763440860215054,
+          "avg_confidence": 23.428571428571427,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 11.378236271570595,
+        "metrics": {
+          "score": 11.378236271570595,
+          "signal_rate": 0.43391812865497076,
+          "avg_confidence": 17.264150943396228,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 9.318540385850326,
+        "metrics": {
+          "score": 9.318540385850326,
+          "signal_rate": 0.5020360674810936,
+          "avg_confidence": 15.666280417149478,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 10.052883165342575,
+        "metrics": {
+          "score": 10.052883165342575,
+          "signal_rate": 0.481917211328976,
+          "avg_confidence": 16.329113924050635,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 11.940910894608706,
+        "metrics": {
+          "score": 11.940910894608706,
+          "signal_rate": 0.44676530316217,
+          "avg_confidence": 18.32792207792208,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 13.74111321980161,
+        "metrics": {
+          "score": 13.74111321980161,
+          "signal_rate": 0.42917874396135264,
+          "avg_confidence": 20.520036019810895,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "sessions/kill_zones",
+    "category": "sessions",
+    "name": "kill_zones",
+    "avg_score": 5.538370257562563,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 5.430406108989933,
+        "metrics": {
+          "score": 5.430406108989933,
+          "signal_rate": 1.0,
+          "avg_confidence": 56.075268817204304,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 5.532345793310958,
+        "metrics": {
+          "score": 5.532345793310958,
+          "signal_rate": 1.0,
+          "avg_confidence": 55.91228070175438,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 5.557838088073606,
+        "metrics": {
+          "score": 5.557838088073606,
+          "signal_rate": 1.0,
+          "avg_confidence": 55.87260034904014,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 5.564211622759428,
+        "metrics": {
+          "score": 5.564211622759428,
+          "signal_rate": 1.0,
+          "avg_confidence": 55.86274509803921,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 5.570585341859319,
+        "metrics": {
+          "score": 5.570585341859319,
+          "signal_rate": 1.0,
+          "avg_confidence": 55.85291557876414,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 5.574834590382129,
+        "metrics": {
+          "score": 5.574834590382129,
+          "signal_rate": 1.0,
+          "avg_confidence": 55.846376811594205,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "smc_ict/swing_failure_pattern",
+    "category": "smc_ict",
+    "name": "swing_failure_pattern",
+    "avg_score": 0.7595897839128386,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.9718847622353348,
+        "metrics": {
+          "score": 0.9718847622353348,
+          "signal_rate": 1.0,
+          "avg_confidence": 10.03584229390681,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.7580141187362571,
+        "metrics": {
+          "score": 0.7580141187362571,
+          "signal_rate": 1.0,
+          "avg_confidence": 7.6608187134502925,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.59892367339853,
+        "metrics": {
+          "score": 0.59892367339853,
+          "signal_rate": 1.0,
+          "avg_confidence": 6.020942408376963,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.5902521591944793,
+        "metrics": {
+          "score": 0.5902521591944793,
+          "signal_rate": 1.0,
+          "avg_confidence": 5.925925925925926,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.7765978993663376,
+        "metrics": {
+          "score": 0.7765978993663376,
+          "signal_rate": 1.0,
+          "avg_confidence": 7.786480997969249,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.8618660905460926,
+        "metrics": {
+          "score": 0.8618660905460926,
+          "signal_rate": 1.0,
+          "avg_confidence": 8.633816425120774,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "smc_ict/displacement",
+    "category": "smc_ict",
+    "name": "displacement",
+    "avg_score": 0.389409537396286,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.35751475182228387,
+        "metrics": {
+          "score": 0.35751475182228387,
+          "signal_rate": 1.0,
+          "avg_confidence": 3.6917562724014337,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.37784978590440915,
+        "metrics": {
+          "score": 0.37784978590440915,
+          "signal_rate": 1.0,
+          "avg_confidence": 3.818713450292398,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.3960997627452114,
+        "metrics": {
+          "score": 0.3960997627452114,
+          "signal_rate": 1.0,
+          "avg_confidence": 3.9819662594531704,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.40992144438175415,
+        "metrics": {
+          "score": 0.40992144438175415,
+          "signal_rate": 1.0,
+          "avg_confidence": 4.1154684095860565,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.3988599866901998,
+        "metrics": {
+          "score": 0.3988599866901998,
+          "signal_rate": 1.0,
+          "avg_confidence": 3.9991296779808527,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.39621149283385726,
+        "metrics": {
+          "score": 0.39621149283385726,
+          "signal_rate": 1.0,
+          "avg_confidence": 3.969082125603865,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "smc_ict/optimal_trade_entry",
+    "category": "smc_ict",
+    "name": "optimal_trade_entry",
+    "avg_score": 1.9572327045093576,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 2.121159319680666,
+        "metrics": {
+          "score": 2.121159319680666,
+          "signal_rate": 0.8960573476702509,
+          "avg_confidence": 10.74,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 2.1331345681181353,
+        "metrics": {
+          "score": 2.1331345681181353,
+          "signal_rate": 0.9029239766081871,
+          "avg_confidence": 10.939119170984457,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 2.0235572399799002,
+        "metrics": {
+          "score": 2.0235572399799002,
+          "signal_rate": 0.9040139616055847,
+          "avg_confidence": 10.37966537966538,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 1.9179901077185213,
+        "metrics": {
+          "score": 1.9179901077185213,
+          "signal_rate": 0.9084967320261438,
+          "avg_confidence": 10.05515587529976,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 1.8125461010127444,
+        "metrics": {
+          "score": 1.8125461010127444,
+          "signal_rate": 0.9007832898172323,
+          "avg_confidence": 9.122383252818036,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 1.735008890546177,
+        "metrics": {
+          "score": 1.735008890546177,
+          "signal_rate": 0.903768115942029,
+          "avg_confidence": 8.857173401753261,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "fibonacci/fibonacci_retracements",
+    "category": "fibonacci",
+    "name": "fibonacci_retracements",
+    "avg_score": 6.892735656191568,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 6.71641791044776,
+        "metrics": {
+          "score": 6.71641791044776,
+          "signal_rate": 1.0,
+          "avg_confidence": 69.35483870967742,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 6.886934382594606,
+        "metrics": {
+          "score": 6.886934382594606,
+          "signal_rate": 1.0,
+          "avg_confidence": 69.60233918128655,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 6.937677217753601,
+        "metrics": {
+          "score": 6.937677217753601,
+          "signal_rate": 1.0,
+          "avg_confidence": 69.74403723094822,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 6.950653183455578,
+        "metrics": {
+          "score": 6.950653183455578,
+          "signal_rate": 1.0,
+          "avg_confidence": 69.78213507625273,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 6.9352738636034825,
+        "metrics": {
+          "score": 6.9352738636034825,
+          "signal_rate": 1.0,
+          "avg_confidence": 69.53582825645489,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 6.929457379294378,
+        "metrics": {
+          "score": 6.929457379294378,
+          "signal_rate": 1.0,
+          "avg_confidence": 69.41642512077294,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "smc_ict/inducement",
+    "category": "smc_ict",
+    "name": "inducement",
+    "avg_score": 0.9768891918725662,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 1.2721277334258934,
+        "metrics": {
+          "score": 1.2721277334258934,
+          "signal_rate": 1.0,
+          "avg_confidence": 13.136200716845877,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 1.0548547621803028,
+        "metrics": {
+          "score": 1.0548547621803028,
+          "signal_rate": 1.0,
+          "avg_confidence": 10.660818713450292,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.8127423181528846,
+        "metrics": {
+          "score": 0.8127423181528846,
+          "signal_rate": 1.0,
+          "avg_confidence": 8.170447934845841,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.828957076515776,
+        "metrics": {
+          "score": 0.828957076515776,
+          "signal_rate": 1.0,
+          "avg_confidence": 8.322440087145969,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.9245970892045945,
+        "metrics": {
+          "score": 0.9245970892045945,
+          "signal_rate": 1.0,
+          "avg_confidence": 9.270380040615027,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.9680561717559458,
+        "metrics": {
+          "score": 0.9680561717559458,
+          "signal_rate": 1.0,
+          "avg_confidence": 9.697584541062803,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "smc_ict/break_of_structure",
+    "category": "smc_ict",
+    "name": "break_of_structure",
+    "avg_score": 15.021026879663623,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 16.457095302417585,
+        "metrics": {
+          "score": 16.457095302417585,
+          "signal_rate": 0.8924731182795699,
+          "avg_confidence": 81.88755020080322,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 14.932779347467124,
+        "metrics": {
+          "score": 14.932779347467124,
+          "signal_rate": 0.9111111111111111,
+          "avg_confidence": 79.89730423620026,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 14.631557139708214,
+        "metrics": {
+          "score": 14.631557139708214,
+          "signal_rate": 0.9144851657940664,
+          "avg_confidence": 79.28753180661577,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 14.752857986127735,
+        "metrics": {
+          "score": 14.752857986127735,
+          "signal_rate": 0.9137254901960784,
+          "avg_confidence": 79.51359084406295,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 14.838825994203155,
+        "metrics": {
+          "score": 14.838825994203155,
+          "signal_rate": 0.9141282274441543,
+          "avg_confidence": 80.04443033957473,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 14.513045508057935,
+        "metrics": {
+          "score": 14.513045508057935,
+          "signal_rate": 0.9196135265700484,
+          "avg_confidence": 80.5967640260559,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "price_levels/hod",
+    "category": "price_levels",
+    "name": "hod",
+    "avg_score": 59.543612969280105,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 64.87851440472059,
+        "metrics": {
+          "score": 64.87851440472059,
+          "signal_rate": 0.3118279569892473,
+          "avg_confidence": 85.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 59.16849901631755,
+        "metrics": {
+          "score": 59.16849901631755,
+          "signal_rate": 0.39649122807017545,
+          "avg_confidence": 85.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 55.67472947167409,
+        "metrics": {
+          "score": 55.67472947167409,
+          "signal_rate": 0.44153577661431065,
+          "avg_confidence": 85.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 57.05156026214141,
+        "metrics": {
+          "score": 57.05156026214141,
+          "signal_rate": 0.4261437908496732,
+          "avg_confidence": 85.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 59.33841613379242,
+        "metrics": {
+          "score": 59.33841613379242,
+          "signal_rate": 0.4000580214679431,
+          "avg_confidence": 85.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 61.149958527034585,
+        "metrics": {
+          "score": 61.149958527034585,
+          "signal_rate": 0.37932367149758456,
+          "avg_confidence": 85.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "True"
+  },
+  {
+    "block": "wyckoff/wyckoff_reaccumulation",
+    "category": "wyckoff",
+    "name": "wyckoff_reaccumulation",
+    "avg_score": 4.220831028396822,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 4.104824713641096,
+        "metrics": {
+          "score": 4.104824713641096,
+          "signal_rate": 1.0,
+          "avg_confidence": 42.38709677419355,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 4.2423330633028575,
+        "metrics": {
+          "score": 4.2423330633028575,
+          "signal_rate": 1.0,
+          "avg_confidence": 42.87485380116959,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 4.241536948093281,
+        "metrics": {
+          "score": 4.241536948093281,
+          "signal_rate": 1.0,
+          "avg_confidence": 42.639906922629436,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 4.235319647584739,
+        "metrics": {
+          "score": 4.235319647584739,
+          "signal_rate": 1.0,
+          "avg_confidence": 42.521132897603486,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 4.242064755070744,
+        "metrics": {
+          "score": 4.242064755070744,
+          "signal_rate": 1.0,
+          "avg_confidence": 42.532637075718014,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 4.258907042688218,
+        "metrics": {
+          "score": 4.258907042688218,
+          "signal_rate": 1.0,
+          "avg_confidence": 42.663961352657005,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "wyckoff/wyckoff_distribution",
+    "category": "wyckoff",
+    "name": "wyckoff_distribution",
+    "avg_score": 3.6879032590683285,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 3.5491148906629633,
+        "metrics": {
+          "score": 3.5491148906629633,
+          "signal_rate": 1.0,
+          "avg_confidence": 36.64874551971326,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 3.628630945492419,
+        "metrics": {
+          "score": 3.628630945492419,
+          "signal_rate": 1.0,
+          "avg_confidence": 36.67251461988304,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 3.7214281580927024,
+        "metrics": {
+          "score": 3.7214281580927024,
+          "signal_rate": 1.0,
+          "avg_confidence": 37.41128563118092,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 3.7172865761034677,
+        "metrics": {
+          "score": 3.7172865761034677,
+          "signal_rate": 1.0,
+          "avg_confidence": 37.3202614379085,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 3.750614854894244,
+        "metrics": {
+          "score": 3.750614854894244,
+          "signal_rate": 1.0,
+          "avg_confidence": 37.60516391064694,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 3.7603441291641735,
+        "metrics": {
+          "score": 3.7603441291641735,
+          "signal_rate": 1.0,
+          "avg_confidence": 37.6695652173913,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "price_levels/us_settlement",
+    "category": "price_levels",
+    "name": "us_settlement",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "price_action/breaker_block",
+    "category": "price_action",
+    "name": "breaker_block",
+    "avg_score": 11.51207656737241,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 13.135179230082503,
+        "metrics": {
+          "score": 13.135179230082503,
+          "signal_rate": 0.921146953405018,
+          "avg_confidence": 75.83657587548637,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 11.882240273376597,
+        "metrics": {
+          "score": 11.882240273376597,
+          "signal_rate": 0.9368421052631579,
+          "avg_confidence": 73.60174781523096,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 10.738149039131544,
+        "metrics": {
+          "score": 10.738149039131544,
+          "signal_rate": 0.951716114019779,
+          "avg_confidence": 72.79951100244499,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 10.529172621101845,
+        "metrics": {
+          "score": 10.529172621101845,
+          "signal_rate": 0.9559912854030501,
+          "avg_confidence": 73.40474020054694,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 11.042043225369845,
+        "metrics": {
+          "score": 11.042043225369845,
+          "signal_rate": 0.9495213228894691,
+          "avg_confidence": 73.57317445768408,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 11.745675015172134,
+        "metrics": {
+          "score": 11.745675015172134,
+          "signal_rate": 0.9420289855072463,
+          "avg_confidence": 74.48410256410257,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "wyckoff/wyckoff_accumulation",
+    "category": "wyckoff",
+    "name": "wyckoff_accumulation",
+    "avg_score": 5.505813539586765,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 5.321069073238458,
+        "metrics": {
+          "score": 5.321069073238458,
+          "signal_rate": 1.0,
+          "avg_confidence": 54.946236559139784,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 5.499363499594953,
+        "metrics": {
+          "score": 5.499363499594953,
+          "signal_rate": 1.0,
+          "avg_confidence": 55.578947368421055,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 5.532665933684392,
+        "metrics": {
+          "score": 5.532665933684392,
+          "signal_rate": 1.0,
+          "avg_confidence": 55.6195462478185,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 5.536218046091749,
+        "metrics": {
+          "score": 5.536218046091749,
+          "signal_rate": 1.0,
+          "avg_confidence": 55.58169934640523,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 5.562339052689446,
+        "metrics": {
+          "score": 5.562339052689446,
+          "signal_rate": 1.0,
+          "avg_confidence": 55.77023498694517,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 5.583225632221599,
+        "metrics": {
+          "score": 5.583225632221599,
+          "signal_rate": 1.0,
+          "avg_confidence": 55.93043478260869,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "price_levels/lod",
+    "category": "price_levels",
+    "name": "lod",
+    "avg_score": 63.858961172813,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 67.23880597014926,
+        "metrics": {
+          "score": 67.23880597014926,
+          "signal_rate": 0.2831541218637993,
+          "avg_confidence": 85.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 65.95590788103229,
+        "metrics": {
+          "score": 65.95590788103229,
+          "signal_rate": 0.3157894736842105,
+          "avg_confidence": 85.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 60.79017417973497,
+        "metrics": {
+          "score": 60.79017417973497,
+          "signal_rate": 0.38103548574752766,
+          "avg_confidence": 85.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 60.85130853695586,
+        "metrics": {
+          "score": 60.85130853695586,
+          "signal_rate": 0.3812636165577342,
+          "avg_confidence": 85.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 62.6586325627152,
+        "metrics": {
+          "score": 62.6586325627152,
+          "signal_rate": 0.36089353060632434,
+          "avg_confidence": 85.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 65.65893790629039,
+        "metrics": {
+          "score": 65.65893790629039,
+          "signal_rate": 0.32618357487922706,
+          "avg_confidence": 85.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "True"
+  },
+  {
+    "block": "oscillators/stochastic_rsi",
+    "category": "oscillators",
+    "name": "stochastic_rsi",
+    "avg_score": 68.77623620274692,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 69.63445852134674,
+        "metrics": {
+          "score": 69.63445852134674,
+          "signal_rate": 0.3154121863799283,
+          "avg_confidence": 91.64772727272727,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 67.1282127061087,
+        "metrics": {
+          "score": 67.1282127061087,
+          "signal_rate": 0.35906432748538014,
+          "avg_confidence": 91.56351791530945,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 68.37766344501796,
+        "metrics": {
+          "score": 68.37766344501796,
+          "signal_rate": 0.35020360674810935,
+          "avg_confidence": 91.67774086378738,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 68.38932183118214,
+        "metrics": {
+          "score": 68.38932183118214,
+          "signal_rate": 0.3516339869281046,
+          "avg_confidence": 91.74721189591078,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 69.32387399465676,
+        "metrics": {
+          "score": 69.32387399465676,
+          "signal_rate": 0.34319698288366696,
+          "avg_confidence": 91.84277261200339,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 69.80388671816922,
+        "metrics": {
+          "score": 69.80388671816922,
+          "signal_rate": 0.33758454106280195,
+          "avg_confidence": 91.71722953634803,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "True"
+  },
+  {
+    "block": "oscillators/macd_signal",
+    "category": "oscillators",
+    "name": "macd_signal",
+    "avg_score": 87.05944003292755,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 84.58347795904199,
+        "metrics": {
+          "score": 84.58347795904199,
+          "signal_rate": 0.06451612903225806,
+          "avg_confidence": 90.55555555555556,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 86.91497026553827,
+        "metrics": {
+          "score": 86.91497026553827,
+          "signal_rate": 0.07251461988304093,
+          "avg_confidence": 90.3225806451613,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 87.28926070746569,
+        "metrics": {
+          "score": 87.28926070746569,
+          "signal_rate": 0.07329842931937172,
+          "avg_confidence": 90.15873015873017,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 87.66224220057084,
+        "metrics": {
+          "score": 87.66224220057084,
+          "signal_rate": 0.07538126361655774,
+          "avg_confidence": 90.23121387283237,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 87.99523656105197,
+        "metrics": {
+          "score": 87.99523656105197,
+          "signal_rate": 0.07745865970409051,
+          "avg_confidence": 90.2621722846442,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 87.91145250389648,
+        "metrics": {
+          "score": 87.91145250389648,
+          "signal_rate": 0.07516908212560386,
+          "avg_confidence": 90.30848329048843,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "True"
+  },
+  {
+    "block": "volatility/adr",
+    "category": "volatility",
+    "name": "adr",
+    "avg_score": 9.907131305576543,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 9.684137452273514,
+        "metrics": {
+          "score": 9.684137452273514,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 9.894688114801525,
+        "metrics": {
+          "score": 9.894688114801525,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 9.947341010358196,
+        "metrics": {
+          "score": 9.947341010358196,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 9.96050518640684,
+        "metrics": {
+          "score": 9.96050518640684,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 9.973669743352332,
+        "metrics": {
+          "score": 9.973669743352332,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 9.982446326266853,
+        "metrics": {
+          "score": 9.982446326266853,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "trend/adx",
+    "category": "trend",
+    "name": "adx",
+    "avg_score": 3.07914719629933,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 3.0780701145435607,
+        "metrics": {
+          "score": 3.0780701145435607,
+          "signal_rate": 1.0,
+          "avg_confidence": 31.784659498207887,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 3.1413146626547843,
+        "metrics": {
+          "score": 3.1413146626547843,
+          "signal_rate": 1.0,
+          "avg_confidence": 31.747485380116956,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 3.046413980672414,
+        "metrics": {
+          "score": 3.046413980672414,
+          "signal_rate": 1.0,
+          "avg_confidence": 30.62541012216405,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 3.0509062106679385,
+        "metrics": {
+          "score": 3.0509062106679385,
+          "signal_rate": 1.0,
+          "avg_confidence": 30.630034858387795,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 3.056907786233037,
+        "metrics": {
+          "score": 3.056907786233037,
+          "signal_rate": 1.0,
+          "avg_confidence": 30.64977951842182,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 3.1012704230242463,
+        "metrics": {
+          "score": 3.1012704230242463,
+          "signal_rate": 1.0,
+          "avg_confidence": 31.067238647342993,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "price_levels/asia_session_50_percent",
+    "category": "price_levels",
+    "name": "asia_session_50_percent",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 0.0,
+          "avg_confidence": 0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "price_levels/low",
+    "category": "price_levels",
+    "name": "low",
+    "avg_score": 64.37201360825226,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 69.63207219715376,
+        "metrics": {
+          "score": 69.63207219715376,
+          "signal_rate": 0.3010752688172043,
+          "avg_confidence": 90.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 64.94040041661844,
+        "metrics": {
+          "score": 64.94040041661844,
+          "signal_rate": 0.3707602339181287,
+          "avg_confidence": 90.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 59.47051675250275,
+        "metrics": {
+          "score": 59.47051675250275,
+          "signal_rate": 0.43571844095404305,
+          "avg_confidence": 90.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 60.60283841847142,
+        "metrics": {
+          "score": 60.60283841847142,
+          "signal_rate": 0.42396514161220045,
+          "avg_confidence": 90.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 64.0267932062151,
+        "metrics": {
+          "score": 64.0267932062151,
+          "signal_rate": 0.38671308384102115,
+          "avg_confidence": 90.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 67.55946065855211,
+        "metrics": {
+          "score": 67.55946065855211,
+          "signal_rate": 0.34801932367149757,
+          "avg_confidence": 90.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "True"
+  },
+  {
+    "block": "price_levels/how",
+    "category": "price_levels",
+    "name": "how",
+    "avg_score": 59.26458649610296,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 67.13293995140575,
+        "metrics": {
+          "score": 67.13293995140575,
+          "signal_rate": 0.32974910394265233,
+          "avg_confidence": 90.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 61.71160745284111,
+        "metrics": {
+          "score": 61.71160745284111,
+          "signal_rate": 0.4070175438596491,
+          "avg_confidence": 90.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 54.21040449048088,
+        "metrics": {
+          "score": 54.21040449048088,
+          "signal_rate": 0.4944735311227458,
+          "avg_confidence": 90.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 54.15780565079641,
+        "metrics": {
+          "score": 54.15780565079641,
+          "signal_rate": 0.4958605664488017,
+          "avg_confidence": 90.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 57.98530135123405,
+        "metrics": {
+          "score": 57.98530135123405,
+          "signal_rate": 0.4540179866550624,
+          "avg_confidence": 90.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 60.38946007985957,
+        "metrics": {
+          "score": 60.38946007985957,
+          "signal_rate": 0.42782608695652175,
+          "avg_confidence": 90.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "True"
+  },
+  {
+    "block": "oscillators/rsi_divergence",
+    "category": "oscillators",
+    "name": "rsi_divergence",
+    "avg_score": 72.81866876935565,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 74.52420366859796,
+        "metrics": {
+          "score": 74.52420366859796,
+          "signal_rate": 0.1863799283154122,
+          "avg_confidence": 84.23076923076923,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 72.12291352212485,
+        "metrics": {
+          "score": 72.12291352212485,
+          "signal_rate": 0.2198830409356725,
+          "avg_confidence": 82.81914893617021,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 72.56211749209841,
+        "metrics": {
+          "score": 72.56211749209841,
+          "signal_rate": 0.2198952879581152,
+          "avg_confidence": 82.88359788359789,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 72.49579002682036,
+        "metrics": {
+          "score": 72.49579002682036,
+          "signal_rate": 0.21873638344226579,
+          "avg_confidence": 82.58964143426294,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 72.56018344376609,
+        "metrics": {
+          "score": 72.56018344376609,
+          "signal_rate": 0.2181607194662025,
+          "avg_confidence": 82.5,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 72.64680446272628,
+        "metrics": {
+          "score": 72.64680446272628,
+          "signal_rate": 0.21584541062801932,
+          "avg_confidence": 82.30975828111012,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "True"
+  },
+  {
+    "block": "volatility/bollinger_bands",
+    "category": "volatility",
+    "name": "bollinger_bands",
+    "avg_score": 9.907131305576543,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 9.684137452273514,
+        "metrics": {
+          "score": 9.684137452273514,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 9.894688114801525,
+        "metrics": {
+          "score": 9.894688114801525,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 9.947341010358196,
+        "metrics": {
+          "score": 9.947341010358196,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 9.96050518640684,
+        "metrics": {
+          "score": 9.96050518640684,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 9.973669743352332,
+        "metrics": {
+          "score": 9.973669743352332,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 9.982446326266853,
+        "metrics": {
+          "score": 9.982446326266853,
+          "signal_rate": 1.0,
+          "avg_confidence": 100.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "trend/ichimoku_cloud",
+    "category": "trend",
+    "name": "ichimoku_cloud",
+    "avg_score": 25.657690786249912,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 25.033756862591723,
+        "metrics": {
+          "score": 25.033756862591723,
+          "signal_rate": 0.7634408602150538,
+          "avg_confidence": 76.8075117370892,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 26.33418313512189,
+        "metrics": {
+          "score": 26.33418313512189,
+          "signal_rate": 0.7555555555555555,
+          "avg_confidence": 77.26780185758514,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 26.133545937124566,
+        "metrics": {
+          "score": 26.133545937124566,
+          "signal_rate": 0.7609075043630017,
+          "avg_confidence": 77.4770642201835,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 25.171979712455133,
+        "metrics": {
+          "score": 25.171979712455133,
+          "signal_rate": 0.7729847494553377,
+          "avg_confidence": 77.28015783540023,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 25.236111985086634,
+        "metrics": {
+          "score": 25.236111985086634,
+          "signal_rate": 0.7734261676820423,
+          "avg_confidence": 77.47936984246061,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 26.036567085119515,
+        "metrics": {
+          "score": 26.036567085119515,
+          "signal_rate": 0.7634782608695653,
+          "avg_confidence": 77.50569476082005,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "volatility/atr",
+    "category": "volatility",
+    "name": "atr",
+    "avg_score": 92.28082166948424,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 90.28115237764663,
+        "metrics": {
+          "score": 90.28115237764663,
+          "signal_rate": 0.03225806451612903,
+          "avg_confidence": 100.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 92.40828607800023,
+        "metrics": {
+          "score": 92.40828607800023,
+          "signal_rate": 0.03391812865497076,
+          "avg_confidence": 100.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 92.70875528036572,
+        "metrics": {
+          "score": 92.70875528036572,
+          "signal_rate": 0.031995346131471786,
+          "avg_confidence": 100.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 92.76941104986764,
+        "metrics": {
+          "score": 92.76941104986764,
+          "signal_rate": 0.03137254901960784,
+          "avg_confidence": 100.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 92.68539683458233,
+        "metrics": {
+          "score": 92.68539683458233,
+          "signal_rate": 0.029300841311285176,
+          "avg_confidence": 100.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 92.83192839644296,
+        "metrics": {
+          "score": 92.83192839644296,
+          "signal_rate": 0.02995169082125604,
+          "avg_confidence": 100.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "True"
+  },
+  {
+    "block": "price_action/order_block",
+    "category": "price_action",
+    "name": "order_block",
+    "avg_score": 1.983254855251424,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 3.21808521414284,
+        "metrics": {
+          "score": 3.21808521414284,
+          "signal_rate": 0.921146953405018,
+          "avg_confidence": 18.579766536964982,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 2.2985022505999644,
+        "metrics": {
+          "score": 2.2985022505999644,
+          "signal_rate": 0.9345029239766082,
+          "avg_confidence": 14.036295369211514,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 1.2647031279150338,
+        "metrics": {
+          "score": 1.2647031279150338,
+          "signal_rate": 0.9557882489819662,
+          "avg_confidence": 8.816189896530737,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 1.07621697776205,
+        "metrics": {
+          "score": 1.07621697776205,
+          "signal_rate": 0.9629629629629629,
+          "avg_confidence": 7.884615384615385,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 1.794720330308537,
+        "metrics": {
+          "score": 1.794720330308537,
+          "signal_rate": 0.9434290687554395,
+          "avg_confidence": 11.492927429274292,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 2.2473012307801166,
+        "metrics": {
+          "score": 2.2473012307801166,
+          "signal_rate": 0.9360386473429951,
+          "avg_confidence": 13.730388109000826,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "smc_ict/market_structure_shift",
+    "category": "smc_ict",
+    "name": "market_structure_shift",
+    "avg_score": 8.533537538236994,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 8.387712599791737,
+        "metrics": {
+          "score": 8.387712599791737,
+          "signal_rate": 1.0,
+          "avg_confidence": 86.61290322580645,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 8.527369517416965,
+        "metrics": {
+          "score": 8.527369517416965,
+          "signal_rate": 1.0,
+          "avg_confidence": 86.18128654970761,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 8.536543024130546,
+        "metrics": {
+          "score": 8.536543024130546,
+          "signal_rate": 1.0,
+          "avg_confidence": 85.8173356602676,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 8.552580183151772,
+        "metrics": {
+          "score": 8.552580183151772,
+          "signal_rate": 1.0,
+          "avg_confidence": 85.86492374727669,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 8.582216949741037,
+        "metrics": {
+          "score": 8.582216949741037,
+          "signal_rate": 1.0,
+          "avg_confidence": 86.04873803307224,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 8.614802955189905,
+        "metrics": {
+          "score": 8.614802955189905,
+          "signal_rate": 1.0,
+          "avg_confidence": 86.29951690821257,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "smc_ict/mitigation_block",
+    "category": "smc_ict",
+    "name": "mitigation_block",
+    "avg_score": 0.0,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.0,
+        "metrics": {
+          "score": 0.0,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "price_action/liquidity_sweep",
+    "category": "price_action",
+    "name": "liquidity_sweep",
+    "avg_score": 4.376021076501921,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 4.79347448802499,
+        "metrics": {
+          "score": 4.79347448802499,
+          "signal_rate": 1.0,
+          "avg_confidence": 49.49820788530466,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 4.322416386992245,
+        "metrics": {
+          "score": 4.322416386992245,
+          "signal_rate": 1.0,
+          "avg_confidence": 43.68421052631579,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 4.083097042995196,
+        "metrics": {
+          "score": 4.083097042995196,
+          "signal_rate": 1.0,
+          "avg_confidence": 41.047120418848166,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 4.161711731261663,
+        "metrics": {
+          "score": 4.161711731261663,
+          "signal_rate": 1.0,
+          "avg_confidence": 41.78213507625272,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 4.357512803448974,
+        "metrics": {
+          "score": 4.357512803448974,
+          "signal_rate": 1.0,
+          "avg_confidence": 43.69016536118364,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 4.5379140062884575,
+        "metrics": {
+          "score": 4.5379140062884575,
+          "signal_rate": 1.0,
+          "avg_confidence": 45.45893719806763,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/symmetrical_triangle",
+    "category": "patterns",
+    "name": "symmetrical_triangle",
+    "avg_score": 0.020524721174408046,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.04165220409580006,
+        "metrics": {
+          "score": 0.04165220409580006,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.43010752688172044,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.021988195810670054,
+        "metrics": {
+          "score": 0.021988195810670054,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.2222222222222222,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.010994734101035818,
+        "metrics": {
+          "score": 0.010994734101035818,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.11052937754508435,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.016492339742198686,
+        "metrics": {
+          "score": 0.016492339742198686,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.1655773420479303,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.013888487022944934,
+        "metrics": {
+          "score": 0.013888487022944934,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.1392515230635335,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.018132366273798727,
+        "metrics": {
+          "score": 0.018132366273798727,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.18164251207729468,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "market_structure/swing_points",
+    "category": "market_structure",
+    "name": "swing_points",
+    "avg_score": 6.9349919139035805,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 6.778896216591459,
+        "metrics": {
+          "score": 6.778896216591459,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.0,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 6.926281680361067,
+        "metrics": {
+          "score": 6.926281680361067,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.0,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 6.963138707250736,
+        "metrics": {
+          "score": 6.963138707250736,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.0,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 6.972353630484787,
+        "metrics": {
+          "score": 6.972353630484787,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.0,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 6.981568820346632,
+        "metrics": {
+          "score": 6.981568820346632,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.0,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 6.987712428386796,
+        "metrics": {
+          "score": 6.987712428386796,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.0,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/triple_top",
+    "category": "patterns",
+    "name": "triple_top",
+    "avg_score": 6.369655911297074,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 5.9770912877473075,
+        "metrics": {
+          "score": 5.9770912877473075,
+          "signal_rate": 1.0,
+          "avg_confidence": 61.72043010752688,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 6.375998148362456,
+        "metrics": {
+          "score": 6.375998148362456,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.43859649122807,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 6.4929691568774945,
+        "metrics": {
+          "score": 6.4929691568774945,
+          "signal_rate": 1.0,
+          "avg_confidence": 65.27341477603258,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 6.438305629095958,
+        "metrics": {
+          "score": 6.438305629095958,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.63834422657952,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 6.466103411359622,
+        "metrics": {
+          "score": 6.466103411359622,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.83173774296489,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 6.4674678343396135,
+        "metrics": {
+          "score": 6.4674678343396135,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.78840579710145,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/falling_wedge",
+    "category": "patterns",
+    "name": "falling_wedge",
+    "avg_score": 0.013329374997143246,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.021867407150295032,
+        "metrics": {
+          "score": 0.021867407150295032,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.22580645161290322,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.007290822821432703,
+        "metrics": {
+          "score": 0.007290822821432703,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.07368421052631578,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.008737920259244254,
+        "metrics": {
+          "score": 0.008737920259244254,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.08784176847004072,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.014756303979861982,
+        "metrics": {
+          "score": 0.014756303979861982,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.14814814814814814,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.014206764850554091,
+        "metrics": {
+          "score": 0.014206764850554091,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.14244270380040616,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.013117030921471418,
+        "metrics": {
+          "score": 0.013117030921471418,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.13140096618357489,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/rising_wedge",
+    "category": "patterns",
+    "name": "rising_wedge",
+    "avg_score": 0.03982287809386481,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.02082610204790003,
+        "metrics": {
+          "score": 0.02082610204790003,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.21505376344086022,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.04860548547621801,
+        "metrics": {
+          "score": 0.04860548547621801,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.49122807017543857,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.038192234245703366,
+        "metrics": {
+          "score": 0.038192234245703366,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.38394415357766143,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.04643895664250683,
+        "metrics": {
+          "score": 0.04643895664250683,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.4662309368191721,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.04311217846705823,
+        "metrics": {
+          "score": 0.04311217846705823,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.43225993617638525,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.041762311683802386,
+        "metrics": {
+          "score": 0.041762311683802386,
+          "signal_rate": 1.0,
+          "avg_confidence": 0.41835748792270533,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/triple_bottom",
+    "category": "patterns",
+    "name": "triple_bottom",
+    "avg_score": 6.925881792477811,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 6.55154460256855,
+        "metrics": {
+          "score": 6.55154460256855,
+          "signal_rate": 1.0,
+          "avg_confidence": 67.65232974910394,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 6.879412105080429,
+        "metrics": {
+          "score": 6.879412105080429,
+          "signal_rate": 1.0,
+          "avg_confidence": 69.52631578947368,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 7.028528441641107,
+        "metrics": {
+          "score": 7.028528441641107,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.65735892961024,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 7.06826960635389,
+        "metrics": {
+          "score": 7.06826960635389,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.96296296296296,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 7.012528572668614,
+        "metrics": {
+          "score": 7.012528572668614,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.3104148534958,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 7.015007426554269,
+        "metrics": {
+          "score": 7.015007426554269,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.27342995169082,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/head_and_shoulders",
+    "category": "patterns",
+    "name": "head_and_shoulders",
+    "avg_score": 3.472834418418701,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 3.293995140576188,
+        "metrics": {
+          "score": 3.293995140576188,
+          "signal_rate": 1.0,
+          "avg_confidence": 34.01433691756272,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 3.3688230528873966,
+        "metrics": {
+          "score": 3.3688230528873966,
+          "signal_rate": 1.0,
+          "avg_confidence": 34.046783625730995,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 3.5860193275852086,
+        "metrics": {
+          "score": 3.5860193275852086,
+          "signal_rate": 1.0,
+          "avg_confidence": 36.0500290866783,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 3.582743804522373,
+        "metrics": {
+          "score": 3.582743804522373,
+          "signal_rate": 1.0,
+          "avg_confidence": 35.969498910675384,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 3.5059749428546616,
+        "metrics": {
+          "score": 3.5059749428546616,
+          "signal_rate": 1.0,
+          "avg_confidence": 35.15230635335074,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 3.4994502420863784,
+        "metrics": {
+          "score": 3.4994502420863784,
+          "signal_rate": 1.0,
+          "avg_confidence": 35.056038647342994,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/double_top",
+    "category": "patterns",
+    "name": "double_top",
+    "avg_score": 6.378236000197778,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 6.126345019090592,
+        "metrics": {
+          "score": 6.126345019090592,
+          "signal_rate": 1.0,
+          "avg_confidence": 63.261648745519715,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 6.394514523781969,
+        "metrics": {
+          "score": 6.394514523781969,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.62573099415205,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 6.424686071407904,
+        "metrics": {
+          "score": 6.424686071407904,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.586969168121,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 6.401197864676011,
+        "metrics": {
+          "score": 6.401197864676011,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.26579520697167,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 6.467550128757846,
+        "metrics": {
+          "score": 6.467550128757846,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.84624310995068,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 6.455122393472346,
+        "metrics": {
+          "score": 6.455122393472346,
+          "signal_rate": 1.0,
+          "avg_confidence": 64.66473429951691,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "elliott_wave/elliott_wave_count",
+    "category": "elliott_wave",
+    "name": "elliott_wave_count",
+    "avg_score": 4.1513336274821695,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 4.073238458868447,
+        "metrics": {
+          "score": 4.073238458868447,
+          "signal_rate": 1.0,
+          "avg_confidence": 42.060931899641574,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 4.126837171623654,
+        "metrics": {
+          "score": 4.126837171623654,
+          "signal_rate": 1.0,
+          "avg_confidence": 41.707602339181285,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 4.170476245587639,
+        "metrics": {
+          "score": 4.170476245587639,
+          "signal_rate": 1.0,
+          "avg_confidence": 41.925538103548575,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 4.178855084414738,
+        "metrics": {
+          "score": 4.178855084414738,
+          "signal_rate": 1.0,
+          "avg_confidence": 41.95424836601307,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 4.173490350394952,
+        "metrics": {
+          "score": 4.173490350394952,
+          "signal_rate": 1.0,
+          "avg_confidence": 41.845082680591815,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 4.185104454003587,
+        "metrics": {
+          "score": 4.185104454003587,
+          "signal_rate": 1.0,
+          "avg_confidence": 41.92463768115942,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/ascending_triangle",
+    "category": "patterns",
+    "name": "ascending_triangle",
+    "avg_score": 0.5809873251889012,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.40958000694203395,
+        "metrics": {
+          "score": 0.40958000694203395,
+          "signal_rate": 1.0,
+          "avg_confidence": 4.229390681003585,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.6266635806040967,
+        "metrics": {
+          "score": 0.6266635806040967,
+          "signal_rate": 1.0,
+          "avg_confidence": 6.333333333333333,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.6431919449105954,
+        "metrics": {
+          "score": 0.6431919449105954,
+          "signal_rate": 1.0,
+          "avg_confidence": 6.465968586387435,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.6290959593767631,
+        "metrics": {
+          "score": 0.6290959593767631,
+          "signal_rate": 1.0,
+          "avg_confidence": 6.315904139433552,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.595034865889297,
+        "metrics": {
+          "score": 0.595034865889297,
+          "signal_rate": 1.0,
+          "avg_confidence": 5.966057441253263,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.5823575934106208,
+        "metrics": {
+          "score": 0.5823575934106208,
+          "signal_rate": 1.0,
+          "avg_confidence": 5.833816425120773,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/descending_triangle",
+    "category": "patterns",
+    "name": "descending_triangle",
+    "avg_score": 0.4780186769342292,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 0.44255466851787567,
+        "metrics": {
+          "score": 0.44255466851787567,
+          "signal_rate": 1.0,
+          "avg_confidence": 4.56989247311828,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 0.457701654901053,
+        "metrics": {
+          "score": 0.457701654901053,
+          "signal_rate": 1.0,
+          "avg_confidence": 4.625730994152047,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 0.4964990451941438,
+        "metrics": {
+          "score": 0.4964990451941438,
+          "signal_rate": 1.0,
+          "avg_confidence": 4.991273996509599,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 0.5286228896315264,
+        "metrics": {
+          "score": 0.5286228896315264,
+          "signal_rate": 1.0,
+          "avg_confidence": 5.30718954248366,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 0.4737999479181735,
+        "metrics": {
+          "score": 0.4737999479181735,
+          "signal_rate": 1.0,
+          "avg_confidence": 4.750507687844502,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 0.46893385544260324,
+        "metrics": {
+          "score": 0.46893385544260324,
+          "signal_rate": 1.0,
+          "avg_confidence": 4.697584541062802,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/double_bottom",
+    "category": "patterns",
+    "name": "double_bottom",
+    "avg_score": 6.957516411724289,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 6.7060048594238095,
+        "metrics": {
+          "score": 6.7060048594238095,
+          "signal_rate": 1.0,
+          "avg_confidence": 69.24731182795699,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 6.9054507580141165,
+        "metrics": {
+          "score": 6.9054507580141165,
+          "signal_rate": 1.0,
+          "avg_confidence": 69.78947368421052,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 7.018691047971759,
+        "metrics": {
+          "score": 7.018691047971759,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.55846422338568,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 7.0192265960678775,
+        "metrics": {
+          "score": 7.0192265960678775,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.47058823529412,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 7.018894129220796,
+        "metrics": {
+          "score": 7.018894129220796,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.37423846823324,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 7.076831079647382,
+        "metrics": {
+          "score": 7.076831079647382,
+          "signal_rate": 1.0,
+          "avg_confidence": 70.89275362318841,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  },
+  {
+    "block": "patterns/inverse_head_and_shoulders",
+    "category": "patterns",
+    "name": "inverse_head_and_shoulders",
+    "avg_score": 3.9310982314291487,
+    "period_scores": [
+      {
+        "days": 30,
+        "score": 3.495314127039222,
+        "metrics": {
+          "score": 3.495314127039222,
+          "signal_rate": 1.0,
+          "avg_confidence": 36.09318996415771,
+          "valid_results": 279,
+          "config": {}
+        }
+      },
+      {
+        "days": 90,
+        "score": 3.807429695637078,
+        "metrics": {
+          "score": 3.807429695637078,
+          "signal_rate": 1.0,
+          "avg_confidence": 38.47953216374269,
+          "valid_results": 855,
+          "config": {}
+        }
+      },
+      {
+        "days": 180,
+        "score": 4.160349516810369,
+        "metrics": {
+          "score": 4.160349516810369,
+          "signal_rate": 1.0,
+          "avg_confidence": 41.82373472949389,
+          "valid_results": 1719,
+          "config": {}
+        }
+      },
+      {
+        "days": 240,
+        "score": 4.066446768803437,
+        "metrics": {
+          "score": 4.066446768803437,
+          "signal_rate": 1.0,
+          "avg_confidence": 40.82570806100218,
+          "valid_results": 2295,
+          "config": {}
+        }
+      },
+      {
+        "days": 360,
+        "score": 4.016521512687711,
+        "metrics": {
+          "score": 4.016521512687711,
+          "signal_rate": 1.0,
+          "avg_confidence": 40.27125036263418,
+          "valid_results": 3447,
+          "config": {}
+        }
+      },
+      {
+        "days": 540,
+        "score": 4.040527767597075,
+        "metrics": {
+          "score": 4.040527767597075,
+          "signal_rate": 1.0,
+          "avg_confidence": 40.476328502415456,
+          "valid_results": 5175,
+          "config": {}
+        }
+      }
+    ],
+    "optimal_config": {},
+    "production_ready": "False"
+  }
+]

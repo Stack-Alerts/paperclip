@@ -57,17 +57,17 @@ class ElliottWaveOscillator:
         if current_ewo > 0:
             if current_ewo > prev_ewo:
                 signal = 'BULLISH_MOMENTUM_INCREASING'
-                confidence = 65
+                confidence = 80
             else:
                 signal = 'BULLISH_MOMENTUM_WEAKENING'
-                confidence = 50
+                confidence = 65
         else:
             if current_ewo < prev_ewo:
                 signal = 'BEARISH_MOMENTUM_INCREASING'
-                confidence = 65
+                confidence = 80
             else:
                 signal = 'BEARISH_MOMENTUM_WEAKENING'
-                confidence = 50
+                confidence = 65
         
         # Check for divergence
         price_trend = 'UP' if df['close'].iloc[-1] > df['close'].iloc[-10] else 'DOWN'
@@ -76,10 +76,10 @@ class ElliottWaveOscillator:
         divergence = None
         if price_trend == 'UP' and ewo_trend == 'DOWN':
             divergence = 'BEARISH_DIVERGENCE'
-            confidence += 15
+            confidence += 20
         elif price_trend == 'DOWN' and ewo_trend == 'UP':
             divergence = 'BULLISH_DIVERGENCE'
-            confidence += 15
+            confidence += 20
         
         confluence_factors = []
         confluence_factors.append(f"EWO: {current_ewo:.2f}")
@@ -97,7 +97,7 @@ class ElliottWaveOscillator:
         
         return {
             'signal': signal,
-            'confidence': min(100, confidence),
+            'confidence': min(95, confidence),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe,

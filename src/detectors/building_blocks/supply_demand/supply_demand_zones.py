@@ -31,18 +31,18 @@ class SupplyDemandZones:
         # Demand zone (support)
         if current_price <= recent_low * 1.02:
             signal = 'DEMAND_ZONE'
-            confidence = 65
+            confidence = 80
             confluence_factors = [f'At demand zone (support ${recent_low:.2f})']
             zone_type = 'DEMAND'
         # Supply zone (resistance)
         elif current_price >= recent_high * 0.98:
             signal = 'SUPPLY_ZONE'
-            confidence = 65
+            confidence = 80
             confluence_factors = [f'At supply zone (resistance ${recent_high:.2f})']
             zone_type = 'SUPPLY'
         else:
             signal = 'NO_ZONE'
-            confidence = 40
+            confidence = 55
             confluence_factors = ['No zone detected']
             zone_type = 'NONE'
         

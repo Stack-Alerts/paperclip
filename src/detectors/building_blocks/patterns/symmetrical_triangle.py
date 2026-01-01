@@ -101,6 +101,11 @@ class SymmetricalTrianglePattern:
             'completion': 100.0
         }
     
+    
+        # Adaptive lookback based on data size
+        adaptive_lookback = min(lookback, len(df) // 4)
+        lookback = max(lookback // 2, adaptive_lookback)
+
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """Main analysis method"""
         if not all(col in df.columns for col in ['open', 'high', 'low', 'close', 'volume', 'timestamp']):
@@ -141,13 +146,13 @@ class SymmetricalTrianglePattern:
         
         if resistance_broken:
             signal = 'BREAKOUT_UP'
-            confidence = 60
+            confidence = 75
         elif support_broken:
             signal = 'BREAKOUT_DOWN'
-            confidence = 60
+            confidence = 75
         else:
             signal = 'PATTERN_FORMING'
-            confidence = 50
+            confidence = 65
         
         pattern_height = pattern['resistance_start'] - pattern['support_start']
         target_up = pattern['apex_price'] + pattern_height
@@ -163,11 +168,11 @@ class SymmetricalTrianglePattern:
         if resistance_broken:
             confluence_factors.append("✅ BULLISH breakout confirmed!")
             confluence_factors.append(f"Target: ${target_up:.2f}")
-            confidence += 10
+            confidence += 15
         elif support_broken:
             confluence_factors.append("✅ BEARISH breakout confirmed!")
             confluence_factors.append(f"Target: ${target_down:.2f}")
-            confidence += 10
+            confidence += 15
         else:
             confluence_factors.append("⏳ Awaiting breakout direction")
             confluence_factors.append(f"Bullish target: ${target_up:.2f}")

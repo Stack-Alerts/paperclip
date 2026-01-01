@@ -138,7 +138,7 @@ class DescendingTrianglePattern:
         support_broken = current_price < pattern['support_level']
         
         signal = 'BREAKDOWN_CONFIRMED' if support_broken else 'PATTERN_FORMING'
-        confidence = 70 if support_broken else 55
+        confidence = 85 if support_broken else 55
         
         pattern_height = pattern['resistance_start'] - pattern['support_level']
         target_price = pattern['support_level'] - pattern_height
@@ -151,7 +151,7 @@ class DescendingTrianglePattern:
         
         if support_broken:
             confluence_factors.append("✅ BREAKDOWN confirmed - Bearish!")
-            confidence += 10
+            confidence += 15
         else:
             confluence_factors.append("⏳ Awaiting breakdown")
         

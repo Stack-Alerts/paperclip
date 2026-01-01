@@ -1,0 +1,3268 @@
+[
+  {
+    "block": "pennant_pattern",
+    "category": "patterns",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 80,
+    "signal_count": 9,
+    "avg_confidence": 53.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.10112587531821465,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 9 \u2265 5",
+      "\u2705 Quality score: 80.0 \u2265 70",
+      "\u2705 Walk-forward variance: 10.1% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 2,
+        "signal_rate": 0.0051013901288101005
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 1,
+        "signal_rate": 0.0025506950644050503
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 4,
+        "signal_rate": 0.004854074388690007
+      }
+    ]
+  },
+  {
+    "block": "flag_pattern",
+    "category": "patterns",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 15,
+    "signal_count": 0,
+    "avg_confidence": 0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Signal count: 0 < 5",
+      "\u274c Quality score: 15.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      }
+    ]
+  },
+  {
+    "block": "supply_demand_zones",
+    "category": "supply_demand",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 60,
+    "signal_count": 2553,
+    "avg_confidence": 64.93145319232276,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 60.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 60,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "range_liquidity",
+    "category": "market_structure",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 60,
+    "signal_count": 2553,
+    "avg_confidence": 60.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 60.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 60,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "market_depth",
+    "category": "institutional",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 60,
+    "signal_count": 2553,
+    "avg_confidence": 55.78143360752056,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 60.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 60,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "rounding_bottom",
+    "category": "patterns",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2307,
+    "avg_confidence": 73.86519289120069,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2307 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 59,
+        "signal_rate": 0.15049100879989796
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 340,
+        "signal_rate": 0.8672363218977172
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 395,
+        "signal_rate": 0.47933984588313816
+      }
+    ]
+  },
+  {
+    "block": "cup_and_handle",
+    "category": "patterns",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 15,
+    "signal_count": 0,
+    "avg_confidence": 0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Signal count: 0 < 5",
+      "\u274c Quality score: 15.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      }
+    ]
+  },
+  {
+    "block": "premium_discount_zones",
+    "category": "market_structure",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 60,
+    "signal_count": 2553,
+    "avg_confidence": 55.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 60.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 60,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "ema_255_vector",
+    "category": "moving_averages",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 90,
+    "signal_count": 75,
+    "avg_confidence": 62.333333333333336,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.054392829322042105,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 75 \u2265 5",
+      "\u2705 Quality score: 90.0 \u2265 70",
+      "\u2705 Walk-forward variance: 5.4% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 10,
+        "signal_rate": 0.025506950644050504
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 13,
+        "signal_rate": 0.033159035837265656
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 90,
+        "signal_count": 30,
+        "signal_rate": 0.03640555791517505
+      }
+    ]
+  },
+  {
+    "block": "ema_800_vector",
+    "category": "moving_averages",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 90,
+    "signal_count": 42,
+    "avg_confidence": 67.38095238095238,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.1767766952966369,
+    "walk_forward_consistent": "False",
+    "passes": [
+      "\u2705 Signal count: 42 \u2265 5",
+      "\u2705 Quality score: 90.0 \u2265 70",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Walk-forward variance: 17.7% \u2265 15%"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 2,
+        "signal_rate": 0.0051013901288101005
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 7,
+        "signal_rate": 0.017854865450835353
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 90,
+        "signal_count": 15,
+        "signal_rate": 0.018202778957587526
+      }
+    ]
+  },
+  {
+    "block": "ema_55_vector",
+    "category": "moving_averages",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 90,
+    "signal_count": 193,
+    "avg_confidence": 54.97409326424871,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 193 \u2265 5",
+      "\u2705 Quality score: 90.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 37,
+        "signal_rate": 0.09437571738298686
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 25,
+        "signal_rate": 0.06376737661012626
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 90,
+        "signal_count": 58,
+        "signal_rate": 0.0703840786360051
+      }
+    ]
+  },
+  {
+    "block": "ema_200_trend",
+    "category": "moving_averages",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2553,
+    "avg_confidence": 80.82843713278496,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "ema_50_vector",
+    "category": "moving_averages",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 275,
+    "avg_confidence": 95.61818181818182,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.12297509238026913,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 275 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 12.3% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 37,
+        "signal_rate": 0.09437571738298686
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 44,
+        "signal_rate": 0.11223058283382222
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 95,
+        "signal_rate": 0.11528426673138767
+      }
+    ]
+  },
+  {
+    "block": "ema_20_50_cross",
+    "category": "moving_averages",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2553,
+    "avg_confidence": 71.23580101840972,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "balanced_price_range",
+    "category": "smc_ict",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 45,
+    "signal_count": 2553,
+    "avg_confidence": 0.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 45.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 45,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 45,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 45,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "ema_crossover",
+    "category": "institutional",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 60,
+    "signal_count": 2553,
+    "avg_confidence": 60.08813160987074,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 60.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 60,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "order_flow_imbalance",
+    "category": "institutional",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 60,
+    "signal_count": 2553,
+    "avg_confidence": 50.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 60.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 60,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "vwap",
+    "category": "institutional",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 60,
+    "signal_count": 2553,
+    "avg_confidence": 60.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 60.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 60,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "fair_value_gap",
+    "category": "price_action",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 55,
+    "signal_count": 1078,
+    "avg_confidence": 20.686456400742117,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 1078 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 55.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 155,
+        "signal_rate": 0.3953577349827828
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 226,
+        "signal_rate": 0.5764570845555413
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 55,
+        "signal_count": 311,
+        "signal_rate": 0.37740428372064805
+      }
+    ]
+  },
+  {
+    "block": "premium_discount",
+    "category": "smc_ict",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 80,
+    "signal_count": 2058,
+    "avg_confidence": 79.067055393586,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2058 \u2265 5",
+      "\u2705 Quality score: 80.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 318,
+        "signal_rate": 0.811121030480806
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 323,
+        "signal_rate": 0.8238745058028313
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 80,
+        "signal_count": 664,
+        "signal_rate": 0.8057763485225411
+      }
+    ]
+  },
+  {
+    "block": "change_of_character",
+    "category": "smc_ict",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 45,
+    "signal_count": 2304,
+    "avg_confidence": 0.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2304 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 45.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 45,
+        "signal_count": 363,
+        "signal_rate": 0.9259023083790333
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 45,
+        "signal_count": 353,
+        "signal_rate": 0.9003953577349828
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 45,
+        "signal_count": 740,
+        "signal_rate": 0.8980037619076513
+      }
+    ]
+  },
+  {
+    "block": "anchored_vwap",
+    "category": "institutional",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 60,
+    "signal_count": 2553,
+    "avg_confidence": 62.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 60.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 60,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "kill_zones",
+    "category": "sessions",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2553,
+    "avg_confidence": 55.79514296905601,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "session_time",
+    "category": "sessions",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 15,
+    "signal_count": 0,
+    "avg_confidence": 0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Signal count: 0 < 5",
+      "\u274c Quality score: 15.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      }
+    ]
+  },
+  {
+    "block": "swing_failure_pattern",
+    "category": "smc_ict",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 55,
+    "signal_count": 2553,
+    "avg_confidence": 8.64473168820995,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 55.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 55,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "displacement",
+    "category": "smc_ict",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 55,
+    "signal_count": 2553,
+    "avg_confidence": 3.7955346650998827,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 55.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 55,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "inducement",
+    "category": "smc_ict",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 55,
+    "signal_count": 2553,
+    "avg_confidence": 9.277320799059929,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 55.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 55,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "elliott_wave_oscillator",
+    "category": "elliott_wave",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2553,
+    "avg_confidence": 61.24559341950646,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "break_of_structure",
+    "category": "smc_ict",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2338,
+    "avg_confidence": 81.45851154833191,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2338 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 355,
+        "signal_rate": 0.9054967478637929
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 359,
+        "signal_rate": 0.9156995281214131
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 758,
+        "signal_rate": 0.9198470966567563
+      }
+    ]
+  },
+  {
+    "block": "optimal_trade_entry",
+    "category": "smc_ict",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 55,
+    "signal_count": 2304,
+    "avg_confidence": 8.951822916666666,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2304 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 55.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 363,
+        "signal_rate": 0.9259023083790333
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 353,
+        "signal_rate": 0.9003953577349828
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 55,
+        "signal_count": 740,
+        "signal_rate": 0.8980037619076513
+      }
+    ]
+  },
+  {
+    "block": "breaker_block",
+    "category": "price_action",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 80,
+    "signal_count": 2387,
+    "avg_confidence": 74.41558441558442,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2387 \u2265 5",
+      "\u2705 Quality score: 80.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 363,
+        "signal_rate": 0.9259023083790333
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 378,
+        "signal_rate": 0.964162734345109
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 80,
+        "signal_count": 779,
+        "signal_rate": 0.9453309871973788
+      }
+    ]
+  },
+  {
+    "block": "fibonacci_retracements",
+    "category": "fibonacci",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2553,
+    "avg_confidence": 53.35291813552683,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "wyckoff_reaccumulation",
+    "category": "wyckoff",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 55,
+    "signal_count": 2553,
+    "avg_confidence": 46.38229533881708,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 55.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 55,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "wyckoff_distribution",
+    "category": "wyckoff",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 55,
+    "signal_count": 2553,
+    "avg_confidence": 37.73207990599295,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 55.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 55,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "wyckoff_accumulation",
+    "category": "wyckoff",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 60,
+    "signal_count": 2553,
+    "avg_confidence": 60.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 60.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 60,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "adr",
+    "category": "volatility",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2553,
+    "avg_confidence": 100.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "us_settlement",
+    "category": "price_levels",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 15,
+    "signal_count": 0,
+    "avg_confidence": 0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Signal count: 0 < 5",
+      "\u274c Quality score: 15.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      }
+    ]
+  },
+  {
+    "block": "order_block",
+    "category": "price_action",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 70,
+    "signal_count": 482,
+    "avg_confidence": 70.87136929460581,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.1767766952966369,
+    "walk_forward_consistent": "False",
+    "passes": [
+      "\u2705 Signal count: 482 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Walk-forward variance: 17.7% \u2265 15%"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 81,
+        "signal_rate": 0.20660630021680906
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 100,
+        "signal_count": 15,
+        "signal_rate": 0.038260425966075755
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 162,
+        "signal_rate": 0.1965900127419453
+      }
+    ]
+  },
+  {
+    "block": "mitigation_block",
+    "category": "smc_ict",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 45,
+    "signal_count": 2553,
+    "avg_confidence": 0.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 45.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 45,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 45,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 45,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "market_structure_shift",
+    "category": "smc_ict",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2553,
+    "avg_confidence": 86.39835487661574,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "macd_signal",
+    "category": "oscillators",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 90,
+    "signal_count": 173,
+    "avg_confidence": 90.34682080924856,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 173 \u2265 5",
+      "\u2705 Quality score: 90.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 21,
+        "signal_rate": 0.05356459635250606
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 28,
+        "signal_rate": 0.07141946180334141
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 90,
+        "signal_count": 60,
+        "signal_rate": 0.0728111158303501
+      }
+    ]
+  },
+  {
+    "block": "liquidity_sweep",
+    "category": "price_action",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 55,
+    "signal_count": 2553,
+    "avg_confidence": 45.88719153936545,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 55.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 55,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "bollinger_bands",
+    "category": "volatility",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2553,
+    "avg_confidence": 100.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "rsi_divergence",
+    "category": "oscillators",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 547,
+    "avg_confidence": 82.17550274223035,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 547 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 85,
+        "signal_rate": 0.2168090804744293
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 89,
+        "signal_rate": 0.2270118607320495
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 173,
+        "signal_rate": 0.2099387173108428
+      }
+    ]
+  },
+  {
+    "block": "low",
+    "category": "price_levels",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 439,
+    "avg_confidence": 90.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 439 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 89,
+        "signal_rate": 0.2270118607320495
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 113,
+        "signal_rate": 0.28822854227777067
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 101,
+        "signal_rate": 0.12256537831442267
+      }
+    ]
+  },
+  {
+    "block": "how",
+    "category": "price_levels",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 599,
+    "avg_confidence": 90.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 599 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 71,
+        "signal_rate": 0.18109934957275858
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 135,
+        "signal_rate": 0.3443438336946818
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 189,
+        "signal_rate": 0.22935501486560284
+      }
+    ]
+  },
+  {
+    "block": "stochastic_rsi",
+    "category": "oscillators",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 80,
+    "signal_count": 876,
+    "avg_confidence": 91.82648401826484,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 876 \u2265 5",
+      "\u2705 Quality score: 80.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 145,
+        "signal_rate": 0.3698507843387323
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 149,
+        "signal_rate": 0.3800535645963525
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 80,
+        "signal_count": 277,
+        "signal_rate": 0.33614465141678296
+      }
+    ]
+  },
+  {
+    "block": "hod",
+    "category": "price_levels",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 943,
+    "avg_confidence": 85.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 943 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 143,
+        "signal_rate": 0.3647493942099222
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 195,
+        "signal_rate": 0.4973855375589848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 291,
+        "signal_rate": 0.353133911777198
+      }
+    ]
+  },
+  {
+    "block": "lod",
+    "category": "price_levels",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 817,
+    "avg_confidence": 85.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 817 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 112,
+        "signal_rate": 0.28567784721336564
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 174,
+        "signal_rate": 0.44382094120647875
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 270,
+        "signal_rate": 0.3276500212365755
+      }
+    ]
+  },
+  {
+    "block": "ichimoku_cloud",
+    "category": "trend",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 80,
+    "signal_count": 1944,
+    "avg_confidence": 77.27109053497942,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 1944 \u2265 5",
+      "\u2705 Quality score: 80.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 284,
+        "signal_rate": 0.7243973982910343
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 304,
+        "signal_rate": 0.7754112995791352
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 80,
+        "signal_count": 639,
+        "signal_rate": 0.7754383835932286
+      }
+    ]
+  },
+  {
+    "block": "atr",
+    "category": "volatility",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 90,
+    "signal_count": 71,
+    "avg_confidence": 100.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 71 \u2265 5",
+      "\u2705 Quality score: 90.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 11,
+        "signal_rate": 0.028057645708455554
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 8,
+        "signal_rate": 0.020405560515240402
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 90,
+        "signal_count": 21,
+        "signal_rate": 0.025483890540622535
+      }
+    ]
+  },
+  {
+    "block": "asia_session_50_percent",
+    "category": "price_levels",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 15,
+    "signal_count": 0,
+    "avg_confidence": 0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Signal count: 0 < 5",
+      "\u274c Quality score: 15.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      }
+    ]
+  },
+  {
+    "block": "adx",
+    "category": "trend",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 55,
+    "signal_count": 2553,
+    "avg_confidence": 31.11442224833529,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 55.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 55,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "swing_points",
+    "category": "market_structure",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2553,
+    "avg_confidence": 70.0,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "falling_wedge",
+    "category": "patterns",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 80,
+    "signal_count": 4,
+    "avg_confidence": 69.25,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.8608256466618839,
+    "walk_forward_consistent": "False",
+    "passes": [
+      "\u2705 Quality score: 80.0 \u2265 70",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Signal count: 4 < 5",
+      "\u274c Walk-forward variance: 86.1% \u2265 15%"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 85,
+        "signal_count": 3,
+        "signal_rate": 0.0036405557915175054
+      }
+    ]
+  },
+  {
+    "block": "ascending_triangle",
+    "category": "patterns",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 90,
+    "signal_count": 198,
+    "avg_confidence": 69.72222222222223,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.04876598490941706,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 198 \u2265 5",
+      "\u2705 Quality score: 90.0 \u2265 70",
+      "\u2705 Walk-forward variance: 4.9% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 33,
+        "signal_rate": 0.08417293712536666
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 100,
+        "signal_count": 31,
+        "signal_rate": 0.07907154699655657
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 100,
+        "signal_count": 55,
+        "signal_rate": 0.06674352284448759
+      }
+    ]
+  },
+  {
+    "block": "symmetrical_triangle",
+    "category": "patterns",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 90,
+    "signal_count": 6,
+    "avg_confidence": 56.666666666666664,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.6655122646461624,
+    "walk_forward_consistent": "False",
+    "passes": [
+      "\u2705 Signal count: 6 \u2265 5",
+      "\u2705 Quality score: 90.0 \u2265 70",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Walk-forward variance: 66.6% \u2265 15%"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 15,
+        "signal_count": 0,
+        "signal_rate": 0.0
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 55,
+        "signal_count": 1,
+        "signal_rate": 0.0012135185971725018
+      }
+    ]
+  },
+  {
+    "block": "triple_bottom",
+    "category": "patterns",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 80,
+    "signal_count": 2520,
+    "avg_confidence": 72.53968253968254,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2520 \u2265 5",
+      "\u2705 Quality score: 80.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 389,
+        "signal_rate": 0.9922203800535646
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 80,
+        "signal_count": 814,
+        "signal_rate": 0.9878041380984164
+      }
+    ]
+  },
+  {
+    "block": "descending_triangle",
+    "category": "patterns",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 90,
+    "signal_count": 176,
+    "avg_confidence": 64.94318181818181,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 176 \u2265 5",
+      "\u2705 Quality score: 90.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 26,
+        "signal_rate": 0.06631807167453131
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 90,
+        "signal_count": 32,
+        "signal_rate": 0.08162224206096161
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 90,
+        "signal_count": 47,
+        "signal_rate": 0.05703537406710758
+      }
+    ]
+  },
+  {
+    "block": "triple_top",
+    "category": "patterns",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2524,
+    "avg_confidence": 66.66600633914422,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2524 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 387,
+        "signal_rate": 0.9871189899247544
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 812,
+        "signal_rate": 0.9853771009040714
+      }
+    ]
+  },
+  {
+    "block": "rising_wedge",
+    "category": "patterns",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 90,
+    "signal_count": 15,
+    "avg_confidence": 63.333333333333336,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.22618581696330986,
+    "walk_forward_consistent": "False",
+    "passes": [
+      "\u2705 Signal count: 15 \u2265 5",
+      "\u2705 Quality score: 90.0 \u2265 70",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Walk-forward variance: 22.6% \u2265 15%"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 60,
+        "signal_count": 2,
+        "signal_rate": 0.0051013901288101005
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 1,
+        "signal_rate": 0.0025506950644050503
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 90,
+        "signal_count": 7,
+        "signal_rate": 0.008494630180207512
+      }
+    ]
+  },
+  {
+    "block": "elliott_wave_count",
+    "category": "elliott_wave",
+    "status": "NEEDS_IMPROVEMENT",
+    "institutional_grade": false,
+    "quality_score": 55,
+    "signal_count": 2553,
+    "avg_confidence": 42.10536623580102,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2553 \u2265 5",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [
+      "\u274c Quality score: 55.0 < 70"
+    ],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 55,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 55,
+        "signal_count": 825,
+        "signal_rate": 1.001152842667314
+      }
+    ]
+  },
+  {
+    "block": "inverse_head_and_shoulders",
+    "category": "patterns",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 80,
+    "signal_count": 2136,
+    "avg_confidence": 79.53417602996255,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2136 \u2265 5",
+      "\u2705 Quality score: 80.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 331,
+        "signal_rate": 0.8442800663180716
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 350,
+        "signal_rate": 0.8927432725417676
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 80,
+        "signal_count": 673,
+        "signal_rate": 0.8166980158970937
+      }
+    ]
+  },
+  {
+    "block": "double_bottom",
+    "category": "patterns",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 80,
+    "signal_count": 2549,
+    "avg_confidence": 71.52216555511966,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2549 \u2265 5",
+      "\u2705 Quality score: 80.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 392,
+        "signal_rate": 0.9998724652467798
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 80,
+        "signal_count": 822,
+        "signal_rate": 0.9975122868757964
+      }
+    ]
+  },
+  {
+    "block": "head_and_shoulders",
+    "category": "patterns",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 80,
+    "signal_count": 2021,
+    "avg_confidence": 73.19643740722415,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2021 \u2265 5",
+      "\u2705 Quality score: 80.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 304,
+        "signal_rate": 0.7754112995791352
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 80,
+        "signal_count": 327,
+        "signal_rate": 0.8340772860604514
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 80,
+        "signal_count": 647,
+        "signal_rate": 0.7851465323706086
+      }
+    ]
+  },
+  {
+    "block": "double_top",
+    "category": "patterns",
+    "status": "INSTITUTIONAL_GRADE",
+    "institutional_grade": true,
+    "quality_score": 70,
+    "signal_count": 2549,
+    "avg_confidence": 65.21577089054531,
+    "error_rate": 0.0,
+    "walk_forward_variance": 0.0,
+    "walk_forward_consistent": "True",
+    "passes": [
+      "\u2705 Signal count: 2549 \u2265 5",
+      "\u2705 Quality score: 70.0 \u2265 70",
+      "\u2705 Walk-forward variance: 0.0% < 15%",
+      "\u2705 Error rate: 0.0% < 10%"
+    ],
+    "fails": [],
+    "best_params": {},
+    "walk_forward_results": [
+      {
+        "period": "0-90 days ago",
+        "start_date": "2025-09-17 07:45:00",
+        "end_date": "2025-12-16 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 391,
+        "signal_rate": 0.9973217701823747
+      },
+      {
+        "period": "90-180 days ago",
+        "start_date": "2025-06-19 07:45:00",
+        "end_date": "2025-09-17 07:45:00",
+        "bars": 8641,
+        "quality_score": 70,
+        "signal_count": 393,
+        "signal_rate": 1.0024231603111848
+      },
+      {
+        "period": "180-360 days ago",
+        "start_date": "2024-12-21 07:45:00",
+        "end_date": "2025-06-19 07:45:00",
+        "bars": 17281,
+        "quality_score": 70,
+        "signal_count": 824,
+        "signal_rate": 0.9999393240701414
+      }
+    ]
+  }
+]

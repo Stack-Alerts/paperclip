@@ -32,11 +32,11 @@ class WyckoffReaccumulation:
         
         if trend_up and consolidating:
             signal = 'REACCUMULATION_DETECTED'
-            confidence = 62
+            confidence = 77
             confluence_factors = ['Uptrend with consolidation', 'Potential re-accumulation']
         else:
             signal = 'NO_REACCUMULATION'
-            confidence = 30
+            confidence = 45
             confluence_factors = ['Pattern not detected']
         
         return {

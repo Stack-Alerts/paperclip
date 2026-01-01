@@ -161,12 +161,12 @@ class Displacement:
         signal = 'BULLISH' if disp['type'] == 'BULLISH_DISPLACEMENT' else 'BEARISH'
         
         # Calculate confidence based on strength
-        confidence = 75  # Base confidence for displacement
+        confidence = 90  # Base confidence for displacement
         if disp['size_vs_avg'] > 200:
-            confidence += 10
+            confidence += 15
         if disp['body_pct'] > 85:
-            confidence += 10
-        confidence = min(100, confidence)
+            confidence += 15
+        confidence = min(95, confidence)
         
         # Build confluence factors
         confluence_factors = []

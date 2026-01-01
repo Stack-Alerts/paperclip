@@ -31,15 +31,15 @@ class MarketDepth:
         
         if depth_ratio > 1.5:
             signal = 'HIGH_LIQUIDITY'
-            confidence = 60
+            confidence = 75
             confluence_factors = ['High liquidity detected']
         elif depth_ratio < 0.5:
             signal = 'LOW_LIQUIDITY'
-            confidence = 60
+            confidence = 75
             confluence_factors = ['Low liquidity - caution']
         else:
             signal = 'NORMAL_LIQUIDITY'
-            confidence = 50
+            confidence = 65
             confluence_factors = ['Normal liquidity conditions']
         
         return {

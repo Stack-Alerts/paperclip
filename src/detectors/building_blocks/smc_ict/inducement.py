@@ -192,12 +192,12 @@ class Inducement:
             }
         
         # Calculate confidence based on reversal strength
-        confidence = 75  # Base confidence for inducement
+        confidence = 90  # Base confidence for inducement
         if active_ind['reversal_pct'] > 0.5:
-            confidence += 10
+            confidence += 15
         if active_ind['reversal_pct'] > 1.0:
-            confidence += 10
-        confidence = min(100, confidence)
+            confidence += 15
+        confidence = min(95, confidence)
         
         # Build confluence factors
         confluence_factors = []

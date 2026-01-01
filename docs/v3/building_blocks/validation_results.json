@@ -1,0 +1,1390 @@
+[
+  {
+    "name": "elliott_wave_count",
+    "category": "elliott_wave",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 41.925538103548575,
+      "std_confidence": 6.778145976014865,
+      "errors": 0
+    }
+  },
+  {
+    "name": "elliott_wave_oscillator",
+    "category": "elliott_wave",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 61.2478184991274,
+      "std_confidence": 9.269365349607783,
+      "errors": 0
+    }
+  },
+  {
+    "name": "fibonacci_retracements",
+    "category": "fibonacci",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 69.74403723094822,
+      "std_confidence": 2.248052143944805,
+      "errors": 0
+    }
+  },
+  {
+    "name": "anchored_vwap",
+    "category": "institutional",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 62.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "ema_crossover",
+    "category": "institutional",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "market_depth",
+    "category": "institutional",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 54.13030831878999,
+      "std_confidence": 4.923782730750222,
+      "errors": 0
+    }
+  },
+  {
+    "name": "order_flow_imbalance",
+    "category": "institutional",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 53.36823734729494,
+      "std_confidence": 6.259276106844276,
+      "errors": 0
+    }
+  },
+  {
+    "name": "vwap",
+    "category": "institutional",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 60.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "premium_discount_zones",
+    "category": "market_structure",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 54.997091332169866,
+      "std_confidence": 0.1205606851428895,
+      "errors": 0
+    }
+  },
+  {
+    "name": "range_liquidity",
+    "category": "market_structure",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 60.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "swing_points",
+    "category": "market_structure",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 70.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "ema_200_trend",
+    "category": "moving_averages",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "ema_20_50_cross",
+    "category": "moving_averages",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 71.17219313554392,
+      "std_confidence": 4.908294011752465,
+      "errors": 0
+    }
+  },
+  {
+    "name": "ema_255_vector",
+    "category": "moving_averages",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "ema_50_vector",
+    "category": "moving_averages",
+    "production_ready": false,
+    "confidence_level": "MEDIUM",
+    "issues": [
+      "Confidence values too static"
+    ],
+    "recommendations": [
+      "Add dynamic confidence adjustment"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.09947643979057591,
+      "avg_confidence": 78.39732402559628,
+      "std_confidence": 7.252193814257625,
+      "errors": 0
+    }
+  },
+  {
+    "name": "ema_55_vector",
+    "category": "moving_averages",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 4.9156486329261195,
+      "std_confidence": 14.995884039751285,
+      "errors": 0
+    }
+  },
+  {
+    "name": "ema_800_vector",
+    "category": "moving_averages",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "macd_signal",
+    "category": "oscillators",
+    "production_ready": false,
+    "confidence_level": "MEDIUM",
+    "issues": [
+      "Confidence values too static"
+    ],
+    "recommendations": [
+      "Add dynamic confidence adjustment"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.07329842931937172,
+      "avg_confidence": 72.41419429901106,
+      "std_confidence": 5.792670222499652,
+      "errors": 0
+    }
+  },
+  {
+    "name": "rsi_divergence",
+    "category": "oscillators",
+    "production_ready": false,
+    "confidence_level": "MEDIUM",
+    "issues": [
+      "Signals too frequent (22.0%)",
+      "Confidence values too static"
+    ],
+    "recommendations": [
+      "Increase signal threshold/filters",
+      "Add dynamic confidence adjustment"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.2198952879581152,
+      "avg_confidence": 72.83304246655032,
+      "std_confidence": 5.743351529169101,
+      "errors": 0
+    }
+  },
+  {
+    "name": "stochastic_rsi",
+    "category": "oscillators",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.35020360674810935,
+      "avg_confidence": 81.62303664921465,
+      "std_confidence": 10.328285873838611,
+      "errors": 0
+    }
+  },
+  {
+    "name": "ascending_triangle",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 6.465968586387435,
+      "std_confidence": 20.591963154952698,
+      "errors": 0
+    }
+  },
+  {
+    "name": "cup_and_handle",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "descending_triangle",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 4.991273996509599,
+      "std_confidence": 17.70869690188238,
+      "errors": 0
+    }
+  },
+  {
+    "name": "double_bottom",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 70.55846422338568,
+      "std_confidence": 15.384614798898935,
+      "errors": 0
+    }
+  },
+  {
+    "name": "double_top",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 64.586969168121,
+      "std_confidence": 14.746387102694955,
+      "errors": 0
+    }
+  },
+  {
+    "name": "falling_wedge",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.08784176847004072,
+      "std_confidence": 2.608855895327201,
+      "errors": 0
+    }
+  },
+  {
+    "name": "flag_pattern",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "head_and_shoulders",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 36.0500290866783,
+      "std_confidence": 37.32807942258785,
+      "errors": 0
+    }
+  },
+  {
+    "name": "inverse_head_and_shoulders",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 41.82373472949389,
+      "std_confidence": 41.72514285210449,
+      "errors": 0
+    }
+  },
+  {
+    "name": "pennant_pattern",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.15415939499709133,
+      "std_confidence": 2.854239446118698,
+      "errors": 0
+    }
+  },
+  {
+    "name": "rising_wedge",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.38394415357766143,
+      "std_confidence": 4.78426965184794,
+      "errors": 0
+    }
+  },
+  {
+    "name": "rounding_bottom",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.3903432228039558,
+      "std_confidence": 4.937131202712492,
+      "errors": 0
+    }
+  },
+  {
+    "name": "symmetrical_triangle",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.11052937754508435,
+      "std_confidence": 2.6726589978574964,
+      "errors": 0
+    }
+  },
+  {
+    "name": "triple_bottom",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 70.65735892961024,
+      "std_confidence": 15.11748030677713,
+      "errors": 0
+    }
+  },
+  {
+    "name": "triple_top",
+    "category": "patterns",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 65.27341477603258,
+      "std_confidence": 13.999947956673497,
+      "errors": 0
+    }
+  },
+  {
+    "name": "breaker_block",
+    "category": "price_action",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.951716114019779,
+      "avg_confidence": 73.1326352530541,
+      "std_confidence": 15.476826099350687,
+      "errors": 0
+    }
+  },
+  {
+    "name": "fair_value_gap",
+    "category": "price_action",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.5020360674810936,
+      "avg_confidence": 46.11401977894125,
+      "std_confidence": 37.77202405377376,
+      "errors": 0
+    }
+  },
+  {
+    "name": "liquidity_sweep",
+    "category": "price_action",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 41.047120418848166,
+      "std_confidence": 42.227914139177045,
+      "errors": 0
+    }
+  },
+  {
+    "name": "order_block",
+    "category": "price_action",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.9557882489819662,
+      "avg_confidence": 11.625945317044794,
+      "std_confidence": 26.348234929660588,
+      "errors": 0
+    }
+  },
+  {
+    "name": "asia_session_50_percent",
+    "category": "price_levels",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.0,
+      "avg_confidence": 78.6998254799302,
+      "std_confidence": 12.442283504956405,
+      "errors": 0
+    }
+  },
+  {
+    "name": "hod",
+    "category": "price_levels",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.44153577661431065,
+      "avg_confidence": 76.64048865619546,
+      "std_confidence": 7.45058657085946,
+      "errors": 0
+    }
+  },
+  {
+    "name": "how",
+    "category": "price_levels",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.4944735311227458,
+      "avg_confidence": 82.41710296684118,
+      "std_confidence": 7.4995418581333,
+      "errors": 0
+    }
+  },
+  {
+    "name": "lod",
+    "category": "price_levels",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.38103548574752766,
+      "avg_confidence": 75.74171029668412,
+      "std_confidence": 7.29098191735608,
+      "errors": 0
+    }
+  },
+  {
+    "name": "low",
+    "category": "price_levels",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.43571844095404305,
+      "avg_confidence": 81.54450261780104,
+      "std_confidence": 7.438885988682105,
+      "errors": 0
+    }
+  },
+  {
+    "name": "us_settlement",
+    "category": "price_levels",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.0,
+      "avg_confidence": 81.64630599185573,
+      "std_confidence": 9.863552939036719,
+      "errors": 0
+    }
+  },
+  {
+    "name": "kill_zones",
+    "category": "sessions",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 55.87260034904014,
+      "std_confidence": 24.947776745808834,
+      "errors": 0
+    }
+  },
+  {
+    "name": "session_time",
+    "category": "sessions",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.0,
+      "avg_confidence": 70.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "balanced_price_range",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "break_of_structure",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.9144851657940664,
+      "avg_confidence": 72.50727166957533,
+      "std_confidence": 25.124398575561386,
+      "errors": 0
+    }
+  },
+  {
+    "name": "change_of_character",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.9040139616055847,
+      "avg_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "displacement",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 3.9819662594531704,
+      "std_confidence": 17.971091143881946,
+      "errors": 0
+    }
+  },
+  {
+    "name": "inducement",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 8.170447934845841,
+      "std_confidence": 24.354625731174337,
+      "errors": 0
+    }
+  },
+  {
+    "name": "market_structure_shift",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 85.8173356602676,
+      "std_confidence": 4.64734490415002,
+      "errors": 0
+    }
+  },
+  {
+    "name": "mitigation_block",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 0.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "optimal_trade_entry",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.9040139616055847,
+      "avg_confidence": 9.383362420011634,
+      "std_confidence": 25.349750859216023,
+      "errors": 0
+    }
+  },
+  {
+    "name": "premium_discount",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.8045375218150087,
+      "avg_confidence": 73.28970331588133,
+      "std_confidence": 13.241870583916503,
+      "errors": 0
+    }
+  },
+  {
+    "name": "swing_failure_pattern",
+    "category": "smc_ict",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 6.020942408376963,
+      "std_confidence": 21.339430385186535,
+      "errors": 0
+    }
+  },
+  {
+    "name": "supply_demand_zones",
+    "category": "supply_demand",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 64.98545666084934,
+      "std_confidence": 0.6028034257144474,
+      "errors": 0
+    }
+  },
+  {
+    "name": "adx",
+    "category": "trend",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 30.62541012216405,
+      "std_confidence": 13.508941577762643,
+      "errors": 0
+    }
+  },
+  {
+    "name": "ichimoku_cloud",
+    "category": "trend",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.7609075043630017,
+      "avg_confidence": 70.94822571262362,
+      "std_confidence": 15.666395454345931,
+      "errors": 0
+    }
+  },
+  {
+    "name": "adr",
+    "category": "volatility",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 100.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "atr",
+    "category": "volatility",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 0.031995346131471786,
+      "avg_confidence": 100.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "bollinger_bands",
+    "category": "volatility",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 100.0,
+      "std_confidence": 0.0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "wyckoff_accumulation",
+    "category": "wyckoff",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 55.6195462478185,
+      "std_confidence": 10.59364137067345,
+      "errors": 0
+    }
+  },
+  {
+    "name": "wyckoff_distribution",
+    "category": "wyckoff",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 37.41128563118092,
+      "std_confidence": 14.299225237207203,
+      "errors": 0
+    }
+  },
+  {
+    "name": "wyckoff_reaccumulation",
+    "category": "wyckoff",
+    "production_ready": false,
+    "confidence_level": "LOW",
+    "issues": [
+      "Backtest failed: Unknown"
+    ],
+    "recommendations": [
+      "Fix backtest implementation"
+    ],
+    "metrics": {
+      "total_bars": 17281,
+      "valid_results": 1719,
+      "data_quality": 0.9947916666666666,
+      "signal_rate": 1.0,
+      "avg_confidence": 42.639906922629436,
+      "std_confidence": 15.643202182143092,
+      "errors": 0
+    }
+  }
+]

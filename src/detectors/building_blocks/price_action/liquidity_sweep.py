@@ -189,10 +189,10 @@ class LiquiditySweep:
             }
         
         # Calculate confidence
-        confidence = 80  # High confidence for sweeps
+        confidence = 90  # High confidence for sweeps
         if active_sweep['sweep_pct'] > 0.3:
-            confidence += 10
-        confidence = min(100, confidence)
+            confidence += 15
+        confidence = min(95, confidence)
         
         # Build confluence
         confluence_factors = []

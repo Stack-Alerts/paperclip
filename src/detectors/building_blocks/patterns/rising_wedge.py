@@ -65,6 +65,11 @@ class RisingWedgePattern:
         
         return (final_range / initial_range) < self.convergence_threshold
     
+    
+        # Adaptive lookback based on data size
+        adaptive_lookback = min(lookback, len(df) // 4)
+        lookback = max(lookback // 2, adaptive_lookback)
+
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """Main analysis method"""
         if not all(col in df.columns for col in ['open', 'high', 'low', 'close', 'volume', 'timestamp']):
@@ -117,7 +122,7 @@ class RisingWedgePattern:
         
         breakdown = current_price < lower_trendline
         signal = 'BREAKDOWN_CONFIRMED' if breakdown else 'PATTERN_FORMING'
-        confidence = 75 if breakdown else 60
+        confidence = 90 if breakdown else 60
         
         pattern_height = recent_highs[0]['price'] - recent_lows[0]['price']
         target = lower_trendline - pattern_height
@@ -129,7 +134,7 @@ class RisingWedgePattern:
         
         if breakdown:
             confluence_factors.append("✅ BREAKDOWN confirmed!")
-            confidence += 10
+            confidence += 15
         else:
             confluence_factors.append("⏳ Awaiting breakdown")
         

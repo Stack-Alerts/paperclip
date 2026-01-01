@@ -125,7 +125,7 @@ class DoubleTopPattern:
         neckline_broken = current_price < pattern['neckline_price']
         
         signal = 'PATTERN_CONFIRMED' if neckline_broken else 'PATTERN_FORMING'
-        confidence = 75 if neckline_broken else 55
+        confidence = 90 if neckline_broken else 55
         
         target_price = pattern['neckline_price'] - pattern['pattern_height']
         
@@ -137,7 +137,7 @@ class DoubleTopPattern:
         
         if neckline_broken:
             confluence_factors.append("✅ Neckline BROKEN - Bearish confirmed")
-            confidence += 10
+            confidence += 15
         else:
             confluence_factors.append("⏳ Awaiting neckline break")
         
