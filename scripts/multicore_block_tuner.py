@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: MACD SIGNAL PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: STOCHASTIC RSI PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,29 +363,31 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'oscillators' / 'macd_signal.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'oscillators' / 'stochastic_rsi.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='macd_signal',
+        block_name='stochastic_rsi',
         data=df,
-        cache_file='macd_signal_tuning_cache.pkl'
+        cache_file='stochastic_rsi_tuning_cache.pkl'
     )
     
-    # Define parameter grid - INSTITUTIONAL GRADE FOR MACD
-    # Test around classic 12/26/9 settings
+    # Define parameter grid - INSTITUTIONAL GRADE FOR STOCHASTIC RSI
+    # Test around classic 14/14/3/3 settings
     param_grid = {
-        'fast_period': [10, 12, 14],  # Fast EMA around 12
-        'slow_period': [24, 26, 28],  # Slow EMA around 26
-        'signal_period': [8, 9, 10],  # Signal around 9
-        'timeframe': ['15min'],  # Keep constant
+        'rsi_period': [12, 14, 16],  # RSI period
+        'stoch_period': [12, 14, 16],  # Stochastic period
+        'k_smooth': [3],  # Keep constant (3 is standard)
+        'd_smooth': [3],  # Keep constant (3 is standard)
+        'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - MACD OSCILLATOR):")
-    print("   fast_period: 10-14 (3 values around classic 12)")
-    print("   slow_period: 24-28 (3 values around classic 26)")
-    print("   signal_period: 8-10 (3 values around classic 9)")
-    print("   Total combinations: 27 (3×3×3)")
-    print("   NOTE: MACD signals on crosses/divergences (event-based)")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - STOCHASTIC RSI):")
+    print("   rsi_period: 12-16 (3 values)")
+    print("   stoch_period: 12-16 (3 values)")
+    print("   k_smooth: 3 (standard)")
+    print("   d_smooth: 3 (standard)")
+    print("   Total combinations: 9 (3×3)")
+    print("   NOTE: StochRSI signals on K/D crossovers + extreme levels")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
