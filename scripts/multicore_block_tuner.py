@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: ATR PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: PREMIUM/DISCOUNT PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,25 +363,24 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'volatility' / 'atr.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'smc_ict' / 'premium_discount.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='atr',
+        block_name='premium_discount',
         data=df,
-        cache_file='atr_tuning_cache.pkl'
+        cache_file='premium_discount_tuning_cache.pkl'
     )
     
-    # Define parameter grid - QUICK TEST FOR ATR
-    # ATR is simple, just test period
+    # Define parameter grid - ICT PREMIUM/DISCOUNT
     param_grid = {
-        'period': [12, 14, 16],  # ATR period around classic 14
+        'lookback': [15, 20, 25],  # Range lookback
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ATR):")
-    print("   period: 12-16 (3 values around classic 14)")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - PREMIUM/DISCOUNT):")
+    print("   lookback: 15-25 (3 values around classic 20)")
     print("   Total combinations: 3 (quick test)")
-    print("   NOTE: ATR signals on volatility level changes only")
+    print("   NOTE: Premium/Discount zones for buy/sell areas")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
