@@ -437,7 +437,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: ATR (AVERAGE TRUE RANGE) OPTIMIZATION")
+    print(f"🎯 EXPERT MODE: ADR (AVERAGE DAILY RANGE) OPTIMIZATION")
     print(f"{'='*80}\n")
     
     # Load data
@@ -446,25 +446,25 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'volatility' / 'atr.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'volatility' / 'adr.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='atr',
+        block_name='adr',
         data=df,
-        cache_file='atr_tuning_cache.pkl'
+        cache_file='adr_tuning_cache.pkl'
     )
     
-    # Define parameter grid - ATR
+    # Define parameter grid - ADR
     param_grid = {
-        'period': [14, 20, 28],  # ATR period
+        'period': [10, 20, 30],  # ADR calculation period
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ATR):") 
-    print("   period: 14-28 (3 values, classic is 14)")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ADR):") 
+    print("   period: 10-30 (3 values)")
     print("   Total combinations: 3")
-    print("   NOTE: ATR = Average True Range (volatility indicator)")
-    print("   🔬 NEW: Auto-detects volatility signals, uses custom validator")
+    print("   NOTE: ADR = Average Daily Range (volatility indicator)")
+    print("   🔬 Uses volatility validator (auto-detected)")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     

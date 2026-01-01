@@ -170,30 +170,32 @@ class VolatilitySignalValidator:
         Parse volatility level from signal type
         
         Args:
-            signal_type: Signal string (e.g., 'VOLATILITY_HIGH', 'SQUEEZE_BREAKOUT_BULL')
+            signal_type: Signal string (e.g., 'VOLATILITY_HIGH', 'CALM', 'SQUEEZE_BREAKOUT_BULL')
             
         Returns:
             Volatility level or special indicator
         """
         signal_upper = signal_type.upper()
         
-        # Direct volatility signals
-        if 'VOLATILITY_' in signal_upper:
-            if 'EXTREME' in signal_upper:
-                return 'EXTREME'
-            elif 'VERY_HIGH' in signal_upper or 'VERY HIGH' in signal_upper:
-                return 'VERY_HIGH'
-            elif 'HIGH' in signal_upper:
-                return 'HIGH'
-            elif 'NORMAL' in signal_upper:
-                return 'NORMAL'
-            elif 'CALM' in signal_upper or 'LOW' in signal_upper:
-                return 'CALM'
+        # Direct volatility level keywords (with or without VOLATILITY_ prefix)
+        # Handles both 'VOLATILITY_HIGH' and 'HIGH', 'CALM' and 'VOLATILITY_CALM', etc.
+        if 'EXTREME' in signal_upper:
+            return 'EXTREME'
+        elif 'VERY_HIGH' in signal_upper or 'VERY HIGH' in signal_upper:
+            return 'VERY_HIGH'
+        elif 'ELEVATED' in signal_upper:  # ADR uses ELEVATED for HIGH
+            return 'HIGH'
+        elif 'HIGH' in signal_upper and 'VERY' not in signal_upper:
+            return 'HIGH'
+        elif 'NORMAL' in signal_upper:
+            return 'NORMAL'
+        elif 'CALM' in signal_upper or (signal_upper == 'LOW'):
+            return 'CALM'
         
         # Trend signals
-        if 'RISING' in signal_upper:
+        if 'RISING' in signal_upper or 'EXPANDING' in signal_upper:
             return 'RISING'
-        if 'FALLING' in signal_upper:
+        if 'FALLING' in signal_upper or 'CONTRACTING' in signal_upper:
             return 'FALLING'
         if 'STABLE' in signal_upper:
             return 'STABLE'
@@ -203,8 +205,6 @@ class VolatilitySignalValidator:
             return 'CALM'  # Squeeze = low volatility
         if 'BREAKOUT' in signal_upper:
             return 'HIGH'  # Breakout = high volatility spike
-        if 'EXPANSION' in signal_upper:
-            return 'RISING'  # Expanding = volatility increasing
         
         return None
     
