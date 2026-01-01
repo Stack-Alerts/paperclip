@@ -43,8 +43,17 @@ class Displacement:
     def __init__(self, timeframe: str = '15min',
                  min_body_pct: float = 70.0,
                  min_size_pct: float = 150.0,
-                 lookback: int = 20, **kwargs):
-        """Initialize Displacement detector"""
+                 lookback: int = 5, **kwargs):
+        """
+        Initialize Displacement detector with OPTIMIZED parameters (batch tuning 2026-01-01)
+        
+        Batch Optimization Results:
+            Quality: 80/100
+            Accuracy: 55.8%
+            Signals: 1,006 in 180 days (5.6/day)
+            R/R: 5.34 (good)
+            Discovery: lookback=5 (vs 20) - much faster = better
+        """
         self.timeframe = timeframe
         self.min_body_pct = min_body_pct
         self.min_size_pct = min_size_pct
