@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: FAIR VALUE GAP PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: ORDER BLOCK PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,24 +363,24 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'price_action' / 'fair_value_gap.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'price_action' / 'order_block.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='fair_value_gap',
+        block_name='order_block',
         data=df,
-        cache_file='fair_value_gap_tuning_cache.pkl'
+        cache_file='order_block_tuning_cache.pkl'
     )
     
-    # Define parameter grid - FAIR VALUE GAP
+    # Define parameter grid - ORDER BLOCK
     param_grid = {
-        'lookback': [3, 5, 7],  # Gap detection lookback
+        'lookback': [15, 20, 25],  # Order block detection
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - FAIR VALUE GAP):") 
-    print("   lookback: 3-7 (3 values around classic 5)")
-    print("   Total combinations: 3 (quick test)")
-    print("   NOTE: FVG = Critical ICT price action concept")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ORDER BLOCK):") 
+    print("   lookback: 15-25 (3 values around classic 20)")
+    print("   Total combinations: 3")
+    print("   NOTE: Order Block = Critical ICT institutional zones")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
