@@ -290,15 +290,20 @@ This document catalogs the **exact return signatures** of all building blocks. U
 
 ### Volatility Blocks (Complex Signal Types)
 
-#### Bollinger Bands
+#### Bollinger Bands ✅ EXPANDED
 **File:** `volatility/bollinger_bands.py`  
 **Function:** `analyze(df)`  
 **Returns:**
-- **Signals:** `SQUEEZE_BREAKOUT_BULL`, `SQUEEZE_BREAKOUT_BEAR`, `BULLISH_REVERSAL`, `BEARISH_REVERSAL`, `ABOVE_UPPER`, `NEAR_UPPER`, `UPPER_HALF`, `LOWER_HALF`, `NEAR_LOWER`, `BELOW_LOWER`
+- **Signal (original):** `SQUEEZE_BREAKOUT_BULL`, `SQUEEZE_BREAKOUT_BEAR`, `BULLISH_REVERSAL`, `BEARISH_REVERSAL`, `ABOVE_UPPER`, `NEAR_UPPER`, `UPPER_HALF`, `LOWER_HALF`, `NEAR_LOWER`, `BELOW_LOWER`
 - **Metadata:** Complex - includes bands, squeeze detection, patterns, volatility regime
-- **Status:** ❌ INCOMPATIBLE with simple directional validator
-- **Reason:** Returns 10+ different signal types describing market state
-- **Solution:** Needs specialized validator for volatility indicators
+  - **EXPANSION:** `simple_signal` field added with `BULLISH`, `BEARISH`, or `NEUTRAL`
+  - **EXPANSION:** `original_signal` field preserves complex signal
+- **Status:** ✅ EXPANDED - Now validator compatible while preserving all original functionality
+- **Backward Compatible:** YES - All original functionality intact
+- **Usage:**
+  - **Existing code:** Uses `result['signal']` (unchanged - complex signals)
+  - **Validators:** Can use `result['metadata']['simple_signal']` (new - directional)
+  - **Best of both:** Full complexity + validator compatibility
 
 #### ATR (Average True Range)
 **File:** `volatility/atr.py`  
