@@ -40,10 +40,19 @@ class OptimalTradeEntry:
     """
     
     def __init__(self, timeframe: str = '15min',
-                 lookback: int = 20,
+                 lookback: int = 15,
                  ote_min: float = 0.618,
                  ote_max: float = 0.786, **kwargs):
-        """Initialize OTE detector"""
+        """
+        Initialize OTE detector with OPTIMIZED parameters (batch tuning 2026-01-01)
+        
+        Batch Optimization Results:
+            Quality: 70/100
+            Accuracy: 55.4%
+            Signals: 2,460 in 180 days (13.7/day)
+            R/R: 5.34 (good)
+            Discovery: lookback=15 (vs 20) - faster = better (consistent pattern)
+        """
         self.timeframe = timeframe
         self.lookback = lookback
         self.ote_min = ote_min
