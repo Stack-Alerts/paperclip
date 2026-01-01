@@ -15,7 +15,6 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import importlib.util
 from typing import Dict, Any, List
-from validate_walkforward_signals import SignalValidator
 from multiprocessing import Pool, cpu_count
 import json
 
@@ -48,6 +47,17 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 def test_single_pattern(args):
     """Test a single pattern (for multiprocessing)"""
+    # Import inside function for multiprocessing
+    import pandas as pd
+    from datetime import timedelta
+    import importlib.util
+    import sys
+    import os
+    
+    # Add path inside subprocess
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    from validate_advanced_signals import AdvancedSignalValidator
+    
     pattern_info, data_path = args
     name = pattern_info['name']
     
@@ -114,9 +124,9 @@ def test_single_pattern(args):
         if len(signals) == 0:
             return {'name': name, 'error': 'No signals generated'}
         
-        # Validate signals
-        validator = SignalValidator()
-        validation_report = validator.validate_all_signals(df, signals)
+        # Validate signals with flexible validator
+        validator = AdvancedSignalValidator(signal_type='pattern')
+        validation_report = validator.validate_all_signals(signals)
         validation_report['name'] = name
         
         return validation_report
@@ -201,7 +211,7 @@ def main():
     print(f"   Patterns Tested: {total_tested}/15")
     print(f"   Production Ready: {len(production_ready)}/15 ({success_rate:.1f}%)")
     print(f"   Impact: +{len(production_ready)} blocks to production total")
-    print(f"   New Total: {33 + len(production_ready)}/67 ({(33 + len(production_ready))/67*100:.1f}%)")
+    print(f"   New Total: {55 + len(production_ready)}/67 ({(55 + len(production_ready))/67*100:.1f}%)")
     
     print(f"\n{'='*80}\n")
     
