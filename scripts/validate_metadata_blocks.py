@@ -201,6 +201,80 @@ class MetadataBlockValidator:
             'quality_score': max(0, 100 - len(issues) * 20 - len(warnings) * 5)
         }
     
+    def validate_fibonacci_metadata(self, metadata: Dict) -> Dict[str, Any]:
+        """Validate Fibonacci retracement levels"""
+        issues = []
+        warnings = []
+        
+        # Check for levels
+        if 'levels' not in metadata and 'fibonacci_levels' not in metadata:
+            issues.append('No Fibonacci levels found')
+        else:
+            levels = metadata.get('levels') or metadata.get('fibonacci_levels', {})
+            expected_levels = [0.236, 0.382, 0.5, 0.618, 0.786]
+            
+            for level in expected_levels:
+                if str(level) not in str(levels) and level not in levels:
+                    warnings.append(f'Missing Fibonacci level: {level}')
+        
+        return {
+            'valid': len(issues) == 0,
+            'issues': issues,
+            'warnings': warnings,
+            'quality_score': max(0, 100 - len(issues) * 20 - len(warnings) * 5)
+        }
+    
+    def validate_session_metadata(self, metadata: Dict) -> Dict[str, Any]:
+        """Validate session/kill zone metadata"""
+        issues = []
+        warnings = []
+        
+        # Check for session data
+        has_session_data = any(key in metadata for key in ['session', 'kill_zone', 'active_session', 'session_time'])
+        if not has_session_data:
+            issues.append('No session data found')
+        
+        return {
+            'valid': len(issues) == 0,
+            'issues': issues,
+            'warnings': warnings,
+            'quality_score': max(0, 100 - len(issues) * 20 - len(warnings) * 5)
+        }
+    
+    def validate_institutional_metadata(self, metadata: Dict) -> Dict[str, Any]:
+        """Validate institutional metadata (VWAP, depth, etc)"""
+        issues = []
+        warnings = []
+        
+        # Check for institutional data
+        has_inst_data = any(key in metadata for key in ['vwap', 'anchored_vwap', 'depth', 'liquidity', 'institutional_level'])
+        if not has_inst_data:
+            issues.append('No institutional data found')
+        
+        return {
+            'valid': len(issues) == 0,
+            'issues': issues,
+            'warnings': warnings,
+            'quality_score': max(0, 100 - len(issues) * 20 - len(warnings) * 5)
+        }
+    
+    def validate_hybrid_metadata(self, metadata: Dict, current_price: float) -> Dict[str, Any]:
+        """Validate hybrid blocks (bands, channels, etc)"""
+        issues = []
+        warnings = []
+        
+        # Check for band/channel data
+        has_bands = any(key in metadata for key in ['upper', 'lower', 'middle', 'bands', 'channel'])
+        if not has_bands:
+            warnings.append('No band/channel data found')
+        
+        return {
+            'valid': len(issues) == 0,
+            'issues': issues,
+            'warnings': warnings,
+            'quality_score': max(0, 100 - len(issues) * 20 - len(warnings) * 5)
+        }
+    
     def validate_all_metadata(self, df: pd.DataFrame, metadata_results: List[Dict]) -> Dict[str, Any]:
         """
         Validate all metadata returns from a block
@@ -235,6 +309,14 @@ class MetadataBlockValidator:
                 validation = self.validate_adx_metadata(metadata)
             elif self.metadata_type == 'price_levels':
                 validation = self.validate_price_level_metadata(metadata, price)
+            elif self.metadata_type == 'fibonacci':
+                validation = self.validate_fibonacci_metadata(metadata)
+            elif self.metadata_type == 'session':
+                validation = self.validate_session_metadata(metadata)
+            elif self.metadata_type == 'institutional':
+                validation = self.validate_institutional_metadata(metadata)
+            elif self.metadata_type == 'hybrid':
+                validation = self.validate_hybrid_metadata(metadata, price)
             else:
                 validation = {'valid': True, 'issues': [], 'warnings': [], 'quality_score': 100}
             
