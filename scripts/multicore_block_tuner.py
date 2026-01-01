@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: EMA 200 TREND PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: MACD SIGNAL PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,24 +363,29 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'moving_averages' / 'ema_200_trend.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'oscillators' / 'macd_signal.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='ema_200_trend',
+        block_name='macd_signal',
         data=df,
-        cache_file='ema_200_trend_tuning_cache.pkl'
+        cache_file='macd_signal_tuning_cache.pkl'
     )
     
-    # Define parameter grid - INSTITUTIONAL GRADE FOR TREND FILTER
-    # Test periods around 200 (this is a single EMA, not a cross)
+    # Define parameter grid - INSTITUTIONAL GRADE FOR MACD
+    # Test around classic 12/26/9 settings
     param_grid = {
-        'period': [180, 190, 200, 210, 220, 230],  # Periods around 200
+        'fast_period': [10, 12, 14],  # Fast EMA around 12
+        'slow_period': [24, 26, 28],  # Slow EMA around 26
+        'signal_period': [8, 9, 10],  # Signal around 9
         'timeframe': ['15min'],  # Keep constant
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - TREND FILTER):")
-    print("   period: 180-230 (6 values around 200)")
-    print("   NOTE: Single EMA - signals on crosses with slope confirmation")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - MACD OSCILLATOR):")
+    print("   fast_period: 10-14 (3 values around classic 12)")
+    print("   slow_period: 24-28 (3 values around classic 26)")
+    print("   signal_period: 8-10 (3 values around classic 9)")
+    print("   Total combinations: 27 (3×3×3)")
+    print("   NOTE: MACD signals on crosses/divergences (event-based)")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
