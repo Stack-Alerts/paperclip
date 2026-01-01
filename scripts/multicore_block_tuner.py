@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: VWAP PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: BOLLINGER BANDS PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,23 +363,26 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'institutional' / 'vwap.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'volatility' / 'bollinger_bands.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='vwap',
+        block_name='bollinger_bands',
         data=df,
-        cache_file='vwap_tuning_cache.pkl'
+        cache_file='bollinger_bands_tuning_cache.pkl'
     )
     
-    # Define parameter grid - VWAP
+    # Define parameter grid - Bollinger Bands
     param_grid = {
+        'period': [20],  # Standard BB period
+        'num_std': [2.0, 2.5, 3.0],  # Standard deviations
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - VWAP):") 
-    print("   timeframe: 15min")
-    print("   Total combinations: 1")
-    print("   NOTE: VWAP = Volume Weighted Average Price (institutional anchor)")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - BOLLINGER BANDS):") 
+    print("   period: 20 (classic)")
+    print("   num_std: 2.0-3.0 (3 values)")
+    print("   Total combinations: 3")
+    print("   NOTE: Bollinger Bands = volatility envelope indicator")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
