@@ -125,10 +125,20 @@ def main():
         # Already tested
         # {'name': 'ATR', 'path': 'volatility/atr.py', 'class': 'ATR', 'type': 'volatility', 
         #  'kwargs': {'period': 14, 'timeframe':'15min'}},
+        # {'name': 'ADX', 'path': 'trend/adx.py', 'class': 'ADX', 'type': 'trend_strength',
+        #  'kwargs': {'period': 14, 'timeframe': '15min'}},
         
-        # ADX - Trend strength
-        {'name': 'ADX', 'path': 'trend/adx.py', 'class': 'ADX', 'type': 'trend_strength',
-         'kwargs': {'period': 14, 'timeframe': '15min'}},
+        # Fibonacci - Retracement levels
+        {'name': 'Fibonacci', 'path': 'fibonacci/fibonacci_retracements.py', 'class': 'FibonacciRetracements', 
+         'type': 'price_levels', 'kwargs': {'timeframe': '15min'}},
+        
+        # Sessions - Kill Zones
+        {'name': 'KillZones', 'path': 'sessions/kill_zones.py', 'class': 'KillZones',
+         'type': 'price_levels', 'kwargs': {'timeframe': '15min'}},
+        
+        # Price Levels - LOD (Low of Day)
+        {'name': 'LOD', 'path': 'price_levels/lod.py', 'class': 'LOD',
+         'type': 'price_levels', 'kwargs': {'timeframe': '15min'}},
     ]
     
     results = {}
