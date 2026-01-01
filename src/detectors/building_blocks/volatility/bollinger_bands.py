@@ -359,6 +359,56 @@ class BollingerBands:
         else:
             return 'BELOW_LOWER'
     
+    def map_to_simple_signal(self, signal: str, percent_b: float, 
+                            squeeze_breakout: Dict, w_bottom: bool, m_top: bool) -> str:
+        """
+        EXPANSION: Map complex Bollinger signals to simple directional signals
+        
+        This maintains ALL original functionality while adding validator compatibility.
+        Original 'signal' field is unchanged - this creates a NEW 'simple_signal' field.
+        
+        Args:
+            signal: Original complex signal
+            percent_b: Current %B value
+            squeeze_breakout: Squeeze breakout detection dict
+            w_bottom: W-bottom pattern detected
+            m_top: M-top pattern detected
+            
+        Returns:
+            Simple directional signal: BULLISH, BEARISH, or NEUTRAL
+        """
+        # Priority 1: Squeeze breakouts (strongest signals)
+        if 'SQUEEZE_BREAKOUT_BULL' in signal:
+            return 'BULLISH'
+        if 'SQUEEZE_BREAKOUT_BEAR' in signal:
+            return 'BEARISH'
+        
+        # Priority 2: Reversal patterns
+        if 'BULLISH_REVERSAL' in signal or w_bottom:
+            return 'BULLISH'
+        if 'BEARISH_REVERSAL' in signal or m_top:
+            return 'BEARISH'
+        
+        # Priority 3: Extreme positions (oversold/overbought)
+        if signal in ['BELOW_LOWER']:  # Oversold = bullish opportunity
+            return 'BULLISH'
+        if signal in ['ABOVE_UPPER']:  # Overbought = bearish opportunity
+            return 'BEARISH'
+        
+        # Priority 4: Near extremes
+        if signal in ['NEAR_LOWER']:
+            return 'BULLISH'
+        if signal in ['NEAR_UPPER']:
+            return 'BEARISH'
+        
+        # Default: Use %B to determine bias
+        if percent_b > 0.5:
+            return 'BULLISH'  # Above middle = bullish bias
+        elif percent_b < 0.5:
+            return 'BEARISH'  # Below middle = bearish bias
+        else:
+            return 'NEUTRAL'  # At equilibrium
+    
     def classify_volatility_regime(self, band_width_series: pd.Series, lookback: int = 50) -> Dict[str, Any]:
         """
         Classify current volatility regime based on historical band width percentiles
@@ -577,6 +627,9 @@ class BollingerBands:
         else:
             signal = position
         
+        # EXPANSION: Map to simple signal (maintains all original functionality)
+        simple_signal = self.map_to_simple_signal(signal, current_percent_b, squeeze_breakout, w_bottom, m_top)
+        
         # Prepare metadata
         metadata = {
             'upper_band': round(current_upper, 2),
@@ -598,11 +651,13 @@ class BollingerBands:
             'std_dev_multiplier': self.std_dev,
             'distance_from_middle': round(((current_price - current_middle) / current_middle) * 100, 2),
             'recent_band_widths': band_width_series.tail(10).tolist(),
-            'recent_percent_b': percent_b_series.tail(10).tolist()
+            'recent_percent_b': percent_b_series.tail(10).tolist(),
+            'simple_signal': simple_signal,  # EXPANSION: Added for validator compatibility
+            'original_signal': signal  # EXPANSION: Preserve original for reference
         }
         
         return {
-            'signal': signal,
+            'signal': signal,  # UNCHANGED: Original complex signal preserved
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),
