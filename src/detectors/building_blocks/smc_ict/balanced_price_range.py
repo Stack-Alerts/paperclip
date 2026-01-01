@@ -36,8 +36,14 @@ class BalancedPriceRange:
     
     def __init__(self, timeframe: str = '15min',
                  lookback: int = 20,
-                 balance_threshold: float = 5.0, **kwargs):
-        """Initialize Balanced Price Range detector"""
+                 balance_threshold: float = 15.0, **kwargs):
+        """
+        Initialize Balanced Price Range detector
+        
+        CRITICAL FIX: Increased default balance_threshold from 5% to 15%
+        Bitcoin is volatile - perfect balance (5%) extremely rare
+        15% allows detection of consolidation ranges in volatile markets
+        """
         self.timeframe = timeframe
         self.lookback = lookback
         self.balance_threshold = balance_threshold
@@ -131,22 +137,27 @@ class BalancedPriceRange:
             }
         
         # Determine signal based on position in range
-        if balanced['position_in_range'] < 40:
-            signal = 'BULLISH'  # Near low of range
-            bias = 'Buy near range low'
-        elif balanced['position_in_range'] > 60:
-            signal = 'BEARISH'  # Near high of range
-            bias = 'Sell near range high'
+        # CRITICAL FIX: Always generate directional signal (no NEUTRAL at mid)
+        if balanced['position_in_range'] <= 50:
+            signal = 'BULLISH'  # Low half of range = bullish bias
+            bias = 'Buy low in range'
         else:
-            signal = 'NEUTRAL'  # At midpoint
-            bias = 'At equilibrium'
+            signal = 'BEARISH'  # High half of range = bearish bias
+            bias = 'Sell high in range'
         
-        # Calculate confidence
-        confidence = 60  # Base confidence for balanced range
+        # Calculate confidence based on position in range and compression
+        confidence = 60  # Base confidence
+        
+        # More extreme position = higher confidence
+        position_extremity = abs(balanced['position_in_range'] - 50)
+        if position_extremity > 30:  # Near edges (0-20% or 80-100%)
+            confidence += 15
+        elif position_extremity > 20:  # Moderately away from mid
+            confidence += 10
+        
         if balanced['is_compressing']:
-            confidence += 15  # Higher confidence if compressing (coiling)
-        if balanced['avg_deviation'] < 3.0:
-            confidence += 10  # Tighter balance = higher confidence
+            confidence += 10  # Compression = coiling for breakout
+        
         confidence = min(100, confidence)
         
         # Build confluence factors

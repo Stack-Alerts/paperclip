@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: MITIGATION BLOCK OPTIMIZATION")
+    print(f"🎯 EXPERT MODE: BALANCED PRICE RANGE OPTIMIZATION")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,24 +363,26 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'smc_ict' / 'mitigation_block.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'smc_ict' / 'balanced_price_range.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='mitigation_block',
+        block_name='balanced_price_range',
         data=df,
-        cache_file='mitigation_block_tuning_cache.pkl'
+        cache_file='balanced_price_range_tuning_cache.pkl'
     )
     
-    # Define parameter grid - Mitigation Block
+    # Define parameter grid - Balanced Price Range
     param_grid = {
-        'lookback': [20, 30, 50],  # Order block lookback
+        'lookback': [20, 30, 50],  # Range detection window
+        'balance_threshold': [15.0],  # Fixed at 15% for Bitcoin
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - MITIGATION BLOCK):") 
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - BALANCED PRICE RANGE):") 
     print("   lookback: 20-50 (3 values)")
+    print("   balance_threshold: 15% (fixed for Bitcoin volatility)")
     print("   Total combinations: 3")
-    print("   NOTE: Mitigation Block = ICT order block mitigation (last block)")
+    print("   NOTE: Balanced Price Range = ICT equilibrium/consolidation detection")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     

@@ -1,1 +1,56 @@
-[]
+[
+  {
+    "params": {
+      "lookback": 20,
+      "balance_threshold": 15.0,
+      "timeframe": "15min"
+    },
+    "param_hash": "513626db38524d868c045bf3f2740df6",
+    "total_signals": 1749,
+    "correct_signals": 985,
+    "accuracy": 56.317895940537454,
+    "quality_score": 80,
+    "reward_risk": 7.249096326735043,
+    "follow_through": 7.0771869639794165,
+    "bullish_accuracy": 58.68772782503038,
+    "bearish_accuracy": 54.21166306695464,
+    "errors": 0,
+    "status": "SUCCESS"
+  },
+  {
+    "params": {
+      "lookback": 30,
+      "balance_threshold": 15.0,
+      "timeframe": "15min"
+    },
+    "param_hash": "1aaecbb4203796012260369cf6989e03",
+    "total_signals": 1913,
+    "correct_signals": 1015,
+    "accuracy": 53.05802404600104,
+    "quality_score": 60,
+    "reward_risk": 5.980048800396901,
+    "follow_through": 7.515420805018296,
+    "bullish_accuracy": 52.95950155763239,
+    "bearish_accuracy": 53.1578947368421,
+    "errors": 0,
+    "status": "SUCCESS"
+  },
+  {
+    "params": {
+      "lookback": 50,
+      "balance_threshold": 15.0,
+      "timeframe": "15min"
+    },
+    "param_hash": "2cabf5442403862346dca57cf54b59b9",
+    "total_signals": 2051,
+    "correct_signals": 1125,
+    "accuracy": 54.85129205265724,
+    "quality_score": 60,
+    "reward_risk": 6.958291045152274,
+    "follow_through": 8.486591906387128,
+    "bullish_accuracy": 54.50819672131148,
+    "bearish_accuracy": 55.16279069767441,
+    "errors": 0,
+    "status": "SUCCESS"
+  }
+]
