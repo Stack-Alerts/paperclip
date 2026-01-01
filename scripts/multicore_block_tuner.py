@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: PREMIUM/DISCOUNT PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: BREAK OF STRUCTURE PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,24 +363,26 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'smc_ict' / 'premium_discount.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'smc_ict' / 'break_of_structure.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='premium_discount',
+        block_name='break_of_structure',
         data=df,
-        cache_file='premium_discount_tuning_cache.pkl'
+        cache_file='break_of_structure_tuning_cache.pkl'
     )
     
-    # Define parameter grid - ICT PREMIUM/DISCOUNT
+    # Define parameter grid - BOS
     param_grid = {
-        'lookback': [15, 20, 25],  # Range lookback
+        'swing_lookback': [8, 10, 12],  # Swing detection
+        'min_break_pct': [0.05, 0.1, 0.15],  # Break confirmation
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - PREMIUM/DISCOUNT):")
-    print("   lookback: 15-25 (3 values around classic 20)")
-    print("   Total combinations: 3 (quick test)")
-    print("   NOTE: Premium/Discount zones for buy/sell areas")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - BREAK OF STRUCTURE):") 
+    print("   swing_lookback: 8-12 (3 values around classic 10)")
+    print("   min_break_pct: 0.05-0.15 (3 values)")
+    print("   Total combinations: 9 (3×3)")
+    print("   NOTE: BOS detects trend continuation breaks")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
