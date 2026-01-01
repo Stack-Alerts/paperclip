@@ -354,7 +354,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: MITIGATION BLOCK PARAMETER TUNING")
+    print(f"🎯 EXPERT MODE: CHANGE OF CHARACTER PARAMETER TUNING")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,24 +363,24 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'smc_ict' / 'mitigation_block.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'smc_ict' / 'change_of_character.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='mitigation_block',
+        block_name='change_of_character',
         data=df,
-        cache_file='mitigation_block_tuning_cache.pkl'
+        cache_file='change_of_character_tuning_cache.pkl'
     )
     
-    # Define parameter grid - MITIGATION BLOCK
+    # Define parameter grid - CHANGE OF CHARACTER
     param_grid = {
-        'lookback': [15, 20, 25],  # Gap detection lookback
+        'swing_lookback': [3, 5, 7],  # Swing detection lookback
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - MITIGATION BLOCK):") 
-    print("   lookback: 15-25 (3 values around classic 20)")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - CHANGE OF CHARACTER):") 
+    print("   swing_lookback: 3-7 (3 values around classic 5)")
     print("   Total combinations: 3")
-    print("   NOTE: Mitigation Block = ICT unfilled orders/gaps")
+    print("   NOTE: Change of Character = ICT early reversal signal (CHOCH)")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
