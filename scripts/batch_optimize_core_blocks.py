@@ -309,8 +309,11 @@ def main():
     successful = 0
     failed = 0
     
-    with Pool(n_parallel) as pool:
-        results = pool.map(optimize_single_block, args_list)
+    # Run blocks sequentially without Pool (avoid daemon issue)
+    results = []
+    for args in args_list:
+        result = optimize_single_block(args)
+        results.append(result)
     
     os.unlink(temp_data_path)
     
