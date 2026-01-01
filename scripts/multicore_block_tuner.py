@@ -437,7 +437,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: BOLLINGER BANDS OPTIMIZATION")
+    print(f"🎯 EXPERT MODE: ATR FIXED (ALGORITHM REDESIGN)")
     print(f"{'='*80}\n")
     
     # Load data
@@ -446,27 +446,25 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'volatility' / 'bollinger_bands.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'volatility' / 'atr.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='bollinger_bands',
+        block_name='atr_fixed',
         data=df,
-        cache_file='bollinger_bands_tuning_cache.pkl'
+        cache_file='atr_fixed_tuning_cache.pkl'
     )
     
-    # Define parameter grid - Bollinger Bands
+    # Define parameter grid - ATR (FIXED: Now signals TRENDS not LEVELS)
     param_grid = {
-        'period': [20, 30],  # BB period
-        'std_dev': [2.0, 2.5],  # Standard deviations
+        'period': [14, 20, 28],  # ATR period
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - BOLLINGER BANDS):") 
-    print("   period: 20-30 (2 values)")
-    print("   std_dev: 2.0-2.5 (2 values)")
-    print("   Total combinations: 4")
-    print("   NOTE: Bollinger Bands = volatility + overbought/oversold")
-    print("   🔬 Uses volatility validator (auto-detected)")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ATR FIXED):") 
+    print("   period: 14-28 (3 values)")
+    print("   Total combinations: 3")
+    print("   NOTE: ATR now signals EXPANDING/CONTRACTING/STABLE per documentation")
+    print("   🔬 FIXED: Matches ATR.md design (volatility trends not levels)")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     

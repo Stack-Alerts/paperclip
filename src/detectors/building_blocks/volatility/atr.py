@@ -302,12 +302,17 @@ class ATR:
             'position_sizing_factor': round(1.0 / max(atr_percent / 100, 0.01), 2)  # Inverse of volatility
         }
         
-        # Signal ONLY on volatility level changes, not continuously
-        # This prevents signaling on every bar (reduces noise)
-        if volatility_changed:
-            signal = f'VOLATILITY_{volatility_level}'  # e.g., VOLATILITY_HIGH
+        # Signal based on ATR trend (EXPANDING/CONTRACTING) per documentation
+        # Primary use case: Detect volatility expansion (breakouts) or contraction (consolidation)
+        # Per ATR.md: "ATR expansion = volatility increasing, ATR contraction = decreasing"
+        if atr_trend == 'RISING':
+            signal = 'EXPANDING'  # Volatility increasing - breakout potential
+        elif atr_trend == 'FALLING':
+            signal = 'CONTRACTING'  # Volatility decreasing - consolidation
+        elif atr_trend == 'STABLE':
+            signal = 'STABLE'  # Volatility stable - range-bound
         else:
-            signal = 'NEUTRAL'  # No change in volatility level
+            signal = 'NEUTRAL'  # Insufficient data
         
         return {
             'signal': signal,
