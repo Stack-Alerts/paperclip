@@ -20,7 +20,7 @@ This document catalogs the **exact return signatures** of all building blocks. U
 ---
 
 ## Block Categorization System
-
+docs/v3/building_blocks/BLOCK_CATEGORIZATION.md
 ### THREE BLOCK TYPES
 
 **📊 SIGNAL BLOCKS** - Predictive Trading Signals (27 confirmed)

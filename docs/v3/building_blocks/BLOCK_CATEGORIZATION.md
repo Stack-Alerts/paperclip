@@ -74,80 +74,107 @@ Method: Documentation review for each block's design intent
 29. ❓ Order Flow Imbalance - HYBRID (can signal + provide levels)
 30. ❓ EMA Crossover Systems - SIGNAL (already covered in MA)
 
-**Patterns (15)** - All SIGNALS (pattern completion)
-31. ❓ Head & Shoulders - SIGNAL (completion)
-32. ❓ Inverse Head & Shoulders - SIGNAL (completion)
-33. ❓ Double Top - SIGNAL (completion)
-34. ❓ Double Bottom - SIGNAL (completion)
-35. ❓ Triple Top - SIGNAL (completion)
-36. ❓ Triple Bottom - SIGNAL (completion)
-37. ❓ Cup & Handle - SIGNAL (breakout)
-38. ❓ Rounding Bottom - SIGNAL (completion)
-39. ❓ Flags/Pennants - SIGNAL (breakout)
-40. ❓ Ascending Triangle - SIGNAL (breakout)
-41. ❓ Descending Triangle - SIGNAL (breakout)
-42. ❓ Symmetrical Triangle - SIGNAL (breakout)
-43. ❓ Wedge Patterns - SIGNAL (breakout)
-44. ❓ Diamond Pattern - SIGNAL (breakout)
-45. ❓ Harmonic Patterns - SIGNAL (completion)
+**Patterns (16)** - All SIGNALS (pattern completion/breakout)
+31. ✅ Head & Shoulders - SIGNAL (bearish reversal 75-82% success)
+32. ✅ Inverse Head & Shoulders - SIGNAL (bullish reversal)
+33. ✅ Double Top - SIGNAL (bearish reversal)
+34. ✅ Double Bottom - SIGNAL (bullish reversal)
+35. ✅ Triple Top - SIGNAL (bearish reversal)
+36. ✅ Triple Bottom - SIGNAL (bullish reversal)
+37. ✅ Cup & Handle - SIGNAL (bullish breakout)
+38. ✅ Rounding Bottom - SIGNAL (bullish reversal)
+39. ✅ Flag Pattern - SIGNAL (continuation breakout)
+40. ✅ Pennant Pattern - SIGNAL (continuation breakout)
+41. ✅ Ascending Triangle - SIGNAL (bullish breakout)
+42. ✅ Descending Triangle - SIGNAL (bearish breakout)
+43. ✅ Symmetrical Triangle - SIGNAL (breakout either direction)
+44. ✅ Wedge Patterns - SIGNAL (rising/falling wedge)
+45. ✅ Diamond Pattern - SIGNAL (reversal breakout)
+46. ✅ Harmonic Patterns - SIGNAL (Gartley, Bat, etc.)
 
 ---
 
 ### METADATA/CONTEXT BLOCKS (Non-Predictive)
 
-**Volatility (3)** - All METADATA
-46. ❌→✅ ATR - METADATA (stop-loss distance, position sizing)
-47. ✅ ADR - HYBRID (volatility level + targets)
-48. ❓ Bollinger Bands - HYBRID (bands + squeeze/expansion)
-49. ❓ Keltner Channels - METADATA (volatility bands)
+**Volatility (4)** - 1 METADATA, 3 HYBRID
+47. ✅ ATR - METADATA (stop-loss distance, position sizing)
+48. ✅ ADR - HYBRID (volatility level + targets)
+49. ✅ Bollinger Bands - HYBRID (bands + squeeze/expansion signals)
+50. ✅ Keltner Channels - METADATA (volatility channel bands)
 
-**Trend Strength (2)** - METADATA
-50. ❓ ADX - METADATA (trend strength 0-100)
-51. ❓ Ichimoku Cloud - HYBRID (cloud + signals)
+**Trend Strength (2)** - 1 METADATA, 1 HYBRID
+51. ✅ ADX - METADATA (trend strength 0-100 filter)
+52. ✅ Ichimoku Cloud - HYBRID (cloud position + crossover signals)
 
-**Sessions/Time (2)** - METADATA
-52. ❓ Kill Zones - METADATA (time windows)
-53. ❓ Session High/Low - METADATA (session levels)
+**Sessions/Time (2)** - All METADATA
+53. ✅ Kill Zones - METADATA (ICT time windows: Asia/London/NY)
+54. ✅ Session High/Low - METADATA (session price ranges)
 
-**Price Levels (6)** - METADATA (Reference Levels)
-54. ❌ HOD - METADATA (resistance reference)
-55. ❓ HOW - METADATA (resistance reference)
-56. ❓ LOD - METADATA (support reference)
-57. ❓ LOW - METADATA (support reference)
-58. ❓ Asia Session 50% - METADATA (level reference)
-59. ❓ US Settlement - METADATA (level reference)
+**Price Levels (6)** - All METADATA (Reference Levels)
+55. ✅ HOD - METADATA (daily high resistance reference, needs fix)
+56. ✅ HOW - METADATA (weekly high resistance reference)
+57. ✅ LOD - METADATA (daily low support reference)
+58. ✅ LOW - METADATA (weekly low support reference)
+59. ✅ Asia Session 50% - METADATA (session midpoint level)
+60. ✅ US Settlement - METADATA (4pm EST settlement level)
 
-**Elliott Wave (2)** - SIGNALS (Wave completion)
-60. ❓ Elliott Wave Count - SIGNAL (wave completion)
-61. ❓ Elliott Wave Oscillator - SIGNAL (wave momentum)
+**Elliott Wave (2)** - All SIGNALS (Wave Analysis)
+61. ✅ Elliott Wave Count - SIGNAL (wave completion prediction)
+62. ✅ Elliott Wave Oscillator - SIGNAL (wave momentum confirmation)
 
-**Fibonacci (1)** - METADATA (Retracement levels)
-62. ❓ Fibonacci Retracements - METADATA (support/resistance levels)
+**Fibonacci (1)** - METADATA (Retracement Levels)
+63. ✅ Fibonacci Retracements - METADATA (0.236, 0.382, 0.5, 0.618, 0.786)
 
-**Wyckoff (3)** - SIGNALS (Phase detection)
-63. ❓ Wyckoff Accumulation - SIGNAL (phase completion)
-64. ❓ Wyckoff Distribution - SIGNAL (phase completion)
-65. ❓ Wyckoff Reaccumulation - SIGNAL (phase completion)
+**Wyckoff (3)** - All SIGNALS (Phase Detection)
+64. ✅ Wyckoff Accumulation - SIGNAL (accumulation phase complete)
+65. ✅ Wyckoff Distribution - SIGNAL (distribution phase complete)
+66. ✅ Wyckoff Reaccumulation - SIGNAL (reaccumulation phase complete)
 
-**Volume (2)** - METADATA
-66. ❓ Volume Profile - METADATA (volume at price levels)  
-67. ❓ Volume Analyzer - METADATA (volume metrics)
+**Volume (2)** - All METADATA (Volume Analysis)
+67. ✅ Volume Profile - METADATA (volume at price levels POC/VAH/VAL)  
+68. ✅ Volume Analyzer - METADATA (volume metrics and statistics)
+
+**Institutional (Additional)** - Mix
+27. ✅ Anchored VWAP - METADATA (event-anchored institutional reference)
+28. ✅ Market Depth - METADATA (order book liquidity levels)
+29. ✅ Order Flow Imbalance - HYBRID (imbalance metrics + signals)
+30. ✅ EMA Crossover Systems - SIGNAL (duplicate of #1, skip)
 
 ---
 
 ## Summary Counts
 
-**CONFIRMED:**
-- ✅ Signal Blocks: 27 (tested and validated)
-- ✅ Metadata Blocks: 1 (ATR - identified, needs proper validation)
-- ✅ Hybrid Blocks: 1 (ADR - works as metadata)
+**✅ CATEGORIZATION COMPLETE: 67/67 BLOCKS** 
 
-**TO CATEGORIZE:** 38 blocks remaining
+**SIGNAL BLOCKS: 47/67 (70.1%)**
+- Moving Averages: 6
+- Oscillators: 3
+- Price Action: 4
+- Trend: 2
+- ICT/SMC: 10
+- Institutional: 1 (VWAP)
+- Patterns: 16
+- Elliott Wave: 2
+- Wyckoff: 3
+- **Production Ready: 27/47 (57.4%)**
 
-**ESTIMATED FINAL:**
-- Signals: 40-45 blocks
-- Metadata: 15-20 blocks
-- Hybrid: 5-7 blocks
+**METADATA BLOCKS: 16/67 (23.9%)**
+- ATR: 1 (stop-loss calculator)
+- Keltner Channels: 1
+- ADX: 1 (trend strength filter)
+- Sessions/Time: 2 (Kill Zones, Session High/Low)
+- Price Levels: 6 (HOD, HOW, LOD, LOW, Asia 50%, US Settlement)
+- Fibonacci: 1 (retracements)
+- Volume: 2 (Profile, Analyzer)
+- Institutional: 2 (Anchored VWAP, Market Depth)
+- **Production Ready: 0/16 (need metadata validation)**
+
+**HYBRID BLOCKS: 4/67 (6.0%)**
+- ADR (volatility + targets)
+- Bollinger Bands (bands + signals)
+- Ichimoku Cloud (cloud + crossovers)
+- Order Flow Imbalance (metrics + signals)
+- **Production Ready: 1/4 (ADR only)**
 
 ---
 
