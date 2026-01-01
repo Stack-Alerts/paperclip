@@ -128,16 +128,17 @@ def main():
         # {'name': 'ADX', 'path': 'trend/adx.py', 'class': 'ADX', 'type': 'trend_strength',
         #  'kwargs': {'period': 14, 'timeframe': '15min'}},
         
-        # Fibonacci - Retracement levels
-        {'name': 'Fibonacci', 'path': 'fibonacci/fibonacci_retracements.py', 'class': 'FibonacciRetracements', 
+        # Price Levels - All should pass like LOD
+        # {'name': 'LOD', 'path': 'price_levels/lod.py', 'class': 'LOD',
+        #  'type': 'price_levels', 'kwargs': {'timeframe': '15min'}},
+        
+        {'name': 'HOD', 'path': 'price_levels/hod.py', 'class': 'HOD',
          'type': 'price_levels', 'kwargs': {'timeframe': '15min'}},
         
-        # Sessions - Kill Zones
-        {'name': 'KillZones', 'path': 'sessions/kill_zones.py', 'class': 'KillZones',
+        {'name': 'HOW', 'path': 'price_levels/how.py', 'class': 'HOW',
          'type': 'price_levels', 'kwargs': {'timeframe': '15min'}},
         
-        # Price Levels - LOD (Low of Day)
-        {'name': 'LOD', 'path': 'price_levels/lod.py', 'class': 'LOD',
+        {'name': 'LOW', 'path': 'price_levels/low.py', 'class': 'LOW',
          'type': 'price_levels', 'kwargs': {'timeframe': '15min'}},
     ]
     
