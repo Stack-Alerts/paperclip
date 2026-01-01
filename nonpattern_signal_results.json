@@ -1,0 +1,22 @@
+{
+  "ElliottWaveCount": {
+    "error": "No validated signals",
+    "name": "ElliottWaveCount"
+  },
+  "ElliottWaveOscillator": {
+    "error": "No validated signals",
+    "name": "ElliottWaveOscillator"
+  },
+  "WyckoffAccumulation": {
+    "error": "No validated signals",
+    "name": "WyckoffAccumulation"
+  },
+  "WyckoffDistribution": {
+    "error": "No validated signals",
+    "name": "WyckoffDistribution"
+  },
+  "WyckoffReaccumulation": {
+    "error": "No validated signals",
+    "name": "WyckoffReaccumulation"
+  }
+}
