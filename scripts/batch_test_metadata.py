@@ -128,17 +128,13 @@ def main():
         # {'name': 'ADX', 'path': 'trend/adx.py', 'class': 'ADX', 'type': 'trend_strength',
         #  'kwargs': {'period': 14, 'timeframe': '15min'}},
         
-        # Price Levels - All should pass like LOD
-        # {'name': 'LOD', 'path': 'price_levels/lod.py', 'class': 'LOD',
-        #  'type': 'price_levels', 'kwargs': {'timeframe': '15min'}},
+        # Already tested price levels: LOD, HOD, HOW, LOW (all 100/100)
         
-        {'name': 'HOD', 'path': 'price_levels/hod.py', 'class': 'HOD',
+        # Remaining price levels
+        {'name': 'Asia50%', 'path': 'price_levels/asia_session_50_percent.py', 'class': 'AsiaSession50Percent',
          'type': 'price_levels', 'kwargs': {'timeframe': '15min'}},
         
-        {'name': 'HOW', 'path': 'price_levels/how.py', 'class': 'HOW',
-         'type': 'price_levels', 'kwargs': {'timeframe': '15min'}},
-        
-        {'name': 'LOW', 'path': 'price_levels/low.py', 'class': 'LOW',
+        {'name': 'USSettlement', 'path': 'price_levels/us_settlement.py', 'class': 'USSettlement',
          'type': 'price_levels', 'kwargs': {'timeframe': '15min'}},
     ]
     
