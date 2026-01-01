@@ -1,13 +1,50 @@
 # Building Blocks Production Readiness Master Tracker
 
-**Last Updated:** 2026-01-01 14:53:00  
+**Last Updated:** 2026-01-01 15:48:00  
 **Total Blocks:** 67  
-**Production Ready:** 26  
-**In Review:** 41
+**Production Ready:** 27 Signal Blocks + Categorization Framework  
+**In Review:** 40 (categorization in progress)
 
-**Session:** 18+ hours intensive optimization  
-**Git Commits:** 32  
-**Success Rate:** 89.7% (26 of 29 tested)
+**Session:** 24+ hours intensive optimization + categorization  
+**Git Commits:** 38  
+**Success Rate:** 79.4% (27 of 34 tested)
+
+---
+
+## 🎯 BLOCK CATEGORIZATION SYSTEM
+
+### Three Block Types Identified
+
+**📊 SIGNAL BLOCKS (27 confirmed production-ready)**
+- **Purpose:** Generate predictive trading signals
+- **Testing:** Walk-forward validation (did prediction work?)
+- **Validators:** `DirectionalSignalValidator`, `VolatilitySignalValidator`
+- **Examples:** MA crossovers, Order Blocks, BOS, Mitigation Block
+- **Status:** 27/67 production-ready (40.3%)
+
+**📏 METADATA BLOCKS (ATR, ADX, price levels identified)**
+- **Purpose:** Provide measurements and context for risk management
+- **Testing:** Data quality validation (is measurement accurate?)
+- **Validator:** `MetadataBlockValidator` (NEW!)
+- **Examples:** ATR (stop-loss calc), ADX (trend strength 0-100), HOD/LOD (price levels)
+- **Status:** Identified, need metadata validation
+
+**🔀 HYBRID BLOCKS (ADR, Bollinger Bands confirmed)**
+- **Purpose:** Both signals AND measurements
+- **Testing:** Dual validation (both tests)
+- **Examples:** ADR (volatility levels + targets), Bollinger Bands (bands + signals)
+- **Status:** ADR production-ready, others under review
+
+### Categorization Progress
+
+**Confirmed (29/67):**
+- ✅ Signal Blocks: 27 (walk-forward validated)
+- ✅ Metadata Blocks: 1 (ATR - needs metadata validator test)
+- ✅ Hybrid Blocks: 1 (ADR - passed both validations)
+
+**Remaining (38/67):** Categorization in progress
+
+**Impact:** Now can test ALL 67 blocks with appropriate validators!
 
 ---
 

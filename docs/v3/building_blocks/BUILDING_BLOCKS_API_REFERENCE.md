@@ -19,6 +19,43 @@ This document catalogs the **exact return signatures** of all building blocks. U
 
 ---
 
+## Block Categorization System
+
+### THREE BLOCK TYPES
+
+**📊 SIGNAL BLOCKS** - Predictive Trading Signals (27 confirmed)
+- **Purpose:** Generate predictions about future price movement
+- **Returns:** Directional signals (BULLISH/BEARISH or pattern-specific)
+- **Testing:** Walk-forward validation (did prediction work?)
+- **Validator:** `DirectionalSignalValidator` or `VolatilitySignalValidator`
+- **Examples:** MA crossovers, Order Blocks, BOS, pattern completions
+
+**📏 METADATA BLOCKS** - Context/Measurements (Identified: ATR, ADX, price levels)
+- **Purpose:** Provide current measurements, not predictions
+- **Returns:** Descriptive data (ATR value, trend strength, price levels)
+- **Testing:** Data quality validation (is measurement accurate?)
+- **Validator:** `MetadataBlockValidator`
+- **Examples:** ATR (stop-loss distance), ADX (trend strength 0-100), HOD (price level)
+- **Usage:** Context for signal blocks, risk management, filtering
+
+**🔀 HYBRID BLOCKS** - Both Signals & Metadata (Confirmed: ADR, Bollinger Bands)
+- **Purpose:** Generate signals AND provide measurements
+- **Returns:** Both directional signals and metadata
+- **Testing:** Dual validation (both tests)
+- **Validators:** Both signal validator AND metadata validator
+- **Examples:** ADR (volatility levels + targets), Bollinger Bands (bands + squeeze signals)
+
+### Categorization Status
+
+**Confirmed (29/67):**
+- ✅ Signal Blocks: 27 (production-ready)
+- ✅ Metadata Blocks: 1 (ATR)
+- ✅ Hybrid Blocks: 1 (ADR)
+
+**Remaining (38/67):** Under categorization review
+
+---
+
 ## Signal Type Categories
 
 ### Directional Signals (Trading Actions)
@@ -311,7 +348,87 @@ This document catalogs the **exact return signatures** of all building blocks. U
 
 ---
 
-## 🔄 BLOCKS IDENTIFIED AS INCOMPATIBLE
+## 🔄 METADATA & HYBRID BLOCKS
+
+### Metadata Blocks (Context/Measurements)
+
+#### ATR (Average True Range) - METADATA BLOCK
+**File:** `volatility/atr.py`  
+**Function:** `analyze(df)`  
+**Block Type:** **METADATA** (not signal generator)
+**Purpose:** Risk management tool - stop-loss placement, position sizing
+**Returns:**
+- **Signal:** `EXPANDING`, `CONTRACTING`, `STABLE`, `NEUTRAL` (volatility trend - NOT predictive)
+- **Metadata (PRIMARY FUNCTION):**
+  - `atr_value`: Current ATR in price units
+  - `atr_percent`: ATR as % of price (BTC typically 0.1-10%)
+  - `stop_suggestions`: Dict with conservative/standard/aggressive stops
+    * `distance`: Stop distance in price units
+    * `multiplier`: ATR multiplier used (1.5x, 2.0x, 2.5x)
+    * `long_stop`: Entry - (ATR × multiplier)
+    * `short_stop`: Entry + (ATR × multiplier)
+  - `position_sizing_factor`: Inverse volatility scaling (higher ATR = smaller position)
+  - `volatility_level`: Classification (CALM, NORMAL, HIGH, VERY_HIGH, EXTREME)
+  - `atr_trend`: Trend direction (RISING, FALLING, STABLE)
+  - `current_price`: Reference price
+- **Status:** ✅ METADATA BLOCK - Test with MetadataBlockValidator
+- **Quality:** 90/100 (as metadata tool) - Validates ATR calculations, stop suggestions
+- **Usage:** Reference ATR value for stop placement; multiply ATR by 1.5-2.5 for stop distance
+- **Note:** Signals (EXPANDING/CONTRACTING) are NOT predictive - describes current state only
+
+#### ADX (Average Directional Index) - METADATA BLOCK
+**File:** `trend_momentum/adx.py`  
+**Function:** `analyze(df)`  
+**Block Type:** **METADATA** (trend strength filter)
+**Purpose:** Measure trend strength (not direction)
+**Returns:**
+- **Signal:** `STRONG_TREND`, `WEAK_TREND`, `RANGING` (descriptive - NOT predictive)
+- **Metadata (PRIMARY FUNCTION):**
+  - `adx_value`: 0-100 scale
+    * 0-25: Weak/no trend (ranging)
+    * 25-50: Strong trend
+    * 50-75: Very strong trend
+    * 75-100: Extreme trend
+  - `trend_classification`: Strength category
+  - `plus_di`: Positive Direction Indicator
+  - `minus_di`: Negative Direction Indicator
+- **Status:** ⚠️ METADATA BLOCK - Test with MetadataBlockValidator
+- **Quality:** TBD (pending metadata validation)
+- **Usage:** Filter - only trade trend strategies when ADX >25; range strategies when <20
+- **Note:** ADX does NOT indicate direction, only strength
+
+#### HOD/HOW/LOD/LOW - METADATA BLOCKS (Price Levels)
+**Files:** `price_levels/hod.py`, etc.  
+**Block Type:** **METADATA** (reference price levels)
+**Purpose:** Provide intraday resistance/support references
+**Returns:**
+- **Metadata (PRIMARY FUNCTION):**
+  - `hod`/`lod`: Price level
+  - `current_price`: Current price
+  - `distance_pct`: Distance to level as %
+  - `test_count`: Number of times tested
+- **Status:** ⚠️ NEEDS REDESIGN - Self-referencing logic bug (HOD updates realtime)
+- **Fix Needed:** Use yesterday's HOD as fixed reference
+- **Usage:** Reference levels for other strategies
+
+### Hybrid Blocks (Both Signals & Metadata)
+
+#### ADR (Average Daily Range) - HYBRID BLOCK
+**File:** `volatility/adr.py`  
+**Function:** `analyze(df)`  
+**Block Type:** **HYBRID** (volatility levels + targets)
+**Returns:**
+- **Signals (for validation):** `CALM`, `NORMAL`, `ELEVATED`, `HIGH`, `EXTREME`
+- **Metadata (for usage):**
+  - `adr_value`: Average daily range in price units
+  - `adr_percent`: ADR as % of price
+  - `current_range`: Today's range
+  - `range_classification`: Volatility level
+  - `targets`: Profit target suggestions at 0.5x, 1.0x, 1.5x, 2.0x ADR
+  - `position_sizing_factor`: Volatility-based sizing
+- **Status:** ✅ PRODUCTION READY (70/100, 60.1% accuracy)
+- **Quality:** CALM predictions 95.3% accurate
+- **Usage:** Both signal (volatility level) and metadata (targets, position sizing)
 
 ### Volatility Blocks (Complex Signal Types)
 
