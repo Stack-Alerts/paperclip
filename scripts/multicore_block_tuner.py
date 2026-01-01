@@ -31,6 +31,7 @@ from itertools import product
 import pickle
 
 from validate_walkforward_signals import SignalValidator
+from validate_volatility_signals import VolatilitySignalValidator
 
 
 class BlockParameterTuner:
@@ -165,9 +166,8 @@ class BlockParameterTuner:
                 self.tested_combinations[param_hash] = result
                 return result
             
-            # Run Expert Mode validation
-            validator = SignalValidator(lookback_bars=20, lookforward_bars=50)
-            validation_report = validator.validate_all_signals(self.data, signals)
+            # Auto-detect signal type and use appropriate validator
+            validator, validation_report = self.validate_with_appropriate_validator(signals)
             
             if 'error' in validation_report:
                 result = {
@@ -184,7 +184,7 @@ class BlockParameterTuner:
                 self.tested_combinations[param_hash] = result
                 return result
             
-            # Extract metrics
+            # Extract metrics (handle both directional and volatility validators)
             result = {
                 'params': params,
                 'param_hash': param_hash,
@@ -192,14 +192,23 @@ class BlockParameterTuner:
                 'correct_signals': validation_report['correct_signals'],
                 'accuracy': validation_report['accuracy'],
                 'quality_score': validation_report['quality_score'],
-                'reward_risk': validation_report['overall_metrics']['avg_reward_risk_ratio'],
-                'follow_through': validation_report['overall_metrics']['avg_consecutive_favorable_bars'],
-                'bullish_accuracy': validation_report['bullish_signals']['accuracy'],
-                'bearish_accuracy': validation_report['bearish_signals']['accuracy'],
                 'errors': errors,
                 'status': 'SUCCESS',
                 'validation_report': validation_report
             }
+            
+            # Add directional-specific metrics if available
+            if 'bullish_signals' in validation_report:
+                result['reward_risk'] = validation_report['overall_metrics']['avg_reward_risk_ratio']
+                result['follow_through'] = validation_report['overall_metrics']['avg_consecutive_favorable_bars']
+                result['bullish_accuracy'] = validation_report['bullish_signals']['accuracy']
+                result['bearish_accuracy'] = validation_report['bearish_signals']['accuracy']
+            else:
+                # Volatility validator - use placeholder values
+                result['reward_risk'] = 0.0
+                result['follow_through'] = 0.0
+                result['bullish_accuracy'] = 0.0
+                result['bearish_accuracy'] = 0.0
             
             # Cache result
             self.tested_combinations[param_hash] = result
@@ -305,6 +314,80 @@ class BlockParameterTuner:
             print(f"   Bearish Accuracy: {result['bearish_accuracy']:.1f}%")
             print()
     
+    def detect_signal_type(self, signals: List[Dict]) -> str:
+        """
+        Auto-detect signal type category from signals
+        
+        Args:
+            signals: List of signal dictionaries
+            
+        Returns:
+            'DIRECTIONAL', 'VOLATILITY', or 'UNKNOWN'
+        """
+        if not signals:
+            return 'UNKNOWN'
+        
+        # Sample first 10 signals
+        sample_signals = signals[:min(10, len(signals))]
+        
+        volatility_keywords = [
+            'VOLATILITY_', 'SQUEEZE', 'EXPANSION', 'BREAKOUT',
+            'CALM', 'RISING', 'FALLING', 'STABLE',
+            'ABOVE_UPPER', 'BELOW_LOWER', 'NEAR_UPPER', 'NEAR_LOWER'
+        ]
+        
+        directional_keywords = [
+            'BULLISH', 'BEARISH', '_BUY', '_SELL',
+            'LONG', 'SHORT', 'UP', 'DOWN'
+        ]
+        
+        volatility_count = 0
+        directional_count = 0
+        
+        for signal in sample_signals:
+            signal_type = signal.get('signal', '').upper()
+            
+            # Check for volatility signals
+            if any(kw in signal_type for kw in volatility_keywords):
+                volatility_count += 1
+            
+            # Check for directional signals
+            if any(kw in signal_type for kw in directional_keywords):
+                directional_count += 1
+        
+        # Determine majority type
+        if volatility_count > directional_count:
+            return 'VOLATILITY'
+        elif directional_count > volatility_count:
+            return 'DIRECTIONAL'
+        else:
+            return 'UNKNOWN'
+    
+    def validate_with_appropriate_validator(self, signals: List[Dict]) -> Tuple[Any, Dict]:
+        """
+        Auto-detect signal type and validate with appropriate validator
+        
+        Args:
+            signals: List of signal dictionaries
+            
+        Returns:
+            Tuple of (validator instance, validation report)
+        """
+        signal_type = self.detect_signal_type(signals)
+        
+        print(f"🔍 Detected signal type: {signal_type}")
+        
+        if signal_type == 'VOLATILITY':
+            print(f"📊 Using Volatility Signal Validator\n")
+            validator = VolatilitySignalValidator(lookback_bars=20, lookforward_bars=50)
+        else:
+            print(f"📊 Using Directional Signal Validator\n")
+            validator = SignalValidator(lookback_bars=20, lookforward_bars=50)
+        
+        validation_report = validator.validate_all_signals(self.data, signals)
+        
+        return validator, validation_report
+    
     def save_top_results(self, results: List[Dict], filename: str, top_n: int = 10):
         """Save top results to JSON file"""
         output_path = Path(__file__).parent.parent / filename
@@ -354,7 +437,7 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
 
 if __name__ == "__main__":
     print(f"\n{'='*80}")
-    print(f"🎯 EXPERT MODE: BALANCED PRICE RANGE OPTIMIZATION")
+    print(f"🎯 EXPERT MODE: ATR (AVERAGE TRUE RANGE) OPTIMIZATION")
     print(f"{'='*80}\n")
     
     # Load data
@@ -363,26 +446,25 @@ if __name__ == "__main__":
     print(f"✅ Loaded {len(df)} bars\n")
     
     # Initialize tuner
-    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'smc_ict' / 'balanced_price_range.py'
+    block_path = Path(__file__).parent.parent / 'src' / 'detectors' / 'building_blocks' / 'volatility' / 'atr.py'
     tuner = BlockParameterTuner(
         block_path=str(block_path),
-        block_name='balanced_price_range',
+        block_name='atr',
         data=df,
-        cache_file='balanced_price_range_tuning_cache.pkl'
+        cache_file='atr_tuning_cache.pkl'
     )
     
-    # Define parameter grid - Balanced Price Range
+    # Define parameter grid - ATR
     param_grid = {
-        'lookback': [20, 30, 50],  # Range detection window
-        'balance_threshold': [15.0],  # Fixed at 15% for Bitcoin
+        'period': [14, 20, 28],  # ATR period
         'timeframe': ['15min'],
     }
     
-    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - BALANCED PRICE RANGE):") 
-    print("   lookback: 20-50 (3 values)")
-    print("   balance_threshold: 15% (fixed for Bitcoin volatility)")
+    print("📝 Parameter Ranges (INSTITUTIONAL GRADE - ATR):") 
+    print("   period: 14-28 (3 values, classic is 14)")
     print("   Total combinations: 3")
-    print("   NOTE: Balanced Price Range = ICT equilibrium/consolidation detection")
+    print("   NOTE: ATR = Average True Range (volatility indicator)")
+    print("   🔬 NEW: Auto-detects volatility signals, uses custom validator")
     print("   ⚠️  Testing EVERY bar (17K+) for maximum accuracy")
     print(f"\n{'='*80}\n")
     
