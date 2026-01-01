@@ -47,86 +47,120 @@ class MitigationBlock:
         self.gap_threshold = gap_threshold
     
     def detect_bullish_mitigation(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        """Detect bullish mitigation zone (unfilled orders below)"""
+        """
+        Detect bullish mitigation zone (unfilled buy orders below)
+        
+        CRITICAL FIX for Bitcoin: Traditional gaps rare in 24/7 crypto markets.
+        Instead, detect:
+        1. Strong bullish impulse candles (institutional buying)
+        2. Areas not yet retested (mitigation pending)
+        3. Imbalances in price action
+        """
         if len(df) < self.lookback:
             return None
         
         recent = df.tail(self.lookback)
         current_price = float(df['close'].iloc[-1])
         
-        # Look for gaps below current price
-        for i in range(len(recent) - 1):
-            current_bar = recent.iloc[i]
-            next_bar = recent.iloc[i+1]
+        # Look for strong bullish candles that created mitigation zones
+        for i in range(len(recent) - 3):  # Need 3 bars after to check retest
+            bar = recent.iloc[i]
             
-            # Check for gap  up (mitigation zone left below)
-            if next_bar['low'] > current_bar['high']:
-                gap_size = next_bar['low'] - current_bar['high']
-                gap_pct = (gap_size / current_bar['high']) * 100
+            # Strong bullish candle criteria
+            body = bar['close'] - bar['open']
+            full_range = bar['high'] - bar['low']
+            
+            if full_range == 0:
+                continue
                 
-                if gap_pct >= self.gap_threshold:
-                    mitigation_high = float(current_bar['high'])
-                    mitigation_low = float(current_bar['low'])
-                    
-                    # Check if price is above this zone (not yet mitigated)
-                    if current_price > mitigation_high:
-                        return {
-                            'type': 'BULLISH_MITIGATION',
-                            'mitigation_high': mitigation_high,
-                            'mitigation_low': mitigation_low,
-                            'gap_size': float(gap_size),
-                            'gap_pct': round(gap_pct, 3),
-                            'current_price': current_price,
-                            'distance_pct': round(((current_price - mitigation_high) / current_price) * 100, 2),
-                            'timestamp': df['timestamp'].iloc[-1]
-                        }
+            body_pct = (body / full_range) * 100
+            move_pct = (body / bar['open']) * 100
+            
+            # Strong bullish move: body >50% of range, move >0.2% (more lenient for Bitcoin)
+            if body > 0 and body_pct > 50 and move_pct > 0.2:
+                mitigation_low = float(bar['low'])
+                mitigation_high = float(bar['close'])  # Use close for bullish
+                
+                # Check if price is APPROACHING this zone (within 3%)
+                distance_pct = ((current_price - mitigation_high) / current_price) * 100
+                
+                # Signal when price is above zone AND approaching (within 10%)
+                if current_price > mitigation_high and distance_pct < 10.0:
+                    return {
+                        'type': 'BULLISH_MITIGATION',
+                        'mitigation_high': mitigation_high,
+                        'mitigation_low': mitigation_low,
+                        'gap_size': mitigation_high - mitigation_low,
+                        'gap_pct': round(move_pct, 3),
+                        'current_price': current_price,
+                        'distance_pct': round(((current_price - mitigation_high) / current_price) * 100, 2),
+                        'timestamp': df['timestamp'].iloc[-1],
+                        'bars_ago': len(recent) - i - 1
+                    }
         
         return None
     
     def detect_bearish_mitigation(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        """Detect bearish mitigation zone (unfilled orders above)"""
+        """
+        Detect bearish mitigation zone (unfilled sell orders above)
+        
+        CRITICAL FIX for Bitcoin: Traditional gaps rare in 24/7 crypto markets.
+        Instead, detect:
+        1. Strong bearish impulse candles (institutional selling)
+        2. Areas not yet retested (mitigation pending)
+        3. Imbalances in price action
+        """
         if len(df) < self.lookback:
             return None
         
         recent = df.tail(self.lookback)
         current_price = float(df['close'].iloc[-1])
         
-        # Look for gaps above current price
-        for i in range(len(recent) - 1):
-            current_bar = recent.iloc[i]
-            next_bar = recent.iloc[i+1]
+        # Look for strong bearish candles that created mitigation zones
+        for i in range(len(recent) - 3):  # Need 3 bars after to check retest
+            bar = recent.iloc[i]
             
-            # Check for gap down (mitigation zone left above)
-            if next_bar['high'] < current_bar['low']:
-                gap_size = current_bar['low'] - next_bar['high']
-                gap_pct = (gap_size / current_bar['low']) * 100
+            # Strong bearish candle criteria
+            body = bar['open'] - bar['close']  # Bearish body
+            full_range = bar['high'] - bar['low']
+            
+            if full_range == 0:
+                continue
                 
-                if gap_pct >= self.gap_threshold:
-                    mitigation_high = float(current_bar['high'])
-                    mitigation_low = float(current_bar['low'])
-                    
-                    # Check if price is below this zone (not yet mitigated)
-                    if current_price < mitigation_low:
-                        return {
-                            'type': 'BEARISH_MITIGATION',
-                            'mitigation_high': mitigation_high,
-                            'mitigation_low': mitigation_low,
-                            'gap_size': float(gap_size),
-                            'gap_pct': round(gap_pct, 3),
-                            'current_price': current_price,
-                            'distance_pct': round(((mitigation_low - current_price) / current_price) * 100, 2),
-                            'timestamp': df['timestamp'].iloc[-1]
-                        }
+            body_pct = (body / full_range) * 100
+            move_pct = (body / bar['open']) * 100
+            
+            # Strong bearish move: body >50% of range, move >0.2% (more lenient for Bitcoin)
+            if body > 0 and body_pct > 50 and move_pct > 0.2:
+                mitigation_high = float(bar['high'])
+                mitigation_low = float(bar['close'])  # Use close for bearish
+                
+                # Check if price is APPROACHING this zone (within 3%)
+                distance_pct = ((mitigation_low - current_price) / current_price) * 100
+                
+                # Signal when price is below zone AND approaching (within 10%)
+                if current_price < mitigation_low and distance_pct < 10.0:
+                    return {
+                        'type': 'BEARISH_MITIGATION',
+                        'mitigation_high': mitigation_high,
+                        'mitigation_low': mitigation_low,
+                        'gap_size': mitigation_high - mitigation_low,
+                        'gap_pct': round(move_pct, 3),
+                        'current_price': current_price,
+                        'distance_pct': round(((mitigation_low - current_price) / current_price) * 100, 2),
+                        'timestamp': df['timestamp'].iloc[-1],
+                        'bars_ago': len(recent) - i - 1
+                    }
         
         return None
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """Main analysis method"""
-        if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
+        if not all(col in df.columns for col in ['timestamp', 'open', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns (need open, high, low, close, timestamp)'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
