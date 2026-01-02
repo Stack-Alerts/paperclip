@@ -169,7 +169,7 @@ class ATR:
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
-        Main analysis method for ATR building block
+        Main analysis method for ATR - tracks CONTINUOUS volatility regime and REGIME CHANGES
         
         Args:
             df: OHLCV DataFrame with columns [open, high, low, close, volume, timestamp]
@@ -179,9 +179,9 @@ class ATR:
         
         Returns:
             {
-                'signal': str,  # Volatility level classification
+                'signal': str,  # Volatility regime (EXPANDING/STABLE/CONTRACTING)
                 'confidence': float,  # 0-100 confidence score
-                'metadata': dict,  # ATR value, trend, stop suggestions
+                'metadata': dict,  # ATR value, trend, stop suggestions, is_new_event
                 'timestamp': datetime,
                 'timeframe': str,
                 'confluence_factors': list
@@ -192,7 +192,7 @@ class ATR:
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Invalid data format'},
+                'metadata': {'error': 'Invalid data format', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -232,6 +232,22 @@ class ATR:
         # Detect ATR trend
         atr_trend = self.detect_atr_trend(atr_series, lookback)
         
+        # **NEW:** Event tracking - detect volatility REGIME changes
+        is_new_event = False
+        bars_in_regime = 0
+        
+        # Check if regime changed
+        if len(df) > self.period + lookback:
+            # Get previous regime
+            prev_atr_trend = self.detect_atr_trend(atr_series[:-1], lookback)
+            
+            # Detect regime change
+            is_new_event = (atr_trend != prev_atr_trend) and (prev_atr_trend != 'INSUFFICIENT_DATA')
+            
+            # If not changed, approximate bars in regime
+            if not is_new_event:
+                bars_in_regime = 1  # At least 1 bar in current regime
+        
         # Calculate stop-loss suggestions
         stop_distance_conservative = self.calculate_stop_distance(current_atr, 1.5)
         stop_distance_standard = self.calculate_stop_distance(current_atr, 2.0)
@@ -251,8 +267,34 @@ class ATR:
         current_price = float(df['close'].iloc[-1])
         atr_percent = (current_atr / current_price) * 100
         
+        # **DEFINE SIGNAL FIRST** - based on ATR trend (EXPANDING/CONTRACTING)
+        # Primary use case: Detect volatility expansion (breakouts) or contraction (consolidation)
+        if atr_trend == 'RISING':
+            signal = 'EXPANDING'  # Volatility increasing - breakout potential
+        elif atr_trend == 'FALLING':
+            signal = 'CONTRACTING'  # Volatility decreasing - consolidation
+        elif atr_trend == 'STABLE':
+            signal = 'STABLE'  # Volatility stable - range-bound
+        else:
+            signal = 'NEUTRAL'  # Insufficient data
+        
+        #  Fresh regime change boost
+        if is_new_event:
+            confidence = min(100, confidence + 5)
+        
         # Build confluence factors
         confluence_factors = []
+        
+        # Event-specific confluence (regime changes)
+        if is_new_event:
+            if signal == 'EXPANDING':
+                confluence_factors.append('⭐ NEW VOLATILITY EXPANSION (breakout starting!)')
+            elif signal == 'CONTRACTING':
+                confluence_factors.append('⭐ NEW VOLATILITY CONTRACTION (consolidation starting!)')
+            elif signal == 'STABLE':
+                confluence_factors.append('⭐ VOLATILITY STABILIZED (range trading!)')
+        elif bars_in_regime > 0:
+            confluence_factors.append(f'Continuing {signal.lower()} regime ({bars_in_regime} bars)')
         
         if volatility_level == 'CALM':
             confluence_factors.append('Low volatility - tight stops possible')
@@ -272,6 +314,8 @@ class ATR:
             'atr_trend': atr_trend,
             'period': self.period,
             'current_price': current_price,
+            'is_new_event': is_new_event,  # NEW: Event tracking
+            'bars_in_regime': bars_in_regime,  # NEW: Age tracking
             'stop_suggestions': {
                 'conservative': {
                     'distance': round(stop_distance_conservative, 2),
@@ -301,18 +345,6 @@ class ATR:
             'recent_atr_values': atr_series.tail(10).tolist(),
             'position_sizing_factor': round(1.0 / max(atr_percent / 100, 0.01), 2)  # Inverse of volatility
         }
-        
-        # Signal based on ATR trend (EXPANDING/CONTRACTING) per documentation
-        # Primary use case: Detect volatility expansion (breakouts) or contraction (consolidation)
-        # Per ATR.md: "ATR expansion = volatility increasing, ATR contraction = decreasing"
-        if atr_trend == 'RISING':
-            signal = 'EXPANDING'  # Volatility increasing - breakout potential
-        elif atr_trend == 'FALLING':
-            signal = 'CONTRACTING'  # Volatility decreasing - consolidation
-        elif atr_trend == 'STABLE':
-            signal = 'STABLE'  # Volatility stable - range-bound
-        else:
-            signal = 'NEUTRAL'  # Insufficient data
         
         return {
             'signal': signal,
