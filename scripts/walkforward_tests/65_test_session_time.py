@@ -69,7 +69,7 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     print(f"\nTesting with EXPANDING window (full history, sample_every={sample_every})...")
     print(f"Starting from bar {min_bars}, using all previous bars for context...")
     
-    # EXPANDING window - use ALL data from start to current bar
+    # EXPANDING window - use ALL data from start to current bar (SEQUENTIAL - fastest for expanding window)
     for i in range(min_bars, len(df_full), sample_every):
         try:
             # EXPANDING window: use ALL data from beginning up to current bar

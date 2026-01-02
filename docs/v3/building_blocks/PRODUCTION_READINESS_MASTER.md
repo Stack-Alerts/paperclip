@@ -7,7 +7,7 @@
 
 **⚠️ IMPORTANT UPDATE (2026-01-02 09:45):**  
 Block `ema_20_50_cross` has been split into two properly categorized blocks:
-- **ema_20_50_cross** (NEW): Event-driven crossover detector (~15-30 signals/180 days)
+- **ema_20_50_cross** (NEW): Event-driven crossover detector with event tracking (~820 signals, ~270 fresh crosses/180 days)
 - **ema_20_50_trend** (RENAMED): Continuous trend tracker (~17,000 signals/180 days)
 See: `docs/v3/building_blocks/EMA_20_50_BLOCK_SPLIT_SUMMARY.md` for complete details.
 

@@ -202,6 +202,39 @@ class EMA2050Cross:
         confluence_factors.append(f'Fast EMA ({self.fast_period}): ${current_fast:.2f}')
         confluence_factors.append(f'Slow EMA ({self.slow_period}): ${current_slow:.2f}')
         
+        # **EVENT TRACKING** - Detect fresh crossover vs continuing cross confirmation
+        is_new_event = False
+        bars_in_state = 0
+        
+        if len(df) > min_required + 1:
+            # Calculate previous bar's signal
+            prev_df = df.iloc[:-1]
+            prev_fast_ema = self.calculate_ema(prev_df['close'], self.fast_period)
+            prev_slow_ema = self.calculate_ema(prev_df['close'], self.slow_period)
+            prev_cross = self.detect_cross(prev_fast_ema, prev_slow_ema, lookback=self.cross_lookback)
+            
+            # Determine previous signal
+            if prev_cross == 'GOLDEN_CROSS':
+                prev_signal = 'BULLISH'
+            elif prev_cross == 'DEATH_CROSS':
+                prev_signal = 'BEARISH'
+            else:
+                prev_signal = 'NEUTRAL'
+            
+            # Detect signal change (new event)
+            is_new_event = (signal != prev_signal)
+            
+            # Approximate bars in current state (minimal tracking)
+            if not is_new_event:
+                bars_in_state = 1  # At least 1 bar
+        
+        # Boost confidence for fresh cross events
+        if is_new_event and signal != 'NEUTRAL':
+            confidence = min(100, confidence + 5)
+            confluence_factors.insert(0, f'⭐ NEW EVENT: Fresh {cross.replace("_", " ").lower()} detected!')
+        elif signal != 'NEUTRAL' and bars_in_state > 0:
+            confluence_factors.insert(0, f'Continuing {cross.replace("_", " ").lower()} confirmation ({bars_in_state} bars)')
+        
         # Metadata
         metadata = {
             'fast_ema': round(current_fast, 2),
@@ -212,7 +245,9 @@ class EMA2050Cross:
             'separation_pct': round(separation_pct, 2),
             'fast_period': self.fast_period,
             'slow_period': self.slow_period,
-            'cross_lookback': self.cross_lookback
+            'cross_lookback': self.cross_lookback,
+            'is_new_event': is_new_event,  # EVENT TRACKING
+            'bars_in_state': bars_in_state   # EVENT TRACKING
         }
         
         return {

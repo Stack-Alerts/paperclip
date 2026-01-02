@@ -50,22 +50,22 @@ BLOCK_CONFIGS = [
     (29, "adr", "volatility.adr", "ADR"),
     (30, "bollinger_bands", "volatility.bollinger_bands", "BollingerBands"),
     
-    # Patterns
-    (31, "double_top", "patterns.double_top", "DoubleTop"),
-    (32, "double_bottom", "patterns.double_bottom", "DoubleBottom"),
-    (33, "triple_top", "patterns.triple_top", "TripleTop"),
-    (34, "triple_bottom", "patterns.triple_bottom", "TripleBottom"),
-    (35, "head_and_shoulders", "patterns.head_and_shoulders", "HeadAndShoulders"),
-    (36, "inverse_head_and_shoulders", "patterns.inverse_head_and_shoulders", "InverseHeadAndShoulders"),
-    (37, "cup_and_handle", "patterns.cup_and_handle", "CupAndHandle"),
-    (38, "rounding_bottom", "patterns.rounding_bottom", "RoundingBottom"),
+    # Patterns (ALL have "Pattern" suffix)
+    (31, "double_top", "patterns.double_top", "DoubleTopPattern"),
+    (32, "double_bottom", "patterns.double_bottom", "DoubleBottomPattern"),
+    (33, "triple_top", "patterns.triple_top", "TripleTopPattern"),
+    (34, "triple_bottom", "patterns.triple_bottom", "TripleBottomPattern"),
+    (35, "head_and_shoulders", "patterns.head_and_shoulders", "HeadAndShouldersPattern"),
+    (36, "inverse_head_and_shoulders", "patterns.inverse_head_and_shoulders", "InverseHeadAndShouldersPattern"),
+    (37, "cup_and_handle", "patterns.cup_and_handle", "CupAndHandlePattern"),
+    (38, "rounding_bottom", "patterns.rounding_bottom", "RoundingBottomPattern"),
     (39, "flag_pattern", "patterns.flag_pattern", "FlagPattern"),
     (40, "pennant_pattern", "patterns.pennant_pattern", "PennantPattern"),
-    (41, "symmetrical_triangle", "patterns.symmetrical_triangle", "SymmetricalTriangle"),
-    (42, "ascending_triangle", "patterns.ascending_triangle", "AscendingTriangle"),
-    (43, "descending_triangle", "patterns.descending_triangle", "DescendingTriangle"),
-    (44, "falling_wedge", "patterns.falling_wedge", "FallingWedge"),
-    (45, "rising_wedge", "patterns.rising_wedge", "RisingWedge"),
+    (41, "symmetrical_triangle", "patterns.symmetrical_triangle", "SymmetricalTrianglePattern"),
+    (42, "ascending_triangle", "patterns.ascending_triangle", "AscendingTrianglePattern"),
+    (43, "descending_triangle", "patterns.descending_triangle", "DescendingTrianglePattern"),
+    (44, "falling_wedge", "patterns.falling_wedge", "FallingWedgePattern"),
+    (45, "rising_wedge", "patterns.rising_wedge", "RisingWedgePattern"),
     
     # Price Levels
     (46, "hod", "price_levels.hod", "HOD"),
@@ -181,7 +181,7 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     print(f"\\nTesting with EXPANDING window (full history, sample_every={{sample_every}})...")
     print(f"Starting from bar {{min_bars}}, using all previous bars for context...")
     
-    # EXPANDING window - use ALL data from start to current bar
+    # EXPANDING window - use ALL data from start to current bar (SEQUENTIAL - fastest for expanding window)
     for i in range(min_bars, len(df_full), sample_every):
         try:
             # EXPANDING window: use ALL data from beginning up to current bar
