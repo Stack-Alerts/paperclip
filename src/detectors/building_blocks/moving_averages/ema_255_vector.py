@@ -17,9 +17,9 @@ class EMA255VectorBreak:
     The 255 EMA represents a very long-term trend indicator.
     On 15min charts, it provides strong support/resistance for major trends.
     
-    Uses proper PVSRA/TBD vector candle detection:
-    - Tier 2 (Climax): ≥200% volume from previous 10 candles
-    - Tier 1 (Pseudo): ≥150% volume from previous 10 candles
+    Uses proper PVSRA/TBD vector candle detection (OPTIMIZED for strategic fit):
+    - Tier 2 (Climax): ≥150% volume from previous 10 candles (OPTIMIZED from 200%)
+    - Tier 1 (Pseudo): ≥110% volume from previous 10 candles (OPTIMIZED from 150%)
     
     Signals:
     - Vector Break Up: Price breaks above 255 EMA with PVSRA vector
@@ -194,13 +194,13 @@ class EMA255VectorBreak:
             current_open = float(df['open'].iloc[-1])
             is_bullish_candle = current_price > current_open
             
-            # PVSRA Tier 2: Climax Vector (200%+)
-            if current_volume >= (vol_ma_10 * 2.0):
+            # PVSRA Tier 2: Climax Vector (150%+ - OPTIMIZED from 200% for strategic fit)
+            if current_volume >= (vol_ma_10 * 1.5):
                 is_vector_candle = True
                 vector_tier = "CLIMAX_GREEN" if is_bullish_candle else "CLIMAX_RED"
                 
-            # PVSRA Tier 1: Pseudo Vector (150%+)
-            elif current_volume >= (vol_ma_10 * 1.5):
+            # PVSRA Tier 1: Pseudo Vector (110%+ - OPTIMIZED from 150% for strategic fit)
+            elif current_volume >= (vol_ma_10 * 1.1):
                 is_vector_candle = True
                 vector_tier = "PSEUDO_BLUE" if is_bullish_candle else "PSEUDO_PURPLE"
         
@@ -218,7 +218,7 @@ class EMA255VectorBreak:
             if "CLIMAX" in vector_tier:
                 signal = 'BULLISH'
                 confidence = 95
-                confluence_factors.append(f'⚡ CLIMAX VECTOR: {vector_tier} (200%+ volume)')
+                confluence_factors.append(f'⚡ CLIMAX VECTOR: {vector_tier} (150%+ volume)')
                 
                 if slope in ['RISING', 'STRONG_RISING']:
                     confidence += 5
@@ -231,7 +231,7 @@ class EMA255VectorBreak:
                 if slope in ['RISING', 'STRONG_RISING']:
                     signal = 'BULLISH'
                     confidence = 90
-                    confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (150%+ volume)')
+                    confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (110%+ volume)')
                     confluence_factors.append('✅ 255 EMA slope confirming uptrend - CONFIRMED')
                     confluence_factors.append('📈 BULLISH: Confirmed pseudo vector crossed above 255 EMA')
                 
@@ -242,7 +242,7 @@ class EMA255VectorBreak:
             if "CLIMAX" in vector_tier:
                 signal = 'BEARISH'
                 confidence = 95
-                confluence_factors.append(f'⚡ CLIMAX VECTOR: {vector_tier} (200%+ volume)')
+                confluence_factors.append(f'⚡ CLIMAX VECTOR: {vector_tier} (150%+ volume)')
                 
                 if slope in ['FALLING', 'STRONG_FALLING']:
                     confidence += 5
@@ -255,7 +255,7 @@ class EMA255VectorBreak:
                 if slope in ['FALLING', 'STRONG_FALLING']:
                     signal = 'BEARISH'
                     confidence = 90
-                    confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (150%+ volume)')
+                    confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (110%+ volume)')
                     confluence_factors.append('✅ 255 EMA slope confirming downtrend - CONFIRMED')
                     confluence_factors.append('📉 BEARISH: Confirmed pseudo vector crossed below 255 EMA')
         
