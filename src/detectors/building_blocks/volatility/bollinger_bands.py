@@ -469,7 +469,7 @@ class BollingerBands:
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
-        Main analysis method for Bollinger Bands building block
+        Main analysis method for Bollinger Bands - tracks CONTINUOUS multi-state and STATE CHANGES
         
         Args:
             df: OHLCV DataFrame with columns [open, high, low, close, volume, timestamp]
@@ -479,9 +479,9 @@ class BollingerBands:
         
         Returns:
             {
-                'signal': str,  # Position classification
+                'signal': str,  # Complex multi-state signal
                 'confidence': float,  # 0-100 confidence score
-                'metadata': dict,  # Band values, patterns, etc.
+                'metadata': dict,  # Band values, patterns, is_new_event
                 'timestamp': datetime,
                 'timeframe': str,
                 'confluence_factors': list
@@ -492,7 +492,7 @@ class BollingerBands:
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Invalid data format'},
+                'metadata': {'error': 'Invalid data format', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -627,8 +627,61 @@ class BollingerBands:
         else:
             signal = position
         
+        # **NEW:** Event tracking - detect multi-state SIGNAL CHANGES
+        is_new_event = False
+        bars_in_state = 0
+        
+        # Check if signal state changed
+        if len(df) > self.period + 1:
+            # Calculate previous bar's signal
+            prev_df = df.iloc[:-1]
+            prev_upper, prev_middle, prev_lower = self.calculate_bands(prev_df)
+            prev_band_width_series = self.calculate_band_width(prev_upper, prev_lower, prev_middle)
+            prev_percent_b_series = self.calculate_percent_b(prev_df['close'], prev_upper, prev_lower)
+            
+            prev_percent_b = float(prev_percent_b_series.iloc[-1])
+            prev_position = self.classify_position(prev_percent_b)
+            
+            prev_squeeze_breakout = self.detect_squeeze_breakout(
+                prev_band_width_series, prev_df['close'], prev_upper, prev_lower, lookback=10
+            )
+            prev_w_bottom = self.detect_w_bottom(prev_df, prev_lower, lookback_pattern)
+            prev_m_top = self.detect_m_top(prev_df, prev_upper, lookback_pattern)
+            
+            # Determine previous signal
+            if prev_squeeze_breakout['breakout_detected']:
+                if prev_squeeze_breakout['breakout_direction'] == 'BULLISH':
+                    prev_signal = 'SQUEEZE_BREAKOUT_BULL'
+                elif prev_squeeze_breakout['breakout_direction'] == 'BEARISH':
+                    prev_signal = 'SQUEEZE_BREAKOUT_BEAR'
+                else:
+                    prev_signal = prev_position
+            elif prev_w_bottom:
+                prev_signal = 'BULLISH_REVERSAL'
+            elif prev_m_top:
+                prev_signal = 'BEARISH_REVERSAL'
+            else:
+                prev_signal = prev_position
+            
+            # Detect state change
+            is_new_event = (signal != prev_signal)
+            
+            # If not changed, approximate bars in state
+            if not is_new_event:
+                bars_in_state = 1  # At least 1 bar in current state
+        
+        # Fresh state change boost
+        if is_new_event:
+            confidence = min(100, confidence + 5)
+        
         # EXPANSION: Map to simple signal (maintains all original functionality)
         simple_signal = self.map_to_simple_signal(signal, current_percent_b, squeeze_breakout, w_bottom, m_top)
+        
+        # Update confluence with event info
+        if is_new_event:
+            confluence_factors.insert(0, f'⭐ NEW STATE: {signal} (BB signal changed!)')
+        elif bars_in_state > 0:
+            confluence_factors.insert(0, f'Continuing {signal.lower().replace("_", " ")} state ({bars_in_state} bars)')
         
         # Prepare metadata
         metadata = {
@@ -653,7 +706,9 @@ class BollingerBands:
             'recent_band_widths': band_width_series.tail(10).tolist(),
             'recent_percent_b': percent_b_series.tail(10).tolist(),
             'simple_signal': simple_signal,  # EXPANSION: Added for validator compatibility
-            'original_signal': signal  # EXPANSION: Preserve original for reference
+            'original_signal': signal,  # EXPANSION: Preserve original for reference
+            'is_new_event': is_new_event,  # NEW: Event tracking
+            'bars_in_state': bars_in_state  # NEW: Age tracking
         }
         
         return {
