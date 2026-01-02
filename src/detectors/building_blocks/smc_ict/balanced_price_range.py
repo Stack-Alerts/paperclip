@@ -102,12 +102,12 @@ class BalancedPriceRange:
         return None
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method - tracks both RANGE PRESENCE and NEW range entries"""
         if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -117,7 +117,7 @@ class BalancedPriceRange:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': f'Need at least {self.lookback + 5} bars'},
+                'metadata': {'error': f'Need at least {self.lookback + 5} bars', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -130,7 +130,7 @@ class BalancedPriceRange:
             return {
                 'signal': 'NEUTRAL',
                 'confidence': 0,
-                'metadata': {'message': 'No balanced range detected'},
+                'metadata': {'message': 'No balanced range detected', 'is_new_event': False},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['Not in balanced range - trending or expanding']
@@ -145,6 +145,27 @@ class BalancedPriceRange:
             signal = 'BEARISH'  # High half of range = bearish bias
             bias = 'Sell high in range'
         
+        # **NEW:** Event tracking - detect when range entered or signal changed
+        is_new_event = False
+        bars_in_range = 0
+        
+        # Check if we just entered range or signal changed
+        if len(df) > self.lookback + 6:
+            # Check previous bar's state
+            prev_balanced = self.detect_balanced_range(df.iloc[:-1])
+            
+            if prev_balanced is None:
+                # Just entered range (wasn't in range last bar, is now)
+                is_new_event = True
+            else:
+                # Still in range - check if signal changed
+                prev_signal = 'BULLISH' if prev_balanced['position_in_range'] <= 50 else 'BEARISH'
+                is_new_event = (signal != prev_signal)
+                
+                # If continuing, approximate bars in range
+                if not is_new_event:
+                    bars_in_range = 1  # At least 1 bar in range
+        
         # Calculate confidence based on position in range and compression
         confidence = 60  # Base confidence
         
@@ -158,10 +179,23 @@ class BalancedPriceRange:
         if balanced['is_compressing']:
             confidence += 10  # Compression = coiling for breakout
         
+        # Fresh event boost
+        if is_new_event:
+            confidence += 5
         confidence = min(100, confidence)
         
         # Build confluence factors
         confluence_factors = []
+        
+        # Event-specific confluence
+        if is_new_event:
+            if prev_balanced is None:
+                confluence_factors.append('⭐ NEW BALANCED RANGE ENTRY (fresh consolidation zone!)')
+            else:
+                confluence_factors.append(f'⭐ RANGE POSITION SHIFT ({signal} half entry!)')
+        elif bars_in_range > 0:
+            confluence_factors.append(f'Continuing in balanced range ({bars_in_range} bars)')
+        
         confluence_factors.append(f'Balanced Range: ${balanced["range_low"]:.2f} - ${balanced["range_high"]:.2f}')
         confluence_factors.append(f'Midpoint: ${balanced["range_mid"]:.2f}')
         confluence_factors.append(f'Position: {balanced["position_in_range"]:.1f}% ({bias})')
@@ -186,7 +220,9 @@ class BalancedPriceRange:
             'avg_deviation': balanced['avg_deviation'],
             'is_compressing': balanced['is_compressing'],
             'bias': bias,
-            'balance_timestamp': balanced['timestamp']
+            'balance_timestamp': balanced['timestamp'],
+            'is_new_event': is_new_event,  # NEW: Event tracking
+            'bars_in_range': bars_in_range  # NEW: Age tracking
         }
         
         return {
