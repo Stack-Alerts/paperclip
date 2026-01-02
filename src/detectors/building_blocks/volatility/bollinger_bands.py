@@ -260,19 +260,21 @@ class BollingerBands:
         
         return 'NO_WALK'
     
-    def detect_w_bottom(self, df: pd.DataFrame, lower_band: pd.Series, lookback: int = 20) -> bool:
+    def detect_w_bottom(self, df: pd.DataFrame, lower_band: pd.Series, middle_band: pd.Series, lookback: int = 20) -> bool:
         """
-        Detect W-Bottom pattern (bullish reversal)
+        Detect W-Bottom pattern (bullish reversal) - INSTITUTIONAL GRADE
         
-        W-Bottom criteria:
+        TRUE W-Bottom criteria (STRICT):
         - First low penetrates lower band
-        - Rally to middle
-        - Second low holds above lower band (bullish divergence)
-        - Break above middle band confirms
+        - Rally toward middle
+        - Second low holds ABOVE first low (bullish divergence - KEY!)
+        - Price breaking UP from second low
+        - Must be in downtrend/neutral context (price below middle)
         
         Args:
             df: OHLCV DataFrame
             lower_band: Lower band series
+            middle_band: Middle band series
             lookback: Periods to search for pattern
             
         Returns:
@@ -281,36 +283,70 @@ class BollingerBands:
         if len(df) < lookback:
             return False
         
-        # Simplified W-Bottom detection
+        # FIXED: Proper W-Bottom structure detection
         recent_data = df.iloc[-lookback:]
         recent_lower = lower_band.iloc[-lookback:]
+        recent_middle = middle_band.iloc[-lookback:]
         
-        # Find lows
         lows = recent_data['low'].values
         closes = recent_data['close'].values
         lower_vals = recent_lower.values
+        current_price = closes[-1]
+        current_middle = recent_middle.values[-1]
         
-        # Check for price touching/penetrating lower band
+        # FILTER 1: Only valid in downtrend/neutral (price below/at middle)
+        if current_price > current_middle * 1.02:  # More than 2% above middle = uptrend
+            return False
+        
+        # FILTER 2: Find touches to lower band
         touches_lower = closes < (lower_vals * 1.01)  # Within 1% of lower band
+        touch_indices = np.where(touches_lower)[0]
         
-        if touches_lower.sum() >= 2:  # At least 2 touches
-            return True
+        if len(touch_indices) < 2:  # Need at least 2 touches
+            return False
         
-        return False
+        # FILTER 3: Check for W-structure (second low higher than first)
+        first_touch_idx = touch_indices[0]
+        last_touch_idx = touch_indices[-1]
+        
+        first_low = lows[first_touch_idx]
+        second_low = lows[last_touch_idx]
+        
+        # CRITICAL: Second low must be higher (bullish divergence)
+        if second_low <= first_low:
+            return False  # Not a W - second low failed to hold
+        
+        # FILTER 4: Must have rallied between touches (to create W shape)
+        between_highs = recent_data['high'].iloc[first_touch_idx:last_touch_idx+1].values
+        if len(between_highs) > 2:
+            rally_high = np.max(between_highs)
+            # Rally must reach at least middle band
+            middle_between = recent_middle.values[first_touch_idx:last_touch_idx+1].mean()
+            if rally_high < middle_between * 0.98:  # Didn't rally enough
+                return False
+        
+        # FILTER 5: Price must be breaking UP from second low (confirmation)
+        if current_price < second_low * 1.005:  # Need 0.5% above second low minimum
+            return False  # Not confirmed yet
+        
+        # All filters passed = TRUE W-Bottom!
+        return True
     
-    def detect_m_top(self, df: pd.DataFrame, upper_band: pd.Series, lookback: int = 20) -> bool:
+    def detect_m_top(self, df: pd.DataFrame, upper_band: pd.Series, middle_band: pd.Series, lookback: int = 20) -> bool:
         """
-        Detect M-Top pattern (bearish reversal)
+        Detect M-Top pattern (bearish reversal) - INSTITUTIONAL GRADE
         
-        M-Top criteria:
+        TRUE M-Top criteria (STRICT):
         - First high penetrates upper band
-        - Pull back to middle
-        - Second high fails to penetrate upper band (bearish divergence)
-        - Break below middle band confirms
+        - Pullback toward middle
+        - Second high holds BELOW first high (bearish divergence - KEY!)
+        - Price breaking DOWN from second high
+        - Must be in uptrend/neutral context (price above middle)
         
         Args:
             df: OHLCV DataFrame
             upper_band: Upper band series
+            middle_band: Middle band series
             lookback: Periods to search for pattern
             
         Returns:
@@ -319,22 +355,54 @@ class BollingerBands:
         if len(df) < lookback:
             return False
         
-        # Simplified M-Top detection
+        # FIXED: Proper M-Top structure detection
         recent_data = df.iloc[-lookback:]
         recent_upper = upper_band.iloc[-lookback:]
+        recent_middle = middle_band.iloc[-lookback:]
         
-        # Find highs
         highs = recent_data['high'].values
         closes = recent_data['close'].values
         upper_vals = recent_upper.values
+        current_price = closes[-1]
+        current_middle = recent_middle.values[-1]
         
-        # Check for price touching/penetrating upper band
+        # FILTER 1: Only valid in uptrend/neutral (price above/at middle)
+        if current_price < current_middle * 0.98:  # More than 2% below middle = downtrend
+            return False
+        
+        # FILTER 2: Find touches to upper band
         touches_upper = closes > (upper_vals * 0.99)  # Within 1% of upper band
+        touch_indices = np.where(touches_upper)[0]
         
-        if touches_upper.sum() >= 2:  # At least 2 touches
-            return True
+        if len(touch_indices) < 2:  # Need at least 2 touches
+            return False
         
-        return False
+        # FILTER 3: Check for M-structure (second high lower than first)
+        first_touch_idx = touch_indices[0]
+        last_touch_idx = touch_indices[-1]
+        
+        first_high = highs[first_touch_idx]
+        second_high = highs[last_touch_idx]
+        
+        # CRITICAL: Second high must be lower (bearish divergence)
+        if second_high >= first_high:
+            return False  # Not an M - second high failed to reject
+        
+        # FILTER 4: Must have pulled back between touches (to create M shape)
+        between_lows = recent_data['low'].iloc[first_touch_idx:last_touch_idx+1].values
+        if len(between_lows) > 2:
+            pullback_low = np.min(between_lows)
+            # Pullback must reach at least middle band
+            middle_between = recent_middle.values[first_touch_idx:last_touch_idx+1].mean()
+            if pullback_low > middle_between * 1.02:  # Didn't pull back enough
+                return False
+        
+        # FILTER 5: Price must be breaking DOWN from second high (confirmation)
+        if current_price > second_high * 0.995:  # Need 0.5% below second high minimum
+            return False  # Not confirmed yet
+        
+        # All filters passed = TRUE M-Top!
+        return True
     
     def classify_position(self, percent_b: float) -> str:
         """
@@ -544,9 +612,9 @@ class BollingerBands:
         # Detect band walk
         band_walk = self.detect_band_walk(percent_b_series, lookback_walk)
         
-        # Detect patterns
-        w_bottom = self.detect_w_bottom(df, lower, lookback_pattern)
-        m_top = self.detect_m_top(df, upper, lookback_pattern)
+        # Detect patterns (FIXED: Pass middle_band for trend filtering)
+        w_bottom = self.detect_w_bottom(df, lower, middle, lookback_pattern)
+        m_top = self.detect_m_top(df, upper, middle, lookback_pattern)
         
         # Classify volatility regime
         volatility_regime = self.classify_volatility_regime(band_width_series, lookback=50)
@@ -645,8 +713,8 @@ class BollingerBands:
             prev_squeeze_breakout = self.detect_squeeze_breakout(
                 prev_band_width_series, prev_df['close'], prev_upper, prev_lower, lookback=10
             )
-            prev_w_bottom = self.detect_w_bottom(prev_df, prev_lower, lookback_pattern)
-            prev_m_top = self.detect_m_top(prev_df, prev_upper, lookback_pattern)
+            prev_w_bottom = self.detect_w_bottom(prev_df, prev_lower, prev_middle, lookback_pattern)
+            prev_m_top = self.detect_m_top(prev_df, prev_upper, prev_middle, lookback_pattern)
             
             # Determine previous signal
             if prev_squeeze_breakout['breakout_detected']:
