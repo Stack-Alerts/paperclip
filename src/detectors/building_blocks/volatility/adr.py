@@ -232,7 +232,7 @@ class ADR:
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
-        Main analysis method for ADR building block
+        Main analysis method for ADR - tracks CONTINUOUS volatility level and LEVEL CHANGES
         
         Args:
             df: OHLCV DataFrame with columns [open, high, low, close, volume, timestamp]
@@ -240,9 +240,9 @@ class ADR:
         
         Returns:
             {
-                'signal': str,  # Range classification
+                'signal': str,  # Range classification (CALM/NORMAL/ELEVATED/HIGH/EXTREME)
                 'confidence': float,  # 0-100 confidence score
-                'metadata': dict,  # ADR values, targets, etc.
+                'metadata': dict,  # ADR values, targets, is_new_event
                 'timestamp': datetime,
                 'timeframe': str,
                 'confluence_factors': list
@@ -253,7 +253,7 @@ class ADR:
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Invalid data format'},
+                'metadata': {'error': 'Invalid data format', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -293,6 +293,41 @@ class ADR:
         # Classify range
         range_classification = self.classify_range(current_range_percent)
         
+        # **NEW:** Event tracking - detect volatility LEVEL changes
+        is_new_event = False
+        bars_in_level = 0
+        
+        # Check if level changed
+        if len(df) > 2:
+            # Get previous bar's range and classification
+            if self.timeframe == '1D':
+                prev_high = float(df['high'].iloc[-2])
+                prev_low = float(df['low'].iloc[-2])
+            else:
+                # For intraday, get previous day's range
+                df_temp = df.iloc[:-1].copy()
+                df_temp['date'] = pd.to_datetime(df_temp['timestamp']).dt.date
+                prev_daily = df_temp.groupby('date').agg({'high': 'max', 'low': 'min', 'close': 'last'})
+                if len(prev_daily) > 0:
+                    prev_high = float(prev_daily['high'].iloc[-1])
+                    prev_low = float(prev_daily['low'].iloc[-1])
+                    prev_price = float(prev_daily['close'].iloc[-1])
+                else:
+                    prev_high = current_high
+                    prev_low = current_low
+                    prev_price = current_price
+            
+            prev_range = prev_high - prev_low
+            prev_range_percent = (prev_range / current_price) * 100  # Use current price for consistency
+            prev_classification = self.classify_range(prev_range_percent)
+            
+            # Detect level change
+            is_new_event = (range_classification != prev_classification)
+            
+            # If not changed, approximate bars in level
+            if not is_new_event:
+                bars_in_level = 1  # At least 1 bar in current level
+        
         # Calculate range percentile
         range_percentile = self.calculate_range_percentile(current_range, daily_ranges)
         
@@ -309,8 +344,18 @@ class ADR:
         data_completeness = min(100, (len(daily_ranges) / self.period) * 100)
         confidence = data_completeness
         
+        # Fresh level change boost
+        if is_new_event:
+            confidence = min(100, confidence + 5)
+        
         # Build confluence factors
         confluence_factors = []
+        
+        # Event-specific confluence (volatility level changes)
+        if is_new_event:
+            confluence_factors.append(f'⭐ NEW VOLATILITY LEVEL: {range_classification} (range regime changed!)')
+        elif bars_in_level > 0:
+            confluence_factors.append(f'Continuing {range_classification.lower()} volatility ({bars_in_level} bars)')
         
         if range_classification == 'CALM':
             confluence_factors.append(f'Daily range: {range_classification} ({current_range_percent:.1f}%) - Low volatility, potential breakout setup')
@@ -350,7 +395,9 @@ class ADR:
             'targets': targets,
             'position_sizing_factor': position_sizing,
             'daily_ranges_analyzed': len(daily_ranges),
-            'recent_ranges': daily_ranges.tail(10).tolist() if len(daily_ranges) > 0 else []
+            'recent_ranges': daily_ranges.tail(10).tolist() if len(daily_ranges) > 0 else [],
+            'is_new_event': is_new_event,  # NEW: Event tracking
+            'bars_in_level': bars_in_level  # NEW: Age tracking
         }
         
         return {
