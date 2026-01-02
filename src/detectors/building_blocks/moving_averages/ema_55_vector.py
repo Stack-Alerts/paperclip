@@ -194,13 +194,13 @@ class EMA55VectorBreak:
             current_open = float(df['open'].iloc[-1])
             is_bullish_candle = current_price > current_open
             
-            # PVSRA Tier 2: Climax Vector (200%+)
-            if current_volume >= (vol_ma_10 * 2.0):
+            # PVSRA Tier 2: Climax Vector (160%+ - DIFFERENTIATED from EMA 50 for tiered system)
+            if current_volume >= (vol_ma_10 * 1.6):
                 is_vector_candle = True
                 vector_tier = "CLIMAX_GREEN" if is_bullish_candle else "CLIMAX_RED"
                 
-            # PVSRA Tier 1: Pseudo Vector (150%+)
-            elif current_volume >= (vol_ma_10 * 1.5):
+            # PVSRA Tier 1: Pseudo Vector (120%+ - DIFFERENTIATED from EMA 50 for tiered system)
+            elif current_volume >= (vol_ma_10 * 1.2):
                 is_vector_candle = True
                 vector_tier = "PSEUDO_BLUE" if is_bullish_candle else "PSEUDO_PURPLE"
         
