@@ -27,7 +27,7 @@ class DescendingTrianglePattern:
         support_tolerance: Tolerance for flat support (default: 0.01)
     """
     
-    def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 20,
+    def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 15,
                  support_tolerance: float = 0.01, **kwargs):
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars

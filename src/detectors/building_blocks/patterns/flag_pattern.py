@@ -34,18 +34,18 @@ class FlagPattern:
         self.parallel_tolerance = parallel_tolerance
     
     def detect_strong_move(self, df: pd.DataFrame) -> Optional[Dict]:
-        """Detect preceding strong directional move (flagpole)"""
-        if len(df) < 50:
+        """Detect preceding strong directional move (flagpole) - SIMPLIFIED FOR 15MIN"""
+        if len(df) < 30:
             return None
         
-        # Look at price change in last 20 bars
-        lookback_start = float(df['close'].iloc[-20])
-        lookback_end = float(df['close'].iloc[-10])
+        # SIMPLIFIED: Look at smaller window, lower threshold
+        lookback_start = float(df['close'].iloc[-15])  # Reduced from 20
+        lookback_end = float(df['close'].iloc[-5])      # Reduced from 10
         
         price_change_pct = (lookback_end - lookback_start) / lookback_start
         
-        # Need >3% move to qualify as flagpole
-        if abs(price_change_pct) < 0.03:
+        # SIMPLIFIED: Only need 1.5% move (down from 3%)
+        if abs(price_change_pct) < 0.015:  # Changed from 0.03
             return None
         
         return {
@@ -56,9 +56,31 @@ class FlagPattern:
         }
     
     def detect_parallel_channel(self, df: pd.DataFrame) -> Optional[Dict]:
-        """Detect parallel consolidation channel"""
+        """Detect parallel consolidation channel - SIMPLIFIED FOR 15MIN"""
         if len(df) < self.min_pattern_bars:
             return None
+        
+        # SIMPLIFIED: Use recent bars, relaxed criteria
+        recent = df.iloc[-self.min_pattern_bars:]
+        
+        highs = recent['high'].values
+        lows = recent['low'].values
+        
+        # SIMPLIFIED: Just check range stability instead of perfect parallelism
+        range_pct = (highs.max() - lows.min()) / lows.min()
+        
+        # If consolidating in tight range, accept as flag
+        if range_pct < 0.04:  # 4% range
+            return {
+                'upper_start': float(highs[0]),
+                'upper_end': float(highs[-1]),
+                'lower_start': float(lows[0]),
+                'lower_end': float(lows[-1]),
+                'slope': 0.0,
+                'is_parallel': True
+            }
+        
+        return None
         
         # Analyze recent consolidation
         recent = df.iloc[-self.min_pattern_bars:]

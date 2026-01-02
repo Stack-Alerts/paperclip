@@ -23,7 +23,7 @@ class RoundingBottomPattern:
     Success Rate: 63% bullish (research validated)
     """
     
-    def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 30,
+    def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 15,
                  depth_min: float = 0.08, **kwargs):
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars

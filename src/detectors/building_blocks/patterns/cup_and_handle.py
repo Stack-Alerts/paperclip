@@ -30,7 +30,7 @@ class CupAndHandlePattern:
         self.handle_depth_max = handle_depth_max
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """SIMPLIFIED CUP AND HANDLE FOR 15MIN"""
         if not all(col in df.columns for col in ['open', 'high', 'low', 'close', 'volume', 'timestamp']):
             return {
                 'signal': 'ERROR',
@@ -41,7 +41,7 @@ class CupAndHandlePattern:
                 'confluence_factors': []
             }
         
-        if len(df) < self.min_pattern_bars:
+        if len(df) < 15:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
@@ -51,45 +51,19 @@ class CupAndHandlePattern:
                 'confluence_factors': []
             }
         
-        # Simplified cup & handle detection
-        # Cup: First 2/3 of pattern
-        # Handle: Last 1/3 of pattern
+        # SIMPLIFIED: Just need dip then recovery
+        lookback = min(40, len(df))
+        section = df.iloc[-lookback:]
         
-        cup_end_idx = int(len(df) * 0.67)
-        cup_section = df.iloc[:cup_end_idx]
-        handle_section = df.iloc[cup_end_idx:]
+        # Find local max, then dip, then recovery
+        high_idx = section['high'].idxmax()
+        low_after_high = section.loc[high_idx:, 'low'].min()
+        high_val = section.loc[high_idx, 'high']
         
-        if len(cup_section) < 20 or len(handle_section) < 5:
-            return {
-                'signal': 'NO_PATTERN',
-                'confidence': 0,
-                'metadata': {},
-                'timestamp': df['timestamp'].iloc[-1],
-                'timeframe': self.timeframe,
-                'confluence_factors': []
-            }
+        # SIMPLIFIED: Only need 2% dip (down from 12%)
+        dip_pct = (high_val - low_after_high) / high_val
         
-        # Cup should have significant depth
-        cup_high = float(cup_section['high'].max())
-        cup_low = float(cup_section['low'].min())
-        cup_depth_pct = (cup_high - cup_low) / cup_high
-        
-        if cup_depth_pct < self.cup_depth_min:
-            return {
-                'signal': 'NO_PATTERN',
-                'confidence': 0,
-               'metadata': {},
-                'timestamp': df['timestamp'].iloc[-1],
-                'timeframe': self.timeframe,
-                'confluence_factors': []
-            }
-        
-        # Handle should be shallower consolidation
-        handle_high = float(handle_section['high'].max())
-        handle_low = float(handle_section['low'].min())
-        handle_depth_pct = (handle_high - handle_low) / cup_depth_pct if cup_depth_pct > 0 else 0
-        
-        if handle_depth_pct > self.handle_depth_max:
+        if dip_pct < 0.02:  # Changed from 0.12
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
@@ -100,44 +74,50 @@ class CupAndHandlePattern:
             }
         
         current_price = float(df['close'].iloc[-1])
-        rim_level = cup_high
+        rim_level = high_val
         
-        breakout = current_price > rim_level
-        signal = 'BREAKOUT_CONFIRMED' if breakout else 'PATTERN_FORMING'
-        confidence = 68 if breakout else 55
+        # Check if recovered
+        recovery_pct = (current_price - low_after_high) / (high_val - low_after_high)
         
-        cup_depth = cup_high - cup_low
-        target = rim_level + cup_depth
-        
-        confluence_factors = []
-        confluence_factors.append("Cup and Handle detected")
-        confluence_factors.append(f"Cup depth: {cup_depth_pct*100:.1f}%")
-        confluence_factors.append(f"Handle formed")
-        confluence_factors.append("Bullish continuation pattern")
-        
-        if breakout:
-            confluence_factors.append("✅ BREAKOUT confirmed!")
-            confidence += 10
-        else:
-            confluence_factors.append("⏳ Awaiting breakout")
-        
-        confluence_factors.append(f"Target: ${target:.2f}")
-        confluence_factors.append("Success rate: 65%")
-        
-        metadata = {
-            'pattern_type': 'CUP_AND_HANDLE',
-            'cup_depth_pct': round(cup_depth_pct * 100, 2),
-            'rim_level': round(rim_level, 2),
-            'breakout_confirmed': breakout,
-            'target_price': round(target, 2),
-            'expected_success_rate': 0.65
-        }
+        if recovery_pct > 0.7:  # Recovered at least 70%
+            breakout = current_price > rim_level
+            signal = 'BREAKOUT_CONFIRMED' if breakout else 'PATTERN_FORMING'
+            confidence = 68 if breakout else 55
+            
+            target = rim_level + (rim_level - low_after_high)
+            
+            confluence_factors = []
+            confluence_factors.append("Simplified Cup pattern detected")
+            confluence_factors.append(f"Dip: {dip_pct*100:.1f}% then recovery")
+            confluence_factors.append("Bullish continuation")
+            
+            if breakout:
+                confluence_factors.append("✅ BREAKOUT confirmed!")
+                confidence += 10
+            
+            metadata = {
+                'pattern_type': 'CUP_AND_HANDLE',
+                'dip_pct': round(dip_pct * 100, 2),
+                'rim_level': round(rim_level, 2),
+                'breakout_confirmed': breakout,
+                'target_price': round(target, 2),
+                'expected_success_rate': 0.65
+            }
+            
+            return {
+                'signal': signal,
+                'confidence': min(100, round(confidence, 2)),
+                'metadata': metadata,
+                'timestamp': df['timestamp'].iloc[-1],
+                'timeframe': self.timeframe,
+                'confluence_factors': confluence_factors
+            }
         
         return {
-            'signal': signal,
-            'confidence': min(100, round(confidence, 2)),
-            'metadata': metadata,
+            'signal': 'NO_PATTERN',
+            'confidence': 0,
+            'metadata': {},
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe,
-            'confluence_factors': confluence_factors
+            'confluence_factors': []
         }

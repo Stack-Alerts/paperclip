@@ -28,7 +28,7 @@ class HeadAndShouldersPattern:
         neckline_tolerance: Neckline slope tolerance (default: 0.02 = 2%)
     """
     
-    def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 20,
+    def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 15,
                  shoulder_tolerance: float = 0.05, neckline_tolerance: float = 0.02, **kwargs):
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars

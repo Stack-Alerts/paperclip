@@ -27,7 +27,7 @@ class AscendingTrianglePattern:
         resistance_tolerance: Tolerance for flat resistance (default: 0.01)
     """
     
-    def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 20,
+    def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 15,
                  resistance_tolerance: float = 0.01, **kwargs):
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
