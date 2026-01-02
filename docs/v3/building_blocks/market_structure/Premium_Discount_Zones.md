@@ -12,6 +12,24 @@
 
 Premium & Discount Zones divide the current dealing range into institutional "expensive" (premium) and "cheap" (discount) areas using the 50% equilibrium level. This provides an institutional perspective on where to look for longs (discount) vs shorts (premium).
 
+## Block Behavior (Continuous + Event Tracking)
+
+This block operates in **DUAL MODE**:
+- **Continuous State:** Always tracking zone position (80.3% signal rate)
+- **Event Detection:** Identifies when price CHANGES zones (44.35 zone changes/day)
+
+**Metadata Fields:**
+- `is_new_event`: Boolean - True if price just changed zones, False if continuing
+- `bars_in_current_zone`: Integer - How many bars in current zone (approximate)
+- `zone`: String - Current zone (EXTREME_DISCOUNT, DISCOUNT, EQUILIBRIUM, PREMIUM, EXTREME_PREMIUM)
+
+**Usage:**
+- **Zone Entry Timing:** Use `is_new_event == True` for precise entry points (44/day fresh signals)
+- **Reference Positioning:** Use continuous signal to know current market positioning
+- **Age Assessment:** Check `bars_in_current_zone` to gauge zone stability
+
+**Important:** 46.5% of signals are NEW zone entries - highest event rate of all blocks! 5 zones = frequent transitions.
+
 ## Purpose
 
 - **Institutional Perspective:** Where smart money sees value

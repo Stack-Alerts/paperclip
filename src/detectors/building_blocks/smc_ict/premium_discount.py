@@ -97,12 +97,12 @@ class PremiumDiscount:
             return 'EQUILIBRIUM'
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method - tracks both CONTINUOUS zone position and NEW zone entries"""
         if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -112,7 +112,7 @@ class PremiumDiscount:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': f'Need at least {self.lookback} bars'},
+                'metadata': {'error': f'Need at least {self.lookback} bars', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -134,6 +134,23 @@ class PremiumDiscount:
             position_pct = 50.0
             distance_from_eq_pct = 0.0
         
+        # **NEW:** Event tracking - detect zone changes (zone entry events)
+        is_new_event = False
+        bars_in_current_zone = 0
+        
+        # Check if zone changed from previous bar
+        if len(df) > self.lookback + 1:
+            prev_price = float(df['close'].iloc[-2])
+            prev_eq_data = self.calculate_equilibrium(df.iloc[:-1])
+            prev_zone = self.classify_zone(prev_price, prev_eq_data)
+            
+            # Check if zone changed
+            is_new_event = (zone != prev_zone)
+            
+            # Count bars in current zone (approximate - just check if same as previous)
+            if not is_new_event:
+                bars_in_current_zone = 1  # At least 1 bar in zone
+        
         # Determine signal
         if zone in ['EXTREME_DISCOUNT', 'DISCOUNT']:
             signal = 'BULLISH'
@@ -145,8 +162,29 @@ class PremiumDiscount:
             signal = 'NEUTRAL'
             confidence = 50
         
+        # Fresh zone entry boost
+        if is_new_event:
+            confidence += 5
+        confidence = min(100, confidence)
+        
         # Build confluence
         confluence_factors = []
+        
+        # Event-specific confluence
+        if is_new_event:
+            if zone == 'EXTREME_DISCOUNT':
+                confluence_factors.append('⭐ NEW EXTREME DISCOUNT ENTRY (strong buy zone!)')
+            elif zone == 'DISCOUNT':
+                confluence_factors.append('⭐ NEW DISCOUNT ENTRY (buy zone entry)')
+            elif zone == 'EQUILIBRIUM':
+                confluence_factors.append('⭐ ENTERED EQUILIBRIUM (fair value)')
+            elif zone == 'PREMIUM':
+                confluence_factors.append('⭐ NEW PREMIUM ENTRY (sell zone entry)')
+            elif zone == 'EXTREME_PREMIUM':
+                confluence_factors.append('⭐ NEW EXTREME PREMIUM ENTRY (strong sell zone!)')
+        elif bars_in_current_zone > 0:
+            confluence_factors.append(f'Continuing in {zone} ({bars_in_current_zone} bars)')
+        
         confluence_factors.append(f'Zone: {zone}')
         confluence_factors.append(f'Position in Range: {position_pct:.1f}%')
         confluence_factors.append(f'Range: ${eq_data["range_low"]:.2f} - ${eq_data["range_high"]:.2f}')
@@ -172,7 +210,9 @@ class PremiumDiscount:
             'range_size': eq_data['range_size'],
             'current_price': round(current_price, 2),
             'position_pct': round(position_pct, 2),
-            'distance_from_eq_pct': round(distance_from_eq_pct, 3)
+            'distance_from_eq_pct': round(distance_from_eq_pct, 3),
+            'is_new_event': is_new_event,  # NEW: Event tracking
+            'bars_in_current_zone': bars_in_current_zone  # NEW: Age tracking
         }
         
         return {

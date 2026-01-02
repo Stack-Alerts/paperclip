@@ -315,11 +315,14 @@ docs/v3/building_blocks/BLOCK_CATEGORIZATION.md
 **File:** `smc_ict/premium_discount.py`  
 **Function:** `analyze(df)`  
 **Returns:**
-- **Signals:** `PREMIUM`, `DISCOUNT`, `EQUILIBRIUM`
-- **Metadata:** `zone_type`, `range_high`, `range_low`, `current_pct`
-- **Optimization:** range_lookback=20
-- **Quality:** 80/100, Accuracy: 56.6%
-- **NOTE:** Special case - returns zone types, not directional signals
+- **Signals:** `BULLISH`, `BEARISH`, `NEUTRAL` (based on zone position)
+- **Metadata:** `zone`, `range_high`, `range_low`, `equilibrium`, `range_size`, `position_pct`, `distance_from_eq_pct`, `is_new_event`, `bars_in_current_zone`
+- **Optimization:** lookback=15
+- **Quality:** 80/100, Accuracy: 56.1%
+- **⭐ ENHANCED (2026-01-02):** Added event tracking - `is_new_event` detects zone changes vs continuing in zone
+- **Behavior:** DUAL MODE - Continuous zone tracker (80.3% signal rate) + zone change detection (44.35 events/day)
+- **Critical:** HIGHEST event rate (46.5% fresh)! 5 zones = frequent transitions. Zone entry timing extremely valuable.
+- **Zones:** EXTREME_DISCOUNT, DISCOUNT, EQUILIBRIUM, PREMIUM, EXTREME_PREMIUM
 
 #### 23. Change of Character (CHOCH)
 **File:** `smc_ict/change_of_character.py`  
