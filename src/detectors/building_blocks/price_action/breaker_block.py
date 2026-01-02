@@ -111,12 +111,12 @@ class BreakerBlock:
         return None
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method - tracks both CONTINUOUS breaker state and NEW breaker formations"""
         if not all(col in df.columns for col in ['timestamp', 'open', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -126,7 +126,7 @@ class BreakerBlock:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': 'Need at least 10 bars'},
+                'metadata': {'error': 'Need at least 10 bars', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -157,11 +157,26 @@ class BreakerBlock:
             return {
                 'signal': 'NO_BREAKER',
                 'confidence': 0,
-                'metadata': {'error': 'No breaker block detected'},
+                'metadata': {'error': 'No breaker block detected', 'is_new_event': False},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
+        
+        # **NEW:** Event tracking - detect when price ENTERS breaker zone (new event)
+        current_bar_index = len(df) - 1
+        bars_since_breaker = current_bar_index - active_breaker['index']
+        
+        # Check if price just entered the zone (wasn't in zone last bar, is in zone now)
+        is_new_event = False
+        if signal != 'NEUTRAL' and len(df) > 1:  # Price IS in zone now
+            prev_price = float(df['close'].iloc[-2])
+            # Check if previous price was NOT in zone
+            if active_breaker['type'] == 'BULLISH_BREAKER':
+                was_in_zone = (active_breaker['low'] <= prev_price <= active_breaker['high'] * 1.01)
+            else:  # BEARISH_BREAKER
+                was_in_zone = (active_breaker['low'] * 0.99 <= prev_price <= active_breaker['high'])
+            is_new_event = not was_in_zone  # Just entered if wasn't in before
         
         # Calculate confidence
         confidence = 75
@@ -169,10 +184,19 @@ class BreakerBlock:
             confidence += 10
         if active_breaker['break_pct'] > 1.0:
             confidence += 10
+        if is_new_event:
+            confidence += 5  # Boost for fresh breaker (immediate entry opportunity)
         confidence = min(100, confidence)
         
         # Build confluence
         confluence_factors = []
+        
+        # Event-specific confluence
+        if is_new_event:
+            confluence_factors.append('⭐ NEW BREAKER FORMED (just occurred - fresh failed OB!)')
+        elif bars_since_breaker > 0:
+            confluence_factors.append(f'Active breaker zone (formed {bars_since_breaker} bars ago)')
+        
         confluence_factors.append(f'Breaker Type: {active_breaker["type"]}')
         confluence_factors.append(f'Zone: ${active_breaker["low"]:.2f} - ${active_breaker["high"]:.2f}')
         confluence_factors.append(f'Break Strength: {active_breaker["break_pct"]}%')
@@ -190,7 +214,9 @@ class BreakerBlock:
             'break_pct': active_breaker['break_pct'],
             'current_price': round(current_price, 2),
             'in_zone': signal != 'NEUTRAL',
-            'breaker_timestamp': active_breaker['timestamp']
+            'breaker_timestamp': active_breaker['timestamp'],
+            'is_new_event': is_new_event,  # NEW: Event tracking
+            'bars_since_breaker': bars_since_breaker  # NEW: Age tracking
         }
         
         return {

@@ -108,12 +108,12 @@ class FairValueGap:
         return None
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method - tracks both CONTINUOUS gap state and NEW gap entries"""
         if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -123,7 +123,7 @@ class FairValueGap:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': 'Need at least 10 bars'},
+                'metadata': {'error': 'Need at least 10 bars', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -154,11 +154,23 @@ class FairValueGap:
             return {
                 'signal': 'NO_FVG',
                 'confidence': 0,
-                'metadata': {'error': 'No fair value gap detected'},
+                'metadata': {'error': 'No fair value gap detected', 'is_new_event': False},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
+        
+        # **NEW:** Event tracking - detect when price ENTERS gap zone (new event)
+        current_bar_index = len(df) - 1
+        bars_since_gap = current_bar_index - active_fvg['index']
+        
+        # Check if price just entered the gap zone (wasn't in zone last bar, is in zone now)
+        is_new_event = False
+        if signal != 'NEUTRAL' and len(df) > 1:  # Price IS in gap now
+            prev_price = float(df['close'].iloc[-2])
+            # Check if previous price was NOT in gap
+            was_in_gap = (active_fvg['gap_low'] <= prev_price <= active_fvg['gap_high'])
+            is_new_event = not was_in_gap  # Just entered if wasn't in before
         
         # Calculate confidence
         confidence = 90
@@ -166,10 +178,21 @@ class FairValueGap:
             confidence += 15
         if active_fvg['gap_pct'] > 1.0:
             confidence += 15
-        confidence = min(95, confidence)
+        if is_new_event:
+            confidence += 5  # Boost for fresh gap entry (immediate fill opportunity)
+        confidence = min(100, confidence)
         
         # Build confluence
         confluence_factors = []
+        
+        # Event-specific confluence
+        if is_new_event:
+            confluence_factors.append('⭐ NEW GAP ENTRY (price entered - fresh fill opportunity!)')
+        elif signal != 'NEUTRAL':
+            confluence_factors.append(f'Price in gap zone (gap fill in progress)')
+        elif bars_since_gap > 0:
+            confluence_factors.append(f'Active FVG (formed {bars_since_gap} bars ago - watch for return)')
+        
         confluence_factors.append(f'FVG Type: {active_fvg["type"]}')
         confluence_factors.append(f'Gap Zone: ${active_fvg["gap_low"]:.2f} - ${active_fvg["gap_high"]:.2f}')
         confluence_factors.append(f'Gap Size: ${active_fvg["gap_size"]:.2f} ({active_fvg["gap_pct"]:.3f}%)')
@@ -189,7 +212,9 @@ class FairValueGap:
             'gap_pct': active_fvg['gap_pct'],
             'current_price': round(current_price, 2),
             'in_gap': signal != 'NEUTRAL',
-            'fvg_timestamp': active_fvg['timestamp']
+            'fvg_timestamp': active_fvg['timestamp'],
+            'is_new_event': is_new_event,  # NEW: Event tracking
+            'bars_since_gap': bars_since_gap  # NEW: Age tracking
         }
         
         return {

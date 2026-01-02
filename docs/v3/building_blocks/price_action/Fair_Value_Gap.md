@@ -5,6 +5,24 @@
 ## Overview
 Identifies price imbalances where three-candle patterns create gaps representing unfilled orders that price seeks to fill.
 
+## Block Behavior (Continuous + Event Tracking)
+
+This block operates in **DUAL MODE**:
+- **Continuous State:** Tracks active FVG zones (91.8% relative to active signals, but only 1.4 signals/day actual)
+- **Event Detection:** Identifies when price ENTERS gap zones (0.89 gap entries/day)
+
+**Metadata Fields:**
+- `is_new_event`: Boolean - True if price just entered gap zone, False if continuing fill
+- `bars_since_gap`: Integer - How many bars ago the gap formed
+- `in_gap`: Boolean - Whether price is currently in the gap zone
+
+**Usage:**
+- **Gap Entry Timing:** Use `is_new_event == True` for precise fill entry points (critical for gap mitigation trades)
+- **Reference Zones:** Use FVG presence to identify inefficiency zones
+- **Age Assessment:** Check `bars_since_gap` to gauge gap validity (older gaps = weaker pull)
+
+**Important:** This block shows NO_FVG when no gaps exist (~90% of time). When gaps exist, 63.9% of signals are NEW gap entries!
+
 ## Technical Specifications
 **Bullish FVG:** Gap between candle 1 high and candle 3 low (unfilled buy orders)
 **Bearish FVG:** Gap between candle 1 low and candle 3 high (unfilled sell orders)

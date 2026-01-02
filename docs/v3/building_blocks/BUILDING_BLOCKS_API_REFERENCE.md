@@ -126,6 +126,18 @@ docs/v3/building_blocks/BLOCK_CATEGORIZATION.md
 - **Optimization:** period=800, slope_threshold=0.0001
 - **Quality:** 80/100, Accuracy: 57.2%
 
+#### 2. EMA 20/50 Trend Tracker
+**File:** `moving_averages/ema_20_50_trend.py`  
+**Function:** `analyze(df)`  
+**Returns:**
+- **Signals:** `BULLISH`, `BEARISH`, `NEUTRAL`
+- **Metadata:** `fast_ema`, `slow_ema`, `trend`, `separation_pct`, `is_new_event`, `bars_since_trend_change`
+- **Optimization:** fast=15, slow=45, cross_lookback=2
+- **Quality:** 100/100, Accuracy: 100% signal rate
+- **⭐ ENHANCED (2026-01-02):** Added event tracking - `is_new_event` distinguishes new trend changes vs continuing state
+- **Behavior:** DUAL MODE - Continuous trend tracker (100% signal rate) + event detection
+- **Critical:** Always maintains directional bias - use for trend filtering + change detection
+
 #### 6. EMA 20/50 Cross
 **File:** `moving_averages/ema_20_50_cross.py`  
 **Function:** `analyze(df)`  
@@ -183,10 +195,13 @@ docs/v3/building_blocks/BLOCK_CATEGORIZATION.md
 **File:** `price_action/fair_value_gap.py`  
 **Function:** `analyze(df)`  
 **Returns:**
-- **Signals:** `BULLISH_FVG`, `BEARISH_FVG`, `NEUTRAL`
-- **Metadata:** `fvg_type`, `gap_size`, `gap_high`, `gap_low`
-- **Optimization:** min_gap_pct=0.1
+- **Signals:** `BULLISH`, `BEARISH`, `NEUTRAL`, `NO_FVG`
+- **Metadata:** `fvg_type`, `gap_high`, `gap_low`, `gap_size`, `gap_pct`, `in_gap`, `is_new_event`, `bars_since_gap`
+- **Optimization:** min_gap_pct=0.2, lookback=7
 - **Quality:** 90/100, Accuracy: 62.9% ⭐⭐
+- **⭐ ENHANCED (2026-01-02):** Added event tracking - `is_new_event` detects gap entries vs continuing gap fill
+- **Behavior:** DUAL MODE - Active gap tracker (91.8% when gaps exist) + gap entry detection (0.89 entries/day)
+- **Critical:** Most signals are NO_FVG (~90%). When gaps exist, 63.9% are NEW entries - high precision!
 
 #### 12. Liquidity Sweep
 **File:** `price_action/liquidity_sweep.py`  
@@ -201,10 +216,13 @@ docs/v3/building_blocks/BLOCK_CATEGORIZATION.md
 **File:** `price_action/breaker_block.py`  
 **Function:** `analyze(df)`  
 **Returns:**
-- **Signals:** `BULLISH_BREAKER`, `BEARISH_BREAKER`, `NEUTRAL`
-- **Metadata:** `breaker_type`, `original_ob`, `break_price`, `retest_detected`
-- **Optimization:** lookback=20
+- **Signals:** `BULLISH`, `BEARISH`, `NEUTRAL`, `NO_BREAKER`
+- **Metadata:** `breaker_type`, `breaker_high`, `breaker_low`, `break_pct`, `in_zone`, `is_new_event`, `bars_since_breaker`
+- **Optimization:** lookback=15, min_break_pct=0.3
 - **Quality:** 80/100, Accuracy: 58.2%
+- **⭐ ENHANCED (2026-01-02):** Added event tracking - `is_new_event` detects zone entries vs continuing breaker state
+- **Behavior:** DUAL MODE - Continuous breaker tracker (96.1% rate) + zone entry detection (0.72 events/day)
+- **Critical:** Zone entries rare (<1%) but high-value - use for precise entry timing!
 
 ---
 
@@ -239,18 +257,23 @@ docs/v3/building_blocks/BLOCK_CATEGORIZATION.md
 **Function:** `analyze(df)`  
 **Returns:**
 - **Signals:** `BULLISH_BOS`, `BEARISH_BOS`, `NEUTRAL`
-- **Metadata:** `bos_type`, `previous_high`, `previous_low`, `break_price`
-- **Optimization:** swing_lookback=3
-- **Quality:** 90/100, Accuracy: 61.3%
+- **Metadata:** `bos_type`, `previous_high`, `previous_low`, `break_price`, `is_new_event`, `bars_since_bos`
+- **Optimization:** swing_lookback=8, min_break_pct=0.05
+- **Quality:** 80/100, Accuracy: 55.4%
+- **⭐ ENHANCED (2026-01-02):** Added event tracking - `is_new_event` distinguishes new breaks vs continuing state
+- **Behavior:** DUAL MODE - Continuous structure tracker (91% signal rate) + event detection
 
 #### 17. Market Structure Shift (MSS)
 **File:** `smc_ict/market_structure_shift.py`  
 **Function:** `analyze(df)`  
 **Returns:**
 - **Signals:** `BULLISH_MSS`, `BEARISH_MSS`, `NEUTRAL`
-- **Metadata:** `mss_type`, `broken_structure`, `shift_strength`
-- **Optimization:** swing_lookback=3
-- **Quality:** 90/100, Accuracy: 62.0%
+- **Metadata:** `mss_type`, `broken_structure`, `shift_strength`, `is_new_event`, `bars_since_mss`
+- **Optimization:** swing_lookback=8, min_break_pct=0.05
+- **Quality:** 80/100, Accuracy: 55.7%
+- **⭐ ENHANCED (2026-01-02):** Added event tracking - `is_new_event` distinguishes new reversals vs continuing state
+- **Behavior:** DUAL MODE - Continuous reversal state tracker (100% signal rate) + event detection  
+- **Critical:** MSS marks reversals - new event timing crucial for entries!
 
 #### 18. Displacement
 **File:** `smc_ict/displacement.py`  

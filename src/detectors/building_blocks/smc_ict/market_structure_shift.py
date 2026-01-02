@@ -108,12 +108,12 @@ class MarketStructureShift:
         return None
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method - tracks both CONTINUOUS state and NEW events"""
         if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -123,7 +123,7 @@ class MarketStructureShift:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': f'Need at least {self.swing_lookback + 5} bars'},
+                'metadata': {'error': f'Need at least {self.swing_lookback + 5} bars', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -148,16 +148,22 @@ class MarketStructureShift:
             return {
                 'signal': 'NO_MSS',
                 'confidence': 0,
-                'metadata': {'error': 'No market structure shift detected'},
+                'metadata': {'error': 'No market structure shift detected', 'is_new_event': False},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
         
+        # **NEW:** Determine if this is a NEW event (occurred on current bar) vs continuing state
+        current_bar_index = len(df) - 1
+        is_new_event = (active_mss['index'] == current_bar_index)
+        
         # Calculate confidence
         confidence = 85  # High confidence for MSS
         if active_mss['break_pct'] > 0.5:
             confidence += 10
+        if is_new_event:
+            confidence += 5  # Higher confidence for fresh MSS (reversal timing critical!)
         confidence = min(100, confidence)
         
         # Build confluence
@@ -165,6 +171,10 @@ class MarketStructureShift:
         confluence_factors.append(f'MSS Type: {active_mss["type"]}')
         confluence_factors.append(f'Break Strength: {active_mss["break_pct"]:.3f}%')
         confluence_factors.append('Market structure changed - trend reversal signal')
+        if is_new_event:
+            confluence_factors.append('⭐ NEW MSS EVENT (just occurred - fresh reversal signal!)')
+        else:
+            confluence_factors.append('Continuing MSS state (structure already shifted)')
         confluence_factors.append('Institutional positioning shift likely')
         
         # Metadata
@@ -174,7 +184,9 @@ class MarketStructureShift:
                 'swing_high': active_mss['swing_high'],
                 'break_high': active_mss['break_high'],
                 'break_pct': active_mss['break_pct'],
-                'mss_timestamp': active_mss['timestamp']
+                'mss_timestamp': active_mss['timestamp'],
+                'is_new_event': is_new_event,  # NEW: Event tracking
+                'bars_since_mss': current_bar_index - active_mss['index']  # NEW: Age tracking
             }
         else:
             metadata = {
@@ -182,7 +194,9 @@ class MarketStructureShift:
                 'swing_low': active_mss['swing_low'],
                 'break_low': active_mss['break_low'],
                 'break_pct': active_mss['break_pct'],
-                'mss_timestamp': active_mss['timestamp']
+                'mss_timestamp': active_mss['timestamp'],
+                'is_new_event': is_new_event,  # NEW: Event tracking
+                'bars_since_mss': current_bar_index - active_mss['index']  # NEW: Age tracking
             }
         
         return {

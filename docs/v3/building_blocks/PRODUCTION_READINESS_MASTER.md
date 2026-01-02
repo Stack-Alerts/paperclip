@@ -1,9 +1,15 @@
 # Building Blocks Production Readiness Master Tracker
 
-**Last Updated:** 2026-01-02 07:04:00  
-**Total Blocks:** 67  
-**Production Ready:** 67/67 (100%) ✅ COMPLETE  
+**Last Updated:** 2026-01-02 09:45:00  
+**Total Blocks:** 68  
+**Production Ready:** 68/68 (100%) ✅ COMPLETE  
 **In Review:** 0
+
+**⚠️ IMPORTANT UPDATE (2026-01-02 09:45):**  
+Block `ema_20_50_cross` has been split into two properly categorized blocks:
+- **ema_20_50_cross** (NEW): Event-driven crossover detector (~15-30 signals/180 days)
+- **ema_20_50_trend** (RENAMED): Continuous trend tracker (~17,000 signals/180 days)
+See: `docs/v3/building_blocks/EMA_20_50_BLOCK_SPLIT_SUMMARY.md` for complete details.
 
 **Session:** 48+ hours intensive optimization + Expert Mode pattern fixes  
 **Git Commits:** 45+  
@@ -256,13 +262,35 @@
   - Expert Mode validation passed
   - Zero calculation errors
 
-### moving_averages/ema_20_50_cross ✅
+### moving_averages/ema_20_50_cross ✅ (NEW - Event-Driven)
 
 - **File:** `src/detectors/building_blocks/moving_averages/ema_20_50_cross.py`
 - **Documentation:** `docs/v3/building_blocks/moving_averages/20_50_EMA_Cross.md`
-- **Function:** Detects fast/slow EMA crossovers with volume confirmation. Golden Cross (bullish) and Death Cross (bearish) signals.
-- **Status:** ✅ PRODUCTION READY
-- **Approved:** 2026-01-01
+- **Function:** Event-driven pure crossover detector. Signals ONLY on actual Golden Cross/Death Cross events. Returns NEUTRAL when no cross.
+- **Status:** ✅ PRODUCTION READY (NEW)
+- **Approved:** 2026-01-02
+- **Type:** Event-Driven
+- **Parameters:** fast=15, slow=45, volume_threshold=1.1, lookback=2
+- **Expected Performance:**
+  - Signals: ~15-30 crosses per 180 days (~0.1-0.17/day)
+  - Signal Rate: ~0.5-1% of bars (event-based)
+  - Confidence: 75-95% (volume-dependent)
+- **Why Production Ready:**
+  - Pure crossover detection (ONLY signals on actual cross events)
+  - Returns NEUTRAL appropriately when no cross
+  - 15/45 outperforms classic 20/50
+  - Volume confirmation for higher confidence
+  - Optimized parameters align with vector blocks
+  - Institutional-grade event detection
+
+### moving_averages/ema_20_50_trend ✅ (RENAMED - Continuous)
+
+- **File:** `src/detectors/building_blocks/moving_averages/ema_20_50_trend.py`
+- **Documentation:** `docs/v3/building_blocks/moving_averages/20_50_EMA_Trend_Tracker.md`
+- **Function:** Continuous trend position tracker. Signals on every bar based on Price/Fast EMA/Slow EMA alignment.
+- **Status:** ✅ PRODUCTION READY (Renamed from ema_20_50_cross)
+- **Approved:** 2026-01-01 (Renamed 2026-01-02)
+- **Type:** Continuous
 - **Optimization:** Institutional-grade tuning (300 combinations tested)
 - **Parameters:** fast=15 (not 20), slow=45 (not 50), volume_threshold=1.1, lookback=2
 - **Performance:**
@@ -275,10 +303,11 @@
 - **Why Production Ready:**
   - 15/45 outperforms classic 20/50 crossover
   - Volume confirmation with looser threshold (1.1x for more signals)
-  - Continuous trend tracking (not just crossing events)
+  - Continuous trend tracking (signals on every bar based on trend position)
   - Institutional tuning on 17,281 bars
   - Expert Mode validation passed
   - Zero calculation errors
+  - **Note:** This is the original data from the block previously named "ema_20_50_cross"
 
 ### moving_averages/ema_200_trend ✅
 

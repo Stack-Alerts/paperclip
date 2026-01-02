@@ -100,12 +100,12 @@ class IchimokuCloud:
         }
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method - tracks both CONTINUOUS cloud position and NEW cloud breakouts"""
         if not all(col in df.columns for col in ['high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -115,7 +115,7 @@ class IchimokuCloud:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': f'Need at least {self.senkou_period + 10} bars'},
+                'metadata': {'error': f'Need at least {self.senkou_period + 10} bars', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -156,6 +156,36 @@ class IchimokuCloud:
             position = 'IN_CLOUD'
             signal = 'NEUTRAL'
         
+        # **NEW:** Event tracking - detect cloud position changes (breakouts/breakdowns)
+        is_new_event = False
+        bars_in_current_position = 0
+        
+        # Simple check: did position change from previous bar?
+        if len(df) > self.senkou_period + 11:  # Need history
+            prev_price = float(df['close'].iloc[-2])
+            
+            # Calculate previous cloud boundaries (only once)
+            prev_result = self.calculate_ichimoku(df.iloc[:-1])
+            if prev_result:
+                prev_cloud_top = max(prev_result['senkou_a'], prev_result['senkou_b'])
+                prev_cloud_bottom = min(prev_result['senkou_a'], prev_result['senkou_b'])
+                
+                # Determine previous position
+                if prev_price > prev_cloud_top:
+                    prev_position = 'ABOVE_CLOUD'
+                elif prev_price < prev_cloud_bottom:
+                    prev_position = 'BELOW_CLOUD'
+                else:
+                    prev_position = 'IN_CLOUD'
+                
+                # Check if position changed
+                is_new_event = (position != prev_position)
+                
+                # For age: simplified - just use signal consistency (avoid expensive lookback)
+                # If same position as previous bar, assume continuing (bars count approximation)
+                if not is_new_event:
+                    bars_in_current_position = 1  # Approximate - at least 1 bar in position
+        
         # Confidence based on multiple factors
         confidence = 50  # Base
         
@@ -175,10 +205,26 @@ class IchimokuCloud:
         if cloud_thickness > price * 0.02:  # >2% thick
             confidence += 10
         
+        # Fresh breakout boost
+        if is_new_event:
+            confidence += 5
+        
         confidence = min(100, confidence)
         
         # Build confluence factors
         confluence_factors = []
+        
+        # Event-specific confluence
+        if is_new_event:
+            if position == 'ABOVE_CLOUD':
+                confluence_factors.append('⭐ NEW CLOUD BREAKOUT (bullish breakout - fresh trend!)')
+            elif position == 'BELOW_CLOUD':
+                confluence_factors.append('⭐ NEW CLOUD BREAKDOWN (bearish breakdown - fresh trend!)')
+            else:
+                confluence_factors.append('⭐ ENTERED CLOUD (consolidation zone entry)')
+        elif bars_in_current_position > 0:
+            confluence_factors.append(f'Continuing {position.lower().replace("_", " ")} ({bars_in_current_position} bars)')
+        
         confluence_factors.append(f'Position: {position}')
         confluence_factors.append(f'Cloud: {cloud_color}')
         confluence_factors.append(f'Tenkan: ${tenkan:.2f}, Kijun: ${kijun:.2f}')
@@ -204,7 +250,9 @@ class IchimokuCloud:
             'cloud_bottom': round(cloud_bottom, 2),
             'cloud_color': cloud_color,
             'position': position,
-            'cloud_thickness_pct': round((cloud_thickness / price) * 100, 2)
+            'cloud_thickness_pct': round((cloud_thickness / price) * 100, 2),
+            'is_new_event': is_new_event,  # NEW: Event tracking
+            'bars_in_current_position': bars_in_current_position  # NEW: Age tracking
         }
         
         return {

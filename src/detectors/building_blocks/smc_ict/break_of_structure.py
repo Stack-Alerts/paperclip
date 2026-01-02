@@ -137,12 +137,12 @@ class BreakOfStructure:
         return None
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method - tracks both CONTINUOUS state and NEW events"""
         if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -152,7 +152,7 @@ class BreakOfStructure:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': f'Need at least {self.swing_lookback + 20} bars'},
+                'metadata': {'error': f'Need at least {self.swing_lookback + 20} bars', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -165,7 +165,7 @@ class BreakOfStructure:
             return {
                 'signal': 'NEUTRAL',
                 'confidence': 0,
-                'metadata': {'trend': 'NEUTRAL', 'error': 'No clear trend for BOS detection'},
+                'metadata': {'trend': 'NEUTRAL', 'error': 'No clear trend for BOS detection', 'is_new_event': False},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['No clear trend - BOS requires established trend']
@@ -190,16 +190,22 @@ class BreakOfStructure:
             return {
                 'signal': 'NO_BOS',
                 'confidence': 0,
-                'metadata': {'trend': trend, 'error': 'No break of structure detected'},
+                'metadata': {'trend': trend, 'error': 'No break of structure detected', 'is_new_event': False},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': [f'Trend: {trend}', 'No BOS yet - waiting for structure break']
             }
         
+        # **NEW:** Determine if this is a NEW event (occurred on current bar) vs continuing state
+        current_bar_index = len(df) - 1
+        is_new_event = (active_bos['index'] == current_bar_index)
+        
         # Calculate confidence
         confidence = 80  # High confidence for BOS in trend
         if active_bos['break_pct'] > 0.5:
             confidence += 10
+        if is_new_event:
+            confidence += 5  # Higher confidence for fresh BOS
         confidence = min(100, confidence)
         
         # Build confluence
@@ -208,6 +214,10 @@ class BreakOfStructure:
         confluence_factors.append(f'Trend: {active_bos["trend"]} (confirmed)')
         confluence_factors.append(f'Break Strength: {active_bos["break_pct"]:.3f}%')
         confluence_factors.append('Structure broken in trend direction')
+        if is_new_event:
+            confluence_factors.append('⭐ NEW BOS EVENT (just occurred on current bar)')
+        else:
+            confluence_factors.append('Continuing BOS state (structure already broken)')
         confluence_factors.append('Trend continuation signal - high probability')
         
         # Metadata
@@ -218,7 +228,9 @@ class BreakOfStructure:
                 'swing_high': active_bos['swing_high'],
                 'break_high': active_bos['break_high'],
                 'break_pct': active_bos['break_pct'],
-                'bos_timestamp': active_bos['timestamp']
+                'bos_timestamp': active_bos['timestamp'],
+                'is_new_event': is_new_event,  # NEW: Event tracking
+                'bars_since_bos': current_bar_index - active_bos['index']  # NEW: Age tracking
             }
         else:
             metadata = {
@@ -227,7 +239,9 @@ class BreakOfStructure:
                 'swing_low': active_bos['swing_low'],
                 'break_low': active_bos['break_low'],
                 'break_pct': active_bos['break_pct'],
-                'bos_timestamp': active_bos['timestamp']
+                'bos_timestamp': active_bos['timestamp'],
+                'is_new_event': is_new_event,  # NEW: Event tracking
+                'bars_since_bos': current_bar_index - active_bos['index']  # NEW: Age tracking
             }
         
         return {

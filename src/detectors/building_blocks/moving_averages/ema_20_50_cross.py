@@ -1,7 +1,7 @@
 """
 20/50 EMA Cross Building Block
 Category: Moving Averages
-Purpose: Medium-term trend identification using 20 and 50 EMA crossovers with volume confirmation
+Purpose: Event-driven crossover detection for 20 and 50 EMA with volume confirmation
 """
 
 from typing import Dict, Any
@@ -12,59 +12,54 @@ import numpy as np
 
 class EMA2050Cross:
     """
-    20/50 EMA Cross - Medium-Term Trend Indicator with Volume Confirmation
+    20/50 EMA Cross - Event-Driven Crossover Detector
     
-    Classic moving average crossover system enhanced with volume analysis:
-    - Golden Cross: Fast EMA crosses above Slow EMA (bullish)
-    - Death Cross: Fast EMA crosses below Slow EMA (bearish)
+    Pure crossover detection system that ONLY signals on actual cross events:
+    - Golden Cross: Fast EMA crosses above Slow EMA (bullish event)
+    - Death Cross: Fast EMA crosses below Slow EMA (bearish event)
+    - Returns NEUTRAL when no cross occurs
     - Volume confirmation: Higher volume on cross increases confidence
-    - EMA separation: Distance between EMAs shows trend strength
+    
+    This indicator signals ONLY when an actual crossover event happens.
+    For continuous trend position tracking, use ema_20_50_trend instead.
     
     Parameters:
-        fast_period: Fast EMA period (default: 20)
-        slow_period: Slow EMA period (default: 50) 
+        fast_period: Fast EMA period (default: 15, optimized)
+        slow_period: Slow EMA period (default: 45, optimized) 
         timeframe: Data timeframe
-        volume_confirmation: Require above-average volume for cross (default: True)
-        volume_threshold: Volume multiplier for confirmation (default: 1.2)
+        cross_lookback: Bars to confirm cross (default: 2)
+        volume_threshold: Volume multiplier for confirmation (default: 1.1)
     
     Returns:
-        Standardized dict with cross signals, separation, and trend strength
+        BULLISH on Golden Cross, BEARISH on Death Cross, NEUTRAL otherwise
     """
     
     def __init__(self, 
                  fast_period: int = 15,  # OPTIMIZED: 15 outperforms 20
-                 slow_period: int = 45,  # OPTIMIZED: 45 outperforms 50 (matches vector findings!)
+                 slow_period: int = 45,  # OPTIMIZED: 45 outperforms 50
                  timeframe: str = '15min',
-                 volume_confirmation: bool = True,
-                 volume_threshold: float = 1.1,  # OPTIMIZED: Looser threshold for more signals
                  cross_lookback: int = 2,  # OPTIMIZED: Faster confirmation
+                 volume_threshold: float = 1.1,  # OPTIMIZED: Looser threshold
                  **kwargs):
-        """Initialize 20/50 EMA Cross block with tunable parameters"""
+        """Initialize 20/50 EMA Cross block"""
         self.fast_period = fast_period
         self.slow_period = slow_period
         self.timeframe = timeframe
-        self.volume_confirmation = volume_confirmation
-        self.volume_threshold = volume_threshold
         self.cross_lookback = cross_lookback
-        
-        # Bitcoin-specific separation thresholds (% between EMAs)
-        self.btc_separation_levels = {
-            'tight': 0.3,
-            'normal': 1.0,
-            'wide': 2.0,
-            'very_wide': 2.0
-        }
+        self.volume_threshold = volume_threshold
     
     def calculate_ema(self, close: pd.Series, period: int) -> pd.Series:
         """Calculate Exponential Moving Average"""
         return close.ewm(span=period, adjust=False).mean()
     
-    def detect_cross(self, fast_ema: pd.Series, slow_ema: pd.Series, lookback: int = 3) -> str:
+    def detect_cross(self, fast_ema: pd.Series, slow_ema: pd.Series, lookback: int = 2) -> str:
         """
         Detect EMA crossovers with confirmation
         
         Returns:
-            'GOLDEN_CROSS', 'DEATH_CROSS', or 'NO_CROSS'
+            'GOLDEN_CROSS': Fast crossed above Slow
+            'DEATH_CROSS': Fast crossed below Slow
+            'NO_CROSS': No crossover detected
         """
         if len(fast_ema) < lookback + 1:
             return 'INSUFFICIENT_DATA'
@@ -110,34 +105,12 @@ class EMA2050Cross:
         """Calculate percentage separation between EMAs"""
         return ((fast_ema - slow_ema) / slow_ema) * 100
     
-    def classify_separation(self, separation_pct: float) -> str:
-        """Classify separation level"""
-        abs_sep = abs(separation_pct)
-        
-        if abs_sep < self.btc_separation_levels['tight']:
-            return 'TIGHT'
-        elif abs_sep < self.btc_separation_levels['normal']:
-            return 'NORMAL'
-        elif abs_sep < self.btc_separation_levels['wide']:
-            return 'WIDE'
-        else:
-            return 'VERY_WIDE'
-    
-    def determine_trend(self, fast_ema: float, slow_ema: float, price: float) -> str:
-        """Determine overall trend based on EMA alignment"""
-        if price > fast_ema > slow_ema:
-            return 'STRONG_UPTREND'
-        elif price > fast_ema and fast_ema < slow_ema:
-            return 'EARLY_UPTREND'
-        elif price < fast_ema < slow_ema:
-            return 'STRONG_DOWNTREND'
-        elif price < fast_ema and fast_ema > slow_ema:
-            return 'EARLY_DOWNTREND'
-        else:
-            return 'NEUTRAL'
-    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """
+        Main analysis method - ONLY signals on actual cross events
+        
+        Returns NEUTRAL when no cross is detected
+        """
         # Validate
         if 'close' not in df.columns:
             return {
@@ -177,18 +150,14 @@ class EMA2050Cross:
         
         # Calculate separation
         separation_pct = self.calculate_separation(current_fast, current_slow)
-        separation_class = self.classify_separation(separation_pct)
         
-        # Determine trend
-        trend = self.determine_trend(current_fast, current_slow, current_price)
-        
-        # Determine signal and confidence
+        # CRITICAL: ONLY signal on actual cross events
         signal = 'NEUTRAL'
         confidence = 70
         confluence_factors = []
         
-        # Cross signals
         if cross == 'GOLDEN_CROSS':
+            # Bullish cross detected
             signal = 'BULLISH'
             confidence = 85
             confluence_factors.append('✅ GOLDEN CROSS - Fast EMA crossed above Slow EMA (bullish)')
@@ -196,11 +165,14 @@ class EMA2050Cross:
             if has_volume_conf:
                 confidence += 10
                 confluence_factors.append('📊 Volume confirmation - above average volume on cross')
-            elif self.volume_confirmation:
+            else:
                 confidence -= 10
                 confluence_factors.append('⚠️ Low volume - cross lacks volume confirmation')
+            
+            confluence_factors.append(f'Cross confirmed over {self.cross_lookback} bars')
                 
         elif cross == 'DEATH_CROSS':
+            # Bearish cross detected
             signal = 'BEARISH'
             confidence = 85
             confluence_factors.append('❌ DEATH CROSS - Fast EMA crossed below Slow EMA (bearish)')
@@ -208,34 +180,25 @@ class EMA2050Cross:
             if has_volume_conf:
                 confidence += 10
                 confluence_factors.append('📊 Volume confirmation - above average volume on cross')
-            elif self.volume_confirmation:
+            else:
                 confidence -= 10
                 confluence_factors.append('⚠️ Low volume - cross lacks volume confirmation')
+            
+            confluence_factors.append(f'Cross confirmed over {self.cross_lookback} bars')
         
-        # Trend-based signals (when no cross)
-        elif trend == 'STRONG_UPTREND':
-            signal = 'BULLISH'
-            confidence = 75
-            confluence_factors.append('📈 STRONG UPTREND - Price > Fast EMA > Slow EMA (perfect alignment)')
-        elif trend == 'STRONG_DOWNTREND':
-            signal = 'BEARISH'
-            confidence = 75
-            confluence_factors.append('📉 STRONG DOWNTREND - Price < Fast EMA < Slow EMA (perfect alignment)')
-        elif trend == 'EARLY_UPTREND':
-            signal = 'BULLISH'
-            confidence = 65
-            confluence_factors.append('📈 EARLY UPTREND - Price above Fast EMA, awaiting Slow EMA cross')
-        elif trend == 'EARLY_DOWNTREND':
-            signal = 'BEARISH'
-            confidence = 65
-            confluence_factors.append('📉 EARLY DOWNTREND - Price below Fast EMA, awaiting Slow EMA cross')
+        else:
+            # NO CROSS - Return NEUTRAL
+            signal = 'NEUTRAL'
+            confidence = 70
+            
+            # Just provide current position info
+            if current_fast > current_slow:
+                confluence_factors.append('Fast EMA above Slow EMA - no recent cross')
+            else:
+                confluence_factors.append('Fast EMA below Slow EMA - no recent cross')
         
-        # Separation boost
-        if separation_class in ['WIDE', 'VERY_WIDE']:
-            confidence = min(100, confidence + 5)
-            confluence_factors.append(f'💪 {separation_class} separation - strong trend momentum')
-        
-        confluence_factors.append(f'EMA separation: {separation_pct:+.2f}% ({separation_class})')
+        # Always add current values for context
+        confluence_factors.append(f'EMA separation: {separation_pct:+.2f}%')
         confluence_factors.append(f'Fast EMA ({self.fast_period}): ${current_fast:.2f}')
         confluence_factors.append(f'Slow EMA ({self.slow_period}): ${current_slow:.2f}')
         
@@ -247,10 +210,9 @@ class EMA2050Cross:
             'cross': cross,
             'has_volume_confirmation': has_volume_conf,
             'separation_pct': round(separation_pct, 2),
-            'separation_class': separation_class,
-            'trend': trend,
             'fast_period': self.fast_period,
-            'slow_period': self.slow_period
+            'slow_period': self.slow_period,
+            'cross_lookback': self.cross_lookback
         }
         
         return {
@@ -261,3 +223,36 @@ class EMA2050Cross:
             'timeframe': self.timeframe,
             'confluence_factors': confluence_factors
         }
+
+
+if __name__ == "__main__":
+    # Test
+    dates = pd.date_range(start='2024-01-01', periods=200, freq='15min')
+    np.random.seed(42)
+    
+    # Create data with a clear cross
+    base = 45000
+    data = pd.DataFrame({
+        'timestamp': dates,
+        'close': base + np.concatenate([
+            np.linspace(0, -500, 100),  # Downtrend
+            np.linspace(-500, 500, 100)  # Uptrend (creates cross)
+        ]),
+        'volume': np.random.uniform(100, 1000, 200)
+    })
+    
+    cross = EMA2050Cross()
+    
+    print("=" * 80)
+    print("20/50 EMA CROSS - TEST RESULTS (Event-Driven)")
+    print("=" * 80)
+    
+    # Test at different points
+    for i in [50, 100, 150, 199]:
+        result = cross.analyze(data.iloc[:i+1])
+        print(f"\nBar {i}: {result['signal']} ({result['confidence']}%)")
+        if result['signal'] != 'NEUTRAL':
+            for factor in result['confluence_factors']:
+                print(f"  - {factor}")
+    
+    print("=" * 80)

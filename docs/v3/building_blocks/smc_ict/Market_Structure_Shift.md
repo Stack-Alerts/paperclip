@@ -10,6 +10,23 @@ Identifies significant market structure changes signaling potential trend revers
 **Bearish MSS:** In uptrend, price breaks below most recent higher low → potential reversal
 **File:** `src/detectors/building_blocks/smc_ict/market_structure_shift.py`
 
+## Block Behavior (Continuous + Event Tracking)
+This block operates in **DUAL MODE**:
+- **Continuous State:** Tracks current market structure (BULLISH/BEARISH reversal state)
+- **Event Detection:** Identifies when NEW MSS events occur vs continuing reversal state
+
+**Metadata Fields:**
+- `is_new_event`: Boolean - True if MSS just occurred on current bar, False if continuing  
+- `bars_since_mss`: Integer - How many bars ago the current MSS occurred
+- `mss_timestamp`: Datetime - When the current MSS occurred
+
+**Usage:**
+- **Reversal Entry:** Use `is_new_event == True` to enter on fresh MSS (critical timing!)
+- **Trend Filter:** Use continuous signal to avoid counter-trend trades
+- **Exit Signal:** When opposite `is_new_event == True` (structure reversed again)
+
+**Important:** MSS marks REVERSAL points - new event timing is critical for entries!
+
 ## Difference from BOS
 - **MSS:** Signals potential REVERSAL
 - **BOS:** Signals trend CONTINUATION

@@ -5,6 +5,24 @@
 ## Overview
 A failed order block that marks pivotal market structure shift, transforming from support to resistance (or vice versa) after liquidity sweep.
 
+## Block Behavior (Continuous + Event Tracking)
+
+This block operates in **DUAL MODE**:
+- **Continuous State:** Tracks active breaker zones (96.1% signal rate)
+- **Event Detection:** Identifies when price ENTERS breaker zones (0.72 events/day)
+
+**Metadata Fields:**
+- `is_new_event`: Boolean - True if price just entered breaker zone, False if continuing
+- `bars_since_breaker`: Integer - How many bars ago the breaker formed
+- `in_zone`: Boolean - Whether price is currently in the breaker zone
+
+**Usage:**
+- **Zone Entry Timing:** Use `is_new_event == True` for precise entry points (rare but high-value)
+- **Reference Zones:** Use continuous signal to identify active breaker levels
+- **Age Assessment:** Check `bars_since_breaker` to gauge breaker validity
+
+**Important:** 96.1% signal rate reflects active breaker zones. Only 0.72 zone entries/day = actual entry opportunities!
+
 ## Technical Specifications
 **Bullish Breaker:** Failed bearish OB becomes bullish support after sweep
 **Bearish Breaker:** Failed bullish OB becomes bearish resistance after sweep
