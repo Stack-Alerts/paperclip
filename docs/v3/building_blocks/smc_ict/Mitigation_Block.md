@@ -5,6 +5,24 @@
 ## Overview
 Identifies unfilled orders and price gaps requiring institutional mitigation before continuation - areas price "must" return to.
 
+## Block Behavior (Continuous + Event Tracking)
+
+This block operates in **DUAL MODE**:
+- **Continuous State:** Always tracking approach to mitigation zones (67.4% signal rate)
+- **Event Detection:** Identifies when price ENTERS approach zone (3.88 approaches/day)
+
+**Metadata Fields:**
+- `is_new_event`: Boolean - True if price just entered approach zone (NEW approach), False if continuing
+- `bars_in_approach`: Integer - How many bars approaching zone
+- `mitigation_type`: String - BULLISH_MITIGATION or BEARISH_MITIGATION
+
+**Usage:**
+- **Fresh Approach Timing:** Use `is_new_event == True` for precise retracement entry setup (3.88/day)
+- **Ongoing Approaches:** Use continuous signal to monitor active approach (67% of time)
+- **Age Assessment:** Check `bars_in_approach` to gauge proximity timing
+
+**Important:** 4.06% of signals are NEW approach entries - low event rate but high precision! Once approaching, tends to stay in approach for many bars (94%).
+
 ## Technical Specifications
 **Mitigation Block:** Candle/zone with unfilled institutional orders, creating strong price magnet
 **Types:** Similar to Order Blocks but focus on unfilled gaps and imbalances

@@ -155,12 +155,12 @@ class MitigationBlock:
         return None
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method - tracks both CONTINUOUS approach state and NEW zone entries"""
         if not all(col in df.columns for col in ['timestamp', 'open', 'high', 'low', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns (need open, high, low, close, timestamp)'},
+                'metadata': {'error': 'Missing required columns (need open, high, low, close, timestamp)', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -170,7 +170,7 @@ class MitigationBlock:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': f'Need at least {self.lookback + 5} bars'},
+                'metadata': {'error': f'Need at least {self.lookback + 5} bars', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -203,11 +203,31 @@ class MitigationBlock:
             return {
                 'signal': 'NEUTRAL',
                 'confidence': 0,
-                'metadata': {'message': 'No mitigation zones detected'},
+                'metadata': {'message': 'No mitigation zones detected', 'is_new_event': False},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['No unfilled gaps - clean price action']
             }
+        
+        # **NEW:** Event tracking - detect when price ENTERS approach zone
+        is_new_event = False
+        bars_in_approach = 0
+        
+        # Check if we just started approaching (wasn't approaching last bar, is now)
+        if len(df) > self.lookback + 6:
+            # Check previous bar's state
+            prev_bullish = self.detect_bullish_mitigation(df.iloc[:-1])
+            prev_bearish = self.detect_bearish_mitigation(df.iloc[:-1])
+            
+            # Determine if previous bar had ANY mitigation signal
+            had_prev_signal = (prev_bullish is not None or prev_bearish is not None)
+            
+            # New event if we NOW have signal but DIDN'T before
+            is_new_event = not had_prev_signal
+            
+            # If continuing, approximate bars in approach
+            if not is_new_event:
+                bars_in_approach = 1  # At least 1 bar approaching
         
         # Calculate confidence based on gap size and distance
         confidence = 70  # Base confidence for mitigation
@@ -217,10 +237,24 @@ class MitigationBlock:
             confidence += 15  # Very close
         elif active_mit['distance_pct'] < 5.0:
             confidence += 10  # Close
+        
+        # Fresh approach boost
+        if is_new_event:
+            confidence += 5
         confidence = min(100, confidence)
         
         # Build confluence factors
         confluence_factors = []
+        
+        # Event-specific confluence
+        if is_new_event:
+            if signal == 'BULLISH':
+                confluence_factors.append('⭐ NEW BULLISH MITIGATION APPROACH (fresh retracement opportunity!)')
+            else:
+                confluence_factors.append('⭐ NEW BEARISH MITIGATION APPROACH (fresh retracement opportunity!)')
+        elif bars_in_approach > 0:
+            confluence_factors.append(f'Continuing approach to mitigation ({bars_in_approach} bars)')
+        
         confluence_factors.append(f'Mitigation Type: {active_mit["type"]}')
         confluence_factors.append(f'Zone: ${active_mit["mitigation_low"]:.2f} - ${active_mit["mitigation_high"]:.2f}')
         confluence_factors.append(f'Gap Size: {active_mit["gap_pct"]:.3f}%')
@@ -237,7 +271,9 @@ class MitigationBlock:
             'gap_pct': active_mit['gap_pct'],
             'current_price': active_mit['current_price'],
             'distance_pct': active_mit['distance_pct'],
-            'mitigation_timestamp': active_mit['timestamp']
+            'mitigation_timestamp': active_mit['timestamp'],
+            'is_new_event': is_new_event,  # NEW: Event tracking
+            'bars_in_approach': bars_in_approach  # NEW: Age tracking
         }
         
         return {

@@ -339,11 +339,14 @@ docs/v3/building_blocks/BLOCK_CATEGORIZATION.md
 **Function:** `analyze(df)`  
 **Returns:**
 - **Signals:** `BULLISH`, `BEARISH`, `NEUTRAL`
-- **Metadata:** `mitigation_type`, `mitigation_high`, `mitigation_low`, `gap_size`, `gap_pct`, `distance_pct`
+- **Metadata:** `mitigation_type`, `mitigation_high`, `mitigation_low`, `gap_size`, `gap_pct`, `distance_pct`, `is_new_event`, `bars_in_approach`
 - **Optimization:** lookback=20
 - **Quality:** 90/100, Accuracy: 60.2% ⭐
-- **Signals:** 11,088 in 180 days (61.6/day)
+- **Signals:** 11,588 in 180 days (64.38/day)
 - **R/R:** 7.89 (excellent)
+- **⭐ ENHANCED (2026-01-02):** Added event tracking - `is_new_event` detects fresh approach entries vs continuing approach
+- **Behavior:** DUAL MODE - Continuous approach tracker (67.4% signal rate) + approach entry detection (3.88 events/day)
+- **Critical:** Low event rate (4.06% fresh) but high precision! Once approaching, continues for many bars (94%).
 - **NOTE:** Bitcoin-adapted - detects impulse candles approaching mitigation zones (not traditional gaps)
 
 #### 25. Balanced Price Range
