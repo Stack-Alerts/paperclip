@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 
 
-class AsiaSession50:
+class AsiaSession50Percent:
     """
     Asia Session 50% Price Level
     

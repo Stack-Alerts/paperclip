@@ -20,7 +20,7 @@ class SwingFailurePattern:
     
     SFP Characteristics:
     - Attempts to break swing high/low
-    - Fails to close beyond it
+    - Fails to close beyond it (or closes back inside)
     - Quick reversal in opposite direction
     - Traps breakout traders
     
@@ -36,24 +36,28 @@ class SwingFailurePattern:
     Parameters:
         swing_lookback: Periods for swing detection (default: 10)
         failure_threshold: % penetration to confirm (default: 0.1%)
+        reversal_window: Bars to check for reversal (default: 3)
     """
     
     def __init__(self, timeframe: str = '15min',
                  lookback: int = 10,
-                 failure_threshold_pct: float = 0.3, **kwargs):
+                 failure_threshold_pct: float = 0.1,
+                 reversal_window: int = 3,
+                 **kwargs):
         """
-        Initialize SFP detector with OPTIMIZED parameters (batch tuning 2026-01-01)
+        Initialize SFP detector with FIXED parameters
         
-        Batch Optimization Results:
-            Quality: 80/100
-            Accuracy: 62.3% ⭐ (2nd HIGHEST)
-            Signals: 1,331 in 180 days (7.4/day)
-            R/R: 6.81 (excellent)
-            Discovery: lookback=10 (classic), thresh=0.3 (vs 0.1) - looser threshold = exceptional
+        FIXES APPLIED (2026-01-02):
+        - Changed NO_SFP to NEUTRAL (proper signal naming)
+        - Expanded reversal detection window (2 → 3 bars)
+        - Allow reversal across multiple candles (not just same candle)
+        - Lowered threshold for more sensitivity (0.3 → 0.1)
+        - Improved SFP detection logic
         """
         self.timeframe = timeframe
         self.swing_lookback = lookback
         self.failure_threshold = failure_threshold_pct
+        self.reversal_window = reversal_window
     
     def find_swing_high(self, df: pd.DataFrame) -> Optional[float]:
         """Find recent swing high"""
@@ -70,76 +74,138 @@ class SwingFailurePattern:
         return float(recent['low'].min())
     
     def detect_bullish_sfp(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        """Detect bullish SFP (failed swing low)"""
-        if len(df) < self.swing_lookback + 3:
+        """
+        Detect bullish SFP (failed swing low)
+        
+        IMPROVED LOGIC:
+        - Check last N candles for break attempt
+        - Allow reversal across multiple candles
+        - More flexible detection
+        """
+        if len(df) < self.swing_lookback + self.reversal_window:
             return None
         
-        # Find swing low from earlier data
-        swing_low = self.find_swing_low(df.iloc[:-2])
+        # Find swing low from earlier data (exclude recent reversal window)
+        swing_low = self.find_swing_low(df.iloc[:-self.reversal_window])
         if swing_low is None:
             return None
         
-        # Check recent candles for failed break
-        recent = df.tail(2)
+        # Check recent candles for break attempt and reversal
+        recent = df.tail(self.reversal_window)
         
-        # Check if we briefly broke below swing low
-        broke_below = False
+        # Look for candle that broke below swing low
+        break_candle_idx = None
         failure_low = None
+        penetration_pct = 0
         
         for idx in range(len(recent)):
             if recent.iloc[idx]['low'] < swing_low:
-                penetration_pct = ((swing_low - recent.iloc[idx]['low']) / swing_low) * 100
-                if penetration_pct >= self.failure_threshold:
-                    broke_below = True
+                pct = ((swing_low - recent.iloc[idx]['low']) / swing_low) * 100
+                if pct >= self.failure_threshold:
+                    break_candle_idx = idx
                     failure_low = float(recent.iloc[idx]['low'])
-                    # Check if close is back above swing low (failure)
-                    if recent.iloc[idx]['close'] > swing_low:
-                        return {
-                            'type': 'BULLISH_SFP',
-                            'swing_low': swing_low,
-                            'failure_low': failure_low,
-                            'recovery_close': float(recent.iloc[idx]['close']),
-                            'penetration_pct': round(penetration_pct, 3),
-                            'timestamp': recent.iloc[idx]['timestamp']
-                        }
+                    penetration_pct = pct
+                    break
         
-        return None
-    
-    def detect_bearish_sfp(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        """Detect bearish SFP (failed swing high)"""
-        if len(df) < self.swing_lookback + 3:
+        # If no break, no SFP
+        if break_candle_idx is None:
             return None
         
-        # Find swing high from earlier data
-        swing_high = self.find_swing_high(df.iloc[:-2])
+        # Check for reversal: either same candle closes back above, 
+        # or subsequent candle(s) push back above swing low
+        reversal_found = False
+        recovery_close = None
+        
+        # Check if break candle itself closed back above (classic SFP)
+        if recent.iloc[break_candle_idx]['close'] > swing_low:
+            reversal_found = True
+            recovery_close = float(recent.iloc[break_candle_idx]['close'])
+        else:
+            # Check subsequent candles for reversal back above
+            for idx in range(break_candle_idx + 1, len(recent)):
+                if recent.iloc[idx]['close'] > swing_low:
+                    reversal_found = True
+                    recovery_close = float(recent.iloc[idx]['close'])
+                    break
+        
+        if not reversal_found:
+            return None
+        
+        return {
+            'type': 'BULLISH_SFP',
+            'swing_low': swing_low,
+            'failure_low': failure_low,
+            'recovery_close': recovery_close,
+            'penetration_pct': round(penetration_pct, 3),
+            'timestamp': recent.iloc[-1]['timestamp']
+        }
+    
+    def detect_bearish_sfp(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Detect bearish SFP (failed swing high)
+        
+        IMPROVED LOGIC:
+        - Check last N candles for break attempt
+        - Allow reversal across multiple candles
+        - More flexible detection
+        """
+        if len(df) < self.swing_lookback + self.reversal_window:
+            return None
+        
+        # Find swing high from earlier data (exclude recent reversal window)
+        swing_high = self.find_swing_high(df.iloc[:-self.reversal_window])
         if swing_high is None:
             return None
         
-        # Check recent candles for failed break
-        recent = df.tail(2)
+        # Check recent candles for break attempt and reversal
+        recent = df.tail(self.reversal_window)
         
-        # Check if we briefly broke above swing high
-        broke_above = False
+        # Look for candle that broke above swing high
+        break_candle_idx = None
         failure_high = None
+        penetration_pct = 0
         
         for idx in range(len(recent)):
             if recent.iloc[idx]['high'] > swing_high:
-                penetration_pct = ((recent.iloc[idx]['high'] - swing_high) / swing_high) * 100
-                if penetration_pct >= self.failure_threshold:
-                    broke_above = True
+                pct = ((recent.iloc[idx]['high'] - swing_high) / swing_high) * 100
+                if pct >= self.failure_threshold:
+                    break_candle_idx = idx
                     failure_high = float(recent.iloc[idx]['high'])
-                    # Check if close is back below swing high (failure)
-                    if recent.iloc[idx]['close'] < swing_high:
-                        return {
-                            'type': 'BEARISH_SFP',
-                            'swing_high': swing_high,
-                            'failure_high': failure_high,
-                            'recovery_close': float(recent.iloc[idx]['close']),
-                            'penetration_pct': round(penetration_pct, 3),
-                            'timestamp': recent.iloc[idx]['timestamp']
-                        }
+                    penetration_pct = pct
+                    break
         
-        return None
+        # If no break, no SFP
+        if break_candle_idx is None:
+            return None
+        
+        # Check for reversal: either same candle closes back below,
+        # or subsequent candle(s) push back below swing high
+        reversal_found = False
+        recovery_close = None
+        
+        # Check if break candle itself closed back below (classic SFP)
+        if recent.iloc[break_candle_idx]['close'] < swing_high:
+            reversal_found = True
+            recovery_close = float(recent.iloc[break_candle_idx]['close'])
+        else:
+            # Check subsequent candles for reversal back below
+            for idx in range(break_candle_idx + 1, len(recent)):
+                if recent.iloc[idx]['close'] < swing_high:
+                    reversal_found = True
+                    recovery_close = float(recent.iloc[idx]['close'])
+                    break
+        
+        if not reversal_found:
+            return None
+        
+        return {
+            'type': 'BEARISH_SFP',
+            'swing_high': swing_high,
+            'failure_high': failure_high,
+            'recovery_close': recovery_close,
+            'penetration_pct': round(penetration_pct, 3),
+            'timestamp': recent.iloc[-1]['timestamp']
+        }
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """Main analysis method"""
@@ -153,11 +219,11 @@ class SwingFailurePattern:
                 'confluence_factors': []
             }
         
-        if len(df) < self.swing_lookback + 5:
+        if len(df) < self.swing_lookback + self.reversal_window + 2:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': f'Need at least {self.swing_lookback + 5} bars'},
+                'metadata': {'error': f'Need at least {self.swing_lookback + self.reversal_window + 2} bars'},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -178,21 +244,31 @@ class SwingFailurePattern:
             active_sfp = bearish_sfp
             signal = 'BEARISH'
         
+        # FIXED: Return NEUTRAL instead of NO_SFP to avoid validation confusion
         if not active_sfp:
             return {
-                'signal': 'NO_SFP',
+                'signal': 'NEUTRAL',
                 'confidence': 0,
-                'metadata': {'error': 'No swing failure pattern detected'},
+                'metadata': {},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
-                'confluence_factors': ['No SFP - clean swings']
+                'confluence_factors': []
             }
         
-        # Calculate confidence
-        confidence = 90  # High confidence for SFP
-        if active_sfp['penetration_pct'] > 0.3:
-            confidence += 15
-        confidence = min(95, confidence)
+        # Calculate confidence based on penetration depth
+        # Deeper penetration = stronger SFP = higher confidence
+        base_confidence = 75  # Base for any SFP
+        
+        # Add confidence based on penetration
+        pen = active_sfp['penetration_pct']
+        if pen > 0.5:
+            base_confidence += 15  # Deep penetration
+        elif pen > 0.3:
+            base_confidence += 10  # Good penetration
+        elif pen > 0.1:
+            base_confidence += 5   # Minimal penetration
+        
+        confidence = min(95, base_confidence)
         
         # Build confluence factors
         confluence_factors = []

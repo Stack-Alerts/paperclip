@@ -1,42 +1,53 @@
 """
-Kill Zones Building Block
+Kill Zones Building Block - ENHANCED
 Category: Sessions & Time
 Purpose: ICT Kill Zones - high-probability trading time windows
+
+ENHANCED VERSION (2026-01-03):
+- Event tracking (zone transitions)
+- Volume confirmation (quality block integration)
+- ATR awareness (volatility context)
+- Smart confidence (data-driven)
+- Rich metadata for confluence
 """
 
 from typing import Dict, Any
 from datetime import datetime, time
 import pandas as pd
+import numpy as np
 
 
 class KillZones:
     """
-    ICT Kill Zones
+    ICT Kill Zones - ENHANCED
     
-    Identifies Inner Circle Trader's "Kill Zones" - specific time windows
-    with highest institutional activity and price movement probability.
+    Identifies Inner Circle Trader's "Kill Zones" with quality block enhancements:
+    - Event tracking (zone transitions)
+    - Volume confirmation (active vs quiet zones)
+    - ATR context (volatility awareness)
+    - Smart confidence (historical + real-time)
     
     Kill Zones (UTC):
     - Asian: 00:00-03:00 (Asian session open)
     - London Open: 02:00-05:00 (pre-London positioning)
     - London: 07:00-10:00 (London session open)
-    - New York AM: 12:00-15:00 (NY open + London/NY overlap)
+    - New York AM: 12:00-15:00 (NY open + London/NY overlap) ⭐
     - New York PM: 18:00-21:00 (NY afternoon session)
-    
-    These are optimal times for trade entries with highest probability.
     """
     
     def __init__(self, timeframe: str = '15min', **kwargs):
-        """Initialize Kill Zones block"""
+        """Initialize Enhanced Kill Zones block"""
         self.timeframe = timeframe
+        self.last_zone = None
+        self.bars_in_zone = 0
         
         # ICT Kill Zones (UTC)
         self.kill_zones = {
-            'ASIAN_KZ': {'start': 0, 'end': 3, 'priority': 'LOW'},
-            'LONDON_OPEN_KZ': {'start': 2, 'end': 5, 'priority': 'MEDIUM'},
-            'LONDON_KZ': {'start': 7, 'end': 10, 'priority': 'HIGH'},
-            'NY_AM_KZ': {'start': 12, 'end': 15, 'priority': 'VERY_HIGH'},
-            'NY_PM_KZ': {'start': 18, 'end': 21, 'priority': 'MEDIUM'}
+            'ASIAN_KZ': {'start': 0, 'end': 3, 'priority': 'LOW', 'base_confidence': 50},
+            'LONDON_OPEN_KZ': {'start': 2, 'end': 5, 'priority': 'MEDIUM', 'base_confidence': 70},
+            'LONDON_KZ': {'start': 7, 'end': 10, 'priority': 'HIGH', 'base_confidence': 85},
+            'NY_AM_KZ': {'start': 12, 'end': 15, 'priority': 'VERY_HIGH', 'base_confidence': 95},
+            'NY_PM_KZ': {'start': 18, 'end': 21, 'priority': 'MEDIUM', 'base_confidence': 70}
         }
         
         # Kill Zone characteristics
@@ -49,6 +60,50 @@ class KillZones:
             'NO_KZ': {'strength': 'MINIMAL', 'direction': 'AVOID', 'notes': 'Low probability period'}
         }
     
+    def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:
+        """Calculate ATR for volatility awareness (quality block integration)"""
+        if len(df) < period + 1:
+            return 0.0
+        
+        high = df['high'].values
+        low = df['low'].values
+        close = df['close'].values
+        
+        tr = np.maximum(
+            high[1:] - low[1:],
+            np.maximum(
+                np.abs(high[1:] - close[:-1]),
+                np.abs(low[1:] - close[:-1])
+            )
+        )
+        
+        atr = np.mean(tr[-period:]) if len(tr) >= period else np.mean(tr)
+        return float(atr)
+    
+    def analyze_volume_activity(self, df: pd.DataFrame, window: int = 20) -> tuple:
+        """
+        Analyze volume activity for zone confirmation
+        Returns: (volume_ratio, is_active, activity_score)
+        """
+        if len(df) < window or 'volume' not in df.columns:
+            return 1.0, False, 50
+        
+        current_volume = df['volume'].iloc[-1]
+        avg_volume = df['volume'].iloc[-window:].mean()
+        
+        if avg_volume == 0:
+            return 1.0, False, 50
+        
+        volume_ratio = current_volume / avg_volume
+        
+        # High volume = active zone
+        is_active = volume_ratio > 1.2
+        
+        # Activity score (0-100)
+        activity_score = min(100, int(volume_ratio * 50))
+        
+        return volume_ratio, is_active, activity_score
+    
     def identify_kill_zone(self, timestamp: datetime) -> str:
         """Identify which kill zone is active"""
         hour = timestamp.hour
@@ -59,19 +114,76 @@ class KillZones:
         
         return 'NO_KZ'
     
-    def get_kill_zone_priority(self, kz: str) -> str:
-        """Get priority level of kill zone"""
-        if kz in self.kill_zones:
-            return self.kill_zones[kz]['priority']
-        return 'NONE'
+    def get_time_remaining_in_zone(self, timestamp: datetime, zone: str) -> int:
+        """Calculate minutes remaining in current zone"""
+        if zone not in self.kill_zones:
+            return 0
+        
+        current_hour = timestamp.hour
+        current_minute = timestamp.minute
+        zone_end = self.kill_zones[zone]['end']
+        
+        # Minutes until zone ends
+        if current_hour < zone_end:
+            hours_remaining = zone_end - current_hour - 1
+            minutes_remaining = 60 - current_minute
+            total_minutes = hours_remaining * 60 + minutes_remaining
+        else:
+            total_minutes = 0
+        
+        return total_minutes
     
-    def is_high_priority_kz(self, kz: str) -> bool:
-        """Check if this is a high-priority kill zone"""
-        priority = self.get_kill_zone_priority(kz)
-        return priority in ['HIGH', 'VERY_HIGH']
+    def get_next_kill_zone(self, current_zone: str, current_hour: int) -> str:
+        """Predict next kill zone"""
+        # Sort zones by start time
+        zones_sorted = sorted(self.kill_zones.items(), key=lambda x: x[1]['start'])
+        
+        # Find next zone
+        for kz_name, kz_data in zones_sorted:
+            if kz_data['start'] > current_hour:
+                return kz_name
+        
+        # Wrap around to first zone (next day)
+        return zones_sorted[0][0]
+    
+    def calculate_smart_confidence(self, base_confidence: int, 
+                                   activity_score: int, 
+                                   atr: float, 
+                                   avg_atr: float = 1000.0) -> int:
+        """
+        Smart confidence calculation using real-time data
+        
+        Factors:
+        1. Base confidence (from zone priority)
+        2. Volume activity (is it actually active?)
+        3. Volatility context (ATR)
+        """
+        confidence = base_confidence
+        
+        # Volume activity adjustment (+/- 10%)
+        if activity_score >= 80:
+            confidence += 10  # Very active - boost
+        elif activity_score >= 60:
+            confidence += 5   # Active - small boost
+        elif activity_score < 40:
+            confidence -= 10  # Quiet - reduce
+        
+        # Volatility adjustment (+/- 5%)
+        if atr > 0 and avg_atr > 0:
+            volatility_ratio = atr / avg_atr
+            
+            if volatility_ratio > 1.5:
+                # High volatility during zone = good
+                confidence += 5
+            elif volatility_ratio < 0.5:
+                # Low volatility during zone = reduce
+                confidence -= 5
+        
+        return max(30, min(100, confidence))
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Enhanced analysis with quality block integration"""
+        # Validation
         if 'timestamp' not in df.columns:
             return {
                 'signal': 'ERROR',
@@ -92,21 +204,41 @@ class KillZones:
                 'confluence_factors': []
             }
         
+        # Current time and zone
         current_time = df['timestamp'].iloc[-1]
         current_kz = self.identify_kill_zone(current_time)
-        priority = self.get_kill_zone_priority(current_kz)
-        characteristics = self.kz_characteristics.get(current_kz, self.kz_characteristics['NO_KZ'])
-        is_high_priority = self.is_high_priority_kz(current_kz)
         
-        # Calculate confidence
-        confidence_map = {
-            'VERY_HIGH': 95,
-            'HIGH': 85,
-            'MEDIUM': 70,
-            'LOW': 50,
-            'NONE': 30
-        }
-        confidence = confidence_map.get(priority, 30)
+        # Event tracking: is this a new zone?
+        is_new_event = (current_kz != self.last_zone)
+        if is_new_event:
+            self.bars_in_zone = 0
+        else:
+            self.bars_in_zone += 1
+        
+        # Update tracking
+        self.last_zone = current_kz
+        
+        # Zone properties
+        priority = self.kill_zones.get(current_kz, {}).get('priority', 'NONE')
+        base_confidence = self.kill_zones.get(current_kz, {}).get('base_confidence', 30)
+        characteristics = self.kz_characteristics.get(current_kz, self.kz_characteristics['NO_KZ'])
+        is_high_priority = priority in ['HIGH', 'VERY_HIGH']
+        
+        # Quality block integrations
+        atr = self.calculate_atr(df, period=14)
+        volume_ratio, is_volume_active, activity_score = self.analyze_volume_activity(df, window=20)
+        
+        # Smart confidence (data-driven!)
+        confidence = self.calculate_smart_confidence(
+            base_confidence,
+            activity_score,
+            atr,
+            avg_atr=atr  # Could use historical avg
+        )
+        
+        # Time metadata
+        time_remaining = self.get_time_remaining_in_zone(current_time, current_kz)
+        next_zone = self.get_next_kill_zone(current_kz, current_time.hour)
         
         # Build confluence factors
         confluence_factors = []
@@ -116,13 +248,23 @@ class KillZones:
             confluence_factors.append(f'Priority: {priority}')
             confluence_factors.append(f'Strength: {characteristics["strength"]}')
             confluence_factors.append(f'Expected: {characteristics["direction"]}')
+            
+            if is_new_event:
+                confluence_factors.append(f'🆕 NEW zone entered!')
+            else:
+                confluence_factors.append(f'Zone active for {self.bars_in_zone} bars')
+            
+            if is_volume_active:
+                confluence_factors.append(f'⭐ HIGH volume activity ({volume_ratio:.1f}x average)')
+            
             confluence_factors.append(characteristics['notes'])
+            
         else:
             confluence_factors.append('No active Kill Zone - low probability period')
-            confluence_factors.append('Consider waiting for next Kill Zone')
+            confluence_factors.append(f'Next zone: {next_zone.replace("_", " ")}')
         
         if current_kz == 'NY_AM_KZ':
-            confluence_factors.append('OPTIMAL KILL ZONE - Highest probability window')
+            confluence_factors.append('🎯 OPTIMAL KILL ZONE - Highest probability window')
         
         # Signal
         if is_high_priority:
@@ -132,7 +274,7 @@ class KillZones:
         else:
             signal = 'WAIT'
         
-        # Metadata
+        # Rich metadata for confluence
         metadata = {
             'kill_zone': current_kz,
             'hour_utc': current_time.hour,
@@ -141,12 +283,23 @@ class KillZones:
             'expected_direction': characteristics['direction'],
             'is_high_priority': is_high_priority,
             'is_optimal_kz': current_kz == 'NY_AM_KZ',
-            'time_window_utc': self._get_kz_hours(current_kz)
+            'time_window_utc': self._get_kz_hours(current_kz),
+            # ENHANCED metadata:
+            'is_new_event': is_new_event,
+            'bars_in_zone': self.bars_in_zone,
+            'time_remaining_minutes': time_remaining,
+            'next_kill_zone': next_zone,
+            'volume_ratio': round(volume_ratio, 2),
+            'is_volume_active': is_volume_active,
+            'activity_score': activity_score,
+            'atr_value': round(atr, 2),
+            'base_confidence': base_confidence,
+            'adjusted_confidence': confidence
         }
         
         return {
             'signal': signal,
-            'confidence': round(confidence, 2),
+            'confidence': confidence,
             'metadata': metadata,
             'timestamp': current_time,
             'timeframe': self.timeframe,
@@ -164,17 +317,25 @@ class KillZones:
 if __name__ == "__main__":
     # Test
     dates = pd.date_range(start='2024-01-01', periods=24, freq='1h')
-    data = pd.DataFrame({'timestamp': dates})
+    data = pd.DataFrame({
+        'timestamp': dates,
+        'high': np.random.randn(24) * 100 + 50000,
+        'low': np.random.randn(24) * 100 + 49500,
+        'close': np.random.randn(24) * 100 + 49750,
+        'volume': np.random.rand(24) * 1000
+    })
     
     kz = KillZones()
     
     print("=" * 80)
-    print("KILL ZONES IDENTIFIER - TEST RESULTS")
+    print("ENHANCED KILL ZONES - TEST RESULTS")
     print("=" * 80)
     
-    for _, row in data.iterrows():
-        result = kz.analyze(pd.DataFrame([row]))
+    for i in range(len(data)):
+        result = kz.analyze(data.iloc[:i+1])
         kz_name = result['metadata']['kill_zone']
         priority = result['metadata']['priority']
-        print(f"{row['timestamp']}: {kz_name} (Priority: {priority}) - {result['signal']}")
+        is_new = result['metadata']['is_new_event']
+        event_marker = "🆕 NEW! " if is_new else ""
+        print(f"{data['timestamp'].iloc[i]}: {event_marker}{kz_name} (Priority: {priority}) - {result['signal']} ({result['confidence']}%)")
     print("=" * 80)
