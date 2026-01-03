@@ -1,4 +1,6 @@
 """
+ENHANCED WITH ADVANCED DATA (2026-01-03)
+"""
 Order Block Building Block
 Category: Advanced Price Action
 Purpose: Identify institutional order blocks (supply/demand zones)
@@ -8,6 +10,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 import pandas as pd
 import numpy as np
+from src.utils.advanced_data_loader import advanced_data
 
 
 class OrderBlock:

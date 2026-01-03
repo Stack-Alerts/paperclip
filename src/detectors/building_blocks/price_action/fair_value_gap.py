@@ -1,4 +1,6 @@
 """
+ENHANCED WITH ADVANCED DATA (2026-01-03)
+"""
 Fair Value Gap (FVG) Building Block
 Category: Advanced Price Action
 Purpose: Identify fair value gaps (price inefficiencies) - ICT/SMC concept
@@ -8,6 +10,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 import pandas as pd
 import numpy as np
+from src.utils.advanced_data_loader import advanced_data
 
 
 class FairValueGap:

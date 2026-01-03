@@ -14,6 +14,7 @@ from typing import Dict, Any
 from datetime import datetime
 import pandas as pd
 import numpy as np
+from src.utils.advanced_data_loader import advanced_data
 
 
 class RangeLiquidity:
