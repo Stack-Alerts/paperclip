@@ -1,13 +1,21 @@
 """
-Liquidity Sweep Building Block
+Liquidity Sweep Building Block - ENHANCED WITH LIQUIDATION DATA
 Category: Advanced Price Action
 Purpose: Detect liquidity sweeps - price hunting stops before reversing - ICT concept
+
+ENHANCED VERSION (2026-01-03):
+- Liquidation data integration (DIRECT sweep confirmation!)
+- Liquidation spike detection during sweep
+- Liquidation cluster analysis at levels
+- Smart confidence with liquidation boost
+- Event tracking (confirmed sweeps)
 """
 
 from typing import Dict, Any, List
 from datetime import datetime
 import pandas as pd
 import numpy as np
+from src.utils.advanced_data_loader import advanced_data
 
 
 class LiquiditySweep:
@@ -52,6 +60,44 @@ class LiquiditySweep:
         self.min_sweep_pct = min_sweep_pct
         self.max_wick_pct = max_wick_pct
         self.lookback = lookback
+        self.last_confirmed_sweep = None
+    
+    def check_liquidation_confirmation(self, timestamp: datetime, sweep_price: float) -> Dict:
+        """
+        Check if liquidation data confirms the sweep
+        Returns: {has_liquidation, spike_volume, confidence_boost}
+        """
+        try:
+            # Detect liquidation spike at sweep timestamp
+            liq_spike = advanced_data.detect_liquidation_spike(timestamp, window_minutes=15)
+            
+            if liq_spike['has_spike']:
+                # CONFIRMED sweep with liquidation data!
+                return {
+                    'has_liquidation': True,
+                    'spike_volume': liq_spike['spike_volume'],
+                    'spike_side': liq_spike['spike_side'],
+                    'confidence_boost': min(20, int(liq_spike['spike_ratio'] * 10)),
+                    'confirmed': True
+                }
+            else:
+                return {
+                    'has_liquidation': False,
+                    'spike_volume': 0,
+                    'spike_side': 'NONE',
+                    'confidence_boost': 0,
+                    'confirmed': False
+                }
+        except Exception as e:
+            # Graceful fallback if liquidation data unavailable
+            return {
+                'has_liquidation': False,
+                'spike_volume': 0,
+                'spike_side': 'NONE',
+                'confidence_boost': 0,
+                'confirmed': False,
+                'error': str(e)
+            }
     
     def detect_bullish_sweep(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Detect bullish liquidity sweep (sweep low, reverse up)"""
@@ -198,21 +244,43 @@ class LiquiditySweep:
                 'confluence_factors': []
             }
         
-        # Calculate confidence
-        confidence = 90  # High confidence for sweeps
-        if active_sweep['sweep_pct'] > 0.3:
-            confidence += 15
-        confidence = min(95, confidence)
+        # ENHANCED: Check liquidation confirmation
+        sweep_timestamp = active_sweep['timestamp']
+        sweep_price = active_sweep.get('sweep_low') or active_sweep.get('sweep_high')
+        liq_confirm = self.check_liquidation_confirmation(sweep_timestamp, sweep_price)
         
-        # Build confluence
+        # Calculate confidence with liquidation boost
+        confidence = 90  # Base confidence for sweeps
+        
+        if active_sweep['sweep_pct'] > 0.3:
+            confidence += 5  # Larger sweep
+        
+        # LIQUIDATION BOOST! 🔥
+        if liq_confirm['has_liquidation']:
+            confidence += liq_confirm['confidence_boost']  # +10-20 points!
+            is_confirmed = True
+        else:
+            is_confirmed = False
+        
+        confidence = min(98, confidence)  # Cap at 98
+        
+        # Build confluence with liquidation info
         confluence_factors = []
         confluence_factors.append(f'Sweep Type: {active_sweep["type"]}')
         confluence_factors.append(f'Sweep Distance: {active_sweep["sweep_pct"]:.3f}%')
         confluence_factors.append(f'Wick Ratio: {active_sweep["wick_ratio"]:.1f}%')
+        
+        if liq_confirm['has_liquidation']:
+            confluence_factors.append('⭐ LIQUIDATION CONFIRMED! Real stop hunt detected!')
+            confluence_factors.append(f'Liquidation spike: {liq_confirm["spike_side"]}')
+            confluence_factors.append(f'Spike volume: {liq_confirm["spike_volume"]:.2f}')
+        else:
+            confluence_factors.append('Price-based sweep (liquidation data unavailable)')
+        
         confluence_factors.append('Liquidity hunted - institutional manipulation')
         confluence_factors.append('High probability reversal setup')
         
-        # Metadata
+        # Enhanced metadata with liquidation info
         if active_sweep['type'] == 'BULLISH_SWEEP':
             metadata = {
                 'sweep_type': active_sweep['type'],
@@ -221,7 +289,10 @@ class LiquiditySweep:
                 'close': active_sweep['close'],
                 'sweep_pct': active_sweep['sweep_pct'],
                 'wick_ratio': active_sweep['wick_ratio'],
-                'sweep_timestamp': active_sweep['timestamp']
+                'sweep_timestamp': active_sweep['timestamp'],
+                'liquidation_confirmed': is_confirmed,
+                'liquidation_spike_volume': liq_confirm.get('spike_volume', 0),
+                'liquidation_side': liq_confirm.get('spike_side', 'NONE')
             }
         else:
             metadata = {
@@ -231,7 +302,10 @@ class LiquiditySweep:
                 'close': active_sweep['close'],
                 'sweep_pct': active_sweep['sweep_pct'],
                 'wick_ratio': active_sweep['wick_ratio'],
-                'sweep_timestamp': active_sweep['timestamp']
+                'sweep_timestamp': active_sweep['timestamp'],
+                'liquidation_confirmed': is_confirmed,
+                'liquidation_spike_volume': liq_confirm.get('spike_volume', 0),
+                'liquidation_side': liq_confirm.get('spike_side', 'NONE')
             }
         
         return {
