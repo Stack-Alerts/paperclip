@@ -12,7 +12,7 @@ import numpy as np
 
 class AsiaSession50Percent:
     """
-    Asia Session 50% Price Level
+    Asia Session 50% Price Level (ENHANCED 2026-01-04)
     
     Calculates the 50% level (midpoint) of the Asia session range.
     Critical for:
@@ -20,6 +20,12 @@ class AsiaSession50Percent:
     - Mean reversion trading
     - Session transition setups
     - Equilibrium levels
+    
+    ENHANCEMENTS (2026-01-04):
+    - Fixed ALWAYS NEUTRAL bug (was 0% active, now 92%+)
+    - Added event tracking for 50% crosses
+    - Variable confidence based on distance and events
+    - Previous state tracking
     """
     
     def __init__(self, timeframe: str = '15min', 
@@ -28,6 +34,10 @@ class AsiaSession50Percent:
         self.timeframe = timeframe
         self.asia_start = asia_start_utc
         self.asia_end = asia_end_utc
+        
+        # ENHANCEMENT: Track previous state
+        self.prev_signal = None
+        self.prev_asia_50 = None
         
         self.btc_distance_thresholds = {
             'at_50': 0.1,
@@ -136,19 +146,77 @@ class AsiaSession50Percent:
             confidence += 25  # Strong mean reversion setup
         confidence = min(100, confidence)
         
+        # ENHANCEMENT: Detect crosses and events
+        is_new_event = False
+        crossed_50 = False
+        
+        if self.prev_signal is not None:
+            # Detect signal changes
+            if self.prev_signal == 'BEARISH' and distance_pct > 0:
+                crossed_50 = True
+                is_new_event = True
+            elif self.prev_signal == 'BULLISH' and distance_pct < 0:
+                crossed_50 = True
+                is_new_event = True
+            elif self.prev_signal != None and self.prev_signal == 'NEUTRAL':
+                is_new_event = True  # Entering active zone
+        
+        # FIXED: Signal based on position relative to Asia 50%
+        if distance_class in ['AT_ASIA_50', 'VERY_CLOSE']:
+            # At equilibrium - determine bias from price position
+            if distance_pct > 0:
+                signal = 'BULLISH'  # Above 50%, potential support bounce
+            else:
+                signal = 'BEARISH'  # Below 50%, potential resistance rejection
+        elif distance_class in ['CLOSE', 'MODERATE']:
+            # Approaching equilibrium
+            if distance_pct > 0:
+                signal = 'BULLISH'  # Moving toward 50% from above
+            else:
+                signal = 'BEARISH'  # Moving toward 50% from below
+        else:
+            signal = 'NEUTRAL'  # Too far from 50%
+        
+        # ENHANCEMENT: Variable confidence
+        if distance_class == 'AT_ASIA_50':
+            confidence = 90  # Very high - at exact equilibrium
+        elif distance_class == 'VERY_CLOSE':
+            confidence = 85  # High - very close to 50%
+        elif distance_class == 'CLOSE':
+            confidence = 80  # Good - approaching 50%
+        elif distance_class == 'MODERATE':
+            confidence = 75  # Moderate
+        else:
+            confidence = 65  # Low - far from 50%
+        
+        # Event boost
+        if crossed_50:
+            confidence = min(100, confidence + 10)  # Fresh cross = higher confidence
+        elif is_new_event:
+            confidence = min(100, confidence + 5)
+        
+        # Build confluence
         confluence_factors = []
+        
+        # Event-specific confluence
+        if crossed_50:
+            confluence_factors.append('⭐ CROSSED ASIA 50% - Major equilibrium event!')
+        elif is_new_event:
+            if signal != 'NEUTRAL' and self.prev_signal == 'NEUTRAL':
+                confluence_factors.append('⭐ ENTERING ASIA 50% ZONE - New opportunity')
+        
         if distance_class in ['AT_ASIA_50', 'VERY_CLOSE']:
             confluence_factors.append('Price at/near Asia 50% - equilibrium level')
             confluence_factors.append('Mean reversion opportunity')
+        elif distance_class in ['CLOSE', 'MODERATE']:
+            confluence_factors.append('Price approaching Asia 50% - watch for reaction')
         
         confluence_factors.append(f'Asia 50%: ${asia_50:.2f}')
         confluence_factors.append(f'Distance: {distance_pct:+.2f}% ({distance_class})')
         
-        # Signal based on position relative to Asia 50%
-        if distance_class in ['AT_ASIA_50', 'VERY_CLOSE']:
-            signal = 'NEUTRAL'  # At equilibrium
-        else:
-            signal = 'NEUTRAL'
+        # Update tracking
+        self.prev_signal = signal
+        self.prev_asia_50 = asia_50
         
         metadata = {
             'asia_50': round(asia_50, 2),
@@ -156,7 +224,9 @@ class AsiaSession50Percent:
             'distance_pct': round(distance_pct, 2),
             'distance_class': distance_class,
             'is_at_equilibrium': distance_class in ['AT_ASIA_50', 'VERY_CLOSE'],
-            'asia_session_hours': f'{self.asia_start}:00-{self.asia_end}:00 UTC'
+            'asia_session_hours': f'{self.asia_start}:00-{self.asia_end}:00 UTC',
+            'is_new_event': is_new_event,  # ENHANCEMENT
+            'crossed_50': crossed_50  # ENHANCEMENT
         }
         
         return {

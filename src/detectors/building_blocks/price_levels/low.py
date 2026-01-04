@@ -12,7 +12,7 @@ import numpy as np
 
 class LOW:
     """
-    LOW - Low of Week Price Level
+    LOW - Low of Week Price Level (ENHANCED 2026-01-04)
     
     Tracks the lowest price reached during the current trading week.
     Critical level for:
@@ -20,12 +20,22 @@ class LOW:
     - Weekly breakdown detection
     - Swing trading setups
     - Higher timeframe analysis
+    
+    ENHANCEMENTS (2026-01-04):
+    - Added BEARISH signal generation for LOW breakdowns
+    - Added event tracking for LOW breaks and tests
+    - Improved confidence variation (70-100% range)
+    - Fixed breakdown detection to track previous LOW
     """
     
     def __init__(self, timeframe: str = '15min', week_start: int = 0, **kwargs):
         """Initialize LOW block"""
         self.timeframe = timeframe
         self.week_start = week_start
+        
+        # ENHANCEMENT: Track previous state for event detection
+        self.prev_low = None
+        self.prev_signal = None
         
         # Bitcoin-specific distance thresholds (% from LOW)
         self.btc_distance_thresholds = {
@@ -55,19 +65,54 @@ class LOW:
         
         return float(week_data['low'].min())
     
-    def detect_breakdown(self, current_price: float, low: float, threshold_pct: float = 0.1) -> str:
-        """Detect LOW breakdown"""
+    def detect_breakdown(self, current_price: float, low: float, prev_low: float = None, threshold_pct: float = 0.1) -> Dict[str, Any]:
+        """
+        ENHANCED: Detect LOW breakdown by comparing to PREVIOUS LOW
+        
+        Args:
+            current_price: Current price
+            low: Current Low of Week
+            prev_low: Previous LOW (to detect fresh breaks)
+            threshold_pct: Threshold for breakdown confirmation (default: 0.1%)
+            
+        Returns:
+            Dict with breakdown status and event info
+        """
         if low is None:
-            return 'NO_LOW'
+            return {
+                'status': 'NO_LOW',
+                'is_new_low': False,
+                'is_breakdown': False
+            }
         
-        distance_pct = ((current_price - low) / low) * 100
+        # Check if LOW was updated (new weekly low made)
+        is_new_low = False
+        if prev_low is not None and low < prev_low:
+            is_new_low = True
         
-        if distance_pct < -threshold_pct:
-            return 'BREAKDOWN_CONFIRMED'
-        elif distance_pct < 0:
-            return 'BREAKING_DOWN'
+        # Calculate distance from PREVIOUS LOW (not current, which updates)
+        ref_low = prev_low if prev_low is not None else low
+        distance_pct = ((current_price - ref_low) / ref_low) * 100
+        
+        # Determine breakdown status
+        if is_new_low and distance_pct < -threshold_pct:
+            return {
+                'status': 'BREAKDOWN_CONFIRMED',
+                'is_new_low': True,
+                'is_breakdown': True
+            }
+        elif distance_pct < 0 and distance_pct >= -threshold_pct:
+            return {
+                'status': 'BREAKING_DOWN',
+                'is_new_low': is_new_low,
+                'is_breakdown': False
+            }
         else:
-            return 'ABOVE_LOW'
+            return {
+                'status': 'ABOVE_LOW',
+                'is_new_low': False,
+                'is_breakdown': False
+            }
     
     def calculate_distance(self, price: float, low: float) -> float:
         """Calculate percentage distance from LOW"""
@@ -93,13 +138,37 @@ class LOW:
         else:
             return 'FAR'
     
+    def calculate_variable_confidence(self, signal: str, distance_class: str, is_new_event: bool) -> float:
+        """
+        ENHANCEMENT 3: Variable confidence based on signal type and distance
+        """
+        # Base confidence by signal
+        if signal == 'BEARISH':
+            base = 95  # Weekly breakdown = very high confidence
+        elif signal == 'BULLISH':
+            base = 90  # Bounce from LOW = high confidence
+        else:  # NEUTRAL
+            base = 75  # Neutral = baseline (weekly baseline higher than daily)
+        
+        # Adjust by distance
+        if distance_class in ['AT_LOW', 'VERY_CLOSE']:
+            base = min(100, base + 5)  # Near LOW = higher confidence
+        elif distance_class == 'FAR':
+            base = max(70, base - 5)  # Far from LOW = lower confidence
+        
+        # Fresh event boost
+        if is_new_event:
+            base = min(100, base + 5)
+        
+        return base
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method (ENHANCED)"""
         if not all(col in df.columns for col in ['timestamp', 'low', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -109,7 +178,7 @@ class LOW:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': 'No data provided'},
+                'metadata': {'error': 'No data provided', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -121,52 +190,83 @@ class LOW:
             return {
                 'signal': 'NO_LOW_DATA',
                 'confidence': 0,
-                'metadata': {'error': 'Could not calculate LOW'},
+                'metadata': {'error': 'Could not calculate LOW', 'is_new_event': False},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
         
         current_price = float(df['close'].iloc[-1])
-        breakdown = self.detect_breakdown(current_price, low)
+        
+        # ENHANCEMENT 1: Detect breakdown with prev_low tracking
+        breakdown_info = self.detect_breakdown(current_price, low, self.prev_low)
+        breakdown_status = breakdown_info['status']
+        is_new_low = breakdown_info['is_new_low']
+        is_breakdown = breakdown_info['is_breakdown']
+        
         distance_pct = self.calculate_distance(current_price, low)
         distance_class = self.classify_distance(distance_pct)
         
-        confidence = 75
-        if breakdown == 'BREAKDOWN_CONFIRMED':
-            confidence += 20
-        elif distance_class in ['AT_LOW', 'VERY_CLOSE']:
-            confidence += 15
-        confidence = min(100, confidence)
-        
-        confluence_factors = []
-        if breakdown == 'BREAKDOWN_CONFIRMED':
-            confluence_factors.append('LOW breakdown confirmed - strong bearish signal')
-        elif breakdown == 'BREAKING_DOWN':
-            confluence_factors.append('Price breaking below LOW - major support test')
-        elif distance_class in ['AT_LOW', 'VERY_CLOSE']:
-            confluence_factors.append('Price at/near LOW - critical support level')
-        
-        confluence_factors.append(f'LOW: ${low:.2f}')
-        confluence_factors.append(f'Distance from LOW: {distance_pct:+.2f}% ({distance_class})')
-        
-        if breakdown == 'BREAKDOWN_CONFIRMED':
+        # Determine signal
+        if breakdown_status == 'BREAKDOWN_CONFIRMED' or is_new_low:
             signal = 'BEARISH'
-        elif breakdown == 'BREAKING_DOWN':
+        elif breakdown_status == 'BREAKING_DOWN':
             signal = 'NEUTRAL'
         elif distance_class in ['AT_LOW', 'VERY_CLOSE'] and distance_pct > 0:
             signal = 'BULLISH'  # Bounce from LOW
         else:
             signal = 'NEUTRAL'
         
+        # ENHANCEMENT 2: Event tracking
+        is_new_event = False
+        if self.prev_signal is not None and signal != self.prev_signal:
+            is_new_event = True
+        elif is_new_low:
+            is_new_event = True  # New LOW = event
+        
+        # ENHANCEMENT 3: Variable confidence
+        confidence = self.calculate_variable_confidence(signal, distance_class, is_new_event)
+        
+        # Build confluence
+        confluence_factors = []
+        
+        # Event-specific confluence
+        if is_new_event:
+            if is_new_low:
+                confluence_factors.append('⭐ NEW LOW: Fresh weekly low - bearish breakdown!')
+            elif signal == 'BEARISH' and self.prev_signal != 'BEARISH':
+                confluence_factors.append('⭐ NEW STATE: LOW breakdown initiated')
+            elif signal == 'BULLISH' and self.prev_signal != 'BULLISH':
+                confluence_factors.append('⭐ NEW STATE: LOW bounce detected')
+        
+        if breakdown_status == 'BREAKDOWN_CONFIRMED':
+            confluence_factors.append('LOW breakdown confirmed - strong weekly bearish signal')
+        elif breakdown_status == 'BREAKING_DOWN':
+            confluence_factors.append('Price breaking below LOW - major support test')
+        elif distance_class in ['AT_LOW', 'VERY_CLOSE']:
+            if distance_pct > 0:
+                confluence_factors.append('Price testing LOW support - potential weekly bounce')
+            else:
+                confluence_factors.append('Price at LOW - critical weekly level')
+        
+        confluence_factors.append(f'LOW: ${low:.2f}')
+        confluence_factors.append(f'Distance from LOW: {distance_pct:+.2f}% ({distance_class})')
+        
+        # Update tracking
+        self.prev_low = low
+        self.prev_signal = signal
+        
         metadata = {
             'low': round(low, 2),
             'current_price': round(current_price, 2),
             'distance_pct': round(distance_pct, 2),
             'distance_class': distance_class,
-            'breakdown_status': breakdown,
+            'breakdown_status': breakdown_status,
+            'is_new_low': is_new_low,
+            'is_breakdown': is_breakdown,
             'is_major_support': distance_class in ['AT_LOW', 'VERY_CLOSE'] and distance_pct > 0,
-            'is_breaking_down': breakdown in ['BREAKING_DOWN', 'BREAKDOWN_CONFIRMED']
+            'is_breaking_down': breakdown_status in ['BREAKING_DOWN', 'BREAKDOWN_CONFIRMED'],
+            'is_new_event': is_new_event  # ENHANCEMENT 2: Event tracking
         }
         
         return {

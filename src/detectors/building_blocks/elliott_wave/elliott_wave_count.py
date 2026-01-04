@@ -3,6 +3,19 @@ Elliott Wave Count Building Block
 Category: Elliott Wave Pattern Recognition
 Purpose: Identifies 5-wave impulse and 3-wave corrective patterns
 Multi-Timeframe Enhanced: Uses HTF for context, LTF for timing
+
+COMPLETE DOCUMENTATION:
+    docs/v3/building_blocks/ELLIOTT_WAVE_COUNT_COMPLETE_GUIDE.md
+    
+    Includes:
+    - Wave structure & signals (Wave 1-5)
+    - Pivot placement guide
+    - Fibonacci integration (entry/exit targets)
+    - Trade entry/exit strategies
+    - Risk management per wave
+    - Real-world examples
+    - Common pitfalls & solutions
+    - 15min trading using 4H/Daily signals
 """
 
 from typing import Dict, Any, List, Optional
@@ -59,8 +72,142 @@ class ElliottWaveCount:
         
         return pivots
     
+    def identify_current_wave(self, pivots: List[Dict]) -> Dict[str, Any]:
+        """
+        CONTINUOUS WAVE TRACKING: Always identify current wave position
+        
+        Returns current wave (1-5 or ABC), direction, confidence
+        """
+        if len(pivots) < 2:
+            return {'wave': 'UNKNOWN', 'direction': None, 'confidence': 0, 'phase': 'INSUFFICIENT_DATA'}
+        
+        # Try to identify wave position from recent pivots
+        recent = pivots[-8:] if len(pivots) >= 8 else pivots  # Look back further
+        structure = [p['type'] for p in recent]
+        
+        # Analyze what we have
+        wave_info = self.detect_wave_pattern(pivots)
+        
+        # If we found a complete pattern, use it
+        if wave_info['wave'] is not None:
+            return wave_info
+        
+        # Otherwise, estimate current position
+        # Count alternating pivots to estimate wave
+        if len(recent) >= 2:
+            last_type = recent[-1]['type']
+            
+            # Simple heuristic: Count how many pivots we have
+            # 2 pivots (L H or H L) = Wave 1
+            # 3-4 pivots = Wave 2-3
+            # 5-6 pivots = Wave 4-5
+            
+            if len(recent) == 2:
+                if structure == ['LOW', 'HIGH']:
+                    return {'wave': 1, 'direction': 'BULLISH', 'confidence': 50, 'phase': 'WAVE_1_FORMING', 'pattern': 'IMPULSE_EARLY'}
+                elif structure == ['HIGH', 'LOW']:
+                    return {'wave': 1, 'direction': 'BEARISH', 'confidence': 50, 'phase': 'WAVE_1_FORMING', 'pattern': 'IMPULSE_EARLY'}
+            
+            elif len(recent) >= 3:
+                # Check if we're in correction (Wave 2 or 4)
+                if structure[-3:] == ['HIGH', 'LOW', 'HIGH']:  # Potential Wave 2 bullish
+                    return {'wave': 2, 'direction': 'BULLISH', 'confidence': 55, 'phase': 'WAVE_2_CORRECTION', 'pattern': 'IMPULSE_FORMING'}
+                elif structure[-3:] == ['LOW', 'HIGH', 'LOW']:  # Potential Wave 2 bearish
+                    return {'wave': 2, 'direction': 'BEARISH', 'confidence': 55, 'phase': 'WAVE_2_CORRECTION', 'pattern': 'IMPULSE_FORMING'}
+        
+        # Default: uncertain
+        return {'wave': 'UNCERTAIN', 'direction': None, 'confidence': 34, 'phase': 'WAVE_UNCLEAR', 'pattern': 'DEVELOPING'}
+    
+    def detect_wave_pattern(self, pivots: List[Dict]) -> Dict[str, Any]:
+        """
+        ENHANCED: Detect Elliott Wave patterns with proper rules
+        
+        Returns wave count, direction, and validation
+        """
+        if len(pivots) < 6:
+            return {'wave': None, 'direction': None, 'confidence': 0}
+        
+        recent = pivots[-6:]
+        structure = [p['type'] for p in recent]
+        
+        # BULLISH 5-wave impulse: L H L H L H
+        if structure == ['LOW', 'HIGH', 'LOW', 'HIGH', 'LOW', 'HIGH']:
+            w1_size = recent[1]['price'] - recent[0]['price']
+            w2_size = recent[1]['price'] - recent[2]['price']  # Retracement
+            w3_size = recent[3]['price'] - recent[2]['price']
+            w4_size = recent[3]['price'] - recent[4]['price']  # Retracement
+            w5_size = recent[5]['price'] - recent[4]['price']
+            
+            # Elliott Wave rules
+            valid_w3 = w3_size > w1_size  # Wave 3 longest
+            valid_w2 = w2_size < w1_size * 0.9  # Wave 2 doesn't retrace >90%
+            valid_w4 = w4_size < w3_size * 0.5  # Wave 4 shallow
+            
+            if valid_w3 and valid_w2 and valid_w4:
+                return {
+                    'wave': 5,
+                    'direction': 'BULLISH',
+                    'confidence': 80,
+                    'w3_extension': round((w3_size / w1_size - 1) * 100, 2),
+                    'pattern': 'IMPULSE'
+                }
+        
+        # BEARISH 5-wave impulse: H L H L H L
+        elif structure == ['HIGH', 'LOW', 'HIGH', 'LOW', 'HIGH', 'LOW']:
+            w1_size = recent[0]['price'] - recent[1]['price']
+            w2_size = recent[2]['price'] - recent[1]['price']  # Retracement
+            w3_size = recent[2]['price'] - recent[3]['price']
+            w4_size = recent[4]['price'] - recent[3]['price']  # Retracement
+            w5_size = recent[4]['price'] - recent[5]['price']
+            
+            valid_w3 = w3_size > w1_size
+            valid_w2 = w2_size < w1_size * 0.9
+            valid_w4 = w4_size < w3_size * 0.5
+            
+            if valid_w3 and valid_w2 and valid_w4:
+                return {
+                    'wave': 5,
+                    'direction': 'BEARISH',
+                    'confidence': 80,
+                    'w3_extension': round((w3_size / w1_size - 1) * 100, 2),
+                    'pattern': 'IMPULSE'
+                }
+        
+        # Check for Wave 3 in progress (4 pivots)
+        if len(pivots) >= 4:
+            recent4 = pivots[-4:]
+            structure4 = [p['type'] for p in recent4]
+            
+            # Bullish Wave 3: L H L H
+            if structure4 == ['LOW', 'HIGH', 'LOW', 'HIGH']:
+                w1 = recent4[1]['price'] - recent4[0]['price']
+                w3 = recent4[3]['price'] - recent4[2]['price']
+                if w3 > w1:  # Wave 3 extending
+                    return {
+                        'wave': 3,
+                        'direction': 'BULLISH',
+                        'confidence': 70,
+                        'w3_extension': round((w3 / w1 - 1) * 100, 2),
+                        'pattern': 'IMPULSE_FORMING'
+                    }
+            
+            # Bearish Wave 3: H L H L
+            elif structure4 == ['HIGH', 'LOW', 'HIGH', 'LOW']:
+                w1 = recent4[0]['price'] - recent4[1]['price']
+                w3 = recent4[2]['price'] - recent4[3]['price']
+                if w3 > w1:
+                    return {
+                        'wave': 3,
+                        'direction': 'BEARISH',
+                        'confidence': 70,
+                        'w3_extension': round((w3 / w1 - 1) * 100, 2),
+                        'pattern': 'IMPULSE_FORMING'
+                    }
+        
+        return {'wave': None, 'direction': None, 'confidence': 0}
+    
     def analyze_single_timeframe(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Analyze single timeframe (original logic)"""
+        """ENHANCED: Analyze single timeframe with proper wave detection"""
         if len(df) < 50:
             return {
                 'signal': 'INSUFFICIENT_DATA',
@@ -71,62 +218,100 @@ class ElliottWaveCount:
                 'confluence_factors': []
             }
         
-        pivots = self.find_pivots(df)
+        # FIXED: Use lookback=5 for 4H (was too sensitive at 3)
+        pivots = self.find_pivots(df, lookback=5)
         
-        if len(pivots) < 6:
+        if len(pivots) < 4:
             return {
-                'signal': 'NO_PATTERN',
-                'confidence': 0,
-                'metadata': {},
+                'signal': 'INSUFFICIENT_PIVOTS',
+                'confidence': 34,  # Enough data but no pattern yet
+                'metadata': {'pivot_count': len(pivots), 'status': 'too_few_pivots'},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
-                'confluence_factors': []
+                'confluence_factors': [f'Only {len(pivots)} pivots found (need 4+)']
             }
         
-        # Simplified wave detection - look for 5-wave structure
-        recent_pivots = pivots[-6:]
+        # ENHANCED: Always identify current wave position
+        wave_info = self.identify_current_wave(pivots)
         
-        # Check for alternating highs/lows
-        wave_structure = [p['type'] for p in recent_pivots]
+        if wave_info['wave'] == 'UNKNOWN' or wave_info['wave'] == 'UNCERTAIN':
+            # Not enough data for wave count
+            return {
+                'signal': 'WAVE_UNCERTAIN',
+                'confidence': wave_info.get('confidence', 34),
+                'metadata': {
+                    'wave_count': wave_info.get('wave', 'UNKNOWN'),
+                    'pivot_count': len(pivots),
+                    'phase': wave_info.get('phase', 'UNCLEAR'),
+                    'last_6_pivots': [p['type'] for p in pivots[-6:]] if len(pivots) >= 6 else [p['type'] for p in pivots]
+                },
+                'timestamp': df['timestamp'].iloc[-1],
+                'timeframe': self.timeframe,
+                'confluence_factors': [f'{len(pivots)} pivots - wave position unclear']
+            }
         
-        # Bullish 5-wave: LOW, HIGH, LOW, HIGH, LOW, HIGH
-        if len(wave_structure) == 6 and wave_structure == ['LOW', 'HIGH', 'LOW', 'HIGH', 'LOW', 'HIGH']:
-            wave_3_size = recent_pivots[3]['price'] - recent_pivots[2]['price']
-            wave_1_size = recent_pivots[1]['price'] - recent_pivots[0]['price']
-            
-            # Wave 3 should be longer than wave 1
-            if wave_3_size > wave_1_size:
-                signal = 'WAVE_5_FORMING'
-                confidence = 80
-                
-                confluence_factors = []
-                confluence_factors.append("5-wave impulse pattern detected")
-                confluence_factors.append(f"Wave 3 larger than Wave 1 (valid)")
-                confluence_factors.append("Wave 5 forming - potential top")
-                
-                metadata = {
-                    'pattern_type': 'ELLIOTT_5_WAVE',
-                    'wave_count': 5,
-                    'wave_3_extension': round((wave_3_size / wave_1_size - 1) * 100, 2),
-                    'expected_completion': 'Wave 5 near completion'
-                }
-                
-                return {
-                    'signal': signal,
-                    'confidence': confidence,
-                    'metadata': metadata,
-                    'timestamp': df['timestamp'].iloc[-1],
-                    'timeframe': self.timeframe,
-                    'confluence_factors': confluence_factors
-                }
+        # ENHANCED: Build signal based on current wave position
+        direction = wave_info['direction']
+        wave_num = wave_info['wave']
+        confidence = wave_info['confidence']
+        phase = wave_info.get('phase', 'UNKNOWN')
+        
+        # Build signal name
+        if wave_num == 5:
+            signal = f'WAVE_5_{direction}'
+            confluence_factors = [
+                f"⭐ {direction} Wave 5 complete",
+                f"Wave 3 extended {wave_info.get('w3_extension', 0)}%",
+                f"Expect reversal - major exhaustion"
+            ]
+        elif wave_num == 3:
+            signal = f'WAVE_3_{direction}'
+            confluence_factors = [
+                f"✅ {direction} Wave 3 in progress",
+                f"Wave 3 extending {wave_info.get('w3_extension', 0)}%",
+                f"Strong trend - continuation expected"
+            ]
+        elif wave_num == 4:
+            signal = f'WAVE_4_{direction}'
+            confluence_factors = [
+                f"Wave 4 correction ({direction})",
+                f"Shallow pullback expected",
+                f"Wave 5 coming next"
+            ]
+        elif wave_num == 2:
+            signal = f'WAVE_2_{direction}'
+            confluence_factors = [
+                f"Wave 2 correction ({direction})",
+                f"Pullback after Wave 1",
+                f"Wave 3 (strongest) coming"
+            ]
+        elif wave_num == 1:
+            signal = f'WAVE_1_{direction}'
+            confluence_factors = [
+                f"Wave 1 forming ({direction})",
+                f"New impulse starting",
+                f"Early trend detection"
+            ]
+        else:
+            signal = f'{phase}'
+            confluence_factors = [f'Wave position: {phase}']
+        
+        metadata = {
+            'wave_count': wave_num,
+            'direction': direction,
+            'phase': phase,
+            'pattern': wave_info.get('pattern'),
+            'w3_extension': wave_info.get('w3_extension'),
+            'pivot_count': len(pivots)
+        }
         
         return {
-            'signal': 'PATTERN_IN_PROGRESS',
-            'confidence': 40,
-            'metadata': {'pivot_count': len(recent_pivots)},
+            'signal': signal,
+            'confidence': confidence,
+            'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe,
-            'confluence_factors': ['Wave structure developing']
+            'confluence_factors': confluence_factors
         }
     
     def analyze_multi_timeframe(self, df_4h: pd.DataFrame, df_1d: pd.DataFrame) -> Dict[str, Any]:
@@ -168,28 +353,86 @@ class ElliottWaveCount:
         booster_value = 0
         confluence_factors = []
         
-        # Check Daily + 4H alignment (HTF focus)
-        if daily_result['signal'] == 'WAVE_5_FORMING' and h4_result['signal'] == 'WAVE_5_FORMING':
+        # ENHANCED: Check for ALL wave types (1-5)
+        daily_sig = daily_result.get('signal', '')
+        h4_sig = h4_result.get('signal', '')
+        
+        # Extract wave numbers and directions
+        daily_wave = daily_result.get('metadata', {}).get('wave_count')
+        h4_wave = h4_result.get('metadata', {}).get('wave_count')
+        
+        # Check Daily + 4H alignment (HTF focus) - ALL WAVES
+        if daily_wave == 5 and h4_wave == 5:
             alignment_score = 100  # PERFECT
             booster_value = 75  # ULTRA
-            confluence_factors.append('ULTRA: Daily + 4H Wave 5 alignment!')
-            signal = 'WAVE_5_FORMING_DAILY'
+            confluence_factors.append('⭐ ULTRA: Daily + 4H Wave 5 alignment!')
+            signal = daily_sig
             
-        elif daily_result['signal'] == 'WAVE_5_FORMING':
+        elif daily_wave == 5:
             alignment_score = 85  # STRONG
             booster_value = 50  # MAJOR
-            confluence_factors.append('Strong: Daily Wave 5 detected')
-            signal = 'WAVE_5_FORMING_DAILY'
+            confluence_factors.append('⭐ Strong: Daily Wave 5 detected')
+            signal = daily_sig
             
-        elif h4_result['signal'] == 'WAVE_5_FORMING':
+        elif h4_wave == 5:
             alignment_score = 70  # GOOD
             booster_value = 30  # Strong
             confluence_factors.append('Good: 4H Wave 5 detected')
-            signal = 'WAVE_5_FORMING_4H'
+            signal = h4_sig
             
+        elif daily_wave == 3 and h4_wave == 3:
+            alignment_score = 85  # Strong trend
+            booster_value = 40  # Good
+            confluence_factors.append('Strong: Daily + 4H Wave 3 alignment')
+            signal = daily_sig
+            
+        elif daily_wave == 3:
+            alignment_score = 70
+            booster_value = 25
+            confluence_factors.append('Daily Wave 3 in progress')
+            signal = daily_sig
+            
+        elif h4_wave == 3:
+            alignment_score = 60
+            booster_value = 15
+            confluence_factors.append('4H Wave 3 in progress')
+            signal = h4_sig
+            
+        # NEW: Handle Wave 1, 2, 4 with lower booster values
+        elif daily_wave in [1, 2, 4] or h4_wave in [1, 2, 4]:
+            # Prefer Daily over 4H
+            if daily_wave in [1, 2, 4]:
+                signal = daily_sig
+                wave = daily_wave
+                alignment_score = 55
+            else:
+                signal = h4_sig
+                wave = h4_wave
+                alignment_score = 50
+            
+            # Small booster for early waves
+            if wave == 4:
+                booster_value = 10  # Wave 4 = Wave 5 coming
+                confluence_factors.append(f'HTF Wave 4 - Wave 5 next')
+            elif wave == 2:
+                booster_value = 5  # Wave 2 = Wave 3 coming
+                confluence_factors.append(f'HTF Wave 2 - Wave 3 coming')
+            elif wave == 1:
+                booster_value = 3  # Wave 1 = early trend
+                confluence_factors.append(f'HTF Wave 1 - trend starting')
+        
+        # Fallback: Use Daily if it has any signal, otherwise 4H
+        elif daily_sig not in ['WAVE_UNCERTAIN', 'NO_PATTERN', 'INSUFFICIENT_PIVOTS']:
+            signal = daily_sig
+            alignment_score = 45
+            confluence_factors.append(f'HTF wave detected: {daily_sig}')
+        elif h4_sig not in ['WAVE_UNCERTAIN', 'NO_PATTERN', 'INSUFFICIENT_PIVOTS']:
+            signal = h4_sig
+            alignment_score = 42
+            confluence_factors.append(f'4H wave detected: {h4_sig}')
         else:
-            signal = 'PATTERN_IN_PROGRESS'
-            confluence_factors.append('No significant HTF wave alignment')
+            signal = daily_sig  # Pass through whatever Daily has
+            confluence_factors.append('HTF analysis in progress')
         
         # Calculate weighted MTF confidence (HTF ONLY: Daily 60%, 4H 40%)
         daily_conf = daily_result.get('confidence', 0)

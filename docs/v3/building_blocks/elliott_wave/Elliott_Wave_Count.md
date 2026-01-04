@@ -2,6 +2,34 @@
 
 **Block Number:** 51/66 | **Category:** Elliott Wave | **Version:** 2.0 MTF | **Status:** ✅ Production Ready
 
+---
+
+## 📚 COMPLETE TRADING GUIDE
+
+**For comprehensive Elliott Wave trading strategies, see:**
+
+**[ELLIOTT WAVE COUNT - COMPLETE GUIDE](../ELLIOTT_WAVE_COUNT_COMPLETE_GUIDE.md)**
+
+This 60+ page guide includes:
+- ✅ Wave structure & signals (Wave 1-5 detailed)
+- ✅ Pivot placement guide (how pivots are detected)
+- ✅ Fibonacci integration (complete with examples)
+  - Wave 2 entry targets (50-61.8%)
+  - Wave 3 profit targets (1.618x)
+  - Wave 4 correction targets (23.6-38.2%)
+  - Wave 5 exit targets (= Wave 1)
+- ✅ Trade entry & exit strategies (per wave)
+- ✅ Risk management (position sizing per wave)
+- ✅ **15min trading using 4H/Daily signals** ⭐
+- ✅ Real-world examples (complete trade walkthroughs)
+- ✅ Common pitfalls & solutions
+- ✅ Quick reference cheat sheets
+- ✅ Integration with other blocks
+
+**Path:** `docs/v3/building_blocks/ELLIOTT_WAVE_COUNT_COMPLETE_GUIDE.md`
+
+---
+
 ## Overview
 Multi-Timeframe Elliott Wave detector that identifies 5-wave impulse and 3-wave corrective patterns. Uses Daily + 4H for high-conviction context signals (HTF focus).
 

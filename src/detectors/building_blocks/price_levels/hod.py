@@ -12,7 +12,7 @@ import numpy as np
 
 class HOD:
     """
-    HOD - High of Day Price Level
+    HOD - High of Day Price Level (ENHANCED 2026-01-04)
     
     Tracks the highest price reached during the current trading day.
     Critical level for:
@@ -20,6 +20,12 @@ class HOD:
     - Breakout detection
     - Range trading
     - Day trading setups
+    
+    ENHANCEMENTS (2026-01-04):
+    - Added BULLISH signal generation for HOD breakouts
+    - Added event tracking for HOD breaks and tests
+    - Improved confidence variation (70-95% range)
+    - Fixed breakout detection to track previous HOD
     
     Parameters:
         timeframe: Data timeframe
@@ -34,10 +40,14 @@ class HOD:
         self.timeframe = timeframe
         self.day_start_hour = day_start_hour
         
+        # ENHANCEMENT: Track previous state for event detection
+        self.prev_hod = None
+        self.prev_signal = None
+        
         # Bitcoin-specific distance thresholds (% from HOD)
         self.btc_distance_thresholds = {
-            'at_hod': 0.1,          # < 0.1% - at HOD
-            'very_close': 0.5,      # 0.1-0.5% - very close
+            'at_hod': 0.2,          # < 0.2% - at HOD
+            'very_close': 0.5,      # 0.2-0.5% - very close
             'close': 1.0,           # 0.5-1% - close
             'moderate': 2.0,        # 1-2% - moderate distance
             'far': 2.0              # > 2% - far from HOD
@@ -69,26 +79,54 @@ class HOD:
         # Return highest high of the day
         return float(today_data['high'].max())
     
-    def detect_breakout(self, current_price: float, hod: float, threshold_pct: float = 0.05) -> str:
+    def detect_breakout(self, current_price: float, hod: float, prev_hod: float = None, threshold_pct: float = 0.05) -> Dict[str, Any]:
         """
-        Detect HOD breakout
+        ENHANCED: Detect HOD breakout by comparing to PREVIOUS HOD
         
         Args:
             current_price: Current price
-            hod: High of Day
+            hod: Current High of Day  
+            prev_hod: Previous HOD (to detect fresh breaks)
             threshold_pct: Threshold for breakout confirmation (default: 0.05%)
+            
+        Returns:
+            Dict with breakout status and event info
         """
         if hod is None:
-            return 'NO_HOD'
+            return {
+                'status': 'NO_HOD',
+                'is_new_hod': False,
+                'is_breakout': False
+            }
         
-        distance_pct = ((current_price - hod) / hod) * 100
+        # Check if HOD was updated (new high made)
+        is_new_hod = False
+        if prev_hod is not None and hod > prev_hod:
+            is_new_hod = True
         
-        if distance_pct > threshold_pct:
-            return 'BREAKOUT_CONFIRMED'
-        elif distance_pct > 0:
-            return 'BREAKING_OUT'
+        # Calculate distance from PREVIOUS HOD (not current, which updates)
+        ref_hod = prev_hod if prev_hod is not None else hod
+        distance_pct = ((current_price - ref_hod) / ref_hod) * 100
+        
+        # Determine breakout status
+        if is_new_hod and distance_pct > threshold_pct:
+            return {
+                'status': 'BREAKOUT_CONFIRMED',
+                'is_new_hod': True,
+                'is_breakout': True
+            }
+        elif distance_pct > 0 and distance_pct <= threshold_pct:
+            return {
+                'status': 'BREAKING_OUT',
+                'is_new_hod': is_new_hod,
+                'is_breakout': False
+            }
         else:
-            return 'BELOW_HOD'
+            return {
+                'status': 'BELOW_HOD',
+                'is_new_hod': False,
+                'is_breakout': False
+            }
     
     def calculate_distance(self, price: float, hod: float) -> float:
         """Calculate percentage distance from HOD"""
@@ -114,14 +152,38 @@ class HOD:
         else:
             return 'FAR'
     
+    def calculate_variable_confidence(self, signal: str, distance_class: str, is_new_event: bool) -> float:
+        """
+        ENHANCEMENT 3: Variable confidence based on signal type and distance
+        """
+        # Base confidence by signal
+        if signal == 'BULLISH':
+            base = 90  # Breakout = high confidence
+        elif signal == 'BEARISH':
+            base = 85  # Rejection at HOD = high confidence
+        else:  # NEUTRAL
+            base = 70  # Neutral = baseline
+        
+        # Adjust by distance
+        if distance_class in ['AT_HOD', 'VERY_CLOSE']:
+            base = min(100, base + 5)  # Near HOD = higher confidence
+        elif distance_class == 'FAR':
+            base = max(70, base - 5)  # Far from HOD = lower confidence
+        
+        # Fresh event boost
+        if is_new_event:
+            base = min(100, base + 5)
+        
+        return base
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method (ENHANCED)"""
         # Validate
         if not all(col in df.columns for col in ['timestamp', 'high', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -132,7 +194,7 @@ class HOD:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': 'No data provided'},
+                'metadata': {'error': 'No data provided', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -145,7 +207,7 @@ class HOD:
             return {
                 'signal': 'NO_HOD_DATA',
                 'confidence': 0,
-                'metadata': {'error': 'Could not calculate HOD'},
+                'metadata': {'error': 'Could not calculate HOD', 'is_new_event': False},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -153,45 +215,64 @@ class HOD:
         
         current_price = float(df['close'].iloc[-1])
         
-        # Detect breakout
-        breakout = self.detect_breakout(current_price, hod)
+        # ENHANCEMENT 1: Detect breakout with prev_hod tracking
+        breakout_info = self.detect_breakout(current_price, hod, self.prev_hod)
+        breakout_status = breakout_info['status']
+        is_new_hod = breakout_info['is_new_hod']
+        is_breakout = breakout_info['is_breakout']
         
         # Calculate distance
         distance_pct = self.calculate_distance(current_price, hod)
         distance_class = self.classify_distance(distance_pct)
         
-        # Calculate confidence
-        confidence = 70  # Base confidence
-        
-        if breakout == 'BREAKOUT_CONFIRMED':
-            confidence += 25
-        elif distance_class in ['AT_HOD', 'VERY_CLOSE']:
-            confidence += 15
-        
-        confidence = min(100, confidence)
-        
-        # Build confluence
-        confluence_factors = []
-        
-        if breakout == 'BREAKOUT_CONFIRMED':
-            confluence_factors.append('HOD breakout confirmed - bullish signal')
-        elif breakout == 'BREAKING_OUT':
-            confluence_factors.append('Price breaking above HOD - watch for confirmation')
-        elif distance_class in ['AT_HOD', 'VERY_CLOSE']:
-            confluence_factors.append('Price at/near HOD - potential resistance test')
-        
-        confluence_factors.append(f'HOD: ${hod:.2f}')
-        confluence_factors.append(f'Distance from HOD: {distance_pct:+.2f}% ({distance_class})')
-        
         # Determine signal
-        if breakout == 'BREAKOUT_CONFIRMED':
+        if breakout_status == 'BREAKOUT_CONFIRMED' or is_new_hod:
             signal = 'BULLISH'
-        elif breakout == 'BREAKING_OUT':
+        elif breakout_status == 'BREAKING_OUT':
             signal = 'NEUTRAL'
         elif distance_class in ['AT_HOD', 'VERY_CLOSE'] and distance_pct < 0:
             signal = 'BEARISH'  # Rejection at HOD
         else:
             signal = 'NEUTRAL'
+        
+        # ENHANCEMENT 2: Event tracking
+        is_new_event = False
+        if self.prev_signal is not None and signal != self.prev_signal:
+            is_new_event = True
+        elif is_new_hod:
+            is_new_event = True  # New HOD = event
+        
+        # ENHANCEMENT 3: Variable confidence
+        confidence = self.calculate_variable_confidence(signal, distance_class, is_new_event)
+        
+        # Build confluence
+        confluence_factors = []
+        
+        # Event-specific confluence
+        if is_new_event:
+            if is_new_hod:
+                confluence_factors.append('⭐ NEW HOD: Fresh high created - bullish breakout!')
+            elif signal == 'BULLISH' and self.prev_signal != 'BULLISH':
+                confluence_factors.append('⭐ NEW STATE: HOD breakout initiated')
+            elif signal == 'BEARISH' and self.prev_signal != 'BEARISH':
+                confluence_factors.append('⭐ NEW STATE: HOD rejection detected')
+        
+        if breakout_status == 'BREAKOUT_CONFIRMED':
+            confluence_factors.append('HOD breakout confirmed - bullish signal')
+        elif breakout_status == 'BREAKING_OUT':
+            confluence_factors.append('Price breaking above HOD - watch for confirmation')
+        elif distance_class in ['AT_HOD', 'VERY_CLOSE']:
+            if distance_pct < 0:
+                confluence_factors.append('Price testing HOD resistance - potential rejection')
+            else:
+                confluence_factors.append('Price at HOD - critical level')
+        
+        confluence_factors.append(f'HOD: ${hod:.2f}')
+        confluence_factors.append(f'Distance from HOD: {distance_pct:+.2f}% ({distance_class})')
+        
+        # Update tracking
+        self.prev_hod = hod
+        self.prev_signal = signal
         
         # Metadata
         metadata = {
@@ -199,9 +280,12 @@ class HOD:
             'current_price': round(current_price, 2),
             'distance_pct': round(distance_pct, 2),
             'distance_class': distance_class,
-            'breakout_status': breakout,
+            'breakout_status': breakout_status,
+            'is_new_hod': is_new_hod,
+            'is_breakout': is_breakout,
             'is_at_resistance': distance_class in ['AT_HOD', 'VERY_CLOSE'] and distance_pct < 0,
-            'is_breaking_out': breakout in ['BREAKING_OUT', 'BREAKOUT_CONFIRMED']
+            'is_breaking_out': breakout_status in ['BREAKING_OUT', 'BREAKOUT_CONFIRMED'],
+            'is_new_event': is_new_event  # ENHANCEMENT 2: Event tracking
         }
         
         return {

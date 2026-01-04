@@ -12,7 +12,7 @@ import numpy as np
 
 class HOW:
     """
-    HOW - High of Week Price Level
+    HOW - High of Week Price Level (ENHANCED 2026-01-04)
     
     Tracks the highest price reached during the current trading week.
     Critical level for:
@@ -20,6 +20,12 @@ class HOW:
     - Weekly breakout detection
     - Swing trading setups
     - Higher timeframe analysis
+    
+    ENHANCEMENTS (2026-01-04):
+    - Added BULLISH signal generation for HOW breakouts
+    - Added event tracking for HOW breaks and tests
+    - Improved confidence variation (70-100% range)
+    - Fixed breakout detection to track previous HOW
     
     Parameters:
         timeframe: Data timeframe
@@ -30,6 +36,10 @@ class HOW:
         """Initialize HOW block"""
         self.timeframe = timeframe
         self.week_start = week_start
+        
+        # ENHANCEMENT: Track previous state for event detection
+        self.prev_how = None
+        self.prev_signal = None
         
         # Bitcoin-specific distance thresholds (% from HOW)
         self.btc_distance_thresholds = {
@@ -59,19 +69,54 @@ class HOW:
         
         return float(week_data['high'].max())
     
-    def detect_breakout(self, current_price: float, how: float, threshold_pct: float = 0.1) -> str:
-        """Detect HOW breakout"""
+    def detect_breakout(self, current_price: float, how: float, prev_how: float = None, threshold_pct: float = 0.1) -> Dict[str, Any]:
+        """
+        ENHANCED: Detect HOW breakout by comparing to PREVIOUS HOW
+        
+        Args:
+            current_price: Current price
+            how: Current High of Week
+            prev_how: Previous HOW (to detect fresh breaks)
+            threshold_pct: Threshold for breakout confirmation (default: 0.1%)
+            
+        Returns:
+            Dict with breakout status and event info
+        """
         if how is None:
-            return 'NO_HOW'
+            return {
+                'status': 'NO_HOW',
+                'is_new_how': False,
+                'is_breakout': False
+            }
         
-        distance_pct = ((current_price - how) / how) * 100
+        # Check if HOW was updated (new weekly high made)
+        is_new_how = False
+        if prev_how is not None and how > prev_how:
+            is_new_how = True
         
-        if distance_pct > threshold_pct:
-            return 'BREAKOUT_CONFIRMED'
-        elif distance_pct > 0:
-            return 'BREAKING_OUT'
+        # Calculate distance from PREVIOUS HOW (not current, which updates)
+        ref_how = prev_how if prev_how is not None else how
+        distance_pct = ((current_price - ref_how) / ref_how) * 100
+        
+        # Determine breakout status
+        if is_new_how and distance_pct > threshold_pct:
+            return {
+                'status': 'BREAKOUT_CONFIRMED',
+                'is_new_how': True,
+                'is_breakout': True
+            }
+        elif distance_pct > 0 and distance_pct <= threshold_pct:
+            return {
+                'status': 'BREAKING_OUT',
+                'is_new_how': is_new_how,
+                'is_breakout': False
+            }
         else:
-            return 'BELOW_HOW'
+            return {
+                'status': 'BELOW_HOW',
+                'is_new_how': False,
+                'is_breakout': False
+            }
     
     def calculate_distance(self, price: float, how: float) -> float:
         """Calculate percentage distance from HOW"""
@@ -97,14 +142,38 @@ class HOW:
         else:
             return 'FAR'
     
+    def calculate_variable_confidence(self, signal: str, distance_class: str, is_new_event: bool) -> float:
+        """
+        ENHANCEMENT 3: Variable confidence based on signal type and distance
+        """
+        # Base confidence by signal
+        if signal == 'BULLISH':
+            base = 95  # Weekly breakout = very high confidence
+        elif signal == 'BEARISH':
+            base = 90  # Rejection at HOW = high confidence
+        else:  # NEUTRAL
+            base = 75  # Neutral = baseline (weekly baseline higher than daily)
+        
+        # Adjust by distance
+        if distance_class in ['AT_HOW', 'VERY_CLOSE']:
+            base = min(100, base + 5)  # Near HOW = higher confidence
+        elif distance_class == 'FAR':
+            base = max(70, base - 5)  # Far from HOW = lower confidence
+        
+        # Fresh event boost
+        if is_new_event:
+            base = min(100, base + 5)
+        
+        return base
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method (ENHANCED)"""
         # Validate
         if not all(col in df.columns for col in ['timestamp', 'high', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -114,7 +183,7 @@ class HOW:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': 'No data provided'},
+                'metadata': {'error': 'No data provided', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -127,7 +196,7 @@ class HOW:
             return {
                 'signal': 'NO_HOW_DATA',
                 'confidence': 0,
-                'metadata': {'error': 'Could not calculate HOW'},
+                'metadata': {'error': 'Could not calculate HOW', 'is_new_event': False},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -135,45 +204,64 @@ class HOW:
         
         current_price = float(df['close'].iloc[-1])
         
-        # Detect breakout
-        breakout = self.detect_breakout(current_price, how)
+        # ENHANCEMENT 1: Detect breakout with prev_how tracking
+        breakout_info = self.detect_breakout(current_price, how, self.prev_how)
+        breakout_status = breakout_info['status']
+        is_new_how = breakout_info['is_new_how']
+        is_breakout = breakout_info['is_breakout']
         
         # Calculate distance
         distance_pct = self.calculate_distance(current_price, how)
         distance_class = self.classify_distance(distance_pct)
         
-        # Calculate confidence
-        confidence = 75  # Higher base for weekly levels
-        
-        if breakout == 'BREAKOUT_CONFIRMED':
-            confidence += 20
-        elif distance_class in ['AT_HOW', 'VERY_CLOSE']:
-            confidence += 15
-        
-        confidence = min(100, confidence)
-        
-        # Build confluence
-        confluence_factors = []
-        
-        if breakout == 'BREAKOUT_CONFIRMED':
-            confluence_factors.append('HOW breakout confirmed - strong bullish signal')
-        elif breakout == 'BREAKING_OUT':
-            confluence_factors.append('Price breaking above HOW - major resistance test')
-        elif distance_class in ['AT_HOW', 'VERY_CLOSE']:
-            confluence_factors.append('Price at/near HOW - critical resistance level')
-        
-        confluence_factors.append(f'HOW: ${how:.2f}')
-        confluence_factors.append(f'Distance from HOW: {distance_pct:+.2f}% ({distance_class})')
-        
         # Determine signal
-        if breakout == 'BREAKOUT_CONFIRMED':
+        if breakout_status == 'BREAKOUT_CONFIRMED' or is_new_how:
             signal = 'BULLISH'
-        elif breakout == 'BREAKING_OUT':
+        elif breakout_status == 'BREAKING_OUT':
             signal = 'NEUTRAL'
         elif distance_class in ['AT_HOW', 'VERY_CLOSE'] and distance_pct < 0:
             signal = 'BEARISH'  # Rejection at HOW
         else:
             signal = 'NEUTRAL'
+        
+        # ENHANCEMENT 2: Event tracking
+        is_new_event = False
+        if self.prev_signal is not None and signal != self.prev_signal:
+            is_new_event = True
+        elif is_new_how:
+            is_new_event = True  # New HOW = event
+        
+        # ENHANCEMENT 3: Variable confidence
+        confidence = self.calculate_variable_confidence(signal, distance_class, is_new_event)
+        
+        # Build confluence
+        confluence_factors = []
+        
+        # Event-specific confluence
+        if is_new_event:
+            if is_new_how:
+                confluence_factors.append('⭐ NEW HOW: Fresh weekly high - bullish breakout!')
+            elif signal == 'BULLISH' and self.prev_signal != 'BULLISH':
+                confluence_factors.append('⭐ NEW STATE: HOW breakout initiated')
+            elif signal == 'BEARISH' and self.prev_signal != 'BEARISH':
+                confluence_factors.append('⭐ NEW STATE: HOW rejection detected')
+        
+        if breakout_status == 'BREAKOUT_CONFIRMED':
+            confluence_factors.append('HOW breakout confirmed - strong weekly bullish signal')
+        elif breakout_status == 'BREAKING_OUT':
+            confluence_factors.append('Price breaking above HOW - major resistance test')
+        elif distance_class in ['AT_HOW', 'VERY_CLOSE']:
+            if distance_pct < 0:
+                confluence_factors.append('Price testing HOW resistance - potential weekly rejection')
+            else:
+                confluence_factors.append('Price at HOW - critical weekly level')
+        
+        confluence_factors.append(f'HOW: ${how:.2f}')
+        confluence_factors.append(f'Distance from HOW: {distance_pct:+.2f}% ({distance_class})')
+        
+        # Update tracking
+        self.prev_how = how
+        self.prev_signal = signal
         
         # Metadata
         metadata = {
@@ -181,9 +269,12 @@ class HOW:
             'current_price': round(current_price, 2),
             'distance_pct': round(distance_pct, 2),
             'distance_class': distance_class,
-            'breakout_status': breakout,
+            'breakout_status': breakout_status,
+            'is_new_how': is_new_how,
+            'is_breakout': is_breakout,
             'is_major_resistance': distance_class in ['AT_HOW', 'VERY_CLOSE'] and distance_pct < 0,
-            'is_breaking_out': breakout in ['BREAKING_OUT', 'BREAKOUT_CONFIRMED']
+            'is_breaking_out': breakout_status in ['BREAKING_OUT', 'BREAKOUT_CONFIRMED'],
+            'is_new_event': is_new_event  # ENHANCEMENT 2: Event tracking
         }
         
         return {

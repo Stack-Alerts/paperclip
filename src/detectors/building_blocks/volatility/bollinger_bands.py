@@ -427,6 +427,34 @@ class BollingerBands:
         else:
             return 'BELOW_LOWER'
     
+    def calculate_variable_confidence(self, signal: str) -> float:
+        """
+        ENHANCEMENT (2026-01-04): Calculate variable confidence based on signal type
+        
+        Differentiates signal quality:
+        - Squeeze breakouts = highest confidence (rare, high-value)
+        - Reversals = high confidence (pattern-based signals)
+        - Extremes = elevated confidence (outside bands)
+        - Near extremes = moderate-high confidence (approaching bands)
+        - Neutral positions = baseline confidence (inside bands)
+        
+        Args:
+            signal: Signal classification
+            
+        Returns:
+            Confidence score (75-100%)
+        """
+        if 'SQUEEZE_BREAKOUT' in signal:
+            return 100  # Highest - documented +20 confluence points
+        elif 'REVERSAL' in signal:
+            return 90   # High - pattern-based, documented +15 confluence
+        elif signal in ['ABOVE_UPPER', 'BELOW_LOWER']:
+            return 85   # Extreme positions - outside bands
+        elif signal in ['NEAR_UPPER', 'NEAR_LOWER']:
+            return 80   # Approaching extremes
+        else:  # UPPER_HALF, LOWER_HALF
+            return 75   # Neutral positions - inside bands
+    
     def map_to_simple_signal(self, signal: str, percent_b: float, 
                             squeeze_breakout: Dict, w_bottom: bool, m_top: bool) -> str:
         """
@@ -622,13 +650,6 @@ class BollingerBands:
         # Classify position
         position = self.classify_position(current_percent_b)
         
-        # Calculate confidence based on data availability
-        confidence = min(100, (len(df) / (self.period * 2)) * 100)
-        
-        # Adjust confidence based on pattern clarity
-        if squeeze_status == 'TIGHT_SQUEEZE':
-            confidence = min(100, confidence * 1.1)  # Boost for clear squeeze
-        
         # Build confluence factors
         confluence_factors = []
         
@@ -694,6 +715,9 @@ class BollingerBands:
             signal = 'BEARISH_REVERSAL'
         else:
             signal = position
+        
+        # ENHANCEMENT: Calculate variable confidence based on signal type
+        confidence = self.calculate_variable_confidence(signal)
         
         # **NEW:** Event tracking - detect multi-state SIGNAL CHANGES
         is_new_event = False

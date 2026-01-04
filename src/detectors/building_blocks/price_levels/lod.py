@@ -12,7 +12,7 @@ import numpy as np
 
 class LOD:
     """
-    LOD - Low of Day Price Level
+    LOD - Low of Day Price Level (ENHANCED 2026-01-04)
     
     Tracks the lowest price reached during the current trading day.
     Critical level for:
@@ -20,6 +20,12 @@ class LOD:
     - Breakdown detection
     - Range trading
     - Day trading setups
+    
+    ENHANCEMENTS (2026-01-04):
+    - Added BEARISH signal generation for LOD breakdowns
+    - Added event tracking for LOD breaks and tests
+    - Improved confidence variation (70-100% range)
+    - Fixed breakdown detection to track previous LOD
     
     Parameters:
         timeframe: Data timeframe
@@ -34,10 +40,14 @@ class LOD:
         self.timeframe = timeframe
         self.day_start_hour = day_start_hour
         
+        # ENHANCEMENT: Track previous state for event detection
+        self.prev_lod = None
+        self.prev_signal = None
+        
         # Bitcoin-specific distance thresholds (% from LOD)
         self.btc_distance_thresholds = {
-            'at_lod': 0.1,          # < 0.1% - at LOD
-            'very_close': 0.5,      # 0.1-0.5% - very close
+            'at_lod': 0.2,          # < 0.2% - at LOD
+            'very_close': 0.5,      # 0.2-0.5% - very close
             'close': 1.0,           # 0.5-1% - close
             'moderate': 2.0,        # 1-2% - moderate distance
             'far': 2.0              # > 2% - far from LOD
@@ -58,19 +68,54 @@ class LOD:
         
         return float(today_data['low'].min())
     
-    def detect_breakdown(self, current_price: float, lod: float, threshold_pct: float = 0.05) -> str:
-        """Detect LOD breakdown"""
+    def detect_breakdown(self, current_price: float, lod: float, prev_lod: float = None, threshold_pct: float = 0.05) -> Dict[str, Any]:
+        """
+        ENHANCED: Detect LOD breakdown by comparing to PREVIOUS LOD
+        
+        Args:
+            current_price: Current price
+            lod: Current Low of Day
+            prev_lod: Previous LOD (to detect fresh breaks)
+            threshold_pct: Threshold for breakdown confirmation (default: 0.05%)
+            
+        Returns:
+            Dict with breakdown status and event info
+        """
         if lod is None:
-            return 'NO_LOD'
+            return {
+                'status': 'NO_LOD',
+                'is_new_lod': False,
+                'is_breakdown': False
+            }
         
-        distance_pct = ((current_price - lod) / lod) * 100
+        # Check if LOD was updated (new low made)
+        is_new_lod = False
+        if prev_lod is not None and lod < prev_lod:
+            is_new_lod = True
         
-        if distance_pct < -threshold_pct:
-            return 'BREAKDOWN_CONFIRMED'
-        elif distance_pct < 0:
-            return 'BREAKING_DOWN'
+        # Calculate distance from PREVIOUS LOD (not current, which updates)
+        ref_lod = prev_lod if prev_lod is not None else lod
+        distance_pct = ((current_price - ref_lod) / ref_lod) * 100
+        
+        # Determine breakdown status
+        if is_new_lod and distance_pct < -threshold_pct:
+            return {
+                'status': 'BREAKDOWN_CONFIRMED',
+                'is_new_lod': True,
+                'is_breakdown': True
+            }
+        elif distance_pct < 0 and distance_pct >= -threshold_pct:
+            return {
+                'status': 'BREAKING_DOWN',
+                'is_new_lod': is_new_lod,
+                'is_breakdown': False
+            }
         else:
-            return 'ABOVE_LOD'
+            return {
+                'status': 'ABOVE_LOD',
+                'is_new_lod': False,
+                'is_breakdown': False
+            }
     
     def calculate_distance(self, price: float, lod: float) -> float:
         """Calculate percentage distance from LOD"""
@@ -96,14 +141,38 @@ class LOD:
         else:
             return 'FAR'
     
+    def calculate_variable_confidence(self, signal: str, distance_class: str, is_new_event: bool) -> float:
+        """
+        ENHANCEMENT 3: Variable confidence based on signal type and distance
+        """
+        # Base confidence by signal
+        if signal == 'BEARISH':
+            base = 90  # Breakdown = high confidence
+        elif signal == 'BULLISH':
+            base = 85  # Bounce from LOD = high confidence
+        else:  # NEUTRAL
+            base = 70  # Neutral = baseline
+        
+        # Adjust by distance
+        if distance_class in ['AT_LOD', 'VERY_CLOSE']:
+            base = min(100, base + 5)  # Near LOD = higher confidence
+        elif distance_class == 'FAR':
+            base = max(70, base - 5)  # Far from LOD = lower confidence
+        
+        # Fresh event boost
+        if is_new_event:
+            base = min(100, base + 5)
+        
+        return base
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """Main analysis method (ENHANCED)"""
         # Validate
         if not all(col in df.columns for col in ['timestamp', 'low', 'close']):
             return {
                 'signal': 'ERROR',
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -113,7 +182,7 @@ class LOD:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
-                'metadata': {'error': 'No data provided'},
+                'metadata': {'error': 'No data provided', 'is_new_event': False},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -126,7 +195,7 @@ class LOD:
             return {
                 'signal': 'NO_LOD_DATA',
                 'confidence': 0,
-                'metadata': {'error': 'Could not calculate LOD'},
+                'metadata': {'error': 'Could not calculate LOD', 'is_new_event': False},
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -134,45 +203,64 @@ class LOD:
         
         current_price = float(df['close'].iloc[-1])
         
-        # Detect breakdown
-        breakdown = self.detect_breakdown(current_price, lod)
+        # ENHANCEMENT 1: Detect breakdown with prev_lod tracking
+        breakdown_info = self.detect_breakdown(current_price, lod, self.prev_lod)
+        breakdown_status = breakdown_info['status']
+        is_new_lod = breakdown_info['is_new_lod']
+        is_breakdown = breakdown_info['is_breakdown']
         
         # Calculate distance
         distance_pct = self.calculate_distance(current_price, lod)
         distance_class = self.classify_distance(distance_pct)
         
-        # Calculate confidence
-        confidence = 70
-        
-        if breakdown == 'BREAKDOWN_CONFIRMED':
-            confidence += 25
-        elif distance_class in ['AT_LOD', 'VERY_CLOSE']:
-            confidence += 15
-        
-        confidence = min(100, confidence)
-        
-        # Build confluence
-        confluence_factors = []
-        
-        if breakdown == 'BREAKDOWN_CONFIRMED':
-            confluence_factors.append('LOD breakdown confirmed - bearish signal')
-        elif breakdown == 'BREAKING_DOWN':
-            confluence_factors.append('Price breaking below LOD - watch for confirmation')
-        elif distance_class in ['AT_LOD', 'VERY_CLOSE']:
-            confluence_factors.append('Price at/near LOD - potential support test')
-        
-        confluence_factors.append(f'LOD: ${lod:.2f}')
-        confluence_factors.append(f'Distance from LOD: {distance_pct:+.2f}% ({distance_class})')
-        
         # Determine signal
-        if breakdown == 'BREAKDOWN_CONFIRMED':
+        if breakdown_status == 'BREAKDOWN_CONFIRMED' or is_new_lod:
             signal = 'BEARISH'
-        elif breakdown == 'BREAKING_DOWN':
+        elif breakdown_status == 'BREAKING_DOWN':
             signal = 'NEUTRAL'
         elif distance_class in ['AT_LOD', 'VERY_CLOSE'] and distance_pct > 0:
             signal = 'BULLISH'  # Bounce from LOD
         else:
             signal = 'NEUTRAL'
+        
+        # ENHANCEMENT 2: Event tracking
+        is_new_event = False
+        if self.prev_signal is not None and signal != self.prev_signal:
+            is_new_event = True
+        elif is_new_lod:
+            is_new_event = True  # New LOD = event
+        
+        # ENHANCEMENT 3: Variable confidence
+        confidence = self.calculate_variable_confidence(signal, distance_class, is_new_event)
+        
+        # Build confluence
+        confluence_factors = []
+        
+        # Event-specific confluence
+        if is_new_event:
+            if is_new_lod:
+                confluence_factors.append('⭐ NEW LOD: Fresh low created - bearish breakdown!')
+            elif signal == 'BEARISH' and self.prev_signal != 'BEARISH':
+                confluence_factors.append('⭐ NEW STATE: LOD breakdown initiated')
+            elif signal == 'BULLISH' and self.prev_signal != 'BULLISH':
+                confluence_factors.append('⭐ NEW STATE: LOD bounce detected')
+        
+        if breakdown_status == 'BREAKDOWN_CONFIRMED':
+            confluence_factors.append('LOD breakdown confirmed - bearish signal')
+        elif breakdown_status == 'BREAKING_DOWN':
+            confluence_factors.append('Price breaking below LOD - watch for confirmation')
+        elif distance_class in ['AT_LOD', 'VERY_CLOSE']:
+            if distance_pct > 0:
+                confluence_factors.append('Price testing LOD support - potential bounce')
+            else:
+                confluence_factors.append('Price at LOD - critical level')
+        
+        confluence_factors.append(f'LOD: ${lod:.2f}')
+        confluence_factors.append(f'Distance from LOD: {distance_pct:+.2f}% ({distance_class})')
+        
+        # Update tracking
+        self.prev_lod = lod
+        self.prev_signal = signal
         
         # Metadata
         metadata = {
@@ -180,9 +268,12 @@ class LOD:
             'current_price': round(current_price, 2),
             'distance_pct': round(distance_pct, 2),
             'distance_class': distance_class,
-            'breakdown_status': breakdown,
+            'breakdown_status': breakdown_status,
+            'is_new_lod': is_new_lod,
+            'is_breakdown': is_breakdown,
             'is_at_support': distance_class in ['AT_LOD', 'VERY_CLOSE'] and distance_pct > 0,
-            'is_breaking_down': breakdown in ['BREAKING_DOWN', 'BREAKDOWN_CONFIRMED']
+            'is_breaking_down': breakdown_status in ['BREAKING_DOWN', 'BREAKDOWN_CONFIRMED'],
+            'is_new_event': is_new_event  # ENHANCEMENT 2: Event tracking
         }
         
         return {

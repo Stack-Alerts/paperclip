@@ -12,7 +12,7 @@ import numpy as np
 
 class ADR:
     """
-    ADR (Average Daily Range) - Volatility Indicator
+    ADR (Average Daily Range) - Volatility Indicator (ENHANCED 2026-01-04)
     
     Measures the average daily range (high - low) over a specified period.
     Used for:
@@ -23,6 +23,12 @@ class ADR:
     
     Unlike ATR which uses exponential weighting, ADR uses simple average
     and focuses specifically on daily timeframe ranges.
+    
+    ENHANCEMENTS (2026-01-04):
+    - Fixed threshold calibration (ADR-relative instead of absolute %)
+    - Added timeframe detection and auto-adjustment
+    - Added variable confidence scoring
+    - Added percentile tracking for historical context
     
     Parameters:
         period: Number of days to average (default: 14)
@@ -43,14 +49,18 @@ class ADR:
         self.period = period
         self.timeframe = timeframe
         
-        # Bitcoin-specific ADR thresholds (as percentage of price)
-        # These represent typical daily ranges for BTC
-        self.btc_range_thresholds = {
-            'calm': 2.0,      # < 2% daily range
-            'normal': 4.0,    # 2-4% daily range
-            'elevated': 6.0,  # 4-6% daily range
-            'high': 8.0,      # 6-8% daily range
-            'extreme': 8.0    # > 8% daily range
+        # ENHANCEMENT: Track historical ADR values for percentile calculation
+        self.adr_history = []
+        self.max_history = 500  # Keep last 500 ADR values
+        
+        # FIXED: ADR-relative thresholds instead of absolute %
+        # Thresholds now based on ratio to ADR, not absolute price %
+        self.adr_relative_thresholds = {
+            'calm': 0.7,      # < 70% of ADR
+            'normal': 1.3,    # 70-130% of ADR
+            'elevated': 1.7,  # 130-170% of ADR
+            'high': 2.0,      # 170-200% of ADR
+            'extreme': 2.0    # > 200% of ADR
         }
     
     def calculate_daily_range(self, df: pd.DataFrame) -> pd.Series:
@@ -114,26 +124,102 @@ class ADR:
         percentile = (np.sum(daily_ranges < current_range) / len(daily_ranges)) * 100
         return percentile
     
-    def classify_range(self, range_percent: float) -> str:
+    def classify_range(self, current_range: float, adr_value: float) -> str:
         """
-        Classify daily range as calm, normal, elevated, high, or extreme
+        FIXED: Classify daily range relative to ADR, not absolute thresholds
         
         Args:
-            range_percent: Range as percentage of price
+            current_range: Current day's range (dollars)
+            adr_value: Average daily range (dollars)
             
         Returns:
             Range classification
         """
-        if range_percent < self.btc_range_thresholds['calm']:
-            return 'CALM'
-        elif range_percent < self.btc_range_thresholds['normal']:
+        if adr_value == 0:
             return 'NORMAL'
-        elif range_percent < self.btc_range_thresholds['elevated']:
+        
+        # Calculate ratio to ADR
+        adr_ratio = current_range / adr_value
+        
+        # Classify based on ADR ratio
+        if adr_ratio < self.adr_relative_thresholds['calm']:
+            return 'CALM'
+        elif adr_ratio < self.adr_relative_thresholds['normal']:
+            return 'NORMAL'
+        elif adr_ratio < self.adr_relative_thresholds['elevated']:
             return 'ELEVATED'
-        elif range_percent < self.btc_range_thresholds['high']:
+        elif adr_ratio < self.adr_relative_thresholds['high']:
             return 'HIGH'
         else:
             return 'EXTREME'
+    
+    def calculate_adr_percentile(self, current_adr: float) -> Dict[str, Any]:
+        """
+        ENHANCEMENT 4: Calculate ADR percentile for historical context
+        """
+        if len(self.adr_history) < 20:
+            return {
+                'has_percentile': False,
+                'percentile': None,
+                'relative_level': None
+            }
+        
+        # Calculate percentile rank
+        percentile = (sum(1 for adr in self.adr_history if adr < current_adr) / len(self.adr_history)) * 100
+        
+        # Classify relative level
+        if percentile >= 95:
+            relative_level = 'EXTREME_HIGH'
+        elif percentile >= 85:
+            relative_level = 'VERY_HIGH'
+        elif percentile >= 70:
+            relative_level = 'HIGH'
+        elif percentile >= 30:
+            relative_level = 'NORMAL'
+        elif percentile >= 15:
+            relative_level = 'LOW'
+        elif percentile >= 5:
+            relative_level = 'VERY_LOW'
+        else:
+            relative_level = 'EXTREME_LOW'
+        
+        return {
+            'has_percentile': True,
+            'percentile': round(percentile, 1),
+            'relative_level': relative_level,
+            'history_size': len(self.adr_history)
+        }
+    
+    def calculate_variable_confidence(self, classification: str, adr_percentile_data: Dict[str, Any]) -> float:
+        """
+        ENHANCEMENT 3: Variable confidence based on classification and percentile
+        """
+        # Base confidence by classification
+        if classification == 'EXTREME':
+            base_confidence = 100  # Extreme volatility = highest confidence
+        elif classification == 'HIGH':
+            base_confidence = 90
+        elif classification == 'ELEVATED':
+            base_confidence = 85
+        elif classification == 'NORMAL':
+            base_confidence = 75
+        elif classification == 'CALM':
+            base_confidence = 70
+        else:
+            base_confidence = 60
+        
+        # Adjust based on percentile (if available)
+        if adr_percentile_data.get('has_percentile'):
+            percentile = adr_percentile_data['percentile']
+            relative_level = adr_percentile_data['relative_level']
+            
+            # Boost confidence for extreme percentiles
+            if relative_level in ['EXTREME_HIGH', 'EXTREME_LOW']:
+                base_confidence = min(100, base_confidence + 10)
+            elif relative_level in ['VERY_HIGH', 'VERY_LOW']:
+                base_confidence = min(100, base_confidence + 5)
+        
+        return base_confidence
     
     def calculate_expansion_contraction(self, daily_ranges: pd.Series, lookback: int = 5) -> str:
         """
@@ -280,18 +366,39 @@ class ADR:
         # Calculate ADR
         adr_value = self.calculate_adr(daily_ranges)
         
+        # ENHANCEMENT 4: Update ADR history for percentile tracking
+        self.adr_history.append(adr_value)
+        if len(self.adr_history) > self.max_history:
+            self.adr_history.pop(0)
+        
+        # Calculate ADR percentile
+        adr_percentile_data = self.calculate_adr_percentile(adr_value)
+        
         # Get current values
         current_price = float(df['close'].iloc[-1])
-        current_high = float(df['high'].iloc[-1]) if self.timeframe == '1D' else float(df.groupby(pd.to_datetime(df['timestamp']).dt.date)['high'].max().iloc[-1])
-        current_low = float(df['low'].iloc[-1]) if self.timeframe == '1D' else float(df.groupby(pd.to_datetime(df['timestamp']).dt.date)['low'].min().iloc[-1])
+        
+        # ENHANCEMENT 2: Timeframe detection - get TODAY'S complete range
+        if self.timeframe != '1D':
+            # For intraday data, get TODAY'S aggregated range
+            df_today = df.copy()
+            df_today['date'] = pd.to_datetime(df_today['timestamp']).dt.date
+            today = df_today['date'].iloc[-1]
+            today_data = df_today[df_today['date'] == today]
+            current_high = float(today_data['high'].max())
+            current_low = float(today_data['low'].min())
+        else:
+            # For daily data, use current bar
+            current_high = float(df['high'].iloc[-1])
+            current_low = float(df['low'].iloc[-1])
+        
         current_range = current_high - current_low
         
         # Calculate percentages
         adr_percent = (adr_value / current_price) * 100
         current_range_percent = (current_range / current_price) * 100
         
-        # Classify range
-        range_classification = self.classify_range(current_range_percent)
+        # FIXED: Classify range using ADR-relative thresholds
+        range_classification = self.classify_range(current_range, adr_value)
         
         # **NEW:** Event tracking - detect volatility LEVEL changes
         is_new_event = False
@@ -319,7 +426,7 @@ class ADR:
             
             prev_range = prev_high - prev_low
             prev_range_percent = (prev_range / current_price) * 100  # Use current price for consistency
-            prev_classification = self.classify_range(prev_range_percent)
+            prev_classification = self.classify_range(prev_range, adr_value)
             
             # Detect level change
             is_new_event = (range_classification != prev_classification)
@@ -340,9 +447,8 @@ class ADR:
         # Calculate position sizing factor
         position_sizing = self.calculate_position_sizing_factor(current_range_percent, adr_percent)
         
-        # Calculate confidence
-        data_completeness = min(100, (len(daily_ranges) / self.period) * 100)
-        confidence = data_completeness
+        # ENHANCEMENT 3: Calculate variable confidence
+        confidence = self.calculate_variable_confidence(range_classification, adr_percentile_data)
         
         # Fresh level change boost
         if is_new_event:
@@ -376,12 +482,22 @@ class ADR:
         elif range_percentile < 20:
             confluence_factors.append(f'Current range at {range_percentile:.0f}th percentile - unusually small move')
         
+        # ENHANCEMENT 4: Add ADR percentile context
+        if adr_percentile_data.get('has_percentile'):
+            percentile = adr_percentile_data['percentile']
+            relative_level = adr_percentile_data['relative_level']
+            
+            if relative_level in ['EXTREME_HIGH', 'VERY_HIGH']:
+                confluence_factors.append(f'⚠️ ADR at {percentile:.0f}th percentile - EXTREME average volatility (+10 confidence)')
+            elif relative_level in ['EXTREME_LOW', 'VERY_LOW']:
+                confluence_factors.append(f'ADR at {percentile:.0f}th percentile - VERY LOW average volatility')
+        
         if position_sizing < 1.0:
             confluence_factors.append(f'Position sizing: {position_sizing}x - reduce size due to high volatility')
         elif position_sizing > 1.0:
             confluence_factors.append(f'Position sizing: {position_sizing}x - can increase size due to low volatility')
         
-        # Prepare metadata
+        # Prepare metadata (ENHANCED)
         metadata = {
             'adr_value': round(adr_value, 2),
             'adr_percent': round(adr_percent, 2),
@@ -396,8 +512,14 @@ class ADR:
             'position_sizing_factor': position_sizing,
             'daily_ranges_analyzed': len(daily_ranges),
             'recent_ranges': daily_ranges.tail(10).tolist() if len(daily_ranges) > 0 else [],
-            'is_new_event': is_new_event,  # NEW: Event tracking
-            'bars_in_level': bars_in_level  # NEW: Age tracking
+            'is_new_event': is_new_event,
+            'bars_in_level': bars_in_level,
+            # ENHANCEMENTS
+            'adr_ratio': round(current_range / adr_value, 2) if adr_value > 0 else 0,
+            'has_adr_percentile': adr_percentile_data.get('has_percentile', False),
+            'adr_percentile': adr_percentile_data.get('percentile'),
+            'relative_adr_level': adr_percentile_data.get('relative_level'),
+            'history_size': adr_percentile_data.get('history_size', len(self.adr_history))
         }
         
         return {
