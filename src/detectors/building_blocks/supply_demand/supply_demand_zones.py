@@ -311,6 +311,30 @@ class SupplyDemandZones:
         
         return max(40, min(95, confidence))
     
+
+    def check_zone_liquidation_strength(self, zone_price: float, df: pd.DataFrame) -> Dict:
+        """Check if liquidation clusters strengthen this zone"""
+        try:
+            levels = advanced_data.get_liquidation_levels(df, lookback_bars=200)
+            
+            # Check for liquidation clusters near zone
+            cluster_strength = 0
+            for cluster in levels['above'] + levels['below']:
+                distance = abs(cluster['price'] - zone_price) / zone_price
+                if distance < 0.02:  # Within 2%
+                    cluster_strength += cluster['volume']
+            
+            if cluster_strength > 0:
+                return {
+                    'has_clusters': True,
+                    'cluster_strength': cluster_strength,
+                    'confidence_boost': min(20, int(cluster_strength / 100)),
+                    'zone_type': 'INSTITUTIONAL'
+                }
+            return {'has_clusters': False, 'confidence_boost': 0}
+        except:
+            return {'has_clusters': False, 'confidence_boost': 0}
+
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """Enhanced analysis with quality block integration"""
         # Validation

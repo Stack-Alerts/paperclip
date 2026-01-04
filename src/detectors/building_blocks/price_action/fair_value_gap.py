@@ -108,6 +108,23 @@ class FairValueGap:
         
         return None
     
+
+    def check_gap_liquidation_event(self, gap_timestamp: datetime) -> Dict:
+        """Check if gap formed during liquidation event"""
+        try:
+            liq_spike = advanced_data.detect_liquidation_spike(gap_timestamp, window_minutes=15)
+            
+            if liq_spike['has_spike']:
+                return {
+                    'has_liquidation': True,
+                    'gap_quality': 'INSTITUTIONAL',
+                    'confidence_boost': min(15, int(liq_spike['spike_ratio'] * 10)),
+                    'spike_volume': liq_spike['spike_volume']
+                }
+            return {'has_liquidation': False, 'confidence_boost': 0, 'gap_quality': 'STANDARD'}
+        except:
+            return {'has_liquidation': False, 'confidence_boost': 0, 'gap_quality': 'STANDARD'}
+
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """Main analysis method - tracks both CONTINUOUS gap state and NEW gap entries"""
         if not all(col in df.columns for col in ['timestamp', 'high', 'low', 'close']):
@@ -186,7 +203,15 @@ class FairValueGap:
         # Build confluence
         confluence_factors = []
         
+        # Check if gap formed during liquidation
+        liq_event = self.check_gap_liquidation_event(active_fvg['timestamp'])
+        if liq_event['has_liquidation']:
+            confidence += liq_event['confidence_boost']
+        
         # Event-specific confluence
+        if liq_event.get('has_liquidation', False):
+            confluence_factors.append(f'⭐ {liq_event["gap_quality"]} GAP - Liquidation event!')
+        
         if is_new_event:
             confluence_factors.append('⭐ NEW GAP ENTRY (price entered - fresh fill opportunity!)')
         elif signal != 'NEUTRAL':

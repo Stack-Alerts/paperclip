@@ -127,6 +127,36 @@ class RangeLiquidity:
         
         return max(60, min(90, base_confidence))
     
+
+    def check_liquidation_magnets(self, range_high: float, range_low: float, df: pd.DataFrame) -> Dict:
+        """Check for liquidation clusters acting as magnets"""
+        try:
+            levels = advanced_data.get_liquidation_levels(df, lookback_bars=100)
+            
+            magnets_above = []
+            magnets_below = []
+            
+            for cluster in levels['above']:
+                if cluster['price'] > range_high:
+                    magnets_above.append(cluster)
+            
+            for cluster in levels['below']:
+                if cluster['price'] < range_low:
+                    magnets_below.append(cluster)
+            
+            has_magnets = len(magnets_above) > 0 or len(magnets_below) > 0
+            
+            if has_magnets:
+                return {
+                    'has_magnets': True,
+                    'magnets_above': len(magnets_above),
+                    'magnets_below': len(magnets_below),
+                    'confidence_boost': 10 if has_magnets else 0
+                }
+            return {'has_magnets': False, 'confidence_boost': 0}
+        except:
+            return {'has_magnets': False, 'confidence_boost': 0}
+
     def analyze(self, df: pd.DataFrame, orderbook_file: str = None, **kwargs) -> Dict[str, Any]:
         """
         Analyze liquidity with optional real orderbook data

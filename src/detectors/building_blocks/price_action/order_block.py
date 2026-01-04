@@ -112,6 +112,23 @@ class OrderBlock:
         adaptive_lookback = min(lookback, len(df) // 4)
         lookback = max(lookback // 2, adaptive_lookback)
 
+
+    def check_block_liquidation_confirmation(self, block_timestamp: datetime) -> Dict:
+        """Check if order block formed during liquidation hunt"""
+        try:
+            liq_spike = advanced_data.detect_liquidation_spike(block_timestamp, window_minutes=15)
+            
+            if liq_spike['has_spike']:
+                return {
+                    'has_liquidation': True,
+                    'block_type': 'INSTITUTIONAL',
+                    'confidence_boost': min(15, int(liq_spike['spike_ratio'] * 10)),
+                    'spike_side': liq_spike['spike_side']
+                }
+            return {'has_liquidation': False, 'confidence_boost': 0}
+        except:
+            return {'has_liquidation': False, 'confidence_boost': 0}
+
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """Main analysis method"""
         if not all(col in df.columns for col in ['timestamp', 'open', 'high', 'low', 'close']):
