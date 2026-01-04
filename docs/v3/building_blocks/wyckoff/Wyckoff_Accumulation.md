@@ -2,6 +2,45 @@
 
 **Block Number:** 54/66 | **Category:** Wyckoff Method | **Version:** 2.0 MTF | **Status:** ✅ Production Ready
 
+---
+
+## ⚠️ CRITICAL USAGE GUIDELINES
+
+```
+╔════════════════════════════════════════════════════════════════════════════╗
+║ PRODUCTION RECOMMENDATION - MULTI-TIMEFRAME USAGE                         ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+⭐ PRIMARY TIMEFRAME: 2HR
+   ✅ 64.2% NO_ACCUMULATION (trending - EXCELLENT!)
+   ✅ 30.5% PHASE_B (realistic accumulation)
+   ✅ 5.3% PHASE_A (selective selling climax)
+   ✅ 4.09 signals/day (optimal for confluence)
+   → USE THIS as your main Wyckoff signal
+
+⭐ CONFIRMATION TIMEFRAME: 4HR
+   ✅ 91.5% NO_ACCUMULATION (very selective)
+   ✅ 8.3% PHASE_B (true institutional accumulation)
+   ✅ 0.2% PHASE_A (extremely rare)
+   ✅ 0.46 signals/day (confirmation only)
+   → USE THIS to confirm 2HR signals
+
+❌ NOT RECOMMENDED: 15MIN
+   ❌ 4.0% NO_ACCUMULATION (BROKEN - misses trends)
+   ❌ 80.8% PHASE_B (meaningless - micro-ranges)
+   ❌ 95.45 signals/day (too noisy)
+   → DO NOT USE - Wyckoff doesn't work on micro-timeframes
+
+CONFLUENCE STRUCTURE:
+  2HR Phase B:           +45 points
+  4HR Phase B confirms:  +30 points
+  MTF Alignment bonus:   +50 points
+  ─────────────────────────────────
+  Total when aligned:    +125 points!
+```
+
+---
+
 ## Overview
 Multi-timeframe Wyckoff accumulation phase detection where smart money quietly builds positions. Uses **2HR as PRIMARY** timeframe and **4HR as CONFIRMATION** for optimal Bitcoin trading.
 
