@@ -3,10 +3,48 @@ Wyckoff Accumulation Phase Detector
 Category: Wyckoff Method
 Purpose: Identifies accumulation phases (smart money building positions)
 
-PRODUCTION RECOMMENDATION (Multi-Timeframe Testing Results):
-⭐ PRIMARY TIMEFRAME: 2HR (64.2% trending, 30.5% Phase B)
-⭐ CONFIRMATION: 4HR (91.5% trending, 8.3% Phase B)
-❌ NOT RECOMMENDED: 15min (4% trending, 80.8% Phase B - too many micro-ranges)
+╔════════════════════════════════════════════════════════════════════════════╗
+║ PRODUCTION RECOMMENDATION - MULTI-TIMEFRAME USAGE                         ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+⭐ PRIMARY TIMEFRAME: 2HR
+   - 64.2% NO_ACCUMULATION (trending - EXCELLENT!)
+   - 30.5% PHASE_B (realistic accumulation)
+   - 5.3% PHASE_A (selective selling climax)
+   - 4.09 signals/day (optimal for confluence)
+   - USE THIS as your main Wyckoff signal
+
+⭐ CONFIRMATION TIMEFRAME: 4HR
+   - 91.5% NO_ACCUMULATION (very selective)
+   - 8.3% PHASE_B (true institutional accumulation)
+   - 0.2% PHASE_A (extremely rare)
+   - 0.46 signals/day (confirmation only)
+   - USE THIS to confirm 2HR signals
+
+❌ NOT RECOMMENDED: 15MIN
+   - 4.0% NO_ACCUMULATION (BROKEN - misses trends)
+   - 80.8% PHASE_B (meaningless - micro-ranges)
+   - 95.45 signals/day (too noisy)
+   - DO NOT USE - Wyckoff doesn't work on micro-timeframes
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║ HOW TO USE - MULTI-TIMEFRAME STRATEGY                                     ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+RECOMMENDED PATTERN:
+  1. Analyze 2HR for primary signal (Phase A/B detection)
+  2. Analyze 4HR for confirmation
+  3. Use helper function: analyze_multi_timeframe(df_2hr, df_4hr)
+  4. Get confluence boost (20-145 points total!)
+
+CONFLUENCE STRUCTURE:
+  2HR Phase B:           +45 points
+  4HR Phase B confirms:  +30 points
+  MTF Alignment bonus:   +50 points
+  ─────────────────────────────────
+  Total when aligned:    +125 points! (transforms marginal setups)
+
+NEVER USE ON 15MIN - It will produce false signals (80.8% Phase B is wrong)
 
 Multi-Timeframe Testing Results (180 days):
   15MIN: 80.8% Phase B, 4.0% NO_ACCUM (broken - micro-ranges)
