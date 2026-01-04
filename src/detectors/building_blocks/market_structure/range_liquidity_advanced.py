@@ -6,6 +6,19 @@ Purpose: Institutional-grade liquidity detection with real orderbook depth
 This is a GAME-CHANGING enhancement over OHLCV-only proximity analysis!
 Uses actual bid/ask depth from real orderbook data for precise liquidity measurement.
 """
+"""
+Building Block Classification: CONTEXT BLOCK
+Mode: CONTINUOUS
+Purpose: Continuous advanced range analysis
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any
 from datetime import datetime, timedelta

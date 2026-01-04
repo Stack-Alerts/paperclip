@@ -41,6 +41,19 @@ Implementation Features:
 Grade: A (92/100) - Production Ready
 Value: $60K-$95K (multi-timeframe integration)
 """
+"""
+Building Block Classification: EVENT BLOCK
+Mode: SELECTIVE
+Purpose: Accumulation phase detection, fires when identified
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any
 from datetime import datetime

@@ -19,6 +19,19 @@ ENHANCEMENTS (2026-01-04 - Expert Mode):
 - Priority 1.2: Zone duration tracking (freshness awareness)
 - Priority 1.3: Historical zone reaction (data-driven confidence)
 """
+"""
+Building Block Classification: CONTEXT BLOCK
+Mode: CONTINUOUS
+Purpose: Continuous premium/discount state
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any
 from datetime import datetime

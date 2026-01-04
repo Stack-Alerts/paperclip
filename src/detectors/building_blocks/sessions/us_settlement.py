@@ -17,6 +17,19 @@ ENHANCED VERSION (2026-01-03):
 - Magnet effect detection (drift toward settlement)
 - Smart confidence (data-driven)
 """
+"""
+Building Block Classification: CONTEXT BLOCK
+Mode: TIME-BASED
+Purpose: US settlement time state
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any
 from datetime import datetime

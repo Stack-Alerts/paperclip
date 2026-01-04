@@ -6,6 +6,19 @@ Purpose: Detect inducement patterns - ICT liquidity trap concept
 ENHANCEMENTS (2026-01-04):
 - Priority 1.1: Trap strength classification (quality tiers)
 """
+"""
+Building Block Classification: EVENT BLOCK
+Mode: SELECTIVE
+Purpose: Inducement detection, fires when setup complete
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, Optional
 from datetime import datetime

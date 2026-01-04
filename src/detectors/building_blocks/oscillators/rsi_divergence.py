@@ -3,6 +3,19 @@ RSI (Relative Strength Index) Divergence Building Block
 Category: Oscillator Indicators  
 Purpose: Momentum oscillator for overbought/oversold conditions and divergence detection
 """
+"""
+Building Block Classification: EVENT BLOCK
+Mode: SELECTIVE
+Purpose: RSI divergence detection, fires on divergence events
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime

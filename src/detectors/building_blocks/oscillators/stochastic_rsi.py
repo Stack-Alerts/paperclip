@@ -3,6 +3,19 @@ Stochastic RSI Cross Building Block
 Category: Oscillator Indicators
 Purpose: Momentum oscillator combining RSI with Stochastic for precise entry/exit timing
 """
+"""
+Building Block Classification: HYBRID BLOCK
+Mode: CONTINUOUS + EVENT
+Purpose: Continuous overbought/oversold + crossover events
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, Tuple
 from datetime import datetime

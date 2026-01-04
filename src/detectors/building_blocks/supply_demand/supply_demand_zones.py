@@ -15,6 +15,19 @@ INSTITUTIONAL DEFINITION:
 - SUPPLY Zone: Consolidation base → Explosive DOWN move (left sell imbalance)
 - Zone = The BASE area (not current price proximity!)
 """
+"""
+Building Block Classification: EVENT BLOCK
+Mode: SELECTIVE
+Purpose: Zone detection, fires when zones form
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime

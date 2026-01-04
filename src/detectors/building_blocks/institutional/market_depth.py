@@ -22,6 +22,19 @@ ENHANCED VERSION (2026-01-03):
 - Bid/ask imbalance detection
 - Support/resistance levels from order book
 """
+"""
+Building Block Classification: CONTEXT BLOCK
+Mode: CONTINUOUS
+Purpose: Continuous market depth analysis
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any
 from datetime import datetime

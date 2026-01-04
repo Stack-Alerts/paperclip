@@ -10,6 +10,19 @@ ENHANCED VERSION (2026-01-03):
 - Smart confidence (data-driven)
 - Rich metadata for confluence
 """
+"""
+Building Block Classification: CONTEXT BLOCK
+Mode: TIME-BASED
+Purpose: Continuous kill zone state (in/out)
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any
 from datetime import datetime, time

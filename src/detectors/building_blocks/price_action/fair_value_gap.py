@@ -3,6 +3,19 @@ Fair Value Gap (FVG) Building Block - ENHANCED WITH ADVANCED DATA (2026-01-03)
 Category: Advanced Price Action
 Purpose: Identify fair value gaps (price inefficiencies) - ICT/SMC concept
 """
+"""
+Building Block Classification: EVENT BLOCK
+Mode: SELECTIVE
+Purpose: FVG detection, fires when gap forms
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, List
 from datetime import datetime

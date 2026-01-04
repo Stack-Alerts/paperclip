@@ -10,6 +10,19 @@ ENHANCED VERSION (2026-01-03):
 - Event tracking
 - Institutional-grade assessment
 """
+"""
+Building Block Classification: CONTEXT BLOCK
+Mode: CONTINUOUS
+Purpose: Continuous swing high/low tracking
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, List
 from datetime import datetime

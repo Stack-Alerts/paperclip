@@ -3,6 +3,19 @@ Mitigation Block Building Block
 Category: SMC/ICT
 Purpose: Detect mitigation blocks - ICT institutional position mitigation
 """
+"""
+Building Block Classification: EVENT BLOCK
+Mode: SELECTIVE
+Purpose: Mitigation block detection, fires when formed
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, Optional
 from datetime import datetime

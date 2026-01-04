@@ -8,6 +8,19 @@ ENHANCEMENTS (2026-01-04):
 - Priority 1.2: Volume confirmation (quality filtering)
 - Priority 1.3: Gap size tracking (FVG detection integration)
 """
+"""
+Building Block Classification: EVENT BLOCK
+Mode: SELECTIVE
+Purpose: Displacement detection, fires on strong moves
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any
 from datetime import datetime

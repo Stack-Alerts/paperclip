@@ -3,6 +3,19 @@ ADR (Average Daily Range) Building Block
 Category: Volatility Indicators
 Purpose: Measures average daily price range for position sizing and target setting
 """
+"""
+Building Block Classification: CONTEXT BLOCK
+Mode: CONTINUOUS
+Purpose: Continuous Average Daily Range reference
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta

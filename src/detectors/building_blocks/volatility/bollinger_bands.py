@@ -3,6 +3,19 @@ Bollinger Bands Building Block
 Category: Volatility Indicators
 Purpose: Volatility indicator using standard deviations around moving average
 """
+"""
+Building Block Classification: HYBRID BLOCK
+Mode: CONTINUOUS + EVENT
+Purpose: Continuous band state + squeeze/expansion events
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime

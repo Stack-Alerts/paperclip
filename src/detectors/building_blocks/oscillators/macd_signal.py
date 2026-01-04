@@ -3,6 +3,19 @@ MACD (Moving Average Convergence Divergence) Signal Building Block
 Category: Oscillator Indicators
 Purpose: Trend-following momentum indicator for trend identification and reversals
 """
+"""
+Building Block Classification: SIGNAL BLOCK
+Mode: EVENT-DRIVEN
+Purpose: MACD crossover signals, selective on cross events
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime

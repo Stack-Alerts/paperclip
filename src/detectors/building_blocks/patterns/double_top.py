@@ -2,6 +2,19 @@
 Double Top Pattern - INSTITUTIONAL GRADE with Multi-Block Validation
 Integrates RSI, VWAP, Premium/Discount, and Volume for 70%+ confidence
 """
+"""
+Building Block Classification: EVENT BLOCK
+Mode: SELECTIVE
+Purpose: Pattern formation detection, fires when complete
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any
 from datetime import datetime

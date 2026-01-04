@@ -8,6 +8,19 @@ ENHANCEMENTS (2026-01-04):
 - Priority 1.2: Swing strength context (ATR-relative)
 - Priority 1.3: Multiple failure detection (momentum tracking)
 """
+"""
+Building Block Classification: EVENT BLOCK
+Mode: SELECTIVE
+Purpose: SFP detection, fires on failure pattern
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, Optional
 from datetime import datetime

@@ -3,6 +3,19 @@ Order Block Building Block
 Category: Advanced Price Action
 Purpose: Identify institutional order blocks (supply/demand zones) - ENHANCED WITH ADVANCED DATA (2026-01-03)
 """
+"""
+Building Block Classification: EVENT BLOCK
+Mode: SELECTIVE
+Purpose: Order block detection, fires when block forms
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, List
 from datetime import datetime

@@ -3,6 +3,19 @@ Fibonacci Retracements Building Block
 Category: Supply/Demand & Fibonacci
 Purpose: Identifies reversal levels using Fibonacci ratios (23.6%, 38.2%, 50%, 61.8%, 78.6%)
 """
+"""
+Building Block Classification: CONTEXT BLOCK
+Mode: CONTINUOUS
+Purpose: Continuous Fibonacci levels, always provides retracement zones
+
+Block Type Definitions:
+- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
+- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- HYBRID BLOCK: Combination of continuous state + selective events
+"""
+
+
 
 from typing import Dict, Any, List
 from datetime import datetime
