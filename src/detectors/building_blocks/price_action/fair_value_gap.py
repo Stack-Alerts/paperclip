@@ -1,7 +1,5 @@
 """
-ENHANCED WITH ADVANCED DATA (2026-01-03)
-"""
-Fair Value Gap (FVG) Building Block
+Fair Value Gap (FVG) Building Block - ENHANCED WITH ADVANCED DATA (2026-01-03)
 Category: Advanced Price Action
 Purpose: Identify fair value gaps (price inefficiencies) - ICT/SMC concept
 """

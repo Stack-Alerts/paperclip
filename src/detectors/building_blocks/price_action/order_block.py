@@ -1,9 +1,7 @@
 """
-ENHANCED WITH ADVANCED DATA (2026-01-03)
-"""
 Order Block Building Block
 Category: Advanced Price Action
-Purpose: Identify institutional order blocks (supply/demand zones)
+Purpose: Identify institutional order blocks (supply/demand zones) - ENHANCED WITH ADVANCED DATA (2026-01-03)
 """
 
 from typing import Dict, Any, List

@@ -1,0 +1,54 @@
+{
+  "test_run": "2026-01-04T05:33:39.008863",
+  "total_phases": 6,
+  "results": [
+    {
+      "phase": 1,
+      "name": "Pattern Blocks (15)",
+      "status": "COMPLETE",
+      "output_file": "pattern_walkforward_detailed_results.json",
+      "stdout_lines": 183,
+      "stderr_lines": 1
+    },
+    {
+      "phase": 2,
+      "name": "Moving Average Signals (6)",
+      "status": "COMPLETE",
+      "output_file": "moving_average_results.json",
+      "stdout_lines": 105,
+      "stderr_lines": 1
+    },
+    {
+      "phase": 3,
+      "name": "ICT/SMC Advanced Signals (10)",
+      "status": "COMPLETE",
+      "output_file": "advanced_signal_results.json",
+      "stdout_lines": 173,
+      "stderr_lines": 1
+    },
+    {
+      "phase": 4,
+      "name": "Metadata Blocks (16)",
+      "status": "COMPLETE",
+      "output_file": "metadata_validation_results.json",
+      "stdout_lines": 2,
+      "stderr_lines": 1
+    },
+    {
+      "phase": 5,
+      "name": "Custom/Remaining Blocks",
+      "status": "COMPLETE",
+      "output_file": "custom_metadata_results.json",
+      "stdout_lines": 435,
+      "stderr_lines": 1
+    },
+    {
+      "phase": 6,
+      "name": "All Remaining Non-Pattern Signals",
+      "status": "COMPLETE",
+      "output_file": "remaining_nonpattern_results.json",
+      "stdout_lines": 263,
+      "stderr_lines": 1
+    }
+  ]
+}
