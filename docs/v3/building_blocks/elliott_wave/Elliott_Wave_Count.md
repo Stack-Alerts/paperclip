@@ -31,14 +31,99 @@ This 60+ page guide includes:
 ---
 
 ## Overview
-Multi-Timeframe Elliott Wave detector that identifies 5-wave impulse and 3-wave corrective patterns. Uses Daily + 4H for high-conviction context signals (HTF focus).
+Multi-Timeframe Elliott Wave detector with **CONTINUOUS WAVE TRACKING**. Always identifies current wave position (1-5), providing constant HTF context for trade management. Uses Daily + 4H for high-conviction signals.
+
+**Key Innovation:** Unlike traditional Elliott Wave indicators that only signal when complete patterns form, this block **continuously tracks** which wave the market is currently in, enabling real-time trade management decisions.
 
 ## Technical Specifications
 **Mode:** Multi-Timeframe (Daily + 4H) - Expert Mode  
+**Wave Tracking:** CONTINUOUS (always identifies Wave 1, 2, 3, 4, or 5)  
 **Impulse Structure:** 5 waves in trend direction (1-2-3-4-5)  
-**Corrective Structure:** 3 waves against trend (A-B-C)  
+**Corrective Structure:** 3 waves against trend (A-B-C) *[not yet implemented]*  
 **File:** `src/detectors/building_blocks/elliott_wave/elliott_wave_count.py`  
 **Test:** `scripts/walkforward_tests/51_test_elliott_wave_count.py`
+
+## How It Works: Continuous Wave Tracking
+
+### Traditional Elliott Wave Indicators (What We DON'T Do)
+```
+❌ Wait for complete 5-wave pattern
+❌ Signal only at Wave 5 completion
+❌ No information between patterns
+❌ Long periods of "NO_PATTERN" or "WAITING"
+```
+
+### Our Continuous Tracking Approach (What We DO)
+```
+✅ ALWAYS identifies current wave position
+✅ Signals: WAVE_1, WAVE_2, WAVE_3, WAVE_4, WAVE_5
+✅ Updates as pivots form
+✅ 100% coverage (always provides context)
+✅ Enables real-time trade management
+```
+
+### How Wave Identification Works
+
+**Step 1: Pivot Detection**
+```python
+# Detects swing highs and lows on 4H/Daily charts
+Lookback: 5 bars
+Swing HIGH: Current bar's high > previous 5 AND next 5 bars
+Swing LOW: Current bar's low < previous 5 AND next 5 bars
+```
+
+**Step 2: Wave Counting**
+```
+2 Pivots (L→H or H→L):
+  → WAVE_1_BULLISH or WAVE_1_BEARISH
+  Confidence: 50%
+  
+3 Pivots (L→H→L or H→L→H):
+  → WAVE_2_BULLISH or WAVE_2_BEARISH
+  Confidence: 55%
+  
+4 Pivots (L→H→L→H or H→L→H→L):
+  → WAVE_3_BULLISH or WAVE_3_BEARISH (if Wave 3 > Wave 1)
+  Confidence: 70%
+  
+5 Pivots:
+  → WAVE_4_BULLISH or WAVE_4_BEARISH (if shallow correction)
+  Confidence: 60%
+  
+6 Pivots:
+  → WAVE_5_BULLISH or WAVE_5_BEARISH (if complete 5-wave structure)
+  Confidence: 80%
+```
+
+**Step 3: Validation**
+```
+Wave 3 Rules:
+  ✅ Must be > Wave 1 (never shortest)
+  ✅ Typically 1.618x Wave 1
+
+Wave 2 Rules:
+  ✅ Cannot retrace > 100% of Wave 1
+  ✅ Usually 50-61.8% retracement
+
+Wave 4 Rules:
+  ✅ Cannot enter Wave 1 territory
+  ✅ Usually 23.6-38.2% of Wave 3
+```
+
+**Step 4: Multi-Timeframe Alignment**
+```
+Daily Wave + 4H Wave = MTF Signal
+
+Examples:
+  Daily: WAVE_5_BULLISH + 4H: WAVE_5_BULLISH
+    → Booster: +75 points (ULTRA alignment)
+    
+  Daily: WAVE_3_BULLISH + 4H: WAVE_3_BULLISH
+    → Booster: +40 points (strong trend)
+    
+  Daily: WAVE_2_BEARISH (only)
+    → Booster: +5 points (correction ending)
+```
 
 ## MTF Enhancement (Version 2.0)
 
@@ -103,35 +188,110 @@ result = ew.analyze(df_15min)
 # Results: 40-80% confidence, no booster
 ```
 
-## Signal Types (MTF)
+## Signal Types: Complete Wave Coverage
 
-### WAVE_5_FORMING_DAILY (Both Daily + 4H)
-- **Alignment:** 100% (PERFECT)
-- **Confidence:** 95%
-- **Booster:** +75 points
-- **Use:** ULTRA HIGH conviction reversal
-- **Example:** 2021 BTC top ($64K) - both timeframes aligned
+### WAVE_1_BULLISH / WAVE_1_BEARISH
+**Detection:** 2 pivots formed (initial impulse)  
+**Confidence:** 50%  
+**Booster:** +3 points  
+**Meaning:** "New trend starting - early detection"
 
-### WAVE_5_FORMING_DAILY (Daily only)
-- **Alignment:** 85% (STRONG)
-- **Confidence:** 85%
-- **Booster:** +50 points
-- **Use:** HIGH conviction reversal
-- **Example:** Intermediate tops with daily exhaustion
+**What This Tells You:**
+- Initial impulse detected
+- Trend may be beginning
+- High risk (Wave 1 often fails)
+- **Action:** Wait for Wave 2 (better entry)
 
-### WAVE_5_FORMING_4H (4H only)
-- **Alignment:** 70% (GOOD)
-- **Confidence:** 70%
-- **Booster:** +30 points
-- **Use:** MODERATE reversal with confluence
-- **Example:** Shorter-term reversals
+**Typical Duration:** 2-5 days (4H chart)
 
-### PATTERN_IN_PROGRESS
-- **Alignment:** 40% (LOW)
-- **Confidence:** 40%
-- **Booster:** 0 points
-- **Use:** Wait for clearer setup
-- **Note:** Most common (Elliott Waves are rare)
+---
+
+### WAVE_2_BULLISH / WAVE_2_BEARISH
+**Detection:** 3 pivots formed (correction after Wave 1)  
+**Confidence:** 55%  
+**Booster:** +5 points  
+**Meaning:** "Correction ending - IDEAL ENTRY POINT for Wave 3"
+
+**What This Tells You:**
+- Pullback in progress
+- **BEST entry opportunity** (highest R:R)
+- Wave 3 (strongest) coming next
+- Target: 50-61.8% Fibonacci retracement
+- **Action:** Enter on reversal signals at Fib zone
+
+**Typical Duration:** 2-4 days (4H chart)  
+**Critical:** If Wave 2 retraces >100% of Wave 1 → Pattern INVALID
+
+---
+
+### WAVE_3_BULLISH / WAVE_3_BEARISH
+**Detection:** 4 pivots formed (strong extension)  
+**Confidence:** 70%  
+**Booster:** +15-40 points (varies with MTF)  
+**Meaning:** "Strongest wave in progress - HOLD positions"
+
+**What This Tells You:**
+- **THE MONEY WAVE** (most profitable)
+- Typically 1.618-2.618x Wave 1 size
+- Highest volume and momentum
+- **NEVER short during Wave 3**
+- **Action:** HOLD aggressively, add on pullbacks
+
+**Typical Duration:** 5-15 days (4H chart)  
+**Key:** Wave 3 is NEVER the shortest wave
+
+---
+
+### WAVE_4_BULLISH / WAVE_4_BEARISH
+**Detection:** 5 pivots formed (shallow correction)  
+**Confidence:** 60%  
+**Booster:** +10 points  
+**Meaning:** "Brief pause - Wave 5 (final) coming"
+
+**What This Tells You:**
+- Shallow correction before final move
+- **REDUCE position size** (50%)
+- Tighten stops
+- Wave 5 (risky) coming next
+- **Action:** Take partial profits, prepare for Wave 5
+
+**Typical Duration:** 2-3 days (4H chart)  
+**Critical:** If Wave 4 enters Wave 1 territory → Pattern INVALID
+
+---
+
+### WAVE_5_BULLISH / WAVE_5_BEARISH
+**Detection:** 6 pivots formed (complete 5-wave structure)  
+**Confidence:** 80%  
+**Booster:** +30-75 points (MEGA if MTF aligned)  
+**Meaning:** "Final push - MAJOR REVERSAL IMMINENT"
+
+**What This Tells You:**
+- **MOST IMPORTANT SIGNAL**
+- Final move before major reversal
+- **EXIT ALL positions immediately**
+- ABC correction coming (-20-40%)
+- RSI divergence common
+- **Action:** EXIT on ANY reversal signals
+
+**Typical Duration:** 3-7 days (4H chart)  
+**Warning:** Holding past Wave 5 = catastrophic risk
+
+---
+
+### WAVE_UNCERTAIN / NO_PATTERN
+**Detection:** Insufficient pivots or unclear structure  
+**Confidence:** 34-40%  
+**Booster:** 0 points  
+**Meaning:** "Wave position unclear - wait for clarity"
+
+**What This Tells You:**
+- Not enough data yet
+- Or choppy/sideways market
+- **Action:** WAIT for clearer wave identification
+- Use other blocks for confluence
+
+**Note:** With continuous tracking, this state is rare
 
 ## Wave Rules (Standard Elliott Wave Theory)
 - Wave 2 never retraces more than 100% of Wave 1
