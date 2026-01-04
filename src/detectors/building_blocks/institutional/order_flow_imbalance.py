@@ -145,8 +145,42 @@ class OrderFlowImbalance:
         
         return is_persistent, persistent_count
     
+    def check_liquidation_confirmation(self, timestamp: datetime, signal_direction: str) -> Dict:
+        """
+        Check if liquidations confirm the order flow imbalance
+        Returns: {has_liquidation, spike_side, confidence_boost}
+        """
+        try:
+            liq_spike = advanced_data.detect_liquidation_spike(timestamp, window_minutes=15)
+            
+            if liq_spike['has_spike']:
+                # Check if liquidation side aligns with imbalance
+                aligns = False
+                if signal_direction == 'BUY' and liq_spike['spike_side'] == 'LONG':
+                    # Longs getting liquidated = selling pressure confirms buy imbalance reaction
+                    aligns = True
+                elif signal_direction == 'SELL' and liq_spike['spike_side'] == 'SHORT':
+                    # Shorts getting liquidated = buying pressure confirms sell imbalance reaction  
+                    aligns = True
+                elif liq_spike['spike_side'] == 'MIXED':
+                    aligns = True  # Mixed liquidations = high volatility confirms imbalance
+                
+                if aligns:
+                    return {
+                        'has_liquidation': True,
+                        'spike_volume': liq_spike['spike_volume'],
+                        'spike_side': liq_spike['spike_side'],
+                        'confidence_boost': min(15, int(liq_spike['spike_ratio'] * 8)),
+                        'confirmed': True
+                    }
+            
+            return {'has_liquidation': False, 'confidence_boost': 0, 'confirmed': False}
+        except Exception as e:
+            return {'has_liquidation': False, 'confidence_boost': 0, 'confirmed': False, 'error': str(e)}
+    
     def calculate_variable_confidence(self, signal: str, strength: int,
-                                     is_persistent: bool, volume_increasing: bool) -> int:
+                                     is_persistent: bool, volume_increasing: bool,
+                                     liq_boost: int = 0) -> int:
         """
         Variable confidence based on imbalance quality
         
@@ -260,13 +294,26 @@ class OrderFlowImbalance:
         # ATR for context
         atr = self.calculate_atr(df, self.atr_period)
         
-        # VARIABLE CONFIDENCE (key enhancement!)
-        confidence = self.calculate_variable_confidence(
+        # ENHANCED: Check liquidation confirmation
+        timestamp = df['timestamp'].iloc[-1]
+        signal_dir = 'BUY' if signal == 'BUY_IMBALANCE' else 'SELL' if signal == 'SELL_IMBALANCE' else 'NONE'
+        liq_confirm = self.check_liquidation_confirmation(timestamp, signal_dir)
+        
+        # VARIABLE CONFIDENCE with liquidation boost
+        base_confidence = self.calculate_variable_confidence(
             signal, strength, is_persistent, volume_increasing
         )
         
+        # Add liquidation boost
+        confidence = base_confidence + liq_confirm['confidence_boost']
+        confidence = min(95, max(60, confidence))  # Cap at 95
+        
         # Build confluence factors (rich descriptions)
         confluence_factors = []
+        
+        # Liquidation confirmation first (if present)
+        if liq_confirm['has_liquidation']:
+            confluence_factors.append(f'⭐ LIQUIDATION SPIKE! {liq_confirm["spike_side"]} liquidations confirm imbalance!')
         
         if signal == 'BUY_IMBALANCE':
             confluence_factors.append(f'Buy pressure detected ({buy_ratio*100:.1f}% up volume)')
