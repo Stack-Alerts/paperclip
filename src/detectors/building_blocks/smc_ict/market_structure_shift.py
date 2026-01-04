@@ -2,13 +2,17 @@
 Market Structure Shift (MSS) Building Block
 Category: SMC/ICT
 Purpose: Detect market structure changes - trend reversals ICT concept
+
+ENHANCEMENTS (2026-01-04):
+- Priority 1.1: Multiple MSS detection (reversal confirmation tracking)
+- Priority 1.2: Break strength tiers (quality classification)
+- Priority 1.3: Retest detection (safer entry opportunities)
 """
 
 from typing import Dict, Any
 from datetime import datetime
 import pandas as pd
 import numpy as np
-
 
 class MarketStructureShift:
     """
@@ -24,13 +28,17 @@ class MarketStructureShift:
     - Often precedes new directional move
     
     Parameters:
-        swing_lookback: Periods for swing detection (default: 10)
-        min_break_pct: Minimum break % to confirm (default: 0.1%)
+        swing_lookback: Periods for swing detection (default: 8)
+        min_break_pct: Minimum break % to confirm (default: 0.05%)
+        track_confirmation: Track consecutive MSS for confirmation (default: True)
+        detect_retest: Detect pullbacks to MSS level (default: True)
     """
     
     def __init__(self, timeframe: str = '15min',
                  swing_lookback: int = 8,
-                 min_break_pct: float = 0.05, **kwargs):
+                 min_break_pct: float = 0.05,
+                 track_confirmation: bool = True,
+                 detect_retest: bool = True, **kwargs):
         """
         Initialize MSS detector with OPTIMIZED parameters (batch tuning 2026-01-01)
         
@@ -40,10 +48,118 @@ class MarketStructureShift:
             Signals: 16,431 in 180 days (91.3/day - very high frequency)
             R/R: 7.93 (excellent)
             Discovery: swing=8 (vs 10), thresh=0.05 (vs 0.1) - faster + looser
+        
+        Enhancements (2026-01-04 - Expert Mode Priority 1 & 2):
+            track_confirmation: Track consecutive MSS for reversal confirmation
+            detect_retest: Detect pullbacks to MSS level for safer entries
         """
         self.timeframe = timeframe
         self.swing_lookback = swing_lookback
         self.min_break_pct = min_break_pct
+        self.track_confirmation = track_confirmation
+        self.detect_retest = detect_retest
+        self.mss_history = []  # Track MSS events for confirmation
+    
+    def classify_break_strength(self, break_pct: float) -> str:
+        """
+        Classify break strength into tiers (Priority 1.2 Enhancement)
+        
+        Returns:
+            'WEAK': 0.05-0.15% break
+            'MODERATE': 0.15-0.3% break
+            'STRONG': 0.3-0.6% break
+            'VERY_STRONG': >0.6% break
+        """
+        if break_pct >= 0.6:
+            return 'VERY_STRONG'
+        elif break_pct >= 0.3:
+            return 'STRONG'
+        elif break_pct >= 0.15:
+            return 'MODERATE'
+        else:
+            return 'WEAK'
+    
+    def count_consecutive_mss(self, current_signal: str) -> int:
+        """
+        Count consecutive MSS in same direction (Priority 1.1 Enhancement)
+        
+        Returns:
+            Number of consecutive MSS events in current direction
+            (2+ indicates strong reversal confirmation)
+        """
+        if not self.track_confirmation or len(self.mss_history) == 0:
+            return 1
+        
+        consecutive = 1
+        for mss_event in reversed(self.mss_history[-3:]):  # Check last 3
+            if mss_event == current_signal:
+                consecutive += 1
+            else:
+                break
+        
+        return consecutive
+    
+    def update_mss_history(self, signal: str, is_new_event: bool):
+        """Update MSS history for confirmation tracking"""
+        if self.track_confirmation and is_new_event and signal in ['BULLISH', 'BEARISH']:
+            self.mss_history.append(signal)
+            # Keep only last 5 events
+            if len(self.mss_history) > 5:
+                self.mss_history.pop(0)
+    
+    def detect_mss_retest(self, df: pd.DataFrame, mss_data: Dict[str, Any], current_index: int) -> Dict[str, Any]:
+        """
+        Detect pullback to MSS level (Priority 1.3 Enhancement)
+        
+        Returns dict with retest info or None if no retest detected
+        """
+        if not self.detect_retest:  # This is the parameter, not the method
+            return None
+        
+        mss_index = mss_data['index']
+        bars_since_mss = current_index - mss_index
+        
+        # Only check for retest within 10 bars of MSS
+        if bars_since_mss < 2 or bars_since_mss > 10:
+            return None
+        
+        if mss_data['type'] == 'BULLISH_MSS':
+            # Check if price pulled back to MSS level and rejected
+            mss_level = mss_data['swing_high']
+            recent_bars = df.iloc[mss_index+1:current_index+1]
+            
+            # Look for pullback to within 0.5% of MSS level
+            for i, row in recent_bars.iterrows():
+                distance_pct = abs((row['low'] - mss_level) / mss_level) * 100
+                if distance_pct <= 0.5:
+                    # Check if price rejected (closed above)
+                    if row['close'] > mss_level:
+                        return {
+                            'has_retest': True,
+                            'retest_bar': row['timestamp'],
+                            'retest_distance': round(distance_pct, 3),
+                            'retest_type': 'BULLISH_RETEST'
+                        }
+        
+        else:  # BEARISH_MSS
+            # Check if price pulled back to MSS level and rejected
+            mss_level = mss_data['swing_low']
+            recent_bars = df.iloc[mss_index+1:current_index+1]
+            
+            # Look for pullback to within 0.5% of MSS level
+            for i, row in recent_bars.iterrows():
+                distance_pct = abs((row['high'] - mss_level) / mss_level) * 100
+                if distance_pct <= 0.5:
+                    # Check if price rejected (closed below)
+                    if row['close'] < mss_level:
+                        return {
+                            'has_retest': True,
+                            'retest_bar': row['timestamp'],
+                            'retest_distance': round(distance_pct, 3),
+                            'retest_type': 'BEARISH_RETEST'
+                        }
+        
+        return None
     
     def find_swing_high(self, df: pd.DataFrame, idx: int) -> float:
         """Find swing high at index"""
@@ -78,7 +194,8 @@ class MarketStructureShift:
                         'swing_high': float(swing_high),
                         'break_high': float(current_high),
                         'break_pct': round(break_pct, 3),
-                        'timestamp': df['timestamp'].iloc[i]
+                        'timestamp': df['timestamp'].iloc[i],
+                        'break_strength': self.classify_break_strength(break_pct)
                     }
         return None
     
@@ -103,7 +220,8 @@ class MarketStructureShift:
                         'swing_low': float(swing_low),
                         'break_low': float(current_low),
                         'break_pct': round(break_pct, 3),
-                        'timestamp': df['timestamp'].iloc[i]
+                        'timestamp': df['timestamp'].iloc[i],
+                        'break_strength': self.classify_break_strength(break_pct)
                     }
         return None
     
@@ -158,46 +276,92 @@ class MarketStructureShift:
         current_bar_index = len(df) - 1
         is_new_event = (active_mss['index'] == current_bar_index)
         
-        # Calculate confidence
+        # **ENHANCED:** Count consecutive MSS (confirmation tracking)
+        consecutive_mss = self.count_consecutive_mss(signal)
+        
+        # Update MSS history
+        self.update_mss_history(signal, is_new_event)
+        
+        # **ENHANCED:** Detect retest
+        retest_info = self.detect_mss_retest(df, active_mss, current_bar_index)
+        
+        # **ENHANCED:** Calculate confidence with new factors
         confidence = 85  # High confidence for MSS
-        if active_mss['break_pct'] > 0.5:
+        
+        # Break strength bonus
+        break_strength = active_mss.get('break_strength', 'MODERATE')
+        if break_strength == 'VERY_STRONG':
+            confidence += 15
+        elif break_strength == 'STRONG':
             confidence += 10
+        elif break_strength == 'MODERATE':
+            confidence += 5
+        
+        # NEW event bonus
         if is_new_event:
-            confidence += 5  # Higher confidence for fresh MSS (reversal timing critical!)
+            confidence += 5  # Fresh reversal timing critical!
+        
+        # Confirmation bonus (consecutive MSS)
+        if consecutive_mss >= 2:
+            confidence += 5  # Strong reversal confirmation
+        
+        # Retest bonus
+        if retest_info and retest_info['has_retest']:
+            confidence += 10  # Retest = safer entry
+        
         confidence = min(100, confidence)
         
-        # Build confluence
+        # **ENHANCED:** Build confluence with new factors
         confluence_factors = []
         confluence_factors.append(f'MSS Type: {active_mss["type"]}')
-        confluence_factors.append(f'Break Strength: {active_mss["break_pct"]:.3f}%')
+        confluence_factors.append(f'Break Strength: {active_mss["break_pct"]:.3f}% ({break_strength})')
         confluence_factors.append('Market structure changed - trend reversal signal')
+        
+        # Confirmation indicator
+        if consecutive_mss >= 2:
+            confluence_factors.append(f'✅ CONFIRMED: {consecutive_mss} consecutive MSS (strong reversal)')
+        
+        # Retest indicator
+        if retest_info and retest_info['has_retest']:
+            confluence_factors.append(f'🎯 RETEST DETECTED: Pullback to MSS level (safer entry!)')
+        
         if is_new_event:
             confluence_factors.append('⭐ NEW MSS EVENT (just occurred - fresh reversal signal!)')
         else:
             confluence_factors.append('Continuing MSS state (structure already shifted)')
         confluence_factors.append('Institutional positioning shift likely')
         
-        # Metadata
+        # **ENHANCED:** Metadata with new tracking
         if active_mss['type'] == 'BULLISH_MSS':
             metadata = {
                 'mss_type': active_mss['type'],
                 'swing_high': active_mss['swing_high'],
                 'break_high': active_mss['break_high'],
                 'break_pct': active_mss['break_pct'],
+                'break_strength': break_strength,  # NEW: Strength tier
+                'consecutive_mss': consecutive_mss,  # NEW: Confirmation tracking
                 'mss_timestamp': active_mss['timestamp'],
-                'is_new_event': is_new_event,  # NEW: Event tracking
-                'bars_since_mss': current_bar_index - active_mss['index']  # NEW: Age tracking
+                'is_new_event': is_new_event,
+                'bars_since_mss': current_bar_index - active_mss['index']
             }
+            # Add retest info if detected
+            if retest_info:
+                metadata.update(retest_info)
         else:
             metadata = {
                 'mss_type': active_mss['type'],
                 'swing_low': active_mss['swing_low'],
                 'break_low': active_mss['break_low'],
                 'break_pct': active_mss['break_pct'],
+                'break_strength': break_strength,  # NEW: Strength tier
+                'consecutive_mss': consecutive_mss,  # NEW: Confirmation tracking
                 'mss_timestamp': active_mss['timestamp'],
-                'is_new_event': is_new_event,  # NEW: Event tracking
-                'bars_since_mss': current_bar_index - active_mss['index']  # NEW: Age tracking
+                'is_new_event': is_new_event,
+                'bars_since_mss': current_bar_index - active_mss['index']
             }
+            # Add retest info if detected
+            if retest_info:
+                metadata.update(retest_info)
         
         return {
             'signal': signal,

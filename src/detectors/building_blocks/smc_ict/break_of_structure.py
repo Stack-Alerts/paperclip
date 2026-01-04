@@ -2,13 +2,17 @@
 Break of Structure (BOS) Building Block
 Category: SMC/ICT
 Purpose: Detect trend continuation - Break of Structure ICT concept
+
+ENHANCEMENTS (2026-01-04):
+- Priority 1.1: Multiple BOS detection (momentum tracking)
+- Priority 1.2: Break strength tiers (quality classification)
+- Priority 1.3: Volume confirmation (optional)
 """
 
 from typing import Dict, Any
 from datetime import datetime
 import pandas as pd
 import numpy as np
-
 
 class BreakOfStructure:
     """
@@ -28,13 +32,17 @@ class BreakOfStructure:
     - Entry opportunity in trend direction
     
     Parameters:
-        swing_lookback: Periods for swing detection (default: 10)
-        min_break_pct: Minimum break % to confirm (default: 0.1%)
+        swing_lookback: Periods for swing detection (default: 8)
+        min_break_pct: Minimum break % to confirm (default: 0.05%)
+        track_momentum: Track consecutive BOS for momentum (default: True)
+        volume_confirmation: Require volume spike (default: False)
     """
     
     def __init__(self, timeframe: str = '15min',
                  swing_lookback: int = 8,
-                 min_break_pct: float = 0.05, **kwargs):
+                 min_break_pct: float = 0.05,
+                 track_momentum: bool = True,
+                 volume_confirmation: bool = False, **kwargs):
         """
         Initialize BOS detector with OPTIMIZED parameters (institutional tuning 2026-01-01)
         
@@ -45,10 +53,81 @@ class BreakOfStructure:
             R/R: 8.61 (excellent)
             Follow-through: 6.6 bars
             Discovery: Faster lookback (8 vs 10) + looser threshold (0.05 vs 0.1) = better
+        
+        Enhancements (2026-01-04 - Expert Mode Priority 1 & 2):
+            track_momentum: Track consecutive BOS for momentum detection
+            volume_confirmation: Require volume spike for BOS confirmation (optional)
         """
         self.timeframe = timeframe
         self.swing_lookback = swing_lookback
         self.min_break_pct = min_break_pct
+        self.track_momentum = track_momentum
+        self.volume_confirmation = volume_confirmation
+        self.bos_history = []  # Track BOS events for momentum
+    
+    def classify_break_strength(self, break_pct: float) -> str:
+        """
+        Classify break strength into tiers (Priority 1.2 Enhancement)
+        
+        Returns:
+            'WEAK': 0.05-0.15% break
+            'MODERATE': 0.15-0.3% break
+            'STRONG': 0.3-0.6% break
+            'VERY_STRONG': >0.6% break
+        """
+        if break_pct >= 0.6:
+            return 'VERY_STRONG'
+        elif break_pct >= 0.3:
+            return 'STRONG'
+        elif break_pct >= 0.15:
+            return 'MODERATE'
+        else:
+            return 'WEAK'
+    
+    def check_volume_confirmation(self, df: pd.DataFrame, bos_index: int) -> bool:
+        """
+        Check if BOS has volume confirmation (Priority 1.3 Enhancement)
+        
+        Volume spike = current volume > 1.5x average of last 10 bars
+        """
+        if 'volume' not in df.columns or not self.volume_confirmation:
+            return True  # Pass if no volume or not required
+        
+        if len(df) < 10:
+            return True
+        
+        current_volume = df['volume'].iloc[bos_index]
+        avg_volume = df['volume'].iloc[max(0, bos_index-10):bos_index].mean()
+        
+        return current_volume > (avg_volume * 1.5)
+    
+    def count_consecutive_bos(self, current_signal: str) -> int:
+        """
+        Count consecutive BOS in same direction (Priority 1.1 Enhancement)
+        
+        Returns:
+            Number of consecutive BOS events in current direction
+            (3+ indicates strong momentum)
+        """
+        if not self.track_momentum or len(self.bos_history) == 0:
+            return 1
+        
+        consecutive = 1
+        for bos_event in reversed(self.bos_history[-5:]):  # Check last 5
+            if bos_event == current_signal:
+                consecutive += 1
+            else:
+                break
+        
+        return consecutive
+    
+    def update_bos_history(self, signal: str, is_new_event: bool):
+        """Update BOS history for momentum tracking"""
+        if self.track_momentum and is_new_event and signal in ['BULLISH', 'BEARISH']:
+            self.bos_history.append(signal)
+            # Keep only last 10 events
+            if len(self.bos_history) > 10:
+                self.bos_history.pop(0)
     
     def determine_trend(self, df: pd.DataFrame) -> str:
         """Determine current trend from recent price action"""
@@ -96,6 +175,10 @@ class BreakOfStructure:
             if current_high > swing_high:
                 break_pct = ((current_high - swing_high) / swing_high) * 100
                 if break_pct >= self.min_break_pct:
+                    # Check volume confirmation if required
+                    if not self.check_volume_confirmation(df, i):
+                        continue
+                    
                     return {
                         'type': 'BULLISH_BOS',
                         'index': i,
@@ -103,7 +186,8 @@ class BreakOfStructure:
                         'break_high': float(current_high),
                         'break_pct': round(break_pct, 3),
                         'trend': trend,
-                        'timestamp': df['timestamp'].iloc[i]
+                        'timestamp': df['timestamp'].iloc[i],
+                        'break_strength': self.classify_break_strength(break_pct)
                     }
         return None
     
@@ -125,6 +209,10 @@ class BreakOfStructure:
             if current_low < swing_low:
                 break_pct = ((swing_low - current_low) / swing_low) * 100
                 if break_pct >= self.min_break_pct:
+                    # Check volume confirmation if required
+                    if not self.check_volume_confirmation(df, i):
+                        continue
+                    
                     return {
                         'type': 'BEARISH_BOS',
                         'index': i,
@@ -132,7 +220,8 @@ class BreakOfStructure:
                         'break_low': float(current_low),
                         'break_pct': round(break_pct, 3),
                         'trend': trend,
-                        'timestamp': df['timestamp'].iloc[i]
+                        'timestamp': df['timestamp'].iloc[i],
+                        'break_strength': self.classify_break_strength(break_pct)
                     }
         return None
     
@@ -200,27 +289,56 @@ class BreakOfStructure:
         current_bar_index = len(df) - 1
         is_new_event = (active_bos['index'] == current_bar_index)
         
-        # Calculate confidence
+        # **ENHANCED:** Count consecutive BOS (momentum tracking)
+        consecutive_bos = self.count_consecutive_bos(signal)
+        
+        # Update BOS history
+        self.update_bos_history(signal, is_new_event)
+        
+        # **ENHANCED:** Calculate confidence with new factors
         confidence = 80  # High confidence for BOS in trend
-        if active_bos['break_pct'] > 0.5:
+        
+        # Break strength bonus
+        break_strength = active_bos.get('break_strength', 'MODERATE')
+        if break_strength == 'VERY_STRONG':
+            confidence += 15
+        elif break_strength == 'STRONG':
             confidence += 10
+        elif break_strength == 'MODERATE':
+            confidence += 5
+        
+        # NEW event bonus
         if is_new_event:
-            confidence += 5  # Higher confidence for fresh BOS
+            confidence += 5
+        
+        # Momentum bonus
+        if consecutive_bos >= 3:
+            confidence += 10  # Very strong momentum
+        elif consecutive_bos >= 2:
+            confidence += 5
+        
         confidence = min(100, confidence)
         
-        # Build confluence
+        # **ENHANCED:** Build confluence with new factors
         confluence_factors = []
         confluence_factors.append(f'BOS Type: {active_bos["type"]}')
         confluence_factors.append(f'Trend: {active_bos["trend"]} (confirmed)')
-        confluence_factors.append(f'Break Strength: {active_bos["break_pct"]:.3f}%')
+        confluence_factors.append(f'Break Strength: {active_bos["break_pct"]:.3f}% ({break_strength})')
         confluence_factors.append('Structure broken in trend direction')
+        
+        # Momentum indicator
+        if consecutive_bos >= 3:
+            confluence_factors.append(f'🔥 STRONG MOMENTUM: {consecutive_bos} consecutive BOS!')
+        elif consecutive_bos >= 2:
+            confluence_factors.append(f'Momentum building: {consecutive_bos} consecutive BOS')
+        
         if is_new_event:
             confluence_factors.append('⭐ NEW BOS EVENT (just occurred on current bar)')
         else:
             confluence_factors.append('Continuing BOS state (structure already broken)')
         confluence_factors.append('Trend continuation signal - high probability')
         
-        # Metadata
+        # **ENHANCED:** Metadata with new tracking
         if active_bos['type'] == 'BULLISH_BOS':
             metadata = {
                 'bos_type': active_bos['type'],
@@ -228,9 +346,11 @@ class BreakOfStructure:
                 'swing_high': active_bos['swing_high'],
                 'break_high': active_bos['break_high'],
                 'break_pct': active_bos['break_pct'],
+                'break_strength': break_strength,  # NEW: Strength tier
+                'consecutive_bos': consecutive_bos,  # NEW: Momentum tracking
                 'bos_timestamp': active_bos['timestamp'],
-                'is_new_event': is_new_event,  # NEW: Event tracking
-                'bars_since_bos': current_bar_index - active_bos['index']  # NEW: Age tracking
+                'is_new_event': is_new_event,
+                'bars_since_bos': current_bar_index - active_bos['index']
             }
         else:
             metadata = {
@@ -239,9 +359,11 @@ class BreakOfStructure:
                 'swing_low': active_bos['swing_low'],
                 'break_low': active_bos['break_low'],
                 'break_pct': active_bos['break_pct'],
+                'break_strength': break_strength,  # NEW: Strength tier
+                'consecutive_bos': consecutive_bos,  # NEW: Momentum tracking
                 'bos_timestamp': active_bos['timestamp'],
-                'is_new_event': is_new_event,  # NEW: Event tracking
-                'bars_since_bos': current_bar_index - active_bos['index']  # NEW: Age tracking
+                'is_new_event': is_new_event,
+                'bars_since_bos': current_bar_index - active_bos['index']
             }
         
         return {

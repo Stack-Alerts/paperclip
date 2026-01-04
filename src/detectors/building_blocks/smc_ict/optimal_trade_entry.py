@@ -2,6 +2,11 @@
 Optimal Trade Entry (OTE) Building Block
 Category: SMC/ICT
 Purpose: Detect optimal trade entry zones - ICT Fibonacci concept
+
+ENHANCEMENTS (2026-01-04):
+- Priority 1.1: Precise OTE detection (70.5% equilibrium)
+- Priority 1.2: Retracement strength classification
+- Priority 1.3: Swing strength measurement (ATR-relative)
 """
 
 from typing import Dict, Any
@@ -52,11 +57,77 @@ class OptimalTradeEntry:
             Signals: 2,460 in 180 days (13.7/day)
             R/R: 5.34 (good)
             Discovery: lookback=15 (vs 20) - faster = better (consistent pattern)
+        
+        Enhancements (2026-01-04 - Expert Mode):
+            Precise OTE detection, retracement strength, swing strength
         """
         self.timeframe = timeframe
         self.lookback = lookback
         self.ote_min = ote_min
         self.ote_max = ote_max
+        self.precise_ote = 0.705  # 70.5% equilibrium (ICT)
+    
+    def is_precise_ote(self, retracement_pct: float) -> bool:
+        """
+        Check if at precise OTE (70.5% ± 2%) - Priority 1.1
+        
+        ICT's precise OTE is 70.5% (equilibrium between 61.8% and 78.6%)
+        """
+        return 68.5 <= retracement_pct <= 72.5
+    
+    def classify_retracement_strength(self, retracement_pct: float) -> str:
+        """
+        Classify retracement strength - Priority 1.2
+        
+        Returns:
+            'SHALLOW': 61.8-67% (weak retracement)
+            'MODERATE': 67-74% (typical retracement)
+            'DEEP': 74-78.6% (deep retracement)
+        """
+        if retracement_pct < 67:
+            return 'SHALLOW'
+        elif retracement_pct <= 74:
+            return 'MODERATE'
+        else:
+            return 'DEEP'
+    
+    def calculate_swing_strength(self, df: pd.DataFrame, swing_range: float) -> str:
+        """
+        Measure swing strength relative to ATR - Priority 1.3
+        
+        Strong swings (>2x ATR) = higher probability OTE
+        
+        Returns:
+            'WEAK': <1x ATR
+            'MODERATE': 1-2x ATR
+            'STRONG': 2-3x ATR
+            'VERY_STRONG': >3x ATR
+        """
+        if len(df) < 14:
+            return 'MODERATE'  # Default if insufficient data
+        
+        # Calculate ATR(14)
+        high_low = df['high'] - df['low']
+        high_close = abs(df['high'] - df['close'].shift())
+        low_close = abs(df['low'] - df['close'].shift())
+        ranges = pd.concat([high_low, high_close, low_close], axis=1)
+        true_range = ranges.max(axis=1)
+        atr = true_range.tail(14).mean()
+        
+        if atr == 0:
+            return 'MODERATE'
+        
+        # Swing strength as multiple of ATR
+        swing_strength_ratio = swing_range / atr
+        
+        if swing_strength_ratio >= 3.0:
+            return 'VERY_STRONG'
+        elif swing_strength_ratio >= 2.0:
+            return 'STRONG'
+        elif swing_strength_ratio >= 1.0:
+            return 'MODERATE'
+        else:
+            return 'WEAK'
     
     def detect_trend(self, df: pd.DataFrame) -> str:
         """Detect trend direction"""
@@ -118,6 +189,12 @@ class OptimalTradeEntry:
         if in_ote:
             # Calculate retracement percentage
             retracement = (swing_high - current_close) / ote_zone['move_range']
+            retracement_pct = round(retracement * 100, 2)
+            
+            # **ENHANCED:** Calculate quality metrics
+            at_precise_ote = self.is_precise_ote(retracement_pct)
+            retracement_strength = self.classify_retracement_strength(retracement_pct)
+            swing_strength = self.calculate_swing_strength(df, ote_zone['move_range'])
             
             return {
                 'type': 'BULLISH_OTE',
@@ -126,8 +203,11 @@ class OptimalTradeEntry:
                 'swing_high': ote_zone['swing_high'],
                 'swing_low': ote_zone['swing_low'],
                 'current_price': float(current_close),
-                'retracement_pct': round(retracement * 100, 2),
-                'timestamp': df['timestamp'].iloc[-1]
+                'retracement_pct': retracement_pct,
+                'timestamp': df['timestamp'].iloc[-1],
+                'at_precise_ote': at_precise_ote,  # NEW: 70.5% flag
+                'retracement_strength': retracement_strength,  # NEW: Quality tier
+                'swing_strength': swing_strength  # NEW: Context
             }
         
         return None
@@ -162,6 +242,12 @@ class OptimalTradeEntry:
         if in_ote:
             # Calculate retracement percentage
             retracement = (current_close - swing_low) / move_range
+            retracement_pct = round(retracement * 100, 2)
+            
+            # **ENHANCED:** Calculate quality metrics
+            at_precise_ote = self.is_precise_ote(retracement_pct)
+            retracement_strength = self.classify_retracement_strength(retracement_pct)
+            swing_strength = self.calculate_swing_strength(df, move_range)
             
             return {
                 'type': 'BEARISH_OTE',
@@ -170,8 +256,11 @@ class OptimalTradeEntry:
                 'swing_high': float(swing_high),
                 'swing_low': float(swing_low),
                 'current_price': float(current_close),
-                'retracement_pct': round(retracement * 100, 2),
-                'timestamp': df['timestamp'].iloc[-1]
+                'retracement_pct': retracement_pct,
+                'timestamp': df['timestamp'].iloc[-1],
+                'at_precise_ote': at_precise_ote,  # NEW: 70.5% flag
+                'retracement_strength': retracement_strength,  # NEW: Quality tier
+                'swing_strength': swing_strength  # NEW: Context
             }
         
         return None
@@ -236,24 +325,43 @@ class OptimalTradeEntry:
                 'confluence_factors': [f'Trend: {trend}', 'Waiting for OTE zone entry']
             }
         
-        # Calculate confidence
+        # **ENHANCED:** Calculate confidence with quality metrics
         confidence = 90  # Base confidence for OTE
-        # Higher confidence if closer to sweet spot (70%)
-        if 68 <= active_ote['retracement_pct'] <= 72:
-            confidence += 20
-        elif 65 <= active_ote['retracement_pct'] <= 75:
-            confidence += 15
-        confidence = min(95, confidence)
         
-        # Build confluence factors
+        # Precise OTE bonus (70.5% ± 2%)
+        if active_ote['at_precise_ote']:
+            confidence += 10
+        
+        # Swing strength bonus
+        if active_ote['swing_strength'] == 'VERY_STRONG':
+            confidence += 5
+        elif active_ote['swing_strength'] == 'STRONG':
+            confidence += 3
+        
+        confidence = min(100, confidence)
+        
+        # **ENHANCED:** Build confluence factors with quality metrics
         confluence_factors = []
         confluence_factors.append(f'OTE Type: {active_ote["type"]}')
-        confluence_factors.append(f'Retracement: {active_ote["retracement_pct"]:.1f}%')
+        
+        # Retracement with strength
+        retr_str = active_ote['retracement_strength']
+        confluence_factors.append(f'Retracement: {active_ote["retracement_pct"]:.1f}% ({retr_str})')
+        
+        # Precise OTE indicator
+        if active_ote['at_precise_ote']:
+            confluence_factors.append('🎯 PRECISE OTE (70.5%): Highest probability entry!')
+        
+        # Swing strength indicator
+        swing_str = active_ote['swing_strength']
+        if swing_str in ['STRONG', 'VERY_STRONG']:
+            confluence_factors.append(f'💪 {swing_str} SWING: High conviction setup!')
+        
         confluence_factors.append(f'OTE Zone: ${active_ote["ote_low"]:.2f} - ${active_ote["ote_high"]:.2f}')
         confluence_factors.append('Optimal entry zone - institutional interest')
         confluence_factors.append('High probability continuation setup')
         
-        # Metadata
+        # **ENHANCED:** Metadata with quality metrics
         metadata = {
             'ote_type': active_ote['type'],
             'ote_high': active_ote['ote_high'],
@@ -262,7 +370,10 @@ class OptimalTradeEntry:
             'swing_low': active_ote['swing_low'],
             'current_price': active_ote['current_price'],
             'retracement_pct': active_ote['retracement_pct'],
-            'ote_timestamp': active_ote['timestamp']
+            'ote_timestamp': active_ote['timestamp'],
+            'at_precise_ote': active_ote['at_precise_ote'],  # NEW: 70.5% flag
+            'retracement_strength': active_ote['retracement_strength'],  # NEW: Quality
+            'swing_strength': active_ote['swing_strength']  # NEW: Context
         }
         
         return {

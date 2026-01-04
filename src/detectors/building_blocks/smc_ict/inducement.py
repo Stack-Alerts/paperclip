@@ -2,6 +2,9 @@
 Inducement Building Block
 Category: SMC/ICT
 Purpose: Detect inducement patterns - ICT liquidity trap concept
+
+ENHANCEMENTS (2026-01-04):
+- Priority 1.1: Trap strength classification (quality tiers)
 """
 
 from typing import Dict, Any, Optional
@@ -50,10 +53,32 @@ class Inducement:
             Signals: 1,131 in 180 days (6.3/day)
             R/R: 7.66 (excellent)
             Discovery: lookback=20, thresh=0.3 - slower lookback + tight threshold = exceptional
+        
+        Enhancements (2026-01-04 - Expert Mode Priority 1.1):
+            Trap strength classification for quality awareness
         """
         self.timeframe = timeframe
         self.lookback = lookback
         self.reversal_threshold = trap_threshold_pct  # Map to internal name
+    
+    def classify_trap_strength(self, reversal_pct: float) -> str:
+        """
+        Classify trap strength into tiers (Priority 1.1 Enhancement)
+        
+        Returns:
+            'WEAK': 0.3-0.5% reversal
+            'MODERATE': 0.5-0.8% reversal
+            'STRONG': 0.8-1.2% reversal
+            'VERY_STRONG': >1.2% reversal
+        """
+        if reversal_pct >= 1.2:
+            return 'VERY_STRONG'
+        elif reversal_pct >= 0.8:
+            return 'STRONG'
+        elif reversal_pct >= 0.5:
+            return 'MODERATE'
+        else:
+            return 'WEAK'
     
     def find_recent_high(self, df: pd.DataFrame) -> Optional[float]:
         """Find recent swing high"""
@@ -200,23 +225,33 @@ class Inducement:
                 'confluence_factors': ['No inducement - clean price action']
             }
         
-        # Calculate confidence based on reversal strength
-        confidence = 90  # Base confidence for inducement
-        if active_ind['reversal_pct'] > 0.5:
-            confidence += 15
-        if active_ind['reversal_pct'] > 1.0:
-            confidence += 15
-        confidence = min(95, confidence)
+        # **ENHANCED:** Classify trap strength
+        trap_strength = self.classify_trap_strength(active_ind['reversal_pct'])
         
-        # Build confluence factors
+        # **ENHANCED:** Calculate confidence with trap strength
+        confidence = 90  # Base confidence for inducement
+        
+        # Trap strength bonus
+        if trap_strength == 'VERY_STRONG':
+            confidence += 10
+        elif trap_strength == 'STRONG':
+            confidence += 5
+        
+        confidence = min(100, confidence)
+        
+        # **ENHANCED:** Build confluence factors with trap strength
         confluence_factors = []
         confluence_factors.append(f'Inducement Type: {active_ind["type"]}')
-        confluence_factors.append(f'Reversal Strength: {active_ind["reversal_pct"]:.3f}%')
+        confluence_factors.append(f'Reversal Strength: {active_ind["reversal_pct"]:.3f}% ({trap_strength})')
+        
+        # Trap strength indicator
+        if trap_strength in ['STRONG', 'VERY_STRONG']:
+            confluence_factors.append(f'💪 {trap_strength} TRAP: High-quality reversal!')
         confluence_factors.append('Liquidity trap detected - Smart money move')
         confluence_factors.append('Breakout traders trapped')
         confluence_factors.append('High probability reversal setup')
         
-        # Metadata
+        # **ENHANCED:** Metadata with trap strength
         if active_ind['type'] == 'BULLISH_INDUCEMENT':
             metadata = {
                 'inducement_type': active_ind['type'],
@@ -224,7 +259,8 @@ class Inducement:
                 'break_low': active_ind['break_low'],
                 'reversal_close': active_ind['reversal_close'],
                 'reversal_pct': active_ind['reversal_pct'],
-                'inducement_timestamp': active_ind['timestamp']
+                'inducement_timestamp': active_ind['timestamp'],
+                'trap_strength': trap_strength  # NEW: Quality tier
             }
         else:
             metadata = {
@@ -233,7 +269,8 @@ class Inducement:
                 'break_high': active_ind['break_high'],
                 'reversal_close': active_ind['reversal_close'],
                 'reversal_pct': active_ind['reversal_pct'],
-                'inducement_timestamp': active_ind['timestamp']
+                'inducement_timestamp': active_ind['timestamp'],
+                'trap_strength': trap_strength  # NEW: Quality tier
             }
         
         return {

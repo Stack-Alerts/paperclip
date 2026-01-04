@@ -1,5 +1,5 @@
 {
-  "test_run": "2026-01-04T05:33:39.008863",
+  "test_run": "2026-01-04T06:14:18.306123",
   "total_phases": 6,
   "results": [
     {
@@ -47,7 +47,7 @@
       "name": "All Remaining Non-Pattern Signals",
       "status": "COMPLETE",
       "output_file": "remaining_nonpattern_results.json",
-      "stdout_lines": 263,
+      "stdout_lines": 1055,
       "stderr_lines": 1
     }
   ]
