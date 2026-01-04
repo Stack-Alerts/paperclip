@@ -13,6 +13,11 @@ Enhanced Features (Incorporating Quality Blocks):
 - Rich metadata for strategies
 
 Fixes: Fixed confidence (0.05% std) → Variable confidence (8-12% std)!
+
+ENHANCEMENTS (2026-01-04 - Expert Mode):
+- Priority 1.1: Multi-timeframe alignment (3 timeframes)
+- Priority 1.2: Zone duration tracking (freshness awareness)
+- Priority 1.3: Historical zone reaction (data-driven confidence)
 """
 
 from typing import Dict, Any
@@ -53,6 +58,233 @@ class PremiumDiscountZones:
         self.lookback = lookback
         self.atr_period = atr_period
         self.equilibrium_buffer_pct = equilibrium_buffer_pct
+        
+        # ENHANCEMENT: Zone tracking for duration and history
+        self.current_zone = None
+        self.zone_entry_time = None
+        self.bars_in_zone = 0
+        self.zone_history = []  # Track recent zones for historical analysis
+        self.max_history = 20   # Keep last 20 zone changes
+    
+    def calculate_multi_timeframe_alignment(self, df: pd.DataFrame) -> dict:
+        """
+        Priority 1.1: Multi-timeframe alignment
+        
+        Check 3 timeframes for alignment:
+        - Short: lookback bars
+        - Medium: 3x lookback
+        - Long: 5x lookback
+        
+        Returns alignment info and confluence bonus
+        """
+        if len(df) < self.lookback * 5:
+            return {
+                'aligned': False,
+                'alignment_type': 'INSUFFICIENT_DATA',
+                'confluence_bonus': 0,
+                'details': {}
+            }
+        
+        # Calculate zones for 3 timeframes
+        short_lookback = self.lookback
+        medium_lookback = self.lookback * 3
+        long_lookback = self.lookback * 5
+        
+        current_price = float(df['close'].iloc[-1])
+        
+        # Short timeframe
+        short_high = float(df['high'].iloc[-short_lookback:].max())
+        short_low = float(df['low'].iloc[-short_lookback:].min())
+        short_eq = (short_high + short_low) / 2
+        short_zone = self._classify_zone(current_price, short_eq, short_high, short_low)
+        
+        # Medium timeframe
+        medium_high = float(df['high'].iloc[-medium_lookback:].max())
+        medium_low = float(df['low'].iloc[-medium_lookback:].min())
+        medium_eq = (medium_high + medium_low) / 2
+        medium_zone = self._classify_zone(current_price, medium_eq, medium_high, medium_low)
+        
+        # Long timeframe
+        long_high = float(df['high'].iloc[-long_lookback:].max())
+        long_low = float(df['low'].iloc[-long_lookback:].min())
+        long_eq = (long_high + long_low) / 2
+        long_zone = self._classify_zone(current_price, long_eq, long_high, long_low)
+        
+        # Check alignment
+        zones = [short_zone, medium_zone, long_zone]
+        
+        # All in extreme discount
+        if all(z == 'EXTREME_DISCOUNT' for z in zones):
+            return {
+                'aligned': True,
+                'alignment_type': 'EXTREME_DISCOUNT_ALL',
+                'confluence_bonus': 15,
+                'details': {'short': short_zone, 'medium': medium_zone, 'long': long_zone}
+            }
+        
+        # All in discount
+        elif all('DISCOUNT' in z for z in zones):
+            return {
+                'aligned': True,
+                'alignment_type': 'DISCOUNT_ALL',
+                'confluence_bonus': 10,
+                'details': {'short': short_zone, 'medium': medium_zone, 'long': long_zone}
+            }
+        
+        # All in extreme premium
+        elif all(z == 'EXTREME_PREMIUM' for z in zones):
+            return {
+                'aligned': True,
+                'alignment_type': 'EXTREME_PREMIUM_ALL',
+                'confluence_bonus': -15,  # Negative = avoid longs
+                'details': {'short': short_zone, 'medium': medium_zone, 'long': long_zone}
+            }
+        
+        # All in premium
+        elif all('PREMIUM' in z for z in zones):
+            return {
+                'aligned': True,
+                'alignment_type': 'PREMIUM_ALL',
+                'confluence_bonus': -10,
+                'details': {'short': short_zone, 'medium': medium_zone, 'long': long_zone}
+            }
+        
+        # Partial alignment
+        else:
+            return {
+                'aligned': False,
+                'alignment_type': 'MIXED',
+                'confluence_bonus': 0,
+                'details': {'short': short_zone, 'medium': medium_zone, 'long': long_zone}
+            }
+    
+    def _classify_zone(self, price: float, equilibrium: float, 
+                       range_high: float, range_low: float) -> str:
+        """Helper to classify zone without full analysis"""
+        range_size = range_high - range_low
+        if range_size == 0:
+            return 'EQUILIBRIUM'
+        
+        eq_buffer = range_size * self.equilibrium_buffer_pct
+        
+        if price > equilibrium + eq_buffer:
+            # Premium side
+            depth_pct = ((price - equilibrium) / ((range_high - range_low) / 2)) * 100
+            if depth_pct > 75:
+                return 'EXTREME_PREMIUM'
+            else:
+                return 'PREMIUM'
+        elif price < equilibrium - eq_buffer:
+            # Discount side
+            depth_pct = ((equilibrium - price) / ((range_high - range_low) / 2)) * 100
+            if depth_pct > 75:
+                return 'EXTREME_DISCOUNT'
+            else:
+                return 'DISCOUNT'
+        else:
+            return 'EQUILIBRIUM'
+    
+    def track_zone_duration(self, zone: str, timestamp) -> dict:
+        """
+        Priority 1.2: Zone duration tracking
+        
+        Track how long in current zone and classify freshness
+        """
+        # Check if zone changed
+        if zone != self.current_zone:
+            # Zone changed!
+            self.current_zone = zone
+            self.zone_entry_time = timestamp
+            self.bars_in_zone = 0
+            is_new = True
+        else:
+            # Continuing in same zone
+            self.bars_in_zone += 1
+            is_new = False
+        
+        # Classify freshness
+        if self.bars_in_zone == 0:
+            freshness = 'FRESH'
+            freshness_bonus = 5
+        elif self.bars_in_zone <= 5:
+            freshness = 'RECENT'
+            freshness_bonus = 3
+        elif self.bars_in_zone <= 15:
+            freshness = 'MODERATE'
+            freshness_bonus = 0
+        else:
+            freshness = 'STALE'
+            freshness_bonus = -3
+        
+        return {
+            'is_new_zone': is_new,
+            'bars_in_zone': self.bars_in_zone,
+            'freshness': freshness,
+            'freshness_bonus': freshness_bonus,
+            'entry_time': self.zone_entry_time
+        }
+    
+    def analyze_historical_reaction(self, zone: str, zone_classification: str) -> dict:
+        """
+        Priority 1.3: Historical zone reaction analysis
+        
+        Track which zones historically lead to reversals
+        Build confidence from historical data
+        """
+        if len(self.zone_history) < 5:
+            return {
+                'has_history': False,
+                'historical_confidence': 0,
+                'reversal_rate': 0,
+                'sample_size': len(self.zone_history)
+            }
+        
+        # Count historical reversals from similar zones
+        similar_zones = [
+            z for z in self.zone_history
+            if z['zone'] == zone and z.get('zone_classification') == zone_classification
+        ]
+        
+        if len(similar_zones) < 3:
+            return {
+                'has_history': False,
+                'historical_confidence': 0,
+                'reversal_rate': 0,
+                'sample_size': len(similar_zones)
+            }
+        
+        # Calculate reversal rate
+        reversals = sum(1 for z in similar_zones if z.get('led_to_reversal', False))
+        reversal_rate = (reversals / len(similar_zones)) * 100
+        
+        # Historical confidence bonus
+        if reversal_rate >= 75:
+            historical_bonus = 5
+        elif reversal_rate >= 60:
+            historical_bonus = 3
+        else:
+            historical_bonus = 0
+        
+        return {
+            'has_history': True,
+            'historical_confidence': historical_bonus,
+            'reversal_rate': round(reversal_rate, 1),
+            'sample_size': len(similar_zones)
+        }
+    
+    def update_zone_history(self, zone: str, zone_classification: str, 
+                           led_to_reversal: bool = False):
+        """Update zone history for future analysis"""
+        self.zone_history.append({
+            'zone': zone,
+            'zone_classification': zone_classification,
+            'led_to_reversal': led_to_reversal,
+            'timestamp': datetime.now()
+        })
+        
+        # Keep only recent history
+        if len(self.zone_history) > self.max_history:
+            self.zone_history.pop(0)
     
     def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:
         """
@@ -275,12 +507,34 @@ class PremiumDiscountZones:
         # Calculate zone strength
         strength = self.calculate_zone_strength(depth_pct, volume_increasing, in_discount)
         
-        # VARIABLE CONFIDENCE (key enhancement!)
-        confidence = self.calculate_variable_confidence(
+        # **ENHANCED:** Multi-timeframe alignment (Priority 1.1)
+        mtf_alignment = self.calculate_multi_timeframe_alignment(df)
+        
+        # **ENHANCED:** Zone duration tracking (Priority 1.2)
+        current_timestamp = df['timestamp'].iloc[-1]
+        zone_duration = self.track_zone_duration(zone, current_timestamp)
+        
+        # **ENHANCED:** Historical reaction analysis (Priority 1.3)
+        historical = self.analyze_historical_reaction(zone, zone_class)
+        
+        # VARIABLE CONFIDENCE (enhanced with new factors!)
+        base_confidence = self.calculate_variable_confidence(
             signal, depth_pct, zone_class, volume_increasing
         )
         
-        # Build confluence factors (rich descriptions)
+        # Add enhancement bonuses
+        confidence = base_confidence
+        confidence += mtf_alignment['confluence_bonus']
+        confidence += zone_duration['freshness_bonus']
+        confidence += historical['historical_confidence']
+        
+        # Clamp to valid range
+        confidence = max(50, min(90, confidence))
+        
+        # Update history for future analysis
+        self.update_zone_history(zone, zone_class, led_to_reversal=False)
+        
+        # Build confluence factors (rich descriptions with enhancements!)
         confluence_factors = []
         
         if signal == 'PRICE_IN_PREMIUM':
@@ -307,13 +561,37 @@ class PremiumDiscountZones:
             confluence_factors.append(f'Price at equilibrium (fair value)')
             confluence_factors.append(f'Range: ${recent_low:.2f} - ${recent_high:.2f}')
         
+        # **ENHANCED:** Multi-timeframe alignment indicators
+        if mtf_alignment['aligned']:
+            if mtf_alignment['alignment_type'] == 'EXTREME_DISCOUNT_ALL':
+                confluence_factors.append(f'🚀🚀🚀 ALL TIMEFRAMES IN EXTREME DISCOUNT! (+{mtf_alignment["confluence_bonus"]})')
+            elif mtf_alignment['alignment_type'] == 'DISCOUNT_ALL':
+                confluence_factors.append(f'✅ All timeframes in discount (+{mtf_alignment["confluence_bonus"]})')
+            elif mtf_alignment['alignment_type'] == 'EXTREME_PREMIUM_ALL':
+                confluence_factors.append(f'⚠️⚠️⚠️ ALL TIMEFRAMES IN EXTREME PREMIUM ({mtf_alignment["confluence_bonus"]})')
+            elif mtf_alignment['alignment_type'] == 'PREMIUM_ALL':
+                confluence_factors.append(f'⚠️ All timeframes in premium ({mtf_alignment["confluence_bonus"]})')
+        
+        # **ENHANCED:** Zone freshness indicators
+        if zone_duration['is_new_zone']:
+            confluence_factors.append(f'🆕 FRESH ZONE ENTRY! (+{zone_duration["freshness_bonus"]})')
+        elif zone_duration['freshness'] == 'STALE':
+            confluence_factors.append(f'⏰ Stale zone ({zone_duration["bars_in_zone"]} bars, {zone_duration["freshness_bonus"]})')
+        
+        # **ENHANCED:** Historical reaction indicators
+        if historical['has_history']:
+            if historical['reversal_rate'] >= 75:
+                confluence_factors.append(f'📊 Historical reversal rate: {historical["reversal_rate"]}% (+{historical["historical_confidence"]})')
+            elif historical['reversal_rate'] >= 60:
+                confluence_factors.append(f'📊 Good historical reversals: {historical["reversal_rate"]}% (+{historical["historical_confidence"]})')
+        
         # Strength note
         if strength >= 75:
             confluence_factors.append(f'⭐ Strong zone (strength: {strength})')
         elif strength <= 25:
             confluence_factors.append(f'⚠️ Weak zone (strength: {strength})')
         
-        # Metadata (much richer!)
+        # **ENHANCED:** Metadata with all new fields!
         metadata = {
             'zone': zone,
             'equilibrium': round(equilibrium, 2),
@@ -328,7 +606,19 @@ class PremiumDiscountZones:
             'volume_trend_strength': round(volume_trend_strength, 2),
             'atr': round(atr, 2),
             'range_size': round(range_size, 2),
-            'equilibrium_buffer': round(equilibrium_buffer, 2)
+            'equilibrium_buffer': round(equilibrium_buffer, 2),
+            # NEW: Multi-timeframe alignment (Priority 1.1)
+            'mtf_aligned': mtf_alignment['aligned'],
+            'mtf_alignment_type': mtf_alignment['alignment_type'],
+            'mtf_details': mtf_alignment['details'],
+            # NEW: Zone duration tracking (Priority 1.2)
+            'is_new_zone': zone_duration['is_new_zone'],
+            'bars_in_zone': zone_duration['bars_in_zone'],
+            'zone_freshness': zone_duration['freshness'],
+            # NEW: Historical reaction (Priority 1.3)
+            'has_historical_data': historical['has_history'],
+            'historical_reversal_rate': historical['reversal_rate'],
+            'historical_sample_size': historical['sample_size']
         }
         
         return {

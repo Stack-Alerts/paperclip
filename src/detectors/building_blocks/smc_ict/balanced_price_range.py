@@ -12,7 +12,7 @@ import numpy as np
 
 class BalancedPriceRange:
     """
-    Balanced Price Range Detector - ICT/SMC Concept
+    Balanced Price Range Detector - ICT/SMC Concept (ENHANCED 2026-01-04)
     
     Identifies when price is in a balanced, consolidating range where
     neither bulls nor bears have control. These ranges often precede
@@ -28,6 +28,11 @@ class BalancedPriceRange:
     - Anticipate breakout direction
     - Trade mean reversion within range
     - Wait for directional move
+    
+    ENHANCEMENTS (2026-01-04):
+    - Compression Detection: Tracks range tightening over time
+    - Volume Context: Monitors volume decrease during consolidation
+    - Breakout Proximity: Estimates time until breakout based on history
     
     Parameters:
         lookback: Periods for range detection (default: 20)
@@ -47,9 +52,122 @@ class BalancedPriceRange:
         self.timeframe = timeframe
         self.lookback = lookback
         self.balance_threshold = balance_threshold
+        
+        # ENHANCEMENT 3: Breakout Proximity (2026-01-04)
+        self.range_history = []  # Track range durations
+        self.max_history = 20
+    
+    def detect_compression(self, df: pd.DataFrame, range_size: float) -> Dict[str, Any]:
+        """
+        ENHANCEMENT 1: Compression Detection (2026-01-04)
+        Detect if range is tightening over time (coiling for breakout)
+        """
+        if len(df) < self.lookback:
+            return {'has_compression': False}
+        
+        recent = df.tail(self.lookback)
+        
+        # Split into thirds to measure compression
+        third = len(recent) // 3
+        early_third = recent.iloc[:third]
+        middle_third = recent.iloc[third:2*third]
+        late_third = recent.iloc[2*third:]
+        
+        # Calculate range size for each third
+        early_range = early_third['high'].max() - early_third['low'].min()
+        middle_range = middle_third['high'].max() - middle_third['low'].min()
+        late_range = late_third['high'].max() - late_third['low'].min()
+        
+        # Check for compression (range getting smaller)
+        is_compressing = (late_range < middle_range < early_range)
+        
+        if is_compressing:
+            compression_rate = ((early_range - late_range) / early_range * 100) if early_range > 0 else 0
+            
+            return {
+                'has_compression': True,
+                'compression_rate': round(compression_rate, 2),
+                'early_range': float(early_range),
+                'late_range': float(late_range),
+                'compression_strength': 'STRONG' if compression_rate > 30 else 'MODERATE'
+            }
+        
+        return {'has_compression': False}
+    
+    def analyze_volume_context(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        ENHANCEMENT 2: Volume Context (2026-01-04)
+        Analyze volume during consolidation (decreasing = true consolidation)
+        """
+        if 'volume' not in df.columns or len(df) < self.lookback:
+            return {'has_volume_data': False}
+        
+        recent = df.tail(self.lookback)
+        
+        # Split into halves
+        first_half = recent.iloc[:len(recent)//2]
+        second_half = recent.iloc[len(recent)//2:]
+        
+        # Calculate average volumes
+        first_half_vol = first_half['volume'].mean()
+        second_half_vol = second_half['volume'].mean()
+        
+        # Check for volume decrease
+        vol_decrease = ((first_half_vol - second_half_vol) / first_half_vol * 100) if first_half_vol > 0 else 0
+        is_decreasing = second_half_vol < first_half_vol * 0.8  # 20% decrease
+        
+        # Compare to longer-term average
+        if len(df) >= 50:
+            long_term_vol = df.tail(50)['volume'].mean()
+            is_below_average = second_half_vol < long_term_vol * 0.9
+        else:
+            is_below_average = False
+        
+        return {
+            'has_volume_data': True,
+            'is_volume_decreasing': is_decreasing,
+            'volume_decrease_pct': round(vol_decrease, 2),
+            'is_below_long_term_avg': is_below_average,
+            'first_half_vol': float(first_half_vol),
+            'second_half_vol': float(second_half_vol)
+        }
+    
+    def estimate_breakout_proximity(self, bars_in_range: int) -> Dict[str, Any]:
+        """
+        ENHANCEMENT 3: Breakout Proximity (2026-01-04)
+        Estimate when breakout might occur based on historical patterns
+        """
+        if len(self.range_history) < 5:
+            return {
+                'has_history': False,
+                'bars_in_range': bars_in_range
+            }
+        
+        # Calculate average range duration from history
+        avg_duration = np.mean(self.range_history)
+        std_duration = np.std(self.range_history)
+        
+        # Estimate breakout proximity
+        if bars_in_range >= avg_duration * 1.5:
+            proximity = 'IMMINENT'
+        elif bars_in_range >= avg_duration:
+            proximity = 'NEAR'
+        elif bars_in_range >= avg_duration * 0.7:
+            proximity = 'APPROACHING'
+        else:
+            proximity = 'EARLY'
+        
+        return {
+            'has_history': True,
+            'bars_in_range': bars_in_range,
+            'avg_range_duration': round(avg_duration, 1),
+            'std_range_duration': round(std_duration, 1),
+            'breakout_proximity': proximity,
+            'pct_of_avg_duration': round((bars_in_range / avg_duration * 100), 1) if avg_duration > 0 else 0
+        }
     
     def detect_balanced_range(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Detect if price is in balanced range"""
+        """Detect if price is in balanced range (ENHANCED 2026-01-04)"""
         if len(df) < self.lookback:
             return None
         
@@ -77,7 +195,7 @@ class BalancedPriceRange:
             current_price = float(df['close'].iloc[-1])
             position_in_range = ((current_price - range_low) / range_size) * 100 if range_size > 0 else 50
             
-            # Detect compression (tightening range)
+            # Legacy compression check (kept for backward compatibility)
             first_half = recent.iloc[:len(recent)//2]
             second_half = recent.iloc[len(recent)//2:]
             
@@ -148,6 +266,7 @@ class BalancedPriceRange:
         # **NEW:** Event tracking - detect when range entered or signal changed
         is_new_event = False
         bars_in_range = 0
+        range_just_ended = False
         
         # Check if we just entered range or signal changed
         if len(df) > self.lookback + 6:
@@ -166,7 +285,16 @@ class BalancedPriceRange:
                 if not is_new_event:
                     bars_in_range = 1  # At least 1 bar in range
         
-        # Calculate confidence based on position in range and compression
+        # ENHANCEMENT 1: Detailed compression analysis
+        compression_data = self.detect_compression(df, balanced['range_size'])
+        
+        # ENHANCEMENT 2: Volume analysis
+        volume_data = self.analyze_volume_context(df)
+        
+        # ENHANCEMENT 3: Breakout proximity estimation
+        proximity_data = self.estimate_breakout_proximity(bars_in_range)
+        
+        # Calculate confidence based on position in range and compression (ENHANCED)
         confidence = 60  # Base confidence
         
         # More extreme position = higher confidence
@@ -179,12 +307,31 @@ class BalancedPriceRange:
         if balanced['is_compressing']:
             confidence += 10  # Compression = coiling for breakout
         
+        # ENHANCEMENT BONUSES
+        if compression_data.get('has_compression'):
+            if compression_data['compression_strength'] == 'STRONG':
+                confidence += 10
+            else:
+                confidence += 5
+        
+        if volume_data.get('has_volume_data'):
+            if volume_data['is_volume_decreasing'] and volume_data['is_below_long_term_avg']:
+                confidence += 10  # Strong consolidation confirmation
+            elif volume_data['is_volume_decreasing']:
+                confidence += 5
+        
+        if proximity_data.get('has_history'):
+            if proximity_data['breakout_proximity'] == 'IMMINENT':
+                confidence += 10  # Breakout likely soon
+            elif proximity_data['breakout_proximity'] == 'NEAR':
+                confidence += 5
+        
         # Fresh event boost
         if is_new_event:
             confidence += 5
         confidence = min(100, confidence)
         
-        # Build confluence factors
+        # Build confluence factors (ENHANCED)
         confluence_factors = []
         
         # Event-specific confluence
@@ -201,14 +348,28 @@ class BalancedPriceRange:
         confluence_factors.append(f'Position: {balanced["position_in_range"]:.1f}% ({bias})')
         confluence_factors.append(f'Balance Tightness: {balanced["avg_deviation"]:.1f}%')
         
-        if balanced['is_compressing']:
+        # ENHANCEMENT 1: Compression confluence
+        if compression_data.get('has_compression'):
+            confluence_factors.append(f'Compression: {compression_data["compression_strength"]} ({compression_data["compression_rate"]:.1f}% tighter) (+{10 if compression_data["compression_strength"]=="STRONG" else 5} confidence)')
+        elif balanced['is_compressing']:
             confluence_factors.append('Range COMPRESSING - anticipate breakout')
         else:
             confluence_factors.append('Balanced consolidation - mean reversion')
         
+        # ENHANCEMENT 2: Volume confluence
+        if volume_data.get('has_volume_data'):
+            if volume_data['is_volume_decreasing']:
+                confluence_factors.append(f'Volume decreasing: {volume_data["volume_decrease_pct"]:.1f}% lower (confirms consolidation)')
+            if volume_data['is_below_long_term_avg']:
+                confluence_factors.append('Volume below average (true consolidation)')
+        
+        # ENHANCEMENT 3: Breakout proximity
+        if proximity_data.get('has_history'):
+            confluence_factors.append(f'Breakout proximity: {proximity_data["breakout_proximity"]} ({proximity_data["pct_of_avg_duration"]:.0f}% of avg duration)')
+        
         confluence_factors.append('Institutional accumulation/distribution zone')
         
-        # Metadata
+        # Metadata (ENHANCED)
         metadata = {
             'range_type': balanced['type'],
             'range_high': balanced['range_high'],
@@ -221,9 +382,29 @@ class BalancedPriceRange:
             'is_compressing': balanced['is_compressing'],
             'bias': bias,
             'balance_timestamp': balanced['timestamp'],
-            'is_new_event': is_new_event,  # NEW: Event tracking
-            'bars_in_range': bars_in_range  # NEW: Age tracking
+            'is_new_event': is_new_event,
+            'bars_in_range': bars_in_range,
+            # ENHANCEMENTS
+            'has_compression': compression_data.get('has_compression', False),
+            'compression_strength': compression_data.get('compression_strength'),
+            'compression_rate': compression_data.get('compression_rate'),
+            'has_volume_data': volume_data.get('has_volume_data', False),
+            'is_volume_decreasing': volume_data.get('is_volume_decreasing', False),
+            'volume_decrease_pct': volume_data.get('volume_decrease_pct'),
+            'breakout_proximity': proximity_data.get('breakout_proximity'),
+            'pct_of_avg_duration': proximity_data.get('pct_of_avg_duration')
         }
+        
+        # Update range history for breakout proximity tracking
+        if is_new_event and bars_in_range == 0:
+            # Starting new range - will track duration
+            pass
+        elif prev_balanced is None and len(self.range_history) < self.max_history:
+            # Range just ended - add duration to history
+            if bars_in_range > 0:
+                self.range_history.append(bars_in_range)
+                if len(self.range_history) > self.max_history:
+                    self.range_history.pop(0)
         
         return {
             'signal': signal,

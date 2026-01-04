@@ -266,13 +266,14 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
 
 
 if __name__ == "__main__":
-    from src.detectors.building_blocks.smc_ict.premium_discount import PremiumDiscount
+    # UPDATED: Use the enhanced version from market_structure (with MTF, freshness, historical)
+    from src.detectors.building_blocks.market_structure.premium_discount_zones import PremiumDiscountZones
     
     print("Loading 180 days of BTC 15min data...")
     df = load_btc_data(days=180)
     
     if df is not None and len(df) > 0:
-        block = PremiumDiscount()
+        block = PremiumDiscountZones()
         test_block_walkforward_v2(block, "premium_discount", df)
     else:
         print("❌ Failed to load data")

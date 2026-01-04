@@ -12,7 +12,7 @@ import numpy as np
 
 class ATR:
     """
-    Average True Range (ATR) - Volatility Indicator
+    Average True Range (ATR) - Volatility Indicator (ENHANCED 2026-01-04)
     
     Measures market volatility by calculating the average range of price movement.
     Created by J. Welles Wilder Jr., ATR is essential for:
@@ -24,6 +24,10 @@ class ATR:
     Parameters:
         period: ATR calculation period (default: 14)
         timeframe: Timeframe string (e.g., '15min', '1hr', '4hr', '1D')
+    
+    ENHANCEMENTS (2026-01-04):
+    - Variable Confidence: Differentiate extreme volatility states
+    - Volatility Percentile: Historical context for ATR levels
     
     Returns:
         Standardized dict with ATR value, volatility level, and stop-loss suggestions
@@ -39,6 +43,10 @@ class ATR:
         """
         self.period = period
         self.timeframe = timeframe
+        
+        # ENHANCEMENT: Track historical ATR values for percentile calculation
+        self.atr_history = []
+        self.max_history = 500  # Keep last 500 ATR values
         
         # Bitcoin-specific volatility thresholds (in USD for BTC)
         # These can be tuned based on current market conditions
@@ -136,6 +144,83 @@ class ATR:
         """
         return atr_value * multiplier
     
+    def calculate_atr_percentile(self, current_atr: float) -> Dict[str, Any]:
+        """
+        ENHANCEMENT 2: Volatility Percentile (2026-01-04)
+        Calculate where current ATR sits in historical distribution
+        """
+        if len(self.atr_history) < 20:
+            return {
+                'has_percentile': False,
+                'percentile': None,
+                'relative_level': None
+            }
+        
+        # Calculate percentile rank
+        percentile = (sum(1 for atr in self.atr_history if atr < current_atr) / len(self.atr_history)) * 100
+        
+        # Classify relative level
+        if percentile >= 95:
+            relative_level = 'EXTREME_HIGH'
+        elif percentile >= 85:
+            relative_level = 'VERY_HIGH'
+        elif percentile >= 70:
+            relative_level = 'HIGH'
+        elif percentile >= 30:
+            relative_level = 'NORMAL'
+        elif percentile >= 15:
+            relative_level = 'LOW'
+        elif percentile >= 5:
+            relative_level = 'VERY_LOW'
+        else:
+            relative_level = 'EXTREME_LOW'
+        
+        return {
+            'has_percentile': True,
+            'percentile': round(percentile, 1),
+            'relative_level': relative_level,
+            'history_size': len(self.atr_history)
+        }
+    
+    def calculate_variable_confidence(self, signal: str, volatility_level: str, 
+                                     atr_percentile_data: Dict[str, Any]) -> float:
+        """
+        ENHANCEMENT 1: Variable Confidence (2026-01-04)
+        Calculate confidence based on volatility state and extremes
+        """
+        # Base confidence by signal type
+        if signal == 'EXPANDING':
+            if volatility_level in ['EXTREME', 'VERY_HIGH']:
+                base_confidence = 100  # Extreme expansion = highest confidence
+            elif volatility_level == 'HIGH':
+                base_confidence = 90
+            else:
+                base_confidence = 85  # Moderate expansion
+        elif signal == 'CONTRACTING':
+            if volatility_level == 'CALM':
+                base_confidence = 95  # Extreme contraction = very high confidence
+            elif volatility_level == 'NORMAL':
+                base_confidence = 85
+            else:
+                base_confidence = 80  # Moderate contraction
+        elif signal == 'STABLE':
+            base_confidence = 70  # Stable = moderate confidence
+        else:
+            base_confidence = 60  # Neutral/unknown
+        
+        # Adjust based on percentile (if available)
+        if atr_percentile_data.get('has_percentile'):
+            percentile = atr_percentile_data['percentile']
+            relative_level = atr_percentile_data['relative_level']
+            
+            # Boost confidence for extreme percentiles
+            if relative_level in ['EXTREME_HIGH', 'EXTREME_LOW']:
+                base_confidence = min(100, base_confidence + 10)
+            elif relative_level in ['VERY_HIGH', 'VERY_LOW']:
+                base_confidence = min(100, base_confidence + 5)
+        
+        return base_confidence
+    
     def detect_atr_trend(self, atr_series: pd.Series, lookback: int = 5) -> str:
         """
         Detect if ATR is rising (volatility increasing) or falling (volatility decreasing)
@@ -218,6 +303,14 @@ class ATR:
         current_atr = float(atr_series.iloc[-1])
         previous_atr = float(atr_series.iloc[-2])
         
+        # ENHANCEMENT 2: Update ATR history for percentile tracking
+        self.atr_history.append(current_atr)
+        if len(self.atr_history) > self.max_history:
+            self.atr_history.pop(0)
+        
+        # Calculate percentile
+        atr_percentile_data = self.calculate_atr_percentile(current_atr)
+        
         # Get parameters
         stop_multiplier = kwargs.get('stop_multiplier', 2.0)
         lookback = kwargs.get('lookback', 5)
@@ -278,7 +371,10 @@ class ATR:
         else:
             signal = 'NEUTRAL'  # Insufficient data
         
-        #  Fresh regime change boost
+        # ENHANCEMENT 1: Calculate variable confidence
+        confidence = self.calculate_variable_confidence(signal, volatility_level, atr_percentile_data)
+        
+        # Fresh regime change boost
         if is_new_event:
             confidence = min(100, confidence + 5)
         
@@ -306,7 +402,19 @@ class ATR:
         elif atr_trend == 'FALLING':
             confluence_factors.append('Volatility decreasing - consolidation phase')
         
-        # Prepare metadata
+        # ENHANCEMENT 2: Add percentile context to confluence
+        if atr_percentile_data.get('has_percentile'):
+            percentile = atr_percentile_data['percentile']
+            relative_level = atr_percentile_data['relative_level']
+            
+            if relative_level in ['EXTREME_HIGH', 'VERY_HIGH']:
+                confluence_factors.append(f'⚠️ ATR at {percentile:.0f}th percentile - EXTREME volatility (+10 confidence)')
+            elif relative_level == 'HIGH':
+                confluence_factors.append(f'ATR at {percentile:.0f}th percentile - HIGH volatility')
+            elif relative_level in ['EXTREME_LOW', 'VERY_LOW']:
+                confluence_factors.append(f'ATR at {percentile:.0f}th percentile - VERY LOW volatility')
+        
+        # Prepare metadata (ENHANCED)
         metadata = {
             'atr_value': current_atr,
             'atr_percent': round(atr_percent, 2),
@@ -314,8 +422,13 @@ class ATR:
             'atr_trend': atr_trend,
             'period': self.period,
             'current_price': current_price,
-            'is_new_event': is_new_event,  # NEW: Event tracking
-            'bars_in_regime': bars_in_regime,  # NEW: Age tracking
+            'is_new_event': is_new_event,
+            'bars_in_regime': bars_in_regime,
+            # ENHANCEMENTS
+            'has_percentile': atr_percentile_data.get('has_percentile', False),
+            'atr_percentile': atr_percentile_data.get('percentile'),
+            'relative_volatility_level': atr_percentile_data.get('relative_level'),
+            'history_size': atr_percentile_data.get('history_size', len(self.atr_history)),
             'stop_suggestions': {
                 'conservative': {
                     'distance': round(stop_distance_conservative, 2),
