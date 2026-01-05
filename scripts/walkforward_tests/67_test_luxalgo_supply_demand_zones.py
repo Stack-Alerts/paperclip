@@ -23,14 +23,39 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.detectors.building_blocks.supply_demand.luxalgo_supply_demand_zones import LuxAlgoSupplyDemandZones
-from src.utils.advanced_data_loader import data_catalog
+
+
+def load_btc_data(days: int = 180) -> pd.DataFrame:
+    """Load BTC 15min data from CSV."""
+    data_path = project_root / 'data' / 'raw' / 'BTC_USDT_PERP_15m.csv'
+    df = pd.read_csv(data_path)
+    
+    # Standardize column names
+    if 'Timestamp' in df.columns:
+        df.rename(columns={
+            'Timestamp': 'timestamp',
+            'Open': 'open',
+            'High': 'high',
+            'Low': 'low',
+            'Close': 'close',
+            'Volume': 'volume'
+        }, inplace=True)
+    
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df = df.sort_values('timestamp').reset_index(drop=True)
+    
+    # Filter to last N days
+    cutoff_date = df['timestamp'].max() - timedelta(days=days)
+    df = df[df['timestamp'] >= cutoff_date].copy()
+    
+    return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
 
 
 def run_luxalgo_walkforward_test():
@@ -45,7 +70,7 @@ def run_luxalgo_walkforward_test():
     
     # Load data
     print("\n📊 Loading BTC/USDT 15min data...")
-    df = data_catalog.load_data('BTC/USDT', '15min')
+    df = load_btc_data(days=180)
     
     if df is None or len(df) == 0:
         print("❌ Failed to load data")
@@ -53,9 +78,8 @@ def run_luxalgo_walkforward_test():
     
     print(f"✅ Loaded {len(df):,} bars")
     
-    # Use last 180 days (same as current approach test)
-    bars_180_days = 96 * 180  # 96 bars per day * 180 days
-    df_test = df.tail(bars_180_days).copy()
+    # Data already filtered to 180 days by load_btc_data()
+    df_test = df.copy()
     
     print(f"\n📅 Test Period:")
     print(f"   Start: {df_test['timestamp'].iloc[0]}")
