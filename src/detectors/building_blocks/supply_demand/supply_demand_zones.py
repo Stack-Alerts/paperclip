@@ -142,13 +142,19 @@ class SupplyDemandZones:
         """
         Detect explosive moves FROM consolidation bases
         
-        Criteria (CALIBRATED):
-        - DEMAND: Move > 1.3 * ATR (balanced for underdetection)
-        - SUPPLY: Move > 1.5 * ATR (standard)
+        Criteria (CALIBRATED + REGIME-ADAPTIVE):
+        - DEMAND: Move > 1.3 * ATR * regime_mult (balanced for underdetection)
+        - SUPPLY: Move > 1.5 * ATR * regime_mult (standard)
         - Volume spike (> 1.5x average)
         - Happens immediately after base
+        - Path 1: Simple custom regime detection (no external blocks)
         """
         zones = []
+        
+        # Get market regime for adaptive thresholds
+        regime = self.detect_simple_regime(df)
+        demand_mult = regime['demand_mult']
+        supply_mult = regime['supply_mult']
         
         for base in bases:
             base_end = base['end_idx']
@@ -167,8 +173,9 @@ class SupplyDemandZones:
                 move_down = base_price - bar['low']
                 
                 # Check for explosive upward move (DEMAND zone)
-                # CALIBRATED: 1.3 ATR (was 2.0) for better DEMAND detection
-                if move_up > 1.3 * atr:
+                # CALIBRATED: 1.3 ATR * regime multiplier
+                demand_threshold = 1.3 * atr * demand_mult  # Easier in downtrend
+                if move_up > demand_threshold:
                     # Check volume at explosion
                     explosion_idx = df.index.get_loc(idx)
                     volume_ratio, is_spike, volume_score = self.analyze_volume_activity(
@@ -191,8 +198,9 @@ class SupplyDemandZones:
                         break
                 
                 # Check for explosive downward move (SUPPLY zone)
-                # CALIBRATED: 1.5 ATR (was 2.0)
-                elif move_down > 1.5 * atr:
+                # CALIBRATED: 1.5 ATR * regime multiplier  
+                supply_threshold = 1.5 * atr * supply_mult  # Easier in uptrend
+                if move_down > supply_threshold:
                     explosion_idx = df.index.get_loc(idx)
                     volume_ratio, is_spike, volume_score = self.analyze_volume_activity(
                         df.iloc[:explosion_idx+1], window=20
@@ -329,6 +337,44 @@ class SupplyDemandZones:
         
         return max(40, min(85, confidence))  # CALIBRATED range: 40-85%
     
+
+    def detect_simple_regime(self, df: pd.DataFrame, lookback: int = 100) -> Dict:
+        """
+        Simple regime detection using price structure
+        Path 1: Custom implementation (lightweight)
+        
+        Returns multipliers for DEMAND/SUPPLY detection thresholds
+        """
+        if len(df) < lookback:
+            return {'regime': 'RANGING', 'demand_mult': 1.0, 'supply_mult': 1.0}
+        
+        recent = df.iloc[-lookback:]
+        close = recent['close']
+        
+        # Simple slope calculation
+        first_close = close.iloc[0]
+        last_close = close.iloc[-1]
+        change_pct = (last_close - first_close) / first_close
+        
+        # Classify regime
+        if change_pct > 0.10:  # >10% up = uptrend
+            return {
+                'regime': 'UPTREND',
+                'demand_mult': 1.0,
+                'supply_mult': 0.85  # Easier SUPPLY detection
+            }
+        elif change_pct < -0.10:  # >10% down = downtrend
+            return {
+                'regime': 'DOWNTREND',
+                'demand_mult': 0.85,  # Easier DEMAND detection (BALANCE FIX)
+                'supply_mult': 1.0
+            }
+        else:
+            return {
+                'regime': 'RANGING',
+                'demand_mult': 1.0,
+                'supply_mult': 1.0
+            }
 
     def check_zone_liquidation_strength(self, zone_price: float, df: pd.DataFrame) -> Dict:
         """Check if liquidation clusters strengthen this zone"""
