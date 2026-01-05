@@ -29,9 +29,9 @@ This framework defines a **hybrid intelligent system** that extends NautilusTrad
 - ITM operates on its **initial funding value** regardless of exchange account balance
 - If funded with $25,000 (exchange has $250,000), ITM only uses $25,000 as capital pool
 - All growth is **compounded** by reinvesting profits within allocated capital constraints
-- **Risk-free buffer** (20% of gains) protects against catastrophic loss scenarios
+- **Risk-free buffer** (20% of gains) protects against catastrophic loss scenarios (which technically should not ever happen)
 - **Leverage** dynamically adjusts based on signal quality confidence
-- **Position sizing** is calculated deterministically from available capital × leverage ÷ entry price
+- **Position sizing** is calculated deterministically from available capital × leverage ÷ entry price + trading fees
 
 **Key Constraints:**
 - **Position Timeframe:** 15-minute candles (strategic positions, hours/days hold time)
@@ -52,51 +52,52 @@ This framework defines a **hybrid intelligent system** that extends NautilusTrad
 ┌──────────────────────────────────────────────────────────────────┐
 │                    NautilusTrader Core                           │
 │  (Rust engine, Python interface, Event Bus, Risk Engine)         │
-│  Single Pair: BTC/USDT | 15-min Positions | 1-min Analysis      │
+│  Single Pair: BTC/USDT | 15-min Positions | 1-min Analysis       │
 └──────────────┬───────────────────────────────────────────────────┘
                │ Bar Events (Every 1-min + Every 15-min)
                │ Order/Fill Events (Real-time)
                │ Market Data Updates (Every tick)
                ↓
 ┌──────────────────────────────────────────────────────────────────┐
-│              CENTRAL REPOSITORY LAYER                             │
+│              CENTRAL REPOSITORY LAYER                            │
 │  (Aggregates all signals, context, state)                        │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │  Multi-Timeframe Signal Aggregator                         │  │
-│  │  • 67 building blocks → 1-min consensus                   │  │
-│  │  • 67 building blocks → 15-min consensus                  │  │
-│  │  • Cross-timeframe alignment detection                    │  │
-│  │  • Signal freshness & convergence tracking                │  │
+│  │  • 67 building blocks → 1-min consensus                    │  │
+│  │  • 67 building blocks → 15-min consensus                   │  │
+│  │    • Some blocks are MTF (30min,1hr, 2hr, 4hr, etc. )      │  │
+│  │  • Cross-timeframe alignment detection                     │  │
+│  │  • Signal freshness & convergence tracking                 │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │  Position State Cache (Real-time)                          │  │
-│  │  • Active trades (typically 1-2 concurrent)               │  │
-│  │  • Entry/current price, P&L metrics                       │  │
-│  │  • TP1/TP2/TP3 and SL levels (original + current)        │  │
-│  │  • Trailing stop state                                   │  │
-│  │  • Historical snapshots (every 1-min bar)                │  │
+│  │  • Active trades (typically 1-5 concurrent)                │  │
+│  │  • Entry/current price, P&L metrics                        │  │
+│  │  • TP1/TP2/TP3 and SL levels (original + current)          │  │
+│  │  • Trailing stop state                                     │  │
+│  │  • Historical snapshots (every 1-min bar)                  │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │  Capital Management Cache                                  │  │
-│  │  • Current balance (separate from exchange account)       │  │
-│  │  • Allocated capital (in open positions)                  │  │
-│  │  • Risk-free buffer (locked, non-deployable)             │  │
-│  │  • Available leverage pool                                │  │
-│  │  • Position → capital allocation mapping                 │  │
+│  │  • Current balance (separate from exchange account)        │  │
+│  │  • Allocated capital (in open positions)                   │  │
+│  │  • Risk-free buffer (locked, non-deployable)               │  │
+│  │  • Available leverage pool                                 │  │
+│  │  • Position → capital allocation mapping                   │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │  Market Intelligence Cache                                 │  │
-│  │  • Fear/Greed Index (hourly updates)                      │  │
-│  │  • BTC Dominance (5-min updates)                          │  │
-│  │  • Tech Index, DXY trends (daily)                         │  │
-│  │  • Economic calendar (real-time events)                   │  │
-│  │  • Polymarket probabilities (30-min updates)              │  │
-│  │  • Order book metrics (real-time)                         │  │
-│  │  • Session timing (Asian/London/NY)                       │  │
+│  │  • Fear/Greed Index (hourly updates)                       │  │
+│  │  • BTC Dominance (5-min updates)                           │  │
+│  │  • Tech Index, DXY trends (daily)                          │  │
+│  │  • Economic calendar (real-time events)                    │  │
+│  │  • Polymarket probabilities (30-min updates)               │  │
+│  │  • Order book metrics (real-time)                          │  │
+│  │  • Session timing (Asian/London/NY)                        │  │
 │  └────────────────────────────────────────────────────────────┘  │
 └──────────────┬───────────────────────────────────────────────────┘
                │ Every 1-min bar close + 15-min confirmations
@@ -105,59 +106,59 @@ This framework defines a **hybrid intelligent system** that extends NautilusTrad
 │         INTELLIGENT TRADE MANAGER ENGINE                         │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │  Signal Processor & Multi-Timeframe Analysis              │  │
-│  │  • 1-min consensus scoring (tactical)                     │  │
-│  │  • 15-min consensus scoring (strategic)                   │  │
-│  │  • Cross-timeframe alignment strength                     │  │
-│  │  • Block convergence metrics                              │  │
+│  │  Signal Processor & Multi-Timeframe Analysis               │  │
+│  │  • 1-min consensus scoring (tactical)                      │  │
+│  │  • 15-min consensus scoring (strategic)                    │  │
+│  │  • Cross-timeframe alignment strength                      │  │
+│  │  • Block convergence metrics                               │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │  Capital-Aware Ensemble Meta-Learner                      │  │
+│  │  Capital-Aware Ensemble Meta-Learner                       │  │
 │  │                                                            │  │
-│  │  [TCN] Temporal Convolutional Network                    │  │
-│  │    └─ Detects 1-min micro-patterns                       │  │
-│  │       independent of building blocks                      │  │
+│  │  [TCN] Temporal Convolutional Network                      │  │
+│  │    └─ Detects 1-min micro-patterns                         │  │
+│  │       independent of building blocks                       │  │
 │  │                                                            │  │
-│  │  [LSTM-Transformer] Sequence + Attention                 │  │
-│  │    └─ Learns which building block combos                 │  │
-│  │       historically precede reversals                      │  │
+│  │  [LSTM-Transformer] Sequence + Attention                   │  │
+│  │    └─ Learns which building block combos                   │  │
+│  │       historically precede reversals                       │  │
 │  │                                                            │  │
-│  │  [LightGBM] Meta-Learner                                 │  │
-│  │    └─ Routes decisions: Trust blocks? Override with TCN?  │  │
-│  │       5-class output: HOLD/SCALE_IN/SCALE_OUT/REVERSE/CLOSE
+│  │  [LightGBM] Meta-Learner                                   │  │
+│  │    └─ Routes decisions: Trust blocks? Override with TCN?   │  │
+│  │       5-class output: HOLD/SCALE_IN/SCALE_OUT/REVERSE/CLOSE|  |
 │  │                                                            │  │
-│  │  [Anomaly Detector] Isolation Forest                      │  │
-│  │    └─ Detects market stress, blocks overconfident trades │  │
+│  │  [Anomaly Detector] Isolation Forest                       │  │
+│  │    └─ Detects market stress, blocks overconfident trades   │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │  Capital Allocation Guard (NEW)                           │  │
-│  │  • Pre-entry capital validation                           │  │
-│  │  • Signal quality → leverage mapping                      │  │
-│  │  • Position sizing calculations                           │  │
-│  │  • Available capital checks                               │  │
-│  │  • Account heat validation (max 95%)                      │  │
+│  │  Capital Allocation Guard (NEW)                            │  │
+│  │  • Pre-entry capital validation                            │  │
+│  │  • Signal quality → leverage mapping                       │  │
+│  │  • Position sizing calculations                            │  │
+│  │  • Available capital checks                                │  │
+│  │  • Account heat validation (max 95%)                       │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │  Decision Gate (Explainability + Risk Validation)         │  │
-│  │  • SHAP explainability (top 3 feature drivers)            │  │
-│  │  • Signal freshness validation                            │  │
-│  │  • Position constraint checking                           │  │
-│  │  • Economic sense verification                            │  │
-│  │  • Stale data penalty application                         │  │
-│  │  • Capital constraint enforcement                         │  │
+│  │  Decision Gate (Explainability + Risk Validation)          │  │
+│  │  • SHAP explainability (top 3 feature drivers)             │  │
+│  │  • Signal freshness validation                             │  │
+│  │  • Position constraint checking                            │  │
+│  │  • Economic sense verification                             │  │
+│  │  • Stale data penalty application                          │  │
+│  │  • Capital constraint enforcement                          │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │  Risk & Capital Preservation Guard                        │  │
-│  │  • Absolute drawdown limits (hard stops)                  │  │
-│  │  • Max concurrent loss positions                          │  │
-│  │  • Account heat management (max 95%)                      │  │
-│  │  • Event-driven emergency closeouts                       │  │
-│  │  • Capital sufficiency checks                             │  │
-│  │  • Risk-free buffer protection                            │  │
+│  │  Risk & Capital Preservation Guard                         │  │
+│  │  • Absolute drawdown limits (hard stops)                   │  │
+│  │  • Max concurrent loss positions                           │  │
+│  │  • Account heat management (max 95%)                       │  │
+│  │  • Event-driven emergency closeouts                        │  │
+│  │  • Capital sufficiency checks                              │  │
+│  │  • Risk-free buffer protection                             │  │
 │  └────────────────────────────────────────────────────────────┘  │
 └──────────────┬───────────────────────────────────────────────────┘
                │ Command Stream (ModifyOrder, ClosePosition)
@@ -229,7 +230,7 @@ EVERY 1-MINUTE BAR CLOSE:
 │     │
 │     └─ If any check fails → BLOCK decision, return HOLD
 │
-├─ PHASE 5: Capital Check (200-250ms) ← NEW
+├─ PHASE 5: Capital Check (200-250ms) 
 │  │
 │  └─ CapitalAllocationGuard
 │     ├─ Verify available capital ≥ required capital
@@ -238,7 +239,7 @@ EVERY 1-MINUTE BAR CLOSE:
 │     │
 │     └─ If capital insufficient → BLOCK decision, return HOLD
 │
-├─ PHASE 6: Strategy Switch Evaluation (250-300ms) ← NEW
+├─ PHASE 6: Strategy Switch Evaluation (250-300ms) 
 │  │
 │  └─ SignalQualityComparator
 │     ├─ Compare incoming signal vs current position signal quality
