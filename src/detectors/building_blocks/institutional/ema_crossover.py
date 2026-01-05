@@ -4,15 +4,15 @@ Category: Institutional & Volume
 Purpose: Standard EMA crossovers (20/50/200) for trend identification
 """
 """
-Building Block Classification: SIGNAL BLOCK
-Mode: EVENT-DRIVEN
-Purpose: EMA crossover events, selective signals on cross
+Building Block Classification: HYBRID BLOCK
+Mode: CONTINUOUS STATE + RARE EVENTS
+Purpose: Continuous EMA alignment state (99.4%) + rare cross events (0.58%)
 
 Block Type Definitions:
 - SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
 - CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
 - EVENT BLOCK: Specific market event detection (selective, fires when events occur)
-- HYBRID BLOCK: Combination of continuous state + selective events
+- HYBRID BLOCK: Combination of continuous state + selective events ← THIS BLOCK
 """
 
 
