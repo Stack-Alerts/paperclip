@@ -1,0 +1,45 @@
+{
+  "block": "luxalgo_supply_demand_zones",
+  "methodology": "LuxAlgo Volume Profile",
+  "total_bars_sampled": 17181,
+  "valid_results": 17181,
+  "active_signals": 17181,
+  "active_signal_rate": 1.0,
+  "avg_active_confidence": 77.69815493859495,
+  "avg_all_confidence": 77.69815493859495,
+  "std_confidence": 5.2079431857312795,
+  "errors": 0,
+  "error_rate": 0.0,
+  "all_signal_types": {
+    "NEAR_DEMAND": 5130,
+    "SUPPLY_ZONE": 1020,
+    "NEAR_SUPPLY": 10263,
+    "DEMAND_ZONE": 747,
+    "NO_ZONE": 21
+  },
+  "active_signal_types": {
+    "NEAR_DEMAND": 5130,
+    "SUPPLY_ZONE": 1020,
+    "NEAR_SUPPLY": 10263,
+    "DEMAND_ZONE": 747,
+    "NO_ZONE": 21
+  },
+  "signals_per_day": 96.0,
+  "test_period": {
+    "start": "2025-06-19 07:45:00",
+    "end": "2025-12-16 07:45:00",
+    "days": 180,
+    "bars": 17281
+  },
+  "validation_params": {
+    "methodology": "expanding_window",
+    "min_bars": 100,
+    "sample_every": 1,
+    "total_bars_available": 17281
+  },
+  "supply_demand_balance": {
+    "supply_zones": 1020,
+    "demand_zones": 747,
+    "ratio": "57.7/42.3"
+  }
+}
