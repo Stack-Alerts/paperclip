@@ -101,6 +101,57 @@ class RangeLiquidity:
         
         return float(total_depth), float(weighted_depth), levels_within
     
+    def estimate_liquidity_strength_from_price_action(self, df: pd.DataFrame, 
+                                                       target_price: float) -> int:
+        """
+        Estimate liquidity strength WITHOUT orderbook (variation source!)
+        
+        Uses price action signals:
+        - Volume profile near target
+        - Number of touches
+        - Rejection strength
+        """
+        if len(df) < 20:
+            return 50
+        
+        # Base: 30-70 range (creates variation!)
+        base_strength = 50
+        
+        # Factor 1: Volume near target (last 20 bars)
+        recent_highs = df['high'].iloc[-20:]
+        recent_lows = df['low'].iloc[-20:]
+        recent_volumes = df['volume'].iloc[-20:]
+        
+        # How often touched near target?
+        tolerance = target_price * 0.015  # 1.5%
+        touches = 0
+        touch_volumes = []
+        
+        for i in range(len(recent_highs)):
+            if abs(recent_highs.iloc[i] - target_price) < tolerance or \
+               abs(recent_lows.iloc[i] - target_price) < tolerance:
+                touches += 1
+                touch_volumes.append(recent_volumes.iloc[i])
+        
+        # Touch bonus: more touches = stronger level
+        touch_bonus = min(20, touches * 4)  # 0-20
+        
+        # Volume bonus: high volume at touches = stronger
+        if touch_volumes:
+            avg_touch_vol = sum(touch_volumes) / len(touch_volumes)
+            avg_overall_vol = recent_volumes.mean()
+            if avg_overall_vol > 0:
+                vol_ratio = avg_touch_vol / avg_overall_vol
+                vol_bonus = int((vol_ratio - 1.0) * 15)  # -15 to +15
+                vol_bonus = max(-15, min(15, vol_bonus))
+            else:
+                vol_bonus = 0
+        else:
+            vol_bonus = 0
+        
+        strength = base_strength + touch_bonus + vol_bonus
+        return max(30, min(70, strength))
+    
     def calculate_liquidity_strength(self, total_depth: float, weighted_depth: float, levels: int) -> int:
         """Calculate liquidity strength from real orderbook data (0-100)"""
         if total_depth == 0:
@@ -267,7 +318,6 @@ class RangeLiquidity:
         
         # Try orderbook data (ADVANCED MODE!)
         has_orderbook = False
-        liquidity_strength = 50
         total_depth = 0
         weighted_depth = 0
         levels_within = 0
@@ -281,8 +331,15 @@ class RangeLiquidity:
                     )
                     liquidity_strength = self.calculate_liquidity_strength(total_depth, weighted_depth, levels_within)
                     has_orderbook = True
+                else:
+                    # No orderbook: estimate from price action (VARIATION SOURCE!)
+                    liquidity_strength = self.estimate_liquidity_strength_from_price_action(df, target_liquidity)
             except:
-                pass
+                # Fallback: estimate from price action
+                liquidity_strength = self.estimate_liquidity_strength_from_price_action(df, target_liquidity)
+        else:
+            # No orderbook: estimate from price action (VARIATION SOURCE!)
+            liquidity_strength = self.estimate_liquidity_strength_from_price_action(df, target_liquidity)
         
         # Detect volume spike (Priority 2 enhancement)
         has_volume_spike = self.detect_volume_spike(df)
