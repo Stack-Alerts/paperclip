@@ -104,7 +104,7 @@ class SupplyDemandZones:
         
         Criteria:
         - 3+ consecutive bars
-        - Range < 0.5 * ATR (tight consolidation)
+        - Range < 0.7 * ATR (tight consolidation) [CALIBRATED from 0.5]
         - Relatively flat (low volatility)
         """
         if len(df) < lookback or atr == 0:
@@ -121,8 +121,8 @@ class SupplyDemandZones:
             low = window['low'].min()
             range_size = high - low
             
-            # Consolidation = range < 0.5 * ATR
-            if range_size < 0.5 * atr:
+            # Consolidation = range < 0.7 * ATR [CALIBRATED]
+            if range_size < 0.7 * atr:
                 # Found potential base
                 bases.append({
                     'start_idx': i,
@@ -142,8 +142,9 @@ class SupplyDemandZones:
         """
         Detect explosive moves FROM consolidation bases
         
-        Criteria:
-        - Strong directional move (> 2.0 * ATR)
+        Criteria (CALIBRATED):
+        - DEMAND: Move > 1.3 * ATR (balanced for underdetection)
+        - SUPPLY: Move > 1.5 * ATR (standard)
         - Volume spike (> 1.5x average)
         - Happens immediately after base
         """
@@ -166,7 +167,8 @@ class SupplyDemandZones:
                 move_down = base_price - bar['low']
                 
                 # Check for explosive upward move (DEMAND zone)
-                if move_up > 2.0 * atr:
+                # CALIBRATED: 1.3 ATR (was 2.0) for better DEMAND detection
+                if move_up > 1.3 * atr:
                     # Check volume at explosion
                     explosion_idx = df.index.get_loc(idx)
                     volume_ratio, is_spike, volume_score = self.analyze_volume_activity(
@@ -189,7 +191,8 @@ class SupplyDemandZones:
                         break
                 
                 # Check for explosive downward move (SUPPLY zone)
-                elif move_down > 2.0 * atr:
+                # CALIBRATED: 1.5 ATR (was 2.0)
+                elif move_down > 1.5 * atr:
                     explosion_idx = df.index.get_loc(idx)
                     volume_ratio, is_spike, volume_score = self.analyze_volume_activity(
                         df.iloc[:explosion_idx+1], window=20
@@ -232,7 +235,7 @@ class SupplyDemandZones:
     
     def calculate_zone_confidence(self, zone: Dict, distance: float, atr: float, in_zone: bool = False) -> int:
         """
-        Enhanced smart confidence calculation for better variation
+        Enhanced smart confidence calculation for better variation (CALIBRATED)
         
         Factors:
         1. Zone strength (volume at formation) - wider range
@@ -241,27 +244,29 @@ class SupplyDemandZones:
         4. Distance (closer higher) - continuous
         5. In zone boost
         6. Zone type bias correction
-        """
-        confidence = 45  # Lower base for more range
         
-        # Strength factor (+0-25) - ENHANCED for more variation
+        Target: 10-20% std, Range: 40-85%
+        """
+        confidence = 40  # Lower base (was 45) for wider range
+        
+        # Strength factor (+0-30) - WIDENED for more variation
         if zone['strength'] >= 80:
-            strength_bonus = 25
+            strength_bonus = 30
         elif zone['strength'] >= 60:
-            strength_bonus = 20
+            strength_bonus = 24
         elif zone['strength'] >= 40:
-            strength_bonus = 15
+            strength_bonus = 18
         elif zone['strength'] >= 20:
-            strength_bonus = 10
+            strength_bonus = 12
         else:
-            strength_bonus = 5
+            strength_bonus = 6
         confidence += strength_bonus
         
-        # Volume factor (+0-18) - ENHANCED scaling
+        # Volume factor (+0-20) - WIDENED scaling
         if zone['volume_score'] >= 90:
-            volume_bonus = 18
+            volume_bonus = 20
         elif zone['volume_score'] >= 75:
-            volume_bonus = 15
+            volume_bonus = 16
         elif zone['volume_score'] >= 60:
             volume_bonus = 12
         elif zone['volume_score'] >= 45:
@@ -270,59 +275,59 @@ class SupplyDemandZones:
             volume_bonus = 4
         confidence += volume_bonus
         
-        # Age factor (+0-12) - MORE NUANCED
+        # Age factor (+0-15) - WIDENED
         if zone['age'] < 10:
-            age_bonus = 12  # Very fresh
+            age_bonus = 15  # Very fresh
         elif zone['age'] < 20:
-            age_bonus = 9  # Fresh
+            age_bonus = 12  # Fresh
         elif zone['age'] < 40:
-            age_bonus = 6  # Relatively fresh
+            age_bonus = 8  # Relatively fresh
         elif zone['age'] < 60:
-            age_bonus = 3  # Getting old
+            age_bonus = 4  # Getting old
         else:
             age_bonus = 0  # Old zone
         confidence += age_bonus
         
-        # Test factor (+0-12) - GRADUATED
+        # Test factor (+0-15) - WIDENED
         if zone['tests'] == 0:
-            test_bonus = 12  # Untested = strongest
+            test_bonus = 15  # Untested = strongest
         elif zone['tests'] == 1:
-            test_bonus = 8  # One test = still very good
+            test_bonus = 10  # One test = still very good
         elif zone['tests'] == 2:
-            test_bonus = 4  # Two tests = okay
+            test_bonus = 5  # Two tests = okay
         else:
             test_bonus = 0  # Multiple tests = weaker
         confidence += test_bonus
         
-        # Distance factor (+0-12) - CONTINUOUS
+        # Distance factor (+0-15) - WIDENED
         if atr > 0 and distance < atr * 2:
             distance_ratio = distance / atr
             if distance_ratio < 0.3:
-                distance_bonus = 12  # Very close
+                distance_bonus = 15  # Very close
             elif distance_ratio < 0.6:
-                distance_bonus = 10  # Close
+                distance_bonus = 12  # Close
             elif distance_ratio < 1.0:
-                distance_bonus = 7  # Near
+                distance_bonus = 9  # Near
             elif distance_ratio < 1.5:
-                distance_bonus = 4  # Approaching
+                distance_bonus = 5  # Approaching
             else:
                 distance_bonus = 2  # Within range
             confidence += distance_bonus
         
-        # In zone boost (+8)
+        # In zone boost (+10) - WIDENED
         if in_zone and distance == 0:
-            confidence += 8  # Inside zone = boost
+            confidence += 10  # Inside zone = boost
         
         # Zone type balance correction
-        # DEMAND zones slightly boosted to improve balance
+        # DEMAND zones boosted MORE to improve balance
         if zone['type'] == 'DEMAND':
-            confidence += 3  # Small boost for demand
+            confidence += 5  # Boost for demand (was 3)
         
         # Broken penalty
         if zone['broken']:
-            confidence -= 25
+            confidence -= 30
         
-        return max(40, min(95, confidence))
+        return max(40, min(85, confidence))  # CALIBRATED range: 40-85%
     
 
     def check_zone_liquidation_strength(self, zone_price: float, df: pd.DataFrame) -> Dict:
