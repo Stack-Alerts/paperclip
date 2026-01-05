@@ -55,15 +55,19 @@ Grade: A- (90/100) - Production Ready
 Value: $50K-$80K (hybrid context + rare mega signals)
 """
 """
-Building Block Classification: EVENT BLOCK
-Mode: SELECTIVE
-Purpose: Distribution phase detection, fires when identified
+Building Block Classification: HYBRID BLOCK
+Mode: CONTINUOUS + EVENT
+Purpose: Continuous distribution state (NO_DISTRIBUTION) + selective events (Phase A/B/C/D)
 
 Block Type Definitions:
 - SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
 - CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
 - EVENT BLOCK: Specific market event detection (selective, fires when events occur)
 - HYBRID BLOCK: Combination of continuous state + selective events
+
+HYBRID DESIGN:
+- Continuous: Always provides NO_DISTRIBUTION state (65.1% on 2HR)
+- Events: Fires on distribution phases A/B/C/D (34.9% on 2HR)
 """
 
 
