@@ -179,6 +179,32 @@ def run_walkforward_test(use_orderbook=False):
     output_dir = Path(__file__).parent.parent.parent / 'data' / 'reports' / 'walkforward_tests'
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    # Save CSV
+    csv_file = output_dir / 'walkforward_results_range_liquidity_signals_trades.csv'
+    signals_df = pd.DataFrame(results)
+    if len(signals_df) > 0:
+        if 'metadata' in signals_df.columns:
+            metadata_fields = []
+            for idx, row in signals_df.iterrows():
+                meta = row.get('metadata', {})
+                if isinstance(meta, dict):
+                    metadata_fields.append(meta)
+                else:
+                    metadata_fields.append({})
+            
+            meta_df = pd.DataFrame(metadata_fields)
+            signals_df = pd.concat([signals_df.drop('metadata', axis=1), meta_df], axis=1)
+        
+        if 'confluence_factors' in signals_df.columns:
+            signals_df['confluence_factors'] = signals_df['confluence_factors'].apply(
+                lambda x: ' | '.join(x) if isinstance(x, list) else str(x)
+            )
+        
+        signals_df.to_csv(csv_file, index=False)
+        print(f"\n✅ Detailed signals/trades CSV saved to: {csv_file}")
+        print(f"   Total records: {len(signals_df)}")
+        print(f"   Active signals in CSV: {len([s for s in signals_df['signal'] if s in ['NEAR_BUY_SIDE_LIQUIDITY', 'NEAR_SELL_SIDE_LIQUIDITY']])}")
+    
     output_file = output_dir / 'walkforward_results_range_liquidity.json'
     with open(output_file, 'w') as f:
         json.dump(test_results, f, indent=2)
