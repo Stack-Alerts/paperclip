@@ -156,6 +156,10 @@ class SupplyDemandZones:
         demand_mult = regime['demand_mult']
         supply_mult = regime['supply_mult']
         
+        # DEBUG: Print regime info
+        if len(df) % 500 == 0:  # Print every 500 bars
+            print(f"Bar {len(df)}: Regime={regime['regime']}, demand_mult={demand_mult}, supply_mult={supply_mult}")
+        
         for base in bases:
             base_end = base['end_idx']
             
@@ -356,14 +360,15 @@ class SupplyDemandZones:
         last_close = close.iloc[-1]
         change_pct = (last_close - first_close) / first_close
         
-        # Classify regime
-        if change_pct > 0.10:  # >10% up = uptrend
+        # Classify regime (FIXED: 10% was too high for 100 bars = 25 hours)
+        # Realistic thresholds for 25-hour window:
+        if change_pct > 0.03:  # >3% up in 25 hrs = uptrend
             return {
                 'regime': 'UPTREND',
                 'demand_mult': 1.0,
                 'supply_mult': 0.85  # Easier SUPPLY detection
             }
-        elif change_pct < -0.10:  # >10% down = downtrend
+        elif change_pct < -0.03:  # >3% down in 25 hrs = downtrend
             return {
                 'regime': 'DOWNTREND',
                 'demand_mult': 0.85,  # Easier DEMAND detection (BALANCE FIX)
