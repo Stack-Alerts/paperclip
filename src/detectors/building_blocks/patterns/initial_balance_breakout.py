@@ -187,9 +187,7 @@ class InitialBalanceBreakout:
             else:
                 # Continuing breakout state
                 return self._generate_continuation_signal(
-                    current_time, current_price, '
-
-BELOW_IB',
+                    current_time, current_price, 'BELOW_IB',
                     self.current_ib, volume_confirmed
                 )
         
