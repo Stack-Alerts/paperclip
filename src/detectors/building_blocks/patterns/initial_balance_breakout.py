@@ -167,7 +167,7 @@ class InitialBalanceBreakout:
                 self.breakout_detected = True
                 return self._generate_breakout_signal(
                     current_time, current_price, 'BULLISH_BREAKOUT',
-                    self.current_ib, volume_confirmed, atr
+                    self.current_ib, volume_confirmed, atr, df
                 )
             else:
                 # Continuing breakout state
@@ -182,7 +182,7 @@ class InitialBalanceBreakout:
                 self.breakout_detected = True
                 return self._generate_breakout_signal(
                     current_time, current_price, 'BEARISH_BREAKOUT',
-                    self.current_ib, volume_confirmed, atr
+                    self.current_ib, volume_confirmed, atr, df
                 )
             else:
                 # Continuing breakout state
@@ -295,6 +295,7 @@ class InitialBalanceBreakout:
         ib: InitialBalanceRange,
         volume_confirmed: bool,
         atr: float,
+        df: pd.DataFrame,
     ) -> Dict[str, Any]:
         """Generate breakout signal."""
         # Calculate distance from IB extreme
@@ -322,6 +323,18 @@ class InitialBalanceBreakout:
         if volume_confirmed:
             confidence += 10
         
+        # Calculate bars since IB formation
+        try:
+            ib_end_idx = df[df['timestamp'] >= ib.session_end].index[0] if len(df[df['timestamp'] >= ib.session_end]) > 0 else 0
+            bars_since_ib = len(df) - ib_end_idx - 1
+            hours_since_ib = bars_since_ib * 0.25  # 15min bars
+        except:
+            bars_since_ib = 0
+            hours_since_ib = 0.0
+        
+        # Calculate strength score (fine-grained)
+        strength_score = round(distance_pct * 100, 1)  # 0-100 scale
+        
         return {
             'signal': signal_type,
             'confidence': min(85, confidence),
@@ -334,8 +347,11 @@ class InitialBalanceBreakout:
                 'distance_from_ib': round(distance, 2),
                 'distance_pct': round(distance_pct * 100, 1),
                 'strength': strength,
+                'strength_score': strength_score,  # Fine-grained 0-100
                 'volume_confirmed': volume_confirmed,
                 'is_new_event': True,
+                'bars_since_ib': bars_since_ib,
+                'hours_since_ib': round(hours_since_ib, 2),
                 # Targets (IB extensions)
                 'target_25': round(extreme + (ib.range_size * 0.25 * (1 if signal_type == 'BULLISH_BREAKOUT' else -1)), 2),
                 'target_50': round(extreme + (ib.range_size * 0.50 * (1 if signal_type == 'BULLISH_BREAKOUT' else -1)), 2),
