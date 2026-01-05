@@ -145,8 +145,11 @@ InitialBalanceBreakout(
         'distance_from_ib': 49.50,
         'distance_pct': 19.8,
         'strength': 'WEAK',  # or 'MEDIUM', 'STRONG'
+        'strength_score': 19.8,  # Fine-grained 0-100 scale
         'volume_confirmed': True,
         'is_new_event': True,
+        'bars_since_ib': 12,  # Bars since IB formation
+        'hours_since_ib': 3.0,  # Hours since IB formation
         'target_25': 45312.63,   # 25% extension
         'target_50': 45375.75,   # 50% extension  
         'target_100': 45501.00,  # 100% extension
