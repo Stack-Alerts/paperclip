@@ -67,14 +67,18 @@ class AdvancedDataLoader:
             # Combine all months
             combined = pd.concat(dfs, ignore_index=True)
             
-            # Ensure timestamp column
+            # Ensure timestamp column (try multiple possible names)
             if 'timestamp' in combined.columns:
                 combined['timestamp'] = pd.to_datetime(combined['timestamp'])
             elif 'time' in combined.columns:
                 combined['timestamp'] = pd.to_datetime(combined['time'])
+            elif 'origin_time' in combined.columns:
+                combined['timestamp'] = pd.to_datetime(combined['origin_time'])
+            elif 'received_time' in combined.columns:
+                combined['timestamp'] = pd.to_datetime(combined['received_time'])
             else:
                 # No timestamp column found - return empty DataFrame
-                print("Warning: Liquidation data missing timestamp column")
+                print(f"Warning: Liquidation data missing timestamp column. Available: {combined.columns.tolist()}")
                 return pd.DataFrame()
             
             # Filter date range
