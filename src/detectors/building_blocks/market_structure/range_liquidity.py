@@ -139,44 +139,50 @@ class RangeLiquidity:
     def calculate_variable_confidence(self, liquidity_strength: int, distance_pct: float, 
                                      has_orderbook: bool, has_volume_spike: bool = False) -> int:
         """
-        FIXED: Much wider variation based on actual liquidity quality
+        FIXED V2: MUCH wider variation based on distance and liquidity
         
-        Priority 1 fix: Widen confidence range significantly
-        - With orderbook: 60-85 base range
-        - Without orderbook: 55-75 base range
-        - Larger distance adjustments
+        Priority 1 fix: Maximum confidence variation
+        - Distance-driven (primary driver when no orderbook)
+        - Liquidity strength scaling
+        - Volume spike bonus
         """
         # BASE: Scale with liquidity strength (wider range!)
         if has_orderbook:
-            # With real data: 60-85 base range
-            base_confidence = 60 + int(liquidity_strength * 0.25)
+            # With real data: 55-85 base range
+            base_confidence = 55 + int(liquidity_strength * 0.30)
         else:
-            # Without orderbook: 55-75 base range (less confident)
-            base_confidence = 55 + int(liquidity_strength * 0.20)
+            # Without orderbook: Start lower, vary more
+            base_confidence = 50 + int(liquidity_strength * 0.30)
         
-        # DISTANCE: Larger adjustments (proximity matters!)
-        if distance_pct < 2:
-            distance_adj = 10  # Very close = high confidence
-        elif distance_pct < 5:
-            distance_adj = 5   # Close = moderate boost
+        # DISTANCE: MUCH LARGER adjustments (this is the main variation source!)
+        if distance_pct < 1:
+            distance_adj = 20  # Extremely close = very high confidence
+        elif distance_pct < 3:
+            distance_adj = 15  # Very close = high confidence
+        elif distance_pct < 6:
+            distance_adj = 10  # Close = moderate boost
         elif distance_pct < 10:
-            distance_adj = 0   # Moderate = neutral
-        elif distance_pct < 20:
-            distance_adj = -5  # Far = penalty
+            distance_adj = 5   # Moderately close = small boost
+        elif distance_pct < 15:
+            distance_adj = 0   # Moderate distance = neutral
+        elif distance_pct < 25:
+            distance_adj = -10 # Far = penalty
         else:
-            distance_adj = -10 # Very far = big penalty
+            distance_adj = -20 # Very far = big penalty
         
         base_confidence += distance_adj
         
-        # STRENGTH: Additional bonus for strong liquidity
+        # STRENGTH: Additional bonus for strong liquidity (less important without orderbook)
         if liquidity_strength >= 80:
             base_confidence += 5  # Very strong
+        elif liquidity_strength >= 60:
+            base_confidence += 3  # Strong
         elif liquidity_strength <= 30:
             base_confidence -= 5  # Very weak
         
         # VOLUME SPIKE: Magnet effect bonus (Priority 2)
         if has_volume_spike:
-            base_confidence += 5
+            base_confidence += 7  # Increased from 5
         
         return max(50, min(90, base_confidence))
     
