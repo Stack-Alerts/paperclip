@@ -72,6 +72,10 @@ class AdvancedDataLoader:
                 combined['timestamp'] = pd.to_datetime(combined['timestamp'])
             elif 'time' in combined.columns:
                 combined['timestamp'] = pd.to_datetime(combined['time'])
+            else:
+                # No timestamp column found - return empty DataFrame
+                print("Warning: Liquidation data missing timestamp column")
+                return pd.DataFrame()
             
             # Filter date range
             combined = combined[
