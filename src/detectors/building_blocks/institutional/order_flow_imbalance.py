@@ -158,6 +158,62 @@ class OrderFlowImbalance:
         
         return is_persistent, persistent_count
     
+    def detect_acceleration(self, df: pd.DataFrame) -> dict:
+        """
+        Detect if imbalance is accelerating or decelerating
+        
+        Compare recent vs previous strength
+        Acceleration = growing pressure (warning!)
+        Deceleration = pressure fading (reversal?)
+        """
+        if len(df) < 20:
+            return {'status': 'INSUFFICIENT_DATA', 'acceleration': 0}
+        
+        # Calculate imbalance from last 5 bars (recent)
+        recent_df = df.iloc[-5:]
+        recent_up = recent_df[recent_df['close'] > recent_df['open']]['volume'].sum()
+        recent_down = recent_df[recent_df['close'] <= recent_df['open']]['volume'].sum()
+        recent_total = recent_up + recent_down
+        
+        if recent_total > 0:
+            recent_ratio = recent_up / recent_total
+            recent_strength = self.calculate_imbalance_strength(recent_ratio)
+        else:
+            recent_strength = 0
+        
+        # Calculate from bars 6-10 (previous)
+        previous_df = df.iloc[-10:-5]
+        prev_up = previous_df[previous_df['close'] > previous_df['open']]['volume'].sum()
+        prev_down = previous_df[previous_df['close'] <= previous_df['open']]['volume'].sum()
+        prev_total = prev_up + prev_down
+        
+        if prev_total > 0:
+            prev_ratio = prev_up / prev_total
+            prev_strength = self.calculate_imbalance_strength(prev_ratio)
+        else:
+            prev_strength = 0
+        
+        # Calculate acceleration
+        acceleration = recent_strength - prev_strength
+        
+        if acceleration > 20:
+            return {
+                'status': 'ACCELERATING',
+                'acceleration': acceleration,
+                'direction': 'BUY' if recent_ratio > 0.5 else 'SELL'
+            }
+        elif acceleration < -20:
+            return {
+                'status': 'DECELERATING',
+                'acceleration': abs(acceleration),
+                'direction': 'BUY' if recent_ratio > 0.5 else 'SELL'
+            }
+        else:
+            return {
+                'status': 'STABLE',
+                'acceleration': abs(acceleration)
+            }
+    
     def check_liquidation_confirmation(self, timestamp: datetime, signal_direction: str) -> Dict:
         """
         Check if liquidations confirm the order flow imbalance
@@ -307,6 +363,9 @@ class OrderFlowImbalance:
         # ATR for context
         atr = self.calculate_atr(df, self.atr_period)
         
+        # NEW: Detect acceleration/deceleration
+        acceleration = self.detect_acceleration(df)
+        
         # ENHANCED: Check liquidation confirmation
         timestamp = df['timestamp'].iloc[-1]
         signal_dir = 'BUY' if signal == 'BUY_IMBALANCE' else 'SELL' if signal == 'SELL_IMBALANCE' else 'NONE'
@@ -351,6 +410,12 @@ class OrderFlowImbalance:
             if abs(buy_ratio - 0.5) < 0.1:
                 confluence_factors.append('Perfect balance (50/50)')
         
+        # Add acceleration to confluence factors
+        if acceleration['status'] == 'ACCELERATING':
+            confluence_factors.append(f'⚡ Pressure ACCELERATING ({acceleration["acceleration"]:.0f} strength increase!)')
+        elif acceleration['status'] == 'DECELERATING':
+            confluence_factors.append(f'⚠️ Pressure DECELERATING ({acceleration["acceleration"]:.0f} strength decrease)')
+        
         # Metadata (much richer!)
         metadata = {
             'up_volume': round(up_volume, 2),
@@ -364,7 +429,9 @@ class OrderFlowImbalance:
             'volume_trend': 'INCREASING' if volume_increasing else 'DECREASING',
             'volume_trend_strength': round(volume_trend_strength, 2),
             'atr': round(atr, 2),
-            'lookback_bars': lookback
+            'lookback_bars': lookback,
+            'acceleration_status': acceleration['status'],
+            'acceleration_value': round(acceleration['acceleration'], 2)
         }
         
         return {
