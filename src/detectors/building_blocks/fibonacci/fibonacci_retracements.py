@@ -50,10 +50,133 @@ class FibonacciRetracements:
     
     def __init__(self, timeframe: str = '15min', 
                  swing_lookback: int = 100,
+                 min_swing_size_pct: float = 3.0,
+                 use_multi_swing: bool = True,
                  **kwargs):
         self.timeframe = timeframe
         self.swing_lookback = swing_lookback
+        self.min_swing_size_pct = min_swing_size_pct
+        self.use_multi_swing = use_multi_swing
         self.fib_levels = [0.236, 0.382, 0.5, 0.618, 0.786]
+    
+    def score_swing_significance(self, df: pd.DataFrame, 
+                                 high: float, low: float,
+                                 high_idx, low_idx) -> float:
+        """
+        Score swing significance (0-100) - NEW v3
+        
+        Factors:
+        - Swing size (% move)
+        - Duration (bars between high/low)
+        - Volume confirmation
+        - Recency
+        """
+        score = 0
+        
+        # 1. Swing size (30 points max)
+        swing_size_pct = ((high - low) / low) * 100
+        if swing_size_pct >= 10.0:
+            score += 30
+        elif swing_size_pct >= 7.0:
+            score += 25
+        elif swing_size_pct >= 5.0:
+            score += 20
+        elif swing_size_pct >= 3.0:
+            score += 10
+        
+        # 2. Duration (20 points max)
+        try:
+            high_pos = df.index.get_loc(high_idx)
+            low_pos = df.index.get_loc(low_idx)
+            duration = abs(high_pos - low_pos)
+            
+            if duration >= 30:
+                score += 20
+            elif duration >= 20:
+                score += 15
+            elif duration >= 10:
+                score += 10
+        except:
+            score += 5  # Can't determine duration
+        
+        # 3. Volume confirmation (25 points max)
+        try:
+            swing_start = min(high_idx, low_idx)
+            swing_end = max(high_idx, low_idx)
+            swing_bars = df.loc[swing_start:swing_end]
+            
+            if len(swing_bars) > 0:
+                swing_volume = swing_bars['volume'].mean()
+                baseline_volume = df['volume'].iloc[-100:].mean()
+                
+                if swing_volume > baseline_volume * 1.3:
+                    score += 25
+                elif swing_volume > baseline_volume * 1.1:
+                    score += 15
+        except:
+            score += 5  # Can't check volume
+        
+        # 4. Recency (25 points max)
+        try:
+            bars_since = len(df) - max(df.index.get_loc(high_idx), df.index.get_loc(low_idx))
+            
+            if 10 <= bars_since <= 50:
+                score += 25  # Sweet spot
+            elif 5 <= bars_since <= 100:
+                score += 15
+            else:
+                score += 5
+        except:
+            score += 10  # Default
+        
+        return min(100, score)
+    
+    def find_multiple_swings(self, df: pd.DataFrame) -> List[dict]:
+        """
+        Find multiple significant swings (NEW v3)
+        Returns top 3 swings by significance score
+        """
+        swings = []
+        lookback = min(200, len(df))
+        
+        # Look for local highs
+        for i in range(20, lookback - 20):
+            try:
+                window = df.iloc[-i-10:-i+11] if i+11 <= len(df) else df.iloc[-i-10:]
+                current = df.iloc[-i]
+                
+                # Check if local high
+                if current['high'] == window['high'].max():
+                    # Find corresponding low in surrounding area
+                    low_window = df.iloc[-i-20:-i+21] if i+21 <= len(df) else df.iloc[-i-20:]
+                    low_idx = low_window['low'].idxmin()
+                    
+                    high_val = current['high']
+                    low_val = df.loc[low_idx, 'low']
+                    high_idx = df.index[-i]
+                    
+                    # Check minimum swing size
+                    swing_size = ((high_val - low_val) / low_val) * 100
+                    
+                    if swing_size >= self.min_swing_size_pct:
+                        score = self.score_swing_significance(
+                            df, high_val, low_val, high_idx, low_idx
+                        )
+                        
+                        swings.append({
+                            'high': high_val,
+                            'low': low_val,
+                            'high_idx': high_idx,
+                            'low_idx': low_idx,
+                            'score': score,
+                            'size_pct': swing_size
+                        })
+            except:
+                continue
+        
+        # Return top 3 swings by score
+        swings.sort(key=lambda x: x['score'], reverse=True)
+        return swings[:3]
     
     def find_swing_points(self, df: pd.DataFrame) -> tuple:
         """
@@ -113,40 +236,106 @@ class FibonacciRetracements:
         
         return distance <= threshold
     
+    def detect_fib_clusters(self, all_fib_levels: List[dict], 
+                           atr: float, current_price: float) -> dict:
+        """
+        Detect where multiple Fib levels cluster (NEW v3)
+        Returns cluster info if current price in cluster zone
+        """
+        # Flatten all Fib levels with their sources
+        all_levels = []
+        for swing_id, levels in enumerate(all_fib_levels):
+            for level_name, level_price in levels.items():
+                all_levels.append({
+                    'price': level_price,
+                    'name': level_name,
+                    'swing_id': swing_id
+                })
+        
+        # Find clusters (3+ levels within ATR from different swings)
+        for i, level in enumerate(all_levels):
+            nearby = [
+                l for l in all_levels 
+                if abs(l['price'] - level['price']) <= atr 
+                and l['swing_id'] != level['swing_id']
+            ]
+            
+            if len(nearby) >= 2:  # 3+ levels total (current + 2+ nearby)
+                # Calculate cluster center and range
+                cluster_levels = nearby + [level]
+                cluster_center = sum(l['price'] for l in cluster_levels) / len(cluster_levels)
+                cluster_min = min(l['price'] for l in cluster_levels)
+                cluster_max = max(l['price'] for l in cluster_levels)
+                cluster_strength = len(cluster_levels)
+                
+                # Check if current price in this cluster
+                if cluster_min <= current_price <= cluster_max:
+                    return {
+                        'in_cluster': True,
+                        'center': cluster_center,
+                        'range': (cluster_min, cluster_max),
+                        'strength': cluster_strength,
+                        'levels': cluster_levels,
+                        'boost': 20 + (cluster_strength * 5)  # 25-40 point boost
+                    }
+        
+        return {'in_cluster': False}
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method (IMPROVED v2)"""
+        """Main analysis method (IMPROVED v3 - Multi-Swing + Clusters)"""
         if not all(col in df.columns for col in ['open', 'high', 'low', 'close', 'volume', 'timestamp']):
             return {'signal': 'ERROR', 'confidence': 0, 'metadata': {}, 'timestamp': datetime.now(), 'timeframe': self.timeframe, 'confluence_factors': []}
         
         if len(df) < max(20, self.swing_lookback):
             return {'signal': 'INSUFFICIENT_DATA', 'confidence': 0, 'metadata': {}, 'timestamp': datetime.now(), 'timeframe': self.timeframe, 'confluence_factors': []}
         
-        # Find RECENT swing high and low (IMPROVED - ADAPTIVE)
-        swing_high, swing_low, high_idx, low_idx = self.find_swing_points(df)
         current_price = df['close'].iloc[-1]
-        
-        # Determine trend direction (NEW)
-        trend = self.determine_trend_direction(high_idx, low_idx)
-        
-        # Calculate Fibonacci levels based on trend direction
-        price_range = swing_high - swing_low
-        fib_prices = {}
-        
-        if trend == 'UPTREND':
-            # Uptrend retracement: Fib levels from high down
-            for level in self.fib_levels:
-                fib_price = swing_high - (price_range * level)
-                fib_prices[f'fib_{int(level*100)}'] = round(fib_price, 2)
-        else:
-            # Downtrend retracement: Fib levels from low up
-            for level in self.fib_levels:
-                fib_price = swing_low + (price_range * level)
-                fib_prices[f'fib_{int(level*100)}'] = round(fib_price, 2)
-        
-        # Calculate ATR (NEW)
         atr = self.calculate_atr(df)
+        all_fib_sets = []
         
-        # Determine closest level
+        # NEW v3: Multi-swing analysis if enabled
+        if self.use_multi_swing and len(df) >= 200:
+            swings = self.find_multiple_swings(df)
+            
+            # Calculate Fib levels from each swing
+            for swing in swings:
+                trend = self.determine_trend_direction(swing['high_idx'], swing['low_idx'])
+                price_range = swing['high'] - swing['low']
+                fib_set = {}
+                
+                if trend == 'UPTREND':
+                    for level in self.fib_levels:
+                        fib_price = swing['high'] - (price_range * level)
+                        fib_set[f'fib_{int(level*100)}'] = round(fib_price, 2)
+                else:
+                    for level in self.fib_levels:
+                        fib_price = swing['low'] + (price_range * level)
+                        fib_set[f'fib_{int(level*100)}'] = round(fib_price, 2)
+                
+                all_fib_sets.append(fib_set)
+        
+        # Fallback to single swing if multi-swing disabled or not enough data
+        if len(all_fib_sets) == 0:
+            swing_high, swing_low, high_idx, low_idx = self.find_swing_points(df)
+            trend = self.determine_trend_direction(high_idx, low_idx)
+            price_range = swing_high - swing_low
+            fib_prices = {}
+            
+            if trend == 'UPTREND':
+                for level in self.fib_levels:
+                    fib_price = swing_high - (price_range * level)
+                    fib_prices[f'fib_{int(level*100)}'] = round(fib_price, 2)
+            else:
+                for level in self.fib_levels:
+                    fib_price = swing_low + (price_range * level)
+                    fib_prices[f'fib_{int(level*100)}'] = round(fib_price, 2)
+            
+            all_fib_sets.append(fib_prices)
+        
+        # Use primary (most significant) swing for main signal
+        fib_prices = all_fib_sets[0]
+        
+        # Determine closest level from primary swing
         closest_level = None
         min_distance = float('inf')
         
@@ -156,48 +345,64 @@ class FibonacciRetracements:
                 min_distance = distance
                 closest_level = level_name
         
-        # Check if at key level using ATR (IMPROVED)
+        # Check if at key level using ATR
         at_level = self.is_at_fib_level(current_price, fib_prices[closest_level], atr)
         
-        # Build signal and confluence
+        # NEW v3: Check for cluster zones
+        cluster_info = self.detect_fib_clusters(all_fib_sets, atr, current_price)
+        
+        # Build signal and confidence
         if at_level:
             signal = f'AT_{closest_level.upper()}'
-            # Higher confidence for Golden Ratio
+            # Base confidence
             confidence = 90 if closest_level == 'fib_61' else 85
+            
+            # Boost for cluster
+            if cluster_info['in_cluster']:
+                confidence = min(95, confidence + cluster_info['boost']//2)
+                
             confluence_factors = [
-                f'Price at {closest_level} level (${fib_prices[closest_level]:.2f})',
-                f'{trend} retracement'
+                f'Price at {closest_level} level (${fib_prices[closest_level]:.2f})'
             ]
         else:
             signal = 'BETWEEN_LEVELS'
             confidence = 65
+            
+            # Boost for cluster even if between levels
+            if cluster_info['in_cluster']:
+                confidence = min(80, confidence + cluster_info['boost']//3)
+            
             confluence_factors = [
-                f'Nearest: {closest_level} (${fib_prices[closest_level]:.2f})',
-                f'{trend} context'
+                f'Nearest: {closest_level} (${fib_prices[closest_level]:.2f})'
             ]
         
-        # Add Golden Ratio note (most significant)
+        # Add cluster info
+        if cluster_info['in_cluster']:
+            confluence_factors.append(
+                f"🎯 FIB CLUSTER: {cluster_info['strength']} levels converging " +
+                f"(${cluster_info['range'][0]:.2f}-${cluster_info['range'][1]:.2f})"
+            )
+        
+        # Add multi-swing info
+        if len(all_fib_sets) > 1:
+            confluence_factors.append(f'Multi-swing analysis ({len(all_fib_sets)} swings)')
+        
+        # Add Golden Ratio note
         if closest_level == 'fib_61':
             confluence_factors.append('⭐ Golden Ratio (61.8%) - strongest level')
-        
-        # Add trend-specific notes
-        if trend == 'UPTREND' and at_level:
-            confluence_factors.append('Support zone in uptrend')
-        elif trend == 'DOWNTREND' and at_level:
-            confluence_factors.append('Resistance zone in downtrend')
         
         return {
             'signal': signal,
             'confidence': confidence,
             'metadata': {
-                'swing_high': round(swing_high, 2),
-                'swing_low': round(swing_low, 2),
                 'fib_levels': fib_prices,
                 'closest_level': closest_level,
                 'at_level': at_level,
-                'trend': trend,
                 'atr': round(atr, 2),
-                'lookback_bars': self.swing_lookback
+                'lookback_bars': self.swing_lookback,
+                'num_swings': len(all_fib_sets),
+                'in_cluster': cluster_info['in_cluster'],
+                'cluster_strength': cluster_info.get('strength', 0) if cluster_info['in_cluster'] else 0
             },
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe,
