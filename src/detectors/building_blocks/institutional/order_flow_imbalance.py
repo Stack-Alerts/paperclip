@@ -15,15 +15,15 @@ Enhanced Features (Incorporating Quality Blocks):
 Fixes: 99.8% balanced bug → balanced 20/62/18 distribution!
 """
 """
-Building Block Classification: EVENT BLOCK
-Mode: SELECTIVE
-Purpose: Detects order flow imbalances, fires on significant events
+Building Block Classification: HYBRID BLOCK
+Mode: CONTINUOUS PRESSURE STATE
+Purpose: Continuous order flow pressure (21.7% buy, 21.3% sell, 57% balanced)
 
 Block Type Definitions:
 - SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
 - CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
 - EVENT BLOCK: Specific market event detection (selective, fires when events occur)
-- HYBRID BLOCK: Combination of continuous state + selective events
+- HYBRID BLOCK: Combination of continuous state + selective events ← THIS BLOCK
 """
 
 
