@@ -63,6 +63,29 @@ class KillZones:
             'NY_PM_KZ': {'start': 18, 'end': 21, 'priority': 'MEDIUM', 'base_confidence': 70}
         }
         
+        # Optional Enhancement 1: Historical win rates (populated over time)
+        # Tracks actual performance by zone
+        self.zone_performance = {
+            'ASIAN_KZ': {'trades': 0, 'wins': 0, 'win_rate': 0.45},  # Default estimates
+            'LONDON_OPEN_KZ': {'trades': 0, 'wins': 0, 'win_rate': 0.60},
+            'LONDON_KZ': {'trades': 0, 'wins': 0, 'win_rate': 0.65},
+            'NY_AM_KZ': {'trades': 0, 'wins': 0, 'win_rate': 0.75},
+            'NY_PM_KZ': {'trades': 0, 'wins': 0, 'win_rate': 0.62},
+            'NO_KZ': {'trades': 0, 'wins': 0, 'win_rate': 0.40}
+        }
+        
+        # Optional Enhancement 2: Day-of-week patterns
+        # Different days have different characteristics
+        self.day_profiles = {
+            0: {'name': 'Monday', 'behavior': 'TREND_START', 'adjustment': 3},      # +3%
+            1: {'name': 'Tuesday', 'behavior': 'CONTINUATION', 'adjustment': 2},    # +2%
+            2: {'name': 'Wednesday', 'behavior': 'PEAK', 'adjustment': 5},          # +5% (midweek strongest)
+            3: {'name': 'Thursday', 'behavior': 'CONTINUATION', 'adjustment': 2},   # +2%
+            4: {'name': 'Friday', 'behavior': 'CLOSING', 'adjustment': -3},         # -3% (position closing)
+            5: {'name': 'Saturday', 'behavior': 'WEEKEND', 'adjustment': -10},      # -10% (low liquidity)
+            6: {'name': 'Sunday', 'behavior': 'WEEKEND', 'adjustment': -10}         # -10% (low liquidity)
+        }
+        
         # Kill Zone characteristics
         self.kz_characteristics = {
             'ASIAN_KZ': {'strength': 'WEAK', 'direction': 'RANGING', 'notes': 'Low volume, range-bound'},
@@ -159,17 +182,37 @@ class KillZones:
         # Wrap around to first zone (next day)
         return zones_sorted[0][0]
     
+    def detect_zone_overlap(self, zone: str, hour: int) -> bool:
+        """
+        Optional Enhancement 3: Detect zone overlaps
+        Returns True if current time is in an overlap period
+        """
+        # London Open (02:00-05:00) overlaps Asian (00:00-03:00)
+        # Overlap period: 02:00-03:00
+        if zone == 'LONDON_OPEN_KZ' and 2 <= hour < 3:
+            return True
+        if zone == 'ASIAN_KZ' and 2 <= hour < 3:
+            return True
+        
+        return False
+    
     def calculate_smart_confidence(self, base_confidence: int, 
                                    activity_score: int, 
                                    atr: float, 
-                                   avg_atr: float = 1000.0) -> int:
+                                   avg_atr: float = 1000.0,
+                                   current_zone: str = 'NO_KZ',
+                                   day_of_week: int = 0,
+                                   hour: int = 0) -> int:
         """
-        Smart confidence calculation using real-time data
+        Smart confidence calculation using real-time data + optional enhancements
         
         Factors:
         1. Base confidence (from zone priority)
         2. Volume activity (is it actually active?)
         3. Volatility context (ATR)
+        4. OPTIONAL: Historical win rate (if tracked)
+        5. OPTIONAL: Day-of-week patterns
+        6. OPTIONAL: Zone overlap detection
         """
         confidence = base_confidence
         
@@ -191,6 +234,26 @@ class KillZones:
             elif volatility_ratio < 0.5:
                 # Low volatility during zone = reduce
                 confidence -= 5
+        
+        # OPTIONAL ENHANCEMENT 1: Historical win rate adjustment (+/-5%)
+        if current_zone in self.zone_performance:
+            perf = self.zone_performance[current_zone]
+            if perf['trades'] >= 10:  # Only after 10+ trades
+                win_rate = perf['win_rate']
+                # Win rate above 65% = boost, below 50% = reduce
+                if win_rate > 0.65:
+                    confidence += 5
+                elif win_rate < 0.50:
+                    confidence -= 5
+        
+        # OPTIONAL ENHANCEMENT 2: Day-of-week adjustment (+/-10%)
+        if day_of_week in self.day_profiles:
+            day_adj = self.day_profiles[day_of_week]['adjustment']
+            confidence += day_adj
+        
+        # OPTIONAL ENHANCEMENT 3: Zone overlap bonus (+5%)
+        if self.detect_zone_overlap(current_zone, hour):
+            confidence += 5  # Overlap periods often significant
         
         return max(30, min(100, confidence))
     
@@ -241,12 +304,20 @@ class KillZones:
         atr = self.calculate_atr(df, period=14)
         volume_ratio, is_volume_active, activity_score = self.analyze_volume_activity(df, window=20)
         
-        # Smart confidence (data-driven!)
+        # Optional enhancements context
+        day_of_week = current_time.weekday()
+        hour = current_time.hour
+        is_overlap = self.detect_zone_overlap(current_kz, hour)
+        
+        # Smart confidence (data-driven + optional enhancements!)
         confidence = self.calculate_smart_confidence(
             base_confidence,
             activity_score,
             atr,
-            avg_atr=atr  # Could use historical avg
+            avg_atr=atr,  # Could use historical avg
+            current_zone=current_kz,
+            day_of_week=day_of_week,
+            hour=hour
         )
         
         # Time metadata
@@ -279,6 +350,18 @@ class KillZones:
         if current_kz == 'NY_AM_KZ':
             confluence_factors.append('🎯 OPTIMAL KILL ZONE - Highest probability window')
         
+        # Get day profile for confluence
+        day_profile = self.day_profiles.get(day_of_week, {'name': 'Unknown', 'behavior': 'UNKNOWN', 'adjustment': 0})
+        
+        # Optional enhancement confluence factors
+        if is_overlap:
+            confluence_factors.append(f'⭐ ZONE OVERLAP - Asian + London Open transition (+5% conf)')
+        
+        if day_of_week in [2]:  # Wednesday
+            confluence_factors.append(f'📅 {day_profile["name"]} - {day_profile["behavior"]} (Peak day +{day_profile["adjustment"]}% conf)')
+        elif day_of_week in [4, 5, 6]:  # Friday-Sunday
+            confluence_factors.append(f'📅 {day_profile["name"]} - {day_profile["behavior"]} ({day_profile["adjustment"]}% conf)')
+        
         # Signal
         if is_high_priority:
             signal = 'PRIME_TIME'
@@ -307,7 +390,13 @@ class KillZones:
             'activity_score': activity_score,
             'atr_value': round(atr, 2),
             'base_confidence': base_confidence,
-            'adjusted_confidence': confidence
+            'adjusted_confidence': confidence,
+            # OPTIONAL ENHANCEMENTS metadata:
+            'day_of_week': day_profile['name'],
+            'day_behavior': day_profile['behavior'],
+            'day_adjustment': day_profile['adjustment'],
+            'is_zone_overlap': is_overlap,
+            'historical_win_rate': self.zone_performance.get(current_kz, {}).get('win_rate', 0.0)
         }
         
         return {
