@@ -280,14 +280,18 @@ class SessionTime:
         elif current_session == 'SYDNEY':
             confluence_factors.append('Sydney session - minimal activity')
         
-        # Signal ONLY on session changes (not continuously)
-        if session_changed:
-            if is_high_vol:
-                signal = 'SESSION_ACTIVE'  # Entering active session
-            else:
-                signal = 'SESSION_QUIET'  # Entering quiet session
+        # ALWAYS indicate current session (TRUE CONTEXT BLOCK!)
+        # Like Kill Zones: 100% coverage, no NEUTRAL
+        if current_session == 'LONDON_NY_OVERLAP':
+            signal = 'PEAK_HOURS'  # Optimal trading window
+        elif current_session in ['LONDON', 'NEW_YORK']:
+            signal = 'ACTIVE_SESSION'  # High-activity sessions
+        elif current_session == 'ASIA':
+            signal = 'MODERATE_SESSION'  # Moderate activity
+        elif current_session == 'SYDNEY':
+            signal = 'QUIET_SESSION'  # Low activity
         else:
-            signal = 'NEUTRAL'  # No session change
+            signal = 'OFF_SESSION'  # Outside sessions
         
         # Rich metadata for confluence
         metadata = {
