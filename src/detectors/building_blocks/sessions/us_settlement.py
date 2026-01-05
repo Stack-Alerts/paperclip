@@ -18,15 +18,22 @@ ENHANCED VERSION (2026-01-03):
 - Smart confidence (data-driven)
 """
 """
-Building Block Classification: CONTEXT BLOCK
-Mode: TIME-BASED
-Purpose: US settlement time state
+Building Block Classification: EVENT BLOCK
+Mode: SETTLEMENT_WINDOW
+Purpose: US settlement window and magnet effect detection
 
 Block Type Definitions:
 - SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
 - CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
-- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
+- EVENT BLOCK: Specific market event detection (selective, fires when events occur) ← THIS!
 - HYBRID BLOCK: Combination of continuous state + selective events
+
+NOTE: This block is intentionally EVENT (not CONTEXT) because:
+- US Settlement is specialized 1-2hr window phenomenon
+- 6-8% active rate is CORRECT for this event
+- Magnet effect is specific institutional flow event
+- NEUTRAL signals during off-hours are appropriate
+- Different from general time blocks that span 24hr cycle
 """
 
 
