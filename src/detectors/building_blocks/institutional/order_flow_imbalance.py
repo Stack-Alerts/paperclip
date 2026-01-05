@@ -218,11 +218,13 @@ class OrderFlowImbalance:
         """
         Check if liquidations confirm the order flow imbalance
         Returns: {has_liquidation, spike_side, confidence_boost}
+        
+        Note: Silently fails if liquidation data unavailable (optional enhancement)
         """
         try:
             liq_spike = advanced_data.detect_liquidation_spike(timestamp, window_minutes=15)
             
-            if liq_spike['has_spike']:
+            if liq_spike and liq_spike.get('has_spike'):
                 # Check if liquidation side aligns with imbalance
                 aligns = False
                 if signal_direction == 'BUY' and liq_spike['spike_side'] == 'LONG':
@@ -244,8 +246,9 @@ class OrderFlowImbalance:
                     }
             
             return {'has_liquidation': False, 'confidence_boost': 0, 'confirmed': False}
-        except Exception as e:
-            return {'has_liquidation': False, 'confidence_boost': 0, 'confirmed': False, 'error': str(e)}
+        except:
+            # Silently fail - liquidation data is optional enhancement
+            return {'has_liquidation': False, 'confidence_boost': 0, 'confirmed': False}
     
     def calculate_variable_confidence(self, signal: str, strength: int,
                                      is_persistent: bool, volume_increasing: bool,
