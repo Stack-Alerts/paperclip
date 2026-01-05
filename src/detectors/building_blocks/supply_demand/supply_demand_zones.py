@@ -177,8 +177,8 @@ class SupplyDemandZones:
                 move_down = base_price - bar['low']
                 
                 # Check for explosive upward move (DEMAND zone)
-                # CALIBRATED: 1.3 ATR * regime multiplier
-                demand_threshold = 1.3 * atr * demand_mult  # Easier in downtrend
+                # INSTITUTIONAL: 1.0 ATR base (BTC rallies slower/gradual)
+                demand_threshold = 1.0 * atr * demand_mult  # EASIER for balance
                 if move_up > demand_threshold:
                     # Check volume at explosion
                     explosion_idx = df.index.get_loc(idx)
@@ -202,8 +202,8 @@ class SupplyDemandZones:
                         break
                 
                 # Check for explosive downward move (SUPPLY zone)
-                # CALIBRATED: 1.5 ATR * regime multiplier  
-                supply_threshold = 1.5 * atr * supply_mult  # Easier in uptrend
+                # INSTITUTIONAL: 2.0 ATR base (BTC dumps sharp/fast)
+                supply_threshold = 2.0 * atr * supply_mult  # HARDER for balance
                 if move_down > supply_threshold:
                     explosion_idx = df.index.get_loc(idx)
                     volume_ratio, is_spike, volume_score = self.analyze_volume_activity(
@@ -360,25 +360,25 @@ class SupplyDemandZones:
         last_close = close.iloc[-1]
         change_pct = (last_close - first_close) / first_close
         
-        # Classify regime (FIXED: 10% was too high for 100 bars = 25 hours)
-        # Realistic thresholds for 25-hour window:
+        # Classify regime + INSTITUTIONAL-GRADE asymmetric multipliers
+        # BTC Fact: Dumps are SHARPER than rallies → need asymmetric detection
         if change_pct > 0.03:  # >3% up in 25 hrs = uptrend
             return {
                 'regime': 'UPTREND',
-                'demand_mult': 1.0,
-                'supply_mult': 0.85  # Easier SUPPLY detection
+                'demand_mult': 1.2,  # HARDER in uptrend
+                'supply_mult': 0.8   # MUCH easier in uptrend
             }
         elif change_pct < -0.03:  # >3% down in 25 hrs = downtrend
             return {
                 'regime': 'DOWNTREND',
-                'demand_mult': 0.85,  # Easier DEMAND detection (BALANCE FIX)
-                'supply_mult': 1.0
+                'demand_mult': 0.8,  # MUCH easier in downtrend (INSTITUTIONAL FIX)
+                'supply_mult': 1.2   # HARDER in downtrend
             }
         else:
             return {
                 'regime': 'RANGING',
-                'demand_mult': 1.0,
-                'supply_mult': 1.0
+                'demand_mult': 0.9,  # Slightly easier
+                'supply_mult': 1.1   # Slightly harder (balance fix)
             }
 
     def check_zone_liquidation_strength(self, zone_price: float, df: pd.DataFrame) -> Dict:
