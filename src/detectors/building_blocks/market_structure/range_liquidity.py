@@ -118,27 +118,67 @@ class RangeLiquidity:
         strength = int(normalized_depth + weight_bonus + level_bonus)
         return max(0, min(100, strength))
     
-    def calculate_variable_confidence(self, liquidity_strength: int, distance_pct: float, has_orderbook: bool) -> int:
-        """Variable confidence based on real orderbook data (if available)"""
-        base_confidence = 75 if has_orderbook else 65
+    def detect_volume_spike(self, df: pd.DataFrame, threshold: float = 1.5) -> bool:
+        """
+        Priority 2: Detect if volume spiking near liquidity (magnet effect!)
         
-        if liquidity_strength >= 80:
-            base_confidence += 8
-        elif liquidity_strength >= 60:
-            base_confidence += 5
-        elif liquidity_strength >= 40:
-            base_confidence += 2
+        Returns True if recent volume significantly above baseline
+        """
+        if len(df) < 20:
+            return False
+        
+        recent_vol = df['volume'].iloc[-5:].mean()
+        baseline_vol = df['volume'].iloc[-20:-5].mean()
+        
+        if baseline_vol > 0:
+            spike_ratio = recent_vol / baseline_vol
+            return spike_ratio > threshold
+        
+        return False
+    
+    def calculate_variable_confidence(self, liquidity_strength: int, distance_pct: float, 
+                                     has_orderbook: bool, has_volume_spike: bool = False) -> int:
+        """
+        FIXED: Much wider variation based on actual liquidity quality
+        
+        Priority 1 fix: Widen confidence range significantly
+        - With orderbook: 60-85 base range
+        - Without orderbook: 55-75 base range
+        - Larger distance adjustments
+        """
+        # BASE: Scale with liquidity strength (wider range!)
+        if has_orderbook:
+            # With real data: 60-85 base range
+            base_confidence = 60 + int(liquidity_strength * 0.25)
         else:
-            base_confidence -= 3
+            # Without orderbook: 55-75 base range (less confident)
+            base_confidence = 55 + int(liquidity_strength * 0.20)
         
-        if distance_pct < 3:
+        # DISTANCE: Larger adjustments (proximity matters!)
+        if distance_pct < 2:
+            distance_adj = 10  # Very close = high confidence
+        elif distance_pct < 5:
+            distance_adj = 5   # Close = moderate boost
+        elif distance_pct < 10:
+            distance_adj = 0   # Moderate = neutral
+        elif distance_pct < 20:
+            distance_adj = -5  # Far = penalty
+        else:
+            distance_adj = -10 # Very far = big penalty
+        
+        base_confidence += distance_adj
+        
+        # STRENGTH: Additional bonus for strong liquidity
+        if liquidity_strength >= 80:
+            base_confidence += 5  # Very strong
+        elif liquidity_strength <= 30:
+            base_confidence -= 5  # Very weak
+        
+        # VOLUME SPIKE: Magnet effect bonus (Priority 2)
+        if has_volume_spike:
             base_confidence += 5
-        elif distance_pct < 8:
-            base_confidence += 3
-        elif distance_pct > 20:
-            base_confidence -= 3
         
-        return max(60, min(90, base_confidence))
+        return max(50, min(90, base_confidence))
     
 
     def check_liquidation_magnets(self, range_high: float, range_low: float, df: pd.DataFrame) -> Dict:
@@ -243,8 +283,12 @@ class RangeLiquidity:
             except:
                 pass
         
+        # Detect volume spike (Priority 2 enhancement)
+        has_volume_spike = self.detect_volume_spike(df)
+        
         # Variable confidence (justified by real data if available!)
-        confidence = self.calculate_variable_confidence(liquidity_strength, distance_pct, has_orderbook)
+        confidence = self.calculate_variable_confidence(liquidity_strength, distance_pct, 
+                                                       has_orderbook, has_volume_spike)
         
         # Confluence factors
         confluence_factors = []
@@ -257,6 +301,10 @@ class RangeLiquidity:
                     confluence_factors.append(f'💪 Strong resistance (strength: {liquidity_strength})')
             else:
                 confluence_factors.append(f'📊 Estimated liquidity (no orderbook data)')
+            
+            # Volume spike indicator (Priority 2)
+            if has_volume_spike:
+                confluence_factors.append(f'📊 Volume spike detected - MAGNET EFFECT! (+5 confidence)')
         else:
             confluence_factors.append(f'Approaching sell-side liquidity at ${target_liquidity:.2f} ({distance_pct:.1f}% away)')
             if has_orderbook:
@@ -265,6 +313,10 @@ class RangeLiquidity:
                     confluence_factors.append(f'💪 Strong support (strength: {liquidity_strength})')
             else:
                 confluence_factors.append(f'📊 Estimated liquidity (no orderbook data)')
+            
+            # Volume spike indicator (Priority 2)
+            if has_volume_spike:
+                confluence_factors.append(f'📊 Volume spike detected - MAGNET EFFECT! (+5 confidence)')
         
         # Metadata
         metadata = {
@@ -278,6 +330,7 @@ class RangeLiquidity:
             'total_depth_btc': round(total_depth, 4) if has_orderbook else None,
             'weighted_depth_btc': round(weighted_depth, 4) if has_orderbook else None,
             'orderbook_levels': levels_within if has_orderbook else None,
+            'has_volume_spike': has_volume_spike,
             'lookback_bars': lookback
         }
         
