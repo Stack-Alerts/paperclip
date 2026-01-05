@@ -74,6 +74,7 @@ class PremiumDiscountZones:
         
         # ENHANCEMENT: Zone tracking for duration and history
         self.current_zone = None
+        self.previous_zone = None  # Track for breakout detection
         self.zone_entry_time = None
         self.bars_in_zone = 0
         self.zone_history = []  # Track recent zones for historical analysis
@@ -206,6 +207,7 @@ class PremiumDiscountZones:
         # Check if zone changed
         if zone != self.current_zone:
             # Zone changed!
+            self.previous_zone = self.current_zone  # Save for breakout detection
             self.current_zone = zone
             self.zone_entry_time = timestamp
             self.bars_in_zone = 0
@@ -298,6 +300,68 @@ class PremiumDiscountZones:
         # Keep only recent history
         if len(self.zone_history) > self.max_history:
             self.zone_history.pop(0)
+    
+    def detect_zone_breakout(self, current_zone: str, previous_zone: str) -> dict:
+        """
+        Optional Enhancement 2: Zone Breakout Detection
+        
+        Detect when price breaks out of premium/discount into opposite zone
+        This is a potential reversal signal
+        
+        Returns:
+            dict with breakout info and confluence bonus
+        """
+        if previous_zone is None:
+            return {
+                'has_breakout': False,
+                'breakout_type': 'NONE',
+                'confluence_bonus': 0
+            }
+        
+        # Detect breakouts
+        if previous_zone == 'DISCOUNT' and current_zone == 'PREMIUM':
+            # Broke from discount → premium (bullish breakout)
+            return {
+                'has_breakout': True,
+                'breakout_type': 'BULLISH_BREAKOUT',
+                'confluence_bonus': 5,
+                'description': 'Price broke from discount to premium (bullish)'
+            }
+        
+        elif previous_zone == 'PREMIUM' and current_zone == 'DISCOUNT':
+            # Broke from premium → discount (bearish breakout)
+            return {
+                'has_breakout': True,
+                'breakout_type': 'BEARISH_BREAKOUT',
+                'confluence_bonus': 5,
+                'description': 'Price broke from premium to discount (bearish)'
+            }
+        
+        elif previous_zone == 'EQUILIBRIUM' and current_zone == 'DISCOUNT':
+            # Broke from equilibrium → discount
+            return {
+                'has_breakout': True,
+                'breakout_type': 'DISCOUNT_ENTRY',
+                'confluence_bonus': 3,
+                'description': 'Price entered discount from equilibrium'
+            }
+        
+        elif previous_zone == 'EQUILIBRIUM' and current_zone == 'PREMIUM':
+            # Broke from equilibrium → premium
+            return {
+                'has_breakout': True,
+                'breakout_type': 'PREMIUM_ENTRY',
+                'confluence_bonus': 3,
+                'description': 'Price entered premium from equilibrium'
+            }
+        
+        else:
+            # No breakout (same zone)
+            return {
+                'has_breakout': False,
+                'breakout_type': 'NONE',
+                'confluence_bonus': 0
+            }
     
     def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:
         """
@@ -530,6 +594,9 @@ class PremiumDiscountZones:
         # **ENHANCED:** Historical reaction analysis (Priority 1.3)
         historical = self.analyze_historical_reaction(zone, zone_class)
         
+        # **NEW:** Zone breakout detection (Optional Enhancement 2)
+        breakout = self.detect_zone_breakout(zone, self.previous_zone)
+        
         # VARIABLE CONFIDENCE (enhanced with new factors!)
         base_confidence = self.calculate_variable_confidence(
             signal, depth_pct, zone_class, volume_increasing
@@ -540,6 +607,7 @@ class PremiumDiscountZones:
         confidence += mtf_alignment['confluence_bonus']
         confidence += zone_duration['freshness_bonus']
         confidence += historical['historical_confidence']
+        confidence += breakout['confluence_bonus']
         
         # Clamp to valid range
         confidence = max(50, min(90, confidence))
@@ -598,6 +666,10 @@ class PremiumDiscountZones:
             elif historical['reversal_rate'] >= 60:
                 confluence_factors.append(f'📊 Good historical reversals: {historical["reversal_rate"]}% (+{historical["historical_confidence"]})')
         
+        # **NEW:** Zone breakout indicators
+        if breakout['has_breakout']:
+            confluence_factors.append(f'💥 {breakout["description"]} (+{breakout["confluence_bonus"]})')
+        
         # Strength note
         if strength >= 75:
             confluence_factors.append(f'⭐ Strong zone (strength: {strength})')
@@ -631,7 +703,10 @@ class PremiumDiscountZones:
             # NEW: Historical reaction (Priority 1.3)
             'has_historical_data': historical['has_history'],
             'historical_reversal_rate': historical['reversal_rate'],
-            'historical_sample_size': historical['sample_size']
+            'historical_sample_size': historical['sample_size'],
+            # NEW: Zone breakout detection (Optional Enhancement 2)
+            'has_breakout': breakout['has_breakout'],
+            'breakout_type': breakout['breakout_type']
         }
         
         return {
