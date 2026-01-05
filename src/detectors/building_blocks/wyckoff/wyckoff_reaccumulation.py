@@ -112,35 +112,125 @@ class WyckoffReaccumulation:
     
     def detect_uptrend(self, df: pd.DataFrame) -> tuple:
         """
-        Detect if price is in established uptrend
+        Detect if price is in STRONG uptrend (IMPROVED)
         Required context for re-accumulation
+        
+        Improvement: Not just any uptrend - must be convincing
+        Reaccumulation occurs in STRONG uptrends, not weak ones
         """
         if len(df) < self.uptrend_lookback:
             return False, 0
         
-        # Check price above longer-term moving average
-        ma_uptrend = df['close'].iloc[-1] > df['close'].iloc[-self.uptrend_lookback:].mean()
+        # 1. Price above MA (basic requirement)
+        ma = df['close'].iloc[-self.uptrend_lookback:].mean()
+        above_ma = df['close'].iloc[-1] > ma
         
-        # Check recent higher lows (uptrend structure)
-        recent_lows = df['low'].iloc[-self.uptrend_lookback:]
-        earlier_low = recent_lows.iloc[:len(recent_lows)//2].min()
-        later_low = recent_lows.iloc[len(recent_lows)//2:].min()
-        higher_lows = later_low > earlier_low * 0.98  # Allow small variation
-        
-        # Check positive momentum
+        # 2. Uptrend slope (STRONG requirement - NEW)
         price_change = (df['close'].iloc[-1] / df['close'].iloc[-self.uptrend_lookback] - 1) * 100
-        positive_momentum = price_change > 0
+        strong_momentum = price_change > 5.0  # At least 5% gain over period
+        moderate_momentum = price_change > 2.0  # Moderate gain
         
-        if ma_uptrend and (higher_lows or positive_momentum):
-            confidence = 70 if (higher_lows and positive_momentum) else 60
-            return True, confidence
+        # 3. Multiple higher highs (structure - IMPROVED)
+        highs = df['high'].iloc[-self.uptrend_lookback:]
+        hh1 = highs.iloc[:len(highs)//3].max()
+        hh2 = highs.iloc[len(highs)//3:2*len(highs)//3].max()
+        hh3 = highs.iloc[2*len(highs)//3:].max()
+        higher_highs = (hh2 > hh1 * 1.01) and (hh3 > hh2 * 1.01)
         
+        # 4. Price location (should be in upper portion of range - NEW)
+        range_high = df['high'].iloc[-self.uptrend_lookback:].max()
+        range_low = df['low'].iloc[-self.uptrend_lookback:].min()
+        range_position = (df['close'].iloc[-1] - range_low) / (range_high - range_low)
+        upper_range = range_position > 0.6  # In upper 40% of range
+        
+        # STRONG uptrend = all conditions OR most conditions strong
+        if above_ma and strong_momentum and higher_highs and upper_range:
+            return True, 85  # Very strong uptrend
+        elif above_ma and strong_momentum and (higher_highs or upper_range):
+            return True, 75  # Strong uptrend
+        elif above_ma and moderate_momentum and higher_highs:
+            return True, 65  # Good uptrend
+        elif above_ma and moderate_momentum:
+            return True, 55  # Moderate uptrend (borderline)
+        
+        # Too weak for reaccumulation
         return False, 0
+    
+    def assess_range_quality(self, df: pd.DataFrame, resistance: float, support: float) -> tuple:
+        """
+        Assess quality of consolidation range (NEW - IMPROVEMENT)
+        Good reaccumulation vs weak/distribution range
+        
+        Quality indicators:
+        - Volume declining (smart money quiet)
+        - Tight range (controlled)
+        - Multiple support tests (strength)
+        - Balanced distribution (not one-sided)
+        """
+        quality_score = 0
+        factors = []
+        
+        # 1. Volume trend (should decline steadily)
+        if len(df) >= self.range_lookback + 20:
+            volume_early = df['volume'].iloc[-40:-20].mean()
+            volume_recent = df['volume'].iloc[-20:].mean()
+            if volume_recent < volume_early * 0.85:
+                quality_score += 25
+                factors.append('Volume declining (quiet accumulation)')
+            elif volume_recent < volume_early * 0.95:
+                quality_score += 15
+                factors.append('Volume slightly declining')
+        
+        # 2. Range tightness (tighter = better)
+        range_pct = ((resistance - support) / df['close'].iloc[-1]) * 100
+        if range_pct < 3.0:  # Very tight
+            quality_score += 30
+            factors.append(f'Tight range ({range_pct:.1f}%)')
+        elif range_pct < 5.0:  # Good
+            quality_score += 20
+            factors.append(f'Good range ({range_pct:.1f}%)')
+        else:
+            quality_score += 10
+            factors.append(f'Wide range ({range_pct:.1f}%)')
+        
+        # 3. Support tests (multiple tests = strength)
+        support_tests = sum(1 for low in df['low'].iloc[-self.range_lookback:] 
+                           if low < support * 1.015 and low > support * 0.985)
+        if support_tests >= 3:
+            quality_score += 25
+            factors.append(f'{support_tests} support tests (strong)')
+        elif support_tests >= 2:
+            quality_score += 15
+            factors.append(f'{support_tests} support tests')
+        
+        # 4. Price distribution (should be balanced, not one-sided)
+        if len(df) >= 20:
+            midpoint = (support + resistance) / 2
+            upper_bias = sum(1 for c in df['close'].iloc[-20:] if c > midpoint)
+            distribution_balance = abs(upper_bias - 10) / 10  # Perfect = 50/50
+            if distribution_balance < 0.3:  # Well balanced
+                quality_score += 20
+                factors.append('Balanced price distribution')
+            elif distribution_balance < 0.5:
+                quality_score += 10
+                factors.append('Moderately balanced')
+        
+        # Quality assessment
+        if quality_score >= 75:
+            return 'EXCELLENT', quality_score, factors
+        elif quality_score >= 60:
+            return 'GOOD', quality_score, factors
+        elif quality_score >= 40:
+            return 'FAIR', quality_score, factors
+        else:
+            return 'POOR', quality_score, factors
     
     def detect_range(self, df: pd.DataFrame) -> tuple:
         """
-        Detect consolidation range within uptrend
+        Detect consolidation range within uptrend (IMPROVED)
         Similar to Accumulation but at elevated prices
+        
+        Improvement: Now includes range quality assessment
         """
         if len(df) < self.range_lookback:
             return False, 0, 0, 0
@@ -157,20 +247,24 @@ class WyckoffReaccumulation:
         # In consolidation if range < threshold
         in_range = range_pct < self.range_threshold_pct
         
-        # Check volume declining (quiet consolidation)
-        if len(df) >= self.range_lookback + 20:
-            volume_recent = df['volume'].iloc[-20:].mean()
-            volume_earlier = df['volume'].iloc[-self.range_lookback:-20].mean()
-            volume_declining = volume_recent < volume_earlier * 0.9
-        else:
-            volume_declining = False
+        if not in_range:
+            return False, 0, 0, 0
         
-        if in_range:
-            # Higher confidence if volume declining
-            confidence = 65 if volume_declining else 55
+        # NEW: Assess range quality
+        quality, score, quality_factors = self.assess_range_quality(df, range_high, range_low)
+        
+        # Only signal GOOD or EXCELLENT ranges (filter out POOR/FAIR)
+        if quality in ['GOOD', 'EXCELLENT']:
+            # Confidence based on quality score
+            confidence = min(85, 50 + (score - 40))  # 60-85 range
             return True, confidence, range_high, range_low
-        
-        return False, 0, 0, 0
+        elif quality == 'FAIR':
+            # Borderline - lower confidence
+            confidence = 55
+            return True, confidence, range_high, range_low
+        else:
+            # POOR quality - reject
+            return False, 0, 0, 0
     
     def detect_spring(self, df: pd.DataFrame, support_level: float) -> tuple:
         """
