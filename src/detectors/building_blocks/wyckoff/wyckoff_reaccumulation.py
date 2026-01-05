@@ -3,24 +3,66 @@ Wyckoff Re-accumulation Phase Detector
 Category: Wyckoff Method
 Purpose: Identifies continuation consolidation within uptrends (smart money adding positions)
 
-Improved implementation matching Accumulation/Distribution quality:
-- Volume analysis (critical for Wyckoff)
-- Range detection with realistic thresholds
-- Spring pattern detection (false breakdown before continuation)
-- Breakout detection with volume
-- Phase tracking (uptrend context required)
-- Optimized for continuation patterns in established trends
+╔════════════════════════════════════════════════════════════════════════════╗
+║ ⚠️ CRITICAL: MULTI-TIMEFRAME TESTING REQUIRED                             ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+🚨 BLOCK NOT YET VALIDATED ON CORRECT TIMEFRAMES
+
+15MIN RESULTS (Current testing):
+   ❌ 49.8% REACCUMULATION vs 50.2% NO_REACCUMULATION (50/50 split - BROKEN)
+   ❌ 95.45 signals/day (too noisy - micro-consolidations)
+   ❌ DO NOT USE - Detecting micro-ranges, not true reaccumulation
+
+HYPOTHESIS (Based on Accumulation/Distribution siblings):
+⭐ PRIMARY TIMEFRAME: 2HR (needs testing)
+   - Expected: 25-35% REACCUMULATION_DETECTED
+   - Expected: 65-75% NO_REACCUMULATION
+   - Expected: 3-6 signals/day
+
+⭐ CONFIRMATION TIMEFRAME: 4HR (needs testing)
+   - Expected: 10-20% REACCUMULATION_DETECTED
+   - Expected: 80-90% NO_REACCUMULATION
+   - Expected: 1-3 signals/day
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║ HYBRID BLOCK - CONTINUOUS STATE + SELECTIVE EVENTS                        ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+PROVIDES TWO VALUE TYPES (after proper testing):
+  1. Continuous Context: NO_REACCUMULATION state
+     → Know if in uptrend consolidation
+     → Adjust position sizing
+     → +20 confluence points for trending
+  
+  2. Selective Events:
+     → REACCUMULATION_DETECTED: Consolidation in uptrend
+     → SPRING: False breakdown (major signal)
+     → BREAKOUT: Continuation confirmed
+
+CURRENT STATUS: ⚠️ BLOCKED - Test 2HR/4HR before deployment
+Grade: C+ (75/100) - Incomplete testing
+
+PREDICTED Grade (after MTF testing): A- (88-92/100)
+Predicted Value: $45K-$75K (if matches siblings on correct timeframes)
 """
 """
-Building Block Classification: EVENT BLOCK
-Mode: SELECTIVE
-Purpose: Reaccumulation phase detection, fires when identified
+Building Block Classification: HYBRID BLOCK
+Mode: CONTINUOUS + EVENT
+Purpose: Continuous reaccumulation state (NO_REACCUMULATION) + selective events (REACCUMULATION/SPRING/BREAKOUT)
 
 Block Type Definitions:
 - SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
 - CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
 - EVENT BLOCK: Specific market event detection (selective, fires when events occur)
 - HYBRID BLOCK: Combination of continuous state + selective events
+
+HYBRID DESIGN:
+- Continuous: Always provides NO_REACCUMULATION or REACCUMULATION state
+- Events: Fires on SPRING and BREAKOUT (rare continuation signals)
+
+⚠️ WARNING: Only tested on 15MIN (50/50 split - broken)
+🚨 REQUIRED: Test on 2HR/4HR before production deployment
 """
 
 
