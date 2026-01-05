@@ -186,7 +186,8 @@ class SupplyDemandZones:
                         df.iloc[:explosion_idx+1], window=20
                     )
                     
-                    if is_spike or volume_ratio > 1.3:
+                    # INSTITUTIONAL: Easier volume for DEMAND (rallies can be quieter)
+                    if is_spike or volume_ratio > 1.1:  # Was 1.3, now EASIER
                         zones.append({
                             'type': 'DEMAND',
                             'high': base['high'],
@@ -210,7 +211,8 @@ class SupplyDemandZones:
                         df.iloc[:explosion_idx+1], window=20
                     )
                     
-                    if is_spike or volume_ratio > 1.3:
+                    # INSTITUTIONAL: Harder volume for SUPPLY (dumps always have volume)
+                    if is_spike or volume_ratio > 1.5:  # Was 1.3, now HARDER
                         zones.append({
                             'type': 'SUPPLY',
                             'high': base['high'],
