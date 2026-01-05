@@ -187,50 +187,104 @@ class RangeLiquidity:
         
         return False
     
+    def calculate_range_volatility(self, df: pd.DataFrame, lookback: int = 20) -> float:
+        """Calculate range volatility (expansion/contraction)"""
+        if len(df) < lookback * 2:
+            return 1.0
+        
+        # Recent range size vs historical
+        recent_range = df['high'].iloc[-lookback:].max() - df['low'].iloc[-lookback:].min()
+        historical_range = df['high'].iloc[-lookback*2:-lookback].max() - df['low'].iloc[-lookback*2:-lookback].min()
+        
+        if historical_range > 0:
+            volatility_ratio = recent_range / historical_range
+            return float(volatility_ratio)
+        return 1.0
+    
+    def calculate_momentum_toward_target(self, df: pd.DataFrame, target_price: float) -> float:
+        """Calculate price momentum toward target (-1 to +1)"""
+        if len(df) < 10:
+            return 0.0
+        
+        current_price = float(df['close'].iloc[-1])
+        past_price = float(df['close'].iloc[-10])
+        
+        # Direction toward target
+        if target_price > current_price:
+            # Target above, moving up is positive
+            momentum = (current_price - past_price) / past_price
+        else:
+            # Target below, moving down is positive
+            momentum = (past_price - current_price) / past_price
+        
+        return float(max(-0.10, min(0.10, momentum)))  # Clamp to ±10%
+    
     def calculate_variable_confidence(self, liquidity_strength: int, distance_pct: float, 
-                                     has_orderbook: bool, has_volume_spike: bool = False) -> int:
+                                     has_orderbook: bool, has_volume_spike: bool = False,
+                                     range_volatility: float = 1.0, momentum: float = 0.0) -> int:
         """
-        FIXED V3: DISTANCE-FIRST approach with exponential scaling
+        V5: MULTI-DIMENSIONAL confidence (A-grade target!)
         
-        Problem: Distance doesn't vary enough with linear adjustments
-        Solution: Make distance the PRIMARY confidence driver with exponential decay
+        Dimensions:
+        1. Distance (primary)
+        2. Range volatility (high variation!)
+        3. Momentum toward target (high variation!)
+        4. Liquidity strength
+        5. Volume spike
         """
-        # DISTANCE-FIRST: Map distance directly to confidence range
-        # Close = high confidence, Far = low confidence
+        # BASE: Distance mapping (55-85 range)
         if distance_pct < 2:
-            base_confidence = 85  # Very close
+            base = 85
         elif distance_pct < 5:
-            base_confidence = 80  # Close
+            base = 80
         elif distance_pct < 10:
-            base_confidence = 75  # Moderately close
+            base = 75
         elif distance_pct < 15:
-            base_confidence = 70  # Medium distance
+            base = 70
         elif distance_pct < 20:
-            base_confidence = 65  # Getting far
+            base = 65
         elif distance_pct < 30:
-            base_confidence = 60  # Far
+            base = 60
         else:
-            base_confidence = 55  # Very far
+            base = 55
         
-        # STRENGTH: Adjust based on liquidity quality
+        # RANGE VOLATILITY: Expanding range = uncertain targets
+        # This creates MAJOR variation!
+        if range_volatility > 1.5:
+            vol_adj = -15  # Expanding rapidly = low confidence
+        elif range_volatility > 1.2:
+            vol_adj = -10  # Expanding = lower confidence
+        elif range_volatility > 0.8:
+            vol_adj = 0    # Stable
+        elif range_volatility > 0.6:
+            vol_adj = 5    # Contracting = targets reliable
+        else:
+            vol_adj = 10   # Contracting rapidly = very reliable
+        
+        # MOMENTUM: Moving toward target = higher confidence
+        # Momentum: -10% to +10%, scale to -10 to +10 points
+        momentum_adj = int(momentum * 100)  # -10 to +10
+        
+        # STRENGTH: Liquidity quality (smaller adjustment)
         if has_orderbook:
-            # With real orderbook data, add strength bonus
             if liquidity_strength >= 80:
-                base_confidence += 5  # Strong liquidity
+                strength_adj = 5
             elif liquidity_strength >= 60:
-                base_confidence += 3
+                strength_adj = 3
             elif liquidity_strength <= 30:
-                base_confidence -= 5  # Weak liquidity
+                strength_adj = -5
+            else:
+                strength_adj = 0
         else:
-            # Without orderbook, vary based on estimated strength (50 default)
-            strength_adj = int((liquidity_strength - 50) * 0.15)  # -7.5 to +7.5
-            base_confidence += strength_adj
+            strength_adj = int((liquidity_strength - 50) * 0.15)
         
-        # VOLUME SPIKE: Magnet effect bonus
-        if has_volume_spike:
-            base_confidence += 7
+        # VOLUME SPIKE
+        spike_adj = 7 if has_volume_spike else 0
         
-        return max(50, min(90, base_confidence))
+        # TOTAL
+        confidence = base + vol_adj + momentum_adj + strength_adj + spike_adj
+        
+        return max(50, min(90, confidence))
     
 
     def check_liquidation_magnets(self, range_high: float, range_low: float, df: pd.DataFrame) -> Dict:
@@ -341,12 +395,20 @@ class RangeLiquidity:
             # No orderbook: estimate from price action (VARIATION SOURCE!)
             liquidity_strength = self.estimate_liquidity_strength_from_price_action(df, target_liquidity)
         
+        # V5: Calculate range volatility (MAJOR variation source!)
+        range_volatility = self.calculate_range_volatility(df, lookback)
+        
+        # V5: Calculate momentum toward target (MAJOR variation source!)
+        momentum = self.calculate_momentum_toward_target(df, target_liquidity)
+        
         # Detect volume spike (Priority 2 enhancement)
         has_volume_spike = self.detect_volume_spike(df)
         
-        # Variable confidence (justified by real data if available!)
-        confidence = self.calculate_variable_confidence(liquidity_strength, distance_pct, 
-                                                       has_orderbook, has_volume_spike)
+        # V5: Multi-dimensional confidence!
+        confidence = self.calculate_variable_confidence(
+            liquidity_strength, distance_pct, has_orderbook, has_volume_spike,
+            range_volatility, momentum
+        )
         
         # Confluence factors
         confluence_factors = []
@@ -362,7 +424,20 @@ class RangeLiquidity:
             
             # Volume spike indicator (Priority 2)
             if has_volume_spike:
-                confluence_factors.append(f'📊 Volume spike detected - MAGNET EFFECT! (+5 confidence)')
+                confluence_factors.append(f'📊 Volume spike detected - MAGNET EFFECT! (+7 confidence)')
+            
+            # V5: Range volatility indicator
+            if range_volatility > 1.5:
+                confluence_factors.append(f'📉 Range expanding rapidly - uncertain targets (-15 confidence)')
+            elif range_volatility < 0.6:
+                confluence_factors.append(f'📈 Range contracting - reliable targets (+10 confidence)')
+            
+            # V5: Momentum indicator
+            if momentum > 0.05:
+                confluence_factors.append(f'🎯 Strong momentum toward target (+{int(momentum*100)} confidence)')
+            elif momentum < -0.05:
+                confluence_factors.append(f'⚠️ Momentum away from target ({int(momentum*100)} confidence)')
+        
         else:
             confluence_factors.append(f'Approaching sell-side liquidity at ${target_liquidity:.2f} ({distance_pct:.1f}% away)')
             if has_orderbook:
@@ -374,8 +449,21 @@ class RangeLiquidity:
             
             # Volume spike indicator (Priority 2)
             if has_volume_spike:
-                confluence_factors.append(f'📊 Volume spike detected - MAGNET EFFECT! (+5 confidence)')
+                confluence_factors.append(f'📊 Volume spike detected - MAGNET EFFECT! (+7 confidence)')
+            
+            # V5: Range volatility indicator
+            if range_volatility > 1.5:
+                confluence_factors.append(f'📉 Range expanding rapidly - uncertain targets (-15 confidence)')
+            elif range_volatility < 0.6:
+                confluence_factors.append(f'📈 Range contracting - reliable targets (+10 confidence)')
+            
+            # V5: Momentum indicator
+            if momentum > 0.05:
+                confluence_factors.append(f'🎯 Strong momentum toward target (+{int(momentum*100)} confidence)')
+            elif momentum < -0.05:
+                confluence_factors.append(f'⚠️ Momentum away from target ({int(momentum*100)} confidence)')
         
+        # Metadata
         # Metadata
         metadata = {
             'buy_side': round(range_high, 2),
@@ -389,6 +477,8 @@ class RangeLiquidity:
             'weighted_depth_btc': round(weighted_depth, 4) if has_orderbook else None,
             'orderbook_levels': levels_within if has_orderbook else None,
             'has_volume_spike': has_volume_spike,
+            'range_volatility': round(range_volatility, 2),
+            'momentum_toward_target': round(momentum, 4),
             'lookback_bars': lookback
         }
         
