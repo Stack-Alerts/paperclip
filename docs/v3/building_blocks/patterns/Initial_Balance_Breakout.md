@@ -26,6 +26,30 @@ Based on **LuxAlgo Initial Balance** methodology, adapted for BTC/crypto 24/7 ma
 
 ---
 
+## ⚠️ BLOCK TYPE: CONTEXT PROVIDER
+
+**This is a CONTEXT BLOCK, not a selective signal block.**
+
+**What this means:**
+- ✅ 100% active signal rate is **INTENTIONAL**
+- ✅ Always provides IB-relative positioning (ABOVE_IB, BELOW_IB, INSIDE_IB)
+- ✅ Moderate confidence (59.5% avg) is **APPROPRIATE** for context blocks
+- ✅ Use for session structure + event boosting, **NOT** primary filtering
+
+**How to use:**
+1. **USE breakout events** (BULLISH_BREAKOUT, BEARISH_BREAKOUT) as confluence boosters when they occur
+2. **USE context states** (ABOVE_IB, BELOW_IB) for ongoing momentum confirmation
+3. **USE IB levels** for stop placement and target calculation
+4. **DO NOT use** as primary signal filter (combine with selective blocks like EMA Cross)
+5. **DO NOT expect** high base confidence (it provides structure, not conviction)
+
+**Building Block Math:**
+- Selective blocks (EMA Cross): 4.77% signal rate → Primary filtering
+- Context blocks (IB Breakout): 100% active, 6.7% events → Structure + boosting
+- Strategy = Selective blocks (filtering) + Context blocks (enhancement)
+
+---
+
 ## 🎯 WHAT IT DETECTS
 
 ### Initial Balance Formation
