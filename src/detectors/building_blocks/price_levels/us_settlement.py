@@ -40,6 +40,11 @@ class USSettlement:
         self.timeframe = timeframe
         self.settlement_hour_utc = settlement_hour_utc
         
+        # RETEST CONFIRMATION: Track retests of settlement level
+        self.confirmation_candles = 3  # Require 3 consecutive bars
+        self.bounce_test_bars = []  # Track bars testing support (below settlement)
+        self.rejection_test_bars = []  # Track bars testing resistance (above settlement)
+        
         self.btc_distance_thresholds = {
             'at_settlement': 0.15,
             'very_close': 0.75,
@@ -121,24 +126,98 @@ class USSettlement:
         distance_pct = self.calculate_distance(current_price, settlement)
         distance_class = self.classify_distance(distance_pct)
         
+        # RETEST CONFIRMATION: Track settlement retests
+        confirmed_bounce = False
+        confirmed_rejection = False
+        
+        current_bar = {
+            'close': current_price,
+            'low': float(df['low'].iloc[-1]),
+            'high': float(df['high'].iloc[-1]),
+            'distance': distance_pct,
+            'breached_below': float(df['low'].iloc[-1]) < settlement,
+            'breached_above': float(df['high'].iloc[-1]) > settlement,
+            'closed_above': current_price > settlement,
+            'closed_below': current_price < settlement
+        }
+        
+        # BOUNCE TEST: Price wicks BELOW settlement but closes ABOVE (support holding)
+        if current_bar['breached_below'] and current_bar['closed_above']:
+            self.bounce_test_bars.append(current_bar)
+            if len(self.bounce_test_bars) > self.confirmation_candles + 2:
+                self.bounce_test_bars.pop(0)
+            
+            if len(self.bounce_test_bars) >= self.confirmation_candles:
+                recent_bars = self.bounce_test_bars[-self.confirmation_candles:]
+                all_tested_and_held = all(
+                    bar['breached_below'] and bar['closed_above']
+                    for bar in recent_bars
+                )
+                
+                if all_tested_and_held:
+                    confirmed_bounce = True
+                    self.bounce_test_bars = []
+        elif distance_class not in ['AT_SETTLEMENT', 'VERY_CLOSE']:
+            if len(self.bounce_test_bars) > 0:
+                self.bounce_test_bars = []
+        
+        # REJECTION TEST: Price wicks ABOVE settlement but closes BELOW (resistance holding)
+        if current_bar['breached_above'] and current_bar['closed_below']:
+            self.rejection_test_bars.append(current_bar)
+            if len(self.rejection_test_bars) > self.confirmation_candles + 2:
+                self.rejection_test_bars.pop(0)
+            
+            if len(self.rejection_test_bars) >= self.confirmation_candles:
+                recent_bars = self.rejection_test_bars[-self.confirmation_candles:]
+                all_tested_and_rejected = all(
+                    bar['breached_above'] and bar['closed_below']
+                    for bar in recent_bars
+                )
+                
+                if all_tested_and_rejected:
+                    confirmed_rejection = True
+                    self.rejection_test_bars = []
+        elif distance_class not in ['AT_SETTLEMENT', 'VERY_CLOSE']:
+            if len(self.rejection_test_bars) > 0:
+                self.rejection_test_bars = []
+        
+        # Determine signal (ENHANCED with retest confirmation)
+        if confirmed_bounce:
+            signal = 'BULLISH'  # Support holding at settlement
+        elif confirmed_rejection:
+            signal = 'BEARISH'  # Resistance holding at settlement
+        elif distance_pct > 0 and distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE']:
+            signal = 'BULLISH'  # Above settlement (support)
+        elif distance_pct < 0 and distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE']:
+            signal = 'BEARISH'  # Below settlement (resistance)
+        else:
+            signal = 'NEUTRAL'
+        
+        # Confidence calculation (BOOSTED for retest confirmation)
         confidence = 70
         if distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE']:
-            confidence += 20
-        confidence = min(100, confidence)
+            confidence += 15
+        if confirmed_bounce or confirmed_rejection:
+            confidence += 20  # Strong boost for 3-bar confirmation
+        confidence = min(95, confidence)
         
+        # Build confluence
         confluence_factors = []
-        if distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE']:
+        
+        # Retest confirmation confluence (HIGHEST PRIORITY)
+        if confirmed_bounce:
+            confluence_factors.append('⭐⭐ CONFIRMED BOUNCE FROM SETTLEMENT - Strong institutional support!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} retests: wicked below, closed above (settlement support holding!)')
+        elif confirmed_rejection:
+            confluence_factors.append('⭐⭐ CONFIRMED REJECTION FROM SETTLEMENT - Strong institutional resistance!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} retests: wicked above, closed below (settlement resistance holding!)')
+        
+        # Standard confluence
+        elif distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE']:
             confluence_factors.append('Price at/near US settlement - institutional level')
         
         confluence_factors.append(f'US Settlement: ${settlement:.2f}')
         confluence_factors.append(f'Distance: {distance_pct:+.2f}% ({distance_class})')
-        
-        if distance_pct > 0 and distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE']:
-            signal = 'NEUTRAL'  # At resistance
-        elif distance_pct < 0 and distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE']:
-            signal = 'NEUTRAL'  # At support
-        else:
-            signal = 'NEUTRAL'
         
         metadata = {
             'settlement_price': round(settlement, 2),
@@ -146,7 +225,10 @@ class USSettlement:
             'distance_pct': round(distance_pct, 2),
             'distance_class': distance_class,
             'is_institutional_level': distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE'],
-            'settlement_hour_utc': self.settlement_hour_utc
+            'settlement_hour_utc': self.settlement_hour_utc,
+            'confirmed_bounce': confirmed_bounce,
+            'confirmed_rejection': confirmed_rejection,
+            'confirmation_candles': self.confirmation_candles
         }
         
         return {
