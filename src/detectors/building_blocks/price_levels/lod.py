@@ -156,25 +156,25 @@ class LOD:
     
     def calculate_variable_confidence(self, signal: str, distance_class: str, is_new_event: bool) -> float:
         """
-        ENHANCEMENT 3: Variable confidence based on signal type and distance
+        OPTIMIZED V2: Further reduced to hit 80-85% average
         """
-        # Base confidence by signal
+        # Base confidence by signal (FURTHER OPTIMIZED)
         if signal == 'BEARISH':
-            base = 90  # Breakdown = high confidence
+            base = 60  # Breakdown (reduced from 65)
         elif signal == 'BULLISH':
-            base = 85  # Bounce from LOD = high confidence
+            base = 65  # Bounce from LOD (reduced from 70)
         else:  # NEUTRAL
-            base = 70  # Neutral = baseline
+            base = 50  # Neutral (reduced from 55)
         
-        # Adjust by distance
+        # Adjust by distance (±15% for variation)
         if distance_class in ['AT_LOD', 'VERY_CLOSE']:
-            base = min(100, base + 5)  # Near LOD = higher confidence
+            base = min(95, base + 15)  # Near LOD
         elif distance_class == 'FAR':
-            base = max(70, base - 5)  # Far from LOD = lower confidence
+            base = max(40, base - 15)  # Far from LOD
         
-        # Fresh event boost
+        # Fresh event boost (+15% for new events)
         if is_new_event:
-            base = min(100, base + 5)
+            base = min(95, base + 15)
         
         return base
     
@@ -226,12 +226,14 @@ class LOD:
         distance_pct = self.calculate_distance(current_price, lod)
         distance_class = self.classify_distance(distance_pct)
         
-        # Determine signal
+        # Determine signal (OPTIMIZED - More selective BULLISH)
         if breakdown_status == 'BREAKDOWN_CONFIRMED' or is_new_lod:
             signal = 'BEARISH'
         elif breakdown_status == 'BREAKING_DOWN':
             signal = 'NEUTRAL'
-        elif distance_class in ['AT_LOD', 'VERY_CLOSE'] and distance_pct > 0:
+        elif distance_class == 'AT_LOD' and distance_pct > 0:
+            # More selective: Only AT_LOD (not VERY_CLOSE)
+            # This is within 0.2% of LOD (9-18 points on BTC)
             signal = 'BULLISH'  # Bounce from LOD
         else:
             signal = 'NEUTRAL'

@@ -40,11 +40,29 @@ class CupAndHandlePattern:
     """
     
     def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 20,
-                 cup_depth_min: float = 0.01, handle_depth_max: float = 0.3, **kwargs):
+                 cup_depth_min: float = 0.013, handle_depth_max: float = 0.3, **kwargs):
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
-        self.cup_depth_min = cup_depth_min
+        self.cup_depth_min = cup_depth_min  # 1.3% minimum cup depth (middle ground)
         self.handle_depth_max = handle_depth_max
+        
+        # Pattern lifecycle tracking (PHASE 1 improvements)
+        self.active_pattern = None
+        self.pattern_start_idx = None
+        self.breakout_start_idx = None
+        
+        # Pattern duration requirements for 15min timeframe
+        self.MIN_CUP_DURATION = 20   # 5 hours minimum for cup
+        self.MAX_CUP_DURATION = 120  # 30 hours maximum for cup
+        self.PATTERN_MAX_DURATION = 150  # Pattern expires after 150 bars
+        self.BREAKOUT_MAX_DURATION = 20   # Breakout confirmed for 20 bars
+        
+        # Validation requirements (STRICTER for better selectivity)
+        self.MIN_CONFLUENCES = 4  # Back to 4 for better selectivity
+        self.MIN_RECOVERY_PCT = 0.38  # Minimum 38% recovery (middle ground)
+        
+        # Breakout requirements (stricter)
+        self.BREAK_MARGIN = 0.005  # Must break 0.5% above rim
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for bullish confirmation"""
@@ -194,19 +212,23 @@ class CupAndHandlePattern:
             base_confidence += 5
             confluences.append("Handle forming near rim")
         
-        # MINIMUM THRESHOLD: Require at least 2 confluences
-        if len(confluences) < 2:
+        # MINIMUM THRESHOLD: Require at least 4 confluences (PHASE 1: institutional grade)
+        if len(confluences) < self.MIN_CONFLUENCES:
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
-                'metadata': {'reason': 'Insufficient confluence', 'confluences_found': len(confluences)},
+                'metadata': {
+                    'reason': 'Insufficient validation',
+                    'confluences_found': len(confluences),
+                    'confluences_required': self.MIN_CONFLUENCES
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
         
-        # Check if breakout confirmed
-        breakout = current_price > rim_level * 1.002  # 0.2% above rim
+        # Check if breakout confirmed (stricter margin)
+        breakout = current_price > rim_level * (1 + self.BREAK_MARGIN)  # 0.5% above rim
         
         # BREAKOUT gets additional confidence boost
         if breakout:

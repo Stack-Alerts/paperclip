@@ -45,6 +45,11 @@ class AscendingTrianglePattern:
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
         self.resistance_tolerance = resistance_tolerance
+        
+        # Event tracking
+        self.prev_signal = 'NO_PATTERN'
+        self.prev_pattern_id = None
+        self.bars_in_state = 0
     
     def find_swing_points(self, df: pd.DataFrame, lookback: int = 5):
         """Find swing highs and lows"""
@@ -152,14 +157,89 @@ class AscendingTrianglePattern:
             }
         
         current_price = float(df['close'].iloc[-1])
+        current_volume = float(df['volume'].iloc[-1])
         resistance_broken = current_price > pattern['resistance_level']
         
-        signal = 'BREAKOUT_CONFIRMED' if resistance_broken else 'PATTERN_FORMING'
-        confidence = 90 if resistance_broken else 60
+        # Volume analysis for breakout confirmation
+        avg_volume = df['volume'].iloc[-20:].mean()
+        volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
+        
+        # Volume declining into pattern (coiling energy)
+        first_half_vol = df['volume'].iloc[-40:-20].mean() if len(df) >= 40 else avg_volume
+        second_half_vol = df['volume'].iloc[-20:].mean()
+        volume_declining = second_half_vol < first_half_vol * 0.85
+        
+        # Require volume confirmation for breakout
+        volume_confirmed = volume_ratio >= 1.3  # 30% above average
+        high_volume_breakout = volume_ratio >= 1.6  # 60% above average
+        
+        # Only signal BULLISH_BREAKOUT if volume confirms
+        if resistance_broken and volume_confirmed:
+            signal = 'BULLISH_BREAKOUT'
+        elif resistance_broken and not volume_confirmed:
+            # Weak breakout - stay in PATTERN_FORMING
+            signal = 'PATTERN_FORMING'
+            resistance_broken = False  # Treat as not broken yet
+        else:
+            signal = 'PATTERN_FORMING'
+        
+        # Calculate pattern quality score for confidence
+        quality_score = 50  # Base
+        
+        # Resistance touches quality
+        if pattern['highs_count'] >= 4:
+            quality_score += 15
+        elif pattern['highs_count'] == 3:
+            quality_score += 10
+        else:
+            quality_score += 5
+        
+        # Support lows quality  
+        if pattern['lows_count'] >= 3:
+            quality_score += 15
+        elif pattern['lows_count'] == 2:
+            quality_score += 10
+        
+        # Volume pattern bonus
+        if volume_declining:
+            quality_score += 10  # Good coiling
+        
+        # Breakout quality bonuses
+        if resistance_broken and volume_confirmed:
+            if high_volume_breakout:
+                quality_score += 25  # Exceptional volume
+            else:
+                quality_score += 20  # Good volume
+        
+        # Assign confidence based on quality (70-85 range)
+        if quality_score >= 85:
+            confidence = 85  # A grade
+        elif quality_score >= 70:
+            confidence = 78  # B grade
+        else:
+            confidence = 70  # C grade
         
         # Target = pattern height projected upward
         pattern_height = pattern['resistance_level'] - pattern['support_start']
         target_price = pattern['resistance_level'] + pattern_height
+        
+        # Create unique pattern ID for event tracking
+        pattern_id = f"{int(pattern['resistance_level'])}_{int(pattern['support_start'])}"
+        
+        # Detect new event
+        is_new_event = (
+            signal != self.prev_signal or
+            pattern_id != self.prev_pattern_id
+        ) and signal != 'NO_PATTERN'
+        
+        # Update state tracking
+        if signal == self.prev_signal and pattern_id == self.prev_pattern_id:
+            self.bars_in_state += 1
+        else:
+            self.bars_in_state = 1
+        
+        self.prev_signal = signal
+        self.prev_pattern_id = pattern_id
         
         confluence_factors = []
         confluence_factors.append("Ascending Triangle detected")
@@ -169,7 +249,6 @@ class AscendingTrianglePattern:
         
         if resistance_broken:
             confluence_factors.append("✅ BREAKOUT confirmed - Bullish!")
-            confidence += 15
         else:
             confluence_factors.append("⏳ Awaiting breakout")
         
@@ -182,14 +261,24 @@ class AscendingTrianglePattern:
             'support_start': round(pattern['support_start'], 2),
             'support_end': round(pattern['support_end'], 2),
             'breakout_confirmed': resistance_broken,
+            'volume_confirmed': volume_confirmed if resistance_broken else False,
+            'volume_ratio': round(volume_ratio, 2),
+            'volume_declining': volume_declining,
             'target_price': round(target_price, 2),
             'pattern_height': round(pattern_height, 2),
-            'expected_success_rate': 0.72
+            'expected_success_rate': 0.72,
+            'quality_score': quality_score,
+            'pattern_grade': 'A' if quality_score >= 85 else ('B' if quality_score >= 70 else 'C'),
+            'is_new_event': is_new_event,
+            'bars_in_state': self.bars_in_state,
+            'pattern_id': pattern_id,
+            'highs_count': pattern['highs_count'],
+            'lows_count': pattern['lows_count']
         }
         
         return {
             'signal': signal,
-            'confidence': min(100, round(confidence, 2)),
+            'confidence': confidence,
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe,

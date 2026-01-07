@@ -36,10 +36,28 @@ class TripleTopPattern:
     """
     
     def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 15,
-                 peak_tolerance: float = 0.05, **kwargs):
+                 peak_tolerance: float = 0.025, **kwargs):
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
-        self.peak_tolerance = peak_tolerance
+        self.peak_tolerance = peak_tolerance  # 2.5% max difference (middle ground for triple)
+        
+        # Pattern lifecycle tracking (PHASE 1 improvements)
+        self.active_pattern = None  # Track current pattern ID for event detection
+        self.pattern_start_idx = None  # When pattern started forming
+        self.breakdown_start_idx = None  # When breakdown began
+        
+        # Pattern duration requirements for 15min timeframe
+        self.MIN_BARS_BETWEEN_PEAKS = 12   # 3 hours minimum (middle ground)
+        self.MAX_BARS_BETWEEN_PEAKS = 100  # 25 hours maximum
+        self.PATTERN_MAX_DURATION = 150    # Pattern expires after 150 bars (longer for 3 peaks)
+        self.BREAKDOWN_MAX_DURATION = 20   # Breakdown confirmed for 20 bars
+        
+        # Validation requirements (STRICTER for better selectivity)
+        self.MIN_CONFLUENCES = 4  # Increased from 3 for institutional grade
+        self.MIN_PEAK_SPACING = 7  # 7 bars minimum between peaks
+        
+        # Breakdown requirements (stricter)
+        self.BREAK_MARGIN = 0.005  # Must break 0.5% below neckline
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for overbought detection"""
@@ -67,26 +85,81 @@ class TripleTopPattern:
                 return True
         return False
     
-    def find_peaks(self, df: pd.DataFrame, rsi: pd.Series, lookback: int = 5):
-        """Find swing highs with volume and RSI"""
+    def find_peaks(self, df: pd.DataFrame, rsi: pd.Series, min_prominence: float = 0.008):
+        """
+        Find swing highs for triple pattern - 3 of 4 requirements (resistance OPTIONAL for triple)
+        
+        Requirements for a valid peak:
+        1. Highest in 5-hour window (20 bars @ 15min) - ALWAYS REQUIRED
+        2. At least 0.8% above recent average (prominence)
+        3. Volume spike (1.15x average - very relaxed for triple)
+        4. Proper spacing from other peaks (6+ bars)
+        
+        Need 3 of 4 (REQ 1 always required, plus 2 of the other 3)
+        """
         peaks = []
+        lookback = 20  # 5 hours @ 15min bars
+        MIN_PEAK_SPACING = 6  # Minimum spacing
         
         for i in range(lookback, len(df) - lookback):
-            if df['high'].iloc[i] == df['high'].iloc[i-lookback:i+lookback+1].max():
-                vol = df['volume'].iloc[max(0, i-2):i+3].mean()
-                rsi_val = rsi.iloc[i] if i < len(rsi) else 50
-                
-                peaks.append({
-                    'idx': i,
-                    'price': df['high'].iloc[i],
-                    'volume': vol,
-                    'rsi': rsi_val
-                })
+            high = df['high'].iloc[i]
+            
+            # REQ 1: Must be highest in 5-hour window (ALWAYS REQUIRED)
+            if high != df['high'].iloc[i-lookback:i+lookback+1].max():
+                continue
+            
+            requirements_met = 1  # Already met REQ 1
+            
+            # REQ 2: 0.8% above recent average (prominence)
+            recent_avg = df['high'].iloc[i-lookback:i].mean()
+            has_prominence = False
+            if recent_avg > 0 and high >= recent_avg * (1 + min_prominence):
+                requirements_met += 1
+                has_prominence = True
+            
+            # REQ 3: Volume spike (1.15x average - very relaxed)
+            vol = df['volume'].iloc[i]
+            avg_vol = df['volume'].iloc[max(0, i-lookback):i].mean()
+            if avg_vol > 0 and vol >= avg_vol * 1.15:
+                requirements_met += 1
+            
+            # REQ 4: Proper spacing from previous peaks
+            spacing_ok = True
+            if len(peaks) > 0:
+                last_peak_idx = peaks[-1]['idx']
+                if i - last_peak_idx >= MIN_PEAK_SPACING:
+                    requirements_met += 1
+                else:
+                    spacing_ok = False
+            else:
+                requirements_met += 1  # First peak, spacing N/A
+            
+            # Need at least 3 of 4 requirements AND proper spacing
+            if requirements_met < 3 or not spacing_ok:
+                continue
+            
+            # Requirements passed - add peak
+            rsi_val = rsi.iloc[i] if i < len(rsi) else 50
+            
+            peaks.append({
+                'idx': i,
+                'price': high,
+                'volume': vol,
+                'rsi': rsi_val,
+                'prominence': ((high / recent_avg) - 1) * 100 if has_prominence else 0,
+                'requirements_met': requirements_met
+            })
         
         return peaks
     
+    def reset_pattern_state(self):
+        """Reset pattern tracking state - PHASE 1: NEW"""
+        self.pattern_start_idx = None
+        self.breakdown_start_idx = None
+        self.active_pattern = None
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """INSTITUTIONAL GRADE: Triple top with multi-block validation"""
+        """INSTITUTIONAL GRADE: Triple top with multi-block validation + PHASE 1 improvements"""
         if len(df) < 40:  # Need more data for quality validation
             return {
                 'signal': 'NO_PATTERN',
@@ -96,6 +169,23 @@ class TripleTopPattern:
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
+        
+        current_idx = len(df) - 1
+        
+        # PHASE 1: Check pattern expiration
+        if self.pattern_start_idx is not None:
+            bars_since_pattern_start = current_idx - self.pattern_start_idx
+            if bars_since_pattern_start > self.PATTERN_MAX_DURATION:
+                # Pattern expired without breakdown
+                self.reset_pattern_state()
+                return {
+                    'signal': 'NO_PATTERN',
+                    'confidence': 0,
+                    'metadata': {'reason': 'Pattern expired (>150 bars)'},
+                    'timestamp': df['timestamp'].iloc[-1],
+                    'timeframe': self.timeframe,
+                    'confluence_factors': []
+                }
         
         # Calculate validation indicators
         rsi = self.calculate_rsi(df)
@@ -118,7 +208,41 @@ class TripleTopPattern:
         recent = peaks[-3:]
         p1, p2, p3 = recent[0], recent[1], recent[2]
         
-        # Check: Similar price (REQUIRED)
+        # CRITICAL: Check pattern duration between peaks
+        bars_1_2 = p2['idx'] - p1['idx']
+        bars_2_3 = p3['idx'] - p2['idx']
+        
+        if bars_1_2 < self.MIN_BARS_BETWEEN_PEAKS or bars_2_3 < self.MIN_BARS_BETWEEN_PEAKS:
+            return {
+                'signal': 'NO_PATTERN',
+                'confidence': 0,
+                'metadata': {
+                    'reason': 'Pattern forming too quickly',
+                    'bars_1_2': bars_1_2,
+                    'bars_2_3': bars_2_3,
+                    'min_required': self.MIN_BARS_BETWEEN_PEAKS
+                },
+                'timestamp': df['timestamp'].iloc[-1],
+                'timeframe': self.timeframe,
+                'confluence_factors': []
+            }
+        
+        if bars_1_2 > self.MAX_BARS_BETWEEN_PEAKS or bars_2_3 > self.MAX_BARS_BETWEEN_PEAKS:
+            return {
+                'signal': 'NO_PATTERN',
+                'confidence': 0,
+                'metadata': {
+                    'reason': 'Peaks too far apart',
+                    'bars_1_2': bars_1_2,
+                    'bars_2_3': bars_2_3,
+                    'max_allowed': self.MAX_BARS_BETWEEN_PEAKS
+                },
+                'timestamp': df['timestamp'].iloc[-1],
+                'timeframe': self.timeframe,
+                'confluence_factors': []
+            }
+        
+        # Check: Similar price (REQUIRED - tightened to 2%)
         avg_price = (p1['price'] + p2['price'] + p3['price']) / 3
         price_diffs = [
             abs(p1['price'] - avg_price) / avg_price,
@@ -127,10 +251,15 @@ class TripleTopPattern:
         ]
         
         if any(diff > self.peak_tolerance for diff in price_diffs):
+            max_diff = max(price_diffs)
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'reason': 'Peaks not similar enough',
+                    'max_peak_diff_pct': round(max_diff * 100, 2),
+                    'max_allowed': round(self.peak_tolerance * 100, 2)
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -194,12 +323,16 @@ class TripleTopPattern:
             base_confidence += 5
             confluences.append(f"Good pattern duration ({bars_1_2}+{bars_2_3} bars)")
         
-        # MINIMUM THRESHOLD: Require at least 2 confluences to signal
-        if len(confluences) < 2:
+        # MINIMUM THRESHOLD: Require at least 3 confluences (PHASE 1: increased from 2)
+        if len(confluences) < self.MIN_CONFLUENCES:
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
-                'metadata': {'reason': 'Insufficient confluence', 'confluences_found': len(confluences)},
+                'metadata': {
+                    'reason': 'Insufficient validation',
+                    'confluences_found': len(confluences),
+                    'confluences_required': self.MIN_CONFLUENCES
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -209,17 +342,74 @@ class TripleTopPattern:
         section = df.iloc[p1['idx']:p3['idx']+1]
         neckline = section['low'].min()
         
-        breakdown = current_price < neckline
+        # PHASE 1: Stricter breakdown detection
+        # Require: 0.5% break below neckline AND 2 of last 3 closes below
+        neckline_with_margin = neckline * (1 - self.BREAK_MARGIN)
+        clean_break = current_price < neckline_with_margin
         
-        # BREAKDOWN gets additional confidence boost
+        # Count recent closes below neckline
+        recent_closes = df['close'].iloc[-3:]
+        closes_below = (recent_closes < neckline).sum()
+        confirmed_closes = closes_below >= 2
+        
+        # Both conditions required for breakdown
+        breakdown = clean_break and confirmed_closes
+        
+        # PHASE 1: Track breakdown duration
         if breakdown:
-            base_confidence += 10
-            signal = 'BEARISH_BREAKDOWN'
+            if self.breakdown_start_idx is None:
+                # New breakdown starting
+                self.breakdown_start_idx = current_idx
+                base_confidence += 10
+                signal = 'BEARISH_BREAKDOWN'
+            else:
+                # Breakdown continuing
+                bars_since_breakdown = current_idx - self.breakdown_start_idx
+                if bars_since_breakdown > self.BREAKDOWN_MAX_DURATION:
+                    # Breakdown complete - reset
+                    self.reset_pattern_state()
+                    return {
+                        'signal': 'NO_PATTERN',
+                        'confidence': 0,
+                        'metadata': {'reason': 'Breakdown completed (>20 bars)'},
+                        'timestamp': df['timestamp'].iloc[-1],
+                        'timeframe': self.timeframe,
+                        'confluence_factors': []
+                    }
+                else:
+                    base_confidence += 10
+                    signal = 'BEARISH_BREAKDOWN'
         else:
+            # Not broken down
+            if self.breakdown_start_idx is not None:
+                # Was in breakdown but price recovered - pattern invalidated
+                self.reset_pattern_state()
+                return {
+                    'signal': 'NO_PATTERN',
+                    'confidence': 0,
+                    'metadata': {'reason': 'Price recovered above neckline'},
+                    'timestamp': df['timestamp'].iloc[-1],
+                    'timeframe': self.timeframe,
+                    'confluence_factors': []
+                }
+            
+            # Pattern forming - track start time
+            if self.pattern_start_idx is None:
+                self.pattern_start_idx = current_idx
+            
             signal = 'PATTERN_FORMING'
         
         # Cap confidence at 95%
         final_confidence = min(base_confidence, 95)
+        
+        # EVENT TRACKING: Track pattern state for new event detection
+        pattern_id = f"TT_{p1['idx']}_{p2['idx']}_{p3['idx']}"
+        is_new_event = False
+        
+        if breakdown:
+            # New breakdown event if pattern ID changed
+            is_new_event = (self.active_pattern != pattern_id)
+            self.active_pattern = pattern_id
         
         target = neckline - (avg_price - neckline)
         
@@ -238,14 +428,18 @@ class TripleTopPattern:
                 'breakdown_confirmed': breakdown,
                 'target_price': round(target, 2),
                 'confluences_count': len(confluences),
-                'quality_factors': confluences
+                'quality_factors': confluences,
+                'bars_between_peaks': f"{bars_1_2}+{bars_2_3}",
+                'pattern_id': pattern_id,
+                'is_new_event': is_new_event
             },
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe,
             'confluence_factors': [
-                f'Triple Top: {len(confluences)} confluences (Target: 70%+ conf)',
-                f'Confidence: {final_confidence}% (improved from 67%)',
-                *confluences[:4],  # Show top 4 confluences
+                f'Triple Top: {len(confluences)} confluences (Institutional grade)',
+                f'Confidence: {final_confidence}%',
+                f'Pattern duration: {bars_1_2}+{bars_2_3} bars',
+                *confluences[:3],  # Show top 3 confluences
                 f'{'✅ Breakdown confirmed!' if breakdown else '⏳ Pattern forming'}'
             ]
         }

@@ -44,6 +44,25 @@ class FlagPattern:
         self.min_pattern_bars = min_pattern_bars
         self.parallel_tolerance = parallel_tolerance
         
+        # Pattern lifecycle tracking (PHASE 1 improvements)
+        self.active_pattern = None
+        self.pattern_start_idx = None
+        self.breakout_start_idx = None
+        
+        # Pattern duration requirements for 15min timeframe
+        self.MIN_FLAGPOLE_BARS = 5    # 1.25 hours minimum for flagpole
+        self.MIN_FLAG_BARS = 6         # 1.5 hours minimum for flag
+        self.MAX_FLAG_DURATION = 60    # 15 hours maximum for flag
+        self.BREAKOUT_MAX_DURATION = 20  # Breakout confirmed for 20 bars
+        
+        # Validation requirements (STRICTER for better selectivity)
+        self.MIN_CONFLUENCES = 3  # Keep at 3
+        self.MIN_FLAGPOLE_STRENGTH = 0.012  # Minimum 1.2% move (relaxed)
+        self.MAX_FLAG_RANGE = 0.05  # Maximum 5% flag range (relaxed)
+        
+        # Breakout requirements (relaxed to allow more signals)
+        self.BREAK_MARGIN = 0.003  # Must break 0.3% beyond channel (relaxed)
+        
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for momentum alignment"""
         delta = df['close'].diff()
@@ -97,8 +116,8 @@ class FlagPattern:
         
         price_change_pct = (lookback_end - lookback_start) / lookback_start
         
-        # Require 1.5% move for 15min timeframe
-        if abs(price_change_pct) < 0.015:
+        # Require minimum flagpole strength
+        if abs(price_change_pct) < self.MIN_FLAGPOLE_STRENGTH:
             return None
         
         # Calculate flagpole volume
@@ -126,8 +145,8 @@ class FlagPattern:
         # Check range stability (tight consolidation)
         range_pct = (highs.max() - lows.min()) / lows.min()
         
-        # Accept tight range as flag (< 4% for 15min)
-        if range_pct < 0.04:
+        # Accept tight range as flag
+        if range_pct < self.MAX_FLAG_RANGE:
             # Calculate channel volume
             channel_volume = recent['volume'].mean()
             
@@ -257,26 +276,30 @@ class FlagPattern:
             base_confidence += 2
             confluences.append(f"Tight flag ({range_pct*100:.1f}%)")
         
-        # MINIMUM THRESHOLD: Require at least 2 confluences
-        if len(confluences) < 2:
+        # MINIMUM THRESHOLD: Require at least 4 confluences (PHASE 1: institutional grade)
+        if len(confluences) < self.MIN_CONFLUENCES:
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
-                'metadata': {'reason': 'Insufficient confluence', 'confluences_found': len(confluences)},
+                'metadata': {
+                    'reason': 'Insufficient validation',
+                    'confluences_found': len(confluences),
+                    'confluences_required': self.MIN_CONFLUENCES
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
         
-        # Check for breakout (RELAXED for 15min)
+        # Check for breakout (stricter margin)
         if flagpole['direction'] == 'BULLISH':
-            # Breakout if price breaks above upper channel by 0.5%
-            breakout = current_price > channel['upper_end'] * 1.005
+            # Breakout if price breaks above upper channel
+            breakout = current_price > channel['upper_end'] * (1 + self.BREAK_MARGIN)
             signal = 'BULLISH_BREAKOUT' if breakout else 'PATTERN_FORMING'
             target = flagpole['pole_end'] + (flagpole['pole_end'] - flagpole['pole_start'])
         else:
-            # Breakout if price breaks below lower channel by 0.5%
-            breakout = current_price < channel['lower_end'] * 0.995
+            # Breakout if price breaks below lower channel
+            breakout = current_price < channel['lower_end'] * (1 - self.BREAK_MARGIN)
             signal = 'BEARISH_BREAKOUT' if breakout else 'PATTERN_FORMING'
             target = flagpole['pole_end'] - (flagpole['pole_start'] - flagpole['pole_end'])
         

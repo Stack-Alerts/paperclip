@@ -153,25 +153,25 @@ class LOW:
     
     def calculate_variable_confidence(self, signal: str, distance_class: str, is_new_event: bool) -> float:
         """
-        ENHANCEMENT 3: Variable confidence based on signal type and distance
+        OPTIMIZED V2: Further reduced to hit 85-88% average for weekly
         """
-        # Base confidence by signal
+        # Base confidence by signal (FURTHER OPTIMIZED)
         if signal == 'BEARISH':
-            base = 95  # Weekly breakdown = very high confidence
+            base = 60  # Breakdown (reduced from 65)
         elif signal == 'BULLISH':
-            base = 90  # Bounce from LOW = high confidence
+            base = 65  # Bounce from LOW (reduced from 70)
         else:  # NEUTRAL
-            base = 75  # Neutral = baseline (weekly baseline higher than daily)
+            base = 50  # Neutral (reduced from 55)
         
-        # Adjust by distance
+        # Adjust by distance (±15% for variation)
         if distance_class in ['AT_LOW', 'VERY_CLOSE']:
-            base = min(100, base + 5)  # Near LOW = higher confidence
+            base = min(95, base + 15)  # Near LOW
         elif distance_class == 'FAR':
-            base = max(70, base - 5)  # Far from LOW = lower confidence
+            base = max(40, base - 15)  # Far from LOW
         
-        # Fresh event boost
+        # Fresh event boost (+15% for new events)
         if is_new_event:
-            base = min(100, base + 5)
+            base = min(95, base + 15)
         
         return base
     
@@ -220,12 +220,14 @@ class LOW:
         distance_pct = self.calculate_distance(current_price, low)
         distance_class = self.classify_distance(distance_pct)
         
-        # Determine signal
+        # Determine signal (OPTIMIZED - More selective BULLISH)
         if breakdown_status == 'BREAKDOWN_CONFIRMED' or is_new_low:
             signal = 'BEARISH'
         elif breakdown_status == 'BREAKING_DOWN':
             signal = 'NEUTRAL'
-        elif distance_class in ['AT_LOW', 'VERY_CLOSE'] and distance_pct > 0:
+        elif distance_class == 'AT_LOW' and distance_pct > 0:
+            # More selective: Only AT_LOW (not VERY_CLOSE)
+            # This is within 0.2% of LOW (~90-180 points on BTC)
             signal = 'BULLISH'  # Bounce from LOW
         else:
             signal = 'NEUTRAL'

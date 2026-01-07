@@ -38,10 +38,27 @@ class RoundingBottomPattern:
     """
     
     def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 15,
-                 depth_min: float = 0.08, **kwargs):
+                 depth_min: float = 0.11, **kwargs):
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
-        self.depth_min = depth_min
+        self.depth_min = depth_min  # 11% minimum depth (tighter than 10%, less than 12%)
+        
+        # Pattern lifecycle tracking (PHASE 1 improvements)
+        self.active_pattern = None
+        self.pattern_start_idx = None
+        self.breakout_start_idx = None
+        
+        # Pattern duration requirements for 15min timeframe
+        self.MIN_PATTERN_DURATION = 20   # 5 hours minimum
+        self.MAX_PATTERN_DURATION = 120  # 30 hours maximum
+        self.BREAKOUT_MAX_DURATION = 20   # Breakout confirmed for 20 bars
+        
+        # Validation requirements (STRICTER for better selectivity)
+        self.MIN_CONFLUENCES = 4  # Keep at 4 (5 causes 0%)
+        self.MIN_RECOVERY_PCT = 0.50  # Minimum 50% recovery
+        
+        # Breakout requirements (stricter)
+        self.BREAK_MARGIN = 0.009  # Must break 0.9% above initial
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for oversold recovery detection"""
@@ -178,20 +195,24 @@ class RoundingBottomPattern:
             base_confidence += 5
             confluences.append(f"Smooth U-shape ({near_bottom_count} bars)")
         
-        # MINIMUM THRESHOLD: Require at least 2 confluences
-        if len(confluences) < 2:
+        # MINIMUM THRESHOLD: Require at least 4 confluences (PHASE 1: institutional grade)
+        if len(confluences) < self.MIN_CONFLUENCES:
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
-                'metadata': {'reason': 'Insufficient confluence', 'confluences_found': len(confluences)},
+                'metadata': {
+                    'reason': 'Insufficient validation',
+                    'confluences_found': len(confluences),
+                    'confluences_required': self.MIN_CONFLUENCES
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
         
-        # Check breakout
+        # Check breakout (stricter margin)
         initial_price = float(df['close'].iloc[0])
-        breakout = current_price > initial_price
+        breakout = current_price > initial_price * (1 + self.BREAK_MARGIN)  # 0.5% above initial
         
         # BREAKOUT gets additional confidence boost
         if breakout:

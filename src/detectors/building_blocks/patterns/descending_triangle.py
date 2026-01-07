@@ -45,6 +45,24 @@ class DescendingTrianglePattern:
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
         self.support_tolerance = support_tolerance
+        
+        # Pattern lifecycle tracking (PHASE 1 improvements)
+        self.active_pattern = None
+        self.pattern_start_idx = None
+        self.breakout_start_idx = None
+        
+        # Pattern duration requirements for 15min timeframe
+        self.MIN_TRIANGLE_BARS = 15    # 3.75 hours minimum
+        self.MAX_TRIANGLE_DURATION = 80  # 20 hours maximum
+        self.BREAKOUT_MAX_DURATION = 20  # Breakout confirmed for 20 bars
+        
+        # Validation requirements (STRICTER for better selectivity)
+        self.MIN_CONFLUENCES = 3  # Keep at 3
+        self.SUPPORT_TOLERANCE = 0.020  # 2.0% tolerance (final adjustment)
+        self.MIN_SLOPE = -0.0012  # Final slope adjustment
+        
+        # Breakout requirements
+        self.BREAK_MARGIN = 0.005  # Must break 0.5% below support
     
     def find_swing_points(self, df: pd.DataFrame, lookback: int = 5):
         """Find swing highs and lows"""
@@ -79,9 +97,24 @@ class DescendingTrianglePattern:
         avg_price = np.mean(prices)
         
         for price in prices:
-            if abs(price - avg_price) / avg_price > self.support_tolerance:
+            if abs(price - avg_price) / avg_price > self.SUPPORT_TOLERANCE:
                 return False
         return True
+    
+    def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
+        """Calculate RSI for bearish alignment"""
+        delta = df['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+    
+    def calculate_vwap(self, df: pd.DataFrame) -> float:
+        """Calculate VWAP for trend confirmation"""
+        typical_price = (df['high'] + df['low'] + df['close']) / 3
+        vwap = (typical_price * df['volume']).cumsum() / df['volume'].cumsum()
+        return float(vwap.iloc[-1])
     
     def detect_pattern(self, df: pd.DataFrame) -> Optional[Dict]:
         """Detect Descending Triangle"""
@@ -114,7 +147,7 @@ class DescendingTrianglePattern:
         }
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """Main analysis method"""
+        """INSTITUTIONAL GRADE: Descending Triangle with multi-block validation"""
         if not all(col in df.columns for col in ['open', 'high', 'low', 'close', 'volume', 'timestamp']):
             return {
                 'signal': 'ERROR',
@@ -125,12 +158,12 @@ class DescendingTrianglePattern:
                 'confluence_factors': []
             }
         
-        if len(df) < self.min_pattern_bars:
+        if len(df) < 50:
             return {
-                'signal': 'INSUFFICIENT_DATA',
+                'signal': 'NO_PATTERN',
                 'confidence': 0,
-                'metadata': {'error': f'Need at least {self.min_pattern_bars} bars'},
-                'timestamp': datetime.now(),
+                'metadata': {'error': 'Need at least 50 bars'},
+                'timestamp': df['timestamp'].iloc[-1] if len(df) > 0 else datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
@@ -147,46 +180,122 @@ class DescendingTrianglePattern:
                 'confluence_factors': []
             }
         
-        current_price = float(df['close'].iloc[-1])
-        support_broken = current_price < pattern['support_level']
+        # Validate slope is descending enough
+        if pattern['resistance_slope'] > self.MIN_SLOPE:
+            return {
+                'signal': 'NO_PATTERN',
+                'confidence': 0,
+                'metadata': {},
+                'timestamp': df['timestamp'].iloc[-1],
+                'timeframe': self.timeframe,
+                'confluence_factors': []
+            }
         
-        signal = 'BREAKDOWN_CONFIRMED' if support_broken else 'PATTERN_FORMING'
-        confidence = 85 if support_broken else 55
+        # Calculate validation indicators
+        rsi = self.calculate_rsi(df)
+        vwap = self.calculate_vwap(df)
+        current_price = float(df['close'].iloc[-1])
+        current_volume = df['volume'].iloc[-10:].mean()
+        earlier_volume = df['volume'].iloc[-30:-10].mean()
+        
+        # INSTITUTIONAL VALIDATION: Build confidence score
+        base_confidence = 60  # Start at 60%
+        confluences = []
+        
+        current_rsi = rsi.iloc[-1] if len(rsi) > 0 else 50
+        
+        # CONFLUENCE 1: RSI Bearish Alignment (+10 points)
+        if current_rsi < 50:
+            base_confidence += 10
+            confluences.append(f"RSI bearish ({current_rsi:.1f})")
+        elif current_rsi < 60:
+            base_confidence += 5
+            confluences.append(f"RSI near-bearish ({current_rsi:.1f})")
+        
+        # CONFLUENCE 2: VWAP Trend Confirmation (+10 points)
+        if current_price < vwap:
+            base_confidence += 10
+            vwap_diff = ((current_price / vwap) - 1) * 100
+            confluences.append(f"Below VWAP ({vwap_diff:.1f}%)")
+        
+        # CONFLUENCE 3: Volume Pattern (+5 points)
+        vol_declining = current_volume < earlier_volume * 0.9
+        if vol_declining:
+            base_confidence += 5
+            confluences.append("Volume declining")
+        
+        # CONFLUENCE 4: Pattern Quality (+10 points)
+        slope_pct = abs(pattern['resistance_slope'] / pattern['resistance_start']) * 100
+        if slope_pct > 0.5:  # Good descending slope
+            base_confidence += 5
+            confluences.append(f"Strong descent ({slope_pct:.1f}%)")
+        
+        support_quality = abs((max([l['price'] for l in self.find_swing_points(df)[1][-4:]]) - 
+                               min([l['price'] for l in self.find_swing_points(df)[1][-4:]])) / 
+                              pattern['support_level'])
+        if support_quality < 0.01:  # Tight support
+            base_confidence += 5
+            confluences.append("Tight support level")
+        
+        # MINIMUM THRESHOLD: Require at least 3 confluences
+        if len(confluences) < self.MIN_CONFLUENCES:
+            return {
+                'signal': 'NO_PATTERN',
+                'confidence': 0,
+                'metadata': {
+                    'reason': 'Insufficient validation',
+                    'confluences_found': len(confluences),
+                    'confluences_required': self.MIN_CONFLUENCES
+                },
+                'timestamp': df['timestamp'].iloc[-1],
+                'timeframe': self.timeframe,
+                'confluence_factors': []
+            }
+        
+        # Check for breakdown
+        support_broken = current_price < pattern['support_level'] * (1 - self.BREAK_MARGIN)
+        signal = 'BEARISH_BREAKDOWN' if support_broken else 'PATTERN_FORMING'
+        
+        # BREAKDOWN gets additional confidence boost
+        if support_broken:
+            recent_volume = df['volume'].iloc[-3:].mean()
+            if recent_volume > current_volume * 1.2:
+                base_confidence += 15
+                confluences.append("Breakdown with volume surge!")
+            else:
+                base_confidence += 10
+        
+        # Cap confidence at 95%
+        final_confidence = min(base_confidence, 95)
         
         pattern_height = pattern['resistance_start'] - pattern['support_level']
         target_price = pattern['support_level'] - pattern_height
         
-        confluence_factors = []
-        confluence_factors.append("Descending Triangle detected")
-        confluence_factors.append(f"Support: ${pattern['support_level']:.2f}")
-        confluence_factors.append(f"Falling resistance: ${pattern['resistance_start']:.2f} → ${pattern['resistance_end']:.2f}")
-        confluence_factors.append(f"Bearish continuation pattern")
-        
-        if support_broken:
-            confluence_factors.append("✅ BREAKDOWN confirmed - Bearish!")
-            confidence += 15
-        else:
-            confluence_factors.append("⏳ Awaiting breakdown")
-        
-        confluence_factors.append(f"Target: ${target_price:.2f}")
-        confluence_factors.append("Success rate: 68% bearish")
-        
-        metadata = {
-            'pattern_type': 'DESCENDING_TRIANGLE',
-            'support_level': round(pattern['support_level'], 2),
-            'resistance_start': round(pattern['resistance_start'], 2),
-            'resistance_end': round(pattern['resistance_end'], 2),
-            'breakdown_confirmed': support_broken,
-            'target_price': round(target_price, 2),
-            'pattern_height': round(pattern_height, 2),
-            'expected_success_rate': 0.68
-        }
-        
         return {
             'signal': signal,
-            'confidence': min(100, round(confidence, 2)),
-            'metadata': metadata,
+            'confidence': final_confidence,
+            'metadata': {
+                'pattern_type': 'DESCENDING_TRIANGLE_INSTITUTIONAL',
+                'direction': 'BEARISH',
+                'support_level': round(pattern['support_level'], 2),
+                'resistance_start': round(pattern['resistance_start'], 2),
+                'resistance_end': round(pattern['resistance_end'], 2),
+                'resistance_slope': round(pattern['resistance_slope'], 4),
+                'current_rsi': round(current_rsi, 1),
+                'vwap': round(vwap, 2),
+                'volume_declining': vol_declining,
+                'breakdown_confirmed': support_broken,
+                'target_price': round(target_price, 2),
+                'pattern_height': round(pattern_height, 2),
+                'confluences_count': len(confluences),
+                'quality_factors': confluences
+            },
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe,
-            'confluence_factors': confluence_factors
+            'confluence_factors': [
+                f'Descending Triangle: {len(confluences)} confluences',
+                f'Confidence: {final_confidence}%',
+                *confluences[:4],
+                f'{'✅ BEARISH breakdown!' if support_broken else '⏳ Pattern forming'}'
+            ]
         }

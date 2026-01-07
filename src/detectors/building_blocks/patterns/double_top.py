@@ -36,10 +36,28 @@ class DoubleTopPattern:
     """
     
     def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 15,
-                 peak_tolerance: float = 0.05, **kwargs):
+                 peak_tolerance: float = 0.02, **kwargs):
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
-        self.peak_tolerance = peak_tolerance
+        self.peak_tolerance = peak_tolerance  # 2% max difference
+        
+        # Pattern lifecycle tracking (PHASE 1 improvements)
+        self.active_pattern = None  # Track current pattern ID for event detection
+        self.pattern_start_idx = None  # When pattern started forming
+        self.breakdown_start_idx = None  # When breakdown began
+        
+        # Pattern duration requirements for 15min timeframe
+        self.MIN_BARS_BETWEEN_PEAKS = 15   # 3.75 hours minimum (PHASE 1: increased from 10)
+        self.MAX_BARS_BETWEEN_PEAKS = 100  # 25 hours maximum
+        self.PATTERN_MAX_DURATION = 100    # Pattern expires after 100 bars (PHASE 1: NEW)
+        self.BREAKDOWN_MAX_DURATION = 20   # Breakdown confirmed for 20 bars (PHASE 1: NEW)
+        
+        # Validation requirements
+        self.MIN_CONFLUENCES = 3  # Institutional grade validation
+        self.MIN_PEAK_SPACING = 8  # Minimum bars between ANY peaks (PHASE 1: NEW)
+        
+        # Breakdown requirements (PHASE 1: stricter)
+        self.BREAK_MARGIN = 0.005  # Must break 0.5% below neckline
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for overbought detection"""
@@ -67,26 +85,71 @@ class DoubleTopPattern:
                 return True
         return False
     
-    def find_peaks(self, df: pd.DataFrame, rsi: pd.Series, lookback: int = 5):
-        """Find swing highs with volume and RSI"""
+    def find_peaks(self, df: pd.DataFrame, rsi: pd.Series, min_prominence: float = 0.0125):
+        """
+        Find SIGNIFICANT swing highs only - PHASE 1 STRICT
+        
+        Requirements for a valid peak (MUST meet ALL):
+        1. Highest in 5-hour window (20 bars @ 15min) - REQUIRED
+        2. At least 1.25% above recent average (prominence) - REQUIRED
+        3. Volume spike (1.3x average) - REQUIRED  
+        4. Near recent resistance level - REQUIRED
+        5. Proper spacing from other peaks (8+ bars) - REQUIRED
+        """
         peaks = []
+        lookback = 20  # 5 hours @ 15min bars
         
         for i in range(lookback, len(df) - lookback):
-            if df['high'].iloc[i] == df['high'].iloc[i-lookback:i+lookback+1].max():
-                vol = df['volume'].iloc[max(0, i-2):i+3].mean()
-                rsi_val = rsi.iloc[i] if i < len(rsi) else 50
-                
-                peaks.append({
-                    'idx': i,
-                    'price': df['high'].iloc[i],
-                    'volume': vol,
-                    'rsi': rsi_val
-                })
+            high = df['high'].iloc[i]
+            
+            # REQ 1: Must be highest in 5-hour window
+            if high != df['high'].iloc[i-lookback:i+lookback+1].max():
+                continue
+            
+            # REQ 2: Must be 1.25% above recent average (prominence) - PHASE 1: REQUIRED
+            recent_avg = df['high'].iloc[i-lookback:i].mean()
+            if recent_avg == 0 or high < recent_avg * (1 + min_prominence):
+                continue
+            
+            # REQ 3: Must have volume spike (1.3x average) - PHASE 1: REQUIRED
+            vol = df['volume'].iloc[i]
+            avg_vol = df['volume'].iloc[max(0, i-lookback):i].mean()
+            if avg_vol == 0 or vol < avg_vol * 1.3:
+                continue
+            
+            # REQ 4: Must be near recent resistance - PHASE 1: REQUIRED
+            recent_highs = df['high'].iloc[max(0, i-100):i].max()
+            if high < recent_highs * 0.98:  # Not within 2% of resistance
+                continue
+            
+            # REQ 5: Must have proper spacing from previous peaks - PHASE 1: NEW
+            if len(peaks) > 0:
+                last_peak_idx = peaks[-1]['idx']
+                if i - last_peak_idx < self.MIN_PEAK_SPACING:
+                    continue  # Too close to previous peak
+            
+            # ALL requirements passed - add peak
+            rsi_val = rsi.iloc[i] if i < len(rsi) else 50
+            
+            peaks.append({
+                'idx': i,
+                'price': high,
+                'volume': vol,
+                'rsi': rsi_val,
+                'prominence': ((high / recent_avg) - 1) * 100,
+                'requirements_met': 5  # All 5 requirements met
+            })
         
         return peaks
     
+    def reset_pattern_state(self):
+        """Reset pattern tracking state - PHASE 1: NEW"""
+        self.pattern_start_idx = None
+        self.breakdown_start_idx = None
+        self.active_pattern = None
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
-        """INSTITUTIONAL GRADE: Double top with multi-block validation"""
+        """INSTITUTIONAL GRADE: Double top with multi-block validation + PHASE 1 improvements"""
         if len(df) < 30:  # Need more data for quality validation
             return {
                 'signal': 'NO_PATTERN',
@@ -96,6 +159,23 @@ class DoubleTopPattern:
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
+        
+        current_idx = len(df) - 1
+        
+        # PHASE 1: Check pattern expiration
+        if self.pattern_start_idx is not None:
+            bars_since_pattern_start = current_idx - self.pattern_start_idx
+            if bars_since_pattern_start > self.PATTERN_MAX_DURATION:
+                # Pattern expired without breakdown
+                self.reset_pattern_state()
+                return {
+                    'signal': 'NO_PATTERN',
+                    'confidence': 0,
+                    'metadata': {'reason': 'Pattern expired (>100 bars)'},
+                    'timestamp': df['timestamp'].iloc[-1],
+                    'timeframe': self.timeframe,
+                    'confluence_factors': []
+                }
         
         # Calculate validation indicators
         rsi = self.calculate_rsi(df)
@@ -118,13 +198,48 @@ class DoubleTopPattern:
         recent = peaks[-2:]
         p1, p2 = recent[0], recent[1]
         
-        # Check: Similar price (REQUIRED)
+        # CRITICAL: Check pattern duration (5-25 hours @ 15min)
+        bars_between = p2['idx'] - p1['idx']
+        
+        if bars_between < self.MIN_BARS_BETWEEN_PEAKS:
+            return {
+                'signal': 'NO_PATTERN',
+                'confidence': 0,
+                'metadata': {
+                    'reason': 'Pattern forming too quickly',
+                    'bars_between': bars_between,
+                    'min_required': self.MIN_BARS_BETWEEN_PEAKS
+                },
+                'timestamp': df['timestamp'].iloc[-1],
+                'timeframe': self.timeframe,
+                'confluence_factors': []
+            }
+        
+        if bars_between > self.MAX_BARS_BETWEEN_PEAKS:
+            return {
+                'signal': 'NO_PATTERN',
+                'confidence': 0,
+                'metadata': {
+                    'reason': 'Peaks too far apart',
+                    'bars_between': bars_between,
+                    'max_allowed': self.MAX_BARS_BETWEEN_PEAKS
+                },
+                'timestamp': df['timestamp'].iloc[-1],
+                'timeframe': self.timeframe,
+                'confluence_factors': []
+            }
+        
+        # Check: Similar price (REQUIRED - tightened to 2%)
         price_diff = abs(p1['price'] - p2['price']) / p1['price']
         if price_diff > self.peak_tolerance:
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'reason': 'Peaks not similar enough',
+                    'peak_diff_pct': round(price_diff * 100, 2),
+                    'max_allowed': round(self.peak_tolerance * 100, 2)
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -181,12 +296,16 @@ class DoubleTopPattern:
             base_confidence += 5
             confluences.append(f"Good pattern duration ({bars_between} bars)")
         
-        # MINIMUM THRESHOLD: Require at least 2 confluences to signal
-        if len(confluences) < 2:
+        # MINIMUM THRESHOLD: Require at least 4 confluences for institutional grade
+        if len(confluences) < self.MIN_CONFLUENCES:
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
-                'metadata': {'reason': 'Insufficient confluence', 'confluences_found': len(confluences)},
+                'metadata': {
+                    'reason': 'Insufficient validation',
+                    'confluences_found': len(confluences),
+                    'confluences_required': self.MIN_CONFLUENCES
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -196,17 +315,74 @@ class DoubleTopPattern:
         section = df.iloc[p1['idx']:p2['idx']+1]
         neckline = section['low'].min()
         
-        breakdown = current_price < neckline
+        # PHASE 1: Stricter breakdown detection
+        # Require: 0.5% break below neckline AND 2 of last 3 closes below
+        neckline_with_margin = neckline * (1 - self.BREAK_MARGIN)
+        clean_break = current_price < neckline_with_margin
         
-        # BREAKDOWN gets additional confidence boost
+        # Count recent closes below neckline
+        recent_closes = df['close'].iloc[-3:]
+        closes_below = (recent_closes < neckline).sum()
+        confirmed_closes = closes_below >= 2
+        
+        # Both conditions required for breakdown
+        breakdown = clean_break and confirmed_closes
+        
+        # PHASE 1: Track breakdown duration
         if breakdown:
-            base_confidence += 10
-            signal = 'BEARISH_BREAKDOWN'
+            if self.breakdown_start_idx is None:
+                # New breakdown starting
+                self.breakdown_start_idx = current_idx
+                base_confidence += 10
+                signal = 'BEARISH_BREAKDOWN'
+            else:
+                # Breakdown continuing
+                bars_since_breakdown = current_idx - self.breakdown_start_idx
+                if bars_since_breakdown > self.BREAKDOWN_MAX_DURATION:
+                    # Breakdown complete - reset
+                    self.reset_pattern_state()
+                    return {
+                        'signal': 'NO_PATTERN',
+                        'confidence': 0,
+                        'metadata': {'reason': 'Breakdown completed (>20 bars)'},
+                        'timestamp': df['timestamp'].iloc[-1],
+                        'timeframe': self.timeframe,
+                        'confluence_factors': []
+                    }
+                else:
+                    base_confidence += 10
+                    signal = 'BEARISH_BREAKDOWN'
         else:
+            # Not broken down
+            if self.breakdown_start_idx is not None:
+                # Was in breakdown but price recovered - pattern invalidated
+                self.reset_pattern_state()
+                return {
+                    'signal': 'NO_PATTERN',
+                    'confidence': 0,
+                    'metadata': {'reason': 'Price recovered above neckline'},
+                    'timestamp': df['timestamp'].iloc[-1],
+                    'timeframe': self.timeframe,
+                    'confluence_factors': []
+                }
+            
+            # Pattern forming - track start time
+            if self.pattern_start_idx is None:
+                self.pattern_start_idx = current_idx
+            
             signal = 'PATTERN_FORMING'
         
         # Cap confidence at 95%
         final_confidence = min(base_confidence, 95)
+        
+        # EVENT TRACKING: Track pattern state for new event detection
+        pattern_id = f"DT_{p1['idx']}_{p2['idx']}"
+        is_new_event = False
+        
+        if breakdown:
+            # New breakdown event if pattern ID changed
+            is_new_event = (self.active_pattern != pattern_id)
+            self.active_pattern = pattern_id
         
         avg_price = (p1['price'] + p2['price']) / 2
         target = neckline - (avg_price - neckline)
@@ -226,14 +402,18 @@ class DoubleTopPattern:
                 'breakdown_confirmed': breakdown,
                 'target_price': round(target, 2),
                 'confluences_count': len(confluences),
-                'quality_factors': confluences
+                'quality_factors': confluences,
+                'bars_between_peaks': bars_between,
+                'pattern_id': pattern_id,
+                'is_new_event': is_new_event
             },
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe,
             'confluence_factors': [
-                f'Double Top: {len(confluences)} confluences (Target: 70%+ conf)',
-                f'Confidence: {final_confidence}% (improved from 65%)',
-                *confluences[:4],  # Show top 4 confluences
+                f'Double Top: {len(confluences)} confluences (Institutional grade)',
+                f'Confidence: {final_confidence}%',
+                f'Pattern duration: {bars_between} bars ({bars_between/4:.1f} hours)',
+                *confluences[:3],  # Show top 3 confluences
                 f'{'✅ Breakdown confirmed!' if breakdown else '⏳ Pattern forming'}'
             ]
         }

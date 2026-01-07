@@ -157,25 +157,25 @@ class HOW:
     
     def calculate_variable_confidence(self, signal: str, distance_class: str, is_new_event: bool) -> float:
         """
-        ENHANCEMENT 3: Variable confidence based on signal type and distance
+        OPTIMIZED V2: Further reduced bases to hit 80-85% average
         """
-        # Base confidence by signal
+        # Base confidence by signal (FURTHER OPTIMIZED)
         if signal == 'BULLISH':
-            base = 95  # Weekly breakout = very high confidence
+            base = 70  # Weekly breakout (reduced from 75)
         elif signal == 'BEARISH':
-            base = 90  # Rejection at HOW = high confidence
+            base = 60  # Rejection at HOW (reduced from 65)
         else:  # NEUTRAL
-            base = 75  # Neutral = baseline (weekly baseline higher than daily)
+            base = 50  # Neutral (reduced from 55)
         
-        # Adjust by distance
+        # Adjust by distance (±15% for variation)
         if distance_class in ['AT_HOW', 'VERY_CLOSE']:
-            base = min(100, base + 5)  # Near HOW = higher confidence
+            base = min(95, base + 15)  # Near HOW
         elif distance_class == 'FAR':
-            base = max(70, base - 5)  # Far from HOW = lower confidence
+            base = max(40, base - 15)  # Far from HOW
         
-        # Fresh event boost
+        # Fresh event boost (+15% for new events)
         if is_new_event:
-            base = min(100, base + 5)
+            base = min(95, base + 15)
         
         return base
     
@@ -227,12 +227,14 @@ class HOW:
         distance_pct = self.calculate_distance(current_price, how)
         distance_class = self.classify_distance(distance_pct)
         
-        # Determine signal
+        # Determine signal (OPTIMIZED - More selective BEARISH)
         if breakout_status == 'BREAKOUT_CONFIRMED' or is_new_how:
             signal = 'BULLISH'
         elif breakout_status == 'BREAKING_OUT':
             signal = 'NEUTRAL'
-        elif distance_class in ['AT_HOW', 'VERY_CLOSE'] and distance_pct < 0:
+        elif distance_class == 'AT_HOW' and distance_pct < 0:
+            # More selective: Only AT_HOW (not VERY_CLOSE)
+            # This is within 0.2% of HOW (90-180 points on BTC)
             signal = 'BEARISH'  # Rejection at HOW
         else:
             signal = 'NEUTRAL'

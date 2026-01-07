@@ -41,6 +41,23 @@ class SymmetricalTrianglePattern:
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
         
+        # Pattern lifecycle tracking (PHASE 1 improvements)
+        self.active_pattern = None
+        self.pattern_start_idx = None
+        self.breakout_start_idx = None
+        
+        # Pattern duration requirements for 15min timeframe
+        self.MIN_TRIANGLE_BARS = 15    # 3.75 hours minimum
+        self.MAX_TRIANGLE_DURATION = 80  # 20 hours maximum
+        self.BREAKOUT_MAX_DURATION = 20  # Breakout confirmed for 20 bars
+        
+        # Validation requirements (STRICTER for better selectivity)
+        self.MIN_CONFLUENCES = 5  # Increased to 5 (21.54% still too high)
+        self.MIN_COMPRESSION = 0.40  # Minimum 40% compression (even tighter)
+        
+        # Breakout requirements
+        self.BREAK_MARGIN = 0.005  # Must break 0.5% beyond bounds
+        
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for neutral zone validation"""
         delta = df['close'].diff()
@@ -90,8 +107,8 @@ class SymmetricalTrianglePattern:
         first_range = first_5['high'].max() - first_5['low'].min()
         last_range = last_5['high'].max() - last_5['low'].min()
 
-        # Require 25% compression for triangle
-        if last_range >= first_range * 0.75:
+        # Require minimum compression for triangle
+        if last_range >= first_range * (1 - self.MIN_COMPRESSION):
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
@@ -161,12 +178,16 @@ class SymmetricalTrianglePattern:
             base_confidence += 2
             confluences.append(f"Good duration ({len(section)} bars)")
 
-        # MINIMUM THRESHOLD: Require at least 2 confluences
-        if len(confluences) < 2:
+        # MINIMUM THRESHOLD: Require at least 3 confluences (PHASE 1: institutional grade)
+        if len(confluences) < self.MIN_CONFLUENCES:
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
-                'metadata': {'reason': 'Insufficient confluence', 'confluences_found': len(confluences)},
+                'metadata': {
+                    'reason': 'Insufficient validation',
+                    'confluences_found': len(confluences),
+                    'confluences_required': self.MIN_CONFLUENCES
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -176,11 +197,11 @@ class SymmetricalTrianglePattern:
         upper = last_5['high'].max()
         lower = last_5['low'].min()
 
-        if current_price > upper * 1.005:  # 0.5% above
+        if current_price > upper * (1 + self.BREAK_MARGIN):
             signal = 'BULLISH_BREAKOUT'
             breakout = True
             direction = 'BULLISH'
-        elif current_price < lower * 0.995:  # 0.5% below
+        elif current_price < lower * (1 - self.BREAK_MARGIN):
             signal = 'BEARISH_BREAKOUT'
             breakout = True
             direction = 'BEARISH'

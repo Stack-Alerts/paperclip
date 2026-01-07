@@ -43,11 +43,29 @@ class InverseHeadAndShouldersPattern:
     """
     
     def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 15,
-                 shoulder_tolerance: float = 0.05, neckline_tolerance: float = 0.02, **kwargs):
+                 shoulder_tolerance: float = 0.025, neckline_tolerance: float = 0.02, **kwargs):
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
-        self.shoulder_tolerance = shoulder_tolerance
+        self.shoulder_tolerance = shoulder_tolerance  # 2.5% max difference between shoulders (same as H&S)
         self.neckline_tolerance = neckline_tolerance
+        
+        # Pattern lifecycle tracking (PHASE 1 improvements)
+        self.active_pattern = None  # Track current pattern ID for event detection
+        self.pattern_start_idx = None  # When pattern started forming
+        self.breakout_start_idx = None  # When breakout began
+        
+        # Pattern duration requirements for 15min timeframe (same as H&S)
+        self.MIN_BARS_BETWEEN_TROUGHS = 18   # 4.5 hours minimum
+        self.MAX_BARS_BETWEEN_TROUGHS = 90   # 22.5 hours maximum
+        self.PATTERN_MAX_DURATION = 200      # Pattern expires after 200 bars
+        self.BREAKOUT_MAX_DURATION = 20      # Breakout confirmed for 20 bars
+        
+        # Validation requirements (STRICTER for better selectivity)
+        self.MIN_CONFLUENCES = 5  # Same as H&S for consistency
+        self.MIN_TROUGH_SPACING = 10  # 10 bars minimum
+        
+        # Breakout requirements (stricter)
+        self.BREAK_MARGIN = 0.005  # Must break 0.5% above neckline
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for oversold detection"""
@@ -74,30 +92,84 @@ class InverseHeadAndShouldersPattern:
                 return True
         return False
     
-    def find_peaks_troughs(self, df: pd.DataFrame, rsi: pd.Series, lookback: int = 5) -> Tuple[List, List]:
-        """Find swing highs (peaks) and swing lows (troughs) with RSI and volume"""
+    def find_peaks_troughs(self, df: pd.DataFrame, rsi: pd.Series, min_prominence: float = 0.008) -> Tuple[List, List]:
+        """
+        Find SIGNIFICANT swing lows/highs for inverse H&S - 3 of 4 requirements for troughs
+        
+        Trough Requirements (need 3 of 4):
+        1. Lowest in 5-hour window (20 bars @ 15min) - ALWAYS REQUIRED
+        2. At least 0.8% below recent average (prominence)
+        3. Volume spike (1.15x average - relaxed for H&S complexity)
+        4. Proper spacing from other troughs (6+ bars)
+        """
         peaks = []
         troughs = []
+        lookback = 20  # 5 hours @ 15min bars
+        MIN_TROUGH_SPACING = 6  # Minimum spacing
         
         for i in range(lookback, len(df) - lookback):
-            if df['high'].iloc[i] == df['high'].iloc[i-lookback:i+lookback+1].max():
-                peaks.append({'idx': i, 'price': df['high'].iloc[i], 'timestamp': df['timestamp'].iloc[i]})
+            high = df['high'].iloc[i]
+            low = df['low'].iloc[i]
             
-            if df['low'].iloc[i] == df['low'].iloc[i-lookback:i+lookback+1].min():
-                vol = df['volume'].iloc[max(0, i-2):i+3].mean()
-                rsi_val = rsi.iloc[i] if i < len(rsi) else 50
-                troughs.append({
+            # PEAK DETECTION (simpler - just need to be highest)
+            if high == df['high'].iloc[i-lookback:i+lookback+1].max():
+                peaks.append({
                     'idx': i,
-                    'price': df['low'].iloc[i],
-                    'timestamp': df['timestamp'].iloc[i],
-                    'volume': vol,
-                    'rsi': rsi_val
+                    'price': high,
+                    'timestamp': df['timestamp'].iloc[i]
                 })
+            
+            # TROUGH DETECTION with 3 of 4 requirements
+            if low == df['low'].iloc[i-lookback:i+lookback+1].min():
+                requirements_met = 1  # Already met REQ 1
+                
+                # REQ 2: 0.8% below recent average
+                recent_avg = df['low'].iloc[i-lookback:i].mean()
+                has_prominence = False
+                if recent_avg > 0 and low <= recent_avg * (1 - min_prominence):
+                    requirements_met += 1
+                    has_prominence = True
+                
+                # REQ 3: Volume spike (1.15x average)
+                vol = df['volume'].iloc[i]
+                avg_vol = df['volume'].iloc[max(0, i-lookback):i].mean()
+                if avg_vol > 0 and vol >= avg_vol * 1.15:
+                    requirements_met += 1
+                
+                # REQ 4: Proper spacing
+                spacing_ok = True
+                if len(troughs) > 0:
+                    last_trough_idx = troughs[-1]['idx']
+                    if i - last_trough_idx >= MIN_TROUGH_SPACING:
+                        requirements_met += 1
+                    else:
+                        spacing_ok = False
+                else:
+                    requirements_met += 1
+                
+                # Need at least 3 of 4 AND proper spacing
+                if requirements_met >= 3 and spacing_ok:
+                    rsi_val = rsi.iloc[i] if i < len(rsi) else 50
+                    troughs.append({
+                        'idx': i,
+                        'price': low,
+                        'timestamp': df['timestamp'].iloc[i],
+                        'volume': vol,
+                        'rsi': rsi_val,
+                        'prominence': ((recent_avg / low) - 1) * 100 if has_prominence else 0,
+                        'requirements_met': requirements_met
+                    })
         
         return peaks, troughs
     
+    def reset_pattern_state(self):
+        """Reset pattern tracking state - PHASE 1: NEW"""
+        self.pattern_start_idx = None
+        self.breakout_start_idx = None
+        self.active_pattern = None
+    
     def detect_pattern(self, df: pd.DataFrame, rsi: pd.Series) -> Optional[Dict]:
-        """Detect Inverse Head and Shoulders pattern with multi-block validation"""
+        """Detect Inverse Head and Shoulders pattern with PHASE 1 duration validation"""
         if len(df) < self.min_pattern_bars:
             return None
         
@@ -113,11 +185,23 @@ class InverseHeadAndShouldersPattern:
             head = recent_troughs[i + 1]
             right_shoulder = recent_troughs[i + 2]
             
+            # PHASE 1: Check pattern duration between troughs
+            bars_ls_head = head['idx'] - left_shoulder['idx']
+            bars_head_rs = right_shoulder['idx'] - head['idx']
+            
+            # Troughs too close together
+            if bars_ls_head < self.MIN_BARS_BETWEEN_TROUGHS or bars_head_rs < self.MIN_BARS_BETWEEN_TROUGHS:
+                continue
+            
+            # Troughs too far apart
+            if bars_ls_head > self.MAX_BARS_BETWEEN_TROUGHS or bars_head_rs > self.MAX_BARS_BETWEEN_TROUGHS:
+                continue
+            
             # Head must be lowest
             if head['price'] >= left_shoulder['price'] or head['price'] >= right_shoulder['price']:
                 continue
             
-            # Shoulders should be similar depth
+            # Shoulders should be similar depth (tightened to 2.5%)
             shoulder_diff = abs(left_shoulder['price'] - right_shoulder['price']) / left_shoulder['price']
             if shoulder_diff > self.shoulder_tolerance:
                 continue
@@ -252,12 +336,16 @@ class InverseHeadAndShouldersPattern:
             base_confidence += 5
             confluences.append(f"Clear head formation (-{head_discount*100:.1f}%)")
         
-        # MINIMUM THRESHOLD: Require at least 2 confluences
-        if len(confluences) < 2:
+        # MINIMUM THRESHOLD: Require at least 5 confluences (PHASE 1: same as H&S)
+        if len(confluences) < self.MIN_CONFLUENCES:
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
-                'metadata': {'reason': 'Insufficient confluence', 'confluences_found': len(confluences)},
+                'metadata': {
+                    'reason': 'Insufficient validation',
+                    'confluences_found': len(confluences),
+                    'confluences_required': self.MIN_CONFLUENCES
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []

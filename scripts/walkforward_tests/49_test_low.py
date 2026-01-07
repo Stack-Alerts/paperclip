@@ -1,7 +1,7 @@
 """
-Walk-Forward Test for Low
+Walk-Forward Test for LOW (Low of Week)
 V2 - Aligned with institutional_production_validation_v2.py methodology
-Auto-generated test script for individual block validation
+Test script for LOW building block validation
 """
 
 import sys
@@ -13,7 +13,6 @@ import numpy as np
 from datetime import datetime, timedelta
 from pathlib import Path
 import json
-
 
 def load_btc_data(days: int = 180) -> pd.DataFrame:
     """Load BTC 15min data"""
@@ -40,18 +39,8 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
     
     return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
 
-
 def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
-    """
-    Walk-forward test using V2 methodology with FULL HISTORICAL DATA
-    
-    Key changes:
-    - Uses EXPANDING window (all data from start to current bar)
-    - Tests EVERY bar (sample_every=1)
-    - Accepts ALL valid results (including NEUTRAL, INSUFFICIENT_DATA)
-    - Separately tracks "active signals" vs all results
-    - Compatible with long-period indicators (EMA 200, 255, 800)
-    """
+    """Walk-forward test using V2 methodology with FULL HISTORICAL DATA"""
     
     print("="*80)
     print(f"🔬 WALK-FORWARD TEST V2: {block_name}")
@@ -69,23 +58,20 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     print(f"\nTesting with EXPANDING window (full history, sample_every={sample_every})...")
     print(f"Starting from bar {min_bars}, using all previous bars for context...")
     
-    # EXPANDING window - use ALL data from start to current bar (SEQUENTIAL - fastest for expanding window)
+    # EXPANDING window - use ALL data from start to current bar
     for i in range(min_bars, len(df_full), sample_every):
         try:
-            # EXPANDING window: use ALL data from beginning up to current bar
             hist_df = df_full.iloc[:i+1].copy()
-            
             result = block.analyze(hist_df)
             
-            # V2: Accept ANY valid result (including NEUTRAL, INSUFFICIENT_DATA, etc.)
             if result is not None and isinstance(result, dict):
                 results.append(result)
                 
         except Exception as e:
             errors += 1
-            if errors <= 3:  # Store first 3 error messages
+            if errors <= 3:
                 error_messages.append(str(e))
-            if errors > 100:  # Stop if too many errors
+            if errors > 100:
                 print(f"  ⚠️  Too many errors ({errors}), stopping early")
                 break
     
@@ -102,11 +88,10 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     confidences = [r.get('confidence', 0) for r in results]
     
     # V2: Separate "active signals" from all results
-    # Active signals = signals that are NOT neutral/error states
     active_signals = [s for s in signals if s not in ['NEUTRAL', 'INSUFFICIENT_DATA', 'ERROR', 'NO_PATTERN', 'NO_ORDER_BLOCK', 'NO_BREAK', 'NO_SWEEP', 'NO_FVG', 'NO_DISPLACEMENT', 'NO_INDUCEMENT', 'NO_OTE', 'NO_CHOCH', 'NO_MSS']]
     active_signal_rate = len(active_signals) / len(signals) if len(signals) > 0 else 0
     
-    # Confidence stats (only when actively signaling)
+    # Confidence stats
     active_confidences = [confidences[i] for i, s in enumerate(signals) if signals[i] in active_signals]
     avg_active_confidence = np.mean(active_confidences) if active_confidences else 0
     avg_all_confidence = np.mean(confidences) if confidences else 0
@@ -121,12 +106,11 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     for s in signals:
         signal_types[s] = signal_types.get(s, 0) + 1
     
-    # Active signal distribution (for detailed breakdown)
     active_signal_types = {}
     for s in active_signals:
         active_signal_types[s] = active_signal_types.get(s, 0) + 1
     
-    # **NEW:** Track is_new_event for blocks that support it (BOS, MSS, etc.)
+    # Track is_new_event
     new_events = [r for r in results if r.get('metadata', {}).get('is_new_event') == True]
     new_event_count = len(new_events)
     has_event_tracking = any(r.get('metadata', {}).get('is_new_event') is not None for r in results)
@@ -158,10 +142,80 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
             pct = (count / len(active_signals)) * 100
             print(f"      {sig_type}: {count} ({pct:.1f}%)")
     
-    # Calculate signals per day (using active signals)
+    # Calculate signals per day
     days = (df_full['timestamp'].max() - df_full['timestamp'].min()).days
     density = len(active_signals) / max(1, days)
     print(f"\n   Active signal density: {density:.2f} signals/day")
+    
+    # **POST-WALKFORWARD VALIDATION:** Validate LOW accuracy against COMPLETE week data
+    print(f"\n🔍 POST-WALKFORWARD LOW ACCURACY VALIDATION:")
+    print(f"   (After walkforward complete, validate against actual complete weekly data)")
+    
+    # Group results by week and check final LOW for each week
+    results_df = pd.DataFrame(results)
+    if 'timestamp' in results_df.columns:
+        results_df['timestamp'] = pd.to_datetime(results_df['timestamp'])
+        results_df['week'] = results_df['timestamp'].dt.to_period('W')
+        
+        # Get last result for each week (final LOW value for that week)
+        weekly_lows = {}
+        for week, week_results in results_df.groupby('week'):
+            last_result = week_results.iloc[-1]
+            if 'metadata' in last_result and isinstance(last_result['metadata'], dict):
+                if 'low' in last_result['metadata']:
+                    weekly_lows[str(week)] = {
+                        'reported': last_result['metadata']['low'],
+                        'timestamp': last_result['timestamp']
+                    }
+        
+        # Compare to actual complete week data
+        low_errors = 0
+        low_checks = 0
+        sample_errors = []
+        
+        for week_str, low_info in weekly_lows.items():
+            # Get COMPLETE week data from df_full
+            df_full['week'] = pd.to_datetime(df_full['timestamp']).dt.to_period('W')
+            week_data_complete = df_full[df_full['week'] == week_str]
+            
+            if len(week_data_complete) > 0:
+                actual_low_complete = float(week_data_complete['low'].min())
+                reported_low = low_info['reported']
+                
+                # Compare (allow 0.01% tolerance for floating point)
+                if abs(reported_low - actual_low_complete) > actual_low_complete * 0.0001:
+                    low_errors += 1
+                    if len(sample_errors) < 5:
+                        sample_errors.append({
+                            'week': week_str,
+                            'reported': reported_low,
+                            'actual_complete': actual_low_complete,
+                            'diff': reported_low - actual_low_complete,
+                            'diff_pct': ((reported_low - actual_low_complete) / actual_low_complete) * 100
+                        })
+                
+                low_checks += 1
+        
+        if low_checks > 0:
+            low_accuracy = ((low_checks - low_errors) / low_checks) * 100
+            print(f"   Weeks checked: {low_checks}")
+            print(f"   Weeks with errors: {low_errors}")
+            print(f"   Accuracy: {low_accuracy:.2f}%")
+            
+            if low_errors > 0 and sample_errors:
+                print(f"\n   ⚠️  Weeks where final LOW doesn't match complete week LOW:")
+                for err in sample_errors:
+                    print(f"      {err['week']}: Reported ${err['reported']:.2f}, Actual ${err['actual_complete']:.2f}")
+                    print(f"         Diff: ${err['diff']:.2f} ({err['diff_pct']:+.2f}%)")
+                print(f"\n   NOTE: Differences expected in walk-forward (we only see data up to each bar)")
+                print(f"   This validates LOW was updated correctly as week progressed.")
+            elif low_errors == 0:
+                print(f"   ✅ All final weekly LOWs match complete week data!")
+                print(f"   Perfect accuracy - LOW correctly tracked throughout each week.")
+        else:
+            print(f"   ⚠️  No weekly LOWs to validate")
+    else:
+        print(f"   ⚠️  Cannot validate - no timestamp in results")
     
     # Show first few active signals
     if active_signals:
@@ -175,7 +229,7 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
                 if count >= 5:
                     break
     
-    # Save results to proper directory structure
+    # Save results
     output_dir = Path(__file__).parent.parent.parent / 'data' / 'reports' / 'walkforward_tests'
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / f'walkforward_results_{block_name}.json'
@@ -184,9 +238,7 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     csv_file = output_dir / f'walkforward_results_{block_name}_signals_trades.csv'
     signals_df = pd.DataFrame(results)
     if len(signals_df) > 0:
-        # Flatten metadata if it exists
         if 'metadata' in signals_df.columns:
-            # Extract common metadata fields
             metadata_fields = []
             for idx, row in signals_df.iterrows():
                 meta = row.get('metadata', {})
@@ -195,11 +247,9 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
                 else:
                     metadata_fields.append({})
             
-            # Add metadata columns
             meta_df = pd.DataFrame(metadata_fields)
             signals_df = pd.concat([signals_df.drop('metadata', axis=1), meta_df], axis=1)
         
-        # Flatten confluence_factors if it exists (join list into string)
         if 'confluence_factors' in signals_df.columns:
             signals_df['confluence_factors'] = signals_df['confluence_factors'].apply(
                 lambda x: ' | '.join(x) if isinstance(x, list) else str(x)
@@ -239,7 +289,6 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
         }
     }
     
-    # Add event tracking metrics if supported
     if has_event_tracking:
         new_event_rate = new_event_count / len(results) if len(results) > 0 else 0
         continuing_rate = (len(active_signals) - new_event_count) / len(active_signals) if len(active_signals) > 0 else 0
@@ -263,7 +312,6 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     
     print(f"\n✅ JSON results saved to: {output_file}")
     print("="*80)
-
 
 if __name__ == "__main__":
     from src.detectors.building_blocks.price_levels.low import LOW

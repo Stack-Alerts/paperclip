@@ -3,7 +3,7 @@
 **Block:** Asia Session 50 Percent (Selective - Price Level)  
 **Block Script:** `src/detectors/building_blocks/price_levels/asia_session_50_percent.py`  
 **Test Script:** `scripts/walkforward_tests/50_test_asia_session_50_percent.py`  
-**Documentation:** Not found (check archive docs)  
+**Documentation:** `docs/v3/building_blocks/price_levels/Asia_Session_50_Percent.md` 
 **Test Period:** 180 days (2025-06-19 to 2025-12-16)  
 **Analysis Date:** 2026-01-04  
 **Analyst:** Cline (EXPERT MODE)

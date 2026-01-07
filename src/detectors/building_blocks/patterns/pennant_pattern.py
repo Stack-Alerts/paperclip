@@ -42,6 +42,25 @@ class PennantPattern:
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
         
+        # Pattern lifecycle tracking (PHASE 1 improvements)
+        self.active_pattern = None
+        self.pattern_start_idx = None
+        self.breakout_start_idx = None
+        
+        # Pattern duration requirements for 15min timeframe
+        self.MIN_POLE_BARS = 5        # 1.25 hours minimum for pole
+        self.MIN_PENNANT_BARS = 8      # 2 hours minimum for pennant
+        self.MAX_PENNANT_DURATION = 48 # 12 hours maximum for pennant
+        self.BREAKOUT_MAX_DURATION = 20  # Breakout confirmed for 20 bars
+        
+        # Validation requirements (STRICTER for better selectivity)
+        self.MIN_CONFLUENCES = 3  # Keep at 3
+        self.MIN_POLE_STRENGTH = 0.010  # Minimum 1.0% move (relaxed)
+        self.MIN_CONVERGENCE = 0.15     # Minimum 15% convergence (relaxed)
+        
+        # Breakout requirements
+        self.BREAK_MARGIN = 0.005  # Must break 0.5% beyond channel
+        
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for momentum alignment"""
         delta = df['close'].diff()
@@ -103,8 +122,8 @@ class PennantPattern:
         pole_move_pct = (pole_end - pole_start) / pole_start
         pole_volume = pole_section['volume'].mean()
         
-        # Require 1% move for 15min timeframe
-        if abs(pole_move_pct) < 0.01:
+        # Require minimum pole strength
+        if abs(pole_move_pct) < self.MIN_POLE_STRENGTH:
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
@@ -124,8 +143,8 @@ class PennantPattern:
         first_range = first_5['high'].max() - first_5['low'].min()
         last_range = last_5['high'].max() - last_5['low'].min()
         
-        # Need 20% compression (converging)
-        is_converging = last_range < first_range * 0.8
+        # Need minimum convergence (converging)
+        is_converging = last_range < first_range * (1 - self.MIN_CONVERGENCE)
         
         if not is_converging:
             return {
@@ -203,12 +222,16 @@ class PennantPattern:
             base_confidence += 2
             confluences.append(f"Strong convergence ({compression_pct*100:.0f}%)")
         
-        # MINIMUM THRESHOLD: Require at least 2 confluences
-        if len(confluences) < 2:
+        # MINIMUM THRESHOLD: Require at least 3 confluences (PHASE 1: institutional grade)
+        if len(confluences) < self.MIN_CONFLUENCES:
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
-                'metadata': {'reason': 'Insufficient confluence', 'confluences_found': len(confluences)},
+                'metadata': {
+                    'reason': 'Insufficient validation',
+                    'confluences_found': len(confluences),
+                    'confluences_required': self.MIN_CONFLUENCES
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -219,10 +242,10 @@ class PennantPattern:
         lower = last_5['low'].min()
         
         if direction == 'BULLISH':
-            breakout = current_price > upper * 1.005
+            breakout = current_price > upper * (1 + self.BREAK_MARGIN)
             signal = 'BULLISH_BREAKOUT' if breakout else 'PATTERN_FORMING'
         else:
-            breakout = current_price < lower * 0.995
+            breakout = current_price < lower * (1 - self.BREAK_MARGIN)
             signal = 'BEARISH_BREAKOUT' if breakout else 'PATTERN_FORMING'
         
         # BREAKOUT gets additional confidence boost

@@ -72,6 +72,10 @@ class EMA800VectorBreak:
         self.slope_lookback = slope_lookback
         self.vector_candle_multiplier = vector_candle_multiplier
         
+        # Event tracking state
+        self.prev_signal = 'NEUTRAL'
+        self.bars_in_state = 0
+        
         # Bitcoin-specific distance thresholds (% from EMA)
         self.btc_distance_levels = {
             'very_close': 0.5,
@@ -223,6 +227,9 @@ class EMA800VectorBreak:
         # Build confluence
         confluence_factors = []
         
+        # EVENT TRACKING: Detect if this is a NEW event
+        is_new_event = False
+        
         # PVSRA/TBD VECTOR CROSS DETECTION
         if crossed_above and is_vector_candle:
             # Bullish vector break
@@ -231,6 +238,7 @@ class EMA800VectorBreak:
             if "CLIMAX" in vector_tier:
                 signal = 'BULLISH'
                 confidence = 95
+                is_new_event = True  # Fresh vector cross
                 confluence_factors.append(f'⚡ CLIMAX VECTOR: {vector_tier} (200%+ volume)')
                 
                 if slope in ['RISING', 'STRONG_RISING']:
@@ -244,6 +252,7 @@ class EMA800VectorBreak:
                 if slope in ['RISING', 'STRONG_RISING']:
                     signal = 'BULLISH'
                     confidence = 90
+                    is_new_event = True  # Fresh vector cross
                     confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (150%+ volume)')
                     confluence_factors.append('✅ 800 EMA slope confirming uptrend - CONFIRMED')
                     confluence_factors.append('📈 BULLISH: Confirmed pseudo vector crossed above 800 EMA')
@@ -255,6 +264,7 @@ class EMA800VectorBreak:
             if "CLIMAX" in vector_tier:
                 signal = 'BEARISH'
                 confidence = 95
+                is_new_event = True  # Fresh vector cross
                 confluence_factors.append(f'⚡ CLIMAX VECTOR: {vector_tier} (200%+ volume)')
                 
                 if slope in ['FALLING', 'STRONG_FALLING']:
@@ -268,9 +278,19 @@ class EMA800VectorBreak:
                 if slope in ['FALLING', 'STRONG_FALLING']:
                     signal = 'BEARISH'
                     confidence = 90
+                    is_new_event = True  # Fresh vector cross
                     confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (150%+ volume)')
                     confluence_factors.append('✅ 800 EMA slope confirming downtrend - CONFIRMED')
                     confluence_factors.append('📉 BEARISH: Confirmed pseudo vector crossed below 800 EMA')
+        
+        # Update event tracking state
+        if signal != self.prev_signal:
+            is_new_event = True
+            self.bars_in_state = 1
+        else:
+            self.bars_in_state += 1
+        
+        self.prev_signal = signal
         
         # Status information  
         if signal == 'NEUTRAL':
@@ -303,7 +323,9 @@ class EMA800VectorBreak:
             'distance_class': distance_class,
             'is_vector_candle': is_vector_candle,
             'vector_tier': vector_tier,
-            'period': self.period
+            'period': self.period,
+            'is_new_event': is_new_event,
+            'bars_in_state': self.bars_in_state
         }
         
         return {
