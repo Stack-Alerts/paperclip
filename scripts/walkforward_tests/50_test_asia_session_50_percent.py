@@ -131,6 +131,12 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     new_event_count = len(new_events)
     has_event_tracking = any(r.get('metadata', {}).get('is_new_event') is not None for r in results)
     
+    # **ASIA 50%:** Track confirmed bounce/rejection events
+    confirmed_bounces = [r for r in results if r.get('metadata', {}).get('confirmed_bounce') == True]
+    confirmed_rejections = [r for r in results if r.get('metadata', {}).get('confirmed_rejection') == True]
+    breaches = [r for r in results if r.get('metadata', {}).get('breached_50') == True]
+    has_confirmation_tracking = any(r.get('metadata', {}).get('confirmed_bounce') is not None for r in results)
+    
     # Summary
     print(f"\n📊 RESULTS (V2 Methodology):")
     print(f"   Total bars sampled: {len(df_full) // sample_every}")
@@ -138,10 +144,27 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     print(f"   Active signals: {len(active_signals)} ({active_signal_rate:.2%} of results)")
     print(f"   Errors: {errors} ({error_rate:.1%} error rate)")
     
+    # Calculate signals per day (using active signals) - MOVED UP BEFORE USAGE
+    days = (df_full['timestamp'].max() - df_full['timestamp'].min()).days
+    density = len(active_signals) / max(1, days)
+    
     if has_event_tracking:
         new_event_rate = new_event_count / len(results) if len(results) > 0 else 0
         print(f"\n   ⭐ NEW EVENTS: {new_event_count} ({new_event_rate:.2%} of results)")
         print(f"   Continuing state: {len(active_signals) - new_event_count} ({(len(active_signals) - new_event_count) / len(active_signals):.2%} of active)")
+    
+    if has_confirmation_tracking:
+        bounce_rate = len(confirmed_bounces) / len(results) if len(results) > 0 else 0
+        rejection_rate = len(confirmed_rejections) / len(results) if len(results) > 0 else 0
+        breach_rate = len(breaches) / len(results) if len(results) > 0 else 0
+        bounces_per_day = len(confirmed_bounces) / max(1, days)
+        rejections_per_day = len(confirmed_rejections) / max(1, days)
+        breaches_per_day = len(breaches) / max(1, days)
+        
+        print(f"\n   🎯 CONFIRMATION TRACKING:")
+        print(f"      Confirmed Bounces: {len(confirmed_bounces)} ({bounce_rate:.2%}) - {bounces_per_day:.2f}/day")
+        print(f"      Confirmed Rejections: {len(confirmed_rejections)} ({rejection_rate:.2%}) - {rejections_per_day:.2f}/day")
+        print(f"      Total Breaches: {len(breaches)} ({breach_rate:.2%}) - {breaches_per_day:.2f}/day")
     
     print(f"\n   Average confidence (when active): {avg_active_confidence:.1f}%")
     print(f"   Average confidence (all results): {avg_all_confidence:.1f}%")
@@ -258,10 +281,158 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
             'has_event_tracking': False
         }
     
+    # Add confirmation tracking metrics for Asia 50%
+    if has_confirmation_tracking:
+        bounce_rate = len(confirmed_bounces) / len(results) if len(results) > 0 else 0
+        rejection_rate = len(confirmed_rejections) / len(results) if len(results) > 0 else 0
+        breach_rate = len(breaches) / len(results) if len(results) > 0 else 0
+        bounces_per_day = len(confirmed_bounces) / max(1, days)
+        rejections_per_day = len(confirmed_rejections) / max(1, days)
+        breaches_per_day = len(breaches) / max(1, days)
+        
+        report['confirmation_tracking'] = {
+            'has_confirmation_tracking': True,
+            'confirmed_bounces': len(confirmed_bounces),
+            'confirmed_rejections': len(confirmed_rejections),
+            'total_breaches': len(breaches),
+            'bounce_rate': float(bounce_rate),
+            'rejection_rate': float(rejection_rate),
+            'breach_rate': float(breach_rate),
+            'bounces_per_day': float(bounces_per_day),
+            'rejections_per_day': float(rejections_per_day),
+            'breaches_per_day': float(breaches_per_day)
+        }
+    else:
+        report['confirmation_tracking'] = {
+            'has_confirmation_tracking': False
+        }
+    
     with open(output_file, 'w') as f:
         json.dump(report, f, indent=2)
     
     print(f"\n✅ JSON results saved to: {output_file}")
+    
+    # BACKTEST VALIDATION: Check accuracy of bounces/rejections
+    if has_confirmation_tracking and (len(confirmed_bounces) > 0 or len(confirmed_rejections) > 0):
+        print("\n" + "="*80)
+        print("🔬 BACKTEST VALIDATION: Measuring Bounce/Rejection Accuracy")
+        print("="*80)
+        
+        # Get timestamps of confirmed events
+        bounce_timestamps = [r['timestamp'] for r in confirmed_bounces]
+        rejection_timestamps = [r['timestamp'] for r in confirmed_rejections]
+        
+        # Measure accuracy (price movement after signal)
+        lookforward_bars = 5  # Check 5 bars (75min) after signal
+        
+        bounce_accuracy = []
+        rejection_accuracy = []
+        
+        # Check bounces (should go UP after)
+        for ts in bounce_timestamps:
+            idx = df_full[df_full['timestamp'] == ts].index
+            if len(idx) > 0:
+                idx = idx[0]
+                if idx + lookforward_bars < len(df_full):
+                    entry_price = df_full.iloc[idx]['close']
+                    future_high = df_full.iloc[idx+1:idx+1+lookforward_bars]['high'].max()
+                    future_low = df_full.iloc[idx+1:idx+1+lookforward_bars]['low'].min()
+                    
+                    # Success if went up more than down
+                    upside = ((future_high - entry_price) / entry_price) * 100
+                    downside = ((entry_price - future_low) / entry_price) * 100
+                    
+                    bounce_accuracy.append({
+                        'success': upside > downside,
+                        'upside': upside,
+                        'downside': downside,
+                        'net': upside - downside
+                    })
+        
+        # Check rejections (should go DOWN after)
+        for ts in rejection_timestamps:
+            idx = df_full[df_full['timestamp'] == ts].index
+            if len(idx) > 0:
+                idx = idx[0]
+                if idx + lookforward_bars < len(df_full):
+                    entry_price = df_full.iloc[idx]['close']
+                    future_high = df_full.iloc[idx+1:idx+1+lookforward_bars]['high'].max()
+                    future_low = df_full.iloc[idx+1:idx+1+lookforward_bars]['low'].min()
+                    
+                    # Success if went down more than up
+                    upside = ((future_high - entry_price) / entry_price) * 100
+                    downside = ((entry_price - future_low) / entry_price) * 100
+                    
+                    rejection_accuracy.append({
+                        'success': downside > upside,
+                        'upside': upside,
+                        'downside': downside,
+                        'net': downside - upside
+                    })
+        
+        # Calculate statistics
+        if bounce_accuracy:
+            bounce_win_rate = sum(1 for b in bounce_accuracy if b['success']) / len(bounce_accuracy)
+            avg_bounce_net = sum(b['net'] for b in bounce_accuracy) / len(bounce_accuracy)
+            avg_bounce_upside = sum(b['upside'] for b in bounce_accuracy) / len(bounce_accuracy)
+            avg_bounce_downside = sum(b['downside'] for b in bounce_accuracy) / len(bounce_accuracy)
+            
+            print(f"\n📈 CONFIRMED BOUNCE ACCURACY (n={len(bounce_accuracy)}):")
+            print(f"   Win Rate: {bounce_win_rate:.1%} (went up more than down)")
+            print(f"   Avg Upside: {avg_bounce_upside:.2f}%")
+            print(f"   Avg Downside: {avg_bounce_downside:.2f}%")
+            print(f"   Avg Net Movement: {avg_bounce_net:+.2f}% (upside - downside)")
+            
+            report['bounce_validation'] = {
+                'tested': len(bounce_accuracy),
+                'win_rate': float(bounce_win_rate),
+                'avg_upside': float(avg_bounce_upside),
+                'avg_downside': float(avg_bounce_downside),
+                'avg_net_movement': float(avg_bounce_net),
+                'lookforward_bars': lookforward_bars
+            }
+        
+        if rejection_accuracy:
+            rejection_win_rate = sum(1 for r in rejection_accuracy if r['success']) / len(rejection_accuracy)
+            avg_rejection_net = sum(r['net'] for r in rejection_accuracy) / len(rejection_accuracy)
+            avg_rejection_upside = sum(r['upside'] for r in rejection_accuracy) / len(rejection_accuracy)
+            avg_rejection_downside = sum(r['downside'] for r in rejection_accuracy) / len(rejection_accuracy)
+            
+            print(f"\n📉 CONFIRMED REJECTION ACCURACY (n={len(rejection_accuracy)}):")
+            print(f"   Win Rate: {rejection_win_rate:.1%} (went down more than up)")
+            print(f"   Avg Downside: {avg_rejection_downside:.2f}%")
+            print(f"   Avg Upside: {avg_rejection_upside:.2f}%")
+            print(f"   Avg Net Movement: {avg_rejection_net:+.2f}% (downside - upside)")
+            
+            report['rejection_validation'] = {
+                'tested': len(rejection_accuracy),
+                'win_rate': float(rejection_win_rate),
+                'avg_upside': float(avg_rejection_upside),
+                'avg_downside': float(avg_rejection_downside),
+                'avg_net_movement': float(avg_rejection_net),
+                'lookforward_bars': lookforward_bars
+            }
+        
+        # Overall validation
+        if bounce_accuracy and rejection_accuracy:
+            combined_win_rate = (sum(1 for b in bounce_accuracy if b['success']) + 
+                                 sum(1 for r in rejection_accuracy if r['success'])) / (len(bounce_accuracy) + len(rejection_accuracy))
+            
+            print(f"\n🎯 COMBINED VALIDATION:")
+            print(f"   Overall Accuracy: {combined_win_rate:.1%}")
+            print(f"   Lookforward Period: {lookforward_bars} bars (75 minutes)")
+            
+            report['combined_validation'] = {
+                'overall_accuracy': float(combined_win_rate),
+                'total_tested': len(bounce_accuracy) + len(rejection_accuracy),
+                'bounce_tested': len(bounce_accuracy),
+                'rejection_tested': len(rejection_accuracy)
+            }
+        
+        # Re-save report with validation data
+        with open(output_file, 'w') as f:
+            json.dump(report, f, indent=2)
+    
     print("="*80)
 
 

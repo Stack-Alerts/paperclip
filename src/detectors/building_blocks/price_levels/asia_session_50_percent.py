@@ -4,15 +4,15 @@ Category: Price Levels
 Purpose: Mid-point of Asia session range for support/resistance
 """
 """
-Building Block Classification: CONTEXT BLOCK
-Mode: CONTINUOUS
-Purpose: Continuous Asia session midpoint reference
+Building Block Classification: HYBRID BLOCK
+Mode: CONTINUOUS TRACKING + EVENT-DRIVEN SIGNALS
+Purpose: Track Asia 50% level + signal on breaches during London/US
 
 Block Type Definitions:
 - SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
 - CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
 - EVENT BLOCK: Specific market event detection (selective, fires when events occur)
-- HYBRID BLOCK: Combination of continuous state + selective events
+- HYBRID BLOCK: Combination of continuous state + selective events (THIS BLOCK)
 """
 
 
@@ -48,16 +48,23 @@ class AsiaSession50Percent:
         self.asia_start = asia_start_utc
         self.asia_end = asia_end_utc
         
-        # ENHANCEMENT: Track previous state
+        # INSTITUTIONAL: Track previous state for breach detection
         self.prev_signal = None
         self.prev_asia_50 = None
+        self.prev_price_above = None  # Track if price was above/below
         
+        # INSTITUTIONAL: Track bounce/rejection confirmation
+        self.confirmation_candles = 3  # Default: 3 candles for confirmation
+        self.bounce_test_bars = []  # Track bars testing support
+        self.rejection_test_bars = []  # Track bars testing resistance
+        
+        # INSTITUTIONAL: Distance thresholds (BTC-optimized)
         self.btc_distance_thresholds = {
-            'at_50': 0.1,
-            'very_close': 0.5,
-            'close': 1.0,
-            'moderate': 2.0,
-            'far': 2.0
+            'at_50': 0.2,      # ~90-180 points
+            'very_close': 1.0,  # ~450 points
+            'close': 2.5,       # ~1,125 points
+            'moderate': 5.0,    # ~2,250 points
+            'far': 5.0
         }
     
     def calculate_asia_50(self, df: pd.DataFrame) -> float:
@@ -154,82 +161,225 @@ class AsiaSession50Percent:
         distance_pct = self.calculate_distance(current_price, asia_50)
         distance_class = self.classify_distance(distance_pct)
         
-        confidence = 65
-        if distance_class in ['AT_ASIA_50', 'VERY_CLOSE']:
-            confidence += 25  # Strong mean reversion setup
-        confidence = min(100, confidence)
+        # INSTITUTIONAL: Determine current session
+        current_hour = df['timestamp'].iloc[-1].hour
+        in_asia_session = self.asia_start <= current_hour < self.asia_end
+        in_london_us_session = current_hour >= self.asia_end  # After Asia close
         
-        # ENHANCEMENT: Detect crosses and events
+        # INSTITUTIONAL: Detect breaches (ONLY during London/US sessions!)
+        # During Asia session, 50% is still forming - no breach signals
         is_new_event = False
-        crossed_50 = False
+        crossed_50_up = False
+        crossed_50_down = False
+        breached_50 = False
+        confirmed_bounce = False
+        confirmed_rejection = False
         
-        if self.prev_signal is not None:
-            # Detect signal changes
-            if self.prev_signal == 'BEARISH' and distance_pct > 0:
-                crossed_50 = True
-                is_new_event = True
-            elif self.prev_signal == 'BULLISH' and distance_pct < 0:
-                crossed_50 = True
-                is_new_event = True
-            elif self.prev_signal != None and self.prev_signal == 'NEUTRAL':
-                is_new_event = True  # Entering active zone
+        # Track if price is currently above or below 50%
+        price_above = distance_pct > 0
         
-        # FIXED: Signal based on position relative to Asia 50%
-        if distance_class in ['AT_ASIA_50', 'VERY_CLOSE']:
-            # At equilibrium - determine bias from price position
-            if distance_pct > 0:
-                signal = 'BULLISH'  # Above 50%, potential support bounce
+        # INSTITUTIONAL: Track bounce/rejection confirmation with RETESTS
+        # Bounce: Price can breach BELOW 50% but closes ABOVE (support holds)
+        # Rejection: Price can breach ABOVE 50% but closes BELOW (resistance holds)
+        if in_london_us_session:
+            current_bar = {
+                'close': current_price,
+                'low': float(df['low'].iloc[-1]),
+                'high': float(df['high'].iloc[-1]),
+                'distance': distance_pct,
+                'above_50': price_above,
+                'breached_below': float(df['low'].iloc[-1]) < asia_50,  # Wick went below
+                'breached_above': float(df['high'].iloc[-1]) > asia_50,  # Wick went above
+                'closed_above': current_price > asia_50,
+                'closed_below': current_price < asia_50
+            }
+            
+            # BOUNCE TEST: Price wicks BELOW 50% but closes ABOVE (building support)
+            # This shows price testing support and holding
+            if current_bar['breached_below'] and current_bar['closed_above']:
+                self.bounce_test_bars.append(current_bar)
+                # Keep only recent bars (confirmation window)
+                if len(self.bounce_test_bars) > self.confirmation_candles + 2:
+                    self.bounce_test_bars.pop(0)
+                
+                # Check for confirmed bounce (X consecutive tests of support)
+                if len(self.bounce_test_bars) >= self.confirmation_candles:
+                    # Last X candles: all breached below but closed above
+                    recent_bars = self.bounce_test_bars[-self.confirmation_candles:]
+                    all_tested_and_held = all(
+                        bar['breached_below'] and bar['closed_above'] 
+                        for bar in recent_bars
+                    )
+                    
+                    # Confirmed if: support tested X times and held each time
+                    if all_tested_and_held:
+                        confirmed_bounce = True
+                        is_new_event = True
+                        self.bounce_test_bars = []  # Reset after confirmation
+            elif distance_class not in ['AT_ASIA_50', 'VERY_CLOSE']:
+                # Price moved far away, reset bounce tracking
+                if len(self.bounce_test_bars) > 0:
+                    self.bounce_test_bars = []
+            
+            # REJECTION TEST: Price wicks ABOVE 50% but closes BELOW (resistance holds)
+            # This shows price testing resistance and getting rejected
+            if current_bar['breached_above'] and current_bar['closed_below']:
+                self.rejection_test_bars.append(current_bar)
+                # Keep only recent bars
+                if len(self.rejection_test_bars) > self.confirmation_candles + 2:
+                    self.rejection_test_bars.pop(0)
+                
+                # Check for confirmed rejection (X consecutive tests of resistance)
+                if len(self.rejection_test_bars) >= self.confirmation_candles:
+                    recent_bars = self.rejection_test_bars[-self.confirmation_candles:]
+                    all_tested_and_rejected = all(
+                        bar['breached_above'] and bar['closed_below']
+                        for bar in recent_bars
+                    )
+                    
+                    # Confirmed if: resistance tested X times and rejected each time
+                    if all_tested_and_rejected:
+                        confirmed_rejection = True
+                        is_new_event = True
+                        self.rejection_test_bars = []  # Reset after confirmation
+            elif distance_class not in ['AT_ASIA_50', 'VERY_CLOSE']:
+                # Price moved far away, reset rejection tracking
+                if len(self.rejection_test_bars) > 0:
+                    self.rejection_test_bars = []
+        
+        if in_london_us_session and self.prev_price_above is not None:
+            # Only detect breaches AFTER Asia session closes
+            # Asia 50% is now FIXED for the day
+            if self.prev_price_above == False and price_above == True:
+                # Crossed UP through 50%
+                crossed_50_up = True
+                breached_50 = True
+                is_new_event = True
+            elif self.prev_price_above == True and price_above == False:
+                # Crossed DOWN through 50%
+                crossed_50_down = True
+                breached_50 = True
+                is_new_event = True
+        
+        # INSTITUTIONAL: Signal logic (EVENT-DRIVEN - highly selective)
+        # NO SIGNALS during Asia session (50% still forming)
+        # ONLY signal during London/US sessions (50% is FIXED)
+        if in_asia_session:
+            # During Asia session - 50% is still forming
+            # No signals, just NEUTRAL tracking
+            signal = 'NEUTRAL'
+            
+        elif in_london_us_session:
+            # After Asia close - 50% is FIXED for the day
+            # Now we can signal on breaches, confirmations, and proximity
+            
+            if confirmed_bounce:
+                # CONFIRMED BOUNCE - price bounced off 50% support (BULLISH)
+                signal = 'BULLISH'
+                is_new_event = True
+                
+            elif confirmed_rejection:
+                # CONFIRMED REJECTION - price rejected from 50% resistance (BEARISH)
+                signal = 'BEARISH'
+                is_new_event = True
+                
+            elif breached_50:
+                # BREACH EVENT - crossing through 50%
+                if crossed_50_up:
+                    signal = 'BULLISH'  # Crossed up - bullish momentum
+                else:
+                    signal = 'BEARISH'  # Crossed down - bearish momentum
+                    
+            elif distance_class == 'AT_ASIA_50':
+                # AT equilibrium - signal based on position
+                if self.prev_signal == 'NEUTRAL':
+                    # Just entered AT zone
+                    is_new_event = True
+                    if distance_pct > 0:
+                        signal = 'BULLISH'  # Testing support
+                    else:
+                        signal = 'BEARISH'  # Testing resistance
+                else:
+                    # Continue previous signal (not new event)
+                    signal = self.prev_signal if self.prev_signal else 'NEUTRAL'
             else:
-                signal = 'BEARISH'  # Below 50%, potential resistance rejection
-        elif distance_class in ['CLOSE', 'MODERATE']:
-            # Approaching equilibrium
-            if distance_pct > 0:
-                signal = 'BULLISH'  # Moving toward 50% from above
-            else:
-                signal = 'BEARISH'  # Moving toward 50% from below
+                # NEUTRAL - away from 50%
+                signal = 'NEUTRAL'
+                # Detect if exiting active zone
+                if self.prev_signal is not None and self.prev_signal != 'NEUTRAL':
+                    is_new_event = True  # Exiting zone
         else:
-            signal = 'NEUTRAL'  # Too far from 50%
+            # Edge case: before Asia session starts
+            signal = 'NEUTRAL'
         
-        # ENHANCEMENT: Variable confidence
+        # INSTITUTIONAL: Optimized Variable Confidence (target: 75-85% avg)
         if distance_class == 'AT_ASIA_50':
-            confidence = 90  # Very high - at exact equilibrium
+            base = 80  # At exact equilibrium (reduced from 90)
         elif distance_class == 'VERY_CLOSE':
-            confidence = 85  # High - very close to 50%
+            base = 75  # Very close (reduced from 85)
         elif distance_class == 'CLOSE':
-            confidence = 80  # Good - approaching 50%
+            base = 65  # Approaching (reduced from 80)
         elif distance_class == 'MODERATE':
-            confidence = 75  # Moderate
+            base = 55  # Moderate (reduced from 75)
         else:
-            confidence = 65  # Low - far from 50%
+            base = 50  # Far/NEUTRAL (reduced from 65)
         
-        # Event boost
-        if crossed_50:
-            confidence = min(100, confidence + 10)  # Fresh cross = higher confidence
+        # Event modifiers (±15%)
+        if confirmed_bounce or confirmed_rejection:
+            # CONFIRMED EVENT - highest priority (3 candles confirmation)
+            base = min(95, base + 20)
+        elif breached_50:
+            # Major event - price crossed 50% level
+            base = min(95, base + 15)
         elif is_new_event:
-            confidence = min(100, confidence + 5)
+            # State change event
+            base = min(95, base + 10)
+        
+        confidence = base
         
         # Build confluence
         confluence_factors = []
         
-        # Event-specific confluence
-        if crossed_50:
-            confluence_factors.append('⭐ CROSSED ASIA 50% - Major equilibrium event!')
+        # Event-specific confluence (INSTITUTIONAL)
+        if confirmed_bounce:
+            confluence_factors.append('⭐⭐ CONFIRMED BOUNCE OFF ASIA 50% - Strong bullish setup!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} retests: wicked below, closed above (support holding!)')
+        elif confirmed_rejection:
+            confluence_factors.append('⭐⭐ CONFIRMED REJECTION FROM ASIA 50% - Strong bearish setup!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} retests: wicked above, closed below (resistance holding!)')
+        elif crossed_50_up:
+            confluence_factors.append('⭐ BREACHED ASIA 50% UPWARD - Bullish momentum!')
+        elif crossed_50_down:
+            confluence_factors.append('⭐ BREACHED ASIA 50% DOWNWARD - Bearish momentum!')
         elif is_new_event:
             if signal != 'NEUTRAL' and self.prev_signal == 'NEUTRAL':
-                confluence_factors.append('⭐ ENTERING ASIA 50% ZONE - New opportunity')
+                confluence_factors.append('⭐ ENTERING ASIA 50% ZONE - New setup')
+            elif signal == 'NEUTRAL' and self.prev_signal != 'NEUTRAL':
+                confluence_factors.append('Exiting Asia 50% zone')
         
         if distance_class in ['AT_ASIA_50', 'VERY_CLOSE']:
-            confluence_factors.append('Price at/near Asia 50% - equilibrium level')
-            confluence_factors.append('Mean reversion opportunity')
-        elif distance_class in ['CLOSE', 'MODERATE']:
-            confluence_factors.append('Price approaching Asia 50% - watch for reaction')
+            if signal == 'BULLISH':
+                confluence_factors.append('Price testing Asia 50% support - bounce setup')
+            elif signal == 'BEARISH':
+                confluence_factors.append('Price testing Asia 50% resistance - rejection setup')
         
         confluence_factors.append(f'Asia 50%: ${asia_50:.2f}')
         confluence_factors.append(f'Distance: {distance_pct:+.2f}% ({distance_class})')
         
-        # Update tracking
+        # Update tracking (INSTITUTIONAL - includes price_above)
         self.prev_signal = signal
         self.prev_asia_50 = asia_50
+        self.prev_price_above = price_above
+        
+        # Determine session name
+        if in_asia_session:
+            current_session = 'ASIA'
+        elif 8 <= current_hour < 16:
+            current_session = 'LONDON'
+        elif current_hour >= 13:  # US opens at 13:00 UTC
+            current_session = 'US' if current_hour >= 16 else 'LONDON_US_OVERLAP'
+        else:
+            current_session = 'AFTER_HOURS'
         
         metadata = {
             'asia_50': round(asia_50, 2),
@@ -238,8 +388,16 @@ class AsiaSession50Percent:
             'distance_class': distance_class,
             'is_at_equilibrium': distance_class in ['AT_ASIA_50', 'VERY_CLOSE'],
             'asia_session_hours': f'{self.asia_start}:00-{self.asia_end}:00 UTC',
-            'is_new_event': is_new_event,  # ENHANCEMENT
-            'crossed_50': crossed_50  # ENHANCEMENT
+            'current_session': current_session,
+            'asia_50_fixed': in_london_us_session,
+            'is_new_event': is_new_event,
+            'breached_50': breached_50,
+            'crossed_50_up': crossed_50_up,
+            'crossed_50_down': crossed_50_down,
+            'confirmed_bounce': confirmed_bounce,
+            'confirmed_rejection': confirmed_rejection,
+            'confirmation_candles': self.confirmation_candles,
+            'price_above_50': price_above
         }
         
         return {
