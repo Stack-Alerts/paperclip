@@ -57,6 +57,11 @@ class LOD:
         self.prev_lod = None
         self.prev_signal = None
         
+        # RETEST CONFIRMATION: Track retests of LOD level
+        self.confirmation_candles = 3  # Require 3 consecutive bars
+        self.bounce_test_bars = []  # Track bars testing support
+        self.breakdown_bars = []  # Track bars breaking below
+        
         # Bitcoin-specific distance thresholds (% from LOD)
         self.btc_distance_thresholds = {
             'at_lod': 0.2,          # < 0.2% - at LOD
@@ -226,8 +231,77 @@ class LOD:
         distance_pct = self.calculate_distance(current_price, lod)
         distance_class = self.classify_distance(distance_pct)
         
-        # Determine signal (OPTIMIZED - More selective BULLISH)
-        if breakdown_status == 'BREAKDOWN_CONFIRMED' or is_new_lod:
+        # RETEST CONFIRMATION: Track LOD retests
+        confirmed_bounce = False
+        confirmed_breakdown = False
+        
+        current_bar = {
+            'close': current_price,
+            'low': float(df['low'].iloc[-1]),
+            'high': float(df['high'].iloc[-1]),
+            'distance': distance_pct,
+            'breached_below': float(df['low'].iloc[-1]) < lod,  # Wick went below
+            'breached_above': float(df['high'].iloc[-1]) > lod,  # Wick went above
+            'closed_above': current_price > lod,
+            'closed_below': current_price < lod
+        }
+        
+        # BOUNCE TEST: Price wicks BELOW LOD but closes ABOVE (support holding)
+        if current_bar['breached_below'] and current_bar['closed_above']:
+            self.bounce_test_bars.append(current_bar)
+            # Keep only recent bars
+            if len(self.bounce_test_bars) > self.confirmation_candles + 2:
+                self.bounce_test_bars.pop(0)
+            
+            # Check for confirmed bounce (X consecutive tests of support)
+            if len(self.bounce_test_bars) >= self.confirmation_candles:
+                recent_bars = self.bounce_test_bars[-self.confirmation_candles:]
+                all_tested_and_held = all(
+                    bar['breached_below'] and bar['closed_above']
+                    for bar in recent_bars
+                )
+                
+                # Confirmed if: support tested X times and held each time
+                if all_tested_and_held:
+                    confirmed_bounce = True
+                    self.bounce_test_bars = []  # Reset after confirmation
+        elif distance_class not in ['AT_LOD', 'VERY_CLOSE']:
+            # Price moved far away, reset bounce tracking
+            if len(self.bounce_test_bars) > 0:
+                self.bounce_test_bars = []
+        
+        # BREAKDOWN TEST: Price closes BELOW LOD (support broken)
+        if current_bar['closed_below']:
+            self.breakdown_bars.append(current_bar)
+            # Keep only recent bars
+            if len(self.breakdown_bars) > self.confirmation_candles + 2:
+                self.breakdown_bars.pop(0)
+            
+            # Check for confirmed breakdown (X consecutive closes below)
+            if len(self.breakdown_bars) >= self.confirmation_candles:
+                recent_bars = self.breakdown_bars[-self.confirmation_candles:]
+                all_closed_below = all(
+                    bar['closed_below']
+                    for bar in recent_bars
+                )
+                
+                # Confirmed if: X consecutive bars closed below LOD
+                if all_closed_below:
+                    confirmed_breakdown = True
+                    self.breakdown_bars = []  # Reset after confirmation
+        elif current_bar['closed_above']:
+            # Price back above LOD, reset breakdown tracking
+            if len(self.breakdown_bars) > 0:
+                self.breakdown_bars = []
+        
+        # Determine signal (ENHANCED with retest confirmation)
+        if confirmed_bounce:
+            # CONFIRMED BOUNCE - support holding (BULLISH)
+            signal = 'BULLISH'
+        elif confirmed_breakdown:
+            # CONFIRMED BREAKDOWN - support broken (BEARISH)
+            signal = 'BEARISH'
+        elif breakdown_status == 'BREAKDOWN_CONFIRMED' or is_new_lod:
             signal = 'BEARISH'
         elif breakdown_status == 'BREAKING_DOWN':
             signal = 'NEUTRAL'
@@ -244,15 +318,29 @@ class LOD:
             is_new_event = True
         elif is_new_lod:
             is_new_event = True  # New LOD = event
+        elif confirmed_bounce or confirmed_breakdown:
+            is_new_event = True  # Retest confirmation = event
         
-        # ENHANCEMENT 3: Variable confidence
+        # ENHANCEMENT 3: Variable confidence (BOOSTED for retest confirmation)
         confidence = self.calculate_variable_confidence(signal, distance_class, is_new_event)
+        
+        # Boost confidence for confirmed retests (highest priority)
+        if confirmed_bounce or confirmed_breakdown:
+            confidence = min(95, confidence + 20)  # Strong boost for 3-bar confirmation
         
         # Build confluence
         confluence_factors = []
         
+        # Retest confirmation confluence (HIGHEST PRIORITY)
+        if confirmed_bounce:
+            confluence_factors.append('⭐⭐ CONFIRMED BOUNCE FROM LOD - Strong bullish setup!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} retests: wicked below, closed above (support holding!)')
+        elif confirmed_breakdown:
+            confluence_factors.append('⭐⭐ CONFIRMED BREAKDOWN BELOW LOD - Strong bearish setup!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} bars: closed below LOD (support broken!)')
+        
         # Event-specific confluence
-        if is_new_event:
+        elif is_new_event:
             if is_new_lod:
                 confluence_factors.append('⭐ NEW LOD: Fresh low created - bearish breakdown!')
             elif signal == 'BEARISH' and self.prev_signal != 'BEARISH':
@@ -277,7 +365,7 @@ class LOD:
         self.prev_lod = lod
         self.prev_signal = signal
         
-        # Metadata
+        # Metadata (ENHANCED with retest confirmation)
         metadata = {
             'lod': round(lod, 2),
             'current_price': round(current_price, 2),
@@ -288,7 +376,10 @@ class LOD:
             'is_breakdown': is_breakdown,
             'is_at_support': distance_class in ['AT_LOD', 'VERY_CLOSE'] and distance_pct > 0,
             'is_breaking_down': breakdown_status in ['BREAKING_DOWN', 'BREAKDOWN_CONFIRMED'],
-            'is_new_event': is_new_event  # ENHANCEMENT 2: Event tracking
+            'is_new_event': is_new_event,
+            'confirmed_bounce': confirmed_bounce,  # NEW: 3-bar support holding
+            'confirmed_breakdown': confirmed_breakdown,  # NEW: 3-bar support broken
+            'confirmation_candles': self.confirmation_candles
         }
         
         return {

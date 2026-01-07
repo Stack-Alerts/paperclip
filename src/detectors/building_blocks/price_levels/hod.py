@@ -57,6 +57,11 @@ class HOD:
         self.prev_hod = None
         self.prev_signal = None
         
+        # RETEST CONFIRMATION: Track retests of HOD level
+        self.confirmation_candles = 3  # Require 3 consecutive bars
+        self.rejection_test_bars = []  # Track bars testing resistance
+        self.breakthrough_bars = []  # Track bars breaking above
+        
         # Bitcoin-specific distance thresholds (% from HOD)
         self.btc_distance_thresholds = {
             'at_hod': 0.2,          # < 0.2% - at HOD
@@ -244,8 +249,77 @@ class HOD:
         distance_pct = self.calculate_distance(current_price, hod)
         distance_class = self.classify_distance(distance_pct)
         
-        # Determine signal (IMPROVED BEARISH selectivity)
-        if breakout_status == 'BREAKOUT_CONFIRMED' or is_new_hod:
+        # RETEST CONFIRMATION: Track HOD retests
+        confirmed_rejection = False
+        confirmed_breakthrough = False
+        
+        current_bar = {
+            'close': current_price,
+            'low': float(df['low'].iloc[-1]),
+            'high': float(df['high'].iloc[-1]),
+            'distance': distance_pct,
+            'breached_above': float(df['high'].iloc[-1]) > hod,  # Wick went above
+            'breached_below': float(df['low'].iloc[-1]) < hod,  # Wick went below
+            'closed_above': current_price > hod,
+            'closed_below': current_price < hod
+        }
+        
+        # REJECTION TEST: Price wicks ABOVE HOD but closes BELOW (resistance holding)
+        if current_bar['breached_above'] and current_bar['closed_below']:
+            self.rejection_test_bars.append(current_bar)
+            # Keep only recent bars
+            if len(self.rejection_test_bars) > self.confirmation_candles + 2:
+                self.rejection_test_bars.pop(0)
+            
+            # Check for confirmed rejection (X consecutive tests of resistance)
+            if len(self.rejection_test_bars) >= self.confirmation_candles:
+                recent_bars = self.rejection_test_bars[-self.confirmation_candles:]
+                all_tested_and_rejected = all(
+                    bar['breached_above'] and bar['closed_below']
+                    for bar in recent_bars
+                )
+                
+                # Confirmed if: resistance tested X times and rejected each time
+                if all_tested_and_rejected:
+                    confirmed_rejection = True
+                    self.rejection_test_bars = []  # Reset after confirmation
+        elif distance_class not in ['AT_HOD', 'VERY_CLOSE']:
+            # Price moved far away, reset rejection tracking
+            if len(self.rejection_test_bars) > 0:
+                self.rejection_test_bars = []
+        
+        # BREAKTHROUGH TEST: Price closes ABOVE HOD (resistance broken)
+        if current_bar['closed_above']:
+            self.breakthrough_bars.append(current_bar)
+            # Keep only recent bars
+            if len(self.breakthrough_bars) > self.confirmation_candles + 2:
+                self.breakthrough_bars.pop(0)
+            
+            # Check for confirmed breakthrough (X consecutive closes above)
+            if len(self.breakthrough_bars) >= self.confirmation_candles:
+                recent_bars = self.breakthrough_bars[-self.confirmation_candles:]
+                all_closed_above = all(
+                    bar['closed_above']
+                    for bar in recent_bars
+                )
+                
+                # Confirmed if: X consecutive bars closed above HOD
+                if all_closed_above:
+                    confirmed_breakthrough = True
+                    self.breakthrough_bars = []  # Reset after confirmation
+        elif current_bar['closed_below']:
+            # Price back below HOD, reset breakthrough tracking
+            if len(self.breakthrough_bars) > 0:
+                self.breakthrough_bars = []
+        
+        # Determine signal (ENHANCED with retest confirmation)
+        if confirmed_breakthrough:
+            # CONFIRMED BREAKTHROUGH - resistance broken (BULLISH)
+            signal = 'BULLISH'
+        elif confirmed_rejection:
+            # CONFIRMED REJECTION - resistance holding (BEARISH)
+            signal = 'BEARISH'
+        elif breakout_status == 'BREAKOUT_CONFIRMED' or is_new_hod:
             signal = 'BULLISH'
         elif breakout_status == 'BREAKING_OUT':
             signal = 'NEUTRAL'
@@ -262,15 +336,29 @@ class HOD:
             is_new_event = True
         elif is_new_hod:
             is_new_event = True  # New HOD = event
+        elif confirmed_rejection or confirmed_breakthrough:
+            is_new_event = True  # Retest confirmation = event
         
-        # ENHANCEMENT 3: Variable confidence
+        # ENHANCEMENT 3: Variable confidence (BOOSTED for retest confirmation)
         confidence = self.calculate_variable_confidence(signal, distance_class, is_new_event)
+        
+        # Boost confidence for confirmed retests (highest priority)
+        if confirmed_rejection or confirmed_breakthrough:
+            confidence = min(95, confidence + 20)  # Strong boost for 3-bar confirmation
         
         # Build confluence
         confluence_factors = []
         
+        # Retest confirmation confluence (HIGHEST PRIORITY)
+        if confirmed_rejection:
+            confluence_factors.append('⭐⭐ CONFIRMED REJECTION FROM HOD - Strong bearish setup!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} retests: wicked above, closed below (resistance holding!)')
+        elif confirmed_breakthrough:
+            confluence_factors.append('⭐⭐ CONFIRMED BREAKTHROUGH ABOVE HOD - Strong bullish setup!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} bars: closed above HOD (resistance broken!)')
+        
         # Event-specific confluence
-        if is_new_event:
+        elif is_new_event:
             if is_new_hod:
                 confluence_factors.append('⭐ NEW HOD: Fresh high created - bullish breakout!')
             elif signal == 'BULLISH' and self.prev_signal != 'BULLISH':
@@ -295,7 +383,7 @@ class HOD:
         self.prev_hod = hod
         self.prev_signal = signal
         
-        # Metadata
+        # Metadata (ENHANCED with retest confirmation)
         metadata = {
             'hod': round(hod, 2),
             'current_price': round(current_price, 2),
@@ -306,7 +394,10 @@ class HOD:
             'is_breakout': is_breakout,
             'is_at_resistance': distance_class in ['AT_HOD', 'VERY_CLOSE'] and distance_pct < 0,
             'is_breaking_out': breakout_status in ['BREAKING_OUT', 'BREAKOUT_CONFIRMED'],
-            'is_new_event': is_new_event  # ENHANCEMENT 2: Event tracking
+            'is_new_event': is_new_event,
+            'confirmed_rejection': confirmed_rejection,  # NEW: 3-bar resistance holding
+            'confirmed_breakthrough': confirmed_breakthrough,  # NEW: 3-bar resistance broken
+            'confirmation_candles': self.confirmation_candles
         }
         
         return {
