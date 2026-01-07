@@ -50,6 +50,11 @@ class LOW:
         self.prev_low = None
         self.prev_signal = None
         
+        # RETEST CONFIRMATION: Track retests of LOW level
+        self.confirmation_candles = 3  # Require 3 consecutive bars
+        self.bounce_test_bars = []  # Track bars testing support
+        self.breakdown_bars = []  # Track bars breaking below
+        
         # Bitcoin-specific distance thresholds (% from LOW)
         self.btc_distance_thresholds = {
             'at_low': 0.2,
@@ -220,15 +225,72 @@ class LOW:
         distance_pct = self.calculate_distance(current_price, low)
         distance_class = self.classify_distance(distance_pct)
         
-        # Determine signal (OPTIMIZED - More selective BULLISH)
-        if breakdown_status == 'BREAKDOWN_CONFIRMED' or is_new_low:
+        # RETEST CONFIRMATION: Track LOW retests
+        confirmed_bounce = False
+        confirmed_breakdown = False
+        
+        current_bar = {
+            'close': current_price,
+            'low': float(df['low'].iloc[-1]),
+            'high': float(df['high'].iloc[-1]),
+            'distance': distance_pct,
+            'breached_below': float(df['low'].iloc[-1]) < low,
+            'breached_above': float(df['high'].iloc[-1]) > low,
+            'closed_above': current_price > low,
+            'closed_below': current_price < low
+        }
+        
+        # BOUNCE TEST: Price wicks BELOW LOW but closes ABOVE (support holding)
+        if current_bar['breached_below'] and current_bar['closed_above']:
+            self.bounce_test_bars.append(current_bar)
+            if len(self.bounce_test_bars) > self.confirmation_candles + 2:
+                self.bounce_test_bars.pop(0)
+            
+            if len(self.bounce_test_bars) >= self.confirmation_candles:
+                recent_bars = self.bounce_test_bars[-self.confirmation_candles:]
+                all_tested_and_held = all(
+                    bar['breached_below'] and bar['closed_above']
+                    for bar in recent_bars
+                )
+                
+                if all_tested_and_held:
+                    confirmed_bounce = True
+                    self.bounce_test_bars = []
+        elif distance_class not in ['AT_LOW', 'VERY_CLOSE']:
+            if len(self.bounce_test_bars) > 0:
+                self.bounce_test_bars = []
+        
+        # BREAKDOWN TEST: Price closes BELOW LOW (support broken)
+        if current_bar['closed_below']:
+            self.breakdown_bars.append(current_bar)
+            if len(self.breakdown_bars) > self.confirmation_candles + 2:
+                self.breakdown_bars.pop(0)
+            
+            if len(self.breakdown_bars) >= self.confirmation_candles:
+                recent_bars = self.breakdown_bars[-self.confirmation_candles:]
+                all_closed_below = all(
+                    bar['closed_below']
+                    for bar in recent_bars
+                )
+                
+                if all_closed_below:
+                    confirmed_breakdown = True
+                    self.breakdown_bars = []
+        elif current_bar['closed_above']:
+            if len(self.breakdown_bars) > 0:
+                self.breakdown_bars = []
+        
+        # Determine signal (ENHANCED with retest confirmation)
+        if confirmed_bounce:
+            signal = 'BULLISH'
+        elif confirmed_breakdown:
+            signal = 'BEARISH'
+        elif breakdown_status == 'BREAKDOWN_CONFIRMED' or is_new_low:
             signal = 'BEARISH'
         elif breakdown_status == 'BREAKING_DOWN':
             signal = 'NEUTRAL'
         elif distance_class == 'AT_LOW' and distance_pct > 0:
-            # More selective: Only AT_LOW (not VERY_CLOSE)
-            # This is within 0.2% of LOW (~90-180 points on BTC)
-            signal = 'BULLISH'  # Bounce from LOW
+            signal = 'BULLISH'
         else:
             signal = 'NEUTRAL'
         
@@ -237,16 +299,29 @@ class LOW:
         if self.prev_signal is not None and signal != self.prev_signal:
             is_new_event = True
         elif is_new_low:
-            is_new_event = True  # New LOW = event
+            is_new_event = True
+        elif confirmed_bounce or confirmed_breakdown:
+            is_new_event = True
         
-        # ENHANCEMENT 3: Variable confidence
+        # ENHANCEMENT 3: Variable confidence (BOOSTED for retest confirmation)
         confidence = self.calculate_variable_confidence(signal, distance_class, is_new_event)
+        
+        if confirmed_bounce or confirmed_breakdown:
+            confidence = min(95, confidence + 20)
         
         # Build confluence
         confluence_factors = []
         
+        # Retest confirmation confluence (HIGHEST PRIORITY)
+        if confirmed_bounce:
+            confluence_factors.append('⭐⭐ CONFIRMED BOUNCE FROM LOW - Strong weekly bullish setup!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} retests: wicked below, closed above (weekly support holding!)')
+        elif confirmed_breakdown:
+            confluence_factors.append('⭐⭐ CONFIRMED BREAKDOWN BELOW LOW - Strong weekly bearish setup!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} bars: closed below LOW (weekly support broken!)')
+        
         # Event-specific confluence
-        if is_new_event:
+        elif is_new_event:
             if is_new_low:
                 confluence_factors.append('⭐ NEW LOW: Fresh weekly low - bearish breakdown!')
             elif signal == 'BEARISH' and self.prev_signal != 'BEARISH':
@@ -281,7 +356,10 @@ class LOW:
             'is_breakdown': is_breakdown,
             'is_major_support': distance_class in ['AT_LOW', 'VERY_CLOSE'] and distance_pct > 0,
             'is_breaking_down': breakdown_status in ['BREAKING_DOWN', 'BREAKDOWN_CONFIRMED'],
-            'is_new_event': is_new_event  # ENHANCEMENT 2: Event tracking
+            'is_new_event': is_new_event,
+            'confirmed_bounce': confirmed_bounce,
+            'confirmed_breakdown': confirmed_breakdown,
+            'confirmation_candles': self.confirmation_candles
         }
         
         return {

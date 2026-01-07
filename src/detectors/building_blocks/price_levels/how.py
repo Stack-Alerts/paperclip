@@ -54,6 +54,11 @@ class HOW:
         self.prev_how = None
         self.prev_signal = None
         
+        # RETEST CONFIRMATION: Track retests of HOW level
+        self.confirmation_candles = 3  # Require 3 consecutive bars
+        self.rejection_test_bars = []  # Track bars testing resistance
+        self.breakthrough_bars = []  # Track bars breaking above
+        
         # Bitcoin-specific distance thresholds (% from HOW)
         self.btc_distance_thresholds = {
             'at_how': 0.2,          # < 0.2% - at HOW
@@ -227,15 +232,72 @@ class HOW:
         distance_pct = self.calculate_distance(current_price, how)
         distance_class = self.classify_distance(distance_pct)
         
-        # Determine signal (OPTIMIZED - More selective BEARISH)
-        if breakout_status == 'BREAKOUT_CONFIRMED' or is_new_how:
+        # RETEST CONFIRMATION: Track HOW retests
+        confirmed_rejection = False
+        confirmed_breakthrough = False
+        
+        current_bar = {
+            'close': current_price,
+            'low': float(df['low'].iloc[-1]),
+            'high': float(df['high'].iloc[-1]),
+            'distance': distance_pct,
+            'breached_above': float(df['high'].iloc[-1]) > how,
+            'breached_below': float(df['low'].iloc[-1]) < how,
+            'closed_above': current_price > how,
+            'closed_below': current_price < how
+        }
+        
+        # REJECTION TEST: Price wicks ABOVE HOW but closes BELOW (resistance holding)
+        if current_bar['breached_above'] and current_bar['closed_below']:
+            self.rejection_test_bars.append(current_bar)
+            if len(self.rejection_test_bars) > self.confirmation_candles + 2:
+                self.rejection_test_bars.pop(0)
+            
+            if len(self.rejection_test_bars) >= self.confirmation_candles:
+                recent_bars = self.rejection_test_bars[-self.confirmation_candles:]
+                all_tested_and_rejected = all(
+                    bar['breached_above'] and bar['closed_below']
+                    for bar in recent_bars
+                )
+                
+                if all_tested_and_rejected:
+                    confirmed_rejection = True
+                    self.rejection_test_bars = []
+        elif distance_class not in ['AT_HOW', 'VERY_CLOSE']:
+            if len(self.rejection_test_bars) > 0:
+                self.rejection_test_bars = []
+        
+        # BREAKTHROUGH TEST: Price closes ABOVE HOW (resistance broken)
+        if current_bar['closed_above']:
+            self.breakthrough_bars.append(current_bar)
+            if len(self.breakthrough_bars) > self.confirmation_candles + 2:
+                self.breakthrough_bars.pop(0)
+            
+            if len(self.breakthrough_bars) >= self.confirmation_candles:
+                recent_bars = self.breakthrough_bars[-self.confirmation_candles:]
+                all_closed_above = all(
+                    bar['closed_above']
+                    for bar in recent_bars
+                )
+                
+                if all_closed_above:
+                    confirmed_breakthrough = True
+                    self.breakthrough_bars = []
+        elif current_bar['closed_below']:
+            if len(self.breakthrough_bars) > 0:
+                self.breakthrough_bars = []
+        
+        # Determine signal (ENHANCED with retest confirmation)
+        if confirmed_breakthrough:
+            signal = 'BULLISH'
+        elif confirmed_rejection:
+            signal = 'BEARISH'
+        elif breakout_status == 'BREAKOUT_CONFIRMED' or is_new_how:
             signal = 'BULLISH'
         elif breakout_status == 'BREAKING_OUT':
             signal = 'NEUTRAL'
         elif distance_class == 'AT_HOW' and distance_pct < 0:
-            # More selective: Only AT_HOW (not VERY_CLOSE)
-            # This is within 0.2% of HOW (90-180 points on BTC)
-            signal = 'BEARISH'  # Rejection at HOW
+            signal = 'BEARISH'
         else:
             signal = 'NEUTRAL'
         
@@ -244,16 +306,29 @@ class HOW:
         if self.prev_signal is not None and signal != self.prev_signal:
             is_new_event = True
         elif is_new_how:
-            is_new_event = True  # New HOW = event
+            is_new_event = True
+        elif confirmed_rejection or confirmed_breakthrough:
+            is_new_event = True
         
-        # ENHANCEMENT 3: Variable confidence
+        # ENHANCEMENT 3: Variable confidence (BOOSTED for retest confirmation)
         confidence = self.calculate_variable_confidence(signal, distance_class, is_new_event)
+        
+        if confirmed_rejection or confirmed_breakthrough:
+            confidence = min(95, confidence + 20)
         
         # Build confluence
         confluence_factors = []
         
+        # Retest confirmation confluence (HIGHEST PRIORITY)
+        if confirmed_rejection:
+            confluence_factors.append('⭐⭐ CONFIRMED REJECTION FROM HOW - Strong weekly bearish setup!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} retests: wicked above, closed below (weekly resistance holding!)')
+        elif confirmed_breakthrough:
+            confluence_factors.append('⭐⭐ CONFIRMED BREAKTHROUGH ABOVE HOW - Strong weekly bullish setup!')
+            confluence_factors.append(f'✓ {self.confirmation_candles} bars: closed above HOW (weekly resistance broken!)')
+        
         # Event-specific confluence
-        if is_new_event:
+        elif is_new_event:
             if is_new_how:
                 confluence_factors.append('⭐ NEW HOW: Fresh weekly high - bullish breakout!')
             elif signal == 'BULLISH' and self.prev_signal != 'BULLISH':
@@ -278,7 +353,7 @@ class HOW:
         self.prev_how = how
         self.prev_signal = signal
         
-        # Metadata
+        # Metadata (ENHANCED with retest confirmation)
         metadata = {
             'how': round(how, 2),
             'current_price': round(current_price, 2),
@@ -289,7 +364,10 @@ class HOW:
             'is_breakout': is_breakout,
             'is_major_resistance': distance_class in ['AT_HOW', 'VERY_CLOSE'] and distance_pct < 0,
             'is_breaking_out': breakout_status in ['BREAKING_OUT', 'BREAKOUT_CONFIRMED'],
-            'is_new_event': is_new_event  # ENHANCEMENT 2: Event tracking
+            'is_new_event': is_new_event,
+            'confirmed_rejection': confirmed_rejection,
+            'confirmed_breakthrough': confirmed_breakthrough,
+            'confirmation_candles': self.confirmation_candles
         }
         
         return {
