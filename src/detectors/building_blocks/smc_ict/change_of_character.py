@@ -427,48 +427,82 @@ class ChangeOfCharacter:
         elif trend == 'DOWNTREND':
             choch = self.detect_choch_in_downtrend(df)
         
-        # ENHANCEMENT 4: Check if we should start tracking a new continuation
+        # ENHANCEMENT 4: Check continuation pattern if we're tracking one (BEFORE checking new CHOCH)
+        if self.tracking_bullish_continuation and self.continuation_start_bar is not None:
+            bars_since_choch = len(df) - 1 - self.continuation_start_bar  # Current bar index minus start
+            bars_monitored = bars_since_choch
+            
+            if bars_since_choch >= self.reversal_candles:
+                # Check if we have the continuation pattern
+                # Look at the 5 bars AFTER the CHOCH (not including CHOCH bar)
+                if len(df) > self.continuation_start_bar + self.reversal_candles:
+                    pattern_start = self.continuation_start_bar + 1  # Start after CHOCH
+                    pattern_df = df.iloc[pattern_start:pattern_start + self.reversal_candles]
+                    
+                    if len(pattern_df) == self.reversal_candles:
+                        highs = pattern_df['high'].values
+                        lows = pattern_df['low'].values
+                        
+                        # Check for consistent higher highs and higher lows
+                        is_continuation = True
+                        for i in range(1, len(highs)):
+                            if highs[i] <= highs[i-1] or lows[i] <= lows[i-1]:
+                                is_continuation = False
+                                break
+                        
+                        if is_continuation:
+                            continuation_confirmed = True
+                            continuation_type = 'bullish_continuation'
+                            self.tracking_bullish_continuation = False  # Stop tracking
+                
+                if bars_since_choch > self.reversal_candles + 5:
+                    # Pattern failed, stop tracking
+                    self.tracking_bullish_continuation = False
+        
+        elif self.tracking_bearish_continuation and self.continuation_start_bar is not None:
+            bars_since_choch = len(df) - 1 - self.continuation_start_bar  # Current bar index minus start
+            bars_monitored = bars_since_choch
+            
+            if bars_since_choch >= self.reversal_candles:
+                # Check if we have the continuation pattern
+                # Look at the 5 bars AFTER the CHOCH (not including CHOCH bar)
+                if len(df) > self.continuation_start_bar + self.reversal_candles:
+                    pattern_start = self.continuation_start_bar + 1  # Start after CHOCH
+                    pattern_df = df.iloc[pattern_start:pattern_start + self.reversal_candles]
+                    
+                    if len(pattern_df) == self.reversal_candles:
+                        highs = pattern_df['high'].values
+                        lows = pattern_df['low'].values
+                        
+                        # Check for consistent lower highs and lower lows
+                        is_continuation = True
+                        for i in range(1, len(highs)):
+                            if highs[i] >= highs[i-1] or lows[i] >= lows[i-1]:
+                                is_continuation = False
+                                break
+                        
+                        if is_continuation:
+                            continuation_confirmed = True
+                            continuation_type = 'bearish_continuation'
+                            self.tracking_bearish_continuation = False  # Stop tracking
+                
+                if bars_since_choch > self.reversal_candles + 5:
+                    # Pattern failed, stop tracking
+                    self.tracking_bearish_continuation = False
+        
+        # ENHANCEMENT 4: Check if we should start tracking a new continuation (AFTER checking existing)
         if choch:
             choch_type = choch['type']
             if choch_type == 'BULLISH_CHOCH':
                 self.tracking_bullish_continuation = True
                 self.tracking_bearish_continuation = False
                 self.continuation_bars_monitored = 0
-                self.continuation_start_bar = len(df) - 1
+                self.continuation_start_bar = len(df) - 1  # Index of CHOCH bar
             elif choch_type == 'BEARISH_CHOCH':
                 self.tracking_bearish_continuation = True
                 self.tracking_bullish_continuation = False
                 self.continuation_bars_monitored = 0
-                self.continuation_start_bar = len(df) - 1
-        
-        # ENHANCEMENT 4: Check continuation pattern if we're tracking one
-        if self.tracking_bullish_continuation and self.continuation_start_bar is not None:
-            bars_since_choch = len(df) - self.continuation_start_bar
-            bars_monitored = bars_since_choch
-            
-            if bars_since_choch >= self.reversal_candles:
-                # Check if we have the continuation pattern
-                continuation_confirmed = self.check_bullish_continuation_pattern(df)
-                if continuation_confirmed:
-                    continuation_type = 'bullish_continuation'
-                    self.tracking_bullish_continuation = False  # Stop tracking
-                elif bars_since_choch > self.reversal_candles + 5:
-                    # Pattern failed, stop tracking
-                    self.tracking_bullish_continuation = False
-        
-        elif self.tracking_bearish_continuation and self.continuation_start_bar is not None:
-            bars_since_choch = len(df) - self.continuation_start_bar
-            bars_monitored = bars_since_choch
-            
-            if bars_since_choch >= self.reversal_candles:
-                # Check if we have the continuation pattern
-                continuation_confirmed = self.check_bearish_continuation_pattern(df)
-                if continuation_confirmed:
-                    continuation_type = 'bearish_continuation'
-                    self.tracking_bearish_continuation = False  # Stop tracking
-                elif bars_since_choch > self.reversal_candles + 5:
-                    # Pattern failed, stop tracking
-                    self.tracking_bearish_continuation = False
+                self.continuation_start_bar = len(df) - 1  # Index of CHOCH bar
         
         if not choch:
             return {
