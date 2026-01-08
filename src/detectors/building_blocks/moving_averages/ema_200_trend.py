@@ -54,6 +54,13 @@ class EMA200Trend:
             'extended':  10.0,     # 5-10% - extended
             'overextended': 10.0   # > 10% - very overextended
         }
+        
+        # Reversal pattern tracking (5-bar confirmation)
+        self.reversal_candles = 5  # Bars needed to confirm reversal
+        self.tracking_bullish_reversal = False
+        self.tracking_bearish_reversal = False
+        self.reversal_bars_monitored = 0
+        self.reversal_start_bar = None
     
     def calculate_ema(self, close: pd.Series) -> pd.Series:
         """Calculate 200 EMA"""
@@ -134,6 +141,48 @@ class EMA200Trend:
         else:
             return 'NEUTRAL'
     
+    def check_bullish_reversal_pattern(self, df: pd.DataFrame) -> bool:
+        """
+        Check for bullish reversal pattern (5 bars of higher highs + higher lows)
+        after price crossed above 200 EMA
+        
+        Returns True if pattern confirmed
+        """
+        if len(df) < self.reversal_candles:
+            return False
+        
+        recent_bars = df.iloc[-self.reversal_candles:]
+        highs = recent_bars['high'].values
+        lows = recent_bars['low'].values
+        
+        # Check for consistent higher highs and higher lows
+        for i in range(1, len(highs)):
+            if highs[i] <= highs[i-1] or lows[i] <= lows[i-1]:
+                return False
+        
+        return True
+    
+    def check_bearish_reversal_pattern(self, df: pd.DataFrame) -> bool:
+        """
+        Check for bearish reversal pattern (5 bars of lower highs + lower lows)
+        after price crossed below 200 EMA
+        
+        Returns True if pattern confirmed
+        """
+        if len(df) < self.reversal_candles:
+            return False
+        
+        recent_bars = df.iloc[-self.reversal_candles:]
+        highs = recent_bars['high'].values
+        lows = recent_bars['low'].values
+        
+        # Check for consistent lower highs and lower lows
+        for i in range(1, len(highs)):
+            if highs[i] >= highs[i-1] or lows[i] >= lows[i-1]:
+                return False
+        
+        return True
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """Main analysis method - IMPROVED FOR INSTITUTIONAL ACCURACY"""
         # Validate
@@ -189,6 +238,52 @@ class EMA200Trend:
         crossed_above = (prev_position == 'BELOW_200EMA' and current_position == 'ABOVE_200EMA')
         crossed_below = (prev_position == 'ABOVE_200EMA' and current_position == 'BELOW_200EMA')
         
+        # Initialize reversal tracking variables
+        reversal_confirmed = False
+        reversal_type = None
+        bars_monitored = 0
+        
+        # Check if we should start tracking a new reversal
+        if crossed_above:
+            self.tracking_bullish_reversal = True
+            self.tracking_bearish_reversal = False
+            self.reversal_bars_monitored = 0
+            self.reversal_start_bar = len(df) - 1
+        elif crossed_below:
+            self.tracking_bearish_reversal = True
+            self.tracking_bullish_reversal = False
+            self.reversal_bars_monitored = 0
+            self.reversal_start_bar = len(df) - 1
+        
+        # Check reversal pattern if we're tracking one
+        if self.tracking_bullish_reversal and self.reversal_start_bar is not None:
+            bars_since_cross = len(df) - self.reversal_start_bar
+            bars_monitored = bars_since_cross
+            
+            if bars_since_cross >= self.reversal_candles:
+                # Check if we have the reversal pattern
+                reversal_confirmed = self.check_bullish_reversal_pattern(df)
+                if reversal_confirmed:
+                    reversal_type = 'bullish_continuation'
+                    self.tracking_bullish_reversal = False  # Stop tracking
+                elif bars_since_cross > self.reversal_candles + 5:
+                    # Pattern failed, stop tracking
+                    self.tracking_bullish_reversal = False
+        
+        elif self.tracking_bearish_reversal and self.reversal_start_bar is not None:
+            bars_since_cross = len(df) - self.reversal_start_bar
+            bars_monitored = bars_since_cross
+            
+            if bars_since_cross >= self.reversal_candles:
+                # Check if we have the reversal pattern
+                reversal_confirmed = self.check_bearish_reversal_pattern(df)
+                if reversal_confirmed:
+                    reversal_type = 'bearish_continuation'
+                    self.tracking_bearish_reversal = False  # Stop tracking
+                elif bars_since_cross > self.reversal_candles + 5:
+                    # Pattern failed, stop tracking
+                    self.tracking_bearish_reversal = False
+        
         # Build confluence
         confluence_factors = []
         
@@ -239,6 +334,19 @@ class EMA200Trend:
             confluence_factors.append(f'Distance from 200 EMA: {distance_pct:+.2f}% ({distance_class})')
             confluence_factors.append('No cross event - holding position')
         
+        # Add reversal pattern confirmation
+        if reversal_confirmed and reversal_type == 'bullish_continuation':
+            # Boost confidence for confirmed bullish reversal
+            if signal == 'BULLISH' or current_position == 'ABOVE_200EMA':
+                confidence = min(95, confidence + 10)
+                confluence_factors.append('⭐ 5-bar bullish continuation confirmed!')
+                
+        elif reversal_confirmed and reversal_type == 'bearish_continuation':
+            # Boost confidence for confirmed bearish reversal
+            if signal == 'BEARISH' or current_position == 'BELOW_200EMA':
+                confidence = min(95, confidence + 10)
+                confluence_factors.append('⭐ 5-bar bearish continuation confirmed!')
+        
         # Add slope context
         if slope == 'STRONG_UPTREND':
             confluence_factors.append('200 EMA strongly rising')
@@ -264,7 +372,12 @@ class EMA200Trend:
             'distance_class': distance_class,
             'trend_filter': trend_filter,
             'period': self.period,
-            'is_overextended': distance_class == 'OVEREXTENDED'
+            'is_overextended': distance_class == 'OVEREXTENDED',
+            # Reversal pattern tracking
+            'reversal_continuation': reversal_confirmed,
+            'reversal_type': reversal_type if reversal_confirmed else None,
+            'reversal_candles': self.reversal_candles,
+            'bars_monitored': bars_monitored
         }
         
         return {
