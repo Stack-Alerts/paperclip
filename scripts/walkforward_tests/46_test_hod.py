@@ -131,11 +131,11 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     new_event_count = len(new_events)
     has_event_tracking = any(r.get('metadata', {}).get('is_new_event') is not None for r in results)
     
-    # **RETEST CONFIRMATION:** Track confirmed retests (rejection + breakthrough)
-    confirmed_rejections = [r for r in results if r.get('metadata', {}).get('confirmed_rejection') == True]
-    confirmed_breakthroughs = [r for r in results if r.get('metadata', {}).get('confirmed_breakthrough') == True]
-    total_confirmed_retests = len(confirmed_rejections) + len(confirmed_breakthroughs)
-    has_retest_confirmation = any(r.get('metadata', {}).get('confirmed_rejection') is not None for r in results)
+    # **REVERSAL CONFIRMATION:** Track confirmed reversals (rejection + breakthrough patterns)
+    reversal_rejections = [r for r in results if r.get('metadata', {}).get('reversal_rejection') == True]
+    reversal_breakthroughs = [r for r in results if r.get('metadata', {}).get('reversal_breakthrough') == True]
+    total_reversals = len(reversal_rejections) + len(reversal_breakthroughs)
+    has_reversal_confirmation = any(r.get('metadata', {}).get('reversal_rejection') is not None for r in results)
     
     # Summary
     print(f"\n📊 RESULTS (V2 Methodology):")
@@ -152,14 +152,14 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
         print(f"\n   ⭐ NEW EVENTS: {new_event_count} ({new_event_rate:.2%} of results)")
         print(f"   Continuing state: {len(active_signals) - new_event_count} ({(len(active_signals) - new_event_count) / len(active_signals):.2%} of active)")
     
-    if has_retest_confirmation:
-        retest_rate = total_confirmed_retests / len(results) if len(results) > 0 else 0
-        retests_per_day = total_confirmed_retests / max(1, days)
-        print(f"\n   🎯 RETEST CONFIRMATION TRACKING:")
-        print(f"   Confirmed Rejections: {len(confirmed_rejections)} ({len(confirmed_rejections)/len(results):.2%})")
-        print(f"   Confirmed Breakthroughs: {len(confirmed_breakthroughs)} ({len(confirmed_breakthroughs)/len(results):.2%})")
-        print(f"   Total Confirmed Retests: {total_confirmed_retests} ({retest_rate:.2%})")
-        print(f"   Retests per day: {retests_per_day:.2f}")
+    if has_reversal_confirmation:
+        reversal_rate = total_reversals / len(results) if len(results) > 0 else 0
+        reversals_per_day = total_reversals / max(1, days)
+        print(f"\n   🎯 REVERSAL PATTERN CONFIRMATION:")
+        print(f"   Bearish Reversals (test then lower highs/lows): {len(reversal_rejections)} ({len(reversal_rejections)/len(results):.2%})")
+        print(f"   Bullish Breakthroughs (break then higher highs/lows): {len(reversal_breakthroughs)} ({len(reversal_breakthroughs)/len(results):.2%})")
+        print(f"   Total Confirmed Reversals: {total_reversals} ({reversal_rate:.2%})")
+        print(f"   Reversals per day: {reversals_per_day:.2f}")
     
     print(f"\n   Average confidence (when active): {avg_active_confidence:.1f}%")
     print(f"   Average confidence (all results): {avg_all_confidence:.1f}%")
