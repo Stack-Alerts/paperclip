@@ -1,5 +1,5 @@
 """
-Walk-Forward Test for How
+Walk-Forward Test for HOW
 V2 - Aligned with institutional_production_validation_v2.py methodology
 Auto-generated test script for individual block validation
 """
@@ -130,12 +130,12 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     new_events = [r for r in results if r.get('metadata', {}).get('is_new_event') == True]
     new_event_count = len(new_events)
     has_event_tracking = any(r.get('metadata', {}).get('is_new_event') is not None for r in results)
-    # **RETEST CONFIRMATION:** Track confirmed retests
-    confirmed_type1 = [r for r in results if r.get('metadata', {}).get('confirmed_rejection') == True]
-    confirmed_type2 = [r for r in results if r.get('metadata', {}).get('confirmed_breakthrough') == True]
-    total_confirmed_retests = len(confirmed_type1) + len(confirmed_type2)
-    has_retest_confirmation = any(r.get('metadata', {}).get('confirmed_rejection') is not None for r in results)
-
+    
+    # **REVERSAL CONFIRMATION:** Track confirmed reversals (rejection + breakthrough patterns)
+    reversal_rejections = [r for r in results if r.get('metadata', {}).get('reversal_rejection') == True]
+    reversal_breakthroughs = [r for r in results if r.get('metadata', {}).get('reversal_breakthrough') == True]
+    total_reversals = len(reversal_rejections) + len(reversal_breakthroughs)
+    has_reversal_confirmation = any(r.get('metadata', {}).get('reversal_rejection') is not None for r in results)
     
     # Summary
     print(f"\n📊 RESULTS (V2 Methodology):")
@@ -145,22 +145,21 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     print(f"   Errors: {errors} ({error_rate:.1%} error rate)")
     
     # Calculate days early for retest tracking
-    days = (df_full[\'timestamp\'].max() - df_full[\'timestamp\'].min()).days
+    days = (df_full['timestamp'].max() - df_full['timestamp'].min()).days
     
     if has_event_tracking:
         new_event_rate = new_event_count / len(results) if len(results) > 0 else 0
         print(f"\n   ⭐ NEW EVENTS: {new_event_count} ({new_event_rate:.2%} of results)")
-        print(f"   Continuing state: {len(active_signals) - new_event_count} ({(len(active_signals)
-    if has_retest_confirmation:
-        retest_rate = total_confirmed_retests / len(results) if len(results) > 0 else 0
-        retests_per_day = total_confirmed_retests / max(1, days)
-        print(f"
-   🎯 RETEST CONFIRMATION TRACKING:")
-        print(f"   Confirmed Rejection: {len(confirmed_type1)} ({len(confirmed_type1)/len(results):.2%})")
-        print(f"   Confirmed Breakthrough: {len(confirmed_type2)} ({len(confirmed_type2)/len(results):.2%})")
-        print(f"   Total Confirmed Retests: {total_confirmed_retests} ({retest_rate:.2%})")
-        print(f"   Retests per day: {retests_per_day:.2f}")
- - new_event_count) / len(active_signals):.2%} of active)")
+        print(f"   Continuing state: {len(active_signals) - new_event_count} ({(len(active_signals) - new_event_count) / len(active_signals):.2%} of active)")
+    
+    if has_reversal_confirmation:
+        reversal_rate = total_reversals / len(results) if len(results) > 0 else 0
+        reversals_per_day = total_reversals / max(1, days)
+        print(f"\n   🎯 REVERSAL PATTERN CONFIRMATION:")
+        print(f"   Bearish Reversals (test then lower highs/lows): {len(reversal_rejections)} ({len(reversal_rejections)/len(results):.2%})")
+        print(f"   Bullish Breakthroughs (break then higher highs/lows): {len(reversal_breakthroughs)} ({len(reversal_breakthroughs)/len(results):.2%})")
+        print(f"   Total Confirmed Reversals: {total_reversals} ({reversal_rate:.2%})")
+        print(f"   Reversals per day: {reversals_per_day:.2f}")
     
     print(f"\n   Average confidence (when active): {avg_active_confidence:.1f}%")
     print(f"   Average confidence (all results): {avg_all_confidence:.1f}%")
@@ -181,73 +180,72 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     density = len(active_signals) / max(1, days)
     print(f"\n   Active signal density: {density:.2f} signals/day")
     
-    # **POST-WALKFORWARD VALIDATION:** Validate HOW accuracy against COMPLETE week data
-    print(f"\n🔍 POST-WALKFORWARD HOW ACCURACY VALIDATION:")
-    print(f"   (After walkforward complete, validate against actual complete weekly data)")
+    # **POST-WALKFORWARD VALIDATION:** Validate HOD accuracy against COMPLETE day data
+    print(f"\n🔍 POST-WALKFORWARD HOD ACCURACY VALIDATION:")
+    print(f"   (After walkforward complete, validate against actual complete daily data)")
     
-    # Group results by week and check final HOW for each week
+    # Group results by day and check final HOD for each day
     results_df = pd.DataFrame(results)
     if 'timestamp' in results_df.columns:
         results_df['timestamp'] = pd.to_datetime(results_df['timestamp'])
-        results_df['week'] = results_df['timestamp'].dt.to_period('W')
+        results_df['date'] = results_df['timestamp'].dt.date
         
-        # Get last result for each week (final HOW value for that week)
-        weekly_hows = {}
-        for week, week_results in results_df.groupby('week'):
-            last_result = week_results.iloc[-1]
+        # Get last result for each day (final HOD value for that day)
+        daily_hods = {}
+        for date, day_results in results_df.groupby('date'):
+            last_result = day_results.iloc[-1]
             if 'metadata' in last_result and isinstance(last_result['metadata'], dict):
-                if 'how' in last_result['metadata']:
-                    weekly_hows[str(week)] = {
-                        'reported': last_result['metadata']['how'],
+                if 'hod' in last_result['metadata']:
+                    daily_hods[date] = {
+                        'reported': last_result['metadata']['hod'],
                         'timestamp': last_result['timestamp']
                     }
         
-        # Compare to actual complete week data
-        how_errors = 0
-        how_checks = 0
+        # Compare to actual complete day data
+        hod_errors = 0
+        hod_checks = 0
         sample_errors = []
         
-        for week_str, how_info in weekly_hows.items():
-            # Get COMPLETE week data from df_full
-            df_full['week'] = pd.to_datetime(df_full['timestamp']).dt.to_period('W')
-            week_data_complete = df_full[df_full['week'] == week_str]
+        for date, hod_info in daily_hods.items():
+            # Get COMPLETE day data from df_full
+            day_data_complete = df_full[df_full['timestamp'].dt.date == date]
             
-            if len(week_data_complete) > 0:
-                actual_how_complete = float(week_data_complete['high'].max())
-                reported_how = how_info['reported']
+            if len(day_data_complete) > 0:
+                actual_hod_complete = float(day_data_complete['high'].max())
+                reported_hod = hod_info['reported']
                 
                 # Compare (allow 0.01% tolerance for floating point)
-                if abs(reported_how - actual_how_complete) > actual_how_complete * 0.0001:
-                    how_errors += 1
+                if abs(reported_hod - actual_hod_complete) > actual_hod_complete * 0.0001:
+                    hod_errors += 1
                     if len(sample_errors) < 5:
                         sample_errors.append({
-                            'week': week_str,
-                            'reported': reported_how,
-                            'actual_complete': actual_how_complete,
-                            'diff': reported_how - actual_how_complete,
-                            'diff_pct': ((reported_how - actual_how_complete) / actual_how_complete) * 100
+                            'date': date,
+                            'reported': reported_hod,
+                            'actual_complete': actual_hod_complete,
+                            'diff': reported_hod - actual_hod_complete,
+                            'diff_pct': ((reported_hod - actual_hod_complete) / actual_hod_complete) * 100
                         })
                 
-                how_checks += 1
+                hod_checks += 1
         
-        if how_checks > 0:
-            how_accuracy = ((how_checks - how_errors) / how_checks) * 100
-            print(f"   Weeks checked: {how_checks}")
-            print(f"   Weeks with errors: {how_errors}")
-            print(f"   Accuracy: {how_accuracy:.2f}%")
+        if hod_checks > 0:
+            hod_accuracy = ((hod_checks - hod_errors) / hod_checks) * 100
+            print(f"   Days checked: {hod_checks}")
+            print(f"   Days with errors: {hod_errors}")
+            print(f"   Accuracy: {hod_accuracy:.2f}%")
             
-            if how_errors > 0 and sample_errors:
-                print(f"\n   ⚠️  Weeks where final HOW doesn't match complete week HOW:")
+            if hod_errors > 0 and sample_errors:
+                print(f"\n   ⚠️  Days where final HOD doesn't match complete day HOD:")
                 for err in sample_errors:
-                    print(f"      {err['week']}: Reported ${err['reported']:.2f}, Actual ${err['actual_complete']:.2f}")
+                    print(f"      {err['date']}: Reported ${err['reported']:.2f}, Actual ${err['actual_complete']:.2f}")
                     print(f"         Diff: ${err['diff']:.2f} ({err['diff_pct']:+.2f}%)")
                 print(f"\n   NOTE: Differences expected in walk-forward (we only see data up to each bar)")
-                print(f"   This validates HOW was updated correctly as week progressed.")
-            elif how_errors == 0:
-                print(f"   ✅ All final weekly HOWs match complete week data!")
-                print(f"   Perfect accuracy - HOW correctly tracked throughout each week.")
+                print(f"   This validates HOD was updated correctly as day progressed.")
+            elif hod_errors == 0:
+                print(f"   ✅ All final daily HODs match complete day data!")
+                print(f"   Perfect accuracy - HOD correctly tracked throughout each day.")
         else:
-            print(f"   ⚠️  No weekly HOWs to validate")
+            print(f"   ⚠️  No daily HODs to validate")
     else:
         print(f"   ⚠️  Cannot validate - no timestamp in results")
     
@@ -328,9 +326,6 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     }
     
     # Add event tracking metrics if supported
-    # Calculate days early for retest tracking
-    days = (df_full[\'timestamp\'].max() - df_full[\'timestamp\'].min()).days
-    
     if has_event_tracking:
         new_event_rate = new_event_count / len(results) if len(results) > 0 else 0
         continuing_rate = (len(active_signals) - new_event_count) / len(active_signals) if len(active_signals) > 0 else 0

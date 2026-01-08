@@ -1,7 +1,6 @@
 """
-Walk-Forward Test for Us Settlement
+Walk-Forward Test for USSettlement
 V2 - Aligned with institutional_production_validation_v2.py methodology
-MULTICORE - Uses all CPU cores for parallel processing
 Auto-generated test script for individual block validation
 """
 
@@ -14,8 +13,6 @@ import numpy as np
 from datetime import datetime, timedelta
 from pathlib import Path
 import json
-from multiprocessing import Pool, cpu_count
-from functools import partial
 
 
 def load_btc_data(days: int = 180) -> pd.DataFrame:
@@ -44,105 +41,53 @@ def load_btc_data(days: int = 180) -> pd.DataFrame:
     return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
 
 
-def process_chunk(args):
+def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     """
-    Process a chunk of bars sequentially (multicore worker)
-    Each worker gets a chunk to avoid massive serialization overhead
-    Args: tuple of (chunk_indices, df_full_dict, block_class, block_kwargs)
-    Returns: list of (result_dict, error_message or None) tuples
-    """
-    chunk_indices, df_full_dict, block_class, block_kwargs = args
-    
-    # Reconstruct full dataframe once per chunk
-    df_full = pd.DataFrame(df_full_dict)
-    
-    # Create block instance once per chunk
-    block = block_class(**block_kwargs)
-    
-    chunk_results = []
-    
-    for i in chunk_indices:
-        try:
-            # Create expanding window for this bar
-            hist_df = df_full.iloc[:i+1]
-            
-            # Analyze
-            result = block.analyze(hist_df)
-            
-            if result is not None and isinstance(result, dict):
-                chunk_results.append((result, None))
-            else:
-                chunk_results.append((None, "Invalid result type"))
-                
-        except Exception as e:
-            chunk_results.append((None, str(e)))
-    
-    return chunk_results
-
-
-def test_block_walkforward_v2(block_class, block_kwargs, block_name: str, df_full: pd.DataFrame):
-    """
-    Walk-forward test using V2 methodology with MULTICORE PROCESSING
+    Walk-forward test using V2 methodology with FULL HISTORICAL DATA
     
     Key changes:
-    - Uses ALL CPU cores for parallel processing
-    - Much faster than sequential processing
-    - Expanding window (all data from start to current bar)
+    - Uses EXPANDING window (all data from start to current bar)
     - Tests EVERY bar (sample_every=1)
+    - Accepts ALL valid results (including NEUTRAL, INSUFFICIENT_DATA)
+    - Separately tracks "active signals" vs all results
+    - Compatible with long-period indicators (EMA 200, 255, 800)
     """
     
     print("="*80)
-    print(f"🔬 WALK-FORWARD TEST V2 (MULTICORE): {block_name}")
+    print(f"🔬 WALK-FORWARD TEST V2: {block_name}")
     print("="*80)
     print(f"Full Dataset: {len(df_full)} bars from {df_full['timestamp'].min()} to {df_full['timestamp'].max()}")
     
-    # V2 Parameters
-    min_bars = 100
-    sample_every = 1
+    # V2 Parameters - EXPANDING WINDOW (full historical data)
+    min_bars = 100  # Minimum bars before starting tests
+    sample_every = 1  # Test EVERY bar for complete accuracy
     
-    # Get number of CPU cores (leave 1 for system, max 31)
-    num_cores = min(cpu_count() - 1, 31)
-    print(f"🚀 Using {num_cores} CPU cores for parallel processing...")
-    
-    # Prepare chunks for parallel processing
-    indices_to_process = list(range(min_bars, len(df_full), sample_every))
-    total_bars = len(indices_to_process)
-    
-    # Split into chunks (one per core for optimal load balancing)
-    chunk_size = max(1, total_bars // num_cores)
-    chunks = []
-    for i in range(0, total_bars, chunk_size):
-        chunk_indices = indices_to_process[i:i+chunk_size]
-        chunks.append(chunk_indices)
-    
-    print(f"\n📦 Splitting {total_bars} bars into {len(chunks)} chunks (~{chunk_size} bars each)")
-    print(f"🚀 Starting parallel processing with {num_cores} workers...")
-    
-    # Convert dataframe to dict once for all workers
-    df_full_dict = df_full.to_dict('list')
-    
-    # Prepare work items (each worker gets a chunk)
-    work_items = [(chunk, df_full_dict, block_class, block_kwargs) for chunk in chunks]
-    
-    # Process chunks in parallel
-    with Pool(processes=num_cores) as pool:
-        chunk_results = pool.map(process_chunk, work_items)
-    
-    # Flatten results from all chunks
     results = []
     errors = 0
     error_messages = []
     
-    for chunk_result_list in chunk_results:
-        for result, error_msg in chunk_result_list:
-            if result is not None:
-                results.append(result)
-            else:
-                errors += 1
-                if len(error_messages) < 3:
-                    error_messages.append(error_msg)
+    print(f"\nTesting with EXPANDING window (full history, sample_every={sample_every})...")
+    print(f"Starting from bar {min_bars}, using all previous bars for context...")
     
-    print(f"✅ Parallel processing complete!")
+    # EXPANDING window - use ALL data from start to current bar (SEQUENTIAL - fastest for expanding window)
+    for i in range(min_bars, len(df_full), sample_every):
+        try:
+            # EXPANDING window: use ALL data from beginning up to current bar
+            hist_df = df_full.iloc[:i+1].copy()
+            
+            result = block.analyze(hist_df)
+            
+            # V2: Accept ANY valid result (including NEUTRAL, INSUFFICIENT_DATA, etc.)
+            if result is not None and isinstance(result, dict):
+                results.append(result)
+                
+        except Exception as e:
+            errors += 1
+            if errors <= 3:  # Store first 3 error messages
+                error_messages.append(str(e))
+            if errors > 100:  # Stop if too many errors
+                print(f"  ⚠️  Too many errors ({errors}), stopping early")
+                break
     
     # Calculate V2 metrics
     if len(results) == 0:
@@ -157,10 +102,11 @@ def test_block_walkforward_v2(block_class, block_kwargs, block_name: str, df_ful
     confidences = [r.get('confidence', 0) for r in results]
     
     # V2: Separate "active signals" from all results
+    # Active signals = signals that are NOT neutral/error states
     active_signals = [s for s in signals if s not in ['NEUTRAL', 'INSUFFICIENT_DATA', 'ERROR', 'NO_PATTERN', 'NO_ORDER_BLOCK', 'NO_BREAK', 'NO_SWEEP', 'NO_FVG', 'NO_DISPLACEMENT', 'NO_INDUCEMENT', 'NO_OTE', 'NO_CHOCH', 'NO_MSS']]
     active_signal_rate = len(active_signals) / len(signals) if len(signals) > 0 else 0
     
-    # Confidence stats
+    # Confidence stats (only when actively signaling)
     active_confidences = [confidences[i] for i, s in enumerate(signals) if signals[i] in active_signals]
     avg_active_confidence = np.mean(active_confidences) if active_confidences else 0
     avg_all_confidence = np.mean(confidences) if confidences else 0
@@ -175,45 +121,45 @@ def test_block_walkforward_v2(block_class, block_kwargs, block_name: str, df_ful
     for s in signals:
         signal_types[s] = signal_types.get(s, 0) + 1
     
+    # Active signal distribution (for detailed breakdown)
     active_signal_types = {}
     for s in active_signals:
         active_signal_types[s] = active_signal_types.get(s, 0) + 1
     
-    # Track is_new_event
+    # **NEW:** Track is_new_event for blocks that support it (BOS, MSS, etc.)
     new_events = [r for r in results if r.get('metadata', {}).get('is_new_event') == True]
     new_event_count = len(new_events)
     has_event_tracking = any(r.get('metadata', {}).get('is_new_event') is not None for r in results)
-    # **RETEST CONFIRMATION:** Track confirmed retests
-    confirmed_type1 = [r for r in results if r.get('metadata', {}).get('confirmed_bounce') == True]
-    confirmed_type2 = [r for r in results if r.get('metadata', {}).get('confirmed_rejection') == True]
-    total_confirmed_retests = len(confirmed_type1) + len(confirmed_type2)
-    has_retest_confirmation = any(r.get('metadata', {}).get('confirmed_bounce') is not None for r in results)
-
+    
+    # **REVERSAL CONFIRMATION:** Track confirmed reversals (rejection + breakthrough patterns)
+    reversal_rejections = [r for r in results if r.get('metadata', {}).get('reversal_rejection') == True]
+    reversal_breakthroughs = [r for r in results if r.get('metadata', {}).get('reversal_breakthrough') == True]
+    total_reversals = len(reversal_rejections) + len(reversal_breakthroughs)
+    has_reversal_confirmation = any(r.get('metadata', {}).get('reversal_rejection') is not None for r in results)
     
     # Summary
-    print(f"\n📊 RESULTS (V2 Methodology - Multicore):")
+    print(f"\n📊 RESULTS (V2 Methodology):")
     print(f"   Total bars sampled: {len(df_full) // sample_every}")
     print(f"   Valid results: {len(results)}")
     print(f"   Active signals: {len(active_signals)} ({active_signal_rate:.2%} of results)")
     print(f"   Errors: {errors} ({error_rate:.1%} error rate)")
     
     # Calculate days early for retest tracking
-    days = (df_full[\'timestamp\'].max() - df_full[\'timestamp\'].min()).days
+    days = (df_full['timestamp'].max() - df_full['timestamp'].min()).days
     
     if has_event_tracking:
         new_event_rate = new_event_count / len(results) if len(results) > 0 else 0
         print(f"\n   ⭐ NEW EVENTS: {new_event_count} ({new_event_rate:.2%} of results)")
-        print(f"   Continuing state: {len(active_signals) - new_event_count} ({(len(active_signals)
-    if has_retest_confirmation:
-        retest_rate = total_confirmed_retests / len(results) if len(results) > 0 else 0
-        retests_per_day = total_confirmed_retests / max(1, days)
-        print(f"
-   🎯 RETEST CONFIRMATION TRACKING:")
-        print(f"   Confirmed Bounce: {len(confirmed_type1)} ({len(confirmed_type1)/len(results):.2%})")
-        print(f"   Confirmed Rejection: {len(confirmed_type2)} ({len(confirmed_type2)/len(results):.2%})")
-        print(f"   Total Confirmed Retests: {total_confirmed_retests} ({retest_rate:.2%})")
-        print(f"   Retests per day: {retests_per_day:.2f}")
- - new_event_count) / len(active_signals):.2%} of active)")
+        print(f"   Continuing state: {len(active_signals) - new_event_count} ({(len(active_signals) - new_event_count) / len(active_signals):.2%} of active)")
+    
+    if has_reversal_confirmation:
+        reversal_rate = total_reversals / len(results) if len(results) > 0 else 0
+        reversals_per_day = total_reversals / max(1, days)
+        print(f"\n   🎯 REVERSAL PATTERN CONFIRMATION:")
+        print(f"   Bearish Reversals (test then lower highs/lows): {len(reversal_rejections)} ({len(reversal_rejections)/len(results):.2%})")
+        print(f"   Bullish Breakthroughs (break then higher highs/lows): {len(reversal_breakthroughs)} ({len(reversal_breakthroughs)/len(results):.2%})")
+        print(f"   Total Confirmed Reversals: {total_reversals} ({reversal_rate:.2%})")
+        print(f"   Reversals per day: {reversals_per_day:.2f}")
     
     print(f"\n   Average confidence (when active): {avg_active_confidence:.1f}%")
     print(f"   Average confidence (all results): {avg_all_confidence:.1f}%")
@@ -230,10 +176,78 @@ def test_block_walkforward_v2(block_class, block_kwargs, block_name: str, df_ful
             pct = (count / len(active_signals)) * 100
             print(f"      {sig_type}: {count} ({pct:.1f}%)")
     
-    # Calculate signals per day
-    days = (df_full['timestamp'].max() - df_full['timestamp'].min()).days
+    # Calculate signals per day (using active signals) - days already calculated above
     density = len(active_signals) / max(1, days)
     print(f"\n   Active signal density: {density:.2f} signals/day")
+    
+    # **POST-WALKFORWARD VALIDATION:** Validate HOD accuracy against COMPLETE day data
+    print(f"\n🔍 POST-WALKFORWARD HOD ACCURACY VALIDATION:")
+    print(f"   (After walkforward complete, validate against actual complete daily data)")
+    
+    # Group results by day and check final HOD for each day
+    results_df = pd.DataFrame(results)
+    if 'timestamp' in results_df.columns:
+        results_df['timestamp'] = pd.to_datetime(results_df['timestamp'])
+        results_df['date'] = results_df['timestamp'].dt.date
+        
+        # Get last result for each day (final HOD value for that day)
+        daily_hods = {}
+        for date, day_results in results_df.groupby('date'):
+            last_result = day_results.iloc[-1]
+            if 'metadata' in last_result and isinstance(last_result['metadata'], dict):
+                if 'hod' in last_result['metadata']:
+                    daily_hods[date] = {
+                        'reported': last_result['metadata']['hod'],
+                        'timestamp': last_result['timestamp']
+                    }
+        
+        # Compare to actual complete day data
+        hod_errors = 0
+        hod_checks = 0
+        sample_errors = []
+        
+        for date, hod_info in daily_hods.items():
+            # Get COMPLETE day data from df_full
+            day_data_complete = df_full[df_full['timestamp'].dt.date == date]
+            
+            if len(day_data_complete) > 0:
+                actual_hod_complete = float(day_data_complete['high'].max())
+                reported_hod = hod_info['reported']
+                
+                # Compare (allow 0.01% tolerance for floating point)
+                if abs(reported_hod - actual_hod_complete) > actual_hod_complete * 0.0001:
+                    hod_errors += 1
+                    if len(sample_errors) < 5:
+                        sample_errors.append({
+                            'date': date,
+                            'reported': reported_hod,
+                            'actual_complete': actual_hod_complete,
+                            'diff': reported_hod - actual_hod_complete,
+                            'diff_pct': ((reported_hod - actual_hod_complete) / actual_hod_complete) * 100
+                        })
+                
+                hod_checks += 1
+        
+        if hod_checks > 0:
+            hod_accuracy = ((hod_checks - hod_errors) / hod_checks) * 100
+            print(f"   Days checked: {hod_checks}")
+            print(f"   Days with errors: {hod_errors}")
+            print(f"   Accuracy: {hod_accuracy:.2f}%")
+            
+            if hod_errors > 0 and sample_errors:
+                print(f"\n   ⚠️  Days where final HOD doesn't match complete day HOD:")
+                for err in sample_errors:
+                    print(f"      {err['date']}: Reported ${err['reported']:.2f}, Actual ${err['actual_complete']:.2f}")
+                    print(f"         Diff: ${err['diff']:.2f} ({err['diff_pct']:+.2f}%)")
+                print(f"\n   NOTE: Differences expected in walk-forward (we only see data up to each bar)")
+                print(f"   This validates HOD was updated correctly as day progressed.")
+            elif hod_errors == 0:
+                print(f"   ✅ All final daily HODs match complete day data!")
+                print(f"   Perfect accuracy - HOD correctly tracked throughout each day.")
+        else:
+            print(f"   ⚠️  No daily HODs to validate")
+    else:
+        print(f"   ⚠️  Cannot validate - no timestamp in results")
     
     # Show first few active signals
     if active_signals:
@@ -247,16 +261,18 @@ def test_block_walkforward_v2(block_class, block_kwargs, block_name: str, df_ful
                 if count >= 5:
                     break
     
-    # Save results
+    # Save results to proper directory structure
     output_dir = Path(__file__).parent.parent.parent / 'data' / 'reports' / 'walkforward_tests'
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / f'walkforward_results_{block_name}.json'
     
-    # Save CSV
+    # Save detailed signals/trades CSV
     csv_file = output_dir / f'walkforward_results_{block_name}_signals_trades.csv'
     signals_df = pd.DataFrame(results)
     if len(signals_df) > 0:
+        # Flatten metadata if it exists
         if 'metadata' in signals_df.columns:
+            # Extract common metadata fields
             metadata_fields = []
             for idx, row in signals_df.iterrows():
                 meta = row.get('metadata', {})
@@ -265,9 +281,11 @@ def test_block_walkforward_v2(block_class, block_kwargs, block_name: str, df_ful
                 else:
                     metadata_fields.append({})
             
+            # Add metadata columns
             meta_df = pd.DataFrame(metadata_fields)
             signals_df = pd.concat([signals_df.drop('metadata', axis=1), meta_df], axis=1)
         
+        # Flatten confluence_factors if it exists (join list into string)
         if 'confluence_factors' in signals_df.columns:
             signals_df['confluence_factors'] = signals_df['confluence_factors'].apply(
                 lambda x: ' | '.join(x) if isinstance(x, list) else str(x)
@@ -307,9 +325,7 @@ def test_block_walkforward_v2(block_class, block_kwargs, block_name: str, df_ful
         }
     }
     
-    # Calculate days early for retest tracking
-    days = (df_full[\'timestamp\'].max() - df_full[\'timestamp\'].min()).days
-    
+    # Add event tracking metrics if supported
     if has_event_tracking:
         new_event_rate = new_event_count / len(results) if len(results) > 0 else 0
         continuing_rate = (len(active_signals) - new_event_count) / len(active_signals) if len(active_signals) > 0 else 0
@@ -336,13 +352,13 @@ def test_block_walkforward_v2(block_class, block_kwargs, block_name: str, df_ful
 
 
 if __name__ == "__main__":
-    from src.detectors.building_blocks.sessions.us_settlement import USSettlement
+    from src.detectors.building_blocks.price_levels.us_settlement import USSettlement
     
     print("Loading 180 days of BTC 15min data...")
     df = load_btc_data(days=180)
     
     if df is not None and len(df) > 0:
-        # Pass class and kwargs instead of instance (for multiprocessing)
-        test_block_walkforward_v2(USSettlement, {}, "us_settlement", df)
+        block = USSettlement()
+        test_block_walkforward_v2(block, "us_settlement", df)
     else:
         print("❌ Failed to load data")
