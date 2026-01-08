@@ -88,6 +88,13 @@ class ChangeOfCharacter:
         self.last_choch_time = None
         self.choch_intervals = []  # Track time between CHoCHs
         self.max_intervals = 50
+        
+        # ENHANCEMENT 4: 5-Bar Reversal Continuation Detection (2026-01-08)
+        self.reversal_candles = 5  # Bars needed to confirm continuation
+        self.tracking_bullish_continuation = False
+        self.tracking_bearish_continuation = False
+        self.continuation_bars_monitored = 0
+        self.continuation_start_bar = None
     
     def determine_trend(self, df: pd.DataFrame) -> str:
         """Determine current trend"""
@@ -293,6 +300,48 @@ class ChangeOfCharacter:
         
         return {'has_mss': False}
     
+    def check_bullish_continuation_pattern(self, df: pd.DataFrame) -> bool:
+        """
+        ENHANCEMENT 4: Check for bullish continuation pattern (2026-01-08)
+        After BULLISH CHOCH, next 5 bars should show higher highs + higher lows
+        
+        Returns True if pattern confirmed
+        """
+        if len(df) < self.reversal_candles:
+            return False
+        
+        recent_bars = df.iloc[-self.reversal_candles:]
+        highs = recent_bars['high'].values
+        lows = recent_bars['low'].values
+        
+        # Check for consistent higher highs and higher lows
+        for i in range(1, len(highs)):
+            if highs[i] <= highs[i-1] or lows[i] <= lows[i-1]:
+                return False
+        
+        return True
+    
+    def check_bearish_continuation_pattern(self, df: pd.DataFrame) -> bool:
+        """
+        ENHANCEMENT 4: Check for bearish continuation pattern (2026-01-08)
+        After BEARISH CHOCH, next 5 bars should show lower highs + lower lows
+        
+        Returns True if pattern confirmed
+        """
+        if len(df) < self.reversal_candles:
+            return False
+        
+        recent_bars = df.iloc[-self.reversal_candles:]
+        highs = recent_bars['high'].values
+        lows = recent_bars['low'].values
+        
+        # Check for consistent lower highs and lower lows
+        for i in range(1, len(highs)):
+            if highs[i] >= highs[i-1] or lows[i] >= lows[i-1]:
+                return False
+        
+        return True
+    
     def update_time_tracking(self, current_time: datetime) -> Dict[str, Any]:
         """
         ENHANCEMENT 3: Time-Based Analysis (2026-01-04)
@@ -366,12 +415,60 @@ class ChangeOfCharacter:
                 'confluence_factors': ['No clear trend - CHOCH requires established trend']
             }
         
+        # ENHANCEMENT 4: Initialize continuation tracking variables
+        continuation_confirmed = False
+        continuation_type = None
+        bars_monitored = 0
+        
         # Detect CHOCH based on trend
         choch = None
         if trend == 'UPTREND':
             choch = self.detect_choch_in_uptrend(df)
         elif trend == 'DOWNTREND':
             choch = self.detect_choch_in_downtrend(df)
+        
+        # ENHANCEMENT 4: Check if we should start tracking a new continuation
+        if choch:
+            choch_type = choch['type']
+            if choch_type == 'BULLISH_CHOCH':
+                self.tracking_bullish_continuation = True
+                self.tracking_bearish_continuation = False
+                self.continuation_bars_monitored = 0
+                self.continuation_start_bar = len(df) - 1
+            elif choch_type == 'BEARISH_CHOCH':
+                self.tracking_bearish_continuation = True
+                self.tracking_bullish_continuation = False
+                self.continuation_bars_monitored = 0
+                self.continuation_start_bar = len(df) - 1
+        
+        # ENHANCEMENT 4: Check continuation pattern if we're tracking one
+        if self.tracking_bullish_continuation and self.continuation_start_bar is not None:
+            bars_since_choch = len(df) - self.continuation_start_bar
+            bars_monitored = bars_since_choch
+            
+            if bars_since_choch >= self.reversal_candles:
+                # Check if we have the continuation pattern
+                continuation_confirmed = self.check_bullish_continuation_pattern(df)
+                if continuation_confirmed:
+                    continuation_type = 'bullish_continuation'
+                    self.tracking_bullish_continuation = False  # Stop tracking
+                elif bars_since_choch > self.reversal_candles + 5:
+                    # Pattern failed, stop tracking
+                    self.tracking_bullish_continuation = False
+        
+        elif self.tracking_bearish_continuation and self.continuation_start_bar is not None:
+            bars_since_choch = len(df) - self.continuation_start_bar
+            bars_monitored = bars_since_choch
+            
+            if bars_since_choch >= self.reversal_candles:
+                # Check if we have the continuation pattern
+                continuation_confirmed = self.check_bearish_continuation_pattern(df)
+                if continuation_confirmed:
+                    continuation_type = 'bearish_continuation'
+                    self.tracking_bearish_continuation = False  # Stop tracking
+                elif bars_since_choch > self.reversal_candles + 5:
+                    # Pattern failed, stop tracking
+                    self.tracking_bearish_continuation = False
         
         if not choch:
             return {
@@ -410,6 +507,14 @@ class ChangeOfCharacter:
         if mss_data.get('has_mss'):
             confidence += 10  # MSS confirmation = much higher confidence
         
+        # ENHANCEMENT 4: 5-Bar Continuation Confirmation
+        if continuation_confirmed and continuation_type == 'bullish_continuation':
+            if signal == 'BULLISH':
+                confidence += 15  # Huge boost for confirmed continuation
+        elif continuation_confirmed and continuation_type == 'bearish_continuation':
+            if signal == 'BEARISH':
+                confidence += 15  # Huge boost for confirmed continuation
+        
         confidence = min(100, confidence)
         
         # Build confluence (ENHANCED)
@@ -436,6 +541,10 @@ class ChangeOfCharacter:
         
         confluence_factors.append('Character change detected - EARLY reversal signal')
         
+        # ENHANCEMENT 4: Add continuation info to confluence if confirmed
+        if continuation_confirmed:
+            confluence_factors.append(f'⭐ 5-bar {continuation_type.replace("_", " ")} CONFIRMED! (+15 confidence)')
+        
         # Metadata (ENHANCED)
         if choch['type'] == 'BULLISH_CHOCH':
             metadata = {
@@ -452,7 +561,12 @@ class ChangeOfCharacter:
                 'mss_type': mss_data.get('mss_type'),
                 'minutes_since_last_choch': time_data.get('minutes_since_last'),
                 'avg_choch_interval': time_data.get('avg_interval_minutes'),
-                'timing_pattern': time_data.get('timing_note')
+                'timing_pattern': time_data.get('timing_note'),
+                # ENHANCEMENT 4: Continuation tracking
+                'continuation_confirmed': continuation_confirmed,
+                'continuation_type': continuation_type if continuation_confirmed else None,
+                'continuation_candles': self.reversal_candles,
+                'bars_monitored': bars_monitored
             }
         else:
             metadata = {
@@ -469,7 +583,12 @@ class ChangeOfCharacter:
                 'mss_type': mss_data.get('mss_type'),
                 'minutes_since_last_choch': time_data.get('minutes_since_last'),
                 'avg_choch_interval': time_data.get('avg_interval_minutes'),
-                'timing_pattern': time_data.get('timing_note')
+                'timing_pattern': time_data.get('timing_note'),
+                # ENHANCEMENT 4: Continuation tracking
+                'continuation_confirmed': continuation_confirmed,
+                'continuation_type': continuation_type if continuation_confirmed else None,
+                'continuation_candles': self.reversal_candles,
+                'bars_monitored': bars_monitored
             }
         
         # Store in history for MSS tracking
