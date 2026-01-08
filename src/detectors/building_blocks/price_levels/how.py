@@ -54,10 +54,10 @@ class HOW:
         self.prev_how = None
         self.prev_signal = None
         
-        # RETEST CONFIRMATION: Track retests of HOW level
-        self.confirmation_candles = 2  # Require 2 consecutive bars (more realistic)
-        self.rejection_test_bars = []  # Track bars testing resistance
-        self.breakthrough_bars = []  # Track bars breaking above
+        # REVERSAL CONFIRMATION: Track price action after testing HOW
+        self.reversal_candles = 5  # Monitor 5 candles after test for reversal pattern
+        self.last_how_test_bar = None  # Bar that tested HOW
+        self.bars_since_test = []  # Track bars after HOW test for reversal detection
         
         # Bitcoin-specific distance thresholds (% from HOW)
         self.btc_distance_thresholds = {
@@ -232,65 +232,68 @@ class HOW:
         distance_pct = self.calculate_distance(current_price, how)
         distance_class = self.classify_distance(distance_pct)
         
-        # RETEST CONFIRMATION: Track HOW retests
-        confirmed_rejection = False
-        confirmed_breakthrough = False
+        # REVERSAL CONFIRMATION: Detect reversal patterns after testing HOW (resistance)
+        reversal_rejection = False  # Bearish reversal after testing resistance
+        reversal_breakthrough = False  # Bullish continuation after breaking resistance
         
         current_bar = {
             'close': current_price,
             'low': float(df['low'].iloc[-1]),
             'high': float(df['high'].iloc[-1]),
             'distance': distance_pct,
-            'breached_above': float(df['high'].iloc[-1]) > how,
-            'breached_below': float(df['low'].iloc[-1]) < how,
-            'closed_above': current_price > how,
-            'closed_below': current_price < how
+            'tested_how': distance_class in ['AT_HOW', 'VERY_CLOSE', 'CLOSE'] and distance_pct < 0
         }
         
-        # REJECTION TEST: Price wicks ABOVE HOW but closes BELOW (resistance holding)
-        if current_bar['breached_above'] and current_bar['closed_below']:
-            self.rejection_test_bars.append(current_bar)
-            if len(self.rejection_test_bars) > self.confirmation_candles + 2:
-                self.rejection_test_bars.pop(0)
-            
-            if len(self.rejection_test_bars) >= self.confirmation_candles:
-                recent_bars = self.rejection_test_bars[-self.confirmation_candles:]
-                all_tested_and_rejected = all(
-                    bar['breached_above'] and bar['closed_below']
-                    for bar in recent_bars
-                )
-                
-                if all_tested_and_rejected:
-                    confirmed_rejection = True
-                    self.rejection_test_bars = []
-        elif distance_class not in ['AT_HOW', 'VERY_CLOSE']:
-            if len(self.rejection_test_bars) > 0:
-                self.rejection_test_bars = []
+        # Check if testing HOW (came close from below but didn't break)
+        if current_bar['tested_how'] and not is_new_how:
+            self.last_how_test_bar = current_bar
+            self.bars_since_test = []
         
-        # BREAKTHROUGH TEST: Price closes ABOVE HOW (resistance broken)
-        if current_bar['closed_above']:
-            self.breakthrough_bars.append(current_bar)
-            if len(self.breakthrough_bars) > self.confirmation_candles + 2:
-                self.breakthrough_bars.pop(0)
+        # Monitor bars after test
+        if self.last_how_test_bar is not None:
+            self.bars_since_test.append(current_bar)
             
-            if len(self.breakthrough_bars) >= self.confirmation_candles:
-                recent_bars = self.breakthrough_bars[-self.confirmation_candles:]
-                all_closed_above = all(
-                    bar['closed_above']
-                    for bar in recent_bars
-                )
+            if len(self.bars_since_test) > self.reversal_candles:
+                self.bars_since_test.pop(0)
+            
+            # Check for BEARISH REVERSAL (lower highs + lower lows after testing resistance)
+            if len(self.bars_since_test) >= self.reversal_candles:
+                recent = self.bars_since_test[-self.reversal_candles:]
                 
-                if all_closed_above:
-                    confirmed_breakthrough = True
-                    self.breakthrough_bars = []
-        elif current_bar['closed_below']:
-            if len(self.breakthrough_bars) > 0:
-                self.breakthrough_bars = []
+                lower_highs = all(recent[i]['high'] < recent[i-1]['high'] for i in range(1, len(recent)))
+                lower_lows = all(recent[i]['low'] < recent[i-1]['low'] for i in range(1, len(recent)))
+                
+                if lower_highs and lower_lows:
+                    reversal_rejection = True
+                    self.last_how_test_bar = None
+                    self.bars_since_test = []
+            
+            # Reset if price breaks level or moves far away
+            if is_new_how or distance_class == 'FAR':
+                self.last_how_test_bar = None
+                self.bars_since_test = []
         
-        # Determine signal (ENHANCED with retest confirmation)
-        if confirmed_breakthrough:
+        # Check for BULLISH BREAKTHROUGH (higher highs + higher lows after breaking resistance)
+        if is_new_how:
+            self.bars_since_test = [current_bar]
+        
+        if is_new_how or (self.prev_how is not None and how > self.prev_how):
+            if len(self.bars_since_test) > 0 and len(self.bars_since_test) < self.reversal_candles:
+                self.bars_since_test.append(current_bar)
+                
+                if len(self.bars_since_test) >= self.reversal_candles:
+                    recent = self.bars_since_test[-self.reversal_candles:]
+                    
+                    higher_highs = all(recent[i]['high'] > recent[i-1]['high'] for i in range(1, len(recent)))
+                    higher_lows = all(recent[i]['low'] > recent[i-1]['low'] for i in range(1, len(recent)))
+                    
+                    if higher_highs and higher_lows:
+                        reversal_breakthrough = True
+        
+        # Determine signal (ENHANCED with reversal confirmation)
+        if reversal_breakthrough:
             signal = 'BULLISH'
-        elif confirmed_rejection:
+        elif reversal_rejection:
             signal = 'BEARISH'
         elif breakout_status == 'BREAKOUT_CONFIRMED' or is_new_how:
             signal = 'BULLISH'
@@ -307,25 +310,27 @@ class HOW:
             is_new_event = True
         elif is_new_how:
             is_new_event = True
-        elif confirmed_rejection or confirmed_breakthrough:
+        elif reversal_rejection or reversal_breakthrough:
             is_new_event = True
         
-        # ENHANCEMENT 3: Variable confidence (BOOSTED for retest confirmation)
+        # ENHANCEMENT 3: Variable confidence (BOOSTED for reversal confirmation)
         confidence = self.calculate_variable_confidence(signal, distance_class, is_new_event)
         
-        if confirmed_rejection or confirmed_breakthrough:
-            confidence = min(95, confidence + 20)
+        if reversal_rejection or reversal_breakthrough:
+            confidence = min(95, confidence + 25)
         
         # Build confluence
         confluence_factors = []
         
-        # Retest confirmation confluence (HIGHEST PRIORITY)
-        if confirmed_rejection:
-            confluence_factors.append('⭐⭐ CONFIRMED REJECTION FROM HOW - Strong weekly bearish setup!')
-            confluence_factors.append(f'✓ {self.confirmation_candles} retests: wicked above, closed below (weekly resistance holding!)')
-        elif confirmed_breakthrough:
-            confluence_factors.append('⭐⭐ CONFIRMED BREAKTHROUGH ABOVE HOW - Strong weekly bullish setup!')
-            confluence_factors.append(f'✓ {self.confirmation_candles} bars: closed above HOW (weekly resistance broken!)')
+        # Reversal confirmation confluence (HIGHEST PRIORITY)
+        if reversal_rejection:
+            confluence_factors.append('⭐⭐⭐ BEARISH REVERSAL CONFIRMED AT HOW!')
+            confluence_factors.append(f'✓ Tested HOW then {self.reversal_candles} bars of lower highs + lower lows')
+            confluence_factors.append('✓ Strong reversal pattern - weekly resistance holding with downtrend forming')
+        elif reversal_breakthrough:
+            confluence_factors.append('⭐⭐⭐ BULLISH BREAKTHROUGH CONFIRMED AT HOW!')
+            confluence_factors.append(f'✓ Broke HOW then {self.reversal_candles} bars of higher highs + higher lows')
+            confluence_factors.append('✓ Strong continuation pattern - weekly uptrend established')
         
         # Event-specific confluence
         elif is_new_event:
@@ -365,9 +370,10 @@ class HOW:
             'is_major_resistance': distance_class in ['AT_HOW', 'VERY_CLOSE'] and distance_pct < 0,
             'is_breaking_out': breakout_status in ['BREAKING_OUT', 'BREAKOUT_CONFIRMED'],
             'is_new_event': is_new_event,
-            'confirmed_rejection': confirmed_rejection,
-            'confirmed_breakthrough': confirmed_breakthrough,
-            'confirmation_candles': self.confirmation_candles
+            'reversal_rejection': reversal_rejection,  # NEW: Bearish reversal after testing HOW
+            'reversal_breakthrough': reversal_breakthrough,  # NEW: Bullish continuation after breaking HOW
+            'reversal_candles': self.reversal_candles,
+            'bars_monitored': len(self.bars_since_test)
         }
         
         return {
