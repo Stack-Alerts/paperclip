@@ -55,7 +55,7 @@ class HOW:
         self.prev_signal = None
         
         # RETEST CONFIRMATION: Track retests of HOW level
-        self.confirmation_candles = 3  # Require 3 consecutive bars
+        self.confirmation_candles = 2  # Require 2 consecutive bars (more realistic)
         self.rejection_test_bars = []  # Track bars testing resistance
         self.breakthrough_bars = []  # Track bars breaking above
         

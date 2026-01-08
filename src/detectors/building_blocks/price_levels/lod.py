@@ -58,7 +58,7 @@ class LOD:
         self.prev_signal = None
         
         # RETEST CONFIRMATION: Track retests of LOD level
-        self.confirmation_candles = 3  # Require 3 consecutive bars
+        self.confirmation_candles = 2  # Require 2 consecutive bars (more realistic)
         self.bounce_test_bars = []  # Track bars testing support
         self.breakdown_bars = []  # Track bars breaking below
         

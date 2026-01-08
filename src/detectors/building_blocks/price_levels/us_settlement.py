@@ -41,7 +41,7 @@ class USSettlement:
         self.settlement_hour_utc = settlement_hour_utc
         
         # RETEST CONFIRMATION: Track retests of settlement level
-        self.confirmation_candles = 3  # Require 3 consecutive bars
+        self.confirmation_candles = 2  # Require 2 consecutive bars (more realistic)
         self.bounce_test_bars = []  # Track bars testing support (below settlement)
         self.rejection_test_bars = []  # Track bars testing resistance (above settlement)
         
