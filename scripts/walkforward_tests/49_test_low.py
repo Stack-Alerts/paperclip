@@ -128,6 +128,9 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     print(f"   Active signals: {len(active_signals)} ({active_signal_rate:.2%} of results)")
     print(f"   Errors: {errors} ({error_rate:.1%} error rate)")
     
+    # Calculate days early for retest tracking
+    days = (df_full[\'timestamp\'].max() - df_full[\'timestamp\'].min()).days
+    
     if has_event_tracking:
         new_event_rate = new_event_count / len(results) if len(results) > 0 else 0
         print(f"\n   ⭐ NEW EVENTS: {new_event_count} ({new_event_rate:.2%} of results)")
@@ -304,6 +307,9 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
             'total_bars_available': len(df_full)
         }
     }
+    
+    # Calculate days early for retest tracking
+    days = (df_full[\'timestamp\'].max() - df_full[\'timestamp\'].min()).days
     
     if has_event_tracking:
         new_event_rate = new_event_count / len(results) if len(results) > 0 else 0

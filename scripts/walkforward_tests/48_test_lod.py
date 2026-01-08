@@ -144,6 +144,9 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     print(f"   Active signals: {len(active_signals)} ({active_signal_rate:.2%} of results)")
     print(f"   Errors: {errors} ({error_rate:.1%} error rate)")
     
+    # Calculate days early for retest tracking
+    days = (df_full[\'timestamp\'].max() - df_full[\'timestamp\'].min()).days
+    
     if has_event_tracking:
         new_event_rate = new_event_count / len(results) if len(results) > 0 else 0
         print(f"\n   ⭐ NEW EVENTS: {new_event_count} ({new_event_rate:.2%} of results)")
@@ -174,8 +177,7 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
             pct = (count / len(active_signals)) * 100
             print(f"      {sig_type}: {count} ({pct:.1f}%)")
     
-    # Calculate signals per day (using active signals)
-    days = (df_full['timestamp'].max() - df_full['timestamp'].min()).days
+    # Calculate signals per day (using active signals) - days already calculated above
     density = len(active_signals) / max(1, days)
     print(f"\n   Active signal density: {density:.2f} signals/day")
     
@@ -325,6 +327,9 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     }
     
     # Add event tracking metrics if supported
+    # Calculate days early for retest tracking
+    days = (df_full[\'timestamp\'].max() - df_full[\'timestamp\'].min()).days
+    
     if has_event_tracking:
         new_event_rate = new_event_count / len(results) if len(results) > 0 else 0
         continuing_rate = (len(active_signals) - new_event_count) / len(active_signals) if len(active_signals) > 0 else 0
