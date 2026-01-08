@@ -130,6 +130,12 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     new_events = [r for r in results if r.get('metadata', {}).get('is_new_event') == True]
     new_event_count = len(new_events)
     has_event_tracking = any(r.get('metadata', {}).get('is_new_event') is not None for r in results)
+    # **RETEST CONFIRMATION:** Track confirmed retests
+    confirmed_type1 = [r for r in results if r.get('metadata', {}).get('confirmed_bounce') == True]
+    confirmed_type2 = [r for r in results if r.get('metadata', {}).get('confirmed_breakdown') == True]
+    total_confirmed_retests = len(confirmed_type1) + len(confirmed_type2)
+    has_retest_confirmation = any(r.get('metadata', {}).get('confirmed_bounce') is not None for r in results)
+
     
     # Summary
     print(f"\n📊 RESULTS (V2 Metlodology):")
@@ -141,7 +147,17 @@ def test_block_walkforward_v2(block, block_name: str, df_full: pd.DataFrame):
     if has_event_tracking:
         new_event_rate = new_event_count / len(results) if len(results) > 0 else 0
         print(f"\n   ⭐ NEW EVENTS: {new_event_count} ({new_event_rate:.2%} of results)")
-        print(f"   Continuing state: {len(active_signals) - new_event_count} ({(len(active_signals) - new_event_count) / len(active_signals):.2%} of active)")
+        print(f"   Continuing state: {len(active_signals) - new_event_count} ({(len(active_signals)
+    if has_retest_confirmation:
+        retest_rate = total_confirmed_retests / len(results) if len(results) > 0 else 0
+        retests_per_day = total_confirmed_retests / max(1, days)
+        print(f"
+   🎯 RETEST CONFIRMATION TRACKING:")
+        print(f"   Confirmed Bounce: {len(confirmed_type1)} ({len(confirmed_type1)/len(results):.2%})")
+        print(f"   Confirmed Breakdown: {len(confirmed_type2)} ({len(confirmed_type2)/len(results):.2%})")
+        print(f"   Total Confirmed Retests: {total_confirmed_retests} ({retest_rate:.2%})")
+        print(f"   Retests per day: {retests_per_day:.2f}")
+ - new_event_count) / len(active_signals):.2%} of active)")
     
     print(f"\n   Average confidence (when active): {avg_active_confidence:.1f}%")
     print(f"   Average confidence (all results): {avg_all_confidence:.1f}%")
