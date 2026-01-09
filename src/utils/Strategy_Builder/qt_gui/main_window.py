@@ -145,7 +145,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         left_layout = QVBoxLayout(left_widget)
         
         list_label = QLabel("📋 Strategies")
-        list_label.setStyleSheet("font-size: 32pt; font-weight: bold; color: #ffffff;")
+        list_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #ffffff;")
         left_layout.addWidget(list_label)
         
         self.strategy_list = QListWidget()
@@ -158,7 +158,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         right_layout = QVBoxLayout(right_widget)
         
         editor_label = QLabel("📝 Strategy Details")
-        editor_label.setStyleSheet("font-size: 32pt; font-weight: bold; color: #ffffff;")
+        editor_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #ffffff;")
         right_layout.addWidget(editor_label)
         
         self.details_text = QTextEdit()
