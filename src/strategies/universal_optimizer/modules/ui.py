@@ -11,12 +11,23 @@ from .data_classes import ConfigPerformance
 
 def display_top_5_configs(results: List[ConfigPerformance], iteration: int):
     """
-    Display top 5 configurations with full details including fees
+    Display top 5 configurations with COMPREHENSIVE institutional-grade metrics
     """
     print("\n" + "="*80)
-    print("OPTIMIZATION COMPLETE - SELECT CONFIGURATION")
+    print("OPTIMIZATION RESULTS - INSTITUTIONAL GRADE REPORT")
     print("="*80)
-    print(f"\nIteration: {iteration} of 5\n")
+    print(f"\nIteration: {iteration} of 5")
+    
+    # Display test parameters
+    print("\n" + "-"*80)
+    print("TEST PARAMETERS:")
+    print("-"*80)
+    print(f"   ├─ Starting Capital: $10,000.00")
+    print(f"   ├─ Position Size: 0.01 BTC per trade (~$950 @ $95K BTC)")
+    print(f"   ├─ Leverage: 1x (SPOT ONLY - No margin)")
+    print(f"   ├─ Fee Structure: 0.06% taker per side (0.12% round-trip)")
+    print(f"   ├─ Test Period: 180 days")
+    print(f"   └─ Total Configs Tested: 48\n")
     
     preset_names = ['Balanced', 'Event-Heavy', 'Context-Heavy', 'Conservative']
     
@@ -24,19 +35,42 @@ def display_top_5_configs(results: List[ConfigPerformance], iteration: int):
         # Determine config type from config_id
         config_type = preset_names[(result.config_id // 12) % 4]
         
+        # Calculate final capital
+        starting_capital = 10000.0
+        final_capital = starting_capital + result.net_pnl
+        
         if i == 1:
             label = f"#{i}: {config_type} Configuration (RECOMMENDED)"
         else:
             label = f"#{i}: {config_type} Configuration"
         
         print(f"\n{label}")
-        print(f"   ├─ Trades: {result.total_trades}")
-        print(f"   ├─ PnL: ${result.total_pnl:+.2f}")
-        print(f"   ├─ Fees: -${result.total_fees:.2f}")
-        print(f"   ├─ Net PnL: ${result.net_pnl:+.2f} ({result.net_return_pct:+.2f}%)")
-        print(f"   ├─ Win Rate: {result.win_rate_pct:.1f}%")
-        print(f"   ├─ Profit Factor: {result.profit_factor:.2f}")
-        print(f"   └─ Sharpe: {result.sharpe_ratio:.2f}")
+        print(f"   ├─ Config ID: {result.config_id}")
+        print(f"   │")
+        print(f"   ├─ TRADING PERFORMANCE:")
+        print(f"   │  ├─ Total Trades: {result.total_trades}")
+        print(f"   │  ├─ Winning Trades: {result.winning_trades} ({result.win_rate_pct:.1f}%)")
+        print(f"   │  ├─ Losing Trades: {result.losing_trades}")
+        print(f"   │  ├─ Avg Win: ${result.avg_win:.2f}")
+        print(f"   │  ├─ Avg Loss: ${result.avg_loss:.2f}")
+        print(f"   │  ├─ Largest Win: ${result.largest_win:.2f}")
+        print(f"   │  └─ Largest Loss: ${result.largest_loss:.2f}")
+        print(f"   │")
+        print(f"   ├─ FINANCIAL RESULTS:")
+        print(f"   │  ├─ Gross PnL: ${result.total_pnl:+.2f}")
+        print(f"   │  ├─ Total Fees: -${result.total_fees:.2f}")
+        print(f"   │  ├─ Net PnL: ${result.net_pnl:+.2f}")
+        print(f"   │  ├─ Net Return: {result.net_return_pct:+.2f}%")
+        print(f"   │  ├─ Starting Capital: ${starting_capital:,.2f}")
+        print(f"   │  └─ Final Capital: ${final_capital:,.2f}")
+        print(f"   │")
+        print(f"   ├─ RISK METRICS:")
+        print(f"   │  ├─ Profit Factor: {result.profit_factor:.2f}")
+        print(f"   │  ├─ Sharpe Ratio: {result.sharpe_ratio:.2f}")
+        print(f"   │  ├─ Max Drawdown: {result.max_drawdown_pct:.2f}%")
+        print(f"   │  └─ Risk-Adjusted Return: {result.net_return_pct / max(result.max_drawdown_pct, 0.1):.2f}")
+        print(f"   │")
+        print(f"   └─ TRADE RECORD: optimization_results/config_{result.config_id}_trades.csv")
 
 
 def prompt_user_selection() -> int:

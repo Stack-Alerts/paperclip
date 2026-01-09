@@ -133,6 +133,10 @@ def optimize_strategy_v2(
     # 6. Sort results
     results.sort(key=lambda x: x.get_sortable_score(), reverse=True)
     
+    # 6.5. Export trade records for top 5 configs
+    print(f"\n📊 Exporting trade records for top 5 configurations...")
+    export_trade_records(results[:5], configs, strategy_module_name)
+    
     # 7. Display top 5
     display_top_5_configs(results[:5], iteration.iteration_count + 1)
     
@@ -260,3 +264,73 @@ def run_multi_config_optimization(
     from .ultra_hybrid_simulator import UltraHybridSimulator
     ultra_sim = UltraHybridSimulator()
     return ultra_sim.optimize(configs, warmup_df, test_df, strategy_module_name)
+
+
+def export_trade_records(
+    top_results: List[ConfigPerformance],
+    configs: List[OptimizationConfig],
+    strategy_name: str
+):
+    """
+    Export detailed trade records for top configurations to CSV files
+    
+    Args:
+        top_results: Top 5 ConfigPerformance results
+        configs: All optimization configs
+        strategy_name: Strategy name for directory
+    """
+    from pathlib import Path
+    
+    # Create results directory
+    results_dir = Path('optimization_results') / strategy_name
+    results_dir.mkdir(parents=True, exist_ok=True)
+    
+    for result in top_results:
+        config = configs[result.config_id]
+        
+        # Create CSV filename
+        csv_file = results_dir / f'config_{result.config_id}_trades.csv'
+        
+        # Export trades if they exist
+        if hasattr(result, 'trades') and result.trades:
+            trades_df = pd.DataFrame([t.to_dict() for t in result.trades])
+            trades_df.to_csv(csv_file, index=False)
+            print(f"   ✅ Exported {len(result.trades)} trades → {csv_file}")
+        else:
+            # Create summary file even if no trades
+            with open(csv_file, 'w') as f:
+                f.write("No trades executed for this configuration\n")
+                f.write(f"Config ID: {result.config_id}\n")
+                f.write(f"Min Confluence: {config.min_confluence}\n")
+                f.write(f"Min Risk:Reward: {config.min_risk_reward}\n")
+            print(f"   ⚠️  Config {result.config_id}: No trades executed")
+    
+    # Export summary CSV
+    summary_file = results_dir / 'optimization_summary.csv'
+    summary_data = []
+    for result in top_results:
+        config = configs[result.config_id]
+        summary_data.append({
+            'config_id': result.config_id,
+            'min_confluence': config.min_confluence,
+            'min_risk_reward': config.min_risk_reward,
+            'total_trades': result.total_trades,
+            'winning_trades': result.winning_trades,
+            'losing_trades': result.losing_trades,
+            'win_rate_pct': result.win_rate_pct,
+            'total_pnl': result.total_pnl,
+            'total_fees': result.total_fees,
+            'net_pnl': result.net_pnl,
+            'net_return_pct': result.net_return_pct,
+            'profit_factor': result.profit_factor,
+            'sharpe_ratio': result.sharpe_ratio,
+            'max_drawdown_pct': result.max_drawdown_pct,
+            'avg_win': result.avg_win,
+            'avg_loss': result.avg_loss,
+            'largest_win': result.largest_win,
+            'largest_loss': result.largest_loss
+        })
+    
+    summary_df = pd.DataFrame(summary_data)
+    summary_df.to_csv(summary_file, index=False)
+    print(f"   ✅ Summary exported → {summary_file}")
