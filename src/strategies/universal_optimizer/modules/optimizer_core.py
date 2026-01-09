@@ -1068,14 +1068,20 @@ def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
         block_module = block['module']
         block_weight = block['weight']
         
+        # Sanitize class name: remove spaces and special characters
+        # "EMA 20/50 Trend" -> "EMA2050Trend"
+        # "Session Time" -> "SessionTime"
+        # "VWAP" -> "VWAP"
+        class_name = block_name.replace(' ', '').replace('/', '').replace('-', '').replace('_', '')
+        
         # Generate import
         # e.g., from src.detectors.building_blocks.institutional.vwap import VWAP
-        import_line = f"from src.detectors.building_blocks.{block_module} import {block_name.replace(' ', '')}\n"
+        import_line = f"from src.detectors.building_blocks.{block_module} import {class_name}\n"
         added_imports.append(import_line)
         
         # Generate detector init
         # self.detectors['vwap'] = VWAP(timeframe='15min')
-        detector_init = f"        self.detectors['{block_key}'] = {block_name.replace(' ', '')}(timeframe='15min')\n"
+        detector_init = f"        self.detectors['{block_key}'] = {class_name}(timeframe='15min')\n"
         
         # Generate block config
         # 'vwap': {'weight': 12, 'enabled': True},
