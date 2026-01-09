@@ -296,26 +296,46 @@ class HybridConfigSimulator:
         log_debug("Starting bar processing...")
         all_building_block_results = []
         
+        import time
+        total_start = time.time()
+        
         for i in range(warmup_bar_count, len(full_df)):
-            if (i - warmup_bar_count) % 2000 == 0:
-                pct = (i - warmup_bar_count) / len(test_df) * 100
-                log_debug(f"Progress: {pct:.1f}% (bar {i - warmup_bar_count}/{len(test_df)})")
+            bar_num = i - warmup_bar_count
+            
+            # More frequent progress updates (every 100 bars)
+            if bar_num % 100 == 0:
+                pct = bar_num / len(test_df) * 100
+                elapsed = time.time() - total_start
+                bars_per_sec = bar_num / elapsed if elapsed > 0 else 0
+                eta_sec = (len(test_df) - bar_num) / bars_per_sec if bars_per_sec > 0 else 0
+                log_debug(f"Progress: {pct:.1f}% (bar {bar_num}/{len(test_df)}) - {bars_per_sec:.1f} bars/sec - ETA: {eta_sec:.0f}s")
+                
+            # Print every 2000 bars
+            if bar_num % 2000 == 0:
+                pct = bar_num / len(test_df) * 100
                 print(f"   Phase 1 progress: {pct:.1f}%...")
             
-            if (i - warmup_bar_count) == 0:
+            if bar_num == 0:
                 log_debug("Processing first bar...")
             
             history = full_df.iloc[:i+1]
             
             # Run building blocks ONCE for this bar
             try:
+                bar_start = time.time()
                 results = strategy._analyze_blocks(history)
+                bar_time = time.time() - bar_start
                 all_building_block_results.append(results)
                 
-                if (i - warmup_bar_count) == 0:
-                    log_debug(f"First bar processed successfully, got {len(results)} block results")
+                if bar_num == 0:
+                    log_debug(f"First bar processed in {bar_time:.3f}s, got {len(results)} block results")
+                elif bar_num == 1:
+                    log_debug(f"Second bar processed in {bar_time:.3f}s")
+                elif bar_num == 10:
+                    log_debug(f"Bar 10 processed in {bar_time:.3f}s (avg: {(time.time() - total_start) / 11:.3f}s/bar)")
+                    
             except Exception as e:
-                log_debug(f"ERROR at bar {i - warmup_bar_count}: {str(e)}")
+                log_debug(f"ERROR at bar {bar_num}: {str(e)}")
                 import traceback
                 log_debug(traceback.format_exc())
                 raise
