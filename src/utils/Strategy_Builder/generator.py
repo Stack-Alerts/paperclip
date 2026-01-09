@@ -82,8 +82,9 @@ class StrategyGenerator:
         # Render template
         code = self.strategy_template.render(**context)
         
-        # Generate filename
-        filename = f"strategy_{config.strategy_number:03d}_{config.strategy_name.lower().replace(' ', '_')}.py"
+        # Generate filename (use cleaned name to avoid double-prefix)
+        clean_name = self._clean_strategy_name(config.strategy_name)
+        filename = f"strategy_{config.strategy_number:03d}_{clean_name.lower().replace(' ', '_')}.py"
         filepath = output_dir / filename
         
         # Save file
@@ -123,8 +124,9 @@ class StrategyGenerator:
         # Render template
         code = self.test_template.render(**context)
         
-        # Generate filename
-        filename = f"test_{config.strategy_number:03d}_{config.strategy_name.lower().replace(' ', '_')}.py"
+        # Generate filename (use cleaned name to avoid double-prefix)
+        clean_name = self._clean_strategy_name(config.strategy_name)
+        filename = f"test_{config.strategy_number:03d}_{clean_name.lower().replace(' ', '_')}.py"
         filepath = output_dir / filename
         
         # Save file
@@ -164,8 +166,9 @@ class StrategyGenerator:
         # Render template
         yaml_content = self.optimizer_template.render(**context)
         
-        # Generate filename
-        filename = f"optimizer_{config.strategy_number:03d}_{config.strategy_name.lower().replace(' ', '_')}.yaml"
+        # Generate filename (use cleaned name to avoid double-prefix)
+        clean_name = self._clean_strategy_name(config.strategy_name)
+        filename = f"optimizer_{config.strategy_number:03d}_{clean_name.lower().replace(' ', '_')}.yaml"
         filepath = output_dir / filename
         
         # Save file
@@ -213,11 +216,14 @@ class StrategyGenerator:
         Returns:
             Dictionary of context variables for templates
         """
+        # Clean strategy name (remove any existing strategy_XX_ prefix)
+        clean_name = self._clean_strategy_name(config.strategy_name)
+        
         # Generate class name (PascalCase)
-        class_name = self._generate_class_name(config.strategy_name)
+        class_name = self._generate_class_name(clean_name)
         
         # Generate filename (snake_case)
-        filename = f"strategy_{config.strategy_number:03d}_{config.strategy_name.lower().replace(' ', '_')}"
+        filename = f"strategy_{config.strategy_number:03d}_{clean_name.lower().replace(' ', '_')}"
         
         # Generate imports
         imports = self._generate_imports(config.blocks)
@@ -232,6 +238,25 @@ class StrategyGenerator:
         }
         
         return context
+    
+    def _clean_strategy_name(self, strategy_name: str) -> str:
+        """
+        Remove any existing strategy_XX_ prefix from name
+        
+        Args:
+            strategy_name: Original strategy name
+            
+        Returns:
+            Cleaned name without prefix
+            
+        Examples:
+            "strategy_01_test_strategy" -> "test_strategy"
+            "test_strategy" -> "test_strategy"
+        """
+        # Pattern: strategy_\d+_
+        pattern = r'^strategy_\d+_'
+        cleaned = re.sub(pattern, '', strategy_name)
+        return cleaned if cleaned else strategy_name
     
     def _generate_class_name(self, strategy_name: str) -> str:
         """
