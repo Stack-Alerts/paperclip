@@ -133,7 +133,39 @@ def optimize_strategy_v2(
     # 6. Sort results
     results.sort(key=lambda x: x.get_sortable_score(), reverse=True)
     
-    # 6.5. Export trade records for top 5 configs
+    # 6.5. VALIDATE RESULTS - INSTITUTIONAL GRADE
+    print(f"\n🔍 Running institutional-grade result validation...")
+    issues = validate_optimization_results(results, test_days, configs)
+    
+    if issues:
+        print(f"\n⚠️  VALIDATION ISSUES DETECTED")
+        display_diagnostic_report(issues, results, configs)
+        
+        # Offer auto-fix
+        action = prompt_diagnostic_action()
+        
+        if action == 'adjust':
+            print(f"\n🔧 Auto-adjusting parameters and re-running...")
+            adjusted_configs = auto_adjust_configs(configs, issues)
+            
+            # Re-run with adjusted configs
+            results = run_multi_config_optimization(
+                adjusted_configs,
+                warmup_df,
+                test_df,
+                strategy_module_name,
+                use_multicore
+            )
+            results.sort(key=lambda x: x.get_sortable_score(), reverse=True)
+            configs = adjusted_configs  # Use adjusted configs going forward
+            print(f"\n✅ Re-optimization complete with adjusted parameters")
+            
+        elif action == 'quit':
+            print(f"\n⚠️  Optimization cancelled due to validation issues")
+            return None
+        # If 'proceed', continue with results as-is
+    
+    # 6.6. Export trade records for top 5 configs
     print(f"\n📊 Exporting trade records for top 5 configurations...")
     export_trade_records(results[:5], configs, strategy_module_name)
     
@@ -334,3 +366,255 @@ def export_trade_records(
     summary_df = pd.DataFrame(summary_data)
     summary_df.to_csv(summary_file, index=False)
     print(f"   ✅ Summary exported → {summary_file}")
+
+
+def validate_optimization_results(
+    results: List[ConfigPerformance],
+    test_days: int,
+    configs: List[OptimizationConfig]
+) -> List[dict]:
+    """
+    Institutional-grade result validation
+    
+    Detects:
+    - Abnormally low trade counts (simulator bugs)
+    - Unrealistic configurations (parameters too strict)
+    - Data quality issues
+    - Performance anomalies
+    
+    Returns:
+        List of issues (empty if all valid)
+    """
+    issues = []
+    
+    # Expected trades per month (rough baseline)
+    expected_trades_per_month = 5  # Conservative estimate
+    expected_total = (test_days / 30) * expected_trades_per_month
+    
+    # Check top 5 configs
+    top_5 = results[:5]
+    all_trades = [r.total_trades for r in top_5]
+    avg_trades = sum(all_trades) / len(all_trades) if all_trades else 0
+    max_trades = max(all_trades) if all_trades else 0
+    
+    # Issue 1: Abnormally low trade count (likely simulator bug)
+    if max_trades <2:
+        issues.append({
+            'severity': 'CRITICAL',
+            'type': 'LOW_TRADE_COUNT',
+            'description': f'Only {max_trades} trade(s) generated in {test_days} days',
+            'expected': f'{int(expected_total)} trades ({expected_trades_per_month}/month)',
+            'actual': f'{max_trades} trades',
+            'likely_cause': 'Simulator bug OR parameters too strict',
+            'recommendation': 'Lower confluence threshold OR reduce risk:reward requirement',
+            'auto_fix': 'lower_thresholds'
+        })
+    
+    elif avg_trades < expected_total * 0.3:  # Less than 30% of expected
+        issues.append({
+            'severity': 'WARNING',
+            'type': 'BELOW_EXPECTED_TRADES',
+            'description': f'Trade count below expected ({avg_trades:.0f} vs {expected_total:.0f})',
+            'expected': f'{int(expected_total)} trades',
+            'actual': f'{avg_trades:.0f} trades average',
+            'likely_cause': 'Parameters too conservative',
+            'recommendation': 'Consider lowering confluence OR risk:reward thresholds',
+            'auto_fix': 'adjust_thresholds'
+        })
+    
+    # Issue 2: All configs have identical results (data or simulator issue)
+    if len(set(all_trades)) == 1 and all_trades[0] > 0:
+        issues.append({
+            'severity': 'CRITICAL',
+            'type': 'IDENTICAL_RESULTS',
+            'description': 'All configs produced identical trade counts',
+            'expected': 'Varying results based on different parameters',
+            'actual': f'All {len(top_5)} configs: {all_trades[0]} trades',
+            'likely_cause': 'Parameter variations not affecting entry logic',
+            'recommendation': 'Review strategy entry conditions',
+            'auto_fix': None
+        })
+    
+    # Issue 3: Zero trades across all configs
+    if max_trades == 0:
+        issues.append({
+            'severity': 'CRITICAL',
+            'type': 'NO_TRADES',
+            'description': 'No trades generated in any configuration',
+            'expected': f'{int(expected_total)} trades',
+            'actual': '0 trades',
+            'likely_cause': 'Confluence never reached OR R:R requirements impossible',
+            'recommendation': 'Lower confluence to 30 AND risk:reward to 1.5',
+            'auto_fix': 'aggressive_lower'
+        })
+    
+    # Issue 4: Check for abnormally high trade count (overtrading)
+    if max_trades > expected_total * 10:  # 10x more than expected
+        issues.append({
+            'severity': 'WARNING',
+            'type': 'EXCESSIVE_TRADES',
+            'description': f'Abnormally high trade count ({max_trades} vs {expected_total:.0f} expected)',
+            'expected': f'{int(expected_total)} trades',
+            'actual': f'{max_trades} trades',
+            'likely_cause': 'Confluence threshold too low',
+            'recommendation': 'Increase minimum confluence threshold',
+            'auto_fix': 'raise_confluence'
+        })
+    
+    return issues
+
+
+def display_diagnostic_report(
+    issues: List[dict],
+    results: List[ConfigPerformance],
+    configs: List[OptimizationConfig]
+):
+    """Display detailed diagnostic report with recommendations"""
+    
+    print("\n" + "="*80)
+    print("🔍 INSTITUTIONAL DIAGNOSTIC REPORT")
+    print("="*80)
+    
+    for i, issue in enumerate(issues, 1):
+        severity_icon = "🔴" if issue['severity'] == 'CRITICAL' else "⚠️"
+        
+        print(f"\n{severity_icon} ISSUE #{i}: {issue['type']} ({issue['severity']})")
+        print(f"   Description: {issue['description']}")
+        print(f"   Expected: {issue['expected']}")
+        print(f"   Actual: {issue['actual']}")
+        print(f"   Likely Cause: {issue['likely_cause']}")
+        print(f"   Recommendation: {issue['recommendation']}")
+        
+        if issue['auto_fix']:
+            print(f"   ✅ Auto-fix available: {issue['auto_fix']}")
+        else:
+            print(f"   ❌ Manual intervention required")
+    
+    print("\n" + "="*80)
+    print("📊 CURRENT CONFIGURATION SUMMARY")
+    print("="*80)
+    
+    # Show current parameter ranges
+    min_conf = min(c.min_confluence for c in configs)
+    max_conf = max(c.min_confluence for c in configs)
+    min_rr = min(c.min_risk_reward for c in configs)
+    max_rr = max(c.min_risk_reward for c in configs)
+    
+    print(f"   Confluence Range: {min_conf}-{max_conf}")
+    print(f"   Risk:Reward Range: {min_rr:.1f}-{max_rr:.1f}")
+    print(f"   Configs Tested: {len(configs)}")
+    
+    top_result = results[0] if results else None
+    if top_result:
+        print(f"\n   Best Config Results:")
+        print(f"   - Total Trades: {top_result.total_trades}")
+        print(f"   - Win Rate: {top_result.win_rate_pct:.1f}%")
+        print(f"   - Net PnL: ${top_result.net_pnl:.2f}")
+
+
+def prompt_diagnostic_action() -> str:
+    """
+    Prompt user for action after diagnostic report
+    
+    Returns:
+        'adjust': Auto-adjust and re-run
+        'proceed': Continue with current results
+        'quit': Cancel optimization
+    """
+    print("\n" + "="*80)
+    print("🔧 REMEDIATION OPTIONS")
+    print("="*80)
+    print("\n   1. AUTO-ADJUST: Let optimizer auto-adjust parameters and re-run (~90 sec)")
+    print("   2. PROCEED: Continue with current results (not recommended if CRITICAL)")
+    print("   3. QUIT: Cancel optimization and review strategy manually")
+    
+    while True:
+        choice = input("\nSelect action (1-3): ").strip()
+        
+        if choice == '1':
+            return 'adjust'
+        elif choice == '2':
+            confirm = input("⚠️  Are you sure? Issues may indicate broken results (y/n): ").strip().lower()
+            if confirm == 'y':
+                return 'proceed'
+        elif choice == '3':
+            return 'quit'
+        else:
+            print("   Invalid choice. Please enter 1, 2, or 3.")
+
+
+def auto_adjust_configs(
+    configs: List[OptimizationConfig],
+    issues: List[dict]
+) -> List[OptimizationConfig]:
+    """
+    Auto-adjust configuration parameters based on detected issues
+    
+    Smart adjustments:
+    - Low trades → Lower confluence, reduce R:R
+    - No trades → Aggressive lowering
+    - High trades → Raise confluence
+    """
+    
+    # Determine adjustment strategy
+    has_critical_low = any(i['type'] in ['LOW_TRADE_COUNT', 'NO_TRADES'] for i in issues)
+    has_high_trades = any(i['type'] == 'EXCESSIVE_TRADES' for i in issues)
+    
+    if has_critical_low:
+        # Lower thresholds significantly
+        new_confluence = [25, 30, 35, 40]  # Much lower
+        new_rr = [1.5, 2.0, 2.5]  # Easier to achieve
+        adjustment_type = "LOWERED (more entries)"
+    elif has_high_trades:
+        # Raise thresholds
+        new_confluence = [60, 70, 80, 90]  # Higher bar
+        new_rr = [2.5, 3.0, 3.5]  # Stricter
+        adjustment_type = "RAISED (fewer entries)"
+    else:
+        # Moderate adjustment
+        new_confluence = [35, 45, 55, 65]
+        new_rr = [2.0, 2.5, 3.0]
+        adjustment_type = "ADJUSTED (balanced)"
+    
+    print(f"\n🔧 Auto-Adjustment Strategy: {adjustment_type}")
+    print(f"   New Confluence Range: {min(new_confluence)}-{max(new_confluence)}")
+    print(f"   New Risk:Reward Range: {min(new_rr):.1f}-{max(new_rr):.1f}")
+    
+    # Rebuild configs with new parameters
+    adjusted_configs = []
+    config_id = 0
+    
+    # Get blocks from first config
+    blocks = configs[0].blocks
+    block_names = list(blocks.keys())
+    
+    from .catalog import get_weight_presets_for_blocks
+    weight_presets = get_weight_presets_for_blocks(block_names)
+    
+    for confluence in new_confluence:
+        for rr in new_rr:
+            for weights in weight_presets:
+                blocks_with_weights = {}
+                for block_name, block_info in blocks.items():
+                    blocks_with_weights[block_name] = {
+                        'name': block_info['name'],
+                        'weight': weights.get(block_name, block_info['weight']),
+                        'enabled': block_info['enabled']
+                    }
+                
+                config = OptimizationConfig(
+                    config_id=config_id,
+                    min_confluence=confluence,
+                    min_risk_reward=rr,
+                    blocks=blocks_with_weights,
+                    strategy_id=configs[0].strategy_id,
+                    strategy_name=configs[0].strategy_name,
+                    side=configs[0].side
+                )
+                
+                adjusted_configs.append(config)
+                config_id += 1
+    
+    print(f"   ✅ Created {len(adjusted_configs)} adjusted configurations")
+    
+    return adjusted_configs
