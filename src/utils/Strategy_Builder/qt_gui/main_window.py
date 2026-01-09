@@ -113,6 +113,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         new_btn.triggered.connect(self.new_strategy)
         toolbar.addAction(new_btn)
         
+        # Edit button
+        edit_btn = QAction('✏️ Edit', self)
+        edit_btn.triggered.connect(self.edit_strategy)
+        toolbar.addAction(edit_btn)
+        
         # Delete button
         delete_btn = QAction('🗑 Delete', self)
         delete_btn.triggered.connect(self.delete_strategy)
@@ -231,11 +236,14 @@ class StrategyBuilderMainWindow(QMainWindow):
         strategies = self.registry.list_strategies()
         
         for strategy in sorted(strategies, key=lambda s: s.number):
-            item_text = f"{strategy.number:03d}. {strategy.name} ({strategy.category})"
+            # Show [DRAFT] indicator for draft strategies
+            draft_marker = " 💾[DRAFT]" if strategy.description and "[DRAFT]" in strategy.description else ""
+            item_text = f"{strategy.number:03d}. {strategy.name} ({strategy.category}){draft_marker}"
             self.strategy_list.addItem(item_text)
         
         total = len(strategies)
-        self.status_bar.showMessage(f"Ready | {total}/150 Strategy Slots")
+        drafts = sum(1 for s in strategies if s.description and "[DRAFT]" in s.description)
+        self.status_bar.showMessage(f"Ready | {total}/150 Slots | {drafts} Drafts")
         
     def on_strategy_selected(self, current, previous):
         """Handle strategy selection"""
@@ -282,6 +290,36 @@ Building Blocks ({len(config.blocks)}):
                 "Error",
                 "All 150 strategy slots are filled!"
             )
+    
+    def edit_strategy(self):
+        """Edit existing strategy or draft"""
+        current = self.strategy_list.currentItem()
+        if not current:
+            QMessageBox.warning(
+                self,
+                "No Selection",
+                "Please select a strategy to edit"
+            )
+            return
+            
+        item_text = current.text()
+        strategy_num = int(item_text.split('.')[0])
+        
+        # Load strategy config
+        config = self.registry.load_strategy(strategy_num)
+        if not config:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to load strategy #{strategy_num:03d}"
+            )
+            return
+        
+        # Launch visual creator with existing config
+        creator = StrategyCreatorDialog(self, existing_config=config)
+        if creator.exec():
+            # Refresh list after successful edit
+            self.load_strategies()
             
     def delete_strategy(self):
         """Delete selected strategy"""
@@ -417,6 +455,11 @@ Building Blocks ({len(config.blocks)}):
         # Only show actions if item selected
         current = self.strategy_list.currentItem()
         if current:
+            edit_action = menu.addAction("✏️ Edit")
+            edit_action.triggered.connect(self.edit_strategy)
+            
+            menu.addSeparator()
+            
             validate_action = menu.addAction("✓ Validate")
             validate_action.triggered.connect(self.validate_strategy)
             

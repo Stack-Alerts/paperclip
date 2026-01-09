@@ -27,7 +27,7 @@ from src.utils.Strategy_Builder import (
 class StrategyCreatorDialog(QDialog):
     """Dialog for creating new strategies visually"""
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, existing_config=None):
         super().__init__(parent)
         
         self.registry = StrategyRegistry()
@@ -36,12 +36,19 @@ class StrategyCreatorDialog(QDialog):
         
         # Strategy data
         self.selected_blocks = []  # List of BlockConfiguration
+        self.existing_config = existing_config  # For editing existing strategies
+        self.editing_mode = existing_config is not None
         
         self.init_ui()
         
+        # Load existing config if editing
+        if self.existing_config:
+            self.load_existing_config()
+        
     def init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("Create New Strategy")
+        title = "Edit Strategy" if self.editing_mode else "Create New Strategy"
+        self.setWindowTitle(title)
         self.setGeometry(150, 150, 1000, 700)
         
         layout = QVBoxLayout(self)
@@ -158,6 +165,11 @@ class StrategyCreatorDialog(QDialog):
         
         button_layout.addStretch()
         
+        save_draft_btn = QPushButton("💾 Save Draft")
+        save_draft_btn.setToolTip("Save work-in-progress strategy to continue later")
+        save_draft_btn.clicked.connect(self.save_draft)
+        button_layout.addWidget(save_draft_btn)
+        
         cancel_btn = QPushButton("❌ Cancel")
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
@@ -170,6 +182,51 @@ class StrategyCreatorDialog(QDialog):
         
         # Load initial data
         self.load_available_blocks()
+    
+    def load_existing_config(self):
+        """Load existing configuration into UI"""
+        if not self.existing_config:
+            return
+        
+        # Set strategy info
+        self.name_edit.setText(self.existing_config.strategy_name)
+        self.category_combo.setCurrentText(self.existing_config.strategy_category)
+        
+        # Load blocks
+        self.selected_blocks = self.existing_config.blocks.copy()
+        
+        # Populate UI
+        for block_config in self.selected_blocks:
+            # Get block info from registry
+            block_metadata = self.bridge.bridge.registry.get_block(block_config.block_name)
+            if not block_metadata:
+                continue
+            
+            # Create BlockInfo-like object
+            from src.utils.Strategy_Builder.models import BlockInfo, BlockType
+            block_info = BlockInfo(
+                name=block_config.block_name,
+                display_name=block_config.block_display_name,
+                category=block_config.block_category,
+                block_type=block_config.block_type,
+                weight_range=block_config.weight_range,
+                default_weight=block_config.weight,
+                signals=[s.signal_name for s in block_config.signals],
+                description=block_metadata.description
+            )
+            
+            # Add to display
+            signal_names = [s.signal_name for s in block_config.signals]
+            if signal_names:
+                signals_str = f" [{', '.join(signal_names[:2])}{'...' if len(signal_names) > 2 else ''}]"
+            else:
+                signals_str = " [No signals]"
+            
+            item = QListWidgetItem(f"{block_info.display_name} (Weight: {block_config.weight}){signals_str}")
+            item.setData(Qt.ItemDataRole.UserRole, (block_config, block_info))
+            self.selected_blocks_list.addItem(item)
+        
+        self.update_confluence()
         
     def load_available_blocks(self):
         """Load available blocks based on category filter"""
@@ -377,20 +434,24 @@ class StrategyCreatorDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Validation failed:\n{e}")
             
-    def _build_config(self):
+    def _build_config(self, is_draft=False):
         """Build StrategyConfiguration from current state"""
         strategy_name = self.name_edit.text().strip()
         if not strategy_name:
             raise ValueError("Strategy name is required")
         
-        if not self.selected_blocks:
+        # For drafts, allow empty blocks
+        if not is_draft and not self.selected_blocks:
             raise ValueError("At least one block is required")
         
-        # Get next strategy number
-        next_num = self.registry.get_next_strategy_number()
+        # Use existing number if editing, otherwise get next
+        if self.editing_mode and self.existing_config:
+            next_num = self.existing_config.strategy_number
+        else:
+            next_num = self.registry.get_next_strategy_number()
         
-        # Use first block as main signal
-        main_signal = self.selected_blocks[0].block_name
+        # Use first block as main signal (or placeholder for drafts)
+        main_signal = self.selected_blocks[0].block_name if self.selected_blocks else "placeholder"
         
         return StrategyConfiguration(
             strategy_name=strategy_name,
@@ -399,12 +460,51 @@ class StrategyCreatorDialog(QDialog):
             main_signal_block=main_signal,
             blocks=self.selected_blocks.copy()
         )
+    
+    def save_draft(self):
+        """Save strategy as a draft for later editing"""
+        try:
+            # Build configuration (allow incomplete)
+            config = self._build_config(is_draft=True)
+            
+            # Save with is_draft marker in description
+            if not config.description:
+                config.description = "[DRAFT] Work in progress"
+            elif "[DRAFT]" not in config.description:
+                config.description = f"[DRAFT] {config.description}"
+            
+            # Save without strict validation (overwrite if editing)
+            strategy_num = self.registry.save_strategy(
+                config, 
+                validate=False,
+                overwrite=self.editing_mode
+            )
+            
+            action = "updated" if self.editing_mode else "saved"
+            QMessageBox.information(
+                self,
+                f"Draft {action.title()}",
+                f"💾 Draft {action}!\n\n"
+                f"Number: {strategy_num:03d}\n"
+                f"Name: {config.strategy_name}\n"
+                f"Blocks: {len(config.blocks)}\n\n"
+                "You can continue editing this strategy later."
+            )
+            
+            # Don't close dialog user can continue editing
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save draft:\n{e}")
         
     def create_strategy(self):
         """Create and save the strategy"""
         try:
             # Build configuration
             config = self._build_config()
+            
+            # Remove [DRAFT] marker if present
+            if config.description and "[DRAFT]" in config.description:
+                config.description = config.description.replace("[DRAFT] ", "")
             
             # Validate
             result = self.validator.validate(config)
@@ -417,13 +517,17 @@ class StrategyCreatorDialog(QDialog):
                 )
                 return
                 
-            # Save
-            strategy_num = self.registry.save_strategy(config)
+            # Save (overwrite if editing)
+            strategy_num = self.registry.save_strategy(
+                config,
+                overwrite=self.editing_mode
+            )
             
+            action = "updated" if self.editing_mode else "created"
             QMessageBox.information(
                 self,
                 "Success",
-                f"✅ Strategy created!\n\n"
+                f"✅ Strategy {action}!\n\n"
                 f"Number: {strategy_num:03d}\n"
                 f"Name: {config.strategy_name}\n"
                 f"Blocks: {len(config.blocks)}\n"
@@ -434,4 +538,4 @@ class StrategyCreatorDialog(QDialog):
             self.accept()
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to create strategy:\n{e}")
+            QMessageBox.critical(self, "Error", f"Failed to {action} strategy:\n{e}")
