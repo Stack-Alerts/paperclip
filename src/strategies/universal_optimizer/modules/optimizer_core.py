@@ -281,8 +281,8 @@ def export_trade_records(
     """
     from pathlib import Path
     
-    # Create results directory
-    results_dir = Path('optimization_results') / strategy_name
+    # Follow project data structure
+    results_dir = Path('data') / 'reports' / 'strategies' / 'universal_optimizer' / strategy_name
     results_dir.mkdir(parents=True, exist_ok=True)
     
     for result in top_results:
