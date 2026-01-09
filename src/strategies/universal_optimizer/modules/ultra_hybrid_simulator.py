@@ -202,19 +202,19 @@ def test_single_config(args):
             
             # For SHORT positions
             if config.side == 'SHORT':
-                # Check TP levels (price going DOWN)
-                if bar['low'] <= current_position['tp3'] and current_position['remaining_pct'] > 0:
-                    # TP3 hit - close remaining position
-                    exit_price = current_position['tp3']
-                    exit_reason = 'TP3_HIT'
+                # Check TP levels (price going DOWN) - check in order: TP1, TP2, TP3
+                if bar['low'] <= current_position['tp1'] and current_position['remaining_pct'] >= 50:
+                    # TP1 hit - close 50% of original position
+                    exit_price = current_position['tp1']
+                    exit_reason = 'TP1_PARTIAL'
                     current_position['exits'].append({
                         'price': exit_price,
-                        'pct': current_position['remaining_pct'],
+                        'pct': 50.0,
                         'reason': exit_reason
                     })
-                    exit_occurred = True
+                    current_position['remaining_pct'] -= 50.0
                     
-                elif bar['low'] <= current_position['tp2'] and current_position['remaining_pct'] >= 30:
+                if bar['low'] <= current_position['tp2'] and current_position['remaining_pct'] >= 30:
                     # TP2 hit - close 30% of original position
                     exit_price = current_position['tp2']
                     exit_reason = 'TP2_PARTIAL'
@@ -225,16 +225,16 @@ def test_single_config(args):
                     })
                     current_position['remaining_pct'] -= 30.0
                     
-                elif bar['low'] <= current_position['tp1'] and current_position['remaining_pct'] >= 50:
-                    # TP1 hit - close 50% of original position
-                    exit_price = current_position['tp1']
-                    exit_reason = 'TP1_PARTIAL'
+                if bar['low'] <= current_position['tp3'] and current_position['remaining_pct'] > 0:
+                    # TP3 hit - close remaining position
+                    exit_price = current_position['tp3']
+                    exit_reason = 'TP3_HIT'
                     current_position['exits'].append({
                         'price': exit_price,
-                        'pct': 50.0,
+                        'pct': current_position['remaining_pct'],
                         'reason': exit_reason
                     })
-                    current_position['remaining_pct'] -= 50.0
+                    exit_occurred = True
                 
                 # Check SL (price going UP)
                 if bar['high'] >= current_position['sl'] and not exit_occurred:
@@ -249,18 +249,18 @@ def test_single_config(args):
                     exit_occurred = True
                     
             else:  # LONG positions
-                # Check TP levels (price going UP)
-                if bar['high'] >= current_position['tp3'] and current_position['remaining_pct'] > 0:
-                    exit_price = current_position['tp3']
-                    exit_reason = 'TP3_HIT'
+                # Check TP levels (price going UP) - check in order: TP1, TP2, TP3
+                if bar['high'] >= current_position['tp1'] and current_position['remaining_pct'] >= 50:
+                    exit_price = current_position['tp1']
+                    exit_reason = 'TP1_PARTIAL'
                     current_position['exits'].append({
                         'price': exit_price,
-                        'pct': current_position['remaining_pct'],
+                        'pct': 50.0,
                         'reason': exit_reason
                     })
-                    exit_occurred = True
+                    current_position['remaining_pct'] -= 50.0
                     
-                elif bar['high'] >= current_position['tp2'] and current_position['remaining_pct'] >= 30:
+                if bar['high'] >= current_position['tp2'] and current_position['remaining_pct'] >= 30:
                     exit_price = current_position['tp2']
                     exit_reason = 'TP2_PARTIAL'
                     current_position['exits'].append({
@@ -270,15 +270,15 @@ def test_single_config(args):
                     })
                     current_position['remaining_pct'] -= 30.0
                     
-                elif bar['high'] >= current_position['tp1'] and current_position['remaining_pct'] >= 50:
-                    exit_price = current_position['tp1']
-                    exit_reason = 'TP1_PARTIAL'
+                if bar['high'] >= current_position['tp3'] and current_position['remaining_pct'] > 0:
+                    exit_price = current_position['tp3']
+                    exit_reason = 'TP3_HIT'
                     current_position['exits'].append({
                         'price': exit_price,
-                        'pct': 50.0,
+                        'pct': current_position['remaining_pct'],
                         'reason': exit_reason
                     })
-                    current_position['remaining_pct'] -= 50.0
+                    exit_occurred = True
                 
                 # Check SL (price going DOWN)
                 if bar['low'] <= current_position['sl'] and not exit_occurred:
