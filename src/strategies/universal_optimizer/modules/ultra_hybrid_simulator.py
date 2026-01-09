@@ -155,13 +155,25 @@ def test_single_config(args):
                 exit_price = test_df.iloc[bar_idx]['close']
                 exit_time = test_df.iloc[bar_idx]['timestamp']
                 
-                # Position size (0.01 BTC for testing - with 10x leverage this is 0.1 BTC notional)
-                position_size = 0.01
-                leverage = 10.0  # Binance Perpetual standard leverage
+                # Position sizing with 10x leverage
+                # Capital: $10,000
+                # Risk per trade: 25% of capital = $2,500 margin
+                # With 10x leverage: $2,500 × 10 = $25,000 notional
+                # At $95K BTC: $25,000 / $95,000 = 0.263 BTC position
                 
-                # Calculate notional position value
-                entry_notional = current_position['entry_price'] * position_size
-                exit_notional = exit_price * position_size
+                leverage = 10.0
+                starting_capital = 10000.0
+                position_pct = 0.25  # 25% of capital per trade
+                margin_per_trade = starting_capital * position_pct  # $2,500
+                notional_per_trade = margin_per_trade * leverage  # $25,000
+                
+                # Calculate position size in BTC
+                entry_price_val = current_position['entry_price']
+                position_size = notional_per_trade / entry_price_val  # ~0.263 BTC @ $95K
+                
+                # Calculate notional position values
+                entry_notional = entry_price_val * position_size  # $25,000
+                exit_notional = exit_price * position_size  # $25,000 (approximately)
                 
                 # Calculate PnL in USDT (Perpetual futures)
                 if config.side == 'LONG':
