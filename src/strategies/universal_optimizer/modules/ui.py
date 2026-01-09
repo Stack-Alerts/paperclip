@@ -55,10 +55,41 @@ def display_top_5_configs(results: List[ConfigPerformance], iteration: int):
         print(f"\n{label}")
         print(f"   ├─ Config ID: {result.config_id}")
         print(f"   │")
+        # Calculate hold time statistics if trades available
+        avg_hold_bars = 0
+        min_hold_bars = 0
+        max_hold_bars = 0
+        if hasattr(result, 'trades') and result.trades:
+            # Extract hold times from trade exit reasons
+            hold_times = []
+            for trade in result.trades:
+                reason = trade.reason
+                # Extract bars from "Held X bars" format
+                if 'Held' in reason and 'bars' in reason:
+                    try:
+                        bars = int(reason.split('Held ')[1].split(' bars')[0])
+                        hold_times.append(bars)
+                    except:
+                        pass
+            
+            if hold_times:
+                avg_hold_bars = sum(hold_times) / len(hold_times)
+                min_hold_bars = min(hold_times)
+                max_hold_bars = max(hold_times)
+        
+        # Convert bars to hours (15min bars)
+        avg_hold_hours = avg_hold_bars * 0.25
+        min_hold_hours = min_hold_bars * 0.25
+        max_hold_hours = max_hold_bars * 0.25
+        
         print(f"   ├─ TRADING PERFORMANCE:")
         print(f"   │  ├─ Total Trades: {result.total_trades}")
         print(f"   │  ├─ Winning Trades: {result.winning_trades} ({result.win_rate_pct:.1f}%)")
         print(f"   │  ├─ Losing Trades: {result.losing_trades}")
+        if avg_hold_bars > 0:
+            print(f"   │  ├─ Avg Hold Time: {avg_hold_bars:.0f} bars ({avg_hold_hours:.1f} hours)")
+            print(f"   │  ├─ Min Hold Time: {min_hold_bars} bars ({min_hold_hours:.1f} hours)")
+            print(f"   │  ├─ Max Hold Time: {max_hold_bars} bars ({max_hold_hours:.1f} hours)")
         print(f"   │  ├─ Avg Win: ${result.avg_win:.2f}")
         print(f"   │  ├─ Avg Loss: ${result.avg_loss:.2f}")
         print(f"   │  ├─ Largest Win: ${result.largest_win:.2f}")
