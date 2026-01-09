@@ -1195,10 +1195,15 @@ def prompt_add_context_blocks(issue: dict) -> bool:
 
 def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
     """
-    Add recommended context blocks to strategy file
+    Add recommended context blocks to strategy file with AUTO-SCORING
     
     This implements Option 2 - automatically adding "Always On" blocks
     to boost base confluence so patterns become tradeable.
+    
+    ENHANCEMENTS:
+    - Creates backup before modification
+    - Updates _calculate_confluence() to score new blocks
+    - Offers rollback if anything fails
     
     Args:
         strategy_name: Strategy module name
@@ -1210,6 +1215,8 @@ def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
     import importlib
     import inspect
     from pathlib import Path
+    import shutil
+    from datetime import datetime
     
     recommended_blocks = issue.get('recommended_blocks', [])
     
@@ -1224,11 +1231,30 @@ def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
         print(f"   ❌ Strategy file not found: {strategy_path}")
         return False
     
+    # ========================================================================
+    # STEP 1: CREATE BACKUP
+    # ========================================================================
+    backup_dir = Path('src') / 'strategies' / '.backups'
+    backup_dir.mkdir(exist_ok=True)
+    
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_name = f'{strategy_name}_backup_{timestamp}.py'
+    backup_path = backup_dir / backup_name
+    
+    try:
+        shutil.copy2(strategy_path, backup_path)
+        print(f"\n   💾 Backup created: {backup_path.name}")
+    except Exception as e:
+        print(f"   ❌ Failed to create backup: {e}")
+        return False
+    
     print(f"\n   📝 Updating {strategy_path}...")
     
     # Read current file
     with open(strategy_path, 'r') as f:
         lines = f.readlines()
+    
+    original_lines = lines.copy()  # Keep original for rollback
     
     # Find where to add blocks
     # 1. Add imports
@@ -1320,17 +1346,184 @@ def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
                 new_lines.insert(import_section_end, import_line)
                 import_section_end += 1
     
-    # Write updated file
-    with open(strategy_path, 'w') as f:
-        f.writelines(new_lines)
+    # ========================================================================
+    # STEP 2: INJECT SCORING CODE INTO _calculate_confluence()
+    # ========================================================================
+    print(f"\n   🎯 Injecting scoring code into _calculate_confluence()...")
     
-    print(f"   ✅ Added {len(recommended_blocks)} context blocks:")
+    scoring_code_generated = []
     for block in recommended_blocks:
-        print(f"      - {block['name']} (+{block['weight']} points)")
+        block_key = block['key']
+        block_weight = block['weight']
+        block_category = block['category']
+        
+        # Generate scoring code based on block type
+        scoring_code = generate_scoring_code(block_key, block_weight, block_category)
+        scoring_code_generated.append(scoring_code)
     
-    print(f"\n   📝 Updated sections:")
-    print(f"      - Imports: Added {len(added_imports)} imports")
-    print(f"      - _initialize_blocks(): Added {len(new_blocks_config)} blocks")
-    print(f"      - _analyze_blocks(): Added {len(new_blocks_analysis)} analysis calls")
+    # Find _calculate_confluence() and inject before "return confluence, signals"
+    confluence_section = False
+    confluence_injection_point = -1
     
-    return True
+    for i, line in enumerate(new_lines):
+        if 'def _calculate_confluence' in line:
+            confluence_section = True
+        
+        if confluence_section and 'return confluence, signals' in line:
+            confluence_injection_point = i
+            break
+    
+    if confluence_injection_point > 0:
+        # Inject all scoring code before return statement
+        for scoring_code in scoring_code_generated:
+            new_lines.insert(confluence_injection_point, scoring_code)
+            confluence_injection_point += 1
+        
+        print(f"   ✅ Injected {len(scoring_code_generated)} scoring blocks into _calculate_confluence()")
+    else:
+        print(f"   ⚠️  Could not find _calculate_confluence() - scoring NOT injected!")
+        print(f"   ⚠️  Manual scoring required for new blocks")
+    
+    # ========================================================================
+    # STEP 3: WRITE UPDATED FILE WITH ERROR HANDLING
+    # ========================================================================
+    try:
+        with open(strategy_path, 'w') as f:
+            f.writelines(new_lines)
+        
+        print(f"\n   ✅ Strategy file updated successfully!")
+        print(f"\n   📝 Changes Made:")
+        print(f"      - Imports: Added {len(added_imports)} imports")
+        print(f"      - _initialize_blocks(): Added {len(new_blocks_config)} detectors + configs")
+        print(f"      - _analyze_blocks(): Added {len(new_blocks_analysis)} analysis calls")
+        print(f"      - _calculate_confluence(): Added {len(scoring_code_generated)} scoring blocks")
+        
+        for block in recommended_blocks:
+            print(f"\n   ✅ {block['name']}: +{block['weight']} points")
+        
+        return True
+        
+    except Exception as e:
+        print(f"\n   ❌ CRITICAL ERROR during file write: {e}")
+        print(f"   🔄 Rolling back to backup...")
+        
+        # Rollback: restore from backup
+        try:
+            with open(backup_path, 'r') as f:
+                backup_content = f.read()
+            
+            with open(strategy_path, 'w') as f:
+                f.write(backup_content)
+            
+            print(f"   ✅ Rollback successful - strategy restored from backup")
+            print(f"   💾 Backup preserved at: {backup_path}")
+            
+        except Exception as rollback_error:
+            print(f"   ❌ ROLLBACK FAILED: {rollback_error}")
+            print(f"   🆘 MANUAL RECOVERY REQUIRED")
+            print(f"   📁 Backup location: {backup_path}")
+        
+        return False
+
+
+def generate_scoring_code(block_key: str, weight: int, category: str) -> str:
+    """
+    Generate confluence scoring code for a new block
+    
+    This is the CRITICAL missing piece - auto-generating the scoring
+    logic so blocks actually contribute to confluence!
+    
+    Args:
+        block_key: Block identifier (e.g., 'ema_20_50_trend')
+        weight: Maximum points for this block
+        category: Block category for appropriate scoring logic
+    
+    Returns:
+        Multi-line string of Python code to inject
+    """
+    
+    # Template varies by category for appropriate tiered scoring
+    if category == 'TREND':
+        code = f'''
+        # ===================================================================
+        # {block_key.upper()} ({weight} points max) - AUTO-GENERATED
+        # ===================================================================
+        {block_key}_signal = results.get('{block_key}', {{}}).get('signal', '')
+        {block_key}_conf = results.get('{block_key}', {{}}).get('confidence', 0)
+        
+        if 'BULLISH' in {block_key}_signal or 'BEARISH' in {block_key}_signal:
+            # Trend alignment, full points
+            points = int({weight} * {block_key}_conf / 100)
+            confluence += points
+            signals.append(f"{block_key.replace('_', ' ').title()}: {{{block_key}_signal}} ({{{block_key}_conf}}% → +{{points}})")
+        elif 'NEUTRAL' in {block_key}_signal:
+            # Neutral = weak signal, half points
+            points = int({weight} // 2 * {block_key}_conf / 100)
+            confluence += points
+            signals.append(f"{block_key.replace('_', ' ').title()}: NEUTRAL ({{{block_key}_conf}}% → +{{points}})")
+        
+'''
+    
+    elif category == 'SESSION':
+        code = f'''
+        # ===================================================================
+        # {block_key.upper()} ({weight} points max) - AUTO-GENERATED
+        # ===================================================================
+        {block_key}_signal = results.get('{block_key}', {{}}).get('signal', '')
+        {block_key}_conf = results.get('{block_key}', {{}}).get('confidence', 0)
+        
+        if {block_key}_signal and {block_key}_signal != 'NO_SIGNAL':
+            # Session active, points based on importance
+            if 'LONDON' in {block_key}_signal or 'NY_AM' in {block_key}_signal:
+                # Prime sessions, full points
+                points = int({weight} * {block_key}_conf / 100)
+            elif 'ASIAN' in {block_key}_signal or 'NY_PM' in {block_key}_signal:
+                # Secondary sessions, reduced points
+                points = int({weight} * 0.67 * {block_key}_conf / 100)
+            else:
+                # Other times, minimal points
+                points = int({weight} * 0.5 * {block_key}_conf / 100)
+            
+            confluence += points
+            signals.append(f"{block_key.replace('_', ' ').title()}: {{{block_key}_signal}} ({{{block_key}_conf}}% → +{{points}})")
+        
+'''
+    
+    elif category == 'VOLATILITY':
+        code = f'''
+        # ===================================================================
+        # {block_key.upper()} ({weight} points max) - AUTO-GENERATED
+        # ===================================================================
+        {block_key}_signal = results.get('{block_key}', {{}}).get('signal', '')
+        {block_key}_conf = results.get('{block_key}', {{}}).get('confidence', 0)
+        
+        if 'NEAR' in {block_key}_signal or 'EXTREME' in {block_key}_signal:
+            # Extreme/near levels, full points
+            points = int({weight} * {block_key}_conf / 100)
+            confluence += points
+            signals.append(f"{block_key.replace('_', ' ').title()}: {{{block_key}_signal}} ({{{block_key}_conf}}% → +{{points}})")
+        elif {block_key}_signal and {block_key}_signal != 'NO_SIGNAL':
+            # Context only, reduced points
+            points = int({weight} * 0.6 * {block_key}_conf / 100)
+            confluence += points
+            signals.append(f"{block_key.replace('_', ' ').title()}: {{{block_key}_signal}} ({{{block_key}_conf}}% → +{{points}})")
+        
+'''
+    
+    else:  # INSTITUTIONAL, STRUCTURE, PRICE_LEVELS - generic scoring
+        code = f'''
+        # ===================================================================
+        # {block_key.upper()} ({weight} points max) - AUTO-GENERATED
+        # ===================================================================
+        {block_key}_signal = results.get('{block_key}', {{}}).get('signal', '')
+        {block_key}_conf = results.get('{block_key}', {{}}).get('confidence', 0)
+        
+        if {block_key}_signal and {block_key}_signal not in ['NO_SIGNAL', 'NEUTRAL']:
+            # Signal present, score based on confidence
+            points = int({weight} * {block_key}_conf / 100)
+            confluence += points
+            signals.append(f"{block_key.replace('_', ' ').title()}: {{{block_key}_signal}} ({{{block_key}_conf}}% → +{{points}})")
+        
+'''
+    
+    return code
