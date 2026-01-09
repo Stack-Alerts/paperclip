@@ -456,3 +456,55 @@ class StrategyRegistry:
         except Exception as e:
             logger.error(f"Import failed: {e}")
             return None
+    
+    def generate_strategy_files(
+        self,
+        strategy_number: int,
+        strategy_dir: Optional[Path] = None,
+        test_dir: Optional[Path] = None,
+        config_dir: Optional[Path] = None
+    ) -> Optional[Dict[str, Path]]:
+        """
+        Convenience method: Load strategy and generate all files
+        
+        Args:
+            strategy_number: Strategy number to generate files for
+            strategy_dir: Output directory for strategy files
+            test_dir: Output directory for test files
+            config_dir: Output directory for optimizer configs
+            
+        Returns:
+            Dictionary with paths to generated files, or None if failed
+            
+        Example:
+            registry = StrategyRegistry()
+            files = registry.generate_strategy_files(1)
+            print(f"Strategy: {files['strategy']}")
+            print(f"Test: {files['test']}")
+            print(f"Optimizer: {files['optimizer']}")
+        """
+        # Lazy import to avoid circular dependency
+        from src.utils.Strategy_Builder.generator import StrategyGenerator
+        
+        # Load strategy
+        config = self.load_strategy(strategy_number)
+        if not config:
+            logger.error(f"Strategy {strategy_number} not found")
+            return None
+        
+        # Generate files
+        try:
+            generator = StrategyGenerator()
+            files = generator.generate_all(
+                config,
+                strategy_dir=strategy_dir,
+                test_dir=test_dir,
+                config_dir=config_dir
+            )
+            
+            logger.info(f"Generated files for strategy {strategy_number}")
+            return files
+            
+        except Exception as e:
+            logger.error(f"File generation failed: {e}")
+            return None

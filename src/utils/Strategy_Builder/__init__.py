@@ -26,6 +26,7 @@ from src.utils.Strategy_Builder.models import (
 from src.utils.Strategy_Builder.registry_bridge import RegistryBridge
 from src.utils.Strategy_Builder.validator import StrategyValidator
 from src.utils.Strategy_Builder.strategy_registry import StrategyRegistry
+from src.utils.Strategy_Builder.generator import StrategyGenerator
 
 __all__ = [
     # Models
@@ -48,4 +49,5 @@ __all__ = [
     'RegistryBridge',
     'StrategyValidator',
     'StrategyRegistry',
+    'StrategyGenerator',
 ]
