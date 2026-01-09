@@ -40,8 +40,14 @@ class StrategyBuilderApp:
             self.owns_root = False
         
         self.root.title("Strategy Builder v2.0")
-        self.root.geometry("1200x700")
-        self.root.minsize(1000, 600)
+        self.root.geometry("1400x900")
+        self.root.minsize(1200, 800)
+        
+        # Configure larger fonts
+        self.large_font = ('TkDefaultFont', 20)
+        self.medium_font = ('TkDefaultFont', 16)
+        self.small_font = ('TkDefaultFont', 14)
+        self.button_font = ('TkDefaultFont', 14, 'bold')
         
         # Initialize components
         self.registry = StrategyRegistry()
@@ -111,32 +117,40 @@ class StrategyBuilderApp:
         toolbar = ttk.Frame(self.root)
         toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
         
+        # Configure button style
+        style = ttk.Style()
+        style.configure('Large.TButton', font=self.button_font, padding=10)
+        
         # New button
         ttk.Button(
             toolbar,
             text="➕ New",
-            command=self.new_strategy
+            command=self.new_strategy,
+            style='Large.TButton'
         ).pack(side=tk.LEFT, padx=2)
         
         # Save button
         ttk.Button(
             toolbar,
             text="💾 Save",
-            command=self.save_strategy
+            command=self.save_strategy,
+            style='Large.TButton'
         ).pack(side=tk.LEFT, padx=2)
         
         # Validate button
         ttk.Button(
             toolbar,
             text="✓ Validate",
-            command=self.validate_strategy
+            command=self.validate_strategy,
+            style='Large.TButton'
         ).pack(side=tk.LEFT, padx=2)
         
         # Generate button
         ttk.Button(
             toolbar,
             text="⚙ Generate",
-            command=self.generate_files
+            command=self.generate_files,
+            style='Large.TButton'
         ).pack(side=tk.LEFT, padx=2)
         
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
@@ -145,7 +159,8 @@ class StrategyBuilderApp:
         ttk.Button(
             toolbar,
             text="🗑 Delete",
-            command=self.delete_strategy
+            command=self.delete_strategy,
+            style='Large.TButton'
         ).pack(side=tk.LEFT, padx=2)
         
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
@@ -154,7 +169,8 @@ class StrategyBuilderApp:
         ttk.Button(
             toolbar,
             text="🔄 Refresh",
-            command=self.refresh_strategy_list
+            command=self.refresh_strategy_list,
+            style='Large.TButton'
         ).pack(side=tk.LEFT, padx=2)
     
     def _create_main_layout(self):
@@ -185,7 +201,7 @@ class StrategyBuilderApp:
         self.strategy_listbox = tk.Listbox(
             list_frame,
             yscrollcommand=scrollbar.set,
-            font=('TkDefaultFont', 10)
+            font=self.medium_font  # 16pt instead of 10pt
         )
         self.strategy_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.strategy_listbox.yview)
@@ -205,7 +221,7 @@ class StrategyBuilderApp:
                  "or click '➕ New' to create a new strategy.\n\n"
                  "Full editor coming soon!",
             justify=tk.CENTER,
-            font=('TkDefaultFont', 12)
+            font=self.large_font  # 20pt instead of 12pt
         ).pack(expand=True)
         
         self.editor_frame = right_frame  # Save reference for later
@@ -215,10 +231,21 @@ class StrategyBuilderApp:
         status_bar = ttk.Frame(self.root)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X)
         
-        self.status_label = ttk.Label(status_bar, text="Ready", relief=tk.SUNKEN, anchor=tk.W)
+        self.status_label = ttk.Label(
+            status_bar, 
+            text="Ready", 
+            relief=tk.SUNKEN, 
+            anchor=tk.W,
+            font=self.small_font  # 14pt
+        )
         self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        self.slots_label = ttk.Label(status_bar, text="0/150 slots", relief=tk.SUNKEN)
+        self.slots_label = ttk.Label(
+            status_bar, 
+            text="0/150 slots", 
+            relief=tk.SUNKEN,
+            font=self.small_font  # 14pt
+        )
         self.slots_label.pack(side=tk.RIGHT)
     
     def _center_window(self):
