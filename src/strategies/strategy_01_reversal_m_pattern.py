@@ -128,7 +128,7 @@ class MPatternReversalStandard(Strategy):
             'double_top': DoubleTopPattern(timeframe='15min'),
             'rsi_divergence': RSIDivergence(timeframe='15min'),
             'hod': HOD(timeframe='15min'),
-            'asia_50': AsiaSession50Percent(timeframe='15min'),
+            'asia_session_50_percent': AsiaSession50Percent(timeframe='15min'),
             'session_time': SessionTime(timeframe='15min'),
             'vwap': VWAP(timeframe='15min'),
             'ema_20_50_trend': EMA2050Trend(timeframe='15min'),
@@ -158,7 +158,7 @@ class MPatternReversalStandard(Strategy):
             'enabled': True
         }
         
-        self.blocks['asia_50'] = {
+        self.blocks['asia_session_50_percent'] = {
             'name': 'AsiaSession50Percent',
             'weight': 12,
             'enabled': True
@@ -298,7 +298,7 @@ class MPatternReversalStandard(Strategy):
         results['hod'] = self.detectors['hod'].analyze(df)
         
         # 4. Asia 50% Position (REAL)
-        results['asia_50'] = self.detectors['asia_50'].analyze(df)
+        results['asia_session_50_percent'] = self.detectors['asia_session_50_percent'].analyze(df)
         
         # 5. Session Time (REAL)
         results['session_time'] = self.detectors['session_time'].analyze(df)
