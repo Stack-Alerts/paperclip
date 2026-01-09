@@ -67,6 +67,15 @@ class MPatternReversalStandard(Strategy):
     Waits for high-quality M-pattern setups with multiple confirmations.
     Conservative entry at 70+ confluence threshold ensures quality over quantity.
     """
+
+# ============================================================================
+# OPTIMIZED: 2026-01-09 11:29:07
+# Trades: 40, Win Rate: 30.0%, PF: 0.95
+# Net PnL: $-185.89 (-1.86%)
+# Fees: $999.59
+# Sharpe: -0.34, Max DD: 12.13%
+# ============================================================================
+
     
     def __init__(self, config):
         super().__init__(config)
@@ -83,7 +92,7 @@ class MPatternReversalStandard(Strategy):
         # Risk management
         self.max_leverage = 2.0
         self.risk_per_trade_pct = 1.0
-        self.min_risk_reward = 3.0
+        self.min_risk_reward = 2.0
         
         # Pattern detection parameters
         self.lookback_period = 100  # Bars to analyze for pattern
@@ -118,37 +127,37 @@ class MPatternReversalStandard(Strategy):
         # Keep weights configuration
         self.blocks['double_top'] = {
             'name': 'DoubleTopPattern',
-            'weight': 30,
+            'weight': 35,
             'enabled': True
         }
         
         self.blocks['rsi_divergence'] = {
             'name': 'RSIDivergence',
-            'weight': 25,
+            'weight': 30,
             'enabled': True
         }
         
         self.blocks['hod'] = {
             'name': 'HOD',
-            'weight': 20,
+            'weight': 15,
             'enabled': True
         }
         
         self.blocks['asia_50'] = {
             'name': 'AsiaSession50Percent',
-            'weight': 18,
+            'weight': 12,
             'enabled': True
         }
         
         self.blocks['session_time'] = {
             'name': 'SessionTime',
-            'weight': 15,
+            'weight': 10,
             'enabled': True
         }
         
         self.blocks['vwap'] = {
             'name': 'VWAP',
-            'weight': 12,
+            'weight': 10,
             'enabled': True
         }
         
