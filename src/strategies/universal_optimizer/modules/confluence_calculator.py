@@ -349,8 +349,65 @@ class ConfluenceCalculator:
                     'formula': 'scaled'
                 },
                 'NEUTRAL': {
-                    'max_points': 6,
+                    'max_points': 6,  # Weak signal
                     'formula': 'scaled'
+                }
+            }
+        },
+        
+        # ====================================================================
+        # MARKET STRUCTURE BLOCKS (Swing Points, Premium/Discount Zones)
+        # ====================================================================
+        'swing_points': {
+            'max_points': 15,
+            'tiers': {
+                'SWING_HIGH': {
+                    'base_points': 15,
+                    'formula': 'scaled'
+                },
+                'SWING_LOW': {
+                    'base_points': 15,
+                    'formula': 'scaled'
+                },
+                'MAJOR_HIGH': {
+                    'base_points': 15,
+                    'formula': 'scaled'
+                },
+                'MAJOR_LOW': {
+                    'base_points': 15,
+                    'formula': 'scaled'
+                },
+                'MINOR_HIGH': {
+                    'max_points': 10,
+                    'formula': 'scaled'
+                },
+                'MINOR_LOW': {
+                    'max_points': 10,
+                    'formula': 'scaled'
+                },
+                'NO_SWING': {
+                    'points': 0
+                }
+            }
+        },
+        
+        'premium_discount_zones': {
+            'max_points': 14,
+            'tiers': {
+                'PREMIUM_ZONE': {
+                    'base_points': 14,  # Bearish bias - price in premium
+                    'formula': 'scaled'
+                },
+                'DISCOUNT_ZONE': {
+                    'base_points': 14,  # Bullish bias - price in discount
+                    'formula': 'scaled'
+                },
+                'EQUILIBRIUM': {
+                    'max_points': 8,  # Neutral - at equilibrium
+                    'formula': 'scaled'
+                },
+                'NO_ZONE': {
+                    'points': 0
                 }
             }
         },
