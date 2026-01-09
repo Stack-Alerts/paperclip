@@ -75,7 +75,7 @@ def display_top_5_configs(results: List[ConfigPerformance], iteration: int):
         print(f"   │  ├─ Max Drawdown: {result.max_drawdown_pct:.2f}%")
         print(f"   │  └─ Risk-Adjusted Return: {result.net_return_pct / max(result.max_drawdown_pct, 0.1):.2f}")
         print(f"   │")
-        print(f"   └─ TRADE RECORD: optimization_results/config_{result.config_id}_trades.csv")
+        print(f"   └─ TRADE RECORD: data/reports/strategies/universal_optimizer/{result.config_id}_trades.csv")
 
 
 def prompt_user_selection() -> int:
