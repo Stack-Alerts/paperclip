@@ -25,6 +25,7 @@ from src.utils.Strategy_Builder import (
     StrategyValidator,
     StrategyGenerator
 )
+from src.utils.Strategy_Builder.qt_gui.block_library import BlockLibraryPanel
 
 
 class StrategyBuilderMainWindow(QMainWindow):
@@ -137,10 +138,14 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Main layout
         layout = QHBoxLayout(central_widget)
         
-        # Create splitter for resizable panes
+        # Create splitter for resizable panes (3-pane)
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Left pane: Strategy list
+        # Left pane: Block Library
+        self.block_library = BlockLibraryPanel()
+        splitter.addWidget(self.block_library)
+        
+        # Middle pane: Strategy list
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         
@@ -184,8 +189,8 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         splitter.addWidget(right_widget)
         
-        # Set initial sizes (30% left, 70% right)
-        splitter.setSizes([300, 700])
+        # Set initial sizes (25% library, 30% strategies, 45% details)
+        splitter.setSizes([250, 300, 450])
         
         layout.addWidget(splitter)
         
