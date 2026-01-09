@@ -234,6 +234,7 @@ def test_single_config(args):
                         'pct': current_position['remaining_pct'],
                         'reason': exit_reason
                     })
+                    current_position['remaining_pct'] = 0  # CRITICAL FIX
                     exit_occurred = True
                 
                 # Check SL (price going UP)
@@ -246,6 +247,7 @@ def test_single_config(args):
                         'pct': current_position['remaining_pct'],
                         'reason': exit_reason
                     })
+                    current_position['remaining_pct'] = 0  # CRITICAL FIX
                     exit_occurred = True
                     
             else:  # LONG positions
@@ -278,6 +280,7 @@ def test_single_config(args):
                         'pct': current_position['remaining_pct'],
                         'reason': exit_reason
                     })
+                    current_position['remaining_pct'] = 0  # CRITICAL FIX
                     exit_occurred = True
                 
                 # Check SL (price going DOWN)
@@ -289,6 +292,7 @@ def test_single_config(args):
                         'pct': current_position['remaining_pct'],
                         'reason': exit_reason
                     })
+                    current_position['remaining_pct'] = 0  # CRITICAL FIX
                     exit_occurred = True
             
             # Max hold time (1000 bars = ~10 days at 15min)
@@ -300,6 +304,7 @@ def test_single_config(args):
                     'pct': current_position['remaining_pct'],
                     'reason': exit_reason
                 })
+                current_position['remaining_pct'] = 0  # CRITICAL FIX
                 exit_occurred = True
             
             # Force close on last bar
@@ -311,6 +316,7 @@ def test_single_config(args):
                     'pct': current_position['remaining_pct'],
                     'reason': exit_reason
                 })
+                current_position['remaining_pct'] = 0  # CRITICAL FIX
                 exit_occurred = True
             
             # Process trade if fully closed (weighted average of all exits)
