@@ -40,14 +40,25 @@ class StrategyBuilderApp:
             self.owns_root = False
         
         self.root.title("Strategy Builder v2.0")
-        self.root.geometry("1400x900")
-        self.root.minsize(1200, 800)
+        self.root.geometry("1600x1000")
+        self.root.minsize(1400, 900)
         
-        # Configure larger fonts
-        self.large_font = ('TkDefaultFont', 20)
-        self.medium_font = ('TkDefaultFont', 16)
-        self.small_font = ('TkDefaultFont', 14)
-        self.button_font = ('TkDefaultFont', 14, 'bold')
+        # Configure much larger fonts (4x original)
+        self.large_font = ('TkDefaultFont', 40)
+        self.medium_font = ('TkDefaultFont', 32)
+        self.small_font = ('TkDefaultFont', 28)
+        self.button_font = ('TkDefaultFont', 28, 'bold')
+        
+        # VSCode Dark Mode Colors
+        self.bg_dark = '#1e1e1e'  # Background
+        self.bg_darker = '#252526'  # Darker sections
+        self.fg_text = '#d4d4d4'  # Text color
+        self.fg_bright = '#ffffff'  # Bright text
+        self.accent = '#007acc'  # VS Code blue
+        self.border = '#3e3e42'  # Borders
+        
+        # Apply dark theme
+        self.root.configure(bg=self.bg_dark)
         
         # Initialize components
         self.registry = StrategyRegistry()
@@ -117,9 +128,28 @@ class StrategyBuilderApp:
         toolbar = ttk.Frame(self.root)
         toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
         
-        # Configure button style
+        # Configure dark mode styles
         style = ttk.Style()
-        style.configure('Large.TButton', font=self.button_font, padding=10)
+        style.theme_use('clam')  # Base theme that supports customization
+        
+        # Dark button style
+        style.configure('Large.TButton', 
+                       font=self.button_font, 
+                       padding=15,
+                       background=self.bg_darker,
+                       foreground=self.fg_text,
+                       borderwidth=1,
+                       relief='flat')
+        style.map('Large.TButton',
+                 background=[('active', self.accent)],
+                 foreground=[('active', self.fg_bright)])
+        
+        # Dark frame style
+        style.configure('TFrame', background=self.bg_dark)
+        style.configure('TLabelframe', background=self.bg_dark, 
+                       foreground=self.fg_text, borderwidth=2)
+        style.configure('TLabelframe.Label', background=self.bg_dark, 
+                       foreground=self.fg_bright, font=self.medium_font)
         
         # New button
         ttk.Button(
@@ -201,7 +231,13 @@ class StrategyBuilderApp:
         self.strategy_listbox = tk.Listbox(
             list_frame,
             yscrollcommand=scrollbar.set,
-            font=self.medium_font  # 16pt instead of 10pt
+            font=self.medium_font,  # 32pt (4x original)
+            bg=self.bg_darker,
+            fg=self.fg_text,
+            selectbackground=self.accent,
+            selectforeground=self.fg_bright,
+            highlightthickness=0,
+            borderwidth=0
         )
         self.strategy_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.strategy_listbox.yview)
@@ -214,15 +250,18 @@ class StrategyBuilderApp:
         right_frame = ttk.LabelFrame(main_container, text="Strategy Editor", padding=10)
         main_container.add(right_frame, weight=3)
         
-        # Simple editor for MVP
-        ttk.Label(
+        # Simple editor for MVP with dark mode
+        editor_label = tk.Label(
             right_frame,
             text="📝 Strategy Editor\n\nSelect a strategy from the list to edit,\n"
                  "or click '➕ New' to create a new strategy.\n\n"
                  "Full editor coming soon!",
             justify=tk.CENTER,
-            font=self.large_font  # 20pt instead of 12pt
-        ).pack(expand=True)
+            font=self.large_font,  # 40pt (4x original)
+            bg=self.bg_dark,
+            fg=self.fg_text
+        )
+        editor_label.pack(expand=True)
         
         self.editor_frame = right_frame  # Save reference for later
     
@@ -231,22 +270,30 @@ class StrategyBuilderApp:
         status_bar = ttk.Frame(self.root)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X)
         
+        # Dark mode status labels
+        style = ttk.Style()
+        style.configure('Dark.TLabel',
+                       font=self.small_font,  # 28pt (4x original)
+                       background=self.bg_darker,
+                       foreground=self.fg_text,
+                       padding=5)
+        
         self.status_label = ttk.Label(
             status_bar, 
             text="Ready", 
-            relief=tk.SUNKEN, 
-            anchor=tk.W,
-            font=self.small_font  # 14pt
+            style='Dark.TLabel',
+            anchor=tk.W
         )
         self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         self.slots_label = ttk.Label(
             status_bar, 
-            text="0/150 slots", 
-            relief=tk.SUNKEN,
-            font=self.small_font  # 14pt
+            text="0/150 slots",
+            style='Dark.TLabel'
         )
         self.slots_label.pack(side=tk.RIGHT)
+        
+        status_bar.configure(background=self.bg_darker)
     
     def _center_window(self):
         """Center window on screen"""
