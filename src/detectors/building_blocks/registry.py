@@ -110,8 +110,8 @@ class BlockRegistry:
         # Store in registry
         cls._blocks[name] = block_meta
         
-        # Auto-update ConfluenceCalculator if available
-        cls._update_confluence_calculator(name, block_meta)
+        # NOTE: ConfluenceCalculator now reads directly from registry
+        # No need to update SIGNAL_TIERS (removed 2026-01-09)
         
         # Return decorator that doesn't modify the class
         def decorator(block_class):
@@ -147,25 +147,6 @@ class BlockRegistry:
                     f"Block '{metadata['name']}': "
                     f"Signals {undefined} declared in valid_signals but not defined in signal_tiers"
                 )
-    
-    @classmethod
-    def _update_confluence_calculator(cls, name: str, metadata: BlockMetadata):
-        """
-        Auto-update ConfluenceCalculator with this block's tiers
-        
-        This allows ConfluenceCalculator to automatically adapt
-        to new blocks without manual updates.
-        """
-        try:
-            from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
-            
-            ConfluenceCalculator.SIGNAL_TIERS[name] = {
-                'max_points': metadata.default_weight,
-                'tiers': metadata.signal_tiers
-            }
-        except ImportError:
-            # ConfluenceCalculator not available yet (during initial imports)
-            pass
     
     @classmethod
     def get_block(cls, name: str) -> Optional[BlockMetadata]:
