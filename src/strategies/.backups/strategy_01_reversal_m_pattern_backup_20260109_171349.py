@@ -61,9 +61,6 @@ from src.detectors.building_blocks.institutional.vwap import VWAP
 from src.detectors.building_blocks.moving_averages.ema_20_50_trend import EMA2050Trend
 from src.detectors.building_blocks.sessions.kill_zones import KillZones
 from src.detectors.building_blocks.volatility.adr import ADR
-from src.detectors.building_blocks.market_structure.swing_points import SwingPoints
-from src.detectors.building_blocks.moving_averages.ema_200_trend import EMA200Trend
-from src.detectors.building_blocks.market_structure.premium_discount_zones import PremiumDiscountZones
 
 # Import CENTRALIZED confluence calculator (shared with optimizer)
 from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
@@ -133,10 +130,7 @@ class MPatternReversalStandard(Strategy):
             'vwap': VWAP(timeframe='15min'),
             'ema_20_50_trend': EMA2050Trend(timeframe='15min'),
             'kill_zones': KillZones(timeframe='15min'),
-            'adr': ADR(timeframe='15min'),
-            'swing_points': SwingPoints(timeframe='15min'),
-            'ema_200_trend': EMA200Trend(timeframe='15min'),
-            'premium_discount_zones': PremiumDiscountZones(timeframe='15min')
+            'adr': ADR(timeframe='15min')
         }
         
         # Keep weights configuration
@@ -191,24 +185,6 @@ class MPatternReversalStandard(Strategy):
         self.blocks['adr'] = {
             'name': 'ADR',
             'weight': 8,
-            'enabled': True
-        }
-        
-        self.blocks['swing_points'] = {
-            'name': 'SwingPoints',
-            'weight': 15,
-            'enabled': True
-        }
-        
-        self.blocks['ema_200_trend'] = {
-            'name': 'EMA200Trend',
-            'weight': 12,
-            'enabled': True
-        }
-        
-        self.blocks['premium_discount_zones'] = {
-            'name': 'PremiumDiscountZones',
-            'weight': 14,
             'enabled': True
         }
         
@@ -315,9 +291,6 @@ class MPatternReversalStandard(Strategy):
         # 9. ADR (Context)
         results['adr'] = self.detectors['adr'].analyze(df)
         
-        results['swing_points'] = self.detectors['swing_points'].analyze(df)
-        results['ema_200_trend'] = self.detectors['ema_200_trend'].analyze(df)
-        results['premium_discount_zones'] = self.detectors['premium_discount_zones'].analyze(df)
         return results
     
     def _calculate_confluence(self, results: dict) -> tuple:
