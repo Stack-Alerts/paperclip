@@ -176,14 +176,15 @@ def test_single_config(args):
                 
                 current_position = None
     
-    # Calculate metrics (same as before)
+    # Calculate metrics matching ConfigPerformance class
     if len(trades) == 0:
         return ConfigPerformance(
             config_id=config.config_id,
             total_trades=0, winning_trades=0, losing_trades=0,
-            total_pnl=0.0, total_fees=0.0, net_pnl=0.0,
-            win_rate=0.0, profit_factor=0.0, sharpe_ratio=0.0,
-            max_drawdown=0.0, avg_trade_duration=0.0
+            win_rate_pct=0.0, total_pnl=0.0, total_fees=0.0,
+            net_pnl=0.0, net_return_pct=0.0, profit_factor=0.0,
+            sharpe_ratio=0.0, max_drawdown_pct=0.0,
+            avg_win=0.0, avg_loss=0.0, largest_win=0.0, largest_loss=0.0
         )
     
     total_trades = len(trades)
@@ -192,17 +193,23 @@ def test_single_config(args):
     total_pnl = sum(t['pnl'] for t in trades)
     total_fees = sum(t['fee'] for t in trades)
     net_pnl = sum(t['net_pnl'] for t in trades)
-    win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0.0
+    win_rate_pct = (winning_trades / total_trades * 100) if total_trades > 0 else 0.0
     
+    # Net return percentage (assuming $10,000 starting capital)
+    net_return_pct = (net_pnl / 10000 * 100) if net_pnl != 0 else 0.0
+    
+    # Profit factor
     gross_profit = sum(t['net_pnl'] for t in trades if t['net_pnl'] > 0)
     gross_loss = abs(sum(t['net_pnl'] for t in trades if t['net_pnl'] < 0))
     profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else 0.0
     
+    # Sharpe ratio
     returns = [t['net_pnl'] / t['entry_price'] for t in trades]
     avg_return = sum(returns) / len(returns) if returns else 0
     std_return = (sum((r - avg_return)**2 for r in returns) / len(returns))**0.5 if len(returns) > 1 else 0
     sharpe_ratio = (avg_return / std_return * (252**0.5)) if std_return > 0 else 0.0
     
+    # Max drawdown
     cumulative = 0
     peak = 0
     max_dd = 0
@@ -213,23 +220,33 @@ def test_single_config(args):
         dd = peak - cumulative
         if dd > max_dd:
             max_dd = dd
+    max_drawdown_pct = (max_dd / 10000 * 100) if peak > 0 else 0.0
     
-    max_drawdown = (max_dd / 10000 * 100) if peak > 0 else 0.0
-    avg_duration = sum(t['bars_held'] for t in trades) / len(trades) if trades else 0.0
+    # Win/loss stats
+    wins = [t['net_pnl'] for t in trades if t['net_pnl'] > 0]
+    losses = [t['net_pnl'] for t in trades if t['net_pnl'] < 0]
+    avg_win = sum(wins) / len(wins) if wins else 0.0
+    avg_loss = sum(losses) / len(losses) if losses else 0.0
+    largest_win = max(wins) if wins else 0.0
+    largest_loss = min(losses) if losses else 0.0
     
     return ConfigPerformance(
         config_id=config.config_id,
         total_trades=total_trades,
         winning_trades=winning_trades,
         losing_trades=losing_trades,
+        win_rate_pct=win_rate_pct,
         total_pnl=total_pnl,
         total_fees=total_fees,
         net_pnl=net_pnl,
-        win_rate=win_rate,
+        net_return_pct=net_return_pct,
         profit_factor=profit_factor,
         sharpe_ratio=sharpe_ratio,
-        max_drawdown=max_drawdown,
-        avg_trade_duration=avg_duration
+        max_drawdown_pct=max_drawdown_pct,
+        avg_win=avg_win,
+        avg_loss=avg_loss,
+        largest_win=largest_win,
+        largest_loss=largest_loss
     )
 
 
