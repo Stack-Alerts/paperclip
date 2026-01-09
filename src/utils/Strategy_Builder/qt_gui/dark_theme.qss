@@ -1,0 +1,334 @@
+/* 
+Strategy Builder - VSCode Dark Theme
+PyQt6 Stylesheet
+
+Author: Strategy Builder v3.0
+Date: 2026-01-10
+*/
+
+/* === MAIN WINDOW === */
+QMainWindow {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+}
+
+/* === MENU BAR === */
+QMenuBar {
+    background-color: #252526;
+    color: #d4d4d4;
+    font-size: 28pt;
+    padding: 10px;
+}
+
+QMenuBar::item {
+    background-color: transparent;
+    padding: 8px 20px;
+}
+
+QMenuBar::item:selected {
+    background-color: #007acc;
+    color: #ffffff;
+}
+
+QMenu {
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #3e3e42;
+    font-size: 28pt;
+}
+
+QMenu::item {
+    padding: 10px 30px;
+}
+
+QMenu::item:selected {
+    background-color: #007acc;
+    color: #ffffff;
+}
+
+/* === TOOLBAR === */
+QToolBar {
+    background-color: #252526;
+    border: none;
+    spacing: 10px;
+    padding: 10px;
+}
+
+QToolButton {
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 15px;
+    font-size: 28pt;
+    font-weight: bold;
+    min-width: 150px;
+}
+
+QToolButton:hover {
+    background-color: #007acc;
+    color: #ffffff;
+    border-color: #007acc;
+}
+
+QToolButton:pressed {
+    background-color: #005a9e;
+}
+
+/* === BUTTONS === */
+QPushButton {
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 15px 30px;
+    font-size: 28pt;
+    font-weight: bold;
+    min-height: 50px;
+}
+
+QPushButton:hover {
+    background-color: #007acc;
+    color: #ffffff;
+    border-color: #007acc;
+}
+
+QPushButton:pressed {
+    background-color: #005a9e;
+}
+
+QPushButton:disabled {
+    background-color: #2d2d30;
+    color: #656565;
+    border-color: #3e3e42;
+}
+
+/* === LIST WIDGETS === */
+QListWidget {
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #3e3e42;
+    font-size: 32pt;
+    padding: 5px;
+}
+
+QListWidget::item {
+    padding: 10px;
+    border-bottom: 1px solid #3e3e42;
+}
+
+QListWidget::item:selected {
+    background-color: #007acc;
+    color: #ffffff;
+}
+
+QListWidget::item:hover {
+    background-color: #2a2d2e;
+}
+
+/* === TREE WIDGET === */
+QTreeWidget {
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #3e3e42;
+    font-size: 32pt;
+}
+
+QTreeWidget::item {
+    padding: 8px;
+}
+
+QTreeWidget::item:selected {
+    background-color: #007acc;
+    color: #ffffff;
+}
+
+QTreeWidget::item:hover {
+    background-color: #2a2d2e;
+}
+
+/* === TEXT EDIT === */
+QTextEdit, QPlainTextEdit {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    border: 1px solid #3e3e42;
+    font-size: 28pt;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    padding: 10px;
+}
+
+/* === LINE EDIT === */
+QLineEdit {
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 28pt;
+}
+
+QLineEdit:focus {
+    border-color: #007acc;
+}
+
+/* === LABELS === */
+QLabel {
+    color: #d4d4d4;
+    font-size: 28pt;
+    background-color: transparent;
+}
+
+/* === GROUP BOX === */
+QGroupBox {
+    background-color: #1e1e1e;
+    border: 2px solid #3e3e42;
+    border-radius: 6px;
+    margin-top: 20px;
+    font-size: 32pt;
+    font-weight: bold;
+    color: #ffffff;
+    padding: 20px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 5px 15px;
+    background-color: #252526;
+    color: #ffffff;
+}
+
+/* === SPLITTER === */
+QSplitter::handle {
+    background-color: #3e3e42;
+}
+
+QSplitter::handle:hover {
+    background-color: #007acc;
+}
+
+/* === SCROLL BAR === */
+QScrollBar:vertical {
+    background-color: #1e1e1e;
+    width: 20px;
+    border: none;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #424242;
+    min-height: 30px;
+    border-radius: 10px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #4e4e4e;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    background-color: #1e1e1e;
+    height: 20px;
+    border: none;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #424242;
+    min-width: 30px;
+    border-radius: 10px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: #4e4e4e;
+}
+
+/* === STATUS BAR === */
+QStatusBar {
+    background-color: #007acc;
+    color: #ffffff;
+    font-size: 28pt;
+    padding: 5px;
+}
+
+QStatusBar::item {
+    border: none;
+}
+
+/* === TAB WIDGET === */
+QTabWidget::pane {
+    background-color: #1e1e1e;
+    border: 1px solid #3e3e42;
+}
+
+QTabBar::tab {
+    background-color: #252526;
+    color: #d4d4d4;
+    padding: 15px 30px;
+    font-size: 28pt;
+    border: 1px solid #3e3e42;
+    border-bottom: none;
+}
+
+QTabBar::tab:selected {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    border-bottom: 2px solid #007acc;
+}
+
+QTabBar::tab:hover {
+    background-color: #2a2d2e;
+}
+
+/* === SPIN BOX === */
+QSpinBox, QDoubleSpinBox {
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 28pt;
+}
+
+QSpinBox:focus, QDoubleSpinBox:focus {
+    border-color: #007acc;
+}
+
+/* === COMBO BOX === */
+QComboBox {
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 28pt;
+}
+
+QComboBox:hover {
+    border-color: #007acc;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 40px;
+}
+
+QComboBox::down-arrow {
+    image: none;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid #d4d4d4;
+    width: 0;
+    height: 0;
+    margin-right: 15px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #252526;
+    color: #d4d4d4;
+    selection-background-color: #007acc;
+    selection-color: #ffffff;
+    border: 1px solid #3e3e42;
+    font-size: 28pt;
+}
