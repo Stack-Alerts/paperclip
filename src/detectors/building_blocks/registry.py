@@ -357,11 +357,13 @@ def auto_discover_blocks(base_path: Optional[Path] = None):
     if base_path is None:
         base_path = Path(__file__).parent
     
-    # Categories to search
+    # Categories to search (all subdirectories)
     categories = [
         'patterns', 'oscillators', 'price_levels', 'sessions',
         'moving_averages', 'market_structure', 'volatility',
-        'institutional', 'smc_ict'
+        'institutional', 'smc_ict', 'elliott_wave', 'fibonacci',
+        'price_action', 'risk_management', 'signals', 'supply_demand',
+        'trend', 'wyckoff'
     ]
     
     for category in categories:
@@ -381,3 +383,9 @@ def auto_discover_blocks(base_path: Optional[Path] = None):
                 # Silently skip modules that fail to import
                 # (they may not be ready or have dependencies)
                 pass
+
+
+# Auto-discover blocks when module is imported
+if not BlockRegistry._initialized:
+    auto_discover_blocks()
+    BlockRegistry._initialized = True
