@@ -133,6 +133,7 @@ class StrategyCreatorDialog(QDialog):
         
         self.signals_list = QListWidget()
         self.signals_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        self.signals_list.itemSelectionChanged.connect(self.update_block_signals)
         config_layout.addRow("Signals:", self.signals_list)
         
         config_group.setLayout(config_layout)
@@ -213,8 +214,8 @@ class StrategyCreatorDialog(QDialog):
         
         self.selected_blocks.append(block_config)
         
-        # Update display
-        item = QListWidgetItem(f"{block_info.display_name} (Weight: {block_info.default_weight})")
+        # Update display to show it has no signals selected yet
+        item = QListWidgetItem(f"{block_info.display_name} (Weight: {block_info.default_weight}) [No signals]")
         item.setData(Qt.ItemDataRole.UserRole, (block_config, block_info))
         self.selected_blocks_list.addItem(item)
         
@@ -286,9 +287,53 @@ class StrategyCreatorDialog(QDialog):
             # Update display
             item = self.selected_blocks_list.currentItem()
             block_config, block_info = item.data(Qt.ItemDataRole.UserRole)
-            item.setText(f"{block_info.display_name} (Weight: {value})")
+            
+            # Update text to show weight and selected signals
+            signal_names = [s.signal_name for s in block_config.signals]
+            if signal_names:
+                signals_str = f" [{', '.join(signal_names[:2])}{'...' if len(signal_names) > 2 else ''}]"
+            else:
+                signals_str = " [No signals]"
+            
+            item.setText(f"{block_info.display_name} (Weight: {value}){signals_str}")
             
             self.update_confluence()
+            
+    def update_block_signals(self):
+        """Update signals for currently selected block"""
+        current_row = self.selected_blocks_list.currentRow()
+        if current_row < 0:
+            return
+            
+        # Get selected signals from list
+        selected_signals = []
+        for i in range(self.signals_list.count()):
+            item = self.signals_list.item(i)
+            if item.isSelected():
+                signal_info = item.data(Qt.ItemDataRole.UserRole)
+                # Create SignalConfiguration
+                signal_config = SignalConfiguration(
+                    signal_name=signal_info.name,
+                    signal_display_name=signal_info.display_name,
+                    role='SIGNAL',  # Default role
+                    required=True
+                )
+                selected_signals.append(signal_config)
+        
+        # Update block configuration
+        self.selected_blocks[current_row].signals = selected_signals
+        
+        # Update display to show selected signals
+        item = self.selected_blocks_list.currentItem()
+        block_config, block_info = item.data(Qt.ItemDataRole.UserRole)
+        
+        signal_names = [s.signal_name for s in selected_signals]
+        if signal_names:
+            signals_str = f" [{', '.join(signal_names[:2])}{'...' if len(signal_names) > 2 else ''}]"
+        else:
+            signals_str = " [No signals]"
+        
+        item.setText(f"{block_info.display_name} (Weight: {block_config.weight}){signals_str}")
             
     def update_confluence(self):
         """Calculate and display total confluence"""
