@@ -18,11 +18,47 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='ema_50_vector',
+    category='MOVING_AVERAGES',
+    class_name='EMA50Vector',
+    default_weight=12,
+    valid_signals=['ABOVE_EMA', 'BEARISH_BREAK', 'BELOW_EMA', 'BULLISH_BREAK', 'NO_BREAK', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'ABOVE_EMA': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'BEARISH_BREAK': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'BELOW_EMA': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'BULLISH_BREAK': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'NO_BREAK': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class EMA50Vector:
     """
     50 EMA Vector Break - Trend Following Indicator

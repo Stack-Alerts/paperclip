@@ -18,11 +18,40 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='how',
+    category='PRICE_LEVELS',
+    class_name='HOW',
+    default_weight=20,
+    valid_signals=['BELOW_HOW', 'BREAKING_OUT', 'BREAKOUT_CONFIRMED', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BELOW_HOW': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BREAKING_OUT': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BREAKOUT_CONFIRMED': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class HOW:
     """
     HOW - High of Week Price Level (ENHANCED 2026-01-04)

@@ -17,9 +17,9 @@ Block Type Definitions:
 
 
 
-from typing 
+from typing import Dict, Any, List, Optional
+
 from src.detectors.building_blocks.registry import register_block
-import Dict, Any, List, Optional
 from datetime import datetime
 import pandas as pd
 import numpy as np

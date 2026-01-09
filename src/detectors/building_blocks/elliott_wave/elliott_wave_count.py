@@ -32,11 +32,31 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, List, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='elliott_wave_count',
+    category='ELLIOTT_WAVE',
+    class_name='ElliottWaveCount',
+    default_weight=22,
+    valid_signals=['NO_PATTERN', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'NO_PATTERN': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class ElliottWaveCount:
     """
     Elliott Wave Pattern Detector (Multi-Timeframe Enhanced)

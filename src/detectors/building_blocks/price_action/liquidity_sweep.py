@@ -25,12 +25,37 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, List
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 from src.utils.advanced_data_loader import advanced_data
 
 
+@register_block(
+    name='liquidity_sweep',
+    category='PRICE_ACTION',
+    class_name='LiquiditySweep',
+    default_weight=25,
+    valid_signals=['BEARISH_SWEEP', 'BULLISH_SWEEP', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_SWEEP': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BULLISH_SWEEP': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class LiquiditySweep:
     """
     Liquidity Sweep Detector - ICT/SMC Concept

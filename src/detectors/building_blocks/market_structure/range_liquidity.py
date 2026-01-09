@@ -24,12 +24,40 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 from src.utils.advanced_data_loader import advanced_data
 
 
+@register_block(
+    name='range_liquidity',
+    category='MARKET_STRUCTURE',
+    class_name='RangeLiquidity',
+    default_weight=15,
+    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BULLISH': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class RangeLiquidity:
     """
     Range Liquidity with optional real orderbook integration

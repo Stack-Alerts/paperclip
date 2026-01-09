@@ -18,11 +18,76 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, List, Optional, Tuple
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='bollinger_bands',
+    category='VOLATILITY',
+    class_name='BollingerBands',
+    default_weight=10,
+    valid_signals=['ABOVE_UPPER', 'BEARISH_REVERSAL', 'BELOW_LOWER', 'BULLISH_REVERSAL', 'LOWER_BAND_WALK', 'LOWER_HALF', 'MEDIUM_HIGH', 'MEDIUM_LOW', 'NEAR_LOWER', 'SQUEEZE_BREAKOUT', 'SQUEEZE_BREAKOUT_BEAR', 'SQUEEZE_BREAKOUT_BULL', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'ABOVE_UPPER': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'BEARISH_REVERSAL': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'BELOW_LOWER': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'BULLISH_REVERSAL': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'LOWER_BAND_WALK': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'LOWER_HALF': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'MEDIUM_HIGH': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'MEDIUM_LOW': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'NEAR_LOWER': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'SQUEEZE_BREAKOUT': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'SQUEEZE_BREAKOUT_BEAR': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'SQUEEZE_BREAKOUT_BULL': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class BollingerBands:
     """
     Bollinger Bands - Volatility Indicator

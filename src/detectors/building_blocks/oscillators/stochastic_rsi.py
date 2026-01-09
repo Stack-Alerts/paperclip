@@ -18,11 +18,47 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, Tuple
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='stochastic_rsi',
+    category='OSCILLATORS',
+    class_name='StochasticRSI',
+    default_weight=25,
+    valid_signals=['BEARISH_CROSS', 'BULLISH_CROSS', 'NEUTRAL_HIGH', 'NEUTRAL_LOW', 'NO_CROSS', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_CROSS': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BULLISH_CROSS': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'NEUTRAL_HIGH': {
+                'max_points': 12,
+                'formula': 'scaled'
+        },
+        'NEUTRAL_LOW': {
+                'max_points': 12,
+                'formula': 'scaled'
+        },
+        'NO_CROSS': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class StochasticRSI:
     """
     Stochastic RSI - Advanced Momentum Oscillator

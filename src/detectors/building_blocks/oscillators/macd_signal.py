@@ -18,11 +18,66 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, List, Optional, Tuple
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='macd_signal',
+    category='OSCILLATORS',
+    class_name='MACDSignal',
+    default_weight=25,
+    valid_signals=['BEARISH_CROSS', 'BEARISH_ZERO_CROSS', 'BULLISH_CROSS', 'BULLISH_ZERO_CROSS', 'NO_CROSS', 'NO_ZERO_CROSS', 'STRONG_BEARISH', 'STRONG_BULLISH', 'WEAKENING_BEARISH', 'WEAKENING_BULLISH', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_CROSS': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BEARISH_ZERO_CROSS': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BULLISH_CROSS': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BULLISH_ZERO_CROSS': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'NO_CROSS': {
+                'points': 0
+        },
+        'NO_ZERO_CROSS': {
+                'points': 0
+        },
+        'STRONG_BEARISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'STRONG_BULLISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'WEAKENING_BEARISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'WEAKENING_BULLISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class MACDSignal:
     """
     MACD (Moving Average Convergence Divergence) - Momentum Oscillator

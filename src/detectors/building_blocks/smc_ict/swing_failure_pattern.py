@@ -23,11 +23,36 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='swing_failure_pattern',
+    category='SMC_ICT',
+    class_name='SwingFailurePattern',
+    default_weight=20,
+    valid_signals=['BEARISH_SFP', 'BULLISH_SFP', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_SFP': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_SFP': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class SwingFailurePattern:
     """
     Swing Failure Pattern (SFP) Detector - ICT/SMC Concept

@@ -25,12 +25,45 @@ Grade: TBD (pending walkforward test)
 """
 
 from typing import Dict, Any, List, Optional, Tuple
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 from enum import Enum
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='adaptive_momentum_oscillator',
+    category='SIGNALS',
+    class_name='SignalType',
+    default_weight=20,
+    valid_signals=['BEARISH_CROSS', 'BEARISH_DIVERGENCE', 'BULLISH_CROSS', 'BULLISH_DIVERGENCE', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_CROSS': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BEARISH_DIVERGENCE': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_CROSS': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_DIVERGENCE': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class SignalType(Enum):
     """Signal types"""
     BULLISH_CROSS = "bullish_cross"

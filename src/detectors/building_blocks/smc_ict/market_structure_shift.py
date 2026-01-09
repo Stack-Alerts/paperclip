@@ -23,10 +23,43 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
+@register_block(
+    name='market_structure_shift',
+    category='SMC_ICT',
+    class_name='MarketStructureShift',
+    default_weight=20,
+    valid_signals=['BEARISH_MSS', 'BEARISH_RETEST', 'BULLISH_MSS', 'BULLISH_RETEST', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_MSS': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BEARISH_RETEST': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_MSS': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_RETEST': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class MarketStructureShift:
     """
     Market Structure Shift (MSS) Detector - ICT/SMC Concept

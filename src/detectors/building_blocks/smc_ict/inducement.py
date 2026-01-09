@@ -21,11 +21,36 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='inducement',
+    category='SMC_ICT',
+    class_name='Inducement',
+    default_weight=20,
+    valid_signals=['BEARISH_INDUCEMENT', 'BULLISH_INDUCEMENT', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_INDUCEMENT': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_INDUCEMENT': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class Inducement:
     """
     Inducement Detector - ICT/SMC Concept

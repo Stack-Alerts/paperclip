@@ -82,11 +82,40 @@ HYBRID DESIGN:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='wyckoff_reaccumulation',
+    category='WYCKOFF',
+    class_name='WyckoffReaccumulation',
+    default_weight=28,
+    valid_signals=['BREAKOUT_CONTINUATION', 'REACCUMULATION_DETECTED', 'SPRING_DETECTED', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BREAKOUT_CONTINUATION': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'REACCUMULATION_DETECTED': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'SPRING_DETECTED': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class WyckoffReaccumulation:
     """
     Detects Wyckoff re-accumulation phases using proper methodology

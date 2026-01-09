@@ -20,11 +20,36 @@ Grade: TBD (pending walkforward test)
 """
 
 from typing import Dict, Any, List, Optional, Tuple
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='swing_breakout_sequence',
+    category='PATTERNS',
+    class_name='SwingBreakoutSequence',
+    default_weight=30,
+    valid_signals=['BEARISH_BREAKOUT_SEQUENCE', 'BULLISH_BREAKOUT_SEQUENCE', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_BREAKOUT_SEQUENCE': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BULLISH_BREAKOUT_SEQUENCE': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class SwingBreakoutSequence:
     """
     Swing Breakout Sequence Detector

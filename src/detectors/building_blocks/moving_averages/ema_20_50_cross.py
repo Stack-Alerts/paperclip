@@ -18,11 +18,39 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='ema_20_50_cross',
+    category='MOVING_AVERAGES',
+    class_name='EMA2050Cross',
+    default_weight=12,
+    valid_signals=['DEATH_CROSS', 'GOLDEN_CROSS', 'NO_CROSS', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'DEATH_CROSS': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'GOLDEN_CROSS': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'NO_CROSS': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class EMA2050Cross:
     """
     20/50 EMA Cross - Event-Driven Crossover Detector

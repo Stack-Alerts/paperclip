@@ -20,11 +20,44 @@ Grade: TBD (pending walkforward test)
 """
 
 from typing import Dict, Any, List, Optional, Tuple
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='wave_consolidation',
+    category='MARKET_STRUCTURE',
+    class_name='WaveConsolidation',
+    default_weight=15,
+    valid_signals=['BEARISH_ZONE_BREAK', 'BEARISH_ZONE_REJECTION', 'BULLISH_ZONE_BREAK', 'BULLISH_ZONE_REJECTION', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_ZONE_BREAK': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'BEARISH_ZONE_REJECTION': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'BULLISH_ZONE_BREAK': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'BULLISH_ZONE_REJECTION': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class WaveConsolidation:
     """
     Wave Consolidation Zone Detector

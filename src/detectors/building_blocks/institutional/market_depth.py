@@ -37,12 +37,37 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 from src.utils.advanced_data_loader import advanced_data
 
 
+@register_block(
+    name='market_depth',
+    category='INSTITUTIONAL',
+    class_name='MarketDepth',
+    default_weight=15,
+    valid_signals=['HIGH_LIQUIDITY', 'LOW_LIQUIDITY', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'HIGH_LIQUIDITY': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'LOW_LIQUIDITY': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class MarketDepth:
     """
     Enhanced Market Depth with intelligent liquidity assessment

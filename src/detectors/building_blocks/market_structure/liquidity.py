@@ -28,6 +28,8 @@ Grade: TBD (pending walkforward test)
 """
 
 from typing import Dict, Any, List, Optional, Tuple
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 from dataclasses import dataclass
 import pandas as pd
@@ -35,6 +37,25 @@ import numpy as np
 
 
 @dataclass
+@register_block(
+    name='liquidity',
+    category='MARKET_STRUCTURE',
+    class_name='LiquidityZone',
+    default_weight=15,
+    valid_signals=['VOID_DETECTED', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'VOID_DETECTED': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class LiquidityZone:
     """Represents a liquidity zone."""
     zone_type: str  # 'buyside' or 'sellside'

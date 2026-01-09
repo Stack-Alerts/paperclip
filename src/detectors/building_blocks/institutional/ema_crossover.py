@@ -18,10 +18,43 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 
 
+@register_block(
+    name='ema_crossover',
+    category='INSTITUTIONAL',
+    class_name='EMACrossover',
+    default_weight=15,
+    valid_signals=['BEARISH_ALIGNMENT', 'BULLISH_ALIGNMENT', 'DEATH_CROSS', 'GOLDEN_CROSS', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_ALIGNMENT': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'BULLISH_ALIGNMENT': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'DEATH_CROSS': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'GOLDEN_CROSS': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class EMACrossover:
     """
     EMA Crossover detection with enhancements

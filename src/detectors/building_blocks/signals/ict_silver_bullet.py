@@ -19,12 +19,45 @@ Grade: TBD (pending walkforward test)
 """
 
 from typing import Dict, Any, List, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime, time
 from enum import Enum
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='ict_silver_bullet',
+    category='SIGNALS',
+    class_name='SessionType',
+    default_weight=20,
+    valid_signals=['BEARISH_FVG_IN_ZONE', 'BEARISH_FVG_RETEST', 'BULLISH_FVG_IN_ZONE', 'BULLISH_FVG_RETEST', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_FVG_IN_ZONE': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BEARISH_FVG_RETEST': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_FVG_IN_ZONE': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_FVG_RETEST': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class SessionType(Enum):
     """Silver Bullet session types."""
     LONDON_OPEN = "london_open"

@@ -22,6 +22,8 @@ Grade: TBD (pending walkforward test)
 """
 
 from typing import Dict, Any, List, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime, time, timedelta
 from dataclasses import dataclass
 import pandas as pd
@@ -29,6 +31,41 @@ import numpy as np
 
 
 @dataclass
+@register_block(
+    name='initial_balance_breakout',
+    category='PATTERNS',
+    class_name='InitialBalanceRange',
+    default_weight=30,
+    valid_signals=['ABOVE_IB', 'BEARISH_BREAKOUT', 'BELOW_IB', 'BULLISH_BREAKOUT', 'LOWER_IB', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'ABOVE_IB': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BEARISH_BREAKOUT': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BELOW_IB': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BULLISH_BREAKOUT': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'LOWER_IB': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class InitialBalanceRange:
     """Represents an Initial Balance period."""
     session_start: datetime

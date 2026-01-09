@@ -73,11 +73,36 @@ HYBRID DESIGN:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='wyckoff_distribution',
+    category='WYCKOFF',
+    class_name='WyckoffDistribution',
+    default_weight=28,
+    valid_signals=['SOW_BREAKDOWN', 'UTAD_DETECTED', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'SOW_BREAKDOWN': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'UTAD_DETECTED': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class WyckoffDistribution:
     """
     Detects Wyckoff distribution phases using proper methodology
