@@ -119,27 +119,18 @@ def test_single_config(args):
     
     FIXED: No more hardcoded 24-bar exits!
     NOW: Uses actual TP/SL levels from strategy
+    FIXED: Uses centralized confluence calculator with proper tiering
     """
+    from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
+    
     config, all_results, test_df = args
     
     trades = []
     current_position = None
     
     for bar_idx, bar_results in enumerate(all_results):
-        confluence = 0
-        
-        for block_name, block_result in bar_results.items():
-            if block_name not in config.blocks:
-                continue
-            
-            block_config = config.blocks[block_name]
-            weight = block_config['weight']
-            signal = block_result.get('signal', '')
-            confidence = block_result.get('confidence', 0)
-            
-            if signal and signal != 'NO_SIGNAL' and signal != 'ERROR':
-                points = int(weight * confidence / 100)
-                confluence += points
+        # FIXED: Use centralized confluence calculator with proper tiering
+        confluence, _ = ConfluenceCalculator.calculate_confluence(bar_results, config.blocks)
         
         # ENTRY LOGIC
         if confluence >= config.min_confluence and current_position is None:
@@ -623,4 +614,4 @@ class UltraHybridSimulator:
         
         log_debug(f"Debug log saved to: {log_file}")
         
-        return results
+        return results        
