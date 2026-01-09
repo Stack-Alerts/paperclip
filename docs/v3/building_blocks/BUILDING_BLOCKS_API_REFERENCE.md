@@ -1,4 +1,4 @@
-# Building Blocks API Reference - Complete Developer Guide
+g# Building Blocks API Reference - Complete Developer Guide
 
 **Version:** 3.0 (Institutional Grade)  
 **Date:** January 8, 2026  
@@ -2294,45 +2294,141 @@ if result['signal'] == 'BEARISH_A2':
 
 The building blocks system uses a **confluence scoring approach** where multiple blocks must align before taking a trade. This reduces false signals and increases win rate.
 
-### Basic Strategy Structure
+### CRITICAL: Use Centralized ConfluenceCalculator
 
+**As of January 9, 2026, ALL strategies MUST use the centralized ConfluenceCalculator module.**
+
+**Why This Matters:**
+- **Single Source of Truth:** All confluence scoring in ONE place
+- **Consistency Guaranteed:** Optimizer and live strategies use SAME logic  
+- **No Divergence:** What you optimize is what you get in live trading
+- **Easier Maintenance:** Update scoring once, works everywhere
+- **Tested & Validated:** Production-grade tiered scoring system
+
+**WRONG Way (Deprecated):**
+```python
+def _calculate_confluence(self, results: dict) -> tuple:
+    """❌ DON'T DO THIS - Duplicate scoring logic"""
+    confluence = 0
+    signals = []
+    
+    # 400+ lines of manual scoring...
+    if results['double_top']['signal'] == 'BEARISH_BREAKDOWN':
+        confluence += 30
+    # ... etc
+    
+    return confluence, signals
+```
+
+**RIGHT Way (Required):**
+```python
+# Import the centralized calculator
+from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
+
+class MyStrategy(Strategy):
+    def _calculate_confluence(self, results: dict) -> tuple:
+        """✅ USE THIS - Centralized, tested, consistent"""
+        return ConfluenceCalculator.calculate_confluence(results, self.blocks)
+```
+
+**Complete Example:**
 ```python
 from nautilus_trader.trading.strategy import Strategy
 from nautilus_trader.model.data import Bar
 from src.data_manager.nautilus_loader import load_warmup_bars
 import pandas as pd
 
+# ✅ CRITICAL: Import centralized calculator
+from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
+
 class ConfluenceStrategy(Strategy):
     """
-    Example confluence-based strategy combining multiple building blocks
+    Example strategy using CENTRALIZED confluence calculation
+    
+    IMPORTANT: Always use ConfluenceCalculator.calculate_confluence()
+    Never implement your own scoring logic!
     """
     
     def __init__(self, config):
         super().__init__(config)
         
         # Initialize building blocks
-        self.blocks = self._initialize_blocks()
+        self.detectors = {}
+        self.blocks = {}
+        self._initialize_blocks()
         
         # Strategy parameters
-        self.min_confluence = 65  # Minimum points to enter
-        self.max_bars_held = 1000  # Rolling window
+        self.min_confluence = 65
+        self.max_bars_held = 1000
         self.bars_data = []
         
     def _initialize_blocks(self):
-        """Initialize all building blocks for the strategy"""
+        """Initialize building blocks with BOTH detectors and configs"""
         from src.detectors.building_blocks.patterns.double_top import DoubleTopPattern
         from src.detectors.building_blocks.oscillators.rsi_divergence import RSIDivergence
         from src.detectors.building_blocks.price_levels.hod import HOD
         from src.detectors.building_blocks.sessions.session_time import SessionTime
         from src.detectors.building_blocks.price_levels.asia_session_50_percent import AsiaSession50Percent
         
-        return {
+        # Detector instances (for analysis)
+        self.detectors = {
             'double_top': DoubleTopPattern(timeframe='15m'),
-            'rsi': RSIDivergence(timeframe='15m'),
+            'rsi_divergence': RSIDivergence(timeframe='15m'),
             'hod': HOD(timeframe='15m'),
-            'session': SessionTime(timeframe='15m'),
+            'session_time': SessionTime(timeframe='15m'),
             'asia_50': AsiaSession50Percent(timeframe='15m'),
         }
+        
+        # Block configs (for confluence calculation)
+        self.blocks = {
+            'double_top': {
+                'name': 'DoubleTopPattern',
+                'weight': 30,
+                'enabled': True
+            },
+            'rsi_divergence': {
+                'name': 'RSIDivergence',
+                'weight': 25,
+                'enabled': True
+            },
+            'hod': {
+                'name': 'HOD',
+                'weight': 20,
+                'enabled': True
+            },
+            'session_time': {
+                'name': 'SessionTime',
+                'weight': 15,
+                'enabled': True
+            },
+            'asia_50': {
+                'name': 'AsiaSession50Percent',
+                'weight': 18,
+                'enabled': True
+            },
+        }
+    
+    def _analyze_blocks(self, df: pd.DataFrame) -> dict:
+        """Run all building block analysis"""
+        results = {}
+        for name, detector in self.detectors.items():
+            results[name] = detector.analyze(df)
+        return results
+    
+    def _calculate_confluence(self, results: dict) -> tuple:
+        """
+        ✅ CORRECT: Use centralized ConfluenceCalculator
+        
+        This ensures:
+        - Same scoring as Universal Optimizer
+        - Tiered scoring (BREAKDOWN vs FORMING get different points)
+        - Tested and validated logic
+        - Easy to maintain
+        
+        Returns: (confluence_score, list_of_signals)
+        """
+        return ConfluenceCalculator.calculate_confluence(results, self.blocks)
+### Basic Strategy Structure
     
     def _update_dataframe(self, bar: Bar) -> pd.DataFrame:
         """Convert bars to DataFrame for building blocks"""
