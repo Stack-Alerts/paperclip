@@ -29,7 +29,51 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+from src.detectors.building_blocks.registry import register_block
 
+
+@register_block(
+    name='swing_points',
+    category='MARKET_STRUCTURE',
+    class_name='SwingPoints',
+    default_weight=15,
+    valid_signals=['SWING_HIGH_DETECTED', 'SWING_LOW_DETECTED', 'MINOR_SWING_HIGH_DETECTED', 'MINOR_SWING_LOW_DETECTED', 'MAJOR_SWING_HIGH_DETECTED', 'MAJOR_SWING_LOW_DETECTED', 'NO_SWINGS', 'INSUFFICIENT_DATA', 'ERROR'],
+    signal_tiers={
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        },
+        'NO_SWINGS': {
+                'points': 0
+        },
+        'SWING_HIGH_DETECTED': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'SWING_LOW_DETECTED': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'MINOR_SWING_HIGH_DETECTED': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'MINOR_SWING_LOW_DETECTED': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'MAJOR_SWING_HIGH_DETECTED': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'MAJOR_SWING_LOW_DETECTED': {
+                'base_points': 15,
+                'formula': 'scaled'
+        }
+}
+)
 class SwingPoints:
     """
     Identifies swing highs and lows with strength-based confidence

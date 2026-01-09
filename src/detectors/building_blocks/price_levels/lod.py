@@ -17,12 +17,54 @@ Block Type Definitions:
 
 
 
-from typing import Dict, Any
+from typing 
+from src.detectors.building_blocks.registry import register_block
+import Dict, Any
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='lod',
+    category='PRICE_LEVELS',
+    class_name='LOD',
+    default_weight=20,
+    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'LOD_BOUNCE', 'AT_LOD', 'ABOVE_LOD', 'BELOW_LOD', 'ERROR'],
+    signal_tiers={
+        'ERROR': {
+                'points': 0
+        },
+        'BULLISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'max_points': 10,
+                'formula': 'scaled'
+        },
+        'LOD_BOUNCE': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'AT_LOD': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ABOVE_LOD': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BELOW_LOD': {
+                'base_points': 20,
+                'formula': 'scaled'
+        }
+}
+)
 class LOD:
     """
     LOD - Low of Day Price Level (ENHANCED 2026-01-04)

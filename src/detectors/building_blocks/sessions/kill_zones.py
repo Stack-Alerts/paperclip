@@ -24,12 +24,53 @@ Block Type Definitions:
 
 
 
-from typing import Dict, Any
+from typing 
+from src.detectors.building_blocks.registry import register_block
+import Dict, Any
 from datetime import datetime, time
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='kill_zones',
+    category='SESSIONS',
+    class_name='KillZones',
+    default_weight=16,
+    valid_signals=['ACTIVE', 'LONDON_KZ', 'NY_AM_KZ', 'NY_PM_KZ', 'ASIAN_KZ', 'INACTIVE', 'NO_SIGNAL', 'ERROR'],
+    signal_tiers={
+        'ERROR': {
+                'points': 0
+        },
+        'NO_SIGNAL': {
+                'points': 0
+        },
+        'ACTIVE': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'LONDON_KZ': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'NY_AM_KZ': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'NY_PM_KZ': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'ASIAN_KZ': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'INACTIVE': {
+                'base_points': 16,
+                'formula': 'scaled'
+        }
+}
+)
 class KillZones:
     """
     ICT Kill Zones - ENHANCED

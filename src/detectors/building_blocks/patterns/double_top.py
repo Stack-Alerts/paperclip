@@ -16,12 +16,40 @@ Block Type Definitions:
 
 
 
-from typing import Dict, Any
+from typing 
+from src.detectors.building_blocks.registry import register_block
+import Dict, Any
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='double_top',
+    category='PATTERNS',
+    class_name='DoubleTopPattern',
+    default_weight=30,
+    valid_signals=['BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN', 'INSUFFICIENT_DATA', 'ERROR'],
+    signal_tiers={
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        },
+        'NO_PATTERN': {
+                'points': 0
+        },
+        'BEARISH_BREAKDOWN': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'PATTERN_FORMING': {
+                'base_points': 30,
+                'formula': 'scaled'
+        }
+}
+)
 class DoubleTopPattern:
     """
     Double Top: 2 similar peaks with multi-block validation

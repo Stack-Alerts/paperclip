@@ -17,12 +17,50 @@ Block Type Definitions:
 
 
 
-from typing import Dict, Any, List, Optional
+from typing 
+from src.detectors.building_blocks.registry import register_block
+import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='adr',
+    category='VOLATILITY',
+    class_name='ADR',
+    default_weight=8,
+    valid_signals=['CALM', 'VOLATILE', 'NEAR_ADR', 'ABOVE_ADR', 'BELOW_ADR', 'WITHIN_ADR', 'ERROR'],
+    signal_tiers={
+        'ERROR': {
+                'points': 0
+        },
+        'CALM': {
+                'max_points': 4,
+                'formula': 'scaled'
+        },
+        'VOLATILE': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'NEAR_ADR': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'ABOVE_ADR': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'BELOW_ADR': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'WITHIN_ADR': {
+                'base_points': 8,
+                'formula': 'scaled'
+        }
+}
+)
 class ADR:
     """
     ADR (Average Daily Range) - Volatility Indicator (ENHANCED 2026-01-04)
