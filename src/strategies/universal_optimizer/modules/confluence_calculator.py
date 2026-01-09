@@ -16,9 +16,12 @@ Status: Production-Ready (Registry-Only, No Fallbacks)
 
 from typing import Dict, Any, List, Tuple
 
-# CRITICAL: Import all block modules to trigger @register_block decorators
-# This ensures BlockRegistry knows about all blocks before scoring
-import src.detectors.building_blocks.price_levels  # Triggers HOD, LOD, IHOD, ILOD, 50% blocks
+# CRITICAL: Auto-discover and register ALL building blocks
+# This triggers @register_block decorators across all categories
+from src.detectors.building_blocks.registry import BlockRegistry, auto_discover_blocks
+
+# Auto-discover all blocks (this imports all block modules and triggers decorators)
+auto_discover_blocks()
 
 
 class RegistryNotAvailableError(Exception):
@@ -284,3 +287,4 @@ def calculate_confluence(block_results: Dict[str, Dict[str, Any]],
                         block_configs: Dict[str, Dict[str, Any]]) -> Tuple[int, List[str]]:
     """Convenience wrapper for ConfluenceCalculator.calculate_confluence()"""
     return ConfluenceCalculator.calculate_confluence(block_results, block_configs)
+
