@@ -67,19 +67,12 @@ class BlockLibraryPanel(QWidget):
         """Load building blocks from registry"""
         self.tree.clear()
         
-        # Get all blocks
-        all_blocks = self.registry.list_all_blocks()
-        
-        # Group by category
-        categories = {}
-        for block in all_blocks:
-            category = block.category
-            if category not in categories:
-                categories[category] = []
-            categories[category].append(block)
+        # Get blocks by category (already grouped)
+        blocks_by_category = self.registry.get_blocks_by_category()
         
         # Add to tree
-        for category, blocks in sorted(categories.items()):
+        total_blocks = 0
+        for category, blocks in sorted(blocks_by_category.items()):
             # Create category item
             category_item = QTreeWidgetItem([category, ""])
             category_item.setFlags(category_item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
@@ -93,10 +86,10 @@ class BlockLibraryPanel(QWidget):
             
             # Expand category
             category_item.setExpanded(True)
+            total_blocks += len(blocks)
         
         # Update count
-        total = len(all_blocks)
-        self.info_label.setText(f"{total} blocks available")
+        self.info_label.setText(f"{total_blocks} blocks available")
         
     def filter_blocks(self, text):
         """Filter blocks based on search text"""
