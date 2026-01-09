@@ -26,6 +26,7 @@ from src.utils.Strategy_Builder import (
     StrategyGenerator
 )
 from src.utils.Strategy_Builder.qt_gui.block_library import BlockLibraryPanel
+from src.utils.Strategy_Builder.qt_gui.code_preview import CodePreviewDialog
 
 
 class StrategyBuilderMainWindow(QMainWindow):
@@ -185,6 +186,10 @@ class StrategyBuilderMainWindow(QMainWindow):
         generate_btn.clicked.connect(self.generate_files)
         button_layout.addWidget(generate_btn)
         
+        preview_btn = QPushButton("👁 Preview Code")
+        preview_btn.clicked.connect(self.preview_code)
+        button_layout.addWidget(preview_btn)
+        
         right_layout.addLayout(button_layout)
         
         splitter.addWidget(right_widget)
@@ -317,19 +322,40 @@ Building Blocks ({len(config.blocks)}):
         try:
             files = self.registry.generate_strategy_files(strategy_num)
             if files:
-                QMessageBox.information(
-                    self,
-                    "Success",
-                    f"✅ Files generated!\n\n"
-                    f"Strategy: {files['strategy']}\n"
-                    f"Test: {files['test']}\n"
-                    f"Config: {files['optimizer']}"
-                )
+                # Show preview dialog
+                preview = CodePreviewDialog(files, self)
+                preview.exec()
         except Exception as e:
             QMessageBox.critical(
                 self,
                 "Error",
                 f"Generation failed:\n{e}"
+            )
+            
+    def preview_code(self):
+        """Preview code for selected strategy"""
+        current = self.strategy_list.currentItem()
+        if not current:
+            QMessageBox.warning(
+                self,
+                "No Selection",
+                "Please select a strategy to preview"
+            )
+            return
+            
+        item_text = current.text()
+        strategy_num = int(item_text.split('.')[0])
+        
+        try:
+            files = self.registry.generate_strategy_files(strategy_num)
+            if files:
+                preview = CodePreviewDialog(files, self)
+                preview.exec()
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Preview failed:\n{e}"
             )
             
     def show_statistics(self):
