@@ -68,10 +68,10 @@ Execution Engine (order placement with TP/SL)
 - **Institutional Grade:** Complete research backing, explainability, robustness
 
 **Performance Targets:**
-- Win Rate: 55-75% (strategy-dependent)
+- Win Rate: 65-75% (strategy-dependent)
 - Sharpe Ratio: >1.5
 - Max Drawdown: <15%
-- Profit Factor: >2.0
+- Profit Factor: >2.5
 
 ---
 
