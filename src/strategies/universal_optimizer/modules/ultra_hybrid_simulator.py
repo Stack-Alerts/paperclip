@@ -147,8 +147,8 @@ def test_single_config(args):
             entry_time = test_df.iloc[bar_idx]['timestamp']
             
             # Calculate TP/SL levels using ATR from recent bars
-            history_df = test_df.iloc[max(0, bar_idx-20):bar_idx+1]
-            history_df['tr'] = history_df[['high', 'low', 'close']].apply(
+            history_df = test_df.iloc[max(0, bar_idx-20):bar_idx+1].copy()
+            history_df.loc[:, 'tr'] = history_df[['high', 'low', 'close']].apply(
                 lambda x: max(x['high'] - x['low'],
                              abs(x['high'] - x['close']),
                              abs(x['low'] - x['close'])), axis=1
