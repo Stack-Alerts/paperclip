@@ -434,6 +434,57 @@ class MPatternReversalStandard(Strategy):
             confluence += points
             signals.append(f"VWAP: AT_LEVEL ({vwap_conf}% → +{points})")
         
+        # ===================================================================
+        # EMA 20/50 TREND (12 points max) - TIERED SCORING
+        # ===================================================================
+        ema_signal = results.get('ema_20_50_trend', {}).get('signal', '')
+        ema_conf = results.get('ema_20_50_trend', {}).get('confidence', 0)
+        
+        if ema_signal == 'BEARISH_TREND':
+            # BEARISH trend alignment, full points
+            points = int(12 * ema_conf / 100)
+            confluence += points
+            signals.append(f"EMA 20/50: BEARISH ({ema_conf}% → +{points})")
+        elif ema_signal == 'NEUTRAL':
+            # NEUTRAL = weak signal, reduced points (max 6)
+            points = int(6 * ema_conf / 100)
+            confluence += points
+            signals.append(f"EMA 20/50: NEUTRAL ({ema_conf}% → +{points})")
+        
+        # ===================================================================
+        # KILL ZONES (12 points max) - TIERED SCORING
+        # ===================================================================
+        kz_signal = results.get('kill_zones', {}).get('signal', '')
+        kz_conf = results.get('kill_zones', {}).get('confidence', 0)
+        
+        if kz_signal in ['LONDON_KZ', 'NY_AM_KZ']:
+            # Prime kill zones = highest volume, full points
+            points = int(12 * kz_conf / 100)
+            confluence += points
+            signals.append(f"Kill Zone: {kz_signal} ({kz_conf}% → +{points})")
+        elif kz_signal in ['ASIAN_KZ', 'NY_PM_KZ']:
+            # Secondary kill zones = moderate points
+            points = int(8 * kz_conf / 100)
+            confluence += points
+            signals.append(f"Kill Zone: {kz_signal} ({kz_conf}% → +{points})")
+        
+        # ===================================================================
+        # ADR (8 points max) - TIERED SCORING
+        # ===================================================================
+        adr_signal = results.get('adr', {}).get('signal', '')
+        adr_conf = results.get('adr', {}).get('confidence', 0)
+        
+        if adr_signal == 'NEAR_ADR':
+            # NEAR ADR = range exhaustion, full points
+            points = int(8 * adr_conf / 100)
+            confluence += points
+            signals.append(f"ADR: NEAR_ADR ({adr_conf}% → +{points})")
+        elif adr_signal in ['ABOVE_ADR', 'BELOW_ADR']:
+            # Range context = moderate points
+            points = int(5 * adr_conf / 100)
+            confluence += points
+            signals.append(f"ADR: {adr_signal} ({adr_conf}% → +{points})")
+        
         return confluence, signals
     
     def _execute_entry(self, confluence: int, results: dict, signals: list):
