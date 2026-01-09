@@ -114,7 +114,12 @@ def process_bar_chunk(args):
 
 
 def test_single_config(args):
-    """Test one config on pre-computed results (same as before)"""
+    """
+    Test one config on pre-computed results WITH PROPER TP/SL LOGIC
+    
+    FIXED: No more hardcoded 24-bar exits!
+    NOW: Uses actual TP/SL levels from strategy
+    """
     config, all_results, test_df = args
     
     trades = []
@@ -136,31 +141,183 @@ def test_single_config(args):
                 points = int(weight * confidence / 100)
                 confluence += points
         
+        # ENTRY LOGIC
         if confluence >= config.min_confluence and current_position is None:
             entry_price = test_df.iloc[bar_idx]['close']
             entry_time = test_df.iloc[bar_idx]['timestamp']
+            
+            # Calculate TP/SL levels using ATR from recent bars
+            history_df = test_df.iloc[max(0, bar_idx-20):bar_idx+1]
+            history_df['tr'] = history_df[['high', 'low', 'close']].apply(
+                lambda x: max(x['high'] - x['low'],
+                             abs(x['high'] - x['close']),
+                             abs(x['low'] - x['close'])), axis=1
+            )
+            atr = history_df['tr'].mean()
+            
+            # For SHORT positions (M Pattern)
+            if config.side == 'SHORT':
+                # SL: Above entry + buffer
+                sl = entry_price + (atr * 2.0)
+                risk = sl - entry_price
+                
+                # TP levels based on R:R
+                tp1 = entry_price - (risk * 1.5)  # 1.5R
+                tp2 = entry_price - (risk * 3.0)  # 3.0R  
+                tp3 = entry_price - (risk * 5.0)  # 5.0R
+            else:  # LONG
+                sl = entry_price - (atr * 2.0)
+                risk = entry_price - sl
+                tp1 = entry_price + (risk * 1.5)
+                tp2 = entry_price + (risk * 3.0)
+                tp3 = entry_price + (risk * 5.0)
+            
+            # Verify R:R meets minimum
+            rr_ratio = abs((tp2 - entry_price) / (sl - entry_price))
+            if rr_ratio < config.min_risk_reward:
+                continue  # Skip this entry - R:R too low
             
             current_position = {
                 'entry_bar': bar_idx,
                 'entry_price': entry_price,
                 'entry_time': entry_time,
                 'confluence': confluence,
-                'side': config.side
+                'side': config.side,
+                'tp1': tp1,
+                'tp2': tp2,
+                'tp3': tp3,
+                'sl': sl,
+                'remaining_pct': 100.0,  # Track partial exits
+                'exits': []  # Track each partial exit
             }
         
+        # EXIT LOGIC - Monitor TP/SL levels
         if current_position is not None:
             bars_held = bar_idx - current_position['entry_bar']
+            bar = test_df.iloc[bar_idx]
             
-            if bars_held >= 24 or bar_idx == len(all_results) - 1:
-                exit_price = test_df.iloc[bar_idx]['close']
+            exit_occurred = False
+            exit_price = None
+            exit_reason = None
+            
+            # For SHORT positions
+            if config.side == 'SHORT':
+                # Check TP levels (price going DOWN)
+                if bar['low'] <= current_position['tp3'] and current_position['remaining_pct'] > 0:
+                    # TP3 hit - close remaining position
+                    exit_price = current_position['tp3']
+                    exit_reason = 'TP3_HIT'
+                    current_position['exits'].append({
+                        'price': exit_price,
+                        'pct': current_position['remaining_pct'],
+                        'reason': exit_reason
+                    })
+                    exit_occurred = True
+                    
+                elif bar['low'] <= current_position['tp2'] and current_position['remaining_pct'] >= 30:
+                    # TP2 hit - close 30% of original position
+                    exit_price = current_position['tp2']
+                    exit_reason = 'TP2_PARTIAL'
+                    current_position['exits'].append({
+                        'price': exit_price,
+                        'pct': 30.0,
+                        'reason': exit_reason
+                    })
+                    current_position['remaining_pct'] -= 30.0
+                    
+                elif bar['low'] <= current_position['tp1'] and current_position['remaining_pct'] >= 50:
+                    # TP1 hit - close 50% of original position
+                    exit_price = current_position['tp1']
+                    exit_reason = 'TP1_PARTIAL'
+                    current_position['exits'].append({
+                        'price': exit_price,
+                        'pct': 50.0,
+                        'reason': exit_reason
+                    })
+                    current_position['remaining_pct'] -= 50.0
+                
+                # Check SL (price going UP)
+                if bar['high'] >= current_position['sl'] and not exit_occurred:
+                    # Stop loss hit - close entire position
+                    exit_price = current_position['sl']
+                    exit_reason = 'SL_HIT'
+                    current_position['exits'].append({
+                        'price': exit_price,
+                        'pct': current_position['remaining_pct'],
+                        'reason': exit_reason
+                    })
+                    exit_occurred = True
+                    
+            else:  # LONG positions
+                # Check TP levels (price going UP)
+                if bar['high'] >= current_position['tp3'] and current_position['remaining_pct'] > 0:
+                    exit_price = current_position['tp3']
+                    exit_reason = 'TP3_HIT'
+                    current_position['exits'].append({
+                        'price': exit_price,
+                        'pct': current_position['remaining_pct'],
+                        'reason': exit_reason
+                    })
+                    exit_occurred = True
+                    
+                elif bar['high'] >= current_position['tp2'] and current_position['remaining_pct'] >= 30:
+                    exit_price = current_position['tp2']
+                    exit_reason = 'TP2_PARTIAL'
+                    current_position['exits'].append({
+                        'price': exit_price,
+                        'pct': 30.0,
+                        'reason': exit_reason
+                    })
+                    current_position['remaining_pct'] -= 30.0
+                    
+                elif bar['high'] >= current_position['tp1'] and current_position['remaining_pct'] >= 50:
+                    exit_price = current_position['tp1']
+                    exit_reason = 'TP1_PARTIAL'
+                    current_position['exits'].append({
+                        'price': exit_price,
+                        'pct': 50.0,
+                        'reason': exit_reason
+                    })
+                    current_position['remaining_pct'] -= 50.0
+                
+                # Check SL (price going DOWN)
+                if bar['low'] <= current_position['sl'] and not exit_occurred:
+                    exit_price = current_position['sl']
+                    exit_reason = 'SL_HIT'
+                    current_position['exits'].append({
+                        'price': exit_price,
+                        'pct': current_position['remaining_pct'],
+                        'reason': exit_reason
+                    })
+                    exit_occurred = True
+            
+            # Max hold time (1000 bars = ~10 days at 15min)
+            if bars_held >= 1000 and not exit_occurred and current_position['remaining_pct'] > 0:
+                exit_price = bar['close']
+                exit_reason = 'MAX_HOLD'
+                current_position['exits'].append({
+                    'price': exit_price,
+                    'pct': current_position['remaining_pct'],
+                    'reason': exit_reason
+                })
+                exit_occurred = True
+            
+            # Force close on last bar
+            if bar_idx == len(all_results) - 1 and current_position['remaining_pct'] > 0:
+                exit_price = bar['close']
+                exit_reason = 'END_OF_DATA'
+                current_position['exits'].append({
+                    'price': exit_price,
+                    'pct': current_position['remaining_pct'],
+                    'reason': exit_reason
+                })
+                exit_occurred = True
+            
+            # Process trade if fully closed (weighted average of all exits)
+            if exit_occurred and current_position['remaining_pct'] == 0:
                 exit_time = test_df.iloc[bar_idx]['timestamp']
                 
                 # Position sizing with 10x leverage
-                # Capital: $10,000
-                # Risk per trade: 25% of capital = $2,500 margin
-                # With 10x leverage: $2,500 × 10 = $25,000 notional
-                # At $95K BTC: $25,000 / $95,000 = 0.263 BTC position
-                
                 leverage = 10.0
                 starting_capital = 10000.0
                 position_pct = 0.25  # 25% of capital per trade
@@ -171,44 +328,63 @@ def test_single_config(args):
                 entry_price_val = current_position['entry_price']
                 position_size = notional_per_trade / entry_price_val  # ~0.263 BTC @ $95K
                 
-                # Calculate notional position values
-                entry_notional = entry_price_val * position_size  # $25,000
-                exit_notional = exit_price * position_size  # $25,000 (approximately)
+                # Calculate weighted average exit price from all partial exits
+                total_pnl = 0
+                total_fees = 0
+                exit_prices_weighted = []
                 
-                # Calculate PnL in USDT (Perpetual futures)
-                if config.side == 'LONG':
-                    pnl = (exit_price - current_position['entry_price']) * position_size
-                else:
-                    pnl = (current_position['entry_price'] - exit_price) * position_size
+                for exit_info in current_position['exits']:
+                    exit_pct = exit_info['pct']
+                    exit_price_partial = exit_info['price']
+                    
+                    # Size for this partial exit
+                    partial_size = position_size * (exit_pct / 100.0)
+                    partial_notional = entry_price_val * partial_size
+                    
+                    # PnL for this partial exit
+                    if config.side == 'LONG':
+                        partial_pnl = (exit_price_partial - entry_price_val) * partial_size
+                    else:
+                        partial_pnl = (entry_price_val - exit_price_partial) * partial_size
+                    
+                    # Fees for this partial exit
+                    exit_notional_partial = exit_price_partial * partial_size
+                    fee_entry_partial = partial_notional * 0.0005  # Entry fee (prorated)
+                    fee_exit_partial = exit_notional_partial * 0.0005  # Exit fee
+                    partial_fee = fee_entry_partial + fee_exit_partial
+                    
+                    total_pnl += partial_pnl
+                    total_fees += partial_fee
+                    exit_prices_weighted.append((exit_price_partial, exit_pct))
                 
-                # Calculate fees - Binance Perpetual (Market Orders = Taker)
-                # Taker fee: 0.05% per side
-                # Note: If limit orders could have been used, maker fee would be -0.01% (rebate)
-                # For conservative testing, we assume market orders (taker fees)
-                fee_entry = entry_notional * 0.0005  # 0.05% taker fee
-                fee_exit = exit_notional * 0.0005    # 0.05% taker fee
-                fee = fee_entry + fee_exit
+                # Calculate weighted average exit price for reporting
+                weighted_avg_exit = sum(p * (w/100) for p, w in exit_prices_weighted)
                 
-                # Funding fee approximation (0.01% every 8 hours if held)
-                # If position held > 8 hours, add funding fees
+                # Add funding fees (based on total hold time)
+                entry_notional = entry_price_val * position_size
                 funding_periods = bars_held // 32  # 32 bars = 8 hours at 15min bars
                 funding_fee = entry_notional * 0.0001 * funding_periods if funding_periods > 0 else 0
+                total_fees += funding_fee
                 
-                # Total fees
-                total_fee = fee + funding_fee
+                net_pnl = total_pnl - total_fees
                 
-                net_pnl = pnl - total_fee
+                # Create exit reason string
+                exit_reasons = [f"{e['reason']} @ ${e['price']:.2f} ({e['pct']:.0f}%)" 
+                               for e in current_position['exits']]
+                reason_str = "; ".join(exit_reasons)
                 
                 trades.append({
                     'entry_time': current_position['entry_time'],
                     'exit_time': exit_time,
                     'entry_price': current_position['entry_price'],
-                    'exit_price': exit_price,
-                    'pnl': pnl,
-                    'fee': fee,
+                    'exit_price': weighted_avg_exit,  # Weighted average
+                    'pnl': total_pnl,
+                    'fee': total_fees,
                     'net_pnl': net_pnl,
                     'bars_held': bars_held,
-                    'confluence': current_position['confluence']
+                    'confluence': current_position['confluence'],
+                    'exit_reason': reason_str,  # Detailed exit info
+                    'partial_exits': len(current_position['exits'])  # Track # of exits
                 })
                 
                 current_position = None

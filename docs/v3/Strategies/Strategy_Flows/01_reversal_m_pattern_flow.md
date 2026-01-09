@@ -171,9 +171,7 @@
 
 **Signals:**
 - `PATTERN_FORMING` (90-100% confidence): M forming, awaiting confirmation
-- `BEARISH_BREAKDOWN` (80-95% confidence): Support broken, strong
-
- signal
+- `BEARISH_BREAKDOWN` (80-95% confidence): Support broken, strong signal
 
 **Confluence Contribution:**
 - High confidence (90%+): 32-35 points
