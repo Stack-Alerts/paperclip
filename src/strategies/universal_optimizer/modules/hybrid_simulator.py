@@ -21,6 +21,7 @@ Speedup: ~1,500x faster than traditional sequential approach!
 import pandas as pd
 from typing import List, Dict
 from multiprocessing import Pool, cpu_count
+from pathlib import Path
 from .data_classes import OptimizationConfig, ConfigPerformance
 
 
@@ -227,8 +228,26 @@ class HybridConfigSimulator:
         print(f"\n🔄 PHASE 1: Pre-computing building blocks...")
         print(f"   Processing {len(test_df)} bars ONCE (this takes ~60 seconds)")
         
+        # Debug log file
+        import os
+        from datetime import datetime
+        log_dir = Path(__file__).parent.parent.parent.parent.parent / 'logs'
+        log_dir.mkdir(exist_ok=True)
+        log_file = log_dir / f'hybrid_optimizer_debug_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+        
+        def log_debug(message):
+            with open(log_file, 'a') as f:
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                f.write(f"[{timestamp}] {message}\n")
+            print(f"   DEBUG: {message}")
+        
+        log_debug(f"Starting Phase 1: {len(test_df)} test bars to process")
+        log_debug(f"Strategy: {strategy_module_name}")
+        
         # Load strategy class
+        log_debug("Loading strategy class...")
         strategy_class = get_strategy_class(strategy_module_name)
+        log_debug(f"Strategy class loaded: {strategy_class.__name__}")
         
         # Create strategy instance
         class TestStrategy:
@@ -244,36 +263,64 @@ class HybridConfigSimulator:
                 self.blocks = config.blocks
                 self.detectors = {}
         
+        log_debug("Creating strategy instance...")
         strategy = TestStrategy(configs[0])
+        log_debug("Strategy instance created")
         
         # Bind methods
+        log_debug("Binding strategy methods...")
+        method_count = 0
         for method_name in dir(strategy_class):
             if method_name.startswith('_') and not method_name.startswith('__'):
                 method = getattr(strategy_class, method_name)
                 if callable(method):
                     setattr(strategy, method_name, method.__get__(strategy))
+                    method_count += 1
+        log_debug(f"Bound {method_count} methods")
         
         # Initialize building blocks
+        log_debug("Initializing building blocks...")
         if hasattr(strategy, '_initialize_blocks'):
             strategy._initialize_blocks()
+            log_debug(f"Building blocks initialized: {len(strategy.detectors)} detectors")
+        else:
+            log_debug("WARNING: No _initialize_blocks method found!")
         
         # Combine warmup + test
+        log_debug("Combining warmup and test data...")
         full_df = pd.concat([warmup_df, test_df], ignore_index=True)
         warmup_bar_count = len(warmup_df)
+        log_debug(f"Total bars: {len(full_df)}, Warmup: {warmup_bar_count}, Test: {len(test_df)}")
         
         # Pre-compute all building block results
+        log_debug("Starting bar processing...")
         all_building_block_results = []
         
         for i in range(warmup_bar_count, len(full_df)):
             if (i - warmup_bar_count) % 2000 == 0:
                 pct = (i - warmup_bar_count) / len(test_df) * 100
+                log_debug(f"Progress: {pct:.1f}% (bar {i - warmup_bar_count}/{len(test_df)})")
                 print(f"   Phase 1 progress: {pct:.1f}%...")
+            
+            if (i - warmup_bar_count) == 0:
+                log_debug("Processing first bar...")
             
             history = full_df.iloc[:i+1]
             
             # Run building blocks ONCE for this bar
-            results = strategy._analyze_blocks(history)
-            all_building_block_results.append(results)
+            try:
+                results = strategy._analyze_blocks(history)
+                all_building_block_results.append(results)
+                
+                if (i - warmup_bar_count) == 0:
+                    log_debug(f"First bar processed successfully, got {len(results)} block results")
+            except Exception as e:
+                log_debug(f"ERROR at bar {i - warmup_bar_count}: {str(e)}")
+                import traceback
+                log_debug(traceback.format_exc())
+                raise
+        
+        log_debug(f"Bar processing complete: {len(all_building_block_results)} results stored")
         
         print(f"   ✅ Phase 1 complete: {len(all_building_block_results)} bars processed")
         
