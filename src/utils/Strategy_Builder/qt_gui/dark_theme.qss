@@ -16,8 +16,8 @@ QMainWindow {
 QMenuBar {
     background-color: #252526;
     color: #d4d4d4;
-    font-size: 28pt;
-    padding: 10px;
+    font-size: 10pt;
+    padding: 5px;
 }
 
 QMenuBar::item {
@@ -34,11 +34,11 @@ QMenu {
     background-color: #252526;
     color: #d4d4d4;
     border: 1px solid #3e3e42;
-    font-size: 28pt;
+    font-size: 10pt;
 }
 
 QMenu::item {
-    padding: 10px 30px;
+    padding: 5px 15px;
 }
 
 QMenu::item:selected {
@@ -59,10 +59,10 @@ QToolButton {
     color: #d4d4d4;
     border: 1px solid #3e3e42;
     border-radius: 4px;
-    padding: 15px;
-    font-size: 28pt;
+    padding: 8px;
+    font-size: 10pt;
     font-weight: bold;
-    min-width: 150px;
+    min-width: 80px;
 }
 
 QToolButton:hover {
@@ -81,10 +81,10 @@ QPushButton {
     color: #d4d4d4;
     border: 1px solid #3e3e42;
     border-radius: 4px;
-    padding: 15px 30px;
-    font-size: 28pt;
+    padding: 8px 15px;
+    font-size: 10pt;
     font-weight: bold;
-    min-height: 50px;
+    min-height: 30px;
 }
 
 QPushButton:hover {
@@ -108,12 +108,12 @@ QListWidget {
     background-color: #252526;
     color: #d4d4d4;
     border: 1px solid #3e3e42;
-    font-size: 32pt;
-    padding: 5px;
+    font-size: 11pt;
+    padding: 3px;
 }
 
 QListWidget::item {
-    padding: 10px;
+    padding: 5px;
     border-bottom: 1px solid #3e3e42;
 }
 
@@ -131,11 +131,11 @@ QTreeWidget {
     background-color: #252526;
     color: #d4d4d4;
     border: 1px solid #3e3e42;
-    font-size: 32pt;
+    font-size: 11pt;
 }
 
 QTreeWidget::item {
-    padding: 8px;
+    padding: 4px;
 }
 
 QTreeWidget::item:selected {
@@ -152,9 +152,9 @@ QTextEdit, QPlainTextEdit {
     background-color: #1e1e1e;
     color: #d4d4d4;
     border: 1px solid #3e3e42;
-    font-size: 28pt;
+    font-size: 10pt;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    padding: 10px;
+    padding: 5px;
 }
 
 /* === LINE EDIT === */
@@ -163,8 +163,8 @@ QLineEdit {
     color: #d4d4d4;
     border: 1px solid #3e3e42;
     border-radius: 4px;
-    padding: 10px;
-    font-size: 28pt;
+    padding: 5px;
+    font-size: 10pt;
 }
 
 QLineEdit:focus {
@@ -174,7 +174,7 @@ QLineEdit:focus {
 /* === LABELS === */
 QLabel {
     color: #d4d4d4;
-    font-size: 28pt;
+    font-size: 10pt;
     background-color: transparent;
 }
 
@@ -183,11 +183,11 @@ QGroupBox {
     background-color: #1e1e1e;
     border: 2px solid #3e3e42;
     border-radius: 6px;
-    margin-top: 20px;
-    font-size: 32pt;
+    margin-top: 10px;
+    font-size: 11pt;
     font-weight: bold;
     color: #ffffff;
-    padding: 20px;
+    padding: 10px;
 }
 
 QGroupBox::title {
@@ -248,8 +248,8 @@ QScrollBar::handle:horizontal:hover {
 QStatusBar {
     background-color: #007acc;
     color: #ffffff;
-    font-size: 28pt;
-    padding: 5px;
+    font-size: 10pt;
+    padding: 3px;
 }
 
 QStatusBar::item {
@@ -265,8 +265,8 @@ QTabWidget::pane {
 QTabBar::tab {
     background-color: #252526;
     color: #d4d4d4;
-    padding: 15px 30px;
-    font-size: 28pt;
+    padding: 8px 15px;
+    font-size: 10pt;
     border: 1px solid #3e3e42;
     border-bottom: none;
 }
@@ -287,8 +287,8 @@ QSpinBox, QDoubleSpinBox {
     color: #d4d4d4;
     border: 1px solid #3e3e42;
     border-radius: 4px;
-    padding: 10px;
-    font-size: 28pt;
+    padding: 5px;
+    font-size: 10pt;
 }
 
 QSpinBox:focus, QDoubleSpinBox:focus {
@@ -301,8 +301,8 @@ QComboBox {
     color: #d4d4d4;
     border: 1px solid #3e3e42;
     border-radius: 4px;
-    padding: 10px;
-    font-size: 28pt;
+    padding: 5px;
+    font-size: 10pt;
 }
 
 QComboBox:hover {
@@ -330,5 +330,5 @@ QComboBox QAbstractItemView {
     selection-background-color: #007acc;
     selection-color: #ffffff;
     border: 1px solid #3e3e42;
-    font-size: 28pt;
+    font-size: 10pt;
 }
