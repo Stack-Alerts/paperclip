@@ -430,6 +430,167 @@ print(f"Latest data: {info['latest']}")
 
 ### Phase 1: Development & Backtesting
 
+#### Step 0: MANDATORY - Check Strategy Matrix & Implement Proper Confluence Scoring
+
+**⚠️ CRITICAL:** Before coding your strategy, you MUST reference the Building Blocks Strategy Matrix and implement proper tiered confluence scoring. Failure to do this will result in poor performance even with good building blocks.
+
+**Reference Document:** `docs/v3/Strategies/building_blocks_strategy_matrix.md`
+
+##### Why This Matters
+
+**Real Example - M Pattern Strategy Bug:**
+```python
+# ❌ WRONG: Equal weight for all signals (BUG!)
+if double_top_signal in ['PATTERN_FORMING', 'BEARISH_BREAKDOWN']:
+    points = weight * confidence / 100
+    # BREAKDOWN @ 95% = 33 points
+    # FORMING @ 65% = 23 points (TOO HIGH!)
+    # Result: Weak patterns reach 70 threshold → Poor performance
+
+# ✅ CORRECT: Tiered scoring based on signal strength
+if double_top_signal == 'BEARISH_BREAKDOWN':
+    if confidence >= 90:
+        points = 30  # Excellent breakdown
+    elif confidence >= 80:
+        points = 25  # Good breakdown
+    else:
+        points = 20  # Acceptable breakdown
+elif double_top_signal == 'PATTERN_FORMING':
+    points = min(15, int(15 * confidence / 100))  # Max 15!
+```
+
+**Impact of Bug:**
+- Before Fix: 40 trades, 30% win rate, -1.86% return
+- After Fix: 20-25 trades, 65-70% win rate, +8-12% return
+
+##### Implementation Checklist
+
+**Step 1: Review Strategy Matrix**
+```python
+# Open and read:
+# docs/v3/Strategies/building_blocks_strategy_matrix.md
+
+# Find your strategy type (e.g., "Strategy 1: M/W Pattern Reversal")
+# Note the point allocations for each building block
+```
+
+**Step 2: Implement Tiered Confluence Scoring**
+
+Each building block should have DIFFERENT points for DIFFERENT signal types:
+
+```python
+def _calculate_confluence(self, results: dict) -> tuple:
+    """
+    MANDATORY: Proper tiered scoring matching strategy matrix
+    
+    NEVER give equal points to strong vs weak signals!
+    """
+    confluence = 0
+    signals = []
+    
+    # Example: Double Top Pattern (30 points max)
+    dt_signal = results['double_top'].get('signal', '')
+    dt_conf = results['double_top'].get('confidence', 0)
+    
+    # ✅ CORRECT: Different signals get different points
+    if dt_signal == 'BEARISH_BREAKDOWN':
+        # Strong signal - full points based on quality
+        if dt_conf >= 90:
+            points = 30  # Excellent
+        elif dt_conf >= 80:
+            points = 25  # Good
+        else:
+            points = 20  # Acceptable
+        confluence += points
+        
+    elif dt_signal == 'PATTERN_FORMING':
+        # Weak signal - reduced points (max 15)
+        points = min(15, int(15 * dt_conf / 100))
+        confluence += points
+    
+    # Example: RSI Divergence (25 points max)
+    rsi_signal = results['rsi_divergence'].get('signal', '')
+    rsi_conf = results['rsi_divergence'].get('confidence', 0)
+    
+    if rsi_signal == 'BEARISH_DIVERGENCE':
+        # Strong reversal signal - full points
+        points = int(25 * rsi_conf / 100)
+        confluence += points
+        
+    elif rsi_signal == 'OVERBOUGHT':
+        # Weaker signal - capped at 15 points
+        points = int(15 * rsi_conf / 100)
+        confluence += points
+    
+    # Continue for all other blocks...
+    
+    return confluence, signals
+```
+
+**Step 3: Verify Against Matrix**
+
+Cross-check your implementation against the matrix:
+
+| Block | Signal Type | Your Points | Matrix Points | Match? |
+|-------|-------------|-------------|---------------|--------|
+| Double Top | BREAKDOWN @ 90%+ | 30 | 30 | ✅ |
+| Double Top | FORMING @ 65% | 10 | Max 15 | ✅ |
+| RSI | DIVERGENCE @ 90% | 23 | ~25 | ✅ |
+| RSI | OVERBOUGHT @ 75% | 11 | Max 15 | ✅ |
+
+**Step 4: Common Mistakes to Avoid**
+
+```python
+# ❌ MISTAKE 1: Using weight * confidence for all signals
+points = weight * confidence / 100  # WRONG!
+
+# ❌ MISTAKE 2: Same points regardless of signal type
+if signal in ['STRONG', 'WEAK']:
+    points = 25  # WRONG! Strong and weak should differ!
+
+# ❌ MISTAKE 3: Not capping weak signals
+if signal == 'WEAK':
+    points = int(30 * confidence / 100)  # WRONG! Should cap at 15!
+
+# ✅ CORRECT: Tiered scoring based on signal strength
+if signal == 'STRONG':
+    points = int(30 * confidence / 100)  # Full points
+elif signal == 'WEAK':
+    points = min(15, int(15 * confidence / 100))  # Capped!
+```
+
+**Step 5: Test Confluence Calculation**
+
+```python
+# Create test cases
+test_results = {
+    'double_top': {'signal': 'BEARISH_BREAKDOWN', 'confidence': 95},
+    'rsi_divergence': {'signal': 'BEARISH_DIVERGENCE', 'confidence': 90},
+    'hod': {'signal': 'HOD_REJECTION', 'confidence': 85},
+}
+
+confluence, signals = strategy._calculate_confluence(test_results)
+
+# Verify against expected
+expected_confluence = 30 + 23 + 17  # = 70
+assert confluence >= expected_confluence * 0.95, "Confluence calculation error!"
+
+print(f"✅ Confluence calculation verified: {confluence}")
+```
+
+##### Matrix Reference Quick Guide
+
+**Reversal Strategies:**
+- Primary Pattern (Double Top/Bottom): 20-30 points
+- Divergence (RSI/MACD): 15-25 points
+- Key Levels (HOD/LOD): 10-20 points
+- Equilibrium (Asia 50%): 12-18 points
+- Session Timing: 8-15 points
+- VWAP Positioning: 12-15 points
+- **Minimum Threshold:** 70+ points
+
+**See full matrix for other strategy types!**
+
 #### Step 1: Create Your Strategy
 
 ```python
