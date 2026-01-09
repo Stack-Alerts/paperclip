@@ -317,6 +317,70 @@ class ConfluenceCalculator:
         },
         
         # ====================================================================
+        # TREND BLOCKS (EMA, Moving Averages)
+        # ====================================================================
+        'ema_20_50_trend': {
+            'max_points': 12,
+            'tiers': {
+                'BEARISH_TREND': {
+                    'base_points': 12,
+                    'formula': 'scaled'
+                },
+                'BULLISH_TREND': {
+                    'base_points': 12,
+                    'formula': 'scaled'
+                },
+                'NEUTRAL': {
+                    'max_points': 6,  # Weak signal
+                    'formula': 'scaled'
+                }
+            }
+        },
+        
+        'ema_200_trend': {
+            'max_points': 12,
+            'tiers': {
+                'BEARISH_TREND': {
+                    'base_points': 12,
+                    'formula': 'scaled'
+                },
+                'BULLISH_TREND': {
+                    'base_points': 12,
+                    'formula': 'scaled'
+                },
+                'NEUTRAL': {
+                    'max_points': 6,
+                    'formula': 'scaled'
+                }
+            }
+        },
+        
+        # ====================================================================
+        # VOLATILITY BLOCKS (ATR, ADR, Bollinger)
+        # ====================================================================
+        'adr': {
+            'max_points': 8,
+            'tiers': {
+                'NEAR_ADR': {
+                    'base_points': 8,
+                    'formula': 'scaled'
+                },
+                'ABOVE_ADR': {
+                    'max_points': 5,
+                    'formula': 'scaled'
+                },
+                'BELOW_ADR': {
+                    'max_points': 5,
+                    'formula': 'scaled'
+                },
+                'WITHIN_ADR': {
+                    'max_points': 5,
+                    'formula': 'scaled'
+                }
+            }
+        },
+        
+        # ====================================================================
         # INSTITUTIONAL BLOCKS (VWAP, Order Flow, etc.)
         # ====================================================================
         'vwap': {
