@@ -18,11 +18,56 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='change_of_character',
+    category='SMC_ICT',
+    class_name='ChangeOfCharacter',
+    default_weight=20,
+    valid_signals=['BEARISH_CHOCH', 'BEARISH_MSS', 'BULLISH_CHOCH', 'BULLISH_MSS', 'HIGH_SWEEP', 'LOW_SWEEP', 'UNUSUALLY_SLOW', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_CHOCH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BEARISH_MSS': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_CHOCH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_MSS': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'HIGH_SWEEP': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'LOW_SWEEP': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'UNUSUALLY_SLOW': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class ChangeOfCharacter:
     """
     Change of Character (CHOCH) Detector - ICT/SMC Concept (ENHANCED 2026-01-04)

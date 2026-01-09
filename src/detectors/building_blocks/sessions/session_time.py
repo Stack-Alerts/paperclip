@@ -24,9 +24,9 @@ Block Type Definitions:
 
 
 
-from typing 
+from typing import Dict, Any
+
 from src.detectors.building_blocks.registry import register_block
-import Dict, Any
 from datetime import datetime, time
 import pandas as pd
 import numpy as np

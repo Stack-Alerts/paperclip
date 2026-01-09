@@ -18,11 +18,36 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='ema_255_vector',
+    category='MOVING_AVERAGES',
+    class_name='EMA255VectorBreak',
+    default_weight=12,
+    valid_signals=['ABOVE_EMA', 'BELOW_EMA', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'ABOVE_EMA': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'BELOW_EMA': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class EMA255VectorBreak:
     """
     255 EMA Vector Break - Long-Term Trend Indicator with PVSRA/TBD Implementation

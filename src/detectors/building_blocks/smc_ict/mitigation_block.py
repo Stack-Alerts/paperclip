@@ -18,11 +18,36 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='mitigation_block',
+    category='SMC_ICT',
+    class_name='MitigationBlock',
+    default_weight=20,
+    valid_signals=['BEARISH_MITIGATION', 'BULLISH_MITIGATION', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_MITIGATION': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_MITIGATION': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class MitigationBlock:
     """
     Mitigation Block Detector - ICT/SMC Concept (ENHANCED 2026-01-04)

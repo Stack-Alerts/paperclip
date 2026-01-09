@@ -23,10 +23,43 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
+@register_block(
+    name='displacement',
+    category='SMC_ICT',
+    class_name='Displacement',
+    default_weight=20,
+    valid_signals=['BEARISH_DISPLACEMENT', 'BEARISH_FVG', 'BULLISH_DISPLACEMENT', 'BULLISH_FVG', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_DISPLACEMENT': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BEARISH_FVG': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_DISPLACEMENT': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_FVG': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class Displacement:
     """
     Displacement Detector - ICT/SMC Concept

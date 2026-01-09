@@ -18,11 +18,36 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='ichimoku_cloud',
+    category='TREND',
+    class_name='IchimokuCloud',
+    default_weight=16,
+    valid_signals=['ABOVE_CLOUD', 'BELOW_CLOUD', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'ABOVE_CLOUD': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'BELOW_CLOUD': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class IchimokuCloud:
     """
     Ichimoku Cloud - Comprehensive Trend System

@@ -94,11 +94,36 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='wyckoff_accumulation',
+    category='WYCKOFF',
+    class_name='WyckoffAccumulation',
+    default_weight=28,
+    valid_signals=['SOS_BREAKOUT', 'SPRING_DETECTED', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'SOS_BREAKOUT': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'SPRING_DETECTED': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class WyckoffAccumulation:
     """
     Detects Wyckoff accumulation phases using proper methodology

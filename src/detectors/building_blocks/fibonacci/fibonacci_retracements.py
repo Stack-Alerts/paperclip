@@ -43,10 +43,38 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, List
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 
 
+@register_block(
+    name='fibonacci_retracements',
+    category='FIBONACCI',
+    class_name='FibonacciRetracements',
+    default_weight=18,
+    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BULLISH': {
+                'base_points': 18,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 18,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class FibonacciRetracements:
     """
     Calculates Fibonacci retracement levels (IMPROVED v2)

@@ -18,11 +18,52 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='elliott_wave_oscillator',
+    category='ELLIOTT_WAVE',
+    class_name='ElliottWaveOscillator',
+    default_weight=22,
+    valid_signals=['BEARISH_DIVERGENCE', 'BEARISH_MOMENTUM_INCREASING', 'BEARISH_MOMENTUM_WEAKENING', 'BULLISH_DIVERGENCE', 'BULLISH_MOMENTUM_INCREASING', 'BULLISH_MOMENTUM_WEAKENING', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_DIVERGENCE': {
+                'base_points': 22,
+                'formula': 'scaled'
+        },
+        'BEARISH_MOMENTUM_INCREASING': {
+                'base_points': 22,
+                'formula': 'scaled'
+        },
+        'BEARISH_MOMENTUM_WEAKENING': {
+                'base_points': 22,
+                'formula': 'scaled'
+        },
+        'BULLISH_DIVERGENCE': {
+                'base_points': 22,
+                'formula': 'scaled'
+        },
+        'BULLISH_MOMENTUM_INCREASING': {
+                'base_points': 22,
+                'formula': 'scaled'
+        },
+        'BULLISH_MOMENTUM_WEAKENING': {
+                'base_points': 22,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class ElliottWaveOscillator:
     """
     Elliott Wave Oscillator

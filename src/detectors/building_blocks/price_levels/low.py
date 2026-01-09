@@ -18,11 +18,50 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='low',
+    category='PRICE_LEVELS',
+    class_name='LOW',
+    default_weight=20,
+    valid_signals=['ABOVE_LOW', 'AT_LOW', 'BREAKDOWN_CONFIRMED', 'BREAKING_DOWN', 'NO_LOW', 'NO_LOW_DATA', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'ABOVE_LOW': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'AT_LOW': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BREAKDOWN_CONFIRMED': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BREAKING_DOWN': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'NO_LOW': {
+                'points': 0
+        },
+        'NO_LOW_DATA': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class LOW:
     """
     LOW - Low of Week Price Level (ENHANCED 2026-01-04)

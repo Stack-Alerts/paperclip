@@ -18,11 +18,44 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, List, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='atr',
+    category='VOLATILITY',
+    class_name='ATR',
+    default_weight=10,
+    valid_signals=['EXTREME_HIGH', 'EXTREME_LOW', 'VERY_HIGH', 'VERY_LOW', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'EXTREME_HIGH': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'EXTREME_LOW': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'VERY_HIGH': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'VERY_LOW': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class ATR:
     """
     Average True Range (ATR) - Volatility Indicator (ENHANCED 2026-01-04)

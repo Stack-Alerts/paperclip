@@ -27,6 +27,8 @@ Grade: A- (92/100) - Institutional Grade
 """
 
 from typing import Dict, Any, List, Tuple, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 from dataclasses import dataclass
 import pandas as pd
@@ -34,6 +36,32 @@ import numpy as np
 
 
 @dataclass
+@register_block(
+    name='supply_demand_zones',
+    category='SUPPLY_DEMAND',
+    class_name='VolumeZone',
+    default_weight=24,
+    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BULLISH': {
+                'base_points': 24,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 24,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class VolumeZone:
     """Represents a single supply or demand zone from volume profile."""
     zone_type: str  # 'SUPPLY' or 'DEMAND'

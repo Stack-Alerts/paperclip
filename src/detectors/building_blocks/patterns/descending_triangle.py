@@ -18,11 +18,39 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, List, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='descending_triangle',
+    category='PATTERNS',
+    class_name='DescendingTrianglePattern',
+    default_weight=30,
+    valid_signals=['BEARISH_BREAKDOWN', 'NO_PATTERN', 'PATTERN_FORMING', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_BREAKDOWN': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'NO_PATTERN': {
+                'points': 0
+        },
+        'PATTERN_FORMING': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class DescendingTrianglePattern:
     """
     Descending Triangle Pattern Detector

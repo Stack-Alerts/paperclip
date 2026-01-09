@@ -29,11 +29,36 @@ Block Type Definitions:
 
 
 from typing import Dict, Any, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='anchored_vwap',
+    category='INSTITUTIONAL',
+    class_name='AnchoredVWAP',
+    default_weight=15,
+    valid_signals=['ABOVE_ANCHORED_VWAP', 'BELOW_ANCHORED_VWAP', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'ABOVE_ANCHORED_VWAP': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'BELOW_ANCHORED_VWAP': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class AnchoredVWAP:
     """
     Enhanced Anchored VWAP with intelligent features

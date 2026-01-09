@@ -18,11 +18,44 @@ Grade: TBD (pending walkforward test)
 """
 
 from typing import Dict, Any, List, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='internal_pivot_pattern',
+    category='PATTERNS',
+    class_name='InternalPivotPattern',
+    default_weight=30,
+    valid_signals=['BEARISH_PIVOT_HIGH', 'BULLISH_PIVOT_LOW', 'PIVOT_HIGH', 'PIVOT_LOW', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_PIVOT_HIGH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BULLISH_PIVOT_LOW': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'PIVOT_HIGH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'PIVOT_LOW': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class InternalPivotPattern:
     """
     Internal Pivot Pattern Detector

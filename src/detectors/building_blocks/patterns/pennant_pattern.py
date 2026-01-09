@@ -17,11 +17,43 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='pennant_pattern',
+    category='PATTERNS',
+    class_name='PennantPattern',
+    default_weight=30,
+    valid_signals=['BEARISH_BREAKOUT', 'BULLISH_BREAKOUT', 'NO_PATTERN', 'PATTERN_FORMING', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_BREAKOUT': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BULLISH_BREAKOUT': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'NO_PATTERN': {
+                'points': 0
+        },
+        'PATTERN_FORMING': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class PennantPattern:
     """
     Pennant Pattern Detector with Multi-Block Validation

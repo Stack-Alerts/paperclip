@@ -18,11 +18,36 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='ema_800_vector',
+    category='MOVING_AVERAGES',
+    class_name='EMA800VectorBreak',
+    default_weight=12,
+    valid_signals=['ABOVE_EMA', 'BELOW_EMA', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'ABOVE_EMA': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'BELOW_EMA': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class EMA800VectorBreak:
     """
     800 EMA Vector Break - Macro Trend Indicator with PVSRA/TBD Implementation

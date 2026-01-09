@@ -23,11 +23,36 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='optimal_trade_entry',
+    category='SMC_ICT',
+    class_name='OptimalTradeEntry',
+    default_weight=20,
+    valid_signals=['BEARISH_OTE', 'BULLISH_OTE', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_OTE': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH_OTE': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class OptimalTradeEntry:
     """
     Optimal Trade Entry (OTE) Detector - ICT/SMC Concept

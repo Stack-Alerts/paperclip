@@ -26,11 +26,39 @@ Grade: TBD (pending walkforward test)
 """
 
 from typing import Dict, Any, List, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='trailing_stop',
+    category='RISK_MANAGEMENT',
+    class_name='TrailingStop',
+    default_weight=8,
+    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BULLISH': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class TrailingStop:
     """
     Trailing Stop Detector

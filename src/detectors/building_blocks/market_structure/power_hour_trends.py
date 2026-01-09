@@ -19,12 +19,40 @@ Grade: TBD (pending walkforward test)
 """
 
 from typing import Dict, Any, Optional
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime, time
 from enum import Enum
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='power_hour_trends',
+    category='MARKET_STRUCTURE',
+    class_name='TrendDirection',
+    default_weight=15,
+    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BULLISH': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class TrendDirection(Enum):
     """Trend direction classification."""
     UPTREND = "uptrend"

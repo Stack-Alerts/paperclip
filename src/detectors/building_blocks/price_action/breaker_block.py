@@ -18,11 +18,39 @@ Block Type Definitions:
 
 
 from typing import Dict, Any
+
+from src.detectors.building_blocks.registry import register_block
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='breaker_block',
+    category='PRICE_ACTION',
+    class_name='BreakerBlock',
+    default_weight=25,
+    valid_signals=['BEARISH_BREAKER', 'BULLISH_BREAKER', 'NO_BREAKER', 'ERROR', 'INSUFFICIENT_DATA'],
+    signal_tiers={
+        'BEARISH_BREAKER': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BULLISH_BREAKER': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'NO_BREAKER': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        }
+}
+)
 class BreakerBlock:
     """
     Breaker Block Detector - ICT/SMC Concept

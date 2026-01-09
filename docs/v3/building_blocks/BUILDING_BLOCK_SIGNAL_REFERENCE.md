@@ -1,7 +1,7 @@
 # BUILDING BLOCK SIGNAL REFERENCE
 ====================================================================================================
 
-**Generated:** 2026-01-09 17:42:50
+**Generated:** 2026-01-09 17:59:58
 **Purpose:** Comprehensive reference of actual signals returned by each building block
 **Usage:** Update ConfluenceCalculator.SIGNAL_TIERS to match these EXACT signal names
 
@@ -19,9 +19,9 @@
 - ⚠️ NO SIGNALS DETECTED (may need specific conditions)
 
 **Test Results:**
-- neutral: ❌ ERROR - module 'src.detectors.building_blocks.patterns.double_top' has no attribute 'DoubleTop'
-- bullish: ❌ ERROR - module 'src.detectors.building_blocks.patterns.double_top' has no attribute 'DoubleTop'
-- bearish: ❌ ERROR - module 'src.detectors.building_blocks.patterns.double_top' has no attribute 'DoubleTop'
+- neutral: ❌ ERROR - invalid syntax (double_top.py, line 19)
+- bullish: ❌ ERROR - invalid syntax (double_top.py, line 19)
+- bearish: ❌ ERROR - invalid syntax (double_top.py, line 19)
 
 ### double_bottom
 **Class:** `DoubleBottom`  
@@ -92,12 +92,12 @@
 **Module:** `src.detectors.building_blocks.oscillators.rsi_divergence`  
 
 **Possible Signals:**
-- `NEUTRAL`
+- ⚠️ NO SIGNALS DETECTED (may need specific conditions)
 
 **Test Results:**
-- neutral: `NEUTRAL` @ 70.0%
-- bullish: `NEUTRAL` @ 70.0%
-- bearish: `NEUTRAL` @ 70.0%
+- neutral: ❌ ERROR - invalid syntax (rsi_divergence.py, line 20)
+- bullish: ❌ ERROR - invalid syntax (rsi_divergence.py, line 20)
+- bearish: ❌ ERROR - invalid syntax (rsi_divergence.py, line 20)
 
 ### macd_signal
 **Class:** `MACDSignal`  
@@ -133,24 +133,24 @@
 **Module:** `src.detectors.building_blocks.price_levels.hod`  
 
 **Possible Signals:**
-- `BEARISH`
+- ⚠️ NO SIGNALS DETECTED (may need specific conditions)
 
 **Test Results:**
-- neutral: `BEARISH` @ 75%
-- bullish: `BEARISH` @ 75%
-- bearish: `BEARISH` @ 75%
+- neutral: ❌ ERROR - invalid syntax (hod.py, line 20)
+- bullish: ❌ ERROR - invalid syntax (hod.py, line 20)
+- bearish: ❌ ERROR - invalid syntax (hod.py, line 20)
 
 ### lod
 **Class:** `LOD`  
 **Module:** `src.detectors.building_blocks.price_levels.lod`  
 
 **Possible Signals:**
-- `NEUTRAL`
+- ⚠️ NO SIGNALS DETECTED (may need specific conditions)
 
 **Test Results:**
-- neutral: `NEUTRAL` @ 50%
-- bullish: `NEUTRAL` @ 50%
-- bearish: `NEUTRAL` @ 65%
+- neutral: ❌ ERROR - invalid syntax (lod.py, line 20)
+- bullish: ❌ ERROR - invalid syntax (lod.py, line 20)
+- bearish: ❌ ERROR - invalid syntax (lod.py, line 20)
 
 ### asia_50
 **Class:** `Asia50`  
@@ -197,24 +197,24 @@
 **Module:** `src.detectors.building_blocks.sessions.session_time`  
 
 **Possible Signals:**
-- `MODERATE_SESSION`
+- ⚠️ NO SIGNALS DETECTED (may need specific conditions)
 
 **Test Results:**
-- neutral: `MODERATE_SESSION` @ 55%
-- bullish: `MODERATE_SESSION` @ 55%
-- bearish: `MODERATE_SESSION` @ 55%
+- neutral: ❌ ERROR - invalid syntax (session_time.py, line 27)
+- bullish: ❌ ERROR - invalid syntax (session_time.py, line 27)
+- bearish: ❌ ERROR - invalid syntax (session_time.py, line 27)
 
 ### kill_zones
 **Class:** `KillZones`  
 **Module:** `src.detectors.building_blocks.sessions.kill_zones`  
 
 **Possible Signals:**
-- `ACTIVE`
+- ⚠️ NO SIGNALS DETECTED (may need specific conditions)
 
 **Test Results:**
-- neutral: `ACTIVE` @ 50%
-- bullish: `ACTIVE` @ 50%
-- bearish: `ACTIVE` @ 50%
+- neutral: ❌ ERROR - invalid syntax (kill_zones.py, line 27)
+- bullish: ❌ ERROR - invalid syntax (kill_zones.py, line 27)
+- bearish: ❌ ERROR - invalid syntax (kill_zones.py, line 27)
 
 
 ## MOVING_AVERAGES
@@ -225,12 +225,12 @@
 **Module:** `src.detectors.building_blocks.moving_averages.ema_20_50_trend`  
 
 **Possible Signals:**
-- `BULLISH`
+- ⚠️ NO SIGNALS DETECTED (may need specific conditions)
 
 **Test Results:**
-- neutral: `BULLISH` @ 65%
-- bullish: `BULLISH` @ 75%
-- bearish: `BULLISH` @ 70%
+- neutral: ❌ ERROR - invalid syntax (ema_20_50_trend.py, line 20)
+- bullish: ❌ ERROR - invalid syntax (ema_20_50_trend.py, line 20)
+- bearish: ❌ ERROR - invalid syntax (ema_20_50_trend.py, line 20)
 
 ### ema_20_50_cross
 **Class:** `EMA2050Cross`  
@@ -249,12 +249,12 @@
 **Module:** `src.detectors.building_blocks.moving_averages.ema_200_trend`  
 
 **Possible Signals:**
-- `NEUTRAL`
+- ⚠️ NO SIGNALS DETECTED (may need specific conditions)
 
 **Test Results:**
-- neutral: `NEUTRAL` @ 70%
-- bullish: `NEUTRAL` @ 70%
-- bearish: `NEUTRAL` @ 70%
+- neutral: ❌ ERROR - invalid syntax (ema_200_trend.py, line 20)
+- bullish: ❌ ERROR - invalid syntax (ema_200_trend.py, line 20)
+- bearish: ❌ ERROR - invalid syntax (ema_200_trend.py, line 20)
 
 ### ema_50_vector
 **Class:** `EMA50Vector`  
@@ -290,12 +290,12 @@
 **Module:** `src.detectors.building_blocks.market_structure.premium_discount_zones`  
 
 **Possible Signals:**
-- `PRICE_IN_PREMIUM`
+- ⚠️ NO SIGNALS DETECTED (may need specific conditions)
 
 **Test Results:**
-- neutral: `PRICE_IN_PREMIUM` @ 79%
-- bullish: `PRICE_IN_PREMIUM` @ 74%
-- bearish: `PRICE_IN_PREMIUM` @ 68%
+- neutral: ❌ ERROR - invalid syntax (premium_discount_zones.py, line 36)
+- bullish: ❌ ERROR - invalid syntax (premium_discount_zones.py, line 36)
+- bearish: ❌ ERROR - invalid syntax (premium_discount_zones.py, line 36)
 
 ### market_structure_shift
 **Class:** `MarketStructureShift`  
@@ -330,12 +330,12 @@
 **Module:** `src.detectors.building_blocks.volatility.adr`  
 
 **Possible Signals:**
-- `CALM`
+- ⚠️ NO SIGNALS DETECTED (may need specific conditions)
 
 **Test Results:**
-- neutral: `CALM` @ 70%
-- bullish: `CALM` @ 70%
-- bearish: `CALM` @ 70%
+- neutral: ❌ ERROR - invalid syntax (adr.py, line 20)
+- bullish: ❌ ERROR - invalid syntax (adr.py, line 20)
+- bearish: ❌ ERROR - invalid syntax (adr.py, line 20)
 
 ### bollinger_bands
 **Class:** `BollingerBands`  
@@ -360,13 +360,12 @@
 **Module:** `src.detectors.building_blocks.institutional.vwap`  
 
 **Possible Signals:**
-- `BEARISH`
-- `BULLISH`
+- ⚠️ NO SIGNALS DETECTED (may need specific conditions)
 
 **Test Results:**
-- neutral: `BULLISH` @ 75.47%
-- bullish: `BULLISH` @ 100%
-- bearish: `BEARISH` @ 94.38%
+- neutral: ❌ ERROR - invalid syntax (vwap.py, line 20)
+- bullish: ❌ ERROR - invalid syntax (vwap.py, line 20)
+- bearish: ❌ ERROR - invalid syntax (vwap.py, line 20)
 
 ### anchored_vwap
 **Class:** `AnchoredVWAP`  
