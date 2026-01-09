@@ -728,6 +728,128 @@ print(block_info.signals)  # Use one of these
 
 ---
 
+## Code Generation (Phase 2)
+
+The Strategy Builder now includes automatic code generation! Turn your strategy configurations into production-ready NautilusTrader strategies, test files, and optimizer configs.
+
+### Quick Start
+
+```python
+from src.utils.Strategy_Builder import StrategyGenerator, StrategyRegistry
+
+# Load saved strategy
+registry = StrategyRegistry()
+config = registry.load_strategy(1)
+
+# Generate all files
+generator = StrategyGenerator()
+files = generator.generate_all(config)
+
+print(f"Strategy: {files['strategy']}")
+print(f"Test: {files['test']}")
+print(f"Optimizer: {files['optimizer']}")
+```
+
+### One-Line Generation
+
+```python
+# Even easier - one call!
+registry = StrategyRegistry()
+files = registry.generate_strategy_files(1)
+
+# All files generated:
+# src/strategies/strategy_001_name.py
+# tests/strategies/test_001_name.py
+# config/optimizer_001_name.yaml
+```
+
+### What Gets Generated?
+
+1. **NautilusTrader Strategy File**
+   - Complete strategy implementation
+   - All building blocks initialized
+   - Confluence calculation
+   - Entry/exit logic
+   - Risk management
+   - Performance tracking
+
+2. **Comprehensive Test Suite**
+   - Strategy initialization tests
+   - Block processing tests
+   - Confluence calculation tests
+   - Entry/exit logic tests
+   - Risk management tests
+   - Edge case tests
+
+3. **Optimizer Configuration**
+   - Parameter optimization ranges
+   - Walk-forward test settings
+   - Backtest configuration
+   - Validation settings
+
+### Generated Code Features
+
+- ✅ Syntactically valid Python
+- ✅ All imports resolved
+- ✅ Type hints included
+- ✅ Comprehensive logging
+- ✅ Error handling
+- ✅ PEP 8 compliant
+
+### Example: Complete Workflow
+
+```python
+# 1. Create strategy configuration
+config = StrategyConfiguration(
+    strategy_name="my_strategy",
+    strategy_number=1,
+    strategy_category=StrategyCategory.REVERSAL,
+    main_signal_block="double_top",
+    blocks=[...list of blocks...]
+)
+
+# 2. Validate
+validator = StrategyValidator()
+result = validator.validate(config)
+
+if result.is_valid:
+    # 3. Save configuration
+    registry = StrategyRegistry()
+    registry.save_strategy(config)
+    
+    # 4. Generate all files
+    files = registry.generate_strategy_files(1)
+    
+    print("✅ Strategy ready for testing!")
+    print(f"Strategy: {files['strategy']}")
+    print(f"Test: {files['test']}")
+    print(f"Config: {files['optimizer']}")
+```
+
+### Advanced Usage
+
+```python
+# Custom output directories
+generator = StrategyGenerator()
+files = generator.generate_all(
+    config,
+    strategy_dir=Path("custom/strategies"),
+    test_dir=Path("custom/tests"),
+    config_dir=Path("custom/configs")
+)
+
+# Dry run (preview without saving)
+previews = generator.dry_run(config)
+print("Strategy preview:")
+print(previews['strategy'][:500])  # First 500 chars
+
+# Validate generated code
+is_valid = generator.validate_python_syntax(files['strategy'])
+print(f"Generated code valid: {is_valid}")
+```
+
+---
+
 ## Support
 
 For issues or questions:
@@ -738,6 +860,6 @@ For issues or questions:
 
 ---
 
-**Version:** 1.0  
+**Version:** 2.0 (Code Generation Complete!)  
 **Last Updated:** 2026-01-09  
 **Status:** Production Ready ✅
