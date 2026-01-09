@@ -44,19 +44,27 @@ def prompt_user_selection() -> int:
     Prompt user to select configuration
     
     Returns:
-        Selected index (0-4)
+        Selected index (0-4), or -1 to quit
     """
     while True:
         try:
-            choice = input("\nSelect configuration to apply (1-5): ")
+            choice = input("\nSelect configuration to apply (1-5, or 'q' to quit): ").strip().lower()
+            
+            # Check for quit
+            if choice in ['q', 'quit', 'exit']:
+                print("\n⚠️  Optimization cancelled by user.")
+                return -1
+            
+            # Try to convert to number
             idx = int(choice) - 1
             
             if 0 <= idx < 5:
                 return idx
             else:
-                print("❌ Invalid choice. Please select 1-5.")
+                print("❌ Invalid choice. Please select 1-5, or 'q' to quit.")
         except (ValueError, KeyboardInterrupt):
-            print("❌ Invalid input. Please enter a number 1-5.")
+            print("\n⚠️  Interrupted. Exiting...")
+            return -1
         except EOFError:
             # Handle non-interactive mode
             print("\n⚠️  Non-interactive mode detected. Selecting #1 (recommended).")

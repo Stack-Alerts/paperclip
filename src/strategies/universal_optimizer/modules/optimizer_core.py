@@ -138,6 +138,12 @@ def optimize_strategy_v2(
     
     # 8. User selects
     selected_index = prompt_user_selection()
+    
+    # Handle quit
+    if selected_index == -1:
+        print(f"\n⚠️  No configuration applied. Exiting...")
+        return None
+    
     selected_config = configs[results[selected_index].config_id]
     selected_perf = results[selected_index]
     
