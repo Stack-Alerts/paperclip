@@ -7,6 +7,85 @@
 
 ---
 
+## 🔴 CRITICAL UPDATE: January 9, 2026 - TP/SL Logic Implemented
+
+**MAJOR FIX:** The simulator now uses **proper TP/SL-based exits** instead of hardcoded time-based exits.
+
+### What Changed
+
+**Before (❌ BROKEN):**
+- ALL trades exited after exactly 24 bars (6 hours)
+- TP/SL levels calculated but ignored
+- Missing 80-95% of profit potential
+- Results: 350 trades, 0.5-1.5% avg return, losing money
+
+**After (✅ FIXED):**
+- Trades exit when TP or SL levels hit
+- Supports partial exits (TP ladder: 50% @ TP1, 30% @ TP2, 20% @ TP3)
+- Realistic trade simulation with proper risk management
+- Expected: 60-120 trades, 8-30% avg return, profitable
+
+### New Features
+
+1. **Dynamic TP/SL Calculation:**
+   - Uses ATR for adaptive levels
+   - SL: Entry ± 2.0 ATR (above/below based on direction)
+   - TP1: 1.5R, TP2: 3.0R, TP3: 5.0R
+
+2. **Partial Exit Logic (TP Ladder):**
+   - TP1 hit → Close 50% of position
+   - TP2 hit → Close 30% of position
+   - TP3 hit → Close remaining 20%
+   - SL hit → Close 100% immediately
+
+3. **Exit Tracking:**
+   - Records all partial exits with prices
+   - Calculates weighted average exit price
+   - Proper fee calculation per partial exit
+   - Exit reasons: TP1_PARTIAL, TP2_PARTIAL, TP3_HIT, SL_HIT, MAX_HOLD, END_OF_DATA
+
+4. **R:R Validation:**
+   - Skips entries if R:R < min_risk_reward
+   - Ensures only quality setups are traded
+
+5. **Max Hold Time:**
+   - 1000 bars (~10 days at 15min timeframe)
+   - Prevents indefinite position holding
+
+### Impact on Existing Results
+
+**⚠️ ALL PREVIOUS OPTIMIZATION RESULTS ARE INVALID**
+
+If you optimized strategies before January 9, 2026, you MUST re-run optimization:
+
+```bash
+# Re-optimize ALL previously tested strategies
+python scripts/universal_optimizer_v2.py strategy_01_reversal_m_pattern
+python scripts/universal_optimizer_v2.py strategy_02_reversal_w_pattern
+# ... etc
+```
+
+**Expected Changes:**
+- Fewer total trades (more selective)
+- Higher average returns per trade
+- More realistic win rates
+- Better risk-adjusted metrics
+- Profitable strategies should remain profitable
+- Marginal strategies may now show true performance
+
+### Verification
+
+Check trade record CSV files - you should now see:
+- Variable hold times (not all 24 bars)
+- Exit reasons with TP/SL details
+- Partial exits tracked separately
+- Realistic profit/loss distributions
+
+**Investigation Report:** See `docs/v3/Strategies/Strategy_Investigations/01_reversal_m_pattern_investigation_report.md` for complete analysis.
+
+---
+
+
 ## Table of Contents
 
 1. [Overview](#overview)
