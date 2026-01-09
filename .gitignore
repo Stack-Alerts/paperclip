@@ -82,5 +82,5 @@ dmypy.json
 Thumbs.db
 .DS_Store
 
-# Keep .env for configuration template but ignore sensitive versions
-# .env is kept for structure reference
+# Security - .env contains sensitive credentials and MUST be ignored
+# Use .env.example as a template

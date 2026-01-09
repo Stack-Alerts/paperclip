@@ -1,0 +1,935 @@
+{
+  "test_run": "2026-01-08T11:47:14.458698",
+  "total_tests": 84,
+  "complete": 84,
+  "partial": 0,
+  "failed": 0,
+  "aggregate_reports_moved": 4,
+  "output_directory": "data/reports/walkforward_tests/building_blocks",
+  "detailed_results": [
+    {
+      "test_num": "01",
+      "block_name": "ema_20_50_cross",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/01_walkforward_results_ema_20_50_cross.json",
+        "data/reports/walkforward_tests/building_blocks/01_walkforward_results_ema_20_50_cross_trades.csv"
+      ],
+      "stdout_lines": 47,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "02",
+      "block_name": "ema_20_50_trend",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/02_walkforward_results_ema_20_50_trend.json",
+        "data/reports/walkforward_tests/building_blocks/02_walkforward_results_ema_20_50_trend_trades.csv"
+      ],
+      "stdout_lines": 46,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "03",
+      "block_name": "ema_50_vector",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/03_walkforward_results_ema_50_vector.json",
+        "data/reports/walkforward_tests/building_blocks/03_walkforward_results_ema_50_vector_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "04",
+      "block_name": "ema_55_vector",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/04_walkforward_results_ema_55_vector.json",
+        "data/reports/walkforward_tests/building_blocks/04_walkforward_results_ema_55_vector_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "05",
+      "block_name": "ema_200_trend",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/05_walkforward_results_ema_200_trend.json",
+        "data/reports/walkforward_tests/building_blocks/05_walkforward_results_ema_200_trend_trades.csv"
+      ],
+      "stdout_lines": 45,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "06",
+      "block_name": "ema_255_vector",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/06_walkforward_results_ema_255_vector.json",
+        "data/reports/walkforward_tests/building_blocks/06_walkforward_results_ema_255_vector_trades.csv"
+      ],
+      "stdout_lines": 45,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "07",
+      "block_name": "ema_800_vector",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/07_walkforward_results_ema_800_vector.json",
+        "data/reports/walkforward_tests/building_blocks/07_walkforward_results_ema_800_vector_trades.csv"
+      ],
+      "stdout_lines": 48,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "08",
+      "block_name": "macd_signal",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/08_walkforward_results_macd_signal.json",
+        "data/reports/walkforward_tests/building_blocks/08_walkforward_results_macd_signal_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "09",
+      "block_name": "rsi_divergence",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/09_walkforward_results_rsi_divergence.json",
+        "data/reports/walkforward_tests/building_blocks/09_walkforward_results_rsi_divergence_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "10",
+      "block_name": "stochastic_rsi",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/10_walkforward_results_stochastic_rsi.json",
+        "data/reports/walkforward_tests/building_blocks/10_walkforward_results_stochastic_rsi_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "11",
+      "block_name": "order_block",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/11_walkforward_results_order_block.json",
+        "data/reports/walkforward_tests/building_blocks/11_walkforward_results_order_block_trades.csv"
+      ],
+      "stdout_lines": 45,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "12",
+      "block_name": "fair_value_gap",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/12_walkforward_results_fair_value_gap.json",
+        "data/reports/walkforward_tests/building_blocks/12_walkforward_results_fair_value_gap_trades.csv"
+      ],
+      "stdout_lines": 48,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "13",
+      "block_name": "liquidity_sweep",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/13_walkforward_results_liquidity_sweep.json",
+        "data/reports/walkforward_tests/building_blocks/13_walkforward_results_liquidity_sweep_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "14",
+      "block_name": "breaker_block",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/14_walkforward_results_breaker_block.json",
+        "data/reports/walkforward_tests/building_blocks/14_walkforward_results_breaker_block_trades.csv"
+      ],
+      "stdout_lines": 49,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "15",
+      "block_name": "ichimoku_cloud",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/15_walkforward_results_ichimoku_cloud.json",
+        "data/reports/walkforward_tests/building_blocks/15_walkforward_results_ichimoku_cloud_trades.csv"
+      ],
+      "stdout_lines": 47,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "16",
+      "block_name": "adx",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/16_walkforward_results_adx.json",
+        "data/reports/walkforward_tests/building_blocks/16_walkforward_results_adx_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "17",
+      "block_name": "break_of_structure",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/17_walkforward_results_break_of_structure.json",
+        "data/reports/walkforward_tests/building_blocks/17_walkforward_results_break_of_structure_trades.csv"
+      ],
+      "stdout_lines": 47,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "18",
+      "block_name": "market_structure_shift",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/18_walkforward_results_market_structure_shift.json",
+        "data/reports/walkforward_tests/building_blocks/18_walkforward_results_market_structure_shift_trades.csv"
+      ],
+      "stdout_lines": 46,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "19",
+      "block_name": "displacement",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/19_walkforward_results_displacement.json",
+        "data/reports/walkforward_tests/building_blocks/19_walkforward_results_displacement_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "20",
+      "block_name": "inducement",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/20_walkforward_results_inducement.json",
+        "data/reports/walkforward_tests/building_blocks/20_walkforward_results_inducement_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "21",
+      "block_name": "optimal_trade_entry",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/21_walkforward_results_optimal_trade_entry.json",
+        "data/reports/walkforward_tests/building_blocks/21_walkforward_results_optimal_trade_entry_trades.csv"
+      ],
+      "stdout_lines": 45,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "22",
+      "block_name": "swing_failure_pattern",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/22_walkforward_results_swing_failure_pattern.json",
+        "data/reports/walkforward_tests/building_blocks/22_walkforward_results_swing_failure_pattern_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "23",
+      "block_name": "premium_discount",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/23_walkforward_results_premium_discount.json",
+        "data/reports/walkforward_tests/building_blocks/23_walkforward_results_premium_discount_trades.csv"
+      ],
+      "stdout_lines": 45,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "24",
+      "block_name": "change_of_character",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/24_walkforward_results_change_of_character.json",
+        "data/reports/walkforward_tests/building_blocks/24_walkforward_results_change_of_character_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "25",
+      "block_name": "mitigation_block",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/25_walkforward_results_mitigation_block.json",
+        "data/reports/walkforward_tests/building_blocks/25_walkforward_results_mitigation_block_trades.csv"
+      ],
+      "stdout_lines": 47,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "26",
+      "block_name": "balanced_price_range",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/26_walkforward_results_balanced_price_range.json",
+        "data/reports/walkforward_tests/building_blocks/26_walkforward_results_balanced_price_range_trades.csv"
+      ],
+      "stdout_lines": 47,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "27",
+      "block_name": "vwap",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/27_walkforward_results_vwap.json",
+        "data/reports/walkforward_tests/building_blocks/27_walkforward_results_vwap_trades.csv"
+      ],
+      "stdout_lines": 46,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "28",
+      "block_name": "atr",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/28_walkforward_results_atr.json",
+        "data/reports/walkforward_tests/building_blocks/28_walkforward_results_atr_trades.csv"
+      ],
+      "stdout_lines": 48,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "29",
+      "block_name": "adr",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/29_walkforward_results_adr.json",
+        "data/reports/walkforward_tests/building_blocks/29_walkforward_results_adr_trades.csv"
+      ],
+      "stdout_lines": 52,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "30",
+      "block_name": "bollinger_bands",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/30_walkforward_results_bollinger_bands.json",
+        "data/reports/walkforward_tests/building_blocks/30_walkforward_results_bollinger_bands_trades.csv"
+      ],
+      "stdout_lines": 62,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "31",
+      "block_name": "double_top",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/31_walkforward_results_double_top.json",
+        "data/reports/walkforward_tests/building_blocks/31_walkforward_results_double_top_trades.csv"
+      ],
+      "stdout_lines": 49,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "32",
+      "block_name": "double_bottom",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/32_walkforward_results_double_bottom.json",
+        "data/reports/walkforward_tests/building_blocks/32_walkforward_results_double_bottom_trades.csv"
+      ],
+      "stdout_lines": 49,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "33",
+      "block_name": "triple_top",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/33_walkforward_results_triple_top.json",
+        "data/reports/walkforward_tests/building_blocks/33_walkforward_results_triple_top_trades.csv"
+      ],
+      "stdout_lines": 49,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "34",
+      "block_name": "triple_bottom",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/34_walkforward_results_triple_bottom.json",
+        "data/reports/walkforward_tests/building_blocks/34_walkforward_results_triple_bottom_trades.csv"
+      ],
+      "stdout_lines": 49,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "35",
+      "block_name": "head_and_shoulders",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/35_walkforward_results_head_and_shoulders.json",
+        "data/reports/walkforward_tests/building_blocks/35_walkforward_results_head_and_shoulders_trades.csv"
+      ],
+      "stdout_lines": 46,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "36",
+      "block_name": "inverse_head_and_shoulders",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/36_walkforward_results_inverse_head_and_shoulders.json",
+        "data/reports/walkforward_tests/building_blocks/36_walkforward_results_inverse_head_and_shoulders_trades.csv"
+      ],
+      "stdout_lines": 46,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "37",
+      "block_name": "cup_and_handle",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/37_walkforward_results_cup_and_handle.json",
+        "data/reports/walkforward_tests/building_blocks/37_walkforward_results_cup_and_handle_trades.csv"
+      ],
+      "stdout_lines": 46,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "38",
+      "block_name": "rounding_bottom",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/38_walkforward_results_rounding_bottom.json",
+        "data/reports/walkforward_tests/building_blocks/38_walkforward_results_rounding_bottom_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "39",
+      "block_name": "flag_pattern",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/39_walkforward_results_flag_pattern.json",
+        "data/reports/walkforward_tests/building_blocks/39_walkforward_results_flag_pattern_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "40",
+      "block_name": "pennant_pattern",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/40_walkforward_results_pennant_pattern.json",
+        "data/reports/walkforward_tests/building_blocks/40_walkforward_results_pennant_pattern_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "41",
+      "block_name": "symmetrical_triangle",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/41_walkforward_results_symmetrical_triangle.json",
+        "data/reports/walkforward_tests/building_blocks/41_walkforward_results_symmetrical_triangle_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "42",
+      "block_name": "ascending_triangle",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/42_walkforward_results_ascending_triangle.json",
+        "data/reports/walkforward_tests/building_blocks/42_walkforward_results_ascending_triangle_trades.csv"
+      ],
+      "stdout_lines": 49,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "43",
+      "block_name": "descending_triangle",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/43_walkforward_results_descending_triangle.json",
+        "data/reports/walkforward_tests/building_blocks/43_walkforward_results_descending_triangle_trades.csv"
+      ],
+      "stdout_lines": 46,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "44",
+      "block_name": "falling_wedge",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/44_walkforward_results_falling_wedge.json",
+        "data/reports/walkforward_tests/building_blocks/44_walkforward_results_falling_wedge_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "45",
+      "block_name": "rising_wedge",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/45_walkforward_results_rising_wedge.json",
+        "data/reports/walkforward_tests/building_blocks/45_walkforward_results_rising_wedge_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "46",
+      "block_name": "hod",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/46_walkforward_results_hod.json",
+        "data/reports/walkforward_tests/building_blocks/46_walkforward_results_hod_trades.csv"
+      ],
+      "stdout_lines": 61,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "47",
+      "block_name": "how",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/47_walkforward_results_how.json",
+        "data/reports/walkforward_tests/building_blocks/47_walkforward_results_how_trades.csv"
+      ],
+      "stdout_lines": 57,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "48",
+      "block_name": "lod",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/48_walkforward_results_lod.json",
+        "data/reports/walkforward_tests/building_blocks/48_walkforward_results_lod_trades.csv"
+      ],
+      "stdout_lines": 51,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "49",
+      "block_name": "low",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/49_walkforward_results_low.json",
+        "data/reports/walkforward_tests/building_blocks/49_walkforward_results_low_trades.csv"
+      ],
+      "stdout_lines": 51,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "50",
+      "block_name": "asia_session_50_percent",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/50_walkforward_results_asia_session_50_percent.json",
+        "data/reports/walkforward_tests/building_blocks/50_walkforward_results_asia_session_50_percent_trades.csv"
+      ],
+      "stdout_lines": 56,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "51",
+      "block_name": "elliott_wave_count",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/51_walkforward_results_elliott_wave_count.json",
+        "data/reports/walkforward_tests/building_blocks/51_walkforward_results_elliott_wave_count_trades.csv"
+      ],
+      "stdout_lines": 57,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "52",
+      "block_name": "elliott_wave_oscillator",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/52_walkforward_results_elliott_wave_oscillator.json",
+        "data/reports/walkforward_tests/building_blocks/52_walkforward_results_elliott_wave_oscillator_trades.csv"
+      ],
+      "stdout_lines": 49,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "53",
+      "block_name": "wyckoff_accumulation",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/53_walkforward_results_wyckoff_accumulation.json",
+        "data/reports/walkforward_tests/building_blocks/53_walkforward_results_wyckoff_accumulation_trades.csv"
+      ],
+      "stdout_lines": 47,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "53",
+      "block_name": "wyckoff_accumulation_2hr",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/53_walkforward_results_wyckoff_accumulation_2hr.json",
+        "data/reports/walkforward_tests/building_blocks/53_walkforward_results_wyckoff_accumulation_2hr_trades.csv"
+      ],
+      "stdout_lines": 50,
+      "stderr_lines": 3
+    },
+    {
+      "test_num": "53",
+      "block_name": "wyckoff_accumulation_4hr",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/53_walkforward_results_wyckoff_accumulation_4hr.json",
+        "data/reports/walkforward_tests/building_blocks/53_walkforward_results_wyckoff_accumulation_4hr_trades.csv"
+      ],
+      "stdout_lines": 50,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "54",
+      "block_name": "wyckoff_distribution",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/54_walkforward_results_wyckoff_distribution.json",
+        "data/reports/walkforward_tests/building_blocks/54_walkforward_results_wyckoff_distribution_trades.csv"
+      ],
+      "stdout_lines": 47,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "54",
+      "block_name": "wyckoff_distribution_2hr",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/54_walkforward_results_wyckoff_distribution_2hr.json",
+        "data/reports/walkforward_tests/building_blocks/54_walkforward_results_wyckoff_distribution_2hr_trades.csv"
+      ],
+      "stdout_lines": 49,
+      "stderr_lines": 3
+    },
+    {
+      "test_num": "54",
+      "block_name": "wyckoff_distribution_4hr",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/54_walkforward_results_wyckoff_distribution_4hr.json",
+        "data/reports/walkforward_tests/building_blocks/54_walkforward_results_wyckoff_distribution_4hr_trades.csv"
+      ],
+      "stdout_lines": 49,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "55",
+      "block_name": "wyckoff_reaccumulation",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/55_walkforward_results_wyckoff_reaccumulation.json",
+        "data/reports/walkforward_tests/building_blocks/55_walkforward_results_wyckoff_reaccumulation_trades.csv"
+      ],
+      "stdout_lines": 45,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "56",
+      "block_name": "fibonacci_retracements",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/56_walkforward_results_fibonacci_retracements.json",
+        "data/reports/walkforward_tests/building_blocks/56_walkforward_results_fibonacci_retracements_trades.csv"
+      ],
+      "stdout_lines": 53,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "57",
+      "block_name": "anchored_vwap",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/57_walkforward_results_anchored_vwap.json",
+        "data/reports/walkforward_tests/building_blocks/57_walkforward_results_anchored_vwap_trades.csv"
+      ],
+      "stdout_lines": 45,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "58",
+      "block_name": "ema_crossover",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/58_walkforward_results_ema_crossover.json",
+        "data/reports/walkforward_tests/building_blocks/58_walkforward_results_ema_crossover_trades.csv"
+      ],
+      "stdout_lines": 50,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "59",
+      "block_name": "market_depth",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/59_walkforward_results_market_depth.json",
+        "data/reports/walkforward_tests/building_blocks/59_walkforward_results_market_depth_trades.csv"
+      ],
+      "stdout_lines": 47,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "60",
+      "block_name": "order_flow_imbalance",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/60_walkforward_results_order_flow_imbalance.json",
+        "data/reports/walkforward_tests/building_blocks/60_walkforward_results_order_flow_imbalance_trades.csv"
+      ],
+      "stdout_lines": 47,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "61",
+      "block_name": "premium_discount_zones",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/61_walkforward_results_premium_discount_zones.json",
+        "data/reports/walkforward_tests/building_blocks/61_walkforward_results_premium_discount_zones_trades.csv"
+      ],
+      "stdout_lines": 47,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "62",
+      "block_name": "range_liquidity",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/62_walkforward_results_range_liquidity.json",
+        "data/reports/walkforward_tests/building_blocks/62_walkforward_results_range_liquidity_trades.csv"
+      ],
+      "stdout_lines": 27,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "63",
+      "block_name": "swing_points",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/63_walkforward_results_swing_points.json",
+        "data/reports/walkforward_tests/building_blocks/63_walkforward_results_swing_points_trades.csv"
+      ],
+      "stdout_lines": 56,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "64",
+      "block_name": "kill_zones",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/64_walkforward_results_kill_zones.json",
+        "data/reports/walkforward_tests/building_blocks/64_walkforward_results_kill_zones_trades.csv"
+      ],
+      "stdout_lines": 50,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "65",
+      "block_name": "session_time",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/65_walkforward_results_session_time.json",
+        "data/reports/walkforward_tests/building_blocks/65_walkforward_results_session_time_trades.csv"
+      ],
+      "stdout_lines": 52,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "66",
+      "block_name": "us_settlement",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/66_walkforward_results_us_settlement.json",
+        "data/reports/walkforward_tests/building_blocks/66_walkforward_results_us_settlement_trades.csv"
+      ],
+      "stdout_lines": 54,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "67",
+      "block_name": "supply_demand_zones",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/67_walkforward_results_supply_demand_zones.json",
+        "data/reports/walkforward_tests/building_blocks/67_walkforward_results_supply_demand_zones_trades.csv"
+      ],
+      "stdout_lines": 54,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "68",
+      "block_name": "initial_balance_breakout",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/68_walkforward_results_initial_balance_breakout.json",
+        "data/reports/walkforward_tests/building_blocks/68_walkforward_results_initial_balance_breakout_trades.csv"
+      ],
+      "stdout_lines": 56,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "69",
+      "block_name": "liquidity",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/69_walkforward_results_liquidity.json",
+        "data/reports/walkforward_tests/building_blocks/69_walkforward_results_liquidity_trades.csv"
+      ],
+      "stdout_lines": 50,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "70",
+      "block_name": "trailing_stop",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/70_walkforward_results_trailing_stop.json",
+        "data/reports/walkforward_tests/building_blocks/70_walkforward_results_trailing_stop_trades.csv"
+      ],
+      "stdout_lines": 41,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "71",
+      "block_name": "macd_price_forecasting",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/71_walkforward_results_macd_price_forecasting.json",
+        "data/reports/walkforward_tests/building_blocks/71_walkforward_results_macd_price_forecasting_trades.csv"
+      ],
+      "stdout_lines": 40,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "72",
+      "block_name": "adaptive_momentum_oscillator",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/72_walkforward_results_adaptive_momentum_oscillator.json",
+        "data/reports/walkforward_tests/building_blocks/72_walkforward_results_adaptive_momentum_oscillator_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "73",
+      "block_name": "power_hour_trends",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/73_walkforward_results_power_hour_trends.json",
+        "data/reports/walkforward_tests/building_blocks/73_walkforward_results_power_hour_trends_trades.csv"
+      ],
+      "stdout_lines": 52,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "74",
+      "block_name": "ict_silver_bullet",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/74_walkforward_results_ict_silver_bullet.json",
+        "data/reports/walkforward_tests/building_blocks/74_walkforward_results_ict_silver_bullet_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "75",
+      "block_name": "asfx_a2_vwap",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/75_walkforward_results_asfx_a2_vwap.json",
+        "data/reports/walkforward_tests/building_blocks/75_walkforward_results_asfx_a2_vwap_trades.csv"
+      ],
+      "stdout_lines": 40,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "76",
+      "block_name": "three_bar_reversal",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/76_walkforward_results_three_bar_reversal.json",
+        "data/reports/walkforward_tests/building_blocks/76_walkforward_results_three_bar_reversal_trades.csv"
+      ],
+      "stdout_lines": 40,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "77",
+      "block_name": "candle_2_close",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/77_walkforward_results_candle_2_close.json",
+        "data/reports/walkforward_tests/building_blocks/77_walkforward_results_candle_2_close_trades.csv"
+      ],
+      "stdout_lines": 40,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "78",
+      "block_name": "internal_pivot_pattern",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/78_walkforward_results_internal_pivot_pattern.json",
+        "data/reports/walkforward_tests/building_blocks/78_walkforward_results_internal_pivot_pattern_trades.csv"
+      ],
+      "stdout_lines": 40,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "79",
+      "block_name": "swing_breakout_sequence",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/79_walkforward_results_swing_breakout_sequence.json",
+        "data/reports/walkforward_tests/building_blocks/79_walkforward_results_swing_breakout_sequence_trades.csv"
+      ],
+      "stdout_lines": 40,
+      "stderr_lines": 1
+    },
+    {
+      "test_num": "80",
+      "block_name": "wave_consolidation",
+      "status": "COMPLETE",
+      "files_generated": [
+        "data/reports/walkforward_tests/building_blocks/80_walkforward_results_wave_consolidation.json",
+        "data/reports/walkforward_tests/building_blocks/80_walkforward_results_wave_consolidation_trades.csv"
+      ],
+      "stdout_lines": 44,
+      "stderr_lines": 1
+    }
+  ]
+}

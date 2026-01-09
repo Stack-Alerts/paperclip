@@ -9,9 +9,14 @@ pandas>=2.0.0
 numpy>=1.24.0
 pyarrow>=21.0.0
 
+# Data Download (LakeAPI)
+boto3>=1.28.0
+lakeapi>=2.0.0
+
 # Utilities
 python-dotenv>=1.0.0
 pyyaml>=6.0.0
+retry>=0.9.2
 
 # Testing
 pytest>=7.4.0
