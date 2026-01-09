@@ -527,3 +527,5 @@ class MPatternReversalStandard(Strategy):
         self.log.info(f"{self.strategy_name} stopped")
         self.log.info(f"Total trades: {self.trades_count}")
         self.log.info(f"Win rate: {(self.wins/self.trades_count*100) if self.trades_count > 0 else 0:.1f}%")
+        self.log.info(f"Total trades: {self.trades_count}")
+        self.log.info(f"Win rate: {(self.wins/self.trades_count*100) if self.trades_count > 0 else 0:.1f}%")
