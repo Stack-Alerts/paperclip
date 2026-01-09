@@ -155,23 +155,37 @@ def test_single_config(args):
                 exit_price = test_df.iloc[bar_idx]['close']
                 exit_time = test_df.iloc[bar_idx]['timestamp']
                 
-                # Position size (0.01 BTC for testing)
+                # Position size (0.01 BTC for testing - with 10x leverage this is 0.1 BTC notional)
                 position_size = 0.01
+                leverage = 10.0  # Binance Perpetual standard leverage
                 
-                # Calculate PnL in USD
+                # Calculate notional position value
+                entry_notional = current_position['entry_price'] * position_size
+                exit_notional = exit_price * position_size
+                
+                # Calculate PnL in USDT (Perpetual futures)
                 if config.side == 'LONG':
                     pnl = (exit_price - current_position['entry_price']) * position_size
                 else:
                     pnl = (current_position['entry_price'] - exit_price) * position_size
                 
-                # Calculate fees (0.06% taker fee per side = 0.12% round-trip)
-                entry_value = current_position['entry_price'] * position_size
-                exit_value = exit_price * position_size
-                fee_entry = entry_value * 0.0006  # 0.06% taker fee
-                fee_exit = exit_value * 0.0006   # 0.06% taker fee
+                # Calculate fees - Binance Perpetual (Market Orders = Taker)
+                # Taker fee: 0.05% per side
+                # Note: If limit orders could have been used, maker fee would be -0.01% (rebate)
+                # For conservative testing, we assume market orders (taker fees)
+                fee_entry = entry_notional * 0.0005  # 0.05% taker fee
+                fee_exit = exit_notional * 0.0005    # 0.05% taker fee
                 fee = fee_entry + fee_exit
                 
-                net_pnl = pnl - fee
+                # Funding fee approximation (0.01% every 8 hours if held)
+                # If position held > 8 hours, add funding fees
+                funding_periods = bars_held // 32  # 32 bars = 8 hours at 15min bars
+                funding_fee = entry_notional * 0.0001 * funding_periods if funding_periods > 0 else 0
+                
+                # Total fees
+                total_fee = fee + funding_fee
+                
+                net_pnl = pnl - total_fee
                 
                 trades.append({
                     'entry_time': current_position['entry_time'],
