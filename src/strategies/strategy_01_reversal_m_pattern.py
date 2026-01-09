@@ -58,6 +58,9 @@ from src.detectors.building_blocks.price_levels.hod import HOD
 from src.detectors.building_blocks.price_levels.asia_session_50_percent import AsiaSession50Percent
 from src.detectors.building_blocks.sessions.session_time import SessionTime
 from src.detectors.building_blocks.institutional.vwap import VWAP
+from src.detectors.building_blocks.moving_averages.ema_20_50_trend import EMA2050Trend
+from src.detectors.building_blocks.sessions.kill_zones import KillZones
+from src.detectors.building_blocks.volatility.adr import ADR
 
 
 class MPatternReversalStandard(Strategy):
@@ -121,7 +124,10 @@ class MPatternReversalStandard(Strategy):
             'hod': HOD(timeframe='15min'),
             'asia_50': AsiaSession50Percent(timeframe='15min'),
             'session_time': SessionTime(timeframe='15min'),
-            'vwap': VWAP(timeframe='15min')
+            'vwap': VWAP(timeframe='15min'),
+            'ema_20_50_trend': EMA2050Trend(timeframe='15min'),
+            'kill_zones': KillZones(timeframe='15min'),
+            'adr': ADR(timeframe='15min')
         }
         
         # Keep weights configuration
@@ -158,6 +164,24 @@ class MPatternReversalStandard(Strategy):
         self.blocks['vwap'] = {
             'name': 'VWAP',
             'weight': 10,
+            'enabled': True
+        }
+        
+        self.blocks['ema_20_50_trend'] = {
+            'name': 'EMA2050Trend',
+            'weight': 12,
+            'enabled': True
+        }
+        
+        self.blocks['kill_zones'] = {
+            'name': 'KillZones',
+            'weight': 12,
+            'enabled': True
+        }
+        
+        self.blocks['adr'] = {
+            'name': 'ADR',
+            'weight': 8,
             'enabled': True
         }
         
@@ -254,6 +278,15 @@ class MPatternReversalStandard(Strategy):
         
         # 6. VWAP Position (REAL)
         results['vwap'] = self.detectors['vwap'].analyze(df)
+        
+        # 7. EMA 20/50 Trend (Context)
+        results['ema_20_50_trend'] = self.detectors['ema_20_50_trend'].analyze(df)
+        
+        # 8. Kill Zones (Context)
+        results['kill_zones'] = self.detectors['kill_zones'].analyze(df)
+        
+        # 9. ADR (Context)
+        results['adr'] = self.detectors['adr'].analyze(df)
         
         return results
     
@@ -529,3 +562,4 @@ class MPatternReversalStandard(Strategy):
         self.log.info(f"Win rate: {(self.wins/self.trades_count*100) if self.trades_count > 0 else 0:.1f}%")
         self.log.info(f"Total trades: {self.trades_count}")
         self.log.info(f"Win rate: {(self.wins/self.trades_count*100) if self.trades_count > 0 else 0:.1f}%")
+        self.log.info(f"Total trades: {self.trades_count}")
