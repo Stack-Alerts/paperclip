@@ -27,6 +27,7 @@ from src.utils.Strategy_Builder import (
 )
 from src.utils.Strategy_Builder.qt_gui.block_library import BlockLibraryPanel
 from src.utils.Strategy_Builder.qt_gui.code_preview import CodePreviewDialog
+from src.utils.Strategy_Builder.qt_gui.strategy_creator import StrategyCreatorDialog
 
 
 class StrategyBuilderMainWindow(QMainWindow):
@@ -112,6 +113,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         new_btn.triggered.connect(self.new_strategy)
         toolbar.addAction(new_btn)
         
+        # Delete button
+        delete_btn = QAction('🗑 Delete', self)
+        delete_btn.triggered.connect(self.delete_strategy)
+        toolbar.addAction(delete_btn)
+        
         toolbar.addSeparator()
         
         # Validate button
@@ -155,6 +161,8 @@ class StrategyBuilderMainWindow(QMainWindow):
         left_layout.addWidget(list_label)
         
         self.strategy_list = QListWidget()
+        self.strategy_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.strategy_list.customContextMenuRequested.connect(self.show_context_menu)
         left_layout.addWidget(self.strategy_list)
         
         splitter.addWidget(left_widget)
@@ -259,20 +267,62 @@ Building Blocks ({len(config.blocks)}):
     def new_strategy(self):
         """Create new strategy"""
         try:
+            # Check if slots available
             next_num = self.registry.get_next_strategy_number()
-            QMessageBox.information(
-                self,
-                "New Strategy",
-                f"Creating strategy #{next_num:03d}\n\n"
-                "Full editor coming soon!\n"
-                "For now, use CLI or programmatic API."
-            )
+            
+            # Launch visual creator
+            creator = StrategyCreatorDialog(self)
+            if creator.exec():
+                # Refresh list after successful creation
+                self.load_strategies()
+                
         except ValueError:
             QMessageBox.critical(
                 self,
                 "Error",
                 "All 150 strategy slots are filled!"
             )
+            
+    def delete_strategy(self):
+        """Delete selected strategy"""
+        current = self.strategy_list.currentItem()
+        if not current:
+            QMessageBox.warning(
+                self,
+                "No Selection",
+                "Please select a strategy to delete"
+            )
+            return
+            
+        item_text = current.text()
+        strategy_num = int(item_text.split('.')[0])
+        
+        # Confirm deletion
+        reply = QMessageBox.question(
+            self,
+            "Confirm Deletion",
+            f"Are you sure you want to delete Strategy #{strategy_num:03d}?\n\n"
+            "This will remove the strategy configuration.\n"
+            "(Generated files will not be deleted)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                self.registry.delete_strategy(strategy_num)
+                self.load_strategies()
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"✅ Strategy #{strategy_num:03d} deleted"
+                )
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Failed to delete strategy:\n{e}"
+                )
             
     def validate_strategy(self):
         """Validate selected strategy"""
@@ -358,6 +408,31 @@ Building Blocks ({len(config.blocks)}):
                 f"Preview failed:\n{e}"
             )
             
+    def show_context_menu(self, position):
+        """Show right-click context menu"""
+        from PyQt6.QtWidgets import QMenu
+        
+        menu = QMenu()
+        
+        # Only show actions if item selected
+        current = self.strategy_list.currentItem()
+        if current:
+            validate_action = menu.addAction("✓ Validate")
+            validate_action.triggered.connect(self.validate_strategy)
+            
+            generate_action = menu.addAction("⚙ Generate Files")
+            generate_action.triggered.connect(self.generate_files)
+            
+            preview_action = menu.addAction("👁 Preview Code")
+            preview_action.triggered.connect(self.preview_code)
+            
+            menu.addSeparator()
+            
+            delete_action = menu.addAction("🗑 Delete")
+            delete_action.triggered.connect(self.delete_strategy)
+            
+            menu.exec(self.strategy_list.mapToGlobal(position))
+    
     def show_statistics(self):
         """Show strategy statistics"""
         total = self.registry.get_strategy_count()
