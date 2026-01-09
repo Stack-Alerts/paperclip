@@ -829,23 +829,28 @@ def detect_confluence_gap(
     - But only generates 35 points (below 40-70 threshold)
     - Solution: Add "Always On" context blocks for base confluence
     
+    UPDATED: Now detects gap even if no more context blocks available
+    (will suggest parameter adjustment as fallback)
+    
     Returns:
         Issue dict with recommendations, or None if no gap detected
     """
     
-    # TODO: This requires accessing signal fire data from simulator
-    # For now, detect based on low trade count with reasonable params
-    
     min_confluence = min(c.min_confluence for c in configs)
     max_trades = max(r.total_trades for r in results) if results else 0
     
-    # If we have very few trades despite reasonable confluence threshold
-    # This suggests signals fire but don't meet threshold
-    if max_trades <= 2 and min_confluence <= 50:
+    # Detect confluence gap with looser criteria:
+    # - Few trades (0-5) despite reasonable confluence threshold (<=60)
+    # - OR identical results across configs (suggests parameter insensitivity)
+    
+    # Check for identical results
+    all_trades = [r.total_trades for r in results[:5]]
+    identical_results = len(set(all_trades)) == 1
+    
+    # Primary condition: Low trades with reasonable threshold
+    if max_trades <= 5 and min_confluence <= 60:
         # Calculate estimated gap
-        # If min threshold is 40 and we get 0 trades,
-        # likely actual confluence is ~30-35 (5-10 point gap)
-        estimated_gap = min_confluence - 30  # Conservative estimate
+        estimated_gap = min(max_trades, 2) * 10  # Conservative: 0 trades = 0, 2 trades = 20 point gap
         
         # Get current blocks
         current_blocks = list(configs[0].blocks.keys())
@@ -853,98 +858,271 @@ def detect_confluence_gap(
         # Recommend "Always On" blocks
         recommended_blocks = get_always_on_context_blocks(current_blocks)
         
-        if recommended_blocks:
-            return {
-                'severity': 'CRITICAL',
-                'type': 'CONFLUENCE_GAP',
-                'description': f'Signals detected but confluence insufficient (gap ~{estimated_gap} points)',
-                'expected': f'{min_confluence}+ confluence points',
-                'actual': f'~{min_confluence - estimated_gap} points (estimated)',
-                'likely_cause': 'Event blocks fire but lack supporting context blocks',
-                'recommendation': f'Add {len(recommended_blocks)} "Always On" context blocks for base confluence',
-                'auto_fix': 'add_context_blocks',
-                'recommended_blocks': recommended_blocks,
-                'estimated_boost': sum(b['weight'] for b in recommended_blocks)
-            }
+        # CRITICAL FIX: Show gap even if no blocks available
+        # (will offer parameter adjustment instead)
+        if recommended_blocks or identical_results:
+            
+            if recommended_blocks:
+                # We have blocks to recommend
+                return {
+                    'severity': 'CRITICAL',
+                    'type': 'CONFLUENCE_GAP',
+                    'description': f'Low trade count ({max_trades}) suggests confluence gap',
+                    'expected': f'{min_confluence}+ confluence points',
+                    'actual': f'~{max(min_confluence - 10, 25)} points (estimated from {max_trades} trades)',
+                    'likely_cause': 'Event blocks fire but lack supporting context blocks',
+                    'recommendation': f'Add {len(recommended_blocks)} "Always On" context blocks for base confluence',
+                    'auto_fix': 'add_context_blocks',
+                    'recommended_blocks': recommended_blocks,
+                    'estimated_boost': sum(b['weight'] for b in recommended_blocks),
+                    'current_block_count': len(current_blocks),
+                    'identical_results': identical_results
+                }
+            else:
+                # No more blocks to add, but still have low trades
+                # Suggest parameter adjustment
+                return {
+                    'severity': 'WARNING',
+                    'type': 'CONFLUENCE_GAP',
+                    'description': f'Low trade count ({max_trades}) despite {len(current_blocks)} building blocks',
+                    'expected': f'{min_confluence}+ confluence points, 30+ trades',
+                    'actual': f'{max_trades} trades across all configs',
+                    'likely_cause': 'All context blocks added, but threshold still too high OR block weights too low',
+                    'recommendation': 'Lower confluence threshold OR increase block weights',
+                    'auto_fix': 'adjust_thresholds',
+                    'recommended_blocks': [],
+                    'estimated_boost': 0,
+                    'current_block_count': len(current_blocks),
+                    'identical_results': identical_results
+                }
     
     return None
 
 
 def get_always_on_context_blocks(current_blocks: List[str]) -> List[dict]:
     """
-    Get recommended "Always On" context blocks
+    SMART DECIDER: Get recommended "Always On" context blocks
     
-    These blocks ALWAYS provide confluence points because they:
-    - Fire on every bar (VWAP, Session Time, EMA Trend)
-    - Provide market context regardless of pattern state
-    - Boost base confluence to make strategies tradeable
+    Intelligently selects from 80+ production-ready building blocks.
+    Prioritizes blocks that:
+    - Fire on every bar (guaranteed base confluence)
+    - Have Grade A/A- (85%+ quality)
+    - Provide different types of context (diversification)
+    - Match actual module paths
+    
+    Selection Algorithm:
+    1. Identify missing context block categories
+    2. Select highest-graded blocks from each category
+    3. Ensure proper diversification (trend, session, institutional, structure)
+    4. Return top 3-5 blocks for maximum benefit
     
     Returns:
-        List of recommended blocks with metadata
+        List of recommended blocks with complete metadata
     """
     
-    # Define "Always On" context blocks with their benefits
-    always_on_blocks = {
+    # ========================================================================
+    # TIER 1: PREMIUM "ALWAYS ON" CONTEXT BLOCKS (Grade A, 90+/100)
+    # ========================================================================
+    # These are the absolute best blocks that fire on every bar
+    tier1_blocks = {
         'vwap': {
             'name': 'VWAP',
             'module': 'institutional.vwap',
-            'weight': 12,
+            'weight': 15,  # Upgraded from 12 (Grade A, 94/100)
             'category': 'INSTITUTIONAL',
+            'grade': 'A (94/100)',
             'fires': 'ALWAYS (ABOVE/BELOW/AT)',
-            'benefit': 'Institutional reference level',
-            'impact': '+12 points guaranteed'
+            'benefit': 'Institutional reference level - highest-graded block',
+            'impact': '+12-15 points guaranteed',
+            'tier': 1
         },
-        'session_time': {
-            'name': 'Session Time',
-            'module': 'sessions.session_time',
-            'weight': 10,
-            'category': 'SESSION',
-            'fires': 'ALWAYS (ASIA/LONDON/NY)',
-            'benefit': 'Trading session context',
-            'impact': '+10 points guaranteed'
+        'ema_200_trend': {
+            'name': 'EMA200Trend',
+            'module': 'moving_averages.ema_200_trend',
+            'weight': 12,
+            'category': 'TREND',
+            'grade': 'A (90/100)',
+            'fires': 'ALWAYS (BULLISH/BEARISH/NEUTRAL)',
+            'benefit': 'Long-term trend alignment',
+            'impact': '+10-12 points guaranteed',
+            'tier': 1
         },
         'ema_20_50_trend': {
-            'name': 'EMA 20/50 Trend',
+            'name': 'EMA2050Trend',
             'module': 'moving_averages.ema_20_50_trend',
             'weight': 12,
             'category': 'TREND',
+            'grade': 'A (90/100)',
             'fires': 'ALWAYS (BULLISH/BEARISH/NEUTRAL)',
             'benefit': 'Short-term trend context',
-            'impact': '+12 points guaranteed'
+            'impact': '+10-15 points guaranteed',
+            'tier': 1
         },
-        'adr_range': {
-            'name': 'ADR Range',
-            'module': 'market_structure.adr_range',
-            'weight': 8,
-            'category': 'VOLATILITY',
-            'fires': 'ALWAYS (range context)',
-            'benefit': 'Daily range awareness',
-            'impact': '+8 points guaranteed'
-        },
-        'kill_zones': {
-            'name': 'Kill Zones',
-            'module': 'sessions.kill_zones',
-            'weight': 12,
+        'session_time': {
+            'name': 'SessionTime',
+            'module': 'sessions.session_time',
+            'weight': 10,
             'category': 'SESSION',
-            'fires': 'OFTEN (institutional hours)',
-            'benefit': 'High volume periods',
-            'impact': '+12 points when active'
+            'grade': 'A (90/100)',
+            'fires': 'ALWAYS (ASIA/LONDON/NY/OPENS)',
+            'benefit': 'Trading session context and volatility timing',
+            'impact': '+5-15 points guaranteed',
+            'tier': 1
+        },
+        'swing_points': {
+            'name': 'SwingPoints',
+            'module': 'market_structure.swing_points',
+            'weight': 15,
+            'category': 'STRUCTURE',
+            'grade': 'A (91/100)',
+            'fires': 'ALWAYS (structure tracking)',
+            'benefit': 'Market structure highs/lows',
+            'impact': '+13-17 points guaranteed',
+            'tier': 1
         }
     }
     
-    # Filter out blocks already in strategy
+    # ========================================================================
+    # TIER 2: HIGH QUALITY "ALWAYS ON" BLOCKS (Grade A-, 85-89/100)
+    # ========================================================================
+    tier2_blocks = {
+        'kill_zones': {
+            'name': 'KillZones',
+            'module': 'sessions.kill_zones',
+            'weight': 14,  # Upgraded from 12 (Grade A, 89/100)
+            'category': 'SESSION',
+            'grade': 'A (89/100)',
+            'fires': 'OFTEN (4 zones per day)',
+            'benefit': 'Institutional high-volume periods',
+            'impact': '+8-16 points when active',
+            'tier': 2
+        },
+        'premium_discount_zones': {
+            'name': 'PremiumDiscountZones',
+            'module': 'market_structure.premium_discount_zones',
+            'weight': 14,
+            'category': 'STRUCTURE',
+            'grade': 'A (89/100)',
+            'fires': 'ALWAYS (PREMIUM/DISCOUNT/EQUILIBRIUM)',
+            'benefit': 'ICT premium/discount positioning',
+            'impact': '+12-14 points guaranteed',
+            'tier': 2
+        },
+        'anchored_vwap': {
+            'name': 'AnchoredVWAP',
+            'module': 'institutional.anchored_vwap',
+            'weight': 14,
+            'category': 'INSTITUTIONAL',
+            'grade': 'A (89/100)',
+            'fires': 'ALWAYS (session-anchored)',
+            'benefit': 'Session-specific institutional level',
+            'impact': '+12-14 points guaranteed',
+            'tier': 2
+        },
+        'adr': {
+            'name': 'ADR',
+            'module': 'volatility.adr',
+            'weight': 10,  # Upgraded from 8 (Grade A-, 88/100)
+            'category': 'VOLATILITY',
+            'grade': 'A- (88/100)',
+            'fires': 'ALWAYS (range context)',
+            'benefit': 'Average daily range positioning',
+            'impact': '+8-10 points guaranteed',
+            'tier': 2
+        },
+        'ema_50_vector': {
+            'name': 'EMA50Vector',
+            'module': 'moving_averages.ema_50_vector',
+            'weight': 10,
+            'category': 'TREND',
+            'grade': 'A- (88/100)',
+            'fires': 'ALWAYS (RISING/FALLING/FLAT)',
+            'benefit': 'Medium-term trend direction',
+            'impact': '+8-10 points guaranteed',
+            'tier': 2
+        },
+        'us_settlement': {
+            'name': 'USSettlement',
+            'module': 'price_levels.us_settlement',
+            'weight': 12,
+            'category': 'PRICE_LEVELS',
+            'grade': 'A- (87/100)',
+            'fires': 'ALWAYS (ABOVE/BELOW/AT)',
+            'benefit': 'US settlement reference',
+            'impact': '+10-12 points guaranteed',
+            'tier': 2
+        }
+    }
+    
+    # Combine all blocks
+    all_blocks = {**tier1_blocks, **tier2_blocks}
+    
+    # ========================================================================
+    # SMART SELECTION ALGORITHM
+    # ========================================================================
+    
+    # 1. Filter out blocks already in strategy
+    available_blocks = {k: v for k, v in all_blocks.items() if k not in current_blocks}
+    
+    if not available_blocks:
+        return []  # All blocks already added!
+    
+    # 2. Analyze current blocks to determine missing categories
+    current_categories = set()
+    for block_key in current_blocks:
+        # Determine category from block name
+        if 'ema' in block_key or 'trend' in block_key:
+            current_categories.add('TREND')
+        elif 'session' in block_key or 'kill_zone' in block_key:
+            current_categories.add('SESSION')
+        elif 'vwap' in block_key:
+            current_categories.add('INSTITUTIONAL')
+        elif 'swing' in block_key or 'structure' in block_key or 'premium' in block_key:
+            current_categories.add('STRUCTURE')
+        elif 'adr' in block_key or 'volatility' in block_key:
+            current_categories.add('VOLATILITY')
+        elif 'hod' in block_key or 'lod' in block_key or 'asia' in block_key:
+            current_categories.add('PRICE_LEVELS')
+    
+    # 3. Prioritize blocks from missing categories (diversification)
     recommended = []
-    for block_key, block_info in always_on_blocks.items():
-        if block_key not in current_blocks:
-            recommended.append({
-                'key': block_key,
-                **block_info
-            })
     
-    # Sort by weight (highest impact first)
-    recommended.sort(key=lambda x: x['weight'], reverse=True)
+    # Priority 1: Add blocks from missing categories
+    missing_categories = {'TREND', 'SESSION', 'INSTITUTIONAL', 'STRUCTURE', 'VOLATILITY'} - current_categories
     
-    # Return top 3 recommendations
+    for category in missing_categories:
+        # Find best block in this category
+        category_blocks = [
+            {'key': k, **v} for k, v in available_blocks.items()
+            if v['category'] == category
+        ]
+        
+        if category_blocks:
+            # Sort by tier then weight
+            category_blocks.sort(key=lambda x: (x['tier'], -x['weight']))
+            best_block = category_blocks[0]
+            recommended.append(best_block)
+    
+    # Priority 2: If we still need more blocks, add highest-value remaining
+    if len(recommended) < 3:
+        remaining = [
+            {'key': k, **v} for k, v in available_blocks.items()
+            if {'key': k, **v} not in recommended
+        ]
+        
+        # Sort by tier (1 first) then weight (high to low)
+        remaining.sort(key=lambda x: (x['tier'], -x['weight']))
+        
+        # Add until we have 3-5 blocks
+        for block in remaining:
+            if len(recommended) >= 5:
+                break
+            recommended.append(block)
+    
+    # 4. Final sort by overall value (tier * weight)
+    recommended.sort(key=lambda x: (x['tier'], -x['weight']))
+    
+    # 5. Return top 3 recommendations (optimal for most strategies)
     return recommended[:3]
 
 
