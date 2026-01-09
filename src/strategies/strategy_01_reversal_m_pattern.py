@@ -259,63 +259,147 @@ class MPatternReversalStandard(Strategy):
     
     def _calculate_confluence(self, results: dict) -> tuple:
         """
-        Calculate total confluence score based on REAL building block results
+        Calculate total confluence score with PROPER TIERED SCORING
         
-        Uses the actual signals from institutional-grade building blocks.
-        Each block returns: {'signal': str, 'confidence': int, 'metadata': dict}
+        FIXED: Different signal types now get different point allocations
+        matching the strategy matrix design. Strong signals (BREAKDOWN, 
+        DIVERGENCE, REJECTION) get full points, weaker signals (FORMING,
+        OVERBOUGHT, BELOW) get reduced points.
         
         Returns: (confluence_score, list_of_signals)
         """
         confluence = 0
         signals = []
         
-        # Double Top (30 points) - REAL signals: PATTERN_FORMING, BEARISH_BREAKDOWN
+        # ===================================================================
+        # DOUBLE TOP (30 points max) - TIERED SCORING
+        # ===================================================================
         dt_signal = results['double_top'].get('signal', '')
-        if dt_signal in ['PATTERN_FORMING', 'BEARISH_BREAKDOWN']:
-            conf = results['double_top'].get('confidence', 0)
-            points = int(self.blocks['double_top']['weight'] * conf / 100)
-            confluence += points
-            signals.append(f"Double Top: {dt_signal} ({conf}% → +{points})")
+        dt_conf = results['double_top'].get('confidence', 0)
         
-        # RSI Divergence (25 points) - REAL signals: BEARISH_DIVERGENCE, OVERBOUGHT
+        if dt_signal == 'BEARISH_BREAKDOWN':
+            # BREAKDOWN = strongest signal, full points based on quality
+            if dt_conf >= 90:
+                points = 30  # Excellent breakdown
+            elif dt_conf >= 80:
+                points = 25  # Good breakdown
+            elif dt_conf >= 70:
+                points = 20  # Acceptable breakdown
+            else:
+                points = 15  # Weak breakdown
+            confluence += points
+            signals.append(f"M Pattern: BREAKDOWN ({dt_conf}% → +{points})")
+            
+        elif dt_signal == 'PATTERN_FORMING':
+            # FORMING = pattern incomplete, reduced points (max 15)
+            points = min(15, int(15 * dt_conf / 100))
+            confluence += points
+            signals.append(f"M Pattern: FORMING ({dt_conf}% → +{points})")
+        
+        # ===================================================================
+        # RSI DIVERGENCE (25 points max) - TIERED SCORING
+        # ===================================================================
         rsi_signal = results['rsi_divergence'].get('signal', '')
-        if rsi_signal in ['BEARISH_DIVERGENCE', 'OVERBOUGHT']:
-            conf = results['rsi_divergence'].get('confidence', 0)
-            points = int(self.blocks['rsi_divergence']['weight'] * conf / 100)
-            confluence += points
-            signals.append(f"RSI: {rsi_signal} ({conf}% → +{points})")
+        rsi_conf = results['rsi_divergence'].get('confidence', 0)
         
-        # HOD (20 points) - REAL signals: BELOW_HOD, REJECTION, AT_HOD
+        if rsi_signal == 'BEARISH_DIVERGENCE':
+            # DIVERGENCE = strong reversal signal, full points
+            points = int(25 * rsi_conf / 100)
+            confluence += points
+            signals.append(f"RSI: DIVERGENCE ({rsi_conf}% → +{points})")
+            
+        elif rsi_signal == 'OVERBOUGHT':
+            # OVERBOUGHT = weaker signal, capped at 15 points
+            points = int(15 * rsi_conf / 100)
+            confluence += points
+            signals.append(f"RSI: OVERBOUGHT ({rsi_conf}% → +{points})")
+        
+        # ===================================================================
+        # HOD (20 points max) - TIERED SCORING
+        # ===================================================================
         hod_signal = results['hod'].get('signal', '')
-        if hod_signal in ['BELOW_HOD', 'REJECTION', 'AT_HOD']:
-            conf = results['hod'].get('confidence', 0)
-            points = int(self.blocks['hod']['weight'] * conf / 100)
-            confluence += points
-            signals.append(f"HOD: {hod_signal} ({conf}% → +{points})")
+        hod_conf = results['hod'].get('confidence', 0)
         
-        # Asia 50% (18 points) - REAL signals: BELOW_EQUILIBRIUM, AT_EQUILIBRIUM
+        if hod_signal == 'HOD_REJECTION' or hod_signal == 'REJECTION':
+            # REJECTION = strong resistance confirmation, full points
+            points = int(20 * hod_conf / 100)
+            confluence += points
+            signals.append(f"HOD: REJECTION ({hod_conf}% → +{points})")
+            
+        elif hod_signal == 'AT_HOD':
+            # AT_HOD = moderate signal, reduced points (max 15)
+            points = int(15 * hod_conf / 100)
+            confluence += points
+            signals.append(f"HOD: AT_LEVEL ({hod_conf}% → +{points})")
+            
+        elif hod_signal == 'BELOW_HOD':
+            # BELOW_HOD = weak signal, minimal points (max 10)
+            points = int(10 * hod_conf / 100)
+            confluence += points
+            signals.append(f"HOD: BELOW ({hod_conf}% → +{points})")
+        
+        # ===================================================================
+        # ASIA 50% (18 points max) - TIERED SCORING
+        # ===================================================================
         asia_signal = results['asia_50'].get('signal', '')
-        if 'BELOW' in asia_signal or 'EQUILIBRIUM' in asia_signal:
-            conf = results['asia_50'].get('confidence', 0)
-            points = int(self.blocks['asia_50']['weight'] * conf / 100)
-            confluence += points
-            signals.append(f"Asia 50%: {asia_signal} ({conf}% → +{points})")
+        asia_conf = results['asia_50'].get('confidence', 0)
         
-        # Session Time (15 points) - REAL signals: LONDON_OPEN, NY_OPEN, etc.
+        if 'REJECTION' in asia_signal or 'SWEEP' in asia_signal:
+            # REJECTION/SWEEP = strong equilibrium interaction, full points
+            points = int(18 * asia_conf / 100)
+            confluence += points
+            signals.append(f"Asia 50%: {asia_signal} ({asia_conf}% → +{points})")
+            
+        elif 'AT' in asia_signal or 'EQUILIBRIUM' in asia_signal:
+            # AT EQUILIBRIUM = moderate signal, reduced points (max 12)
+            points = int(12 * asia_conf / 100)
+            confluence += points
+            signals.append(f"Asia 50%: {asia_signal} ({asia_conf}% → +{points})")
+            
+        elif 'BELOW' in asia_signal or 'ABOVE' in asia_signal:
+            # BELOW/ABOVE = weak signal, minimal points (max 8)
+            points = int(8 * asia_conf / 100)
+            confluence += points
+            signals.append(f"Asia 50%: {asia_signal} ({asia_conf}% → +{points})")
+        
+        # ===================================================================
+        # SESSION TIME (15 points max) - TIERED SCORING
+        # ===================================================================
         session_signal = results['session_time'].get('signal', '')
-        if session_signal and session_signal != 'NO_SIGNAL':
-            conf = results['session_time'].get('confidence', 0)
-            points = int(self.blocks['session_time']['weight'] * conf / 100)
-            confluence += points
-            signals.append(f"Session: {session_signal} ({conf}% → +{points})")
+        session_conf = results['session_time'].get('confidence', 0)
         
-        # VWAP (12 points) - REAL signals: BELOW_VWAP, ABOVE_VWAP
-        vwap_signal = results['vwap'].get('signal', '')
-        if vwap_signal == 'BELOW_VWAP':
-            conf = results['vwap'].get('confidence', 0)
-            points = int(self.blocks['vwap']['weight'] * conf / 100)
+        if session_signal and session_signal != 'NO_SIGNAL':
+            # High-volume sessions get more points
+            if 'OPEN' in session_signal or 'KZ' in session_signal:
+                # OPEN/Kill Zone = highest volume, full points
+                points = int(15 * session_conf / 100)
+            elif 'LONDON' in session_signal or 'NY' in session_signal:
+                # Active session = good volume, moderate points (max 12)
+                points = int(12 * session_conf / 100)
+            else:
+                # Other sessions = lower volume, reduced points (max 8)
+                points = int(8 * session_conf / 100)
+            
             confluence += points
-            signals.append(f"VWAP: {vwap_signal} ({conf}% → +{points})")
+            signals.append(f"Session: {session_signal} ({session_conf}% → +{points})")
+        
+        # ===================================================================
+        # VWAP (15 points max) - TIERED SCORING
+        # ===================================================================
+        vwap_signal = results['vwap'].get('signal', '')
+        vwap_conf = results['vwap'].get('confidence', 0)
+        
+        if vwap_signal == 'BELOW_VWAP':
+            # BELOW_VWAP = bearish institutional bias, full points
+            points = int(15 * vwap_conf / 100)
+            confluence += points
+            signals.append(f"VWAP: BELOW ({vwap_conf}% → +{points})")
+            
+        elif vwap_signal == 'AT_VWAP':
+            # AT_VWAP = moderate signal, reduced points (max 10)
+            points = int(10 * vwap_conf / 100)
+            confluence += points
+            signals.append(f"VWAP: AT_LEVEL ({vwap_conf}% → +{points})")
         
         return confluence, signals
     
