@@ -79,15 +79,8 @@ The 48x Innovation:
     parser.add_argument(
         '--multicore',
         action='store_true',
-        default=True,
-        help='Use multicore processing (default: enabled). Use --no-multicore to disable'
-    )
-    
-    parser.add_argument(
-        '--no-multicore',
-        dest='multicore',
-        action='store_false',
-        help='Disable multicore processing (use single core)'
+        default=False,
+        help='Use multicore processing (NOT RECOMMENDED: defeats 48x efficiency)'
     )
     
     args = parser.parse_args()
@@ -126,4 +119,5 @@ if __name__ == '__main__':
         print(f"\n❌ Fatal error: {e}")
         import traceback
         traceback.print_exc()
+        sys.exit(1)
         sys.exit(1)

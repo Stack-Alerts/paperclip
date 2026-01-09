@@ -111,11 +111,13 @@ def optimize_strategy_v2(
     
     # 5. Run MultiConfigSimulator (THE MAGIC!)
     if use_multicore:
-        print(f"\n🚀 Running MULTICORE optimization (48x + 8-10x = ~384-480x FASTER!)...")
-        print(f"   Processing data ONCE + distributing across CPU cores")
+        print(f"\n⚠️  Running MULTICORE optimization...")
+        print(f"   WARNING: This duplicates building block analysis across cores")
+        print(f"   For typical use, single-core is faster due to 48x efficiency")
     else:
-        print(f"\n🚀 Running 48x performance optimization...")
-        print(f"   Processing data ONCE, testing ALL configs simultaneously")
+        print(f"\n🚀 Running 48x OPTIMIZED single-core processing...")
+        print(f"   Processing data ONCE, testing ALL 48 configs simultaneously")
+        print(f"   This is FASTER than multicore for this use case!")
     
     start_time = time.time()
     
