@@ -471,30 +471,53 @@ class ConfluenceCalculator:
         # Calculate points based on tier type
         if 'points' in tier:
             # Fixed points (e.g., session timing)
+            # Still respect weight if provided
+            if weight is not None and 'max_points' in block_config:
+                scale_factor = weight / block_config['max_points']
+                return int(tier['points'] * scale_factor)
             return tier['points']
         
         elif 'quality_thresholds' in tier:
-            # Tiered by confidence thresholds
+            # Tiered by confidence thresholds - RESPECT WEIGHT!
+            # Find which tier we're in
+            base_points = 0
             for threshold_conf, threshold_points in tier['quality_thresholds']:
                 if confidence >= threshold_conf:
-                    return threshold_points
-            return 0
+                    base_points = threshold_points
+                    break
+            
+            # If weight provided, scale the points proportionally
+            if weight is not None and 'base_points' in tier:
+                scale_factor = weight / tier['base_points']
+                return int(base_points * scale_factor)
+            
+            return base_points
         
         elif 'formula' in tier and tier['formula'] == 'scaled':
-            # Scale base_points or max_points with confidence
-            if 'base_points' in tier:
-                base = tier['base_points']
-            elif 'max_points' in tier:
-                base = tier['max_points']
-            else:
-                base = max_points
+            # Scale with confidence, respecting weight parameter
             
-            # Apply max_points cap if specified in tier
+            # Determine the maximum points for this signal type
             if 'max_points' in tier:
-                base = min(base, tier['max_points'])
+                # Capped signal (e.g., OVERBOUGHT capped at 15)
+                tier_max = tier['max_points']
+            elif 'base_points' in tier:
+                # Use base_points from tier
+                tier_max = tier['base_points']
+            else:
+                # Fallback to block's max points
+                tier_max = block_config['max_points']
             
-            points = int(base * confidence / 100)
-            return min(points, max_points)  # Never exceed configured max
+            # If weight provided and different from tier max, scale proportionally
+            if weight is not None:
+                # Use weight as the actual maximum
+                effective_max = min(weight, tier_max) if 'max_points' in tier else weight
+            else:
+                effective_max = tier_max
+            
+            # Calculate points based on confidence percentage
+            points = int(effective_max * confidence / 100)
+            
+            return points
         
         else:
             # Fallback - default scaling
