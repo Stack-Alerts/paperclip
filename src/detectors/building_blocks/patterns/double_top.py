@@ -85,59 +85,61 @@ class DoubleTopPattern:
                 return True
         return False
     
-    def find_peaks(self, df: pd.DataFrame, rsi: pd.Series, min_prominence: float = 0.0125):
+    def find_peaks(self, df: pd.DataFrame, rsi: pd.Series, min_prominence: float = 0.008):
         """
-        Find SIGNIFICANT swing highs only - PHASE 1 STRICT
+        Find swing highs - RELAXED for better detection (90 M patterns expected in 180 days)
         
-        Requirements for a valid peak (MUST meet ALL):
-        1. Highest in 5-hour window (20 bars @ 15min) - REQUIRED
-        2. At least 1.25% above recent average (prominence) - REQUIRED
-        3. Volume spike (1.3x average) - REQUIRED  
-        4. Near recent resistance level - REQUIRED
-        5. Proper spacing from other peaks (8+ bars) - REQUIRED
+        ONLY REQUIRED:
+        1. Local high in window (highest in 2-hour period = 8 bars @ 15min)
+        2. Minimum 0.8% prominence above recent average (realistic threshold)
+        3. Proper spacing from other peaks (6+ bars to avoid noise)
+        
+        OPTIONAL (scored for quality, not required):
+        - Volume spike
+        - At resistance
+        - RSI levels
         """
         peaks = []
-        lookback = 20  # 5 hours @ 15min bars
+        lookback = 8  # 2 hours @ 15min bars (RELAXED from 20)
         
         for i in range(lookback, len(df) - lookback):
             high = df['high'].iloc[i]
             
-            # REQ 1: Must be highest in 5-hour window
-            if high != df['high'].iloc[i-lookback:i+lookback+1].max():
+            # REQ 1: Must be local high in 2-hour window (RELAXED)
+            window_high = df['high'].iloc[i-lookback:i+lookback+1].max()
+            if high < window_high * 0.995:  # Within 0.5% of window high is acceptable
                 continue
             
-            # REQ 2: Must be 1.25% above recent average (prominence) - PHASE 1: REQUIRED
+            # REQ 2: Must be 0.8% above recent average (RELAXED from 1.25%)
             recent_avg = df['high'].iloc[i-lookback:i].mean()
             if recent_avg == 0 or high < recent_avg * (1 + min_prominence):
                 continue
             
-            # REQ 3: Must have volume spike (1.3x average) - PHASE 1: REQUIRED
-            vol = df['volume'].iloc[i]
-            avg_vol = df['volume'].iloc[max(0, i-lookback):i].mean()
-            if avg_vol == 0 or vol < avg_vol * 1.3:
-                continue
-            
-            # REQ 4: Must be near recent resistance - PHASE 1: REQUIRED
-            recent_highs = df['high'].iloc[max(0, i-100):i].max()
-            if high < recent_highs * 0.98:  # Not within 2% of resistance
-                continue
-            
-            # REQ 5: Must have proper spacing from previous peaks - PHASE 1: NEW
+            # REQ 3: Must have proper spacing from previous peaks
             if len(peaks) > 0:
                 last_peak_idx = peaks[-1]['idx']
-                if i - last_peak_idx < self.MIN_PEAK_SPACING:
-                    continue  # Too close to previous peak
+                if i - last_peak_idx < 6:  # 6 bars = 1.5 hours (RELAXED from 8)
+                    # Too close - keep higher peak only
+                    if high > peaks[-1]['price']:
+                        peaks[-1] = {
+                            'idx': i,
+                            'price': high,
+                            'volume': df['volume'].iloc[i],
+                            'rsi': rsi.iloc[i] if i < len(rsi) else 50,
+                            'prominence': ((high / recent_avg) - 1) * 100
+                        }
+                    continue
             
-            # ALL requirements passed - add peak
+            # ONLY 3 requirements - add peak
+            # Other factors (volume, resistance) scored for quality, not required
             rsi_val = rsi.iloc[i] if i < len(rsi) else 50
             
             peaks.append({
                 'idx': i,
                 'price': high,
-                'volume': vol,
+                'volume': df['volume'].iloc[i],
                 'rsi': rsi_val,
-                'prominence': ((high / recent_avg) - 1) * 100,
-                'requirements_met': 5  # All 5 requirements met
+                'prominence': ((high / recent_avg) - 1) * 100
             })
         
         return peaks
@@ -296,15 +298,16 @@ class DoubleTopPattern:
             base_confidence += 5
             confluences.append(f"Good pattern duration ({bars_between} bars)")
         
-        # MINIMUM THRESHOLD: Require at least 4 confluences for institutional grade
-        if len(confluences) < self.MIN_CONFLUENCES:
+        # RELAXED THRESHOLD: Accept patterns with 2+ confluences
+        # Let the optimizer's confluence threshold (70+) filter for quality
+        if len(confluences) < 2:
             return {
                 'signal': 'NO_PATTERN',
                 'confidence': 0,
                 'metadata': {
                     'reason': 'Insufficient validation',
                     'confluences_found': len(confluences),
-                    'confluences_required': self.MIN_CONFLUENCES
+                    'confluences_required': 2
                 },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
