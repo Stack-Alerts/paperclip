@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
 
 from src.utils.Strategy_Builder import (
     StrategyRegistry, RegistryBridge, StrategyValidator,
-    StrategyConfiguration, BlockConfiguration, SignalConfiguration
+    StrategyConfiguration, BlockSelection, SignalConfiguration
 )
 
 
@@ -201,9 +201,13 @@ class StrategyCreatorDialog(QDialog):
         block_info = current.data(Qt.ItemDataRole.UserRole)
         
         # Create block configuration
-        block_config = BlockConfiguration(
+        block_config = BlockSelection(
             block_name=block_info.name,
+            block_display_name=block_info.display_name,
+            block_category=block_info.category,
+            block_type=block_info.block_type,
             weight=block_info.default_weight,
+            weight_range=block_info.weight_range,
             signals=[]
         )
         
@@ -333,10 +337,21 @@ class StrategyCreatorDialog(QDialog):
         strategy_name = self.name_edit.text().strip()
         if not strategy_name:
             raise ValueError("Strategy name is required")
-            
+        
+        if not self.selected_blocks:
+            raise ValueError("At least one block is required")
+        
+        # Get next strategy number
+        next_num = self.registry.get_next_strategy_number()
+        
+        # Use first block as main signal
+        main_signal = self.selected_blocks[0].block_name
+        
         return StrategyConfiguration(
             strategy_name=strategy_name,
+            strategy_number=next_num,
             strategy_category=self.category_combo.currentText(),
+            main_signal_block=main_signal,
             blocks=self.selected_blocks.copy()
         )
         
