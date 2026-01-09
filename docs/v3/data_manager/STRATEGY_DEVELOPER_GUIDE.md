@@ -25,6 +25,165 @@
 
 The Data Manager is an **intelligent data system** that provides seamless access to market data for strategy development, backtesting, paper trading, and live trading.
 
+---
+
+## ⚠️ CRITICAL: Centralized Confluence Calculator
+
+**AS OF JANUARY 9, 2026 - MANDATORY FOR ALL STRATEGIES**
+
+### The Problem We Fixed
+
+Previously, each strategy had its own `_calculate_confluence()` method with 400+ lines of duplicate scoring logic. This caused:
+- ❌ **Divergence Risk:** Optimizer and live strategies could score differently
+- ❌ **Maintenance Nightmare:** Update scoring? Change 15+ files
+- ❌ **Testing Inconsistency:** What you optimize ≠ what you get live
+- ❌ **Code Duplication:** Same logic repeated everywhere
+
+### The Solution: Centralized ConfluenceCalculator
+
+**Location:** `src/strategies/universal_optimizer/modules/confluence_calculator.py`
+
+**All strategies MUST use this shared module for confluence calculation.**
+
+### How To Use (Required Pattern)
+
+```python
+from nautilus_trader.trading.strategy import Strategy
+# ✅ CRITICAL: Import centralized calculator
+from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
+
+class MyStrategy(Strategy):
+    def __init__(self, config):
+        super().__init__(config)
+        
+        # Initialize BOTH detectors and block configs
+        self.detectors = {}  # For analysis
+        self.blocks = {}     # For scoring
+        self._initialize_blocks()
+    
+    def _initialize_blocks(self):
+        """Must initialize BOTH detectors and configs"""
+        from src.detectors.building_blocks.patterns.double_top import DoubleTopPattern
+        from src.detectors.building_blocks.oscillators.rsi_divergence import RSIDivergence
+        
+        # Detector instances (for running analysis)
+        self.detectors = {
+            'double_top': DoubleTopPattern(timeframe='15m'),
+            'rsi_divergence': RSIDivergence(timeframe='15m'),
+        }
+        
+        # Block configs (for confluence scoring)
+        self.blocks = {
+            'double_top': {
+                'name': 'DoubleTopPattern',
+                'weight': 30,
+                'enabled': True
+            },
+            'rsi_divergence': {
+                'name': 'RSIDivergence',
+                'weight': 25,
+                'enabled': True
+            },
+        }
+    
+    def _analyze_blocks(self, df):
+        """Run all building block analysis"""
+        results = {}
+        for name, detector in self.detectors.items():
+            results[name] = detector.analyze(df)
+        return results
+    
+    def _calculate_confluence(self, results: dict) -> tuple:
+        """
+        ✅ CORRECT: Use centralized calculator
+        
+        This ensures:
+        - Same scoring as Universal Optimizer
+        - Tiered scoring (BREAKDOWN vs FORMING different points)
+        - Tested and validated logic
+        - Easy maintenance
+        
+        Returns: (confluence_score, list_of_signals)
+        """
+        return ConfluenceCalculator.calculate_confluence(results, self.blocks)
+    
+    def on_bar(self, bar):
+        # Update dataframe...
+        df = self._update_dataframe(bar)
+        
+        # Analyze all blocks
+        results = self._analyze_blocks(df)
+        
+        # Calculate confluence using centralized module
+        confluence, signals = self._calculate_confluence(results)
+        
+        # Trade based on confluence
+        if confluence >= self.min_confluence:
+            self._execute_trade()
+```
+
+### What NOT To Do (Deprecated)
+
+```python
+# ❌ WRONG: Don't implement your own scoring logic
+def _calculate_confluence(self, results: dict) -> tuple:
+    confluence = 0
+    signals = []
+    
+    # 400+ lines of manual scoring...
+    if results['double_top']['signal'] == 'BEARISH_BREAKDOWN':
+        confluence += 30
+    # ... duplicate code that can diverge from optimizer
+    
+    return confluence, signals
+```
+
+### Benefits of Centralized Approach
+
+1. **Single Source of Truth**
+   - All scoring logic in ONE place
+   - Optimizer and strategies guaranteed to match
+   - What you optimize IS what you get live
+
+2. **Easier Maintenance**
+   - Add new block? Update ConfluenceCalculator once
+   - Works in ALL strategies immediately
+   - No need to update 15 strategy files
+
+3. **Tested & Validated**
+   - Tiered scoring system (BREAKDOWN vs FORMING get different points)
+   - Production-grade implementation
+   - Expert-reviewed scoring rules
+
+4. **Cleaner Code**
+   - Strategies ~400 lines shorter
+   - Easier to read and understand
+   - Less code = fewer bugs
+
+### Migration Guide
+
+If you have an existing strategy with manual confluence calculation:
+
+```python
+# 1. Add import
+from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
+
+# 2. Replace _calculate_confluence() method
+def _calculate_confluence(self, results: dict) -> tuple:
+    return ConfluenceCalculator.calculate_confluence(results, self.blocks)
+
+# 3. That's it! 400+ lines removed, consistency guaranteed
+```
+
+### For More Details
+
+See:
+- `docs/v3/building_blocks/BUILDING_BLOCKS_API_REFERENCE.md` (Section: CRITICAL: Use Centralized ConfluenceCalculator)
+- `src/strategies/universal_optimizer/modules/confluence_calculator.py` (Source code)
+- `src/strategies/strategy_01_reversal_m_pattern.py` (Example implementation)
+
+---
+
 **Key Features:**
 - ✅ **Simple API:** One function call for all your data needs
 - ✅ **Smart Routing:** Automatically selects best data source
