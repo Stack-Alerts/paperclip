@@ -1,0 +1,394 @@
+"""
+Strategy Generator - Code Generation Module
+
+Generates NautilusTrader strategy files, tests, and optimizer configs
+from validated StrategyConfiguration objects using Jinja2 templates.
+
+Author: Strategy Builder v1.0
+Date: 2026-01-09
+"""
+
+import ast
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+import re
+
+from jinja2 import Environment, FileSystemLoader, Template
+import yaml
+
+from src.utils.Strategy_Builder.models import StrategyConfiguration, BlockSelection
+
+
+class StrategyGenerator:
+    """
+    Generates strategy files from validated configurations
+    
+    Uses Jinja2 templates to create:
+    - NautilusTrader strategy Python files
+    - pytest test files
+    - Optimizer configuration YAML files
+    """
+    
+    def __init__(self, template_dir: Optional[Path] = None):
+        """
+        Initialize generator with template directory
+        
+        Args:
+            template_dir: Directory containing Jinja2 templates.
+                         Defaults to src/utils/Strategy_Builder/templates
+        """
+        if template_dir is None:
+            template_dir = Path(__file__).parent / 'templates'
+        
+        self.template_dir = Path(template_dir)
+        
+        # Initialize Jinja2 environment
+        self.env = Environment(
+            loader=FileSystemLoader(str(self.template_dir)),
+            trim_blocks=True,
+            lstrip_blocks=True
+        )
+        
+        # Load templates
+        self.strategy_template = self.env.get_template('strategy_template.py.j2')
+        self.test_template = self.env.get_template('test_template.py.j2')
+        self.optimizer_template = self.env.get_template('optimizer_config.yaml.j2')
+        
+    def generate_strategy_file(
+        self,
+        config: StrategyConfiguration,
+        output_dir: Optional[Path] = None
+    ) -> Path:
+        """
+        Generate NautilusTrader strategy Python file
+        
+        Args:
+            config: Validated strategy configuration
+            output_dir: Output directory (defaults to src/strategies/)
+            
+        Returns:
+            Path to generated strategy file
+        """
+        if output_dir is None:
+            output_dir = Path('src/strategies')
+        
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Prepare template context
+        context = self._prepare_context(config)
+        
+        # Render template
+        code = self.strategy_template.render(**context)
+        
+        # Generate filename
+        filename = f"strategy_{config.strategy_number:03d}_{config.strategy_name.lower().replace(' ', '_')}.py"
+        filepath = output_dir / filename
+        
+        # Save file
+        with open(filepath, 'w') as f:
+            f.write(code)
+        
+        # Validate syntax
+        if not self.validate_python_syntax(filepath):
+            raise SyntaxError(f"Generated strategy file has syntax errors: {filepath}")
+        
+        return filepath
+    
+    def generate_test_file(
+        self,
+        config: StrategyConfiguration,
+        output_dir: Optional[Path] = None
+    ) -> Path:
+        """
+        Generate pytest test file
+        
+        Args:
+            config: Validated strategy configuration
+            output_dir: Output directory (defaults to tests/strategies/)
+            
+        Returns:
+            Path to generated test file
+        """
+        if output_dir is None:
+            output_dir = Path('tests/strategies')
+        
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Prepare template context
+        context = self._prepare_context(config)
+        
+        # Render template
+        code = self.test_template.render(**context)
+        
+        # Generate filename
+        filename = f"test_{config.strategy_number:03d}_{config.strategy_name.lower().replace(' ', '_')}.py"
+        filepath = output_dir / filename
+        
+        # Save file
+        with open(filepath, 'w') as f:
+            f.write(code)
+        
+        # Validate syntax
+        if not self.validate_python_syntax(filepath):
+            raise SyntaxError(f"Generated test file has syntax errors: {filepath}")
+        
+        return filepath
+    
+    def generate_optimizer_config(
+        self,
+        config: StrategyConfiguration,
+        output_dir: Optional[Path] = None
+    ) -> Path:
+        """
+        Generate optimizer configuration YAML file
+        
+        Args:
+            config: Validated strategy configuration
+            output_dir: Output directory (defaults to config/)
+            
+        Returns:
+            Path to generated config file
+        """
+        if output_dir is None:
+            output_dir = Path('config')
+        
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Prepare template context
+        context = self._prepare_context(config)
+        
+        # Render template
+        yaml_content = self.optimizer_template.render(**context)
+        
+        # Generate filename
+        filename = f"optimizer_{config.strategy_number:03d}_{config.strategy_name.lower().replace(' ', '_')}.yaml"
+        filepath = output_dir / filename
+        
+        # Save file
+        with open(filepath, 'w') as f:
+            f.write(yaml_content)
+        
+        # Validate YAML syntax
+        if not self.validate_yaml_syntax(filepath):
+            raise ValueError(f"Generated config file has YAML syntax errors: {filepath}")
+        
+        return filepath
+    
+    def generate_all(
+        self,
+        config: StrategyConfiguration,
+        strategy_dir: Optional[Path] = None,
+        test_dir: Optional[Path] = None,
+        config_dir: Optional[Path] = None
+    ) -> Dict[str, Path]:
+        """
+        Generate all files at once
+        
+        Args:
+            config: Validated strategy configuration
+            strategy_dir: Strategy output directory
+            test_dir: Test output directory
+            config_dir: Config output directory
+            
+        Returns:
+            Dictionary with paths to all generated files
+        """
+        return {
+            'strategy': self.generate_strategy_file(config, strategy_dir),
+            'test': self.generate_test_file(config, test_dir),
+            'optimizer': self.generate_optimizer_config(config, config_dir)
+        }
+    
+    def _prepare_context(self, config: StrategyConfiguration) -> Dict[str, Any]:
+        """
+        Prepare template context data
+        
+        Args:
+            config: Strategy configuration
+            
+        Returns:
+            Dictionary of context variables for templates
+        """
+        # Generate class name (PascalCase)
+        class_name = self._generate_class_name(config.strategy_name)
+        
+        # Generate filename (snake_case)
+        filename = f"strategy_{config.strategy_number:03d}_{config.strategy_name.lower().replace(' ', '_')}"
+        
+        # Generate imports
+        imports = self._generate_imports(config.blocks)
+        
+        # Prepare context
+        context = {
+            'config': config,
+            'class_name': class_name,
+            'filename': filename,
+            'imports': imports,
+            'generation_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        }
+        
+        return context
+    
+    def _generate_class_name(self, strategy_name: str) -> str:
+        """
+        Generate PascalCase class name from strategy name
+        
+        Args:
+            strategy_name: Strategy name (may have spaces, underscores)
+            
+        Returns:
+            PascalCase class name
+            
+        Examples:
+            "reversal m pattern" -> "ReversalMPattern"
+            "ema_trend_following" -> "EmaTrendFollowing"
+        """
+        # Split on spaces and underscores
+        words = re.split(r'[\s_]+', strategy_name)
+        
+        # Capitalize each word
+        class_name = ''.join(word.capitalize() for word in words if word)
+        
+        return class_name
+    
+    def _generate_imports(self, blocks: List[BlockSelection]) -> List[str]:
+        """
+        Generate import statements for building blocks
+        
+        Args:
+            blocks: List of selected building blocks
+            
+        Returns:
+            List of import statement strings
+        """
+        imports = []
+        seen = set()  # Track unique imports
+        
+        # Import mapping (block_name -> (module_path, class_name))
+        # This should be generated from registry in production
+        # For now, using common mapping
+        block_import_map = {
+            'double_top': ('src.detectors.building_blocks.patterns.double_top', 'DoubleTopPattern'),
+            'double_bottom': ('src.detectors.building_blocks.patterns.double_bottom', 'DoubleBottomPattern'),
+            'rsi_divergence': ('src.detectors.building_blocks.oscillators.rsi_divergence', 'RSIDivergence'),
+            'hod': ('src.detectors.building_blocks.price_levels.hod', 'HOD'),
+            'lod': ('src.detectors.building_blocks.price_levels.lod', 'LOD'),
+            'vwap': ('src.detectors.building_blocks.institutional.vwap', 'VWAP'),
+            'ema_200_trend': ('src.detectors.building_blocks.moving_averages.ema_200_trend', 'EMA200Trend'),
+            'ema_20_50_trend': ('src.detectors.building_blocks.moving_averages.ema_20_50_trend', 'EMA2050Trend'),
+        }
+        
+        for block in blocks:
+            block_name = block.block_name
+            
+            # Get import info from map or generate it
+            if block_name in block_import_map:
+                module_path, class_name = block_import_map[block_name]
+            else:
+                # Generate import path from block category and name
+                category_slug = block.block_category.lower().replace(' ', '_')
+                module_path = f'src.detectors.building_blocks.{category_slug}.{block_name}'
+                
+                # Generate class name (PascalCase)
+                class_name = self._generate_class_name(block_name)
+            
+            # Create import statement
+            import_stmt = f"from {module_path} import {class_name}"
+            
+            # Add if not duplicate
+            if import_stmt not in seen:
+                imports.append(import_stmt)
+                seen.add(import_stmt)
+        
+        return sorted(imports)  # Sort for consistency
+    
+    def validate_python_syntax(self, filepath: Path) -> bool:
+        """
+        Validate Python file syntax
+        
+        Args:
+            filepath: Path to Python file
+            
+        Returns:
+            True if syntax is valid, False otherwise
+        """
+        try:
+            with open(filepath, 'r') as f:
+                code = f.read()
+            
+            # Try to parse as AST
+            ast.parse(code)
+            return True
+            
+        except SyntaxError as e:
+            print(f"Syntax error in {filepath}: {e}")
+            return False
+        except Exception as e:
+            print(f"Error validating {filepath}: {e}")
+            return False
+    
+    def validate_yaml_syntax(self, filepath: Path) -> bool:
+        """
+        Validate YAML file syntax
+        
+        Args:
+            filepath: Path to YAML file
+            
+        Returns:
+            True if syntax is valid, False otherwise
+        """
+        try:
+            with open(filepath, 'r') as f:
+                yaml.safe_load(f)
+            return True
+            
+        except yaml.YAMLError as e:
+            print(f"YAML error in {filepath}: {e}")
+            return False
+        except Exception as e:
+            print(f"Error validating {filepath}: {e}")
+            return False
+    
+    def dry_run(
+        self,
+        config: StrategyConfiguration
+    ) -> Dict[str, str]:
+        """
+        Perform dry run (render templates without saving)
+        
+        Args:
+            config: Strategy configuration
+            
+        Returns:
+            Dictionary with rendered code for each file type
+        """
+        context = self._prepare_context(config)
+        
+        return {
+            'strategy': self.strategy_template.render(**context),
+            'test': self.test_template.render(**context),
+            'optimizer': self.optimizer_template.render(**context)
+        }
+
+
+# Convenience function
+def generate_strategy(
+    config: StrategyConfiguration,
+    validate: bool = True
+) -> Dict[str, Path]:
+    """
+    Convenience function to generate all files from config
+    
+    Args:
+        config: Strategy configuration
+        validate: Whether to validate syntax
+        
+    Returns:
+        Dictionary with paths to generated files
+    """
+    generator = StrategyGenerator()
+    return generator.generate_all(config)
