@@ -361,31 +361,35 @@ class ConfluenceCalculator:
         'swing_points': {
             'max_points': 15,
             'tiers': {
-                'SWING_HIGH': {
+                # Match actual detector signal names!
+                'MAJOR_SWING_HIGH_DETECTED': {
                     'base_points': 15,
                     'formula': 'scaled'
                 },
-                'SWING_LOW': {
+                'MAJOR_SWING_LOW_DETECTED': {
                     'base_points': 15,
                     'formula': 'scaled'
                 },
-                'MAJOR_HIGH': {
+                'SWING_HIGH_DETECTED': {
                     'base_points': 15,
                     'formula': 'scaled'
                 },
-                'MAJOR_LOW': {
+                'SWING_LOW_DETECTED': {
                     'base_points': 15,
                     'formula': 'scaled'
                 },
-                'MINOR_HIGH': {
+                'MINOR_SWING_HIGH_DETECTED': {
                     'max_points': 10,
                     'formula': 'scaled'
                 },
-                'MINOR_LOW': {
+                'MINOR_SWING_LOW_DETECTED': {
                     'max_points': 10,
                     'formula': 'scaled'
                 },
-                'NO_SWING': {
+                'NO_SWINGS': {
+                    'points': 0
+                },
+                'INSUFFICIENT_DATA': {
                     'points': 0
                 }
             }
@@ -394,19 +398,23 @@ class ConfluenceCalculator:
         'premium_discount_zones': {
             'max_points': 14,
             'tiers': {
-                'PREMIUM_ZONE': {
+                # Match actual detector signal names!
+                'PRICE_IN_PREMIUM': {
                     'base_points': 14,  # Bearish bias - price in premium
                     'formula': 'scaled'
                 },
-                'DISCOUNT_ZONE': {
+                'PRICE_IN_DISCOUNT': {
                     'base_points': 14,  # Bullish bias - price in discount
                     'formula': 'scaled'
                 },
-                'EQUILIBRIUM': {
+                'AT_EQUILIBRIUM': {
                     'max_points': 8,  # Neutral - at equilibrium
                     'formula': 'scaled'
                 },
                 'NO_ZONE': {
+                    'points': 0
+                },
+                'INSUFFICIENT_DATA': {
                     'points': 0
                 }
             }
