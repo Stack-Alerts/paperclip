@@ -1,18 +1,14 @@
 """
-LOD (Low of Day) Building Block
+LOD (Low of Day) Building Block - UPDATED 2026-01-09
 Category: Price Levels
-Purpose: Daily low price level for support/resistance and breakdown detection
-"""
-"""
-Building Block Classification: CONTEXT BLOCK
-Mode: CONTINUOUS
-Purpose: Continuous low of day level
+Purpose: YESTERDAY'S low price level for support/resistance
 
-Block Type Definitions:
-- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
-- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
-- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
-- HYBRID BLOCK: Combination of continuous state + selective events
+IMPORTANT: This block now tracks YESTERDAY's low, not today's.
+For today's low, use ILOD (Intraday Low of Day).
+
+Changes (2026-01-09):
+- LOD = Yesterday's low (static daily reference)
+- ILOD = Today's low (dynamic, updates intraday)
 """
 
 
@@ -114,19 +110,41 @@ class LOD:
         }
     
     def calculate_lod(self, df: pd.DataFrame) -> float:
-        """Calculate Low of Day from intraday data"""
+        """
+        Calculate YESTERDAY's Low of Day
+        
+        UPDATED 2026-01-09: Now calculates YESTERDAY's low (static reference)
+        For today's low, use ILOD building block.
+        """
         if 'timestamp' not in df.columns or 'low' not in df.columns:
             return None
         
         current_time = df['timestamp'].iloc[-1]
         current_date = current_time.date()
         
-        today_data = df[df['timestamp'].dt.date == current_date]
+        # Calculate yesterday's date
+        from datetime import timedelta
+        yesterday_date = current_date - timedelta(days=1)
         
-        if len(today_data) == 0:
-            return None
+        # Filter for YESTERDAY's data only
+        yesterday_data = df[df['timestamp'].dt.date == yesterday_date]
         
-        return float(today_data['low'].min())
+        if len(yesterday_data) == 0:
+            # No yesterday data - try most recent previous day
+            available_dates = df['timestamp'].dt.date.unique()
+            available_dates = sorted([d for d in available_dates if d < current_date])
+            
+            if len(available_dates) == 0:
+                return None
+            
+            prev_date = available_dates[-1]
+            yesterday_data = df[df['timestamp'].dt.date == prev_date]
+            
+            if len(yesterday_data) == 0:
+                return None
+        
+        # Return YESTERDAY's lowest low (static for the day)
+        return float(yesterday_data['low'].min())
     
     def detect_breakdown(self, current_price: float, lod: float, prev_lod: float = None, threshold_pct: float = 0.05) -> Dict[str, Any]:
         """
@@ -468,4 +486,3 @@ if __name__ == "__main__":
     for factor in result['confluence_factors']:
         print(f"  - {factor}")
     print("=" * 80)
-    print(f"\nConfluence Factors:")
