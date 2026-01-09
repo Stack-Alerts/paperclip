@@ -29,7 +29,8 @@ from typing import List, Dict, Tuple
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 import pickle
-from .data_classes import OptimizationConfig, ConfigPerformance
+from .data_classes import OptimizationConfig, ConfigPerformance, TradeResult
+from datetime import datetime
 
 
 def process_bar_chunk(args):
@@ -240,6 +241,25 @@ def test_single_config(args):
     largest_win = max(wins) if wins else 0.0
     largest_loss = min(losses) if losses else 0.0
     
+    # Convert trades to TradeResult objects
+    trade_results = []
+    for t in trades:
+        pnl_pct = (t['net_pnl'] / t['entry_price']) * 100
+        trade_result = TradeResult(
+            entry_time=t['entry_time'],
+            exit_time=t['exit_time'],
+            entry_price=t['entry_price'],
+            exit_price=t['exit_price'],
+            side=config.side,
+            pnl=t['pnl'],
+            pnl_pct=pnl_pct,
+            fees=t['fee'],
+            net_pnl=t['net_pnl'],
+            confluence=t['confluence'],
+            reason=f"Held {t['bars_held']} bars"
+        )
+        trade_results.append(trade_result)
+    
     return ConfigPerformance(
         config_id=config.config_id,
         total_trades=total_trades,
@@ -256,7 +276,8 @@ def test_single_config(args):
         avg_win=avg_win,
         avg_loss=avg_loss,
         largest_win=largest_win,
-        largest_loss=largest_loss
+        largest_loss=largest_loss,
+        trades=trade_results
     )
 
 
