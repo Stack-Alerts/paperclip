@@ -1,18 +1,14 @@
 """
-HOD (High of Day) Building Block
+HOD (High of Day) Building Block - UPDATED 2026-01-09
 Category: Price Levels
-Purpose: Daily high price level for support/resistance and breakout detection
-"""
-"""
-Building Block Classification: CONTEXT BLOCK
-Mode: CONTINUOUS
-Purpose: Continuous high of day level
+Purpose: YESTERDAY'S high price level for support/resistance
 
-Block Type Definitions:
-- SIGNAL BLOCK: Event-driven entry/exit signals (selective, fires on specific conditions)
-- CONTEXT BLOCK: Continuous state provider (always active, used for confluence/reference)
-- EVENT BLOCK: Specific market event detection (selective, fires when events occur)
-- HYBRID BLOCK: Combination of continuous state + selective events
+IMPORTANT: This block now tracks YESTERDAY's high, not today's.
+For today's high, use IHOD (Intraday High of Day).
+
+Changes (2026-01-09):
+- HOD = Yesterday's high (static daily reference)
+- IHOD = Today's high (dynamic, updates intraday)
 """
 
 
@@ -115,17 +111,16 @@ class HOD:
     
     def calculate_hod(self, df: pd.DataFrame) -> float:
         """
-        Calculate High of Day from intraday data
+        Calculate YESTERDAY's High of Day
         
-        CRITICAL FIX: Must look at COMPLETE data for the day, not just expanding window
-        In walk-forward testing, we only have data UP TO current bar, so HOD is 
-        the highest high seen SO FAR today (not complete day's HOD).
+        UPDATED 2026-01-09: Now calculates YESTERDAY's high (static reference)
+        For today's high, use IHOD building block.
         
         Args:
             df: DataFrame with timestamp and high columns
             
         Returns:
-            HOD value (highest high SO FAR today)
+            Yesterday's HOD value (static for the day)
         """
         if 'timestamp' not in df.columns or 'high' not in df.columns:
             return None
@@ -134,16 +129,30 @@ class HOD:
         current_time = df['timestamp'].iloc[-1]
         current_date = current_time.date()
         
-        # Filter for today's data (all bars we have for today so far)
-        today_data = df[df['timestamp'].dt.date == current_date]
+        # Calculate yesterday's date
+        from datetime import timedelta
+        yesterday_date = current_date - timedelta(days=1)
         
-        if len(today_data) == 0:
-            return None
+        # Filter for YESTERDAY's data only
+        yesterday_data = df[df['timestamp'].dt.date == yesterday_date]
         
-        # Return highest high seen SO FAR today
-        # NOTE: In live/walk-forward, this updates as new highs are made
-        # This is CORRECT behavior for HOD tracking
-        return float(today_data['high'].max())
+        if len(yesterday_data) == 0:
+            # No yesterday data available - try to get most recent previous day
+            available_dates = df['timestamp'].dt.date.unique()
+            available_dates = sorted([d for d in available_dates if d < current_date])
+            
+            if len(available_dates) == 0:
+                return None
+            
+            # Use most recent previous day
+            prev_date = available_dates[-1]
+            yesterday_data = df[df['timestamp'].dt.date == prev_date]
+            
+            if len(yesterday_data) == 0:
+                return None
+        
+        # Return YESTERDAY's highest high (static for the day)
+        return float(yesterday_data['high'].max())
     
     def detect_breakout(self, current_price: float, hod: float, prev_hod: float = None, threshold_pct: float = 0.05) -> Dict[str, Any]:
         """
