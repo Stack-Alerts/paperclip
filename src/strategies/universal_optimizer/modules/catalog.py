@@ -48,12 +48,13 @@ BUILDING_BLOCK_CATALOG = {
     'swing_breakout': {'category': 'patterns', 'type': 'EVENT', 'weight_range': (12, 20)},
     'initial_balance_breakout': {'category': 'patterns', 'type': 'EVENT', 'weight_range': (12, 20)},
     
-    # Price Levels (6)
+    # Price Levels (7)
     'hod': {'category': 'price_levels', 'type': 'CONTEXT', 'weight_range': (15, 25)},
     'how': {'category': 'price_levels', 'type': 'CONTEXT', 'weight_range': (12, 22)},
     'lod': {'category': 'price_levels', 'type': 'CONTEXT', 'weight_range': (15, 25)},
     'low': {'category': 'price_levels', 'type': 'CONTEXT', 'weight_range': (12, 22)},
     'asia_50': {'category': 'price_levels', 'type': 'CONTEXT', 'weight_range': (12, 22)},
+    'asia_session_50_percent': {'category': 'price_levels', 'type': 'CONTEXT', 'weight_range': (12, 22)},
     'us_settlement': {'category': 'price_levels', 'type': 'CONTEXT', 'weight_range': (10, 18)},
     
     # SMC/ICT (9)
