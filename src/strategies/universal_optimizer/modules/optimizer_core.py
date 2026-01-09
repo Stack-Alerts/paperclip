@@ -109,11 +109,12 @@ def optimize_strategy_v2(
     configs = build_optimization_configs(blocks, strategy_module_name)
     print(f"✅ Created {len(configs)} parameter combinations")
     
-    # 5. Run Hybrid Optimizer (THE BEST OF BOTH WORLDS!)
-    print(f"\n🚀 Running HYBRID optimization (Phase 1 + Phase 2)...")
-    print(f"   Phase 1: Pre-compute building blocks ONCE (single-core, ~60 sec)")
-    print(f"   Phase 2: Test 48 configs in PARALLEL (multicore, ~0.3 sec)")
-    print(f"   Total: ~60 seconds (vs 2-3 min single, vs 30-40 min bad multicore)")
+    # 5. Run ULTRA Hybrid Optimizer (MAXIMUM PARALLEL!)
+    print(f"\n🚀 Running ULTRA HYBRID optimization (3 phases, ALL parallel!)...")
+    print(f"   Phase 1: Pre-compute blocks PARALLEL (32 cores, ~35 sec)")
+    print(f"   Phase 2: Merge results (single-core, <1 sec)")
+    print(f"   Phase 3: Test 48 configs PARALLEL (32 cores, ~0.3 sec)")
+    print(f"   Total: ~35 seconds (vs 18 min single-core!)")
     
     start_time = time.time()
     
@@ -249,8 +250,7 @@ def run_multi_config_optimization(
     Hybrid = building blocks once + parallel config testing = BEST performance!
     """
     
-    # Always use hybrid (it's the best approach)
-    from .hybrid_simulator import HybridConfigSimulator
-    hybrid_sim = HybridConfigSimulator()
-    return hybrid_sim.optimize(configs, warmup_df, test_df, strategy_module_name)
-    # Otherwise use single-core version (still 48x faster!)
+    # Use ultra hybrid for maximum parallel performance!
+    from .ultra_hybrid_simulator import UltraHybridSimulator
+    ultra_sim = UltraHybridSimulator()
+    return ultra_sim.optimize(configs, warmup_df, test_df, strategy_module_name)
