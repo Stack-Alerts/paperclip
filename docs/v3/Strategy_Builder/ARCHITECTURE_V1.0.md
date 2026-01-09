@@ -376,11 +376,148 @@ class StrategyRegistry:
         """Ensure unique strategy names"""
 ```
 
+### Component 7: Quick Validation Tester (NEW!)
+
+**Purpose:** Run preliminary optimizer tests during strategy development
+
+**User Need:** Get immediate feedback on strategy potential without finalizing it
+
+```python
+class QuickValidationTester:
+    """
+    Lightweight validator that runs optimizer on draft strategies
+    
+    Features:
+    - Run tests on incomplete strategies
+    - Multiple test period options (15, 30, 180 days)
+    - Streamlined results (basic metrics only)
+    - Fast execution (single config or few permutations)
+    - Clear go/no-go feedback
+    """
+    
+    def __init__(self, strategy_config: StrategyConfiguration):
+        self.config = strategy_config
+        self.optimizer = UniversalOptimizerV2()
+    
+    def quick_test(self, 
+                   test_days: int = 30,
+                   test_type: str = 'SINGLE') -> QuickTestResult:
+        """
+        Run quick validation test
+        
+        Args:
+            test_days: 15, 30, 90, or 180 days
+            test_type: 
+                'SINGLE' - Just test current weights (fastest)
+                'LIGHT' - Test 4-8 configs (quick optimization)
+                'FULL' - Test all 48 configs (full optimization)
+        
+        Returns:
+            QuickTestResult with basic metrics
+        """
+    
+    def generate_temp_strategy(self) -> Path:
+        """Generate temporary strategy file for testing"""
+    
+    def parse_results(self, optimizer_output) -> QuickTestResult:
+        """Parse optimizer results into simple metrics"""
+    
+    def cleanup_temp_files(self):
+        """Clean up temporary files after test"""
+
+
+@dataclass
+class QuickTestResult:
+    """Results from quick validation test"""
+    test_passed: bool
+    test_type: str  # 'SINGLE', 'LIGHT', 'FULL'
+    test_days: int
+    
+    # Basic Metrics
+    total_trades: int
+    win_rate: float
+    profit_factor: float
+    net_pnl: float
+    net_pnl_pct: float
+    max_drawdown_pct: float
+    sharpe_ratio: float
+    
+    # Trade Analysis
+    avg_trade_duration: str
+    largest_win: float
+    largest_loss: float
+    
+    # Recommendation
+    recommendation: str  # 'PROMISING', 'NEEDS_WORK', 'FAILED'
+    issues: List[str]
+    suggestions: List[str]
+    
+    # Full Results (optional)
+    detailed_results: Optional[Dict] = None
+    
+    def get_summary(self) -> str:
+        """Get human-readable summary"""
+        if self.recommendation == 'PROMISING':
+            return f"✅ Strategy shows promise! {self.total_trades} trades, {self.win_rate:.1f}% win rate"
+        elif self.recommendation == 'NEEDS_WORK':
+            return f"⚠️ Needs improvement. {', '.join(self.issues)}"
+        else:
+            return f"❌ Strategy failed. {', '.join(self.issues)}"
+```
+
+**UI Integration:**
+
+```
+Configuration Panel (Right Side)
+│
+├── Quick Validation Testing
+│   ├── [Quick Test ⚡]  ← Main button
+│   │   └─▶ Opens test dialog
+│   │
+│   └── Test Dialog:
+│       ├── Test Period: [30 days ▼]
+│       │   Options: 15, 30, 90, 180 days
+│       │
+│       ├── Test Type: [LIGHT ▼]
+│       │   • SINGLE (30 sec)
+│       │   • LIGHT (2-3 min)
+│       │   • FULL (5-10 min)
+│       │
+│       ├── [▶ Run Test]
+│       │
+│       └── Results Display:
+│           ╔═══════════════════════════════════╗
+│           ║ ✅ Test Complete (30 days)       ║
+│           ╠═══════════════════════════════════╣
+│           ║ Trades: 18                        ║
+│           ║ Win Rate: 61.1%                   ║
+│           ║ Net PnL: +$1,234 (+12.3%)        ║
+│           ║ Max DD: -8.4%                     ║
+│           ║ Sharpe: 1.45                      ║
+│           ║                                   ║
+│           ║ ✅ PROMISING STRATEGY             ║
+│           ║                                   ║
+│           ║ Suggestions:                      ║
+│           ║ • Add volatility filter           ║
+│           ║ • Test longer timeframes          ║
+│           ║                                   ║
+│           ║ [View Details] [Save Strategy]   ║
+│           ╚═══════════════════════════════════╝
+```
+
+**Benefits:**
+
+1. **Immediate Feedback** - Know if strategy has potential in minutes
+2. **Iterative Development** - Test → Adjust → Test → Adjust cycle
+3. **Confidence Building** - Don't finalize bad strategies
+4. **Time Saving** - Catch issues early before full optimization
+5. **Learning Tool** - See which blocks contribute most
+
 ---
 
 ## 🔄 User Workflow
 
-### Workflow 1: Create New Strategy
+### Workflow 1: Create New Strategy (with Quick Testing)
 
 ```
 1. Launch Builder
@@ -408,13 +545,44 @@ class StrategyRegistry:
    │   └─ ☑ BELOW_HOD → Role: TEST_ALL 🧪
    │       (Marks for optimizer permutation testing)
    │
-4. Configure Strategy Parameters
+4. Quick Test Strategy (NEW! ⚡)
+   │
+   ├─▶ Click "Quick Test ⚡"
+   │   │
+   │   ├─▶ Select test period: [30 days]
+   │   ├─▶ Select test type: [LIGHT]
+   │   ├─▶ Click "Run Test"
+   │   │
+   │   └─▶ Results appear in 2-3 minutes:
+   │       ╔═══════════════════════════════════════╗
+   │       ║ ✅ Test Complete (30 days, LIGHT)    ║
+   │       ╠═══════════════════════════════════════╣
+   │       ║ Trades: 18                            ║
+   │       ║ Win Rate: 61.1%                       ║
+   │       ║ Net PnL: +$1,234 (+12.3%)            ║
+   │       ║ Max DD: -8.4%                         ║
+   │       ║ Sharpe: 1.45                          ║
+   │       ║                                       ║
+   │       ║ ✅ PROMISING STRATEGY                 ║
+   │       ║                                       ║
+   │       ║ Suggestions:                          ║
+   │       ║ • Add momentum filter                 ║
+   │       ║ • Consider EMA 200 context            ║
+   │       ╚═══════════════════════════════════════╝
+   │
+   ├─▶ Decide based on results:
+   │   │
+   │   ├─▶ If PROMISING → Continue to step 5
+   │   ├─▶ If NEEDS_WORK → Add suggested blocks, re-test
+   │   └─▶ If FAILED → Redesign main signal
+   │
+5. Configure Strategy Parameters
    │
    ├─▶ Min Confluence: 70
    ├─▶ Risk:Reward: 1:3
    └─▶ Enable optimization: ☑
    │
-5. Validate & Save
+6. Validate & Save
    │
    ├─▶ Click "Validate"
    │   ├─ ✅ All blocks exist in registry
@@ -428,13 +596,50 @@ class StrategyRegistry:
    │   ├─ Updates strategy registry
    │   └─ Shows: "✅ Strategy saved successfully!"
    │
-6. Run Optimization (Optional)
+7. Run Full Optimization (Optional)
    │
    └─▶ Click "Run Optimizer"
        ├─ Launches universal_optimizer_v2
-       ├─ Tests all TEST_ALL permutations
+       ├─ Tests all 48 configs + TEST_ALL permutations
        ├─ Finds optimal weights
        └─ Updates strategy file with results
+```
+
+### Workflow 1b: Iterative Testing (Rapid Prototyping)
+
+```
+User wants to quickly test multiple variations:
+
+1. Create initial strategy (2 blocks: Double Top + HOD)
+   │
+   ├─▶ Quick Test (30 days, SINGLE)
+   └─▶ Result: ⚠️ NEEDS_WORK - "Low confluence, only 8 trades"
+   
+2. Add RSI Divergence block
+   │
+   ├─▶ Quick Test (30 days, SINGLE)
+   └─▶ Result: ✅ PROMISING - "18 trades, 61% win rate"
+   
+3. Add EMA 200 Trend context
+   │
+   ├─▶ Quick Test (30 days, SINGLE)
+   └─▶ Result: ✅ PROMISING - "Better! 22 trades, 68% win rate"
+   
+4. Add Session Time filter
+   │
+   ├─▶ Quick Test (30 days, SINGLE)  
+   └─▶ Result: ⚠️ NEEDS_WORK - "Too restrictive, only 12 trades"
+   
+5. Remove Session Time, add VWAP instead
+   │
+   ├─▶ Quick Test (30 days, LIGHT) ← Test 4 weight combos
+   └─▶ Result: ✅ PROMISING - "Best config: 25 trades, 72% win rate!"
+   
+6. Satisfied with results → Save strategy
+   
+7. Later run full optimization (180 days, 48 configs)
+
+Total time: ~15 minutes of quick testing vs hours of blind development
 ```
 
 ### Workflow 2: Edit Existing Strategy
