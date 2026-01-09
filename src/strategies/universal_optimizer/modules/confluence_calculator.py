@@ -16,6 +16,10 @@ Status: Production-Ready (Registry-Powered)
 
 from typing import Dict, Any, List, Tuple
 
+# CRITICAL: Import all block modules to trigger @register_block decorators
+# This ensures BlockRegistry knows about all blocks before scoring
+import src.detectors.building_blocks.price_levels  # Triggers HOD, LOD, IHOD, ILOD, 50% blocks
+
 
 class ConfluenceCalculator:
     """
