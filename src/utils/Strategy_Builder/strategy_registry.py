@@ -133,7 +133,7 @@ class StrategyRegistry:
         config: StrategyConfiguration,
         validate: bool = True,
         overwrite: bool = False
-    ) -> Path:
+    ) -> int:
         """
         Save strategy configuration to JSON
         
@@ -143,7 +143,7 @@ class StrategyRegistry:
             overwrite: Whether to overwrite existing file (default: False)
             
         Returns:
-            Path to saved file
+            Strategy number (int) of saved strategy
             
         Raises:
             ValueError: If validation fails or file exists without overwrite
@@ -179,7 +179,7 @@ class StrategyRegistry:
             json.dump(strategy_dict, f, indent=2)
         
         logger.info(f"Strategy saved: {filepath.name}")
-        return filepath
+        return config.strategy_number
     
     def load_strategy(self, strategy_number: int) -> Optional[StrategyConfiguration]:
         """
