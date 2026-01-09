@@ -71,6 +71,10 @@ def optimize_strategy_v2(
     print(f"📅 Test Period: {test_days} days")
     print(f"🔥 Warmup: {warmup_bars} bars")
     
+    # 0. Archive previous results before starting
+    print(f"\n📁 Archiving previous optimization results...")
+    archive_previous_results(strategy_module_name)
+    
     # 1. Extract & validate blocks
     print(f"\n🔍 Extracting building blocks...")
     blocks = extract_blocks_from_strategy(strategy_module_name)
@@ -618,3 +622,59 @@ def auto_adjust_configs(
     print(f"   ✅ Created {len(adjusted_configs)} adjusted configurations")
     
     return adjusted_configs
+
+
+def archive_previous_results(strategy_name: str, max_archives: int = 5):
+    """
+    Archive previous optimization results before starting new run
+    
+    Keeps results organized and prevents confusion with old data.
+    Maintains last 5 archived versions, deletes older ones.
+    
+    Args:
+        strategy_name: Strategy module name
+        max_archives: Maximum number of archives to keep (default 5)
+    """
+    from pathlib import Path
+    from datetime import datetime
+    import shutil
+    
+    # Results directory
+    results_dir = Path('data') / 'reports' / 'strategies' / 'universal_optimizer' / strategy_name
+    
+    # Check if results exist
+    if not results_dir.exists() or not any(results_dir.iterdir()):
+        print(f"   ℹ️  No previous results to archive")
+        return
+    
+    # Archive directory
+    archive_base = Path('data') / 'reports' / 'strategies' / 'universal_optimizer' / f'{strategy_name}_archives'
+    archive_base.mkdir(parents=True, exist_ok=True)
+    
+    # Create timestamped archive name
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    archive_name = f'archive_{timestamp}'
+    archive_path = archive_base / archive_name
+    
+    try:
+        # Move current results to archive
+        shutil.move(str(results_dir), str(archive_path))
+        print(f"   ✅ Archived previous results → {archive_name}")
+        
+        # Clean up old archives (keep only last max_archives)
+        archives = sorted(archive_base.glob('archive_*'), key=lambda x: x.name, reverse=True)
+        
+        if len(archives) > max_archives:
+            deleted_count = 0
+            for old_archive in archives[max_archives:]:
+                shutil.rmtree(old_archive)
+                deleted_count += 1
+            
+            print(f"   🗑️  Removed {deleted_count} old archive(s) (keeping last {max_archives})")
+        
+        # Recreate results directory for new run
+        results_dir.mkdir(parents=True, exist_ok=True)
+        
+    except Exception as e:
+        print(f"   ⚠️  Archive failed: {e}")
+        print(f"   Continuing with optimization...")
