@@ -154,12 +154,22 @@ def test_single_config(args):
                 exit_price = test_df.iloc[bar_idx]['close']
                 exit_time = test_df.iloc[bar_idx]['timestamp']
                 
-                if config.side == 'LONG':
-                    pnl = exit_price - current_position['entry_price']
-                else:
-                    pnl = current_position['entry_price'] - exit_price
+                # Position size (0.01 BTC for testing)
+                position_size = 0.01
                 
-                fee = current_position['entry_price'] * 0.0012
+                # Calculate PnL in USD
+                if config.side == 'LONG':
+                    pnl = (exit_price - current_position['entry_price']) * position_size
+                else:
+                    pnl = (current_position['entry_price'] - exit_price) * position_size
+                
+                # Calculate fees (0.06% taker fee per side = 0.12% round-trip)
+                entry_value = current_position['entry_price'] * position_size
+                exit_value = exit_price * position_size
+                fee_entry = entry_value * 0.0006  # 0.06% taker fee
+                fee_exit = exit_value * 0.0006   # 0.06% taker fee
+                fee = fee_entry + fee_exit
+                
                 net_pnl = pnl - fee
                 
                 trades.append({
