@@ -146,11 +146,11 @@ def optimize_strategy_v2(
         display_diagnostic_report(issues, results, configs)
         
         # Offer auto-fix
-        action = prompt_diagnostic_action()
+        action, target_trades = prompt_diagnostic_action()
         
         if action == 'adjust':
-            print(f"\n🔧 Auto-adjusting parameters and re-running...")
-            adjusted_configs = auto_adjust_configs(configs, issues)
+            print(f"\n🔧 Auto-adjusting parameters to target {target_trades}+ trades...")
+            adjusted_configs = auto_adjust_configs(configs, issues, target_trades, results)
             
             # Re-run with adjusted configs
             results = run_multi_config_optimization(
@@ -516,19 +516,19 @@ def display_diagnostic_report(
         print(f"   - Net PnL: ${top_result.net_pnl:.2f}")
 
 
-def prompt_diagnostic_action() -> str:
+def prompt_diagnostic_action() -> tuple:
     """
     Prompt user for action after diagnostic report
     
     Returns:
-        'adjust': Auto-adjust and re-run
-        'proceed': Continue with current results
-        'quit': Cancel optimization
+        Tuple of (action, target_trades) where:
+        - action: 'adjust', 'proceed', or 'quit'
+        - target_trades: User-specified minimum trade target (or None)
     """
     print("\n" + "="*80)
     print("🔧 REMEDIATION OPTIONS")
     print("="*80)
-    print("\n   1. AUTO-ADJUST: Let optimizer auto-adjust parameters and re-run (~90 sec)")
+    print("\n   1. AUTO-ADJUST: Adjust parameters to target specific trade count")
     print("   2. PROCEED: Continue with current results (not recommended if CRITICAL)")
     print("   3. QUIT: Cancel optimization and review strategy manually")
     
@@ -536,53 +536,109 @@ def prompt_diagnostic_action() -> str:
         choice = input("\nSelect action (1-3): ").strip()
         
         if choice == '1':
-            return 'adjust'
+            # Get target trade count from user
+            while True:
+                try:
+                    target = input("\nTarget minimum trades for 180 days (default 60): ").strip()
+                    if not target:
+                        target_trades = 60  # Default
+                        break
+                    target_trades = int(target)
+                    if target_trades > 0:
+                        break
+                    print("   Please enter a positive number")
+                except ValueError:
+                    print("   Please enter a valid number")
+            
+            return ('adjust', target_trades)
+            
         elif choice == '2':
             confirm = input("⚠️  Are you sure? Issues may indicate broken results (y/n): ").strip().lower()
             if confirm == 'y':
-                return 'proceed'
+                return ('proceed', None)
         elif choice == '3':
-            return 'quit'
+            return ('quit', None)
         else:
             print("   Invalid choice. Please enter 1, 2, or 3.")
 
 
 def auto_adjust_configs(
     configs: List[OptimizationConfig],
-    issues: List[dict]
+    issues: List[dict],
+    target_trades: int,
+    results: List[ConfigPerformance]
 ) -> List[OptimizationConfig]:
     """
-    Auto-adjust configuration parameters based on detected issues
+    Auto-adjust configuration parameters to reach target trade count
     
-    Smart adjustments:
-    - Low trades → Lower confluence, reduce R:R
-    - No trades → Aggressive lowering
-    - High trades → Raise confluence
+    Uses smart calibration based on current vs target ratio:
+    - Current = 2, Target = 60 → Need 30x more trades → Aggressive lowering
+    - Current = 40, Target = 60 → Need 1.5x more → Moderate lowering
+    - Current = 100, Target = 60 → Need 0.6x → Moderate raising
     """
     
-    # Determine adjustment strategy
-    has_critical_low = any(i['type'] in ['LOW_TRADE_COUNT', 'NO_TRADES'] for i in issues)
-    has_high_trades = any(i['type'] == 'EXCESSIVE_TRADES' for i in issues)
+    # Get current best trade count
+    current_trades = max(r.total_trades for r in results) if results else 0
     
-    if has_critical_low:
-        # Lower thresholds significantly
-        new_confluence = [25, 30, 35, 40]  # Much lower
-        new_rr = [1.5, 2.0, 2.5]  # Easier to achieve
-        adjustment_type = "LOWERED (more entries)"
-    elif has_high_trades:
-        # Raise thresholds
-        new_confluence = [60, 70, 80, 90]  # Higher bar
-        new_rr = [2.5, 3.0, 3.5]  # Stricter
-        adjustment_type = "RAISED (fewer entries)"
+    # Calculate adjustment ratio
+    if current_trades > 0:
+        ratio = target_trades / current_trades
     else:
-        # Moderate adjustment
-        new_confluence = [35, 45, 55, 65]
-        new_rr = [2.0, 2.5, 3.0]
-        adjustment_type = "ADJUSTED (balanced)"
+        ratio = float('inf')  # Need infinite adjustment (aggressive)
     
-    print(f"\n🔧 Auto-Adjustment Strategy: {adjustment_type}")
-    print(f"   New Confluence Range: {min(new_confluence)}-{max(new_confluence)}")
-    print(f"   New Risk:Reward Range: {min(new_rr):.1f}-{max(new_rr):.1f}")
+    # Get current parameter ranges
+    current_conf_min = min(c.min_confluence for c in configs)
+    current_conf_max = max(c.min_confluence for c in configs)
+    current_rr_min = min(c.min_risk_reward for c in configs)
+    current_rr_max = max(c.min_risk_reward for c in configs)
+    
+    print(f"\n📊 ADJUSTMENT ANALYSIS")
+    print(f"="*80)
+    print(f"   Current Trades: {current_trades}")
+    print(f"   Target Trades: {target_trades}")
+    print(f"   Adjustment Needed: {ratio:.1f}x")
+    print(f"\n   Current Parameters:")
+    print(f"   - Confluence: {current_conf_min}-{current_conf_max}")
+    print(f"   - Risk:Reward: {current_rr_min:.1f}-{current_rr_max:.1f}")
+    
+    # Determine new parameters based on ratio
+    if ratio >= 10:  # Need 10x+ more trades (AGGRESSIVE)
+        new_confluence = [20, 25, 30, 35]
+        new_rr = [1.3, 1.5, 1.8]
+        adjustment_type = "AGGRESSIVE LOWERING (10x+ trades needed)"
+    elif ratio >= 5:  # Need 5-10x more trades (STRONG)
+        new_confluence = [25, 30, 35, 40]
+        new_rr = [1.5, 2.0, 2.5]
+        adjustment_type = "STRONG LOWERING (5-10x trades needed)"
+    elif ratio >= 2:  # Need 2-5x more trades (MODERATE)
+        new_confluence = [30, 35, 40, 45]
+        new_rr = [1.8, 2.0, 2.5]
+        adjustment_type = "MODERATE LOWERING (2-5x trades needed)"
+    elif ratio >= 1.2:  # Need 1.2-2x more trades (SLIGHT)
+        new_confluence = [35, 40, 45, 50]
+        new_rr = [2.0, 2.3, 2.5]
+        adjustment_type = "SLIGHT LOWERING (1.2-2x trades needed)"
+    elif ratio >= 0.8:  # About right (FINE-TUNE)
+        new_confluence = [40, 45, 50, 55]
+        new_rr = [2.0, 2.5, 3.0]
+        adjustment_type = "FINE-TUNING (near target)"
+    else:  # Too many trades (RAISE)
+        new_confluence = [50, 60, 70, 80]
+        new_rr = [2.5, 3.0, 3.5]
+        adjustment_type = "RAISING (reduce trades)"
+    
+    print(f"\n   🔧 Adjustment Strategy: {adjustment_type}")
+    print(f"\n   Proposed New Parameters:")
+    print(f"   - Confluence: {min(new_confluence)}-{max(new_confluence)}")
+    print(f"   - Risk:Reward: {min(new_rr):.1f}-{max(new_rr):.1f}")
+    print(f"\n   Expected Result: ~{target_trades} trades")
+    print(f"="*80)
+    
+    # Confirm adjustment
+    confirm = input("\nApply these adjustments? (y/n): ").strip().lower()
+    if confirm != 'y':
+        print("   ⚠️  Adjustment cancelled by user")
+        return configs  # Return original configs
     
     # Rebuild configs with new parameters
     adjusted_configs = []
