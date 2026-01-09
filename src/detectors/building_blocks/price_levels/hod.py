@@ -17,12 +17,54 @@ Block Type Definitions:
 
 
 
-from typing import Dict, Any
+from typing 
+from src.detectors.building_blocks.registry import register_block
+import Dict, Any
 from datetime import datetime, time
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='hod',
+    category='PRICE_LEVELS',
+    class_name='HOD',
+    default_weight=20,
+    valid_signals=['BEARISH', 'BULLISH', 'NEUTRAL', 'HOD_REJECTION', 'AT_HOD', 'BELOW_HOD', 'ABOVE_HOD', 'ERROR'],
+    signal_tiers={
+        'ERROR': {
+                'points': 0
+        },
+        'BEARISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BULLISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'max_points': 10,
+                'formula': 'scaled'
+        },
+        'HOD_REJECTION': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'AT_HOD': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BELOW_HOD': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'ABOVE_HOD': {
+                'base_points': 20,
+                'formula': 'scaled'
+        }
+}
+)
 class HOD:
     """
     HOD - High of Day Price Level (ENHANCED 2026-01-04)

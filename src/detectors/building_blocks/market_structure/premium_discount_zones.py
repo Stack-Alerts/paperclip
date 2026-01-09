@@ -33,12 +33,44 @@ Block Type Definitions:
 
 
 
-from typing import Dict, Any
+from typing 
+from src.detectors.building_blocks.registry import register_block
+import Dict, Any
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='premium_discount_zones',
+    category='MARKET_STRUCTURE',
+    class_name='PremiumDiscountZones',
+    default_weight=14,
+    valid_signals=['PRICE_IN_PREMIUM', 'PRICE_IN_DISCOUNT', 'AT_EQUILIBRIUM', 'NO_ZONE', 'INSUFFICIENT_DATA', 'ERROR'],
+    signal_tiers={
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        },
+        'NO_ZONE': {
+                'points': 0
+        },
+        'PRICE_IN_PREMIUM': {
+                'base_points': 14,
+                'formula': 'scaled'
+        },
+        'PRICE_IN_DISCOUNT': {
+                'base_points': 14,
+                'formula': 'scaled'
+        },
+        'AT_EQUILIBRIUM': {
+                'base_points': 14,
+                'formula': 'scaled'
+        }
+}
+)
 class PremiumDiscountZones:
     """
     Enhanced Premium/Discount Zones with depth awareness

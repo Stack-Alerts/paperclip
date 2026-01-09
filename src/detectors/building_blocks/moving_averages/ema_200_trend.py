@@ -17,12 +17,41 @@ Block Type Definitions:
 
 
 
-from typing import Dict, Any
+from typing 
+from src.detectors.building_blocks.registry import register_block
+import Dict, Any
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='ema_200_trend',
+    category='MOVING_AVERAGES',
+    class_name='EMA200Trend',
+    default_weight=12,
+    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'INSUFFICIENT_DATA', 'ERROR'],
+    signal_tiers={
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
+        },
+        'BULLISH': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'max_points': 6,
+                'formula': 'scaled'
+        }
+}
+)
 class EMA200Trend:
     """
     200 EMA Trend Filter - Long-Term Trend Indicator

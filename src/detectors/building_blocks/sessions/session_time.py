@@ -24,12 +24,49 @@ Block Type Definitions:
 
 
 
-from typing import Dict, Any
+from typing 
+from src.detectors.building_blocks.registry import register_block
+import Dict, Any
 from datetime import datetime, time
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='session_time',
+    category='SESSIONS',
+    class_name='SessionTime',
+    default_weight=15,
+    valid_signals=['MODERATE_SESSION', 'HIGH_VOLUME_SESSION', 'LOW_VOLUME_SESSION', 'SESSION_OPEN', 'SESSION_CLOSE', 'NO_SIGNAL', 'ERROR'],
+    signal_tiers={
+        'ERROR': {
+                'points': 0
+        },
+        'NO_SIGNAL': {
+                'points': 0
+        },
+        'MODERATE_SESSION': {
+                'max_points': 7,
+                'formula': 'scaled'
+        },
+        'HIGH_VOLUME_SESSION': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'LOW_VOLUME_SESSION': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'SESSION_OPEN': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'SESSION_CLOSE': {
+                'base_points': 15,
+                'formula': 'scaled'
+        }
+}
+)
 class SessionTime:
     """
     Session Time Identifier - ENHANCED

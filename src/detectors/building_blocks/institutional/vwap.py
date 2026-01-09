@@ -17,12 +17,38 @@ Block Type Definitions:
 
 
 
-from typing import Dict, Any
+from typing 
+from src.detectors.building_blocks.registry import register_block
+import Dict, Any
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='vwap',
+    category='INSTITUTIONAL',
+    class_name='VWAP',
+    default_weight=15,
+    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR'],
+    signal_tiers={
+        'ERROR': {
+                'points': 0
+        },
+        'BULLISH': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'max_points': 7,
+                'formula': 'scaled'
+        }
+}
+)
 class VWAP:
     """Volume Weighted Average Price (ENHANCED 2026-01-04)"""
     

@@ -17,12 +17,46 @@ Block Type Definitions:
 
 
 
-from typing import Dict, Any, List, Optional
+from typing 
+from src.detectors.building_blocks.registry import register_block
+import Dict, Any, List, Optional
 from datetime import datetime
 import pandas as pd
 import numpy as np
 
 
+@register_block(
+    name='rsi_divergence',
+    category='OSCILLATORS',
+    class_name='RSIDivergence',
+    default_weight=25,
+    valid_signals=['BEARISH_DIVERGENCE', 'BULLISH_DIVERGENCE', 'OVERBOUGHT', 'OVERSOLD', 'NEUTRAL', 'ERROR'],
+    signal_tiers={
+        'ERROR': {
+                'points': 0
+        },
+        'BEARISH_DIVERGENCE': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BULLISH_DIVERGENCE': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'OVERBOUGHT': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'OVERSOLD': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'max_points': 12,
+                'formula': 'scaled'
+        }
+}
+)
 class RSIDivergence:
     """
     RSI (Relative Strength Index) with Divergence Detection
