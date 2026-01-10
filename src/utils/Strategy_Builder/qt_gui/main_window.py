@@ -657,12 +657,23 @@ Building Blocks ({len(config.blocks)}):
         # Buttons
         button_layout = QHBoxLayout()
         
+        # Copy buttons
+        copy_all_btn = QPushButton("📋 Copy to Clipboard")
+        copy_all_btn.setToolTip("Copy all output to clipboard")
+        copy_all_btn.clicked.connect(self._copy_output_to_clipboard)
+        button_layout.addWidget(copy_all_btn)
+        
+        copy_paths_btn = QPushButton("📂 Copy Trade Records")
+        copy_paths_btn.setToolTip("Copy trade record paths to clipboard")
+        copy_paths_btn.clicked.connect(self._copy_trade_records_to_clipboard)
+        button_layout.addWidget(copy_paths_btn)
+        
+        button_layout.addStretch()
+        
         self.live_close_btn = QPushButton("⏸ Running...")
         self.live_close_btn.setEnabled(False)  # Disabled while running
         self.live_close_btn.clicked.connect(self.live_output_dialog.accept)
         button_layout.addWidget(self.live_close_btn)
-        
-        button_layout.addStretch()
         
         layout.addLayout(button_layout)
         
@@ -709,6 +720,61 @@ Building Blocks ({len(config.blocks)}):
             )
         finally:
             self.status_bar.showMessage("Ready")
+    
+    def _copy_output_to_clipboard(self):
+        """Copy all output text to clipboard"""
+        if hasattr(self, 'live_output_text'):
+            from PyQt6.QtWidgets import QApplication
+            clipboard = QApplication.clipboard()
+            clipboard.setText(self.live_output_text.toPlainText())
+            
+            # Show confirmation
+            QMessageBox.information(
+                self.live_output_dialog,
+                "Copied",
+                "📋 All output copied to clipboard!"
+            )
+    
+    def _copy_trade_records_to_clipboard(self):
+        """Copy only trade record paths from output to clipboard"""
+        if hasattr(self, 'live_output_text'):
+            import re
+            from PyQt6.QtWidgets import QApplication
+            
+            # Get all text
+            text = self.live_output_text.toPlainText()
+            
+            # Extract paths that look like trade records
+            # Pattern: optimization_results/*/trade_records.csv
+            paths = []
+            for line in text.split('\n'):
+                # Look for paths containing "trade_records" or "optimization_results"
+                if 'trade_records' in line or ('optimization_results' in line and '.csv' in line):
+                    # Extract path-like strings
+                    matches = re.findall(r'[a-zA-Z0-9_/.-]+\.csv', line)
+                    paths.extend(matches)
+            
+            if paths:
+                # Remove duplicates and sort
+                unique_paths = sorted(set(paths))
+                
+                # Copy to clipboard
+                clipboard = QApplication.clipboard()
+                clipboard.setText('\n'.join(unique_paths))
+                
+                # Show confirmation with count
+                QMessageBox.information(
+                    self.live_output_dialog,
+                    "Copied",
+                    f"📂 Copied {len(unique_paths)} trade record path(s) to clipboard!"
+                )
+            else:
+                QMessageBox.warning(
+                    self.live_output_dialog,
+                    "No Paths Found",
+                    "No trade record paths found in output.\n\n"
+                    "Test may still be running or no results generated yet."
+                )
     
     def _show_test_results(self, strategy_num: int, output: str):
         """Display test results in independent window"""
