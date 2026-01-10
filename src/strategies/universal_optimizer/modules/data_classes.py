@@ -49,6 +49,11 @@ class OptimizationConfig:
     use_structure_sl: bool = True  # Use market structure when available
     structure_sources: List[str] = None  # ['swing_points', 'supply_demand', 'fibonacci']
     
+    # ⭐ RISK MANAGEMENT PARAMETERS (CRITICAL - READ FROM YAML CONFIG)
+    starting_capital: float = 10000.0  # Starting account balance
+    max_leverage: float = 10.0  # Maximum leverage allowed
+    risk_per_trade_pct: float = 1.0  # Risk per trade as percentage of capital
+    
     def __post_init__(self):
         """Set default values for dict fields and lists"""
         if self.tp_fallback_pcts is None:
