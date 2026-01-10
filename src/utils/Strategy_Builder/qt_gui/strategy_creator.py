@@ -198,7 +198,7 @@ class StrategyCreatorDialog(QDialog):
         # Populate UI
         for block_config in self.selected_blocks:
             # Get block info from registry
-            block_metadata = self.bridge.bridge.registry.get_block(block_config.block_name)
+            block_metadata = self.bridge.registry.get_block(block_config.block_name)
             if not block_metadata:
                 continue
             

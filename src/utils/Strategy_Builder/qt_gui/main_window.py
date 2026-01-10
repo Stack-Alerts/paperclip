@@ -172,6 +172,22 @@ class StrategyBuilderMainWindow(QMainWindow):
         list_label.setStyleSheet("font-size: 10pt; font-weight: bold; color: #ffffff;")
         left_layout.addWidget(list_label)
         
+        # Status filter
+        filter_layout = QHBoxLayout()
+        filter_label = QLabel("Filter:")
+        filter_layout.addWidget(filter_label)
+        
+        self.status_filter = QComboBox()
+        self.status_filter.addItems([
+            "All Status",
+            "💾 Drafts Only",
+            "📝 Ready Only",
+            "✅ Published Only"
+        ])
+        self.status_filter.currentTextChanged.connect(self.load_strategies)
+        filter_layout.addWidget(self.status_filter)
+        left_layout.addLayout(filter_layout)
+        
         self.strategy_list = QListWidget()
         self.strategy_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.strategy_list.customContextMenuRequested.connect(self.show_context_menu)
@@ -238,14 +254,18 @@ class StrategyBuilderMainWindow(QMainWindow):
             print(f"Warning: Could not load dark theme: {e}")
             
     def load_strategies(self):
-        """Load strategies from registry with folder status"""
+        """Load strategies from registry with folder status and filtering"""
         self.strategy_list.clear()
         strategies = self.registry.list_strategies()
+        
+        # Get filter selection
+        filter_text = self.status_filter.currentText() if hasattr(self, 'status_filter') else "All Status"
         
         # Count by folder
         drafts_count = 0
         unpublished_count = 0
         published_count = 0
+        displayed_count = 0
         
         for strategy in sorted(strategies, key=lambda s: s.number):
             # Determine folder from file path
@@ -255,22 +275,43 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Set status indicator
             if folder_name == "drafts":
                 status = " 💾[DRAFT]"
+                status_type = "draft"
                 drafts_count += 1
             elif folder_name == "published":
                 status = " ✅[PUBLISHED]"
+                status_type = "published"
                 published_count += 1
             else:  # unpublished
                 status = " 📝[READY]"
+                status_type = "ready"
                 unpublished_count += 1
             
-            item_text = f"{strategy.number:03d}. {strategy.name} ({strategy.category}){status}"
-            self.strategy_list.addItem(item_text)
+            # Apply filter
+            show_strategy = False
+            if filter_text == "All Status":
+                show_strategy = True
+            elif filter_text == "💾 Drafts Only" and status_type == "draft":
+                show_strategy = True
+            elif filter_text == "📝 Ready Only" and status_type == "ready":
+                show_strategy = True
+            elif filter_text == "✅ Published Only" and status_type == "published":
+                show_strategy = True
+            
+            if show_strategy:
+                item_text = f"{strategy.number:03d}. {strategy.name} ({strategy.category}){status}"
+                self.strategy_list.addItem(item_text)
+                displayed_count += 1
         
         total = len(strategies)
-        self.status_bar.showMessage(
-            f"Ready | {total}/150 Slots | "
-            f"💾{drafts_count} Drafts | 📝{unpublished_count} Ready | ✅{published_count} Published"
-        )
+        if filter_text == "All Status":
+            self.status_bar.showMessage(
+                f"Ready | {total}/150 Slots | "
+                f"💾{drafts_count} Drafts | 📝{unpublished_count} Ready | ✅{published_count} Published"
+            )
+        else:
+            self.status_bar.showMessage(
+                f"Filter: {filter_text} | Showing {displayed_count}/{total} strategies"
+            )
         
     def on_strategy_selected(self, current, previous):
         """Handle strategy selection"""
