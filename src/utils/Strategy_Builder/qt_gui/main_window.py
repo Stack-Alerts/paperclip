@@ -196,6 +196,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.strategy_list = QListWidget()
         self.strategy_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.strategy_list.customContextMenuRequested.connect(self.show_context_menu)
+        self.strategy_list.itemDoubleClicked.connect(self.on_strategy_double_clicked)
         left_layout.addWidget(self.strategy_list)
         
         splitter.addWidget(left_widget)
@@ -344,6 +345,11 @@ Building Blocks ({len(config.blocks)}):
             
             self.details_text.setPlainText(details)
             self.status_bar.showMessage(f"Selected: Strategy #{strategy_num:03d}")
+    
+    def on_strategy_double_clicked(self, item):
+        """Handle double-click on strategy - open edit dialog"""
+        # Simply call edit_strategy which already has all the logic
+        self.edit_strategy()
             
     def new_strategy(self):
         """Create new strategy"""
