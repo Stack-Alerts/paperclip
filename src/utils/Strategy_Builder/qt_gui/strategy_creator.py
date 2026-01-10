@@ -480,7 +480,14 @@ class StrategyCreatorDialog(QDialog):
                 overwrite=self.editing_mode
             )
             
-            action = "updated" if self.editing_mode else "saved"
+            # CRITICAL: After first save, switch to edit mode
+            # This prevents creating multiple strategies from the same draft
+            if not self.editing_mode:
+                self.editing_mode = True
+                self.existing_config = config
+                self.setWindowTitle("Edit Strategy (Draft)")
+            
+            action = "updated" if strategy_num == config.strategy_number else "saved"
             QMessageBox.information(
                 self,
                 f"Draft {action.title()}",
@@ -488,10 +495,11 @@ class StrategyCreatorDialog(QDialog):
                 f"Number: {strategy_num:03d}\n"
                 f"Name: {config.strategy_name}\n"
                 f"Blocks: {len(config.blocks)}\n\n"
-                "You can continue editing this strategy later."
+                "You can continue editing this draft.\n"
+                "Subsequent saves will update this same strategy."
             )
             
-            # Don't close dialog user can continue editing
+            # Don't close dialog - user can continue editing
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save draft:\n{e}")
