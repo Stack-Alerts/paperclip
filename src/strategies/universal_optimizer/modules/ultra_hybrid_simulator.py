@@ -132,7 +132,11 @@ def test_single_config(args):
     from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
     from src.strategies.signal_accumulator import SignalAccumulator
     from src.strategies.universal_optimizer.modules.dynamic_tp_calculator import DynamicTPCalculator
-    from src.strategies.universal_optimizer.modules.dynamic_sl_calculator import DynamicSLCalculator
+    from src.strategies.universal_optimizer.modules.dynamic_sl_calculator import (
+        AdaptiveSLCalculator,
+        calculate_breakeven_sl,
+        calculate_trailing_sl
+    )
     
     config, all_results, test_df = args
     
@@ -165,9 +169,19 @@ def test_single_config(args):
                 tp_mode=config.tp_mode
             )
             
-            # Initialize DynamicSLCalculator for this entry
-            sl_calculator = DynamicSLCalculator(
-                sl_mode=getattr(config, 'sl_mode', 'HYBRID')  # Default to HYBRID
+            # Initialize AdaptiveSLCalculator v2.0 for this entry
+            sl_calculator = AdaptiveSLCalculator(
+                volatility_lookback=getattr(config, 'volatility_lookback', 20),
+                volatility_multiplier=getattr(config, 'volatility_multiplier', 1.2),
+                absolute_min_pct=getattr(config, 'absolute_min_sl_pct', 0.7),
+                absolute_max_pct=getattr(config, 'absolute_max_sl_pct', 2.0),
+                initial_sl_multiplier=getattr(config, 'initial_sl_multiplier', 1.5),
+                working_sl_multiplier=getattr(config, 'working_sl_multiplier', 1.0),
+                use_delayed_sl=getattr(config, 'use_delayed_sl', True),
+                delay_bars=getattr(config, 'delay_bars', 2),
+                emergency_sl_pct=getattr(config, 'emergency_sl_pct', 2.5),
+                use_structure_sl=getattr(config, 'use_structure_sl', True),
+                structure_sources=getattr(config, 'structure_sources', ['swing_points', 'supply_demand', 'fibonacci'])
             )
             
             # Calculate dynamic TPs using building blocks!
@@ -181,29 +195,29 @@ def test_single_config(args):
                 fallback_pcts=config.tp_fallback_pcts  # Use config's TP distances
             )
             
-            # Calculate dynamic SL using building blocks!
-            sl_level = sl_calculator.calculate_sl_level(
+            # Calculate ADAPTIVE SL using v2.0 system!
+            sl_result = sl_calculator.calculate_sl_levels(
                 df=history_for_tp,
                 entry_price=entry_price,
                 entry_bar=len(history_for_tp) - 1,
-                side=config.side,
-                max_sl_pct=1.5,  # Absolute maximum
-                fallback_atr_mult=2.0
+                side=config.side
             )
             
             # Extract TP/SL from calculated levels
             tp1 = tp_levels.tp1
             tp2 = tp_levels.tp2
             tp3 = tp_levels.tp3
-            sl = sl_level.sl  # Now from DynamicSLCalculator!
+            emergency_sl = sl_result.emergency_sl  # Wide protection (bar 0-delay)
+            working_sl = sl_result.working_sl      # Tight optimization (after delay)
+            sl = emergency_sl  # Start with emergency SL
             
             # Get partial exit percentages from config
             exit_pct_tp1 = config.partial_exit_pcts.get('tp1', 50)
             exit_pct_tp2 = config.partial_exit_pcts.get('tp2', 30)
             exit_pct_tp3 = config.partial_exit_pcts.get('tp3', 20)
             
-            # Verify R:R meets minimum (using TP2 as reference)
-            rr_ratio = abs((tp2 - entry_price) / (sl - entry_price))
+            # Verify R:R meets minimum (using TP2 vs WORKING SL for realistic R:R)
+            rr_ratio = abs((tp2 - entry_price) / (working_sl - entry_price))
             if rr_ratio < config.min_risk_reward:
                 continue  # Skip this entry - R:R too low
             
@@ -216,17 +230,22 @@ def test_single_config(args):
                 'tp1': tp1,
                 'tp2': tp2,
                 'tp3': tp3,
-                'sl': sl,
+                'sl': sl,  # Active SL (starts with emergency)
+                'emergency_sl': emergency_sl,  # Wide protection
+                'working_sl': working_sl,      # Tight optimization
+                'sl_result': sl_result,        # Full SL calculation result
                 'use_tp1': tp_levels.use_tp1,  # Track which TPs to use
                 'use_tp2': tp_levels.use_tp2,
                 'use_tp3': tp_levels.use_tp3,
+                'tp1_hit': False,  # Track TP hits for breakeven logic
+                'tp2_hit': False,  # Track TP hits for trailing logic
                 'exit_pct_tp1': exit_pct_tp1,  # Dynamic exit percentages
                 'exit_pct_tp2': exit_pct_tp2,
                 'exit_pct_tp3': exit_pct_tp3,
                 'trailing_activation_price': tp_levels.trailing_activation_price,
                 'tp_method': tp_levels.method,  # Track TP calculation method used
-                'sl_method': sl_level.method,  # Track SL calculation method used
-                'sl_invalidation': sl_level.invalidation_reason,  # Why this SL
+                'sl_method': sl_result.method,  # Track SL calculation method used
+                'sl_invalidation': sl_result.invalidation_reason,  # Why this SL
                 'remaining_pct': 100.0,
                 'exits': [],
                 'tp_calculator': tp_calculator,  # Store for trailing logic
@@ -237,6 +256,12 @@ def test_single_config(args):
         if current_position is not None:
             bars_held = bar_idx - current_position['entry_bar']
             bar = test_df.iloc[bar_idx]
+            
+            # Update active SL (emergency → working after delay)
+            current_position['sl'] = sl_calculator.get_active_sl(
+                current_position['sl_result'],
+                bars_held
+            )
             
             exit_occurred = False
             exit_price = None
@@ -260,10 +285,27 @@ def test_single_config(args):
                         'reason': exit_reason
                     })
                     current_position['remaining_pct'] -= exit_pct
+                    current_position['tp1_hit'] = True
                     
                     # Move SL to breakeven after TP1 if configured
-                    if config.breakeven_after_tp1:
-                        current_position['sl'] = current_position['entry_price']
+                    if config.breakeven_after_tp1 and not current_position.get('breakeven_set', False):
+                        entry_notional = current_position['entry_price'] * (10000 * 0.25 * 10 / current_position['entry_price'])
+                        position_size = entry_notional / current_position['entry_price']
+                        breakeven_sl = calculate_breakeven_sl(
+                            current_position['entry_price'],
+                            config.side,
+                            entry_notional,
+                            position_size
+                        )
+                        # Only update if better than current SL
+                        if config.side == 'SHORT':
+                            if breakeven_sl < current_position['sl']:
+                                current_position['sl'] = breakeven_sl
+                                current_position['breakeven_set'] = True
+                        else:
+                            if breakeven_sl > current_position['sl']:
+                                current_position['sl'] = breakeven_sl
+                                current_position['breakeven_set'] = True
                     
                 if current_position['use_tp2'] and bar['low'] <= current_position['tp2'] and current_position['remaining_pct'] >= current_position['exit_pct_tp2']:
                     # TP2 hit - use config's exit percentage
@@ -276,6 +318,7 @@ def test_single_config(args):
                         'reason': exit_reason
                     })
                     current_position['remaining_pct'] -= exit_pct
+                    current_position['tp2_hit'] = True
                     
                 if current_position['use_tp3'] and bar['low'] <= current_position['tp3'] and current_position['remaining_pct'] > 0:
                     # TP3 hit - close remaining position
@@ -289,19 +332,17 @@ def test_single_config(args):
                     current_position['remaining_pct'] = 0
                     exit_occurred = True
                 
-                # Check trailing stop (if configured and activated)
-                if config.use_trailing and current_position['trailing_activation_price'] is not None:
-                    # Has trailing activated yet?
-                    if bar['low'] <= current_position['trailing_activation_price']:
-                        # Trailing activated! Now trail the stop loss
-                        new_sl = current_position['tp_calculator'].apply_trailing_stop(
-                            current_position,
-                            bar,
-                            config.side,
-                            config.trailing_pct
-                        )
-                        if new_sl:
-                            current_position['sl'] = new_sl
+                # Check trailing stop after TP2 (if configured)
+                if config.use_trailing and current_position.get('tp2_hit', False):
+                    # Trailing activated after TP2! Trail the stop loss
+                    new_sl = calculate_trailing_sl(
+                        current_position['best_price'],
+                        config.side,
+                        config.trailing_pct
+                    )
+                    # Only update if tighter than current SL
+                    if new_sl < current_position['sl']:
+                        current_position['sl'] = new_sl
                 
                 # Check SL (price going UP)
                 if bar['high'] >= current_position['sl'] and not exit_occurred:
@@ -333,10 +374,27 @@ def test_single_config(args):
                         'reason': exit_reason
                     })
                     current_position['remaining_pct'] -= exit_pct
+                    current_position['tp1_hit'] = True
                     
                     # Move SL to breakeven after TP1 if configured
-                    if config.breakeven_after_tp1:
-                        current_position['sl'] = current_position['entry_price']
+                    if config.breakeven_after_tp1 and not current_position.get('breakeven_set', False):
+                        entry_notional = current_position['entry_price'] * (10000 * 0.25 * 10 / current_position['entry_price'])
+                        position_size = entry_notional / current_position['entry_price']
+                        breakeven_sl = calculate_breakeven_sl(
+                            current_position['entry_price'],
+                            config.side,
+                            entry_notional,
+                            position_size
+                        )
+                        # Only update if better than current SL
+                        if config.side == 'SHORT':
+                            if breakeven_sl < current_position['sl']:
+                                current_position['sl'] = breakeven_sl
+                                current_position['breakeven_set'] = True
+                        else:
+                            if breakeven_sl > current_position['sl']:
+                                current_position['sl'] = breakeven_sl
+                                current_position['breakeven_set'] = True
                     
                 if current_position['use_tp2'] and bar['high'] >= current_position['tp2'] and current_position['remaining_pct'] >= current_position['exit_pct_tp2']:
                     # TP2 hit - use config's exit percentage
@@ -349,6 +407,7 @@ def test_single_config(args):
                         'reason': exit_reason
                     })
                     current_position['remaining_pct'] -= exit_pct
+                    current_position['tp2_hit'] = True
                     
                 if current_position['use_tp3'] and bar['high'] >= current_position['tp3'] and current_position['remaining_pct'] > 0:
                     # TP3 hit - close remaining position
@@ -362,19 +421,17 @@ def test_single_config(args):
                     current_position['remaining_pct'] = 0
                     exit_occurred = True
                 
-                # Check trailing stop (if configured and activated)
-                if config.use_trailing and current_position['trailing_activation_price'] is not None:
-                    # Has trailing activated yet?
-                    if bar['high'] >= current_position['trailing_activation_price']:
-                        # Trailing activated! Now trail the stop loss
-                        new_sl = current_position['tp_calculator'].apply_trailing_stop(
-                            current_position,
-                            bar,
-                            config.side,
-                            config.trailing_pct
-                        )
-                        if new_sl:
-                            current_position['sl'] = new_sl
+                # Check trailing stop after TP2 (if configured)
+                if config.use_trailing and current_position.get('tp2_hit', False):
+                    # Trailing activated after TP2! Trail the stop loss
+                    new_sl = calculate_trailing_sl(
+                        current_position['best_price'],
+                        config.side,
+                        config.trailing_pct
+                    )
+                    # Only update if tighter than current SL
+                    if new_sl > current_position['sl']:
+                        current_position['sl'] = new_sl
                 
                 # Check SL (price going DOWN)
                 if bar['low'] <= current_position['sl'] and not exit_occurred:
