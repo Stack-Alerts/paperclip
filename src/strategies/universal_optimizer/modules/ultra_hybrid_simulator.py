@@ -137,9 +137,11 @@ def test_single_config(args):
     current_position = None
     
     # Initialize signal accumulator for sequential confluence building
+    # WIDENED WINDOW: 60 bars (15 hours) to capture more HOD rejection setups
+    # HOD rejection may fire infrequently, need wider window for confluence buildup
     accumulator = SignalAccumulator(
         min_confluence=config.min_confluence,
-        window_bars=20  # TODO: Make configurable via config
+        window_bars=60  # Widened from 20 to capture more signals
     )
     
     for bar_idx, bar_results in enumerate(all_results):
