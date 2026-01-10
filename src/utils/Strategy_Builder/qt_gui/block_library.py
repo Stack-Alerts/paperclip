@@ -9,7 +9,7 @@ Date: 2026-01-10
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLineEdit, QTreeWidget,
-    QTreeWidgetItem, QLabel
+    QTreeWidgetItem, QLabel, QTextEdit, QSplitter
 )
 from PyQt6.QtCore import Qt, QMimeData
 from PyQt6.QtGui import QDrag
@@ -50,13 +50,43 @@ class BlockLibraryPanel(QWidget):
         self.search_box.textChanged.connect(self.filter_blocks)
         layout.addWidget(self.search_box)
         
+        # Splitter for tree and details
+        splitter = QSplitter(Qt.Orientation.Vertical)
+        
         # Tree widget
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Block Name", "Category"])
         self.tree.setColumnWidth(0, 250)
         self.tree.setDragEnabled(True)
         self.tree.setSelectionMode(QTreeWidget.SelectionMode.SingleSelection)
-        layout.addWidget(self.tree)
+        self.tree.itemSelectionChanged.connect(self.on_block_selected)
+        splitter.addWidget(self.tree)
+        
+        # Details panel
+        details_widget = QWidget()
+        details_layout = QVBoxLayout(details_widget)
+        details_layout.setContentsMargins(0, 0, 0, 0)
+        
+        details_label = QLabel("📋 Block Details")
+        details_label.setStyleSheet("font-size: 10pt; font-weight: bold; color: #ffffff;")
+        details_layout.addWidget(details_label)
+        
+        self.details_text = QTextEdit()
+        self.details_text.setReadOnly(True)
+        self.details_text.setPlaceholderText(
+            "Select a block to view details...\n\n"
+            "• What the block does\n"
+            "• Signals it returns\n"
+            "• Usage examples"
+        )
+        details_layout.addWidget(self.details_text)
+        
+        splitter.addWidget(details_widget)
+        
+        # Set initial sizes (60% tree, 40% details)
+        splitter.setSizes([600, 400])
+        
+        layout.addWidget(splitter)
         
         # Info label
         self.info_label = QLabel("80 blocks available")
@@ -125,3 +155,53 @@ class BlockLibraryPanel(QWidget):
         
         # Update count
         self.info_label.setText(f"{visible_count} blocks found")
+    
+    def on_block_selected(self):
+        """Display details when a block is selected"""
+        selected_items = self.tree.selectedItems()
+        if not selected_items:
+            self.details_text.clear()
+            return
+        
+        item = selected_items[0]
+        
+        # Skip category items
+        if item.parent() is None:
+            self.details_text.clear()
+            return
+        
+        # Get block data
+        block = item.data(0, Qt.ItemDataRole.UserRole)
+        if not block:
+            return
+        
+        # Build details text
+        details = f"""<h3 style='color: #4ec9b0;'>{block.display_name}</h3>
+
+<p style='color: #ce9178;'><b>Category:</b> {block.category}</p>
+<p style='color: #ce9178;'><b>Type:</b> {block.block_type}</p>
+<p style='color: #ce9178;'><b>Default Weight:</b> {block.default_weight} points</p>
+
+<h4 style='color: #569cd6;'>Description</h4>
+<p style='color: #d4d4d4;'>{block.description}</p>
+
+<h4 style='color: #569cd6;'>Returns (Signals)</h4>
+<ul style='color: #d4d4d4;'>
+"""
+        
+        # Add signals
+        if block.signals:
+            for signal in block.signals:
+                details += f"<li><b>{signal}</b></li>\n"
+        else:
+            details += "<li><i>No specific signals (context block)</i></li>\n"
+        
+        details += "</ul>\n"
+        
+        # Add usage tip
+        details += f"""
+<h4 style='color: #569cd6;'>Usage Tip</h4>
+<p style='color: #d4d4d4;'><i>Double-click to add this block to your strategy, or drag & drop into the strategy creator.</i></p>
+"""
+        
+        self.details_text.setHtml(details)
