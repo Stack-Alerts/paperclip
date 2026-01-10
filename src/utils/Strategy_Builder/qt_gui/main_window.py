@@ -36,31 +36,47 @@ from src.utils.Strategy_Builder.qt_gui.strategy_creator import StrategyCreatorDi
 class BacktestThread(QThread):
     """Background thread for running backtests without freezing UI"""
     
-    # Custom signal that emits strategy_num when complete
-    finished_signal = pyqtSignal(int)
+    # Signals for real-time output streaming
+    output_signal = pyqtSignal(str)  # Emits each line of output
+    finished_signal = pyqtSignal(int, int)  # Emits (strategy_num, return_code)
     
     def __init__(self, cmd, cwd, strategy_num, parent=None):
         super().__init__(parent)
         self.cmd = cmd
         self.cwd = cwd
         self.strategy_num = strategy_num
-        self.result = None
+        self.return_code = -1
         self.error = None
         
     def run(self):
-        """Execute subprocess in background"""
+        """Execute subprocess with real-time output streaming"""
         try:
-            self.result = subprocess.run(
+            # Use Popen for real-time output
+            process = subprocess.Popen(
                 self.cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Merge stderr into stdout
                 text=True,
+                bufsize=1,  # Line buffered
                 cwd=self.cwd
             )
-            # Emit signal when complete
-            self.finished_signal.emit(self.strategy_num)
+            
+            # Stream output line by line
+            for line in iter(process.stdout.readline, ''):
+                if line:
+                    self.output_signal.emit(line.rstrip())
+            
+            # Wait for completion
+            process.wait()
+            self.return_code = process.returncode
+            
+            # Emit completion signal
+            self.finished_signal.emit(self.strategy_num, self.return_code)
+            
         except Exception as e:
             self.error = str(e)
-            self.finished_signal.emit(self.strategy_num)
+            self.output_signal.emit(f"\n❌ ERROR: {e}\n")
+            self.finished_signal.emit(self.strategy_num, -1)
 
 
 class StrategyBuilderMainWindow(QMainWindow):
@@ -576,7 +592,7 @@ Building Blocks ({len(config.blocks)}):
             self._run_backtest(strategy_num)
     
     def _run_backtest(self, strategy_num: int):
-        """Run backtest and show results in background thread"""
+        """Run backtest with live output streaming"""
         try:
             # Update status
             self.status_bar.showMessage(f"Running backtest for strategy #{strategy_num:03d}...")
@@ -600,8 +616,12 @@ Building Blocks ({len(config.blocks)}):
                 "--non-interactive"  # Auto-select best config without prompts
             ]
             
-            # Run in background thread - store as instance variable to prevent garbage collection
+            # Create live output dialog
+            self._create_live_output_dialog(strategy_num)
+            
+            # Run in background thread
             self.backtest_thread = BacktestThread(cmd, Path.cwd(), strategy_num, self)
+            self.backtest_thread.output_signal.connect(self._append_output_line)
             self.backtest_thread.finished_signal.connect(self._on_backtest_finished)
             self.backtest_thread.start()
             
@@ -613,46 +633,73 @@ Building Blocks ({len(config.blocks)}):
             )
             self.status_bar.showMessage("Ready")
     
-    def _on_backtest_finished(self, strategy_num: int):
-        """Handle backtest completion"""
+    def _create_live_output_dialog(self, strategy_num: int):
+        """Create live output dialog that shows test progress in real-time"""
+        # Create independent window
+        self.live_output_dialog = QDialog(self, Qt.WindowType.Window)
+        self.live_output_dialog.setWindowTitle(f"🧪 Testing Strategy #{strategy_num:03d} - LIVE OUTPUT")
+        self.live_output_dialog.setGeometry(200, 200, 900, 700)
+        self.live_output_dialog.setModal(False)
+        
+        layout = QVBoxLayout(self.live_output_dialog)
+        
+        # Status label
+        self.live_status_label = QLabel("⏳ Running backtest...")
+        self.live_status_label.setStyleSheet("font-size: 10pt; font-weight: bold; color: #ffaa00;")
+        layout.addWidget(self.live_status_label)
+        
+        # Output text area
+        self.live_output_text = QTextEdit()
+        self.live_output_text.setReadOnly(True)
+        self.live_output_text.setPlaceholderText("Waiting for output...")
+        layout.addWidget(self.live_output_text)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        
+        self.live_close_btn = QPushButton("⏸ Running...")
+        self.live_close_btn.setEnabled(False)  # Disabled while running
+        self.live_close_btn.clicked.connect(self.live_output_dialog.accept)
+        button_layout.addWidget(self.live_close_btn)
+        
+        button_layout.addStretch()
+        
+        layout.addLayout(button_layout)
+        
+        # Show dialog
+        self.live_output_dialog.show()
+    
+    def _append_output_line(self, line: str):
+        """Append a line of output to the live output dialog"""
+        if hasattr(self, 'live_output_text'):
+            # Append line
+            self.live_output_text.append(line)
+            
+            # Auto-scroll to bottom
+            scrollbar = self.live_output_text.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
+    
+    def _on_backtest_finished(self, strategy_num: int, return_code: int):
+        """Handle backtest completion with live output"""
         try:
-            # Check for thread errors
+            # Update status
+            if return_code == 0:
+                self.live_status_label.setText("✅ Backtest completed successfully!")
+                self.live_status_label.setStyleSheet("font-size: 10pt; font-weight: bold; color: #4ec9b0;")
+            else:
+                self.live_status_label.setText(f"⚠️ Backtest completed with return code: {return_code}")
+                self.live_status_label.setStyleSheet("font-size: 10pt; font-weight: bold; color: #f48771;")
+            
+            # Enable close button
+            self.live_close_btn.setText("✅ Close")
+            self.live_close_btn.setEnabled(True)
+            
+            # Update status bar
+            self.status_bar.showMessage("Backtest completed")
+            
+            # Check for errors
             if self.backtest_thread.error:
-                QMessageBox.critical(
-                    self,
-                    "Error",
-                    f"Backtest failed:\n{self.backtest_thread.error}"
-                )
-                self.status_bar.showMessage("Ready")
-                return
-            
-            result = self.backtest_thread.result
-            
-            # Debug: Show what we got
-            if result is None:
-                QMessageBox.warning(
-                    self,
-                    "No Results",
-                    "Backtest completed but no results were captured.\n"
-                    "Check the terminal for output."
-                )
-                self.status_bar.showMessage("Ready")
-                return
-            
-            # Show results regardless of return code (for debugging)
-            output = f"Return Code: {result.returncode}\n\n"
-            
-            if result.stdout:
-                output += "=== STDOUT ===\n" + result.stdout
-            
-            if result.stderr:
-                output += "\n\n=== STDERR ===\n" + result.stderr
-            
-            if not result.stdout and not result.stderr:
-                output += "No output captured"
-            
-            # Show results dialog
-            self._show_test_results(strategy_num, output)
+                self._append_output_line(f"\n❌ ERROR: {self.backtest_thread.error}\n")
             
         except Exception as e:
             QMessageBox.critical(
