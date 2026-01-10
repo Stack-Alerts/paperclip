@@ -22,6 +22,7 @@ from src.utils.Strategy_Builder import (
     StrategyRegistry, RegistryBridge, StrategyValidator,
     StrategyConfiguration, BlockSelection, SignalConfiguration
 )
+from src.utils.Strategy_Builder.qt_gui.block_library import BlockLibraryPanel
 
 
 class StrategyCreatorDialog(QDialog):
@@ -84,25 +85,21 @@ class StrategyCreatorDialog(QDialog):
         # Main content: Two columns
         content_layout = QHBoxLayout()
         
-        # Left: Available blocks
+        # Left: Available blocks (use enhanced tree view)
         left_group = QGroupBox("📚 Available Blocks")
         left_layout = QVBoxLayout()
         
-        # Category filter
-        self.block_category_filter = QComboBox()
-        self.block_category_filter.addItem("All Categories")
-        blocks_by_cat = self.bridge.get_blocks_by_category()
-        for category in sorted(blocks_by_cat.keys()):
-            self.block_category_filter.addItem(category)
-        self.block_category_filter.currentTextChanged.connect(self.load_available_blocks)
-        left_layout.addWidget(self.block_category_filter)
+        # Use block library with horizontal orientation (top-bottom works better in this layout)
+        self.block_library = BlockLibraryPanel(orientation='horizontal')
         
-        self.available_blocks_list = QListWidget()
-        self.available_blocks_list.itemDoubleClicked.connect(self.add_block)
-        left_layout.addWidget(self.available_blocks_list)
+        # Connect double-click to add block
+        self.block_library.tree.itemDoubleClicked.connect(self.add_block_from_tree)
         
-        add_btn = QPushButton("➕ Add Selected Block")
-        add_btn.clicked.connect(self.add_block)
+        # Add button for explicit addition
+        add_btn = QPushButton("➕ Add Selected Block to Strategy")
+        add_btn.clicked.connect(self.add_block_from_tree)
+        
+        left_layout.addWidget(self.block_library)
         left_layout.addWidget(add_btn)
         
         left_group.setLayout(left_layout)
@@ -185,8 +182,7 @@ class StrategyCreatorDialog(QDialog):
         
         layout.addLayout(button_layout)
         
-        # Load initial data
-        self.load_available_blocks()
+        # Don't need to load blocks - BlockLibraryPanel does it automatically
     
     def load_existing_config(self):
         """Load existing configuration into UI"""
@@ -233,35 +229,23 @@ class StrategyCreatorDialog(QDialog):
         
         self.update_confluence()
         
-    def load_available_blocks(self):
-        """Load available blocks based on category filter"""
-        self.available_blocks_list.clear()
+    def add_block_from_tree(self, item=None):
+        """Add selected block from tree view to strategy"""
+        # Get selected item from tree
+        if not item:
+            selected_items = self.block_library.tree.selectedItems()
+            if not selected_items:
+                return
+            item = selected_items[0]
         
-        category_filter = self.block_category_filter.currentText()
-        blocks_by_cat = self.bridge.get_blocks_by_category()
-        
-        if category_filter == "All Categories":
-            # Show all blocks
-            for category, blocks in sorted(blocks_by_cat.items()):
-                for block in sorted(blocks, key=lambda b: b.display_name):
-                    item = QListWidgetItem(f"{block.display_name} ({category})")
-                    item.setData(Qt.ItemDataRole.UserRole, block)
-                    self.available_blocks_list.addItem(item)
-        else:
-            # Show category blocks
-            blocks = blocks_by_cat.get(category_filter, [])
-            for block in sorted(blocks, key=lambda b: b.display_name):
-                item = QListWidgetItem(block.display_name)
-                item.setData(Qt.ItemDataRole.UserRole, block)
-                self.available_blocks_list.addItem(item)
-                
-    def add_block(self):
-        """Add selected block to strategy"""
-        current = self.available_blocks_list.currentItem()
-        if not current:
+        # Skip category items
+        if item.parent() is None:
             return
-            
-        block_info = current.data(Qt.ItemDataRole.UserRole)
+        
+        # Get block data
+        block_info = item.data(0, Qt.ItemDataRole.UserRole)
+        if not block_info:
+            return
         
         # Create block configuration
         block_config = BlockSelection(

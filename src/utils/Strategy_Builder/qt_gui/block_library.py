@@ -24,11 +24,21 @@ from src.utils.Strategy_Builder import RegistryBridge
 class BlockLibraryPanel(QWidget):
     """Panel displaying available building blocks in a tree view"""
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, orientation='horizontal'):
+        """
+        Initialize block library panel
+        
+        Args:
+            parent: Parent widget
+            orientation: 'horizontal' or 'vertical' splitter orientation
+        """
         super().__init__(parent)
         
         # Initialize registry bridge
         self.registry = RegistryBridge()
+        
+        # Store orientation
+        self.orientation = orientation
         
         # Setup UI
         self.init_ui()
@@ -50,8 +60,11 @@ class BlockLibraryPanel(QWidget):
         self.search_box.textChanged.connect(self.filter_blocks)
         layout.addWidget(self.search_box)
         
-        # Splitter for tree and details
-        splitter = QSplitter(Qt.Orientation.Vertical)
+        # Splitter for tree and details (configurable orientation)
+        if self.orientation == 'vertical':
+            splitter = QSplitter(Qt.Orientation.Horizontal)  # Side-by-side
+        else:
+            splitter = QSplitter(Qt.Orientation.Vertical)  # Top-bottom (default)
         
         # Tree widget
         self.tree = QTreeWidget()
@@ -83,8 +96,13 @@ class BlockLibraryPanel(QWidget):
         
         splitter.addWidget(details_widget)
         
-        # Set initial sizes (60% tree, 40% details)
-        splitter.setSizes([600, 400])
+        # Set initial sizes based on orientation
+        if self.orientation == 'vertical':
+            # For vertical orientation: 50/50 side-by-side
+            splitter.setSizes([500, 500])
+        else:
+            # For horizontal orientation: 60/40 top-bottom
+            splitter.setSizes([600, 400])
         
         layout.addWidget(splitter)
         
@@ -201,7 +219,7 @@ class BlockLibraryPanel(QWidget):
         # Add usage tip
         details += f"""
 <h4 style='color: #569cd6;'>Usage Tip</h4>
-<p style='color: #d4d4d4;'><i>Double-click to add this block to your strategy, or drag & drop into the strategy creator.</i></p>
+<p style='color: #d4d4d4;'><i>This is a reference library for browsing blocks. To add blocks to your strategy, open the Strategy Editor and use the "Available Blocks" section there.</i></p>
 """
         
         self.details_text.setHtml(details)
