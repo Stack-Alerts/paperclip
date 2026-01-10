@@ -1,5 +1,5 @@
 {
-  "strategy_name": "strategy_01_01_HOD_Rejection",
+  "strategy_name": "strategy_01_HOD_Rejection",
   "strategy_number": 1,
   "strategy_category": "REVERSAL",
   "description": "[DRAFT] Work in progress",
@@ -103,11 +103,11 @@
   "test_days": 180,
   "optimization_configs": 48,
   "test_permutations": [],
-  "created_date": "2026-01-10T01:12:40.643540",
-  "modified_date": "2026-01-10T01:12:40.643553",
+  "created_date": "2026-01-10T01:27:06.326362",
+  "modified_date": "2026-01-10T01:27:06.326382",
   "version": 1,
   "_metadata": {
-    "saved_at": "2026-01-10T01:12:40.643986",
+    "saved_at": "2026-01-10T01:27:06.326763",
     "version": "1.0",
     "status": "draft"
   }

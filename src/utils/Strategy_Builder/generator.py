@@ -228,12 +228,16 @@ class StrategyGenerator:
         # Generate imports
         imports = self._generate_imports(config.blocks)
         
+        # Generate block class name mapping from registry
+        block_class_map = self._generate_block_class_map(config.blocks)
+        
         # Prepare context
         context = {
             'config': config,
             'class_name': class_name,
             'filename': filename,
             'imports': imports,
+            'block_class_map': block_class_map,
             'generation_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         }
         
@@ -297,6 +301,37 @@ class StrategyGenerator:
         class_name = f"Strategy{name_part}"
         
         return class_name
+    
+    def _generate_block_class_map(self, blocks: List[BlockSelection]) -> Dict[str, str]:
+        """
+        Generate mapping of block_name to class_name from registry
+        
+        Args:
+            blocks: List of selected building blocks
+            
+        Returns:
+            Dictionary mapping block_name to actual class_name
+            
+        Example:
+            {'hod': 'HOD', 'stochastic_rsi': 'StochasticRSI'}
+        """
+        from src.detectors.building_blocks.registry import BlockRegistry
+        
+        registry = BlockRegistry()
+        class_map = {}
+        
+        for block in blocks:
+            block_name = block.block_name
+            block_metadata = registry.get_block(block_name)
+            
+            if block_metadata:
+                class_map[block_name] = block_metadata.class_name
+            else:
+                print(f"Warning: Block '{block_name}' not in registry")
+                # Fallback to generated name
+                class_map[block_name] = self._generate_class_name(block_name)
+        
+        return class_map
     
     def _generate_imports(self, blocks: List[BlockSelection]) -> List[str]:
         """
