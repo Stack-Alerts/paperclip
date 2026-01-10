@@ -28,7 +28,9 @@ class StrategyCreatorDialog(QDialog):
     """Dialog for creating new strategies visually"""
     
     def __init__(self, parent=None, existing_config=None, on_draft_saved=None):
-        super().__init__(parent)
+        # Make window independent for multi-monitor support
+        super().__init__(parent, Qt.WindowType.Window)
+        self.setModal(False)
         
         self.registry = StrategyRegistry()
         self.bridge = RegistryBridge()
