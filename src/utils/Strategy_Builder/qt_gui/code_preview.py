@@ -107,7 +107,9 @@ class CodePreviewDialog(QDialog):
             files_dict: Dict with keys 'strategy', 'test', 'optimizer'
             parent: Parent widget
         """
-        super().__init__(parent)
+        # Make window independent for multi-monitor support
+        super().__init__(parent, Qt.WindowType.Window)
+        self.setModal(False)
         
         self.files_dict = files_dict
         self.init_ui()
