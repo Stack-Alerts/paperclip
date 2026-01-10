@@ -27,12 +27,15 @@ from src.utils.Strategy_Builder import (
 class StrategyCreatorDialog(QDialog):
     """Dialog for creating new strategies visually"""
     
-    def __init__(self, parent=None, existing_config=None):
+    def __init__(self, parent=None, existing_config=None, on_draft_saved=None):
         super().__init__(parent)
         
         self.registry = StrategyRegistry()
         self.bridge = RegistryBridge()
         self.validator = StrategyValidator()
+        
+        # Callback for when draft is saved
+        self.on_draft_saved = on_draft_saved
         
         # Strategy data
         self.selected_blocks = []  # List of BlockConfiguration
@@ -493,6 +496,11 @@ class StrategyCreatorDialog(QDialog):
                 self.setWindowTitle("Edit Strategy (Draft)")
             
             action = "updated" if strategy_num == config.strategy_number else "saved"
+            
+            # Call callback to refresh parent window
+            if self.on_draft_saved:
+                self.on_draft_saved()
+            
             QMessageBox.information(
                 self,
                 f"Draft {action.title()}",

@@ -103,11 +103,11 @@
   "test_days": 180,
   "optimization_configs": 48,
   "test_permutations": [],
-  "created_date": "2026-01-10T01:27:06.326362",
-  "modified_date": "2026-01-10T01:27:06.326382",
+  "created_date": "2026-01-10T01:31:10.900043",
+  "modified_date": "2026-01-10T01:31:10.900055",
   "version": 1,
   "_metadata": {
-    "saved_at": "2026-01-10T01:27:06.326763",
+    "saved_at": "2026-01-10T01:31:10.900477",
     "version": "1.0",
     "status": "draft"
   }
