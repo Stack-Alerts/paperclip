@@ -389,7 +389,12 @@ Building Blocks ({len(config.blocks)}):
             return
         
         # Launch visual creator with existing config
-        creator = StrategyCreatorDialog(self, existing_config=config)
+        # Pass refresh callback so drafts update list immediately
+        creator = StrategyCreatorDialog(
+            self, 
+            existing_config=config,
+            on_draft_saved=self.load_strategies
+        )
         if creator.exec():
             # Refresh list after successful edit
             self.load_strategies()
