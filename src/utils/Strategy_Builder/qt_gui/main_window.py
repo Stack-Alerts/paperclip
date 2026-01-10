@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QListWidget, QTextEdit,
     QToolBar, QStatusBar, QMessageBox, QSplitter, QComboBox, QDialog
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QSettings
 from PyQt6.QtGui import QAction
 
 # Add project root to path
@@ -44,6 +44,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Setup UI
         self.init_ui()
         self.apply_dark_theme()
+        self.restore_window_state()
         self.load_strategies()
         
     def init_ui(self):
@@ -163,11 +164,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         layout = QHBoxLayout(central_widget)
         
         # Create splitter for resizable panes (3-pane)
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Left pane: Block Library
         self.block_library = BlockLibraryPanel()
-        splitter.addWidget(self.block_library)
+        self.splitter.addWidget(self.block_library)
         
         # Middle pane: Strategy list
         left_widget = QWidget()
@@ -199,7 +200,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.strategy_list.itemDoubleClicked.connect(self.on_strategy_double_clicked)
         left_layout.addWidget(self.strategy_list)
         
-        splitter.addWidget(left_widget)
+        self.splitter.addWidget(left_widget)
         
         # Right pane: Details/Editor
         right_widget = QWidget()
@@ -234,12 +235,12 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         right_layout.addLayout(button_layout)
         
-        splitter.addWidget(right_widget)
+        self.splitter.addWidget(right_widget)
         
         # Set initial sizes (25% library, 30% strategies, 45% details)
-        splitter.setSizes([250, 300, 450])
+        self.splitter.setSizes([250, 300, 450])
         
-        layout.addWidget(splitter)
+        layout.addWidget(self.splitter)
         
         # Connect list selection
         self.strategy_list.currentItemChanged.connect(self.on_strategy_selected)
@@ -810,9 +811,38 @@ Features:
   - unpublished/ (Complete, not published)
   - published/ (Ready for ITM)
 
-© 2026 BTC Engine Project
+©  2026 BTC Engine Project
 """
         QMessageBox.about(self, "About", about_text)
+    
+    def restore_window_state(self):
+        """Restore window geometry and splitter sizes from settings"""
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        
+        # Restore window geometry
+        geometry = settings.value("window/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+        
+        # Restore splitter sizes
+        splitter_state = settings.value("window/splitter")
+        if splitter_state:
+            self.splitter.restoreState(splitter_state)
+    
+    def save_window_state(self):
+        """Save window geometry and splitter sizes to settings"""
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        
+        # Save window geometry
+        settings.setValue("window/geometry", self.saveGeometry())
+        
+        # Save splitter sizes
+        settings.setValue("window/splitter", self.splitter.saveState())
+    
+    def closeEvent(self, event):
+        """Handle window close event - save state before closing"""
+        self.save_window_state()
+        event.accept()
 
 
 def main():
