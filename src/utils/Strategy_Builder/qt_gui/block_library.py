@@ -47,12 +47,12 @@ class BlockLibraryPanel(QWidget):
     def init_ui(self):
         """Initialize the user interface"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(2, 2, 2, 2)
-        layout.setSpacing(4)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
         
-        # Search bar with count
+        # Search bar with count (minimized spacing)
         search_layout = QHBoxLayout()
-        search_layout.setSpacing(4)
+        search_layout.setSpacing(2)
         
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("🔍 Search blocks...")
