@@ -47,8 +47,29 @@ def extract_blocks_from_strategy(strategy_module_name: str) -> Optional[Dict]:
 
 
 def validate_blocks_against_catalog(blocks: Dict, strategy_name: str) -> bool:
-    """Validate blocks exist in catalog (ERROR and HALT if not)"""
-    unknown_blocks = [key for key in blocks if key not in BUILDING_BLOCK_CATALOG]
+    """
+    Validate blocks exist in catalog (ERROR and HALT if not)
+    
+    UPDATED: Strips numeric suffixes (_0, _1, _2) before catalog lookup
+    to support multiple instances of same block type (from Strategy Builder fix).
+    
+    Example:
+        hod_0 -> checks 'hod' in catalog ✅
+        hod_1 -> checks 'hod' in catalog ✅
+        fvg_0 -> checks 'fvg' in catalog ✅
+    """
+    
+    def strip_numeric_suffix(block_key: str) -> str:
+        """Strip _0, _1, _2, etc. from block key to get base name"""
+        # Pattern: _\d+$ (underscore followed by digits at end)
+        return re.sub(r'_\d+$', '', block_key)
+    
+    # Check blocks against catalog using base names
+    unknown_blocks = []
+    for key in blocks:
+        base_name = strip_numeric_suffix(key)
+        if base_name not in BUILDING_BLOCK_CATALOG:
+            unknown_blocks.append((key, base_name))
     
     if unknown_blocks:
         print("\n" + "="*80)
@@ -57,11 +78,11 @@ def validate_blocks_against_catalog(blocks: Dict, strategy_name: str) -> bool:
         print(f"\nStrategy: {strategy_name}")
         print(f"Found {len(unknown_blocks)} unknown block(s):\n")
         
-        for block in unknown_blocks:
-            print(f"   ❌ '{block}' - NOT IN CATALOG")
-            print(f"      Name: {blocks[block].get('name', 'N/A')}")
-            print(f"      Weight: {blocks[block].get('weight', 'N/A')}")
-            print(f"      Enabled: {blocks[block].get('enabled', 'N/A')}\n")
+        for block_key, base_name in unknown_blocks:
+            print(f"   ❌ '{block_key}' (base: '{base_name}') - NOT IN CATALOG")
+            print(f"      Name: {blocks[block_key].get('name', 'N/A')}")
+            print(f"      Weight: {blocks[block_key].get('weight', 'N/A')}")
+            print(f"      Enabled: {blocks[block_key].get('enabled', 'N/A')}\n")
         
         print("REQUIRED ACTION:")
         print("1. Add blocks to BUILDING_BLOCK_CATALOG in catalog.py")
