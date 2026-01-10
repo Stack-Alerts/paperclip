@@ -48,11 +48,11 @@ class BlockLibraryPanel(QWidget):
         """Initialize the user interface"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
+        layout.setSpacing(0)
         
-        # Search bar with count (minimized spacing)
+        # Search bar with count (absolutely zero spacing)
         search_layout = QHBoxLayout()
-        search_layout.setSpacing(2)
+        search_layout.setSpacing(0)
         
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("🔍 Search blocks...")
@@ -63,7 +63,7 @@ class BlockLibraryPanel(QWidget):
         self.info_label.setStyleSheet("font-size: 8pt; color: #888;")
         search_layout.addWidget(self.info_label)
         
-        layout.addLayout(search_layout)
+        layout.addLayout(search_layout, 0)  # 0 stretch = minimum height
         
         # Splitter for tree and details (configurable orientation)
         if self.orientation == 'vertical':
@@ -99,7 +99,7 @@ class BlockLibraryPanel(QWidget):
             # For horizontal orientation: 60/40 top-bottom
             splitter.setSizes([600, 400])
         
-        layout.addWidget(splitter)
+        layout.addWidget(splitter, 1)  # 1 stretch = take all remaining space!
         
     def load_blocks(self):
         """Load building blocks from registry"""
