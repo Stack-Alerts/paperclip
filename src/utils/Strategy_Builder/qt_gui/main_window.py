@@ -668,11 +668,12 @@ Building Blocks ({len(config.blocks)}):
             self.status_bar.showMessage("Ready")
     
     def _show_test_results(self, strategy_num: int, output: str):
-        """Display test results in dialog"""
-        # Create results dialog
-        dialog = QDialog(self)
+        """Display test results in independent window"""
+        # Create results window (not a dialog, so it's independent)
+        dialog = QDialog(self, Qt.WindowType.Window)  # Window flag makes it independent
         dialog.setWindowTitle(f"Test Results - Strategy #{strategy_num:03d}")
         dialog.setGeometry(200, 200, 800, 600)
+        dialog.setModal(False)  # Non-modal - can move independently
         
         layout = QVBoxLayout(dialog)
         
