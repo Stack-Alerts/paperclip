@@ -20,19 +20,43 @@ class OptimizationConfig:
     strategy_name: str
     side: str
     tp_mode: str = 'PERCENTAGE'  # TP calculation method: 'PERCENTAGE', 'FIBONACCI', 'HYBRID'
-    sl_mode: str = 'HYBRID'  # SL calculation method: 'SWING_POINTS', 'SUPPLY_DEMAND', 'FIBONACCI_EXT', 'STRUCTURE_BREAK', 'ATR_DYNAMIC', 'HYBRID'
-    trailing_pct: float = 0.5  # Trailing stop distance (0.3%, 0.5%, 0.7%)
+    sl_mode: str = 'ADAPTIVE'  # SL calculation method: 'ADAPTIVE' (v2.0), 'HYBRID' (v1.0 - deprecated)
+    trailing_pct: float = 0.6  # Trailing stop distance after TP2 (0.5%, 0.6%, 0.8%)
     use_trailing: bool = True  # Enable trailing stops
     breakeven_after_tp1: bool = True  # Move SL to breakeven after TP1
-    tp_fallback_pcts: Dict[str, float] = None  # NEW: {'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5} - TP distances
-    partial_exit_pcts: Dict[str, int] = None  # NEW: {'tp1': 50, 'tp2': 30, 'tp3': 20} - Exit splits
+    tp_fallback_pcts: Dict[str, float] = None  # {'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5} - TP distances
+    partial_exit_pcts: Dict[str, int] = None  # {'tp1': 50, 'tp2': 30, 'tp3': 20} - Exit splits
+    
+    # ⭐ ADAPTIVE SL v2.0 PARAMETERS (NEW)
+    # Volatility Settings
+    volatility_lookback: int = 20  # Bars for volatility calculation
+    volatility_multiplier: float = 1.2  # Min SL = avg_range * this
+    
+    # Bounds
+    absolute_min_sl_pct: float = 0.7  # Never tighter than 0.7%
+    absolute_max_sl_pct: float = 2.0  # Never wider than 2.0%
+    
+    # Two-Stage SL
+    initial_sl_multiplier: float = 1.5  # Initial SL = volatility * 1.5
+    working_sl_multiplier: float = 1.0  # Working SL = volatility * 1.0
+    
+    # Delayed SL Activation (Your Enhancement!)
+    use_delayed_sl: bool = True  # Enable delayed SL activation
+    delay_bars: int = 2  # Wait N bars before tight SL (2-3 recommended for BTC 15min)
+    emergency_sl_pct: float = 2.5  # Wide emergency SL during delay period
+    
+    # Structure-Based SL
+    use_structure_sl: bool = True  # Use market structure when available
+    structure_sources: List[str] = None  # ['swing_points', 'supply_demand', 'fibonacci']
     
     def __post_init__(self):
-        """Set default values for dict fields"""
+        """Set default values for dict fields and lists"""
         if self.tp_fallback_pcts is None:
             self.tp_fallback_pcts = {'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5}
         if self.partial_exit_pcts is None:
             self.partial_exit_pcts = {'tp1': 50, 'tp2': 30, 'tp3': 20}
+        if self.structure_sources is None:
+            self.structure_sources = ['swing_points', 'supply_demand', 'fibonacci']
     
     def to_dict(self) -> dict:
         """Convert to dictionary"""
