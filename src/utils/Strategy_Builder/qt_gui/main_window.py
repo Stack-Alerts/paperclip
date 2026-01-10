@@ -744,13 +744,18 @@ Building Blocks ({len(config.blocks)}):
             # Get all text
             text = self.live_output_text.toPlainText()
             
-            # Extract paths that look like trade records
-            # Pattern: optimization_results/*/trade_records.csv
+            # Extract paths - look for various patterns
             paths = []
             for line in text.split('\n'):
-                # Look for paths containing "trade_records" or "optimization_results"
-                if 'trade_records' in line or ('optimization_results' in line and '.csv' in line):
-                    # Extract path-like strings
+                # Case-insensitive search for trade record indicators
+                line_lower = line.lower()
+                
+                # Check if line contains trade record keywords
+                if any(keyword in line_lower for keyword in [
+                    'trade record', 'trade_record', 'trades.csv', 
+                    'optimization_results', 'data/reports'
+                ]):
+                    # Extract all path-like strings ending in .csv
                     matches = re.findall(r'[a-zA-Z0-9_/.-]+\.csv', line)
                     paths.extend(matches)
             
