@@ -608,27 +608,53 @@ Building Blocks ({len(config.blocks)}):
     
     def _on_backtest_finished(self, strategy_num: int):
         """Handle backtest completion"""
-        if self.backtest_thread.error:
+        try:
+            # Check for thread errors
+            if self.backtest_thread.error:
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Backtest failed:\n{self.backtest_thread.error}"
+                )
+                self.status_bar.showMessage("Ready")
+                return
+            
+            result = self.backtest_thread.result
+            
+            # Debug: Show what we got
+            if result is None:
+                QMessageBox.warning(
+                    self,
+                    "No Results",
+                    "Backtest completed but no results were captured.\n"
+                    "Check the terminal for output."
+                )
+                self.status_bar.showMessage("Ready")
+                return
+            
+            # Show results regardless of return code (for debugging)
+            output = f"Return Code: {result.returncode}\n\n"
+            
+            if result.stdout:
+                output += "=== STDOUT ===\n" + result.stdout
+            
+            if result.stderr:
+                output += "\n\n=== STDERR ===\n" + result.stderr
+            
+            if not result.stdout and not result.stderr:
+                output += "No output captured"
+            
+            # Show results dialog
+            self._show_test_results(strategy_num, output)
+            
+        except Exception as e:
             QMessageBox.critical(
                 self,
                 "Error",
-                f"Backtest failed:\n{self.backtest_thread.error}"
+                f"Error processing backtest results:\n{e}"
             )
+        finally:
             self.status_bar.showMessage("Ready")
-            return
-        
-        result = self.backtest_thread.result
-        
-        if result.returncode == 0:
-            self._show_test_results(strategy_num, result.stdout)
-        else:
-            QMessageBox.critical(
-                self,
-                "Test Failed",
-                f"Backtest failed:\n\n{result.stderr}"
-            )
-        
-        self.status_bar.showMessage("Ready")
     
     def _show_test_results(self, strategy_num: int, output: str):
         """Display test results in dialog"""
