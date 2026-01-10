@@ -172,7 +172,7 @@ def get_weight_presets_for_blocks(block_keys: list) -> list:
         base_name = strip_numeric_suffix(key)
         if base_name in BUILDING_BLOCK_CATALOG:
             min_w, _ = BUILDING_BLOCK_CATALOG[base_name]['weight_range']
-            context_heavy[key] = min_w
+            event_heavy[key] = min_w  # Fixed: was context_heavy, should be event_heavy
     presets.append(event_heavy)
     
     # Preset 3: Context-Heavy
