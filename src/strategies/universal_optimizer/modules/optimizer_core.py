@@ -447,6 +447,7 @@ def build_optimization_configs(
                         strategy_name=strategy_module_name.replace('_', ' ').title(),
                         side=side,
                         tp_mode=tp_combo['mode'],                # TP calculation method
+                        sl_mode='HYBRID',                         # SL calculation method (HYBRID = tightest valid SL)
                         tp_fallback_pcts=tp_combo['distances'],  # Clean dict: {'tp1': X, 'tp2': Y, 'tp3': Z}
                         trailing_pct=tp_combo['trailing'],       # Clean float: 0.3, 0.5, or 0.7
                         partial_exit_pcts=tp_combo['exits'],     # Clean dict: {'tp1': X, 'tp2': Y, 'tp3': Z}

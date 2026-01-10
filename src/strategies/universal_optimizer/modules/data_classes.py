@@ -20,6 +20,7 @@ class OptimizationConfig:
     strategy_name: str
     side: str
     tp_mode: str = 'PERCENTAGE'  # TP calculation method: 'PERCENTAGE', 'FIBONACCI', 'HYBRID'
+    sl_mode: str = 'HYBRID'  # SL calculation method: 'SWING_POINTS', 'SUPPLY_DEMAND', 'FIBONACCI_EXT', 'STRUCTURE_BREAK', 'ATR_DYNAMIC', 'HYBRID'
     trailing_pct: float = 0.5  # Trailing stop distance (0.3%, 0.5%, 0.7%)
     use_trailing: bool = True  # Enable trailing stops
     breakeven_after_tp1: bool = True  # Move SL to breakeven after TP1
