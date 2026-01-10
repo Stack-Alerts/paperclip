@@ -5,7 +5,7 @@ Category:
 Timeframe: 15-minute
 Risk:Reward: 1:3
 Author: Strategy Builder v1.0
-Date: 2026-01-10 01:19:06
+Date: 2026-01-10 01:22:45
 
 Description:
 [DRAFT] Work in progress
@@ -44,14 +44,14 @@ from datetime import datetime
 from typing import Optional
 
 # Import building blocks
-from src.detectors.building_blocks.oscillators.stochastic_rsi import StochasticRsi
+from src.detectors.building_blocks.oscillators.stochastic_rsi import StrategyStochasticRsi
 from src.detectors.building_blocks.price_levels.hod import HOD
 
 # Import centralized confluence calculator
 from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
 
 
-class 01HodRejection(Strategy):
+class StrategyHodRejection(Strategy):
     """
     strategy_01_01_HOD_Rejection
     

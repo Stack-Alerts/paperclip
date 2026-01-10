@@ -300,7 +300,12 @@ class StrategyGenerator:
     
     def _generate_imports(self, blocks: List[BlockSelection]) -> List[str]:
         """
-        Generate import statements for building blocks
+        Generate import statements for building blocks using BlockRegistry
+        
+        Uses the BlockRegistry as the single source of truth for:
+        - Module paths
+        - Class names
+        - Import statements
         
         Args:
             blocks: List of selected building blocks
@@ -308,36 +313,26 @@ class StrategyGenerator:
         Returns:
             List of import statement strings
         """
+        from src.detectors.building_blocks.registry import BlockRegistry
+        
         imports = []
         seen = set()  # Track unique imports
-        
-        # Import mapping (block_name -> (module_path, class_name))
-        # This should be generated from registry in production
-        # For now, using common mapping
-        block_import_map = {
-            'double_top': ('src.detectors.building_blocks.patterns.double_top', 'DoubleTopPattern'),
-            'double_bottom': ('src.detectors.building_blocks.patterns.double_bottom', 'DoubleBottomPattern'),
-            'rsi_divergence': ('src.detectors.building_blocks.oscillators.rsi_divergence', 'RSIDivergence'),
-            'hod': ('src.detectors.building_blocks.price_levels.hod', 'HOD'),
-            'lod': ('src.detectors.building_blocks.price_levels.lod', 'LOD'),
-            'vwap': ('src.detectors.building_blocks.institutional.vwap', 'VWAP'),
-            'ema_200_trend': ('src.detectors.building_blocks.moving_averages.ema_200_trend', 'EMA200Trend'),
-            'ema_20_50_trend': ('src.detectors.building_blocks.moving_averages.ema_20_50_trend', 'EMA2050Trend'),
-        }
+        registry = BlockRegistry()
         
         for block in blocks:
             block_name = block.block_name
             
-            # Get import info from map or generate it
-            if block_name in block_import_map:
-                module_path, class_name = block_import_map[block_name]
-            else:
-                # Generate import path from block category and name
-                category_slug = block.block_category.lower().replace(' ', '_')
-                module_path = f'src.detectors.building_blocks.{category_slug}.{block_name}'
-                
-                # Generate class name (PascalCase)
-                class_name = self._generate_class_name(block_name)
+            # Get block metadata from registry (single source of truth)
+            block_metadata = registry.get_block(block_name)
+            
+            if not block_metadata:
+                # Fallback if block not in registry (shouldn't happen in production)
+                print(f"Warning: Block '{block_name}' not found in registry, skipping import")
+                continue
+            
+            # Get import info from registry metadata
+            module_path = block_metadata.module_path
+            class_name = block_metadata.class_name
             
             # Create import statement
             import_stmt = f"from {module_path} import {class_name}"
