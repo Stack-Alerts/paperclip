@@ -60,11 +60,11 @@
   "test_days": 180,
   "optimization_configs": 48,
   "test_permutations": [],
-  "created_date": "2026-01-10T11:10:02.692081",
-  "modified_date": "2026-01-10T11:10:02.692093",
+  "created_date": "2026-01-10T11:16:00.115786",
+  "modified_date": "2026-01-10T11:16:00.115800",
   "version": 1,
   "_metadata": {
-    "saved_at": "2026-01-10T11:10:02.692656",
+    "saved_at": "2026-01-10T11:16:00.116389",
     "version": "1.0",
     "status": "draft"
   }

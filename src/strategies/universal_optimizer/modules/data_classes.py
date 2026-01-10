@@ -11,7 +11,7 @@ from typing import Dict, List, Any, Optional
 
 @dataclass
 class OptimizationConfig:
-    """Configuration for a single optimization test"""
+    """Configuration for a single optimization test (ENHANCED with Dynamic TPs)"""
     config_id: int
     min_confluence: int
     min_risk_reward: float
@@ -19,6 +19,10 @@ class OptimizationConfig:
     strategy_id: str
     strategy_name: str
     side: str
+    tp_mode: str = 'PERCENTAGE'  # NEW: 'PERCENTAGE', 'FIBONACCI', 'SWING_POINTS', 'SUPPLY_DEMAND', 'HYBRID'
+    trailing_pct: float = 0.5  # NEW: Trailing stop distance (default 0.5%)
+    use_trailing: bool = True  # NEW: Enable trailing stops
+    breakeven_after_tp1: bool = True  # NEW: Move SL to breakeven after TP1
     
     def to_dict(self) -> dict:
         """Convert to dictionary"""

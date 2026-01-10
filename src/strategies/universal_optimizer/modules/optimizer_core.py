@@ -317,22 +317,30 @@ def optimize_strategy_v2(
 def build_optimization_configs(
     blocks: dict,
     strategy_module_name: str,
-    strategy_side: str = None
+    strategy_side: str = None,
+    test_tp_modes: bool = True
 ) -> List[OptimizationConfig]:
     """
-    Build 48 optimization configurations
+    Build optimization configurations with DYNAMIC TP TESTING
+    
+    NEW: Tests different TP calculation methods
+    - PERCENTAGE (fallback, 1%/2%/3.5%)
+    - FIBONACCI (38.2%/23.6%/0% retracements)
+    - HYBRID (best of all blocks)
     
     Combinations:
-    - Confluence: [40, 50, 60, 70] = 4
-    - Risk:Reward: [2.0, 2.5, 3.0] = 3
+    - Confluence: Dynamic [20-80] based on block count
+    - Risk:Reward: [1.5, 2.0, 2.5, 3.0] = 4
     - Weight presets: 4
+    - TP Modes: 3 (if test_tp_modes=True)
     
-    Total: 4 × 3 × 4 = 48 configs
+    Total: ~192 configs (4 × 4 × 4 × 3)
     
     Args:
         blocks: Building blocks dict
         strategy_module_name: Strategy name
         strategy_side: Trade direction ('SHORT' or 'LONG'), read from config
+        test_tp_modes: Whether to test multiple TP modes (default True)
     """
     configs = []
     config_id = 0
@@ -346,30 +354,57 @@ def build_optimization_configs(
         # Fallback: Heuristic based on block names
         side = 'SHORT' if 'double_top' in blocks else 'LONG'
     
-    for confluence in [40, 50, 60, 70]:
-        for rr in [2.0, 2.5, 3.0]:
+    # DYNAMIC CONFLUENCE based on block count
+    num_blocks = len(blocks)
+    if num_blocks <= 2:
+        # Sparse strategies: Need lower thresholds
+        confluence_range = [20, 25, 30, 35, 40, 50]
+    elif num_blocks <= 4:
+        # Medium strategies: Standard range
+        confluence_range = [30, 35, 40, 50, 60]
+    else:
+        # Dense strategies: Higher thresholds OK
+        confluence_range = [40, 50, 60, 70, 80]
+    
+    # Expanded R:R range
+    rr_range = [1.5, 2.0, 2.5, 3.0]
+    
+    # TP modes to test
+    if test_tp_modes:
+        tp_modes = ['PERCENTAGE', 'FIBONACCI', 'HYBRID']
+    else:
+        tp_modes = ['PERCENTAGE']  # Legacy mode only
+    
+    for confluence in confluence_range[:4]:  # Limit to 4 to manage config count
+        for rr in rr_range:
             for weights in weight_presets:
-                # Build blocks with these weights
-                blocks_with_weights = {}
-                for block_name, block_info in blocks.items():
-                    blocks_with_weights[block_name] = {
-                        'name': block_info['name'],
-                        'weight': weights.get(block_name, block_info['weight']),
-                        'enabled': block_info['enabled']
-                    }
-                
-                config = OptimizationConfig(
-                    config_id=config_id,
-                    min_confluence=confluence,
-                    min_risk_reward=rr,
-                    blocks=blocks_with_weights,
-                    strategy_id=strategy_module_name,
-                    strategy_name=strategy_module_name.replace('_', ' ').title(),
-                    side=side  # Use determined side
-                )
-                
-                configs.append(config)
-                config_id += 1
+                for tp_mode in tp_modes:
+                    # Build blocks with these weights
+                    blocks_with_weights = {}
+                    for block_name, block_info in blocks.items():
+                        blocks_with_weights[block_name] = {
+                            'name': block_info['name'],
+                            'weight': weights.get(block_name, block_info['weight']),
+                            'enabled': block_info['enabled']
+                        }
+                    
+                    config = OptimizationConfig(
+                        config_id=config_id,
+                        min_confluence=confluence,
+                        min_risk_reward=rr,
+                        blocks=blocks_with_weights,
+                        strategy_id=strategy_module_name,
+                        strategy_name=strategy_module_name.replace('_', ' ').title(),
+                        side=side,
+                        tp_mode=tp_mode  # NEW: TP calculation method
+                    )
+                    
+                    configs.append(config)
+                    config_id += 1
+    
+    print(f"   ✅ Dynamic confluence: {confluence_range[:4]}")
+    print(f"   ✅ Expanded R:R: {rr_range}")
+    print(f"   ✅ TP Modes: {tp_modes}")
     
     return configs
 
