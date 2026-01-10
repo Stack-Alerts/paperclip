@@ -115,25 +115,40 @@ def process_bar_chunk(args):
 
 def test_single_config(args):
     """
-    Test one config on pre-computed results WITH PROPER TP/SL LOGIC
+    Test one config on pre-computed results WITH SIGNAL ACCUMULATION
     
-    FIXED: No more hardcoded 24-bar exits!
-    NOW: Uses actual TP/SL levels from strategy
-    FIXED: Uses centralized confluence calculator with proper tiering
+    NEW: Sequential signal accumulation across multiple bars!
+    - Signals accumulate over configurable window (default 20 bars)
+    - Entry triggers when accumulated confluence meets threshold
+    - Example: Bar 1 (20pts) + Bar 5 (15pts) + Bar 11 (12pts) = 47pts → ENTRY!
+    
+    FIXED: Proper TP/SL logic (no hardcoded exits)
+    FIXED: Centralized confluence calculator with proper tiering
     """
     from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
+    from src.strategies.signal_accumulator import SignalAccumulator
     
     config, all_results, test_df = args
     
     trades = []
     current_position = None
     
+    # Initialize signal accumulator for sequential confluence building
+    accumulator = SignalAccumulator(
+        min_confluence=config.min_confluence,
+        window_bars=20  # TODO: Make configurable via config
+    )
+    
     for bar_idx, bar_results in enumerate(all_results):
-        # FIXED: Use centralized confluence calculator with proper tiering
-        confluence, _ = ConfluenceCalculator.calculate_confluence(bar_results, config.blocks)
+        # NEW: Use signal accumulator for sequential confluence
+        should_enter, total_confluence, active_signals = accumulator.on_bar(
+            bar_number=bar_idx,
+            block_results=bar_results,
+            block_configs=config.blocks
+        )
         
-        # ENTRY LOGIC
-        if confluence >= config.min_confluence and current_position is None:
+        # ENTRY LOGIC - Triggered by accumulator
+        if should_enter and current_position is None:
             entry_price = test_df.iloc[bar_idx]['close']
             entry_time = test_df.iloc[bar_idx]['timestamp']
             
@@ -172,7 +187,7 @@ def test_single_config(args):
                 'entry_bar': bar_idx,
                 'entry_price': entry_price,
                 'entry_time': entry_time,
-                'confluence': confluence,
+                'confluence': total_confluence,  # From accumulator
                 'side': config.side,
                 'tp1': tp1,
                 'tp2': tp2,
@@ -614,4 +629,4 @@ class UltraHybridSimulator:
         
         log_debug(f"Debug log saved to: {log_file}")
         
-        return results        
+        return results
