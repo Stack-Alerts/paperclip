@@ -115,21 +115,24 @@ def process_bar_chunk(args):
 
 def test_single_config(args):
     """
-    Test one config on pre-computed results WITH DYNAMIC TPs!
+    Test one config on pre-computed results WITH DYNAMIC TPs & SLs!
     
     ENHANCEMENTS:
     - Sequential signal accumulation across multiple bars
     - DYNAMIC TP calculation using building blocks (Fibonacci/Swing/S&D)
+    - DYNAMIC SL calculation using building blocks (Pattern invalidation)
     - Intelligent TP zone selection (not all TPs always used)
     - Trailing stops for profit protection
     - Customizable TP distances and exit splits per config
     
     Entry triggers when accumulated confluence meets threshold.
     TPs calculated using config's tp_mode (PERCENTAGE/FIBONACCI/HYBRID).
+    SLs calculated using config's sl_mode (SWING_POINTS/HYBRID/etc).
     """
     from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
     from src.strategies.signal_accumulator import SignalAccumulator
     from src.strategies.universal_optimizer.modules.dynamic_tp_calculator import DynamicTPCalculator
+    from src.strategies.universal_optimizer.modules.dynamic_sl_calculator import DynamicSLCalculator
     
     config, all_results, test_df = args
     
@@ -162,6 +165,11 @@ def test_single_config(args):
                 tp_mode=config.tp_mode
             )
             
+            # Initialize DynamicSLCalculator for this entry
+            sl_calculator = DynamicSLCalculator(
+                sl_mode=getattr(config, 'sl_mode', 'HYBRID')  # Default to HYBRID
+            )
+            
             # Calculate dynamic TPs using building blocks!
             history_for_tp = test_df.iloc[max(0, bar_idx-100):bar_idx+1]
             
@@ -173,11 +181,21 @@ def test_single_config(args):
                 fallback_pcts=config.tp_fallback_pcts  # Use config's TP distances
             )
             
+            # Calculate dynamic SL using building blocks!
+            sl_level = sl_calculator.calculate_sl_level(
+                df=history_for_tp,
+                entry_price=entry_price,
+                entry_bar=len(history_for_tp) - 1,
+                side=config.side,
+                max_sl_pct=1.5,  # Absolute maximum
+                fallback_atr_mult=2.0
+            )
+            
             # Extract TP/SL from calculated levels
             tp1 = tp_levels.tp1
             tp2 = tp_levels.tp2
             tp3 = tp_levels.tp3
-            sl = tp_levels.sl
+            sl = sl_level.sl  # Now from DynamicSLCalculator!
             
             # Get partial exit percentages from config
             exit_pct_tp1 = config.partial_exit_pcts.get('tp1', 50)
@@ -207,6 +225,8 @@ def test_single_config(args):
                 'exit_pct_tp3': exit_pct_tp3,
                 'trailing_activation_price': tp_levels.trailing_activation_price,
                 'tp_method': tp_levels.method,  # Track TP calculation method used
+                'sl_method': sl_level.method,  # Track SL calculation method used
+                'sl_invalidation': sl_level.invalidation_reason,  # Why this SL
                 'remaining_pct': 100.0,
                 'exits': [],
                 'tp_calculator': tp_calculator,  # Store for trailing logic

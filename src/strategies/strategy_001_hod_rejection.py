@@ -5,7 +5,7 @@ Category:
 Timeframe: 15-minute
 Risk:Reward: 1:3
 Author: Strategy Builder v1.0
-Date: 2026-01-10 12:32:21
+Date: 2026-01-10 12:45:28
 
 Description:
 [DRAFT] Work in progress
@@ -58,11 +58,11 @@ class StrategyHodRejection(Strategy):
     """
 
 # ============================================================================
-# OPTIMIZED: 2026-01-10 12:35:03
-# Trades: 3, Win Rate: 66.7%, PF: 4.01
-# Net PnL: $305.83 (+3.06%)
-# Fees: $79.81
-# Sharpe: 10.48, Max DD: 1.02%
+# OPTIMIZED: 2026-01-10 12:50:26
+# Trades: 69, Win Rate: 53.6%, PF: 1.23
+# Net PnL: $2554.00 (+25.54%)
+# Fees: $2012.72
+# Sharpe: 1.79, Max DD: 33.72%
 # ============================================================================
 
     
@@ -74,7 +74,7 @@ class StrategyHodRejection(Strategy):
         self.strategy_name = "HOD_Rejection"
         
         # Strategy parameters
-        self.min_confluence = 25
+        self.min_confluence = 30
         self.max_bars_held = 1000
         self.accumulation_window = 20  # Bars to keep signals active
         self.capital_allocation_pct = 10.0
@@ -82,7 +82,7 @@ class StrategyHodRejection(Strategy):
         # Risk management
         self.max_leverage = 2.0
         self.risk_per_trade_pct = 1.0
-        self.min_risk_reward = 3.0
+        self.min_risk_reward = 2.0
         
         # Initialize building blocks
         self.blocks = {}
@@ -115,12 +115,12 @@ class StrategyHodRejection(Strategy):
         # Block weights configuration
         self.blocks['hod_0'] = {
             'name': 'Hod',
-            'weight': 15,
+            'weight': 18,
             'enabled': True
         }
         self.blocks['hod_1'] = {
             'name': 'Hod',
-            'weight': 15,
+            'weight': 18,
             'enabled': True
         }
         
