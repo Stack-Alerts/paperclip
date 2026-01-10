@@ -262,21 +262,39 @@ class StrategyGenerator:
         """
         Generate PascalCase class name from strategy name
         
+        Ensures valid Python class names by:
+        - Prepending "Strategy" prefix
+        - Filtering out numeric-only parts
+        - Using PascalCase convention
+        
         Args:
             strategy_name: Strategy name (may have spaces, underscores)
             
         Returns:
-            PascalCase class name
+            PascalCase class name (guaranteed valid Python identifier)
             
         Examples:
-            "reversal m pattern" -> "ReversalMPattern"
-            "ema_trend_following" -> "EmaTrendFollowing"
+            "01_HOD_Rejection" -> "StrategyHodRejection"
+            "reversal m pattern" -> "StrategyReversalMPattern"
+            "ema_trend_following" -> "StrategyEmaTrendFollowing"
         """
         # Split on spaces and underscores
         words = re.split(r'[\s_]+', strategy_name)
         
-        # Capitalize each word
-        class_name = ''.join(word.capitalize() for word in words if word)
+        # Filter out numeric-only words and capitalize
+        # This handles cases like "01" from "01_HOD_Rejection"
+        valid_words = [
+            word.capitalize() 
+            for word in words 
+            if word and not word.isdigit()
+        ]
+        
+        # Join words
+        name_part = ''.join(valid_words)
+        
+        # Always prepend "Strategy" to ensure valid Python identifier
+        # and avoid conflicts with built-in names
+        class_name = f"Strategy{name_part}"
         
         return class_name
     
