@@ -10,7 +10,8 @@ Date: 2026-01-10
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QComboBox, QListWidget, QPushButton,
-    QSpinBox, QGroupBox, QMessageBox, QListWidgetItem, QWidget
+    QSpinBox, QGroupBox, QMessageBox, QListWidgetItem, QWidget,
+    QCheckBox, QDoubleSpinBox, QScrollArea
 )
 from PyQt6.QtCore import Qt
 
@@ -29,8 +30,9 @@ class StrategyCreatorDialog(QDialog):
     """Dialog for creating new strategies visually"""
     
     def __init__(self, parent=None, existing_config=None, on_draft_saved=None):
-        # Make window independent for multi-monitor support
-        super().__init__(parent, Qt.WindowType.Window)
+        # Make window independent for multi-monitor support with maximize capability
+        super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowMaximizeButtonHint)
         self.setModal(False)
         
         self.registry = StrategyRegistry()
@@ -55,7 +57,8 @@ class StrategyCreatorDialog(QDialog):
         """Initialize the user interface"""
         title = "Edit Strategy" if self.editing_mode else "Create New Strategy"
         self.setWindowTitle(title)
-        self.setGeometry(150, 150, 1000, 700)
+        # Start with reasonable default size - maximize button will work on any screen
+        self.resize(1200, 800)
         
         layout = QVBoxLayout(self)
         
@@ -94,6 +97,302 @@ class StrategyCreatorDialog(QDialog):
         
         info_group.setLayout(info_layout)
         layout.addWidget(info_group)
+        
+        # Adaptive SL v2.0 Configuration Section
+        sl_group = QGroupBox("🛡️ Adaptive Stop Loss v2.0 Configuration")
+        sl_group.setCheckable(True)
+        sl_group.setChecked(True)
+        sl_group.setToolTip("Configure adaptive stop loss parameters\nUncheck to use default values")
+        sl_layout = QVBoxLayout()
+        sl_layout.setContentsMargins(5, 2, 5, 2)  # Minimal margins
+        sl_layout.setSpacing(3)  # Very tight spacing
+        
+        # Preset buttons
+        preset_layout = QHBoxLayout()
+        preset_layout.setSpacing(3)  # Very tight spacing between buttons
+        preset_layout.setContentsMargins(0, 0, 0, 0)  # No margins
+        preset_label = QLabel("Presets:")
+        preset_layout.addWidget(preset_label)
+        
+        conservative_btn = QPushButton("🐢 Conservative")
+        conservative_btn.setToolTip("Wider SLs, higher win rate, fewer trades")
+        conservative_btn.clicked.connect(self.apply_conservative_sl)
+        preset_layout.addWidget(conservative_btn)
+        
+        balanced_btn = QPushButton("⚖️ Balanced")
+        balanced_btn.setToolTip("Default settings - balanced approach")
+        balanced_btn.clicked.connect(self.apply_balanced_sl)
+        preset_layout.addWidget(balanced_btn)
+        
+        aggressive_btn = QPushButton("🚀 Aggressive")
+        aggressive_btn.setToolTip("Tighter SLs, more trades, lower win rate")
+        aggressive_btn.clicked.connect(self.apply_aggressive_sl)
+        preset_layout.addWidget(aggressive_btn)
+        
+        preset_layout.addStretch()
+        sl_layout.addLayout(preset_layout)
+        
+        # Create horizontal split: Left = SL params, Right = Risk/Reward settings
+        params_split_layout = QHBoxLayout()
+        params_split_layout.setSpacing(8)  # Tighter horizontal spacing
+        params_split_layout.setContentsMargins(0, 2, 0, 0)  # Minimal top margin
+        
+        # LEFT SIDE: Stop Loss Parameters
+        sl_params_widget = QWidget()
+        sl_params_layout = QFormLayout()
+        sl_params_layout.setVerticalSpacing(2)  # Very tight vertical spacing
+        sl_params_layout.setContentsMargins(0, 0, 0, 0)  # No margins
+        
+        # Delayed SL Checkbox
+        self.delayed_sl_check = QCheckBox("Enable Delayed SL Activation")
+        self.delayed_sl_check.setChecked(True)
+        self.delayed_sl_check.setToolTip(
+            "Delayed SL Activation (CRITICAL FEATURE)\n\n"
+            "Uses wide emergency SL for first few bars,\n"
+            "then switches to optimized working SL.\n\n"
+            "Prevents 83% of instant stops!\n\n"
+            "Emergency SL: 2.5% (bars 0-2)\n"
+            "Working SL: 0.9% (bar 3+)"
+        )
+        sl_params_layout.addRow("", self.delayed_sl_check)
+        
+        # Delay Bars
+        self.delay_bars_spin = QSpinBox()
+        self.delay_bars_spin.setRange(0, 5)
+        self.delay_bars_spin.setValue(2)
+        self.delay_bars_spin.setSuffix(" bars")
+        self.delay_bars_spin.setToolTip(
+            "Delay Period (bars)\n\n"
+            "How long to use emergency SL before switching to working SL.\n"
+            "Default: 2 bars\n"
+            "Conservative: 3 bars\n"
+            "Aggressive: 1 bar"
+        )
+        sl_params_layout.addRow("Delay Period:", self.delay_bars_spin)
+        
+        # Emergency SL
+        self.emergency_sl_spin = QDoubleSpinBox()
+        self.emergency_sl_spin.setRange(1.0, 5.0)
+        self.emergency_sl_spin.setValue(2.5)
+        self.emergency_sl_spin.setSingleStep(0.1)
+        self.emergency_sl_spin.setSuffix(" %")
+        self.emergency_sl_spin.setToolTip(
+            "Emergency SL Width\n\n"
+            "Wide SL used during delay period.\n"
+            "Protects against immediate stop-outs.\n\n"
+            "Default: 2.5%\n"
+            "Conservative: 3.0%\n"
+            "Aggressive: 2.0%"
+        )
+        sl_params_layout.addRow("Emergency SL:", self.emergency_sl_spin)
+        
+        # Volatility Lookback
+        self.volatility_lookback_spin = QSpinBox()
+        self.volatility_lookback_spin.setRange(5, 100)
+        self.volatility_lookback_spin.setValue(20)
+        self.volatility_lookback_spin.setSuffix(" bars")
+        self.volatility_lookback_spin.setToolTip(
+            "Volatility Calculation Window\n\n"
+            "How many bars to analyze for average range.\n"
+            "Used to set minimum SL based on market volatility.\n\n"
+            "Default: 20 bars"
+        )
+        sl_params_layout.addRow("Volatility Lookback:", self.volatility_lookback_spin)
+        
+        # Volatility Multiplier
+        self.volatility_mult_spin = QDoubleSpinBox()
+        self.volatility_mult_spin.setRange(0.5, 3.0)
+        self.volatility_mult_spin.setValue(1.2)
+        self.volatility_mult_spin.setSingleStep(0.1)
+        self.volatility_mult_spin.setToolTip(
+            "Volatility Multiplier\n\n"
+            "Minimum SL = Average Range × This Multiplier\n\n"
+            "Default: 1.2x\n"
+            "Conservative: 1.5x\n"
+            "Aggressive: 1.0x"
+        )
+        sl_params_layout.addRow("Volatility Multiplier:", self.volatility_mult_spin)
+        
+        # Min SL Percentage
+        self.min_sl_pct_spin = QDoubleSpinBox()
+        self.min_sl_pct_spin.setRange(0.3, 2.0)
+        self.min_sl_pct_spin.setValue(0.7)
+        self.min_sl_pct_spin.setSingleStep(0.1)
+        self.min_sl_pct_spin.setSuffix(" %")
+        self.min_sl_pct_spin.setToolTip(
+            "Absolute Minimum SL\n\n"
+            "Never tighter than this, even in low volatility.\n\n"
+            "Default: 0.7%\n"
+            "Conservative: 1.0%\n"
+            "Aggressive: 0.6%"
+        )
+        sl_params_layout.addRow("Min SL %:", self.min_sl_pct_spin)
+        
+        # Max SL Percentage
+        self.max_sl_pct_spin = QDoubleSpinBox()
+        self.max_sl_pct_spin.setRange(1.0, 5.0)
+        self.max_sl_pct_spin.setValue(2.0)
+        self.max_sl_pct_spin.setSingleStep(0.1)
+        self.max_sl_pct_spin.setSuffix(" %")
+        self.max_sl_pct_spin.setToolTip(
+            "Absolute Maximum SL\n\n"
+            "Never wider than this, even in high volatility.\n\n"
+            "Default: 2.0%\n"
+            "Conservative: 2.5%\n"
+            "Aggressive: 1.5%"
+        )
+        sl_params_layout.addRow("Max SL %:", self.max_sl_pct_spin)
+        
+        # Structure-Based SL
+        self.structure_sl_check = QCheckBox("Use Structure for SL Placement")
+        self.structure_sl_check.setChecked(True)
+        self.structure_sl_check.setToolTip(
+            "Structure-Based SL Placement\n\n"
+            "When available, place SL at market structure levels\n"
+            "(swing points, supply/demand zones, fibonacci levels)\n"
+            "within volatility bounds.\n\n"
+            "Improves SL quality when structure is clear."
+        )
+        sl_params_layout.addRow("", self.structure_sl_check)
+        
+        sl_params_widget.setLayout(sl_params_layout)
+        params_split_layout.addWidget(sl_params_widget)
+        
+        # RIGHT SIDE: Risk/Reward Settings
+        rr_params_widget = QWidget()
+        rr_params_layout = QFormLayout()
+        rr_params_layout.setVerticalSpacing(2)  # Very tight vertical spacing
+        rr_params_layout.setContentsMargins(0, 0, 0, 0)  # No margins
+        
+        # Section label
+        rr_label = QLabel("💰 Risk/Reward Settings")
+        rr_label.setStyleSheet("font-weight: bold; color: #4ec9b0; font-size: 9pt;")
+        rr_params_layout.addRow("", rr_label)
+        
+        # Minimum R:R for trade filtering
+        self.min_rr_spin = QDoubleSpinBox()
+        self.min_rr_spin.setRange(0.5, 10.0)
+        self.min_rr_spin.setValue(1.2)
+        self.min_rr_spin.setSingleStep(0.1)
+        self.min_rr_spin.setToolTip(
+            "Minimum Risk/Reward Ratio\n\n"
+            "Only take trades where potential reward\n"
+            "is at least this multiple of risk.\n\n"
+            "Default: 1.2 (reward must be 1.2x risk)\n"
+            "Conservative: 1.5 (better quality trades)\n"
+            "Aggressive: 1.0 (more trades, lower quality)"
+        )
+        rr_params_layout.addRow("Min R:R Ratio:", self.min_rr_spin)
+        
+        # Risk per trade
+        self.risk_per_trade_spin = QDoubleSpinBox()
+        self.risk_per_trade_spin.setRange(0.1, 25.0)
+        self.risk_per_trade_spin.setValue(1.0)
+        self.risk_per_trade_spin.setSingleStep(0.1)
+        self.risk_per_trade_spin.setSuffix(" %")
+        self.risk_per_trade_spin.setToolTip(
+            "Risk Per Trade\n\n"
+            "Percentage of account to risk on each trade.\n\n"
+            "Default: 1.0% (conservative)\n"
+            "Moderate: 1.5-2.0%\n"
+            "Aggressive: 2.5-5.0%\n"
+            "Very Aggressive: 10-25%\n\n"
+            "⚠️ Higher risk = higher potential reward but also higher losses!"
+        )
+        rr_params_layout.addRow("Risk Per Trade:", self.risk_per_trade_spin)
+        
+        # Max leverage
+        self.max_leverage_spin = QDoubleSpinBox()
+        self.max_leverage_spin.setRange(1.0, 25.0)
+        self.max_leverage_spin.setValue(2.0)
+        self.max_leverage_spin.setSingleStep(0.5)
+        self.max_leverage_spin.setSuffix("x")
+        self.max_leverage_spin.setToolTip(
+            "Maximum Leverage\n\n"
+            "Maximum position size multiplier.\n\n"
+            "Default: 2.0x (moderate)\n"
+            "Conservative: 1.0x (no leverage)\n"
+            "Moderate: 3.0-5.0x\n"
+            "Aggressive: 10.0-25.0x\n\n"
+            "⚠️ Higher leverage = MUCH higher risk! Use with extreme caution!"
+        )
+        rr_params_layout.addRow("Max Leverage:", self.max_leverage_spin)
+        
+        # Min confluence
+        self.min_confluence_spin = QSpinBox()
+        self.min_confluence_spin.setRange(20, 200)
+        self.min_confluence_spin.setValue(70)
+        self.min_confluence_spin.setSuffix(" points")
+        self.min_confluence_spin.setToolTip(
+            "Minimum Confluence for Entry\n\n"
+            "Total signal points required to trigger trade.\n\n"
+            "Default: 70 points\n"
+            "Conservative: 80-100 points (fewer, better trades)\n"
+            "Aggressive: 50-60 points (more trades)"
+        )
+        rr_params_layout.addRow("Min Confluence:", self.min_confluence_spin)
+        
+        # Max bars held
+        self.max_bars_held_spin = QSpinBox()
+        self.max_bars_held_spin.setRange(10, 5000)  # Allow from 10 to 5000 bars
+        self.max_bars_held_spin.setValue(1000)
+        self.max_bars_held_spin.setSingleStep(10)  # Step by 10 bars for finer control
+        self.max_bars_held_spin.setSuffix(" bars")
+        self.max_bars_held_spin.setToolTip(
+            "Maximum Trade Duration\n\n"
+            "Force exit after this many bars.\n"
+            "Prevents holding losing positions forever.\n\n"
+            "Examples:\n"
+            "- 50 bars = ~12.5 hours (15min chart)\n"
+            "- 100 bars = ~1 day\n"
+            "- 1000 bars = ~10 days (default)\n"
+            "- 2000+ bars = swing trading"
+        )
+        rr_params_layout.addRow("Max Bars Held:", self.max_bars_held_spin)
+        
+        # Walk-Forward Optimization Settings
+        wf_label = QLabel("🔬 Walk-Forward Settings")
+        wf_label.setStyleSheet("font-weight: bold; color: #ce9178; font-size: 9pt; margin-top: 5px;")
+        rr_params_layout.addRow("", wf_label)
+        
+        # Training Window
+        self.training_window_spin = QSpinBox()
+        self.training_window_spin.setRange(30, 365)
+        self.training_window_spin.setValue(90)
+        self.training_window_spin.setSingleStep(10)
+        self.training_window_spin.setSuffix(" days")
+        self.training_window_spin.setToolTip(
+            "Training Window (days)\n\n"
+            "How many days of data to use for training/optimization.\n\n"
+            "Default: 90 days (3 months)\n"
+            "Conservative: 120-180 days (more data)\n"
+            "Aggressive: 60 days (faster adaptation)"
+        )
+        rr_params_layout.addRow("Training Window:", self.training_window_spin)
+        
+        # Testing Window
+        self.testing_window_spin = QSpinBox()
+        self.testing_window_spin.setRange(7, 180)
+        self.testing_window_spin.setValue(30)
+        self.testing_window_spin.setSingleStep(5)
+        self.testing_window_spin.setSuffix(" days")
+        self.testing_window_spin.setToolTip(
+            "Testing Window (days)\n\n"
+            "How many days to test optimized parameters.\n\n"
+            "Default: 30 days (1 month)\n"
+            "Conservative: 45-60 days (longer validation)\n"
+            "Aggressive: 14-21 days (faster iteration)"
+        )
+        rr_params_layout.addRow("Testing Window:", self.testing_window_spin)
+        
+        rr_params_widget.setLayout(rr_params_layout)
+        params_split_layout.addWidget(rr_params_widget)
+        
+        # Add split layout to main SL layout
+        sl_layout.addLayout(params_split_layout)
+        
+        sl_group.setLayout(sl_layout)
+        layout.addWidget(sl_group)
         
         # Main content: Two columns
         content_layout = QHBoxLayout()
@@ -240,6 +539,27 @@ class StrategyCreatorDialog(QDialog):
         # Set side (with fallback to LONG if not present)
         side = getattr(self.existing_config, 'side', 'LONG')
         self.side_combo.setCurrentText(side)
+        
+        # Load Adaptive SL v2.0 parameters
+        self.delayed_sl_check.setChecked(getattr(self.existing_config, 'use_delayed_sl', True))
+        self.delay_bars_spin.setValue(getattr(self.existing_config, 'delay_bars', 2))
+        self.emergency_sl_spin.setValue(getattr(self.existing_config, 'emergency_sl_pct', 2.5))
+        self.volatility_lookback_spin.setValue(getattr(self.existing_config, 'volatility_lookback', 20))
+        self.volatility_mult_spin.setValue(getattr(self.existing_config, 'volatility_multiplier', 1.2))
+        self.min_sl_pct_spin.setValue(getattr(self.existing_config, 'absolute_min_sl_pct', 0.7))
+        self.max_sl_pct_spin.setValue(getattr(self.existing_config, 'absolute_max_sl_pct', 2.0))
+        self.structure_sl_check.setChecked(getattr(self.existing_config, 'use_structure_sl', True))
+        
+        # Load Risk/Reward parameters
+        self.min_rr_spin.setValue(getattr(self.existing_config, 'min_risk_reward', 1.2))
+        self.risk_per_trade_spin.setValue(getattr(self.existing_config, 'risk_per_trade_pct', 1.0))
+        self.max_leverage_spin.setValue(getattr(self.existing_config, 'max_leverage', 2.0))
+        self.min_confluence_spin.setValue(getattr(self.existing_config, 'min_confluence', 70))
+        self.max_bars_held_spin.setValue(getattr(self.existing_config, 'max_bars_held', 1000))
+        
+        # Load Walk-Forward parameters
+        self.training_window_spin.setValue(getattr(self.existing_config, 'training_window_days', 90))
+        self.testing_window_spin.setValue(getattr(self.existing_config, 'testing_window_days', 30))
         
         # Load blocks
         self.selected_blocks = self.existing_config.blocks.copy()
@@ -496,6 +816,48 @@ class StrategyCreatorDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Validation failed:\n{e}")
             
+    def apply_conservative_sl(self):
+        """Apply conservative SL preset (wider SLs, higher win rate, fewer trades)"""
+        self.delayed_sl_check.setChecked(True)
+        self.delay_bars_spin.setValue(3)
+        self.emergency_sl_spin.setValue(3.0)
+        self.volatility_lookback_spin.setValue(20)
+        self.volatility_mult_spin.setValue(1.5)
+        self.min_sl_pct_spin.setValue(1.0)
+        self.max_sl_pct_spin.setValue(2.5)
+        self.structure_sl_check.setChecked(True)
+        
+        self.status_label.setText("🐢 Conservative preset applied")
+        self.status_label.setStyleSheet("font-size: 9pt; color: #4ec9b0;")
+    
+    def apply_balanced_sl(self):
+        """Apply balanced SL preset (default settings)"""
+        self.delayed_sl_check.setChecked(True)
+        self.delay_bars_spin.setValue(2)
+        self.emergency_sl_spin.setValue(2.5)
+        self.volatility_lookback_spin.setValue(20)
+        self.volatility_mult_spin.setValue(1.2)
+        self.min_sl_pct_spin.setValue(0.7)
+        self.max_sl_pct_spin.setValue(2.0)
+        self.structure_sl_check.setChecked(True)
+        
+        self.status_label.setText("⚖️ Balanced preset applied")
+        self.status_label.setStyleSheet("font-size: 9pt; color: #4ec9b0;")
+    
+    def apply_aggressive_sl(self):
+        """Apply aggressive SL preset (tighter SLs, more trades, lower win rate)"""
+        self.delayed_sl_check.setChecked(True)
+        self.delay_bars_spin.setValue(1)
+        self.emergency_sl_spin.setValue(2.0)
+        self.volatility_lookback_spin.setValue(20)
+        self.volatility_mult_spin.setValue(1.0)
+        self.min_sl_pct_spin.setValue(0.6)
+        self.max_sl_pct_spin.setValue(1.5)
+        self.structure_sl_check.setChecked(True)
+        
+        self.status_label.setText("🚀 Aggressive preset applied")
+        self.status_label.setStyleSheet("font-size: 9pt; color: #4ec9b0;")
+    
     def _build_config(self, is_draft=False):
         """Build StrategyConfiguration from current state"""
         strategy_name = self.name_edit.text().strip()
@@ -515,14 +877,36 @@ class StrategyCreatorDialog(QDialog):
         # Use first block as main signal (or placeholder for drafts)
         main_signal = self.selected_blocks[0].block_name if self.selected_blocks else "placeholder"
         
-        return StrategyConfiguration(
+        # Build configuration with Adaptive SL and Risk/Reward parameters
+        config = StrategyConfiguration(
             strategy_name=strategy_name,
             strategy_number=next_num,
             strategy_category=self.category_combo.currentText(),
-            side=self.side_combo.currentText(),  # Get side from dropdown
+            side=self.side_combo.currentText(),
             main_signal_block=main_signal,
-            blocks=self.selected_blocks.copy()
+            blocks=self.selected_blocks.copy(),
+            # Adaptive SL v2.0 parameters
+            volatility_lookback=self.volatility_lookback_spin.value(),
+            volatility_multiplier=self.volatility_mult_spin.value(),
+            absolute_min_sl_pct=self.min_sl_pct_spin.value(),
+            absolute_max_sl_pct=self.max_sl_pct_spin.value(),
+            use_delayed_sl=self.delayed_sl_check.isChecked(),
+            delay_bars=self.delay_bars_spin.value(),
+            emergency_sl_pct=self.emergency_sl_spin.value(),
+            use_structure_sl=self.structure_sl_check.isChecked(),
+            structure_sources=['swing_points', 'supply_demand', 'fibonacci'],
+            # Risk/Reward parameters
+            min_risk_reward=self.min_rr_spin.value(),
+            risk_per_trade_pct=self.risk_per_trade_spin.value(),
+            max_leverage=self.max_leverage_spin.value(),
+            min_confluence=self.min_confluence_spin.value(),
+            max_bars_held=self.max_bars_held_spin.value(),
+            # Walk-Forward Optimization parameters
+            training_window_days=self.training_window_spin.value(),
+            testing_window_days=self.testing_window_spin.value()
         )
+        
+        return config
     
     def save_draft(self):
         """Save strategy as a draft for later editing"""

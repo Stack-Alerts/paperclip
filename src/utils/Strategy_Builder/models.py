@@ -113,16 +113,30 @@ class StrategyConfiguration(BaseModel):
     
     # Parameters
     min_confluence: int = Field(default=70, ge=0, le=200)
-    risk_reward_ratio: str = "1:3"
+    min_risk_reward: float = Field(default=1.2, ge=0.5, le=5.0)  # Minimum R:R ratio for trade filtering
+    risk_reward_ratio: str = "1:3"  # Target R:R for TP levels (deprecated - use min_risk_reward)
     max_bars_held: int = Field(default=1000, ge=100)
     
     # Risk Management
-    risk_per_trade_pct: float = Field(default=1.0, ge=0.1, le=5.0)
-    max_leverage: float = Field(default=2.0, ge=1.0, le=10.0)
+    risk_per_trade_pct: float = Field(default=1.0, ge=0.1, le=25.0)
+    max_leverage: float = Field(default=2.0, ge=1.0, le=25.0)
+    
+    # Adaptive SL v2.0 Parameters
+    volatility_lookback: int = Field(default=20, ge=5, le=100)
+    volatility_multiplier: float = Field(default=1.2, ge=0.5, le=3.0)
+    absolute_min_sl_pct: float = Field(default=0.7, ge=0.3, le=2.0)
+    absolute_max_sl_pct: float = Field(default=2.0, ge=1.0, le=5.0)
+    use_delayed_sl: bool = True
+    delay_bars: int = Field(default=2, ge=0, le=5)
+    emergency_sl_pct: float = Field(default=2.5, ge=1.0, le=5.0)
+    use_structure_sl: bool = True
+    structure_sources: List[str] = Field(default_factory=lambda: ['swing_points', 'supply_demand', 'fibonacci'])
     
     # Optimization
     optimization_enabled: bool = True
     test_days: int = Field(default=180, ge=30)
+    training_window_days: int = Field(default=90, ge=30, le=365)
+    testing_window_days: int = Field(default=30, ge=7, le=180)
     optimization_configs: int = Field(default=48, ge=4)
     
     # Test permutations (for TEST_ALL signals)

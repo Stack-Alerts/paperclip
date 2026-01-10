@@ -90,6 +90,13 @@ The 48x Innovation:
         help='Non-interactive mode: auto-select best config and apply (for GUI/automation)'
     )
     
+    parser.add_argument(
+        '--quick-test',
+        action='store_true',
+        default=False,
+        help='Quick test mode: skip TP/SL optimization, use current config values (FAST)'
+    )
+
     args = parser.parse_args()
     
     # Run optimization
@@ -103,7 +110,8 @@ The 48x Innovation:
         test_days=args.days,
         warmup_bars=args.warmup,
         use_multicore=args.multicore,
-        non_interactive=args.non_interactive
+        non_interactive=args.non_interactive,
+        quick_test=args.quick_test
     )
     
     if result:

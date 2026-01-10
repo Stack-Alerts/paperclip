@@ -289,7 +289,13 @@ def test_single_config(args):
                     
                     # Move SL to breakeven after TP1 if configured
                     if config.breakeven_after_tp1 and not current_position.get('breakeven_set', False):
-                        entry_notional = current_position['entry_price'] * (10000 * 0.25 * 10 / current_position['entry_price'])
+                        # Use config values (NO HARDCODED VALUES!)
+                        leverage = getattr(config, 'max_leverage', 10.0)
+                        starting_capital = getattr(config, 'starting_capital', 10000.0)
+                        risk_per_trade_pct = getattr(config, 'risk_per_trade_pct', 1.0)
+                        position_pct = risk_per_trade_pct / 100.0
+                        margin_per_trade = starting_capital * position_pct
+                        entry_notional = margin_per_trade * leverage
                         position_size = entry_notional / current_position['entry_price']
                         breakeven_sl = calculate_breakeven_sl(
                             current_position['entry_price'],
@@ -378,7 +384,13 @@ def test_single_config(args):
                     
                     # Move SL to breakeven after TP1 if configured
                     if config.breakeven_after_tp1 and not current_position.get('breakeven_set', False):
-                        entry_notional = current_position['entry_price'] * (10000 * 0.25 * 10 / current_position['entry_price'])
+                        # Use config values (NO HARDCODED VALUES!)
+                        leverage = getattr(config, 'max_leverage', 10.0)
+                        starting_capital = getattr(config, 'starting_capital', 10000.0)
+                        risk_per_trade_pct = getattr(config, 'risk_per_trade_pct', 1.0)
+                        position_pct = risk_per_trade_pct / 100.0
+                        margin_per_trade = starting_capital * position_pct
+                        entry_notional = margin_per_trade * leverage
                         position_size = entry_notional / current_position['entry_price']
                         breakeven_sl = calculate_breakeven_sl(
                             current_position['entry_price'],
@@ -473,12 +485,13 @@ def test_single_config(args):
             if exit_occurred and current_position['remaining_pct'] == 0:
                 exit_time = test_df.iloc[bar_idx]['timestamp']
                 
-                # Position sizing with 10x leverage
-                leverage = 10.0
-                starting_capital = 10000.0
-                position_pct = 0.25  # 25% of capital per trade
-                margin_per_trade = starting_capital * position_pct  # $2,500
-                notional_per_trade = margin_per_trade * leverage  # $25,000
+                # Position sizing - READ FROM CONFIG (NO HARDCODED VALUES!)
+                leverage = getattr(config, 'max_leverage', 10.0)
+                starting_capital = getattr(config, 'starting_capital', 10000.0)
+                risk_per_trade_pct = getattr(config, 'risk_per_trade_pct', 1.0)
+                position_pct = risk_per_trade_pct / 100.0  # Convert percentage to decimal
+                margin_per_trade = starting_capital * position_pct
+                notional_per_trade = margin_per_trade * leverage
                 
                 # Calculate position size in BTC
                 entry_price_val = current_position['entry_price']

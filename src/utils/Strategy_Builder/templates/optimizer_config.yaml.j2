@@ -51,14 +51,14 @@ walk_forward:
   enabled: true
   
   # Training/testing split
-  training_window_days: 90
-  testing_window_days: 30
+  training_window_days: {{ config.training_window_days }}
+  testing_window_days: {{ config.testing_window_days }}
   step_days: 30
   
   # Data settings
   data_file: "data/raw/BTC_USDT_PERP_15m.csv"
   timeframe: "15min"
-  minimum_bars: 1000
+  minimum_bars: {{ config.max_bars_held }}
   
   # Performance metrics to optimize
   optimization_target: "sharpe_ratio"  # sharpe_ratio, profit_factor, win_rate, net_pnl
@@ -68,6 +68,7 @@ walk_forward:
     min_trades: 5  # Minimum trades in test period
     max_drawdown_pct: 25.0  # Maximum allowed drawdown
     min_win_rate_pct: 30.0  # Minimum win rate
+    min_risk_reward: {{ config.min_risk_reward }}  # Minimum R:R ratio (CRITICAL: 1.2-1.5 for Adaptive SL v2.0 with 0.9% SL)
 
 # Backtest Configuration
 backtest:
@@ -87,7 +88,21 @@ backtest:
   # Execution
   slippage_pct: 0.05
   
-  # Exit strategy
+  # Adaptive SL v2.0 Configuration (from Strategy Builder)
+  adaptive_sl:
+    enabled: true  # Always enabled for institutional-grade risk management
+    volatility_lookback: {{ config.volatility_lookback }}
+    volatility_multiplier: {{ config.volatility_multiplier }}
+    absolute_min_sl_pct: {{ config.absolute_min_sl_pct }}
+    absolute_max_sl_pct: {{ config.absolute_max_sl_pct }}
+    use_delayed_sl: {{ 'true' if config.use_delayed_sl else 'false' }}
+    delay_bars: {{ config.delay_bars }}
+    emergency_sl_pct: {{ config.emergency_sl_pct }}
+    use_structure_sl: {{ 'true' if config.use_structure_sl else 'false' }}
+    structure_sources: {{ config.structure_sources|tojson }}
+  
+  # Dynamic TP Configuration (placeholder - will be optimization parameter)
+  # The optimizer will test multiple TP configurations
   take_profit_levels:
     - level: 1.5  # 1.5R
       size_pct: 50.0
@@ -95,10 +110,6 @@ backtest:
       size_pct: 30.0
     - level: 5.0  # 5.0R
       size_pct: 20.0
-  
-  stop_loss:
-    type: "atr_multiple"
-    multiplier: 2.0
 
 # Optimization Settings
 optimization:
