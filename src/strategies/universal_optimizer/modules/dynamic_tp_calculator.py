@@ -167,7 +167,7 @@ class DynamicTPCalculator:
             
             # Validate TPs are below entry
             if tp1 >= entry_price or tp2 >= entry_price or tp3 >= entry_price:
-                print(f"   ⚠️  Fibonacci TPs invalid for SHORT (above entry), using fallback")
+                # Silently fall back to percentage TPs (don't flood console)
                 return self._calculate_percentage_tps(entry_price, side, fallback_pcts)
             
             # SL: Above entry (use ATR, cap at 1.5%)
