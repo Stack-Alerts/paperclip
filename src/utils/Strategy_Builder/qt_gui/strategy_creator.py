@@ -85,11 +85,11 @@ class StrategyCreatorDialog(QDialog):
         # Main content: Two columns
         content_layout = QHBoxLayout()
         
-        # Left: Available blocks (NO GROUP BOX - waste of space!)
+        # Left: Available blocks (absolutely zero wasted space!)
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(2)
+        left_layout.setSpacing(0)
         
         # Use block library with vertical orientation (side-by-side per user mockup)
         self.block_library = BlockLibraryPanel(orientation='vertical')
@@ -101,16 +101,16 @@ class StrategyCreatorDialog(QDialog):
         add_btn = QPushButton("➕ Add to Strategy")
         add_btn.clicked.connect(self.add_block_from_tree)
         
-        left_layout.addWidget(self.block_library)
-        left_layout.addWidget(add_btn)
+        left_layout.addWidget(self.block_library, 1)  # stretch=1 to fill space!
+        left_layout.addWidget(add_btn, 0)  # stretch=0 for button
         
         content_layout.addWidget(left_widget)
         
-        # Right: Selected blocks (NO GROUP BOX - waste of space!)
+        # Right: Selected blocks (absolutely zero wasted space!)
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(2)
+        right_layout.setSpacing(0)
         
         # Compact label
         strategy_label = QLabel("🎯 Strategy Blocks")
