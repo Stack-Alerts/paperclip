@@ -84,7 +84,8 @@ def optimize_strategy_v2(
     test_days: int = 180,
     warmup_bars: int = 5000,
     use_multicore: bool = True,
-    non_interactive: bool = False
+    non_interactive: bool = False,
+    quick_test: bool = False
 ) -> Optional[OptimizationConfig]:
     """
     Universal Optimizer V2.0 - Main orchestration (WITH MULTICORE!)
@@ -107,6 +108,7 @@ def optimize_strategy_v2(
         warmup_bars: Warmup bars (default 5000)
         use_multicore: Enable multicore (default True)
         non_interactive: Auto-select best config without prompts (default False)
+        quick_test: Skip TP/SL optimization, use current config (default False)
     
     Returns:
         Selected configuration or None if failed
@@ -164,7 +166,13 @@ def optimize_strategy_v2(
     if strategy_side:
         print(f"   📍 Strategy direction: {strategy_side} (from config)")
     
-    configs = build_optimization_configs(blocks, strategy_module_name, strategy_side)
+    # Quick test mode: skip TP/SL optimization
+    if quick_test:
+        print(f"   ⚡ QUICK TEST MODE: Skipping TP/SL optimization")
+        configs = build_optimization_configs(blocks, strategy_module_name, strategy_side, test_tp_modes=False)
+    else:
+        configs = build_optimization_configs(blocks, strategy_module_name, strategy_side, test_tp_modes=True)
+    
     print(f"✅ Created {len(configs)} parameter combinations")
     
     # 5. Run ULTRA Hybrid Optimizer (MAXIMUM PARALLEL!)

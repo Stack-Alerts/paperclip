@@ -5,7 +5,7 @@ Category:
 Timeframe: 15-minute
 Risk:Reward: 1:3
 Author: Strategy Builder v1.0
-Date: 2026-01-10 13:06:18
+Date: 2026-01-10 18:57:16
 
 Description:
 [DRAFT] Work in progress
@@ -17,7 +17,7 @@ Building Blocks Used:
   * Bearish ()
 
 Entry Logic:
-- Minimum 70 confluence points required
+- Minimum 38 confluence points required
 
 Exit Logic:
 - TP1: 1.5R (50% position)
@@ -26,9 +26,9 @@ Exit Logic:
 - SL: Pattern invalidation (risk management)
 
 Risk Management:
-- Risk per trade: 1.0%
-- Max leverage: 2.0x
-- Max bars held: 1000
+- Risk per trade: 12.300000000000002%
+- Max leverage: 16.0x
+- Max bars held: 210
 """
 
 from nautilus_trader.trading.strategy import Strategy
@@ -58,11 +58,11 @@ class StrategyHodRejection(Strategy):
     """
 
 # ============================================================================
-# OPTIMIZED: 2026-01-10 13:16:38
-# Trades: 224, Win Rate: 18.3%, PF: 0.77
-# Net PnL: $-4126.43 (-41.26%)
-# Fees: $5784.17
-# Sharpe: -1.50, Max DD: 51.49%
+# OPTIMIZED: 2026-01-10 18:57:24
+# Trades: 9, Win Rate: 66.7%, PF: 2.00
+# Net PnL: $24.32 (+0.24%)
+# Fees: $14.68
+# Sharpe: 5.53, Max DD: 0.16%
 # ============================================================================
 
     
@@ -74,15 +74,15 @@ class StrategyHodRejection(Strategy):
         self.strategy_name = "HOD_Rejection"
         
         # Strategy parameters
-        self.min_confluence = 30
-        self.max_bars_held = 1000
+        self.min_confluence = 25
+        self.max_bars_held = 210
         self.accumulation_window = 20  # Bars to keep signals active
         self.capital_allocation_pct = 10.0
         
         # Risk management
-        self.max_leverage = 2.0
-        self.risk_per_trade_pct = 1.0
-        self.min_risk_reward = 1.5
+        self.max_leverage = 16.0
+        self.risk_per_trade_pct = 12.300000000000002
+        self.min_risk_reward = 2.0
         
         # Initialize building blocks
         self.blocks = {}

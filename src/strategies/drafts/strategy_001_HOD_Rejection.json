@@ -51,20 +51,36 @@
       "is_main_signal": true
     }
   ],
-  "min_confluence": 70,
+  "min_confluence": 38,
+  "min_risk_reward": 1.4999999999999996,
   "risk_reward_ratio": "1:3",
-  "max_bars_held": 1000,
-  "risk_per_trade_pct": 1.0,
-  "max_leverage": 2.0,
+  "max_bars_held": 210,
+  "risk_per_trade_pct": 12.300000000000002,
+  "max_leverage": 16.0,
+  "volatility_lookback": 20,
+  "volatility_multiplier": 1.0,
+  "absolute_min_sl_pct": 0.6,
+  "absolute_max_sl_pct": 1.5,
+  "use_delayed_sl": true,
+  "delay_bars": 1,
+  "emergency_sl_pct": 2.0,
+  "use_structure_sl": true,
+  "structure_sources": [
+    "swing_points",
+    "supply_demand",
+    "fibonacci"
+  ],
   "optimization_enabled": true,
   "test_days": 180,
+  "training_window_days": 120,
+  "testing_window_days": 30,
   "optimization_configs": 48,
   "test_permutations": [],
-  "created_date": "2026-01-10T12:27:32.276352",
-  "modified_date": "2026-01-10T12:27:32.276377",
+  "created_date": "2026-01-10T18:57:13.164374",
+  "modified_date": "2026-01-10T18:57:13.164388",
   "version": 1,
   "_metadata": {
-    "saved_at": "2026-01-10T12:27:32.277005",
+    "saved_at": "2026-01-10T18:57:13.164984",
     "version": "1.0",
     "status": "draft"
   }
