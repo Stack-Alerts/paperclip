@@ -322,6 +322,73 @@ def optimize_strategy_v2(
     return selected_config
 
 
+def load_risk_params_from_yaml(strategy_module_name: str) -> dict:
+    """
+    Load risk management parameters from YAML config
+    
+    Returns dict with:
+    - starting_capital
+    - max_leverage
+    - risk_per_trade_pct
+    """
+    from pathlib import Path
+    import yaml
+    
+    # Strip 'strategy_' prefix if present
+    config_base = strategy_module_name.replace('strategy_', '')
+    
+    # Try to find config file
+    config_paths = [
+        Path('config') / f'optimizer_{strategy_module_name}.yaml',
+        Path('config') / f'optimizer_{config_base}.yaml',
+        Path('config') / f'{strategy_module_name}.yaml',
+        Path('config') / f'{config_base}.yaml',
+    ]
+    
+    # Defaults
+    risk_params = {
+        'starting_capital': 10000.0,
+        'max_leverage': 10.0,
+        'risk_per_trade_pct': 1.0
+    }
+    
+    for config_path in config_paths:
+        if config_path.exists():
+            try:
+                with open(config_path, 'r') as f:
+                    config = yaml.safe_load(f)
+                
+                # Read from backtest section
+                if 'backtest' in config:
+                    backtest = config['backtest']
+                    
+                    if 'initial_capital' in backtest:
+                        risk_params['starting_capital'] = float(backtest['initial_capital'])
+                    
+                    if 'max_leverage' in backtest:
+                        risk_params['max_leverage'] = float(backtest['max_leverage'])
+                    
+                    if 'risk_per_trade_pct' in backtest:
+                        risk_params['risk_per_trade_pct'] = float(backtest['risk_per_trade_pct'])
+                
+                print(f"   📊 Loaded risk params from {config_path.name}:")
+                print(f"      - Starting Capital: ${risk_params['starting_capital']:,.2f}")
+                print(f"      - Max Leverage: {risk_params['max_leverage']}x")
+                print(f"      - Risk per Trade: {risk_params['risk_per_trade_pct']}%")
+                
+                return risk_params
+                
+            except Exception as e:
+                print(f"   ⚠️  Error reading {config_path}: {e}")
+    
+    print(f"   ⚠️  No config file found, using defaults:")
+    print(f"      - Starting Capital: ${risk_params['starting_capital']:,.2f}")
+    print(f"      - Max Leverage: {risk_params['max_leverage']}x")
+    print(f"      - Risk per Trade: {risk_params['risk_per_trade_pct']}%")
+    
+    return risk_params
+
+
 def build_optimization_configs(
     blocks: dict,
     strategy_module_name: str,
@@ -354,6 +421,9 @@ def build_optimization_configs(
     config_id = 0
     
     weight_presets = get_weight_presets_for_blocks(list(blocks.keys()))
+    
+    # ⭐ CRITICAL: Load risk management parameters from YAML config
+    risk_params = load_risk_params_from_yaml(strategy_module_name)
     
     # Determine side (from config or fallback to heuristic)
     if strategy_side:
@@ -460,7 +530,11 @@ def build_optimization_configs(
                         trailing_pct=tp_combo['trailing'],       # Clean float: 0.3, 0.5, or 0.7
                         partial_exit_pcts=tp_combo['exits'],     # Clean dict: {'tp1': X, 'tp2': Y, 'tp3': Z}
                         use_trailing=True,
-                        breakeven_after_tp1=True
+                        breakeven_after_tp1=True,
+                        # ⭐ POPULATE RISK MANAGEMENT FROM YAML CONFIG
+                        starting_capital=risk_params['starting_capital'],
+                        max_leverage=risk_params['max_leverage'],
+                        risk_per_trade_pct=risk_params['risk_per_trade_pct']
                     )
                     
                     configs.append(config)
