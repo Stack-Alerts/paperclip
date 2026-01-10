@@ -99,7 +99,7 @@ class {{ class_name }}(Strategy):
         # Initialize detector instances
         self.detectors = {
             {% for block in config.blocks %}
-            '{{ block.block_name }}': {{ block.block_name|title|replace('_', '') }}(timeframe='15min'),
+            '{{ block.block_name }}': {{ block_class_map[block.block_name] }}(timeframe='15min'),
             {% endfor %}
         }
         
