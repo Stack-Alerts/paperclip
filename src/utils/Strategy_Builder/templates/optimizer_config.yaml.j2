@@ -8,6 +8,7 @@ strategy:
   name: "{{ config.strategy_name }}"
   number: {{ config.strategy_number }}
   category: "{{ config.strategy_category.value }}"
+  side: "{{ config.side if config.side else 'LONG' }}"  # Trade direction: SHORT or LONG
   file: "strategy_{{ '%03d'|format(config.strategy_number) }}_{{ config.strategy_name|lower|replace(' ', '_') }}.py"
   class: "{{ class_name }}"
 

@@ -104,6 +104,7 @@ class StrategyConfiguration(BaseModel):
     strategy_name: str  
     strategy_number: int = Field(ge=1)
     strategy_category: StrategyCategory
+    side: str = "LONG"  # Trade direction: SHORT or LONG
     description: str = ""
     
     # Blocks

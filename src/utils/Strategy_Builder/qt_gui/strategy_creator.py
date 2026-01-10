@@ -79,6 +79,19 @@ class StrategyCreatorDialog(QDialog):
         ])
         info_layout.addRow("Category:", self.category_combo)
         
+        # CRITICAL: Trade direction selector
+        self.side_combo = QComboBox()
+        self.side_combo.addItems(["SHORT", "LONG"])
+        self.side_combo.setToolTip(
+            "Trade Direction\n\n"
+            "SHORT: Profit when price falls (bearish setups)\n"
+            "LONG: Profit when price rises (bullish setups)\n\n"
+            "Choose based on your signal blocks:\n"
+            "- Double Top, HOD Rejection, Bearish = SHORT\n"
+            "- Double Bottom, LOD Support, Bullish = LONG"
+        )
+        info_layout.addRow("Trade Direction:", self.side_combo)
+        
         info_group.setLayout(info_layout)
         layout.addWidget(info_group)
         
@@ -223,6 +236,10 @@ class StrategyCreatorDialog(QDialog):
         # Set strategy info
         self.name_edit.setText(self.existing_config.strategy_name)
         self.category_combo.setCurrentText(self.existing_config.strategy_category)
+        
+        # Set side (with fallback to LONG if not present)
+        side = getattr(self.existing_config, 'side', 'LONG')
+        self.side_combo.setCurrentText(side)
         
         # Load blocks
         self.selected_blocks = self.existing_config.blocks.copy()
@@ -502,6 +519,7 @@ class StrategyCreatorDialog(QDialog):
             strategy_name=strategy_name,
             strategy_number=next_num,
             strategy_category=self.category_combo.currentText(),
+            side=self.side_combo.currentText(),  # Get side from dropdown
             main_signal_block=main_signal,
             blocks=self.selected_blocks.copy()
         )
