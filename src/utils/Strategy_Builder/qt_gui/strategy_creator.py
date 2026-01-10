@@ -89,8 +89,8 @@ class StrategyCreatorDialog(QDialog):
         left_group = QGroupBox("📚 Available Blocks")
         left_layout = QVBoxLayout()
         
-        # Use block library with horizontal orientation (top-bottom works better in this layout)
-        self.block_library = BlockLibraryPanel(orientation='horizontal')
+        # Use block library with vertical orientation (side-by-side per user mockup)
+        self.block_library = BlockLibraryPanel(orientation='vertical')
         
         # Connect double-click to add block
         self.block_library.tree.itemDoubleClicked.connect(self.add_block_from_tree)
