@@ -547,10 +547,9 @@ Building Blocks ({len(config.blocks)}):
             self._run_backtest(strategy_num)
     
     def _run_backtest(self, strategy_num: int):
-        """Run backtest and show results"""
+        """Run backtest and show results in background thread"""
+        from PyQt6.QtCore import QThread
         import subprocess
-        import json
-        from datetime import datetime
         
         try:
             # Update status
@@ -566,39 +565,70 @@ Building Blocks ({len(config.blocks)}):
             strategy_file = Path(files['strategy'])
             strategy_module = strategy_file.stem  # e.g., "strategy_001_hod_rejection"
             
-            # Run universal optimizer v2 with correct module name
+            # Run in background thread to avoid UI freeze
+            class BacktestThread(QThread):
+                def __init__(self, cmd, cwd, parent_window):
+                    super().__init__()
+                    self.cmd = cmd
+                    self.cwd = cwd
+                    self.parent_window = parent_window
+                    self.result = None
+                    self.error = None
+                    
+                def run(self):
+                    try:
+                        self.result = subprocess.run(
+                            self.cmd,
+                            capture_output=True,
+                            text=True,
+                            cwd=self.cwd
+                        )
+                    except Exception as e:
+                        self.error = str(e)
+            
+            # Create and start thread
             cmd = [
                 "python",
                 "scripts/universal_optimizer_v2.py",
-                strategy_module,  # Full module name
+                strategy_module,
                 "--days", "90"
             ]
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                cwd=Path.cwd()
-            )
+            self.backtest_thread = BacktestThread(cmd, Path.cwd(), self)
+            self.backtest_thread.finished.connect(lambda: self._on_backtest_finished(strategy_num))
+            self.backtest_thread.start()
             
-            if result.returncode == 0:
-                # Parse results and show
-                self._show_test_results(strategy_num, result.stdout)
-            else:
-                QMessageBox.critical(
-                    self,
-                    "Test Failed",
-                    f"Backtest failed:\n\n{result.stderr}"
-                )
-                
         except Exception as e:
             QMessageBox.critical(
                 self,
                 "Error",
                 f"Test execution failed:\n{e}"
             )
-        finally:
             self.status_bar.showMessage("Ready")
+    
+    def _on_backtest_finished(self, strategy_num: int):
+        """Handle backtest completion"""
+        if self.backtest_thread.error:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Backtest failed:\n{self.backtest_thread.error}"
+            )
+            self.status_bar.showMessage("Ready")
+            return
+        
+        result = self.backtest_thread.result
+        
+        if result.returncode == 0:
+            self._show_test_results(strategy_num, result.stdout)
+        else:
+            QMessageBox.critical(
+                self,
+                "Test Failed",
+                f"Backtest failed:\n\n{result.stderr}"
+            )
+        
+        self.status_bar.showMessage("Ready")
     
     def _show_test_results(self, strategy_num: int, output: str):
         """Display test results in dialog"""
