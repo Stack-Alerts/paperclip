@@ -83,6 +83,13 @@ The 48x Innovation:
         help='Use multicore processing (NOT RECOMMENDED: defeats 48x efficiency)'
     )
     
+    parser.add_argument(
+        '--non-interactive',
+        action='store_true',
+        default=False,
+        help='Non-interactive mode: auto-select best config and apply (for GUI/automation)'
+    )
+    
     args = parser.parse_args()
     
     # Run optimization
@@ -95,7 +102,8 @@ The 48x Innovation:
         strategy_module_name=args.strategy,
         test_days=args.days,
         warmup_bars=args.warmup,
-        use_multicore=args.multicore
+        use_multicore=args.multicore,
+        non_interactive=args.non_interactive
     )
     
     if result:

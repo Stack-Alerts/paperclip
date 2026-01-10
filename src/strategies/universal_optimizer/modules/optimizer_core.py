@@ -38,7 +38,8 @@ def optimize_strategy_v2(
     strategy_module_name: str,
     test_days: int = 180,
     warmup_bars: int = 5000,
-    use_multicore: bool = True
+    use_multicore: bool = True,
+    non_interactive: bool = False
 ) -> Optional[OptimizationConfig]:
     """
     Universal Optimizer V2.0 - Main orchestration (WITH MULTICORE!)
@@ -50,7 +51,7 @@ def optimize_strategy_v2(
     4. Build 48 configs
     5. Run MultiConfigSimulator (48x FASTER!)
     6. Display top 5
-    7. User selects
+    7. User selects (or auto-select if non_interactive)
     8. Apply to file (zero manual editing)
     9. Save iteration
     10. Check cycle 5 (suggest improvements)
@@ -59,6 +60,8 @@ def optimize_strategy_v2(
         strategy_module_name: Strategy module name
         test_days: Days to test (default 180)
         warmup_bars: Warmup bars (default 5000)
+        use_multicore: Enable multicore (default True)
+        non_interactive: Auto-select best config without prompts (default False)
     
     Returns:
         Selected configuration or None if failed
@@ -141,7 +144,7 @@ def optimize_strategy_v2(
     print(f"\n🔍 Running institutional-grade result validation...")
     issues = validate_optimization_results(results, test_days, configs)
     
-    if issues:
+    if issues and not non_interactive:
         print(f"\n⚠️  VALIDATION ISSUES DETECTED")
         display_diagnostic_report(issues, results, configs)
         
@@ -196,8 +199,12 @@ def optimize_strategy_v2(
     # 7. Display top 5
     display_top_5_configs(results[:5], iteration.iteration_count + 1)
     
-    # 8. User selects
-    selected_index = prompt_user_selection()
+    # 8. User selects (or auto-select if non-interactive)
+    if non_interactive:
+        selected_index = 0  # Auto-select best config
+        print(f"\n🤖 Non-interactive mode: Auto-selecting best configuration (#1)")
+    else:
+        selected_index = prompt_user_selection()
     
     # Handle quit
     if selected_index == -1:
@@ -209,8 +216,8 @@ def optimize_strategy_v2(
     
     print(f"\n✅ Selected configuration #{selected_index + 1}")
     
-    # 9. Apply to file
-    if confirm_application():
+    # 9. Apply to file (auto-confirm if non-interactive)
+    if non_interactive or confirm_application():
         print(f"\n📝 Applying configuration to strategy file...")
         success = apply_config_to_strategy_file(
             strategy_module_name,
