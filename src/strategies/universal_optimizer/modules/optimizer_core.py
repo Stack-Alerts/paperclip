@@ -47,10 +47,16 @@ def load_strategy_side_from_config(strategy_module_name: str) -> Optional[str]:
     from pathlib import Path
     import yaml
     
+    # Strip 'strategy_' prefix if present for config filename
+    # e.g., 'strategy_001_hod_rejection' → '001_hod_rejection'
+    config_base = strategy_module_name.replace('strategy_', '')
+    
     # Try to find config file
     config_paths = [
-        Path('config') / f'optimizer_{strategy_module_name}.yaml',
-        Path('config') / f'{strategy_module_name}.yaml',
+        Path('config') / f'optimizer_{strategy_module_name}.yaml',  # optimizer_strategy_001_...
+        Path('config') / f'optimizer_{config_base}.yaml',  # optimizer_001_...
+        Path('config') / f'{strategy_module_name}.yaml',  # strategy_001_...
+        Path('config') / f'{config_base}.yaml',  # 001_...
     ]
     
     for config_path in config_paths:
