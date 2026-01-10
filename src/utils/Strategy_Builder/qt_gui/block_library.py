@@ -8,7 +8,7 @@ Date: 2026-01-10
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLineEdit, QTreeWidget,
+    QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QTreeWidget,
     QTreeWidgetItem, QLabel, QTextEdit, QSplitter
 )
 from PyQt6.QtCore import Qt, QMimeData
@@ -47,18 +47,23 @@ class BlockLibraryPanel(QWidget):
     def init_ui(self):
         """Initialize the user interface"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(4)
         
-        # Title
-        title = QLabel("📚 Building Blocks Library")
-        title.setStyleSheet("font-size: 11pt; font-weight: bold; color: #ffffff;")
-        layout.addWidget(title)
+        # Search bar with count
+        search_layout = QHBoxLayout()
+        search_layout.setSpacing(4)
         
-        # Search box
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("🔍 Search blocks...")
         self.search_box.textChanged.connect(self.filter_blocks)
-        layout.addWidget(self.search_box)
+        search_layout.addWidget(self.search_box)
+        
+        self.info_label = QLabel("80 blocks")
+        self.info_label.setStyleSheet("font-size: 8pt; color: #888;")
+        search_layout.addWidget(self.info_label)
+        
+        layout.addLayout(search_layout)
         
         # Splitter for tree and details (configurable orientation)
         if self.orientation == 'vertical':
@@ -76,14 +81,6 @@ class BlockLibraryPanel(QWidget):
         splitter.addWidget(self.tree)
         
         # Details panel
-        details_widget = QWidget()
-        details_layout = QVBoxLayout(details_widget)
-        details_layout.setContentsMargins(0, 0, 0, 0)
-        
-        details_label = QLabel("📋 Block Details")
-        details_label.setStyleSheet("font-size: 10pt; font-weight: bold; color: #ffffff;")
-        details_layout.addWidget(details_label)
-        
         self.details_text = QTextEdit()
         self.details_text.setReadOnly(True)
         self.details_text.setPlaceholderText(
@@ -92,9 +89,7 @@ class BlockLibraryPanel(QWidget):
             "• Signals it returns\n"
             "• Usage examples"
         )
-        details_layout.addWidget(self.details_text)
-        
-        splitter.addWidget(details_widget)
+        splitter.addWidget(self.details_text)
         
         # Set initial sizes based on orientation
         if self.orientation == 'vertical':
@@ -105,11 +100,6 @@ class BlockLibraryPanel(QWidget):
             splitter.setSizes([600, 400])
         
         layout.addWidget(splitter)
-        
-        # Info label
-        self.info_label = QLabel("80 blocks available")
-        self.info_label.setStyleSheet("font-size: 9pt; color: #888;")
-        layout.addWidget(self.info_label)
         
     def load_blocks(self):
         """Load building blocks from registry"""

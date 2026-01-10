@@ -10,7 +10,7 @@ Date: 2026-01-10
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QComboBox, QListWidget, QPushButton,
-    QSpinBox, QGroupBox, QMessageBox, QListWidgetItem
+    QSpinBox, QGroupBox, QMessageBox, QListWidgetItem, QWidget
 )
 from PyQt6.QtCore import Qt
 
@@ -85,9 +85,11 @@ class StrategyCreatorDialog(QDialog):
         # Main content: Two columns
         content_layout = QHBoxLayout()
         
-        # Left: Available blocks (use enhanced tree view)
-        left_group = QGroupBox("📚 Available Blocks")
-        left_layout = QVBoxLayout()
+        # Left: Available blocks (NO GROUP BOX - waste of space!)
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(2)
         
         # Use block library with vertical orientation (side-by-side per user mockup)
         self.block_library = BlockLibraryPanel(orientation='vertical')
@@ -95,19 +97,25 @@ class StrategyCreatorDialog(QDialog):
         # Connect double-click to add block
         self.block_library.tree.itemDoubleClicked.connect(self.add_block_from_tree)
         
-        # Add button for explicit addition
-        add_btn = QPushButton("➕ Add Selected Block to Strategy")
+        # Add button for explicit addition (more compact)
+        add_btn = QPushButton("➕ Add to Strategy")
         add_btn.clicked.connect(self.add_block_from_tree)
         
         left_layout.addWidget(self.block_library)
         left_layout.addWidget(add_btn)
         
-        left_group.setLayout(left_layout)
-        content_layout.addWidget(left_group)
+        content_layout.addWidget(left_widget)
         
-        # Right: Selected blocks
-        right_group = QGroupBox("🎯 Strategy Blocks (in order)")
-        right_layout = QVBoxLayout()
+        # Right: Selected blocks (NO GROUP BOX - waste of space!)
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(2)
+        
+        # Compact label
+        strategy_label = QLabel("🎯 Strategy Blocks")
+        strategy_label.setStyleSheet("font-size: 9pt; font-weight: bold; color: #4ec9b0;")
+        right_layout.addWidget(strategy_label)
         
         self.selected_blocks_list = QListWidget()
         self.selected_blocks_list.currentItemChanged.connect(self.on_block_selected)
@@ -153,8 +161,7 @@ class StrategyCreatorDialog(QDialog):
         self.confluence_label.setStyleSheet("font-size: 11pt; font-weight: bold; color: #007acc;")
         right_layout.addWidget(self.confluence_label)
         
-        right_group.setLayout(right_layout)
-        content_layout.addWidget(right_group)
+        content_layout.addWidget(right_widget)
         
         layout.addLayout(content_layout)
         
