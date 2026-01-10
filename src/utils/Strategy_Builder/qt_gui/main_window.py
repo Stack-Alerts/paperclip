@@ -20,6 +20,9 @@ from PyQt6.QtGui import QAction
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
 
+from PyQt6.QtCore import QThread, pyqtSignal
+import subprocess
+
 from src.utils.Strategy_Builder import (
     StrategyRegistry,
     StrategyValidator,
@@ -28,6 +31,36 @@ from src.utils.Strategy_Builder import (
 from src.utils.Strategy_Builder.qt_gui.block_library import BlockLibraryPanel
 from src.utils.Strategy_Builder.qt_gui.code_preview import CodePreviewDialog
 from src.utils.Strategy_Builder.qt_gui.strategy_creator import StrategyCreatorDialog
+
+
+class BacktestThread(QThread):
+    """Background thread for running backtests without freezing UI"""
+    
+    # Custom signal that emits strategy_num when complete
+    finished_signal = pyqtSignal(int)
+    
+    def __init__(self, cmd, cwd, strategy_num, parent=None):
+        super().__init__(parent)
+        self.cmd = cmd
+        self.cwd = cwd
+        self.strategy_num = strategy_num
+        self.result = None
+        self.error = None
+        
+    def run(self):
+        """Execute subprocess in background"""
+        try:
+            self.result = subprocess.run(
+                self.cmd,
+                capture_output=True,
+                text=True,
+                cwd=self.cwd
+            )
+            # Emit signal when complete
+            self.finished_signal.emit(self.strategy_num)
+        except Exception as e:
+            self.error = str(e)
+            self.finished_signal.emit(self.strategy_num)
 
 
 class StrategyBuilderMainWindow(QMainWindow):
@@ -548,9 +581,6 @@ Building Blocks ({len(config.blocks)}):
     
     def _run_backtest(self, strategy_num: int):
         """Run backtest and show results in background thread"""
-        from PyQt6.QtCore import QThread
-        import subprocess
-        
         try:
             # Update status
             self.status_bar.showMessage(f"Running backtest for strategy #{strategy_num:03d}...")
@@ -565,28 +595,7 @@ Building Blocks ({len(config.blocks)}):
             strategy_file = Path(files['strategy'])
             strategy_module = strategy_file.stem  # e.g., "strategy_001_hod_rejection"
             
-            # Run in background thread to avoid UI freeze
-            class BacktestThread(QThread):
-                def __init__(self, cmd, cwd, parent_window):
-                    super().__init__()
-                    self.cmd = cmd
-                    self.cwd = cwd
-                    self.parent_window = parent_window
-                    self.result = None
-                    self.error = None
-                    
-                def run(self):
-                    try:
-                        self.result = subprocess.run(
-                            self.cmd,
-                            capture_output=True,
-                            text=True,
-                            cwd=self.cwd
-                        )
-                    except Exception as e:
-                        self.error = str(e)
-            
-            # Create and start thread
+            # Build command
             cmd = [
                 "python",
                 "scripts/universal_optimizer_v2.py",
@@ -594,8 +603,9 @@ Building Blocks ({len(config.blocks)}):
                 "--days", "90"
             ]
             
-            self.backtest_thread = BacktestThread(cmd, Path.cwd(), self)
-            self.backtest_thread.finished.connect(lambda: self._on_backtest_finished(strategy_num))
+            # Run in background thread - store as instance variable to prevent garbage collection
+            self.backtest_thread = BacktestThread(cmd, Path.cwd(), strategy_num, self)
+            self.backtest_thread.finished_signal.connect(self._on_backtest_finished)
             self.backtest_thread.start()
             
         except Exception as e:
