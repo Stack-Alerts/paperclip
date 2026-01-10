@@ -157,8 +157,7 @@ def test_single_config(args):
             
             # Initialize DynamicTPCalculator for this entry
             tp_calculator = DynamicTPCalculator(
-                tp_mode=config.tp_mode,
-                trailing_pct=config.trailing_pct
+                tp_mode=config.tp_mode
             )
             
             # Calculate dynamic TPs using building blocks!
