@@ -334,7 +334,7 @@ class StrategyCreatorDialog(QDialog):
     def update_block_weight(self, value):
         """Update weight of current block"""
         current_row = self.selected_blocks_list.currentRow()
-        if current_row >= 0:
+        if current_row >= 0 and current_row < len(self.selected_blocks):
             self.selected_blocks[current_row].weight = value
             
             # Update display
