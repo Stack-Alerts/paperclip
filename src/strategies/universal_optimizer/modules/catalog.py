@@ -117,22 +117,32 @@ def get_weight_presets_for_blocks(block_keys: list) -> list:
     """
     Generate optimized weight presets based on block types
     
+    UPDATED: Strips numeric suffixes (_0, _1, _2) before catalog lookup
+    to support multiple instances of same block type (from Strategy Builder fix).
+    
     Args:
-        block_keys: List of block keys used in strategy
+        block_keys: List of block keys used in strategy (may include suffixes like hod_0, hod_1)
     
     Returns:
         List of weight configurations to test
     """
+    import re
+    
+    def strip_numeric_suffix(block_key: str) -> str:
+        """Strip _0, _1, _2, etc. from block key to get base name"""
+        return re.sub(r'_\d+$', '', block_key)
+    
     presets = []
     
-    # Categorize blocks
+    # Categorize blocks (using base names for catalog lookup)
     event_blocks = []
     signal_blocks = []
     context_blocks = []
     
     for key in block_keys:
-        if key in BUILDING_BLOCK_CATALOG:
-            block_type = BUILDING_BLOCK_CATALOG[key]['type']
+        base_name = strip_numeric_suffix(key)
+        if base_name in BUILDING_BLOCK_CATALOG:
+            block_type = BUILDING_BLOCK_CATALOG[base_name]['type']
             if block_type == 'EVENT':
                 event_blocks.append(key)
             elif block_type == 'SIGNAL':
@@ -143,8 +153,9 @@ def get_weight_presets_for_blocks(block_keys: list) -> list:
     # Preset 1: Balanced
     balanced = {}
     for key in block_keys:
-        if key in BUILDING_BLOCK_CATALOG:
-            min_w, max_w = BUILDING_BLOCK_CATALOG[key]['weight_range']
+        base_name = strip_numeric_suffix(key)
+        if base_name in BUILDING_BLOCK_CATALOG:
+            min_w, max_w = BUILDING_BLOCK_CATALOG[base_name]['weight_range']
             balanced[key] = (min_w + max_w) // 2
         else:
             balanced[key] = 15
@@ -153,32 +164,37 @@ def get_weight_presets_for_blocks(block_keys: list) -> list:
     # Preset 2: Event-Heavy
     event_heavy = balanced.copy()
     for key in event_blocks:
-        if key in BUILDING_BLOCK_CATALOG:
-            _, max_w = BUILDING_BLOCK_CATALOG[key]['weight_range']
+        base_name = strip_numeric_suffix(key)
+        if base_name in BUILDING_BLOCK_CATALOG:
+            _, max_w = BUILDING_BLOCK_CATALOG[base_name]['weight_range']
             event_heavy[key] = max_w
     for key in context_blocks:
-        if key in BUILDING_BLOCK_CATALOG:
-            min_w, _ = BUILDING_BLOCK_CATALOG[key]['weight_range']
-            event_heavy[key] = min_w
+        base_name = strip_numeric_suffix(key)
+        if base_name in BUILDING_BLOCK_CATALOG:
+            min_w, _ = BUILDING_BLOCK_CATALOG[base_name]['weight_range']
+            context_heavy[key] = min_w
     presets.append(event_heavy)
     
     # Preset 3: Context-Heavy
     context_heavy = balanced.copy()
     for key in context_blocks:
-        if key in BUILDING_BLOCK_CATALOG:
-            _, max_w = BUILDING_BLOCK_CATALOG[key]['weight_range']
+        base_name = strip_numeric_suffix(key)
+        if base_name in BUILDING_BLOCK_CATALOG:
+            _, max_w = BUILDING_BLOCK_CATALOG[base_name]['weight_range']
             context_heavy[key] = max_w
     for key in event_blocks:
-        if key in BUILDING_BLOCK_CATALOG:
-            min_w, _ = BUILDING_BLOCK_CATALOG[key]['weight_range']
-            context_heavy[key] = min_w
+        base_name = strip_numeric_suffix(key)
+        if base_name in BUILDING_BLOCK_CATALOG:
+            min_w, _ = BUILDING_BLOCK_CATALOG[base_name]['weight_range']
+            event_heavy[key] = min_w
     presets.append(context_heavy)
     
     # Preset 4: Conservative
     conservative = {}
     for key in block_keys:
-        if key in BUILDING_BLOCK_CATALOG:
-            min_w, max_w = BUILDING_BLOCK_CATALOG[key]['weight_range']
+        base_name = strip_numeric_suffix(key)
+        if base_name in BUILDING_BLOCK_CATALOG:
+            min_w, max_w = BUILDING_BLOCK_CATALOG[base_name]['weight_range']
             conservative[key] = min_w + (max_w - min_w) // 3
         else:
             conservative[key] = 12
