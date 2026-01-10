@@ -168,8 +168,7 @@ def test_single_config(args):
                 entry_price=entry_price,
                 entry_bar=len(history_for_tp) - 1,  # Last bar in history
                 side=config.side,
-                fallback_pcts=config.tp_fallback_pcts,  # Use config's TP distances
-                confluence=total_confluence
+                fallback_pcts=config.tp_fallback_pcts  # Use config's TP distances
             )
             
             # Extract TP/SL from calculated levels
