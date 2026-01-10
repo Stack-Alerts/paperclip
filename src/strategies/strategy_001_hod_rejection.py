@@ -5,7 +5,7 @@ Category:
 Timeframe: 15-minute
 Risk:Reward: 1:3
 Author: Strategy Builder v1.0
-Date: 2026-01-10 12:45:28
+Date: 2026-01-10 13:06:18
 
 Description:
 [DRAFT] Work in progress
@@ -58,11 +58,11 @@ class StrategyHodRejection(Strategy):
     """
 
 # ============================================================================
-# OPTIMIZED: 2026-01-10 12:50:26
-# Trades: 69, Win Rate: 53.6%, PF: 1.23
-# Net PnL: $2554.00 (+25.54%)
-# Fees: $2012.72
-# Sharpe: 1.79, Max DD: 33.72%
+# OPTIMIZED: 2026-01-10 13:16:38
+# Trades: 224, Win Rate: 18.3%, PF: 0.77
+# Net PnL: $-4126.43 (-41.26%)
+# Fees: $5784.17
+# Sharpe: -1.50, Max DD: 51.49%
 # ============================================================================
 
     
@@ -82,7 +82,7 @@ class StrategyHodRejection(Strategy):
         # Risk management
         self.max_leverage = 2.0
         self.risk_per_trade_pct = 1.0
-        self.min_risk_reward = 2.0
+        self.min_risk_reward = 1.5
         
         # Initialize building blocks
         self.blocks = {}
@@ -115,12 +115,12 @@ class StrategyHodRejection(Strategy):
         # Block weights configuration
         self.blocks['hod_0'] = {
             'name': 'Hod',
-            'weight': 18,
+            'weight': 15,
             'enabled': True
         }
         self.blocks['hod_1'] = {
             'name': 'Hod',
-            'weight': 18,
+            'weight': 15,
             'enabled': True
         }
         
