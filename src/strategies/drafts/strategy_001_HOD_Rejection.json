@@ -26,6 +26,28 @@
         }
       ],
       "is_main_signal": true
+    },
+    {
+      "block_name": "hod",
+      "block_display_name": "Hod",
+      "block_category": "PRICE_LEVELS",
+      "block_type": "EVENT",
+      "weight": 20,
+      "weight_range": [
+        10,
+        30
+      ],
+      "enabled": true,
+      "signals": [
+        {
+          "signal_name": "BEARISH",
+          "signal_display_name": "Bearish",
+          "role": "SIGNAL",
+          "required": true,
+          "min_confidence": 0.0
+        }
+      ],
+      "is_main_signal": true
     }
   ],
   "min_confluence": 70,
@@ -37,11 +59,11 @@
   "test_days": 180,
   "optimization_configs": 48,
   "test_permutations": [],
-  "created_date": "2026-01-10T09:46:34.147321",
-  "modified_date": "2026-01-10T09:46:34.147334",
+  "created_date": "2026-01-10T09:55:10.068796",
+  "modified_date": "2026-01-10T09:55:10.068809",
   "version": 1,
   "_metadata": {
-    "saved_at": "2026-01-10T09:46:34.147940",
+    "saved_at": "2026-01-10T09:55:10.069406",
     "version": "1.0",
     "status": "draft"
   }

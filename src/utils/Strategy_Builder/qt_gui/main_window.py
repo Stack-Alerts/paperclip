@@ -98,7 +98,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         
     def init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("Strategy Builder v3.0 - Professional")
+        self.setWindowTitle("BTC Engine v3 - Strategy Builder")
         self.setGeometry(100, 100, 1600, 1000)
         
         # Create menu bar

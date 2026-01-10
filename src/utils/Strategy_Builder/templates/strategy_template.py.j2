@@ -99,13 +99,13 @@ class {{ class_name }}(Strategy):
         # Initialize detector instances
         self.detectors = {
             {% for block in config.blocks %}
-            '{{ block.block_name }}': {{ block_class_map[block.block_name] }}(timeframe='15min'),
+            '{{ block.block_name }}_{{ loop.index0 }}': {{ block_class_map[block.block_name] }}(timeframe='15min'),
             {% endfor %}
         }
         
         # Block weights configuration
         {% for block in config.blocks %}
-        self.blocks['{{ block.block_name }}'] = {
+        self.blocks['{{ block.block_name }}_{{ loop.index0 }}'] = {
             'name': '{{ block.block_display_name }}',
             'weight': {{ block.weight }},
             'enabled': {{ 'True' if block.enabled else 'False' }}
@@ -179,7 +179,7 @@ class {{ class_name }}(Strategy):
         
         {% for block in config.blocks %}
         # {{ block.block_display_name }}
-        results['{{ block.block_name }}'] = self.detectors['{{ block.block_name }}'].analyze(df)
+        results['{{ block.block_name }}_{{ loop.index0 }}'] = self.detectors['{{ block.block_name }}_{{ loop.index0 }}'].analyze(df)
         {% endfor %}
         
         return results
