@@ -399,13 +399,34 @@ class StrategyCreatorDialog(QDialog):
         item.setText(f"{block_info.display_name} (Weight: {block_config.weight}){signals_str}")
             
     def update_confluence(self):
-        """Calculate and display total confluence"""
+        """Calculate and display total confluence with validation feedback"""
         total = sum(block.weight for block in self.selected_blocks)
-        self.confluence_label.setText(f"Total Confluence: {total} points")
+        num_blocks = len(self.selected_blocks)
         
-        # Color code
-        if total < 60:
-            color = "#ce9178"  # Orange - too low
+        # Build display text with requirements
+        text = f"Total Confluence: {total} points"
+        
+        # Add minimum requirement (40 is standard minimum)
+        min_required = 40
+        if total < min_required:
+            text += f" (⚠️ {min_required} required)"
+        elif total >= min_required:
+            text += f" (✓ {min_required} met)"
+        
+        # Add block count requirement
+        min_blocks = 2
+        if num_blocks < min_blocks:
+            text += f" | {num_blocks} of {min_blocks} blocks min"
+        else:
+            text += f" | {num_blocks} blocks ✓"
+        
+        self.confluence_label.setText(text)
+        
+        # Color code based on validation
+        if total < min_required or num_blocks < min_blocks:
+            color = "#f48771"  # Red - validation failed
+        elif total < 60:
+            color = "#ce9178"  # Orange - low but valid
         elif total > 100:
             color = "#f48771"  # Red - too high
         else:
