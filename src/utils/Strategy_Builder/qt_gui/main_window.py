@@ -391,11 +391,9 @@ Building Blocks ({len(config.blocks)}):
             # Check if slots available
             next_num = self.registry.get_next_strategy_number()
             
-            # Launch visual creator
+            # Launch visual creator (non-blocking)
             creator = StrategyCreatorDialog(self)
-            if creator.exec():
-                # Refresh list after successful creation
-                self.load_strategies()
+            creator.show()  # Non-blocking - allows multiple windows
                 
         except ValueError:
             QMessageBox.critical(
@@ -428,16 +426,14 @@ Building Blocks ({len(config.blocks)}):
             )
             return
         
-        # Launch visual creator with existing config
+        # Launch visual creator with existing config (non-blocking)
         # Pass refresh callback so drafts update list immediately
         creator = StrategyCreatorDialog(
             self, 
             existing_config=config,
             on_draft_saved=self.load_strategies
         )
-        if creator.exec():
-            # Refresh list after successful edit
-            self.load_strategies()
+        creator.show()  # Non-blocking - allows multiple edit windows
             
     def delete_strategy(self):
         """Delete selected strategy"""
@@ -698,18 +694,17 @@ Building Blocks ({len(config.blocks)}):
         
         layout.addLayout(button_layout)
         
-        dialog.exec()
+        dialog.show()  # Non-blocking - can use main window while open
     
     def _edit_from_results(self, results_dialog, strategy_num: int):
         """Edit strategy from test results dialog"""
         results_dialog.close()
         
-        # Load and edit
+        # Load and edit (non-blocking)
         config = self.registry.load_strategy(strategy_num)
         if config:
-            creator = StrategyCreatorDialog(self, existing_config=config)
-            if creator.exec():
-                self.load_strategies()
+            creator = StrategyCreatorDialog(self, existing_config=config, on_draft_saved=self.load_strategies)
+            creator.show()
             
     def preview_code(self):
         """Preview code for selected strategy"""
@@ -729,7 +724,7 @@ Building Blocks ({len(config.blocks)}):
             files = self.registry.generate_strategy_files(strategy_num)
             if files:
                 preview = CodePreviewDialog(files, self)
-                preview.exec()
+                preview.show()  # Non-blocking
         except Exception as e:
             QMessageBox.critical(
                 self,
