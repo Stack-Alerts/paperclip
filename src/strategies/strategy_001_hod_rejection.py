@@ -5,20 +5,14 @@ Category:
 Timeframe: 15-minute
 Risk:Reward: 1:3
 Author: Strategy Builder v1.0
-Date: 2026-01-10 09:34:16
+Date: 2026-01-10 09:39:56
 
 Description:
 [DRAFT] Work in progress
 
 Building Blocks Used:
 - Hod: 20 points
-  * At Hod ()
-- Hod: 20 points
   * Hod Rejection ()
-- Hod: 20 points
-  * Bearish ()
-- Stochastic Rsi: 25 points
-  * Bearish Cross ()
 
 Entry Logic:
 - Minimum 70 confluence points required
@@ -44,7 +38,6 @@ from datetime import datetime
 from typing import Optional
 
 # Import building blocks
-from src.detectors.building_blocks.oscillators.stochastic_rsi import StochasticRSI
 from src.detectors.building_blocks.price_levels.hod import HOD
 
 # Import centralized confluence calculator
@@ -60,7 +53,7 @@ class StrategyHodRejection(Strategy):
     """
 
 # ============================================================================
-# OPTIMIZED: 2026-01-10 09:34:21
+# OPTIMIZED: 2026-01-10 09:39:59
 # Trades: 0, Win Rate: 0.0%, PF: 0.00
 # Net PnL: $0.00 (+0.00%)
 # Fees: $0.00
@@ -104,30 +97,12 @@ class StrategyHodRejection(Strategy):
         # Initialize detector instances
         self.detectors = {
             'hod': HOD(timeframe='15min'),
-            'hod': HOD(timeframe='15min'),
-            'hod': HOD(timeframe='15min'),
-            'stochastic_rsi': StochasticRSI(timeframe='15min'),
         }
         
         # Block weights configuration
         self.blocks['hod'] = {
             'name': 'Hod',
             'weight': 20,
-            'enabled': True
-        }
-        self.blocks['hod'] = {
-            'name': 'Hod',
-            'weight': 20,
-            'enabled': True
-        }
-        self.blocks['hod'] = {
-            'name': 'Hod',
-            'weight': 20,
-            'enabled': True
-        }
-        self.blocks['stochastic_rsi'] = {
-            'name': 'Stochastic Rsi',
-            'weight': 17,
             'enabled': True
         }
         
@@ -165,7 +140,7 @@ class StrategyHodRejection(Strategy):
         self.log.info(f"Strategy ID: {self.strategy_id}")
         self.log.info(f"Min Confluence: {self.min_confluence}")
         self.log.info(f"Min R:R: {self.min_risk_reward}")
-        self.log.info(f"Building blocks: 4")
+        self.log.info(f"Building blocks: 1")
         
         self.log.info(f"Ready for trading")
         
@@ -198,12 +173,6 @@ class StrategyHodRejection(Strategy):
         
         # Hod
         results['hod'] = self.detectors['hod'].analyze(df)
-        # Hod
-        results['hod'] = self.detectors['hod'].analyze(df)
-        # Hod
-        results['hod'] = self.detectors['hod'].analyze(df)
-        # Stochastic Rsi
-        results['stochastic_rsi'] = self.detectors['stochastic_rsi'].analyze(df)
         
         return results
     

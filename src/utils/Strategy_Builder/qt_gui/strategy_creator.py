@@ -161,6 +161,11 @@ class StrategyCreatorDialog(QDialog):
         self.confluence_label.setStyleSheet("font-size: 11pt; font-weight: bold; color: #007acc;")
         right_layout.addWidget(self.confluence_label)
         
+        # Status label (for save feedback)
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("font-size: 9pt; color: #4ec9b0;")
+        right_layout.addWidget(self.status_label)
+        
         content_layout.addWidget(right_widget)
         
         layout.addLayout(content_layout)
@@ -175,9 +180,14 @@ class StrategyCreatorDialog(QDialog):
         button_layout.addStretch()
         
         save_draft_btn = QPushButton("💾 Save Draft")
-        save_draft_btn.setToolTip("Save work-in-progress strategy to continue later")
+        save_draft_btn.setToolTip("Save work-in-progress - keeps editor open")
         save_draft_btn.clicked.connect(self.save_draft)
         button_layout.addWidget(save_draft_btn)
+        
+        save_and_close_btn = QPushButton("💾 Save Draft & Close")
+        save_and_close_btn.setToolTip("Save work-in-progress and close editor")
+        save_and_close_btn.clicked.connect(self.save_draft_and_close)
+        button_layout.addWidget(save_and_close_btn)
         
         cancel_btn = QPushButton("❌ Cancel")
         cancel_btn.clicked.connect(self.reject)
@@ -494,21 +504,54 @@ class StrategyCreatorDialog(QDialog):
             if self.on_draft_saved:
                 self.on_draft_saved()
             
-            QMessageBox.information(
-                self,
-                f"Draft {action.title()}",
-                f"💾 Draft {action}!\n\n"
-                f"Number: {strategy_num:03d}\n"
-                f"Name: {user_input_name}\n"
-                f"Blocks: {len(config.blocks)}\n\n"
-                "You can continue editing this draft.\n"
-                "Subsequent saves will update this same strategy."
+            # Update status label instead of popup
+            self.status_label.setText(
+                f"💾 Draft {action}! | #{strategy_num:03d} | {user_input_name} | {len(config.blocks)} blocks"
             )
+            self.status_label.setStyleSheet("font-size: 9pt; color: #4ec9b0;")
             
             # Don't close dialog - user can continue editing
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to save draft:\n{e}")
+            # Show error in status label
+            self.status_label.setText(f"❌ Error: {e}")
+            self.status_label.setStyleSheet("font-size: 9pt; color: #f48771;")
+    
+    def save_draft_and_close(self):
+        """Save strategy as a draft and close the editor"""
+        try:
+            # Build configuration (allow incomplete)
+            config = self._build_config(is_draft=True)
+            
+            # Capture user's input name before registry modifies it
+            user_input_name = self.name_edit.text().strip()
+            
+            # Save with is_draft marker in description
+            if not config.description:
+                config.description = "[DRAFT] Work in progress"
+            elif "[DRAFT]" not in config.description:
+                config.description = f"[DRAFT] {config.description}"
+            
+            # Save without strict validation (overwrite if editing)
+            strategy_num = self.registry.save_strategy(
+                config, 
+                validate=False,
+                overwrite=self.editing_mode
+            )
+            
+            action = "updated" if self.editing_mode and strategy_num == config.strategy_number else "saved"
+            
+            # Call callback to refresh parent window
+            if self.on_draft_saved:
+                self.on_draft_saved()
+            
+            # Close dialog (no annoying popup!)
+            self.accept()
+            
+        except Exception as e:
+            # Show error in status label
+            self.status_label.setText(f"❌ Error: {e}")
+            self.status_label.setStyleSheet("font-size: 9pt; color: #f48771;")
         
     def create_strategy(self):
         """Create and save the strategy"""
