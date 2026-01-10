@@ -467,6 +467,9 @@ class StrategyCreatorDialog(QDialog):
             # Build configuration (allow incomplete)
             config = self._build_config(is_draft=True)
             
+            # Capture user's input name before registry modifies it
+            user_input_name = self.name_edit.text().strip()
+            
             # Save with is_draft marker in description
             if not config.description:
                 config.description = "[DRAFT] Work in progress"
@@ -480,11 +483,13 @@ class StrategyCreatorDialog(QDialog):
                 overwrite=self.editing_mode
             )
             
-            # CRITICAL: After first save, switch to edit mode
-            # This prevents creating multiple strategies from the same draft
+            # CRITICAL: After save, update existing_config to reflect changes
+            # Reload the saved config to get the current state
+            self.existing_config = self.registry.load_strategy(strategy_num)
+            
+            # Switch to edit mode if not already
             if not self.editing_mode:
                 self.editing_mode = True
-                self.existing_config = config
                 self.setWindowTitle("Edit Strategy (Draft)")
             
             action = "updated" if strategy_num == config.strategy_number else "saved"
@@ -493,7 +498,7 @@ class StrategyCreatorDialog(QDialog):
                 f"Draft {action.title()}",
                 f"💾 Draft {action}!\n\n"
                 f"Number: {strategy_num:03d}\n"
-                f"Name: {config.strategy_name}\n"
+                f"Name: {user_input_name}\n"
                 f"Blocks: {len(config.blocks)}\n\n"
                 "You can continue editing this draft.\n"
                 "Subsequent saves will update this same strategy."
