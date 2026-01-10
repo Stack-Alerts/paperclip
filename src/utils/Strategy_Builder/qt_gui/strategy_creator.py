@@ -148,6 +148,20 @@ class StrategyCreatorDialog(QDialog):
         self.weight_spin.valueChanged.connect(self.update_block_weight)
         config_layout.addRow("Weight:", self.weight_spin)
         
+        # NEW: Accumulation window setting (for sequential signal accumulation)
+        self.accumulation_window_spin = QSpinBox()
+        self.accumulation_window_spin.setRange(5, 100)
+        self.accumulation_window_spin.setValue(20)
+        self.accumulation_window_spin.setSuffix(" bars")
+        self.accumulation_window_spin.setToolTip(
+            "Signal Accumulation Window\n\n"
+            "How many bars to keep signals active.\n"
+            "Example: 20 bars = signals from last 20 bars count toward confluence.\n\n"
+            "Lower = faster entries, more sensitive\n"
+            "Higher = slower entries, more confirmation needed"
+        )
+        config_layout.addRow("Signal Window:", self.accumulation_window_spin)
+        
         self.signals_list = QListWidget()
         self.signals_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         self.signals_list.itemSelectionChanged.connect(self.update_block_signals)
