@@ -355,7 +355,7 @@ class StrategyCreatorDialog(QDialog):
     def update_block_signals(self):
         """Update signals for currently selected block"""
         current_row = self.selected_blocks_list.currentRow()
-        if current_row < 0:
+        if current_row < 0 or current_row >= len(self.selected_blocks):
             return
             
         # Get selected signals from list
