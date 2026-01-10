@@ -69,11 +69,23 @@ class StrategyRegistry:
             storage_dir = Path(__file__).parent.parent.parent / "strategies"
         
         self.storage_dir = Path(storage_dir)
-        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create organized folder structure
+        self.drafts_dir = self.storage_dir / "drafts"
+        self.unpublished_dir = self.storage_dir / "unpublished"
+        self.published_dir = self.storage_dir / "published"
+        
+        # Ensure all directories exist
+        self.drafts_dir.mkdir(parents=True, exist_ok=True)
+        self.unpublished_dir.mkdir(parents=True, exist_ok=True)
+        self.published_dir.mkdir(parents=True, exist_ok=True)
         
         self.validator = StrategyValidator()
         
         logger.info(f"StrategyRegistry initialized: {self.storage_dir}")
+        logger.info(f"  Drafts: {self.drafts_dir}")
+        logger.info(f"  Unpublished: {self.unpublished_dir}")
+        logger.info(f"  Published: {self.published_dir}")
     
     def get_next_strategy_number(self) -> int:
         """
@@ -107,18 +119,20 @@ class StrategyRegistry:
         
         raise ValueError("All 150 strategy slots are filled. Delete strategies to make room.")
     
-    def _get_strategy_filename(self, config: StrategyConfiguration) -> Path:
+    def _get_strategy_filename(self, config: StrategyConfiguration, is_draft: bool = False, is_published: bool = False) -> Path:
         """
-        Generate filename for strategy
+        Generate filename for strategy based on its state
         
         Format: strategy_NNN_name.json
         Example: strategy_001_reversal_m.json
         
         Args:
             config: Strategy configuration
+            is_draft: Whether this is a draft
+            is_published: Whether this is published
             
         Returns:
-            Path to strategy file
+            Path to strategy file in appropriate folder
         """
         # Remove 'strategy_NN_' prefix if present to get base name
         base_name = config.strategy_name
@@ -126,21 +140,35 @@ class StrategyRegistry:
             base_name = base_name[len(f"strategy_{config.strategy_number:02d}_"):]
         
         filename = f"strategy_{config.strategy_number:03d}_{base_name}.json"
-        return self.storage_dir / filename
+        
+        # Determine folder based on state
+        if is_draft:
+            return self.drafts_dir / filename
+        elif is_published:
+            return self.published_dir / filename
+        else:
+            return self.unpublished_dir / filename
     
     def save_strategy(
         self,
         config: StrategyConfiguration,
         validate: bool = True,
-        overwrite: bool = False
+        overwrite: bool = False,
+        is_published: bool = False
     ) -> int:
         """
-        Save strategy configuration to JSON
+        Save strategy configuration to JSON in appropriate folder
+        
+        Folder Structure:
+        - drafts/       : Work-in-progress strategies
+        - unpublished/  : Complete but not yet published
+        - published/    : Ready for Intelligent Trade Manager
         
         Args:
             config: Strategy configuration to save
             validate: Whether to validate before saving (default: True)
             overwrite: Whether to overwrite existing file (default: False)
+            is_published: Whether to save as published (default: False)
             
         Returns:
             Strategy number (int) of saved strategy
@@ -155,8 +183,15 @@ class StrategyRegistry:
                 error_msg = "\n".join(result.errors)
                 raise ValueError(f"Strategy validation failed:\n{error_msg}")
         
-        # Get filename
-        filepath = self._get_strategy_filename(config)
+        # Determine if this is a draft
+        is_draft = config.description and "[DRAFT]" in config.description
+        
+        # Get filename in appropriate folder
+        filepath = self._get_strategy_filename(config, is_draft, is_published)
+        
+        # If overwriting, delete from all folders first
+        if overwrite:
+            self._delete_from_all_folders(config.strategy_number)
         
         # Check if file exists
         if filepath.exists() and not overwrite:
@@ -171,19 +206,30 @@ class StrategyRegistry:
         # Add metadata
         strategy_dict['_metadata'] = {
             'saved_at': datetime.now().isoformat(),
-            'version': '1.0'
+            'version': '1.0',
+            'status': 'published' if is_published else ('draft' if is_draft else 'unpublished')
         }
         
         # Save to JSON
         with open(filepath, 'w') as f:
             json.dump(strategy_dict, f, indent=2)
         
-        logger.info(f"Strategy saved: {filepath.name}")
+        folder_name = filepath.parent.name
+        logger.info(f"Strategy saved to {folder_name}/: {filepath.name}")
         return config.strategy_number
+    
+    def _delete_from_all_folders(self, strategy_number: int):
+        """Delete strategy from all folders (when moving between states)"""
+        pattern = f"strategy_{strategy_number:03d}_*.json"
+        
+        for folder in [self.drafts_dir, self.unpublished_dir, self.published_dir]:
+            for filepath in folder.glob(pattern):
+                filepath.unlink()
+                logger.info(f"Deleted old version: {filepath}")
     
     def load_strategy(self, strategy_number: int) -> Optional[StrategyConfiguration]:
         """
-        Load strategy by number
+        Load strategy by number from any folder
         
         Args:
             strategy_number: Strategy number to load
@@ -191,12 +237,15 @@ class StrategyRegistry:
         Returns:
             StrategyConfiguration or None if not found
         """
-        # Find file matching strategy number
+        # Search all folders
         pattern = f"strategy_{strategy_number:03d}_*.json"
-        matching_files = list(self.storage_dir.glob(pattern))
+        matching_files = []
+        
+        for folder in [self.drafts_dir, self.unpublished_dir, self.published_dir]:
+            matching_files.extend(folder.glob(pattern))
         
         if not matching_files:
-            logger.warning(f"Strategy {strategy_number} not found")
+            logger.warning(f"Strategy {strategy_number} not found in any folder")
             return None
         
         if len(matching_files) > 1:
@@ -240,7 +289,7 @@ class StrategyRegistry:
         category: Optional[StrategyCategory] = None
     ) -> List[StrategyMetadata]:
         """
-        List all strategies with metadata
+        List all strategies with metadata from all folders
         
         Args:
             category: Optional category filter
@@ -250,33 +299,35 @@ class StrategyRegistry:
         """
         strategies = []
         
-        for filepath in sorted(self.storage_dir.glob("strategy_*.json")):
-            try:
-                config = self.load_strategy_from_file(filepath)
-                if config is None:
+        # Scan all folders
+        for folder in [self.drafts_dir, self.unpublished_dir, self.published_dir]:
+            for filepath in sorted(folder.glob("strategy_*.json")):
+                try:
+                    config = self.load_strategy_from_file(filepath)
+                    if config is None:
+                        continue
+                    
+                    # Filter by category if specified
+                    if category and config.strategy_category != category:
+                        continue
+                    
+                    # Create metadata
+                    metadata = StrategyMetadata(
+                        number=config.strategy_number,
+                        name=config.strategy_name,
+                        category=config.strategy_category,
+                        created_date=config.created_date if hasattr(config, 'created_date') else datetime.now().isoformat(),
+                        modified_date=config.modified_date if hasattr(config, 'modified_date') else datetime.now().isoformat(),
+                        file_path=str(filepath),
+                        config_path=str(filepath),  # Same as file_path for now
+                        version=config.version if hasattr(config, 'version') else 1,
+                        description=config.description if hasattr(config, 'description') else ""
+                    )
+                    strategies.append(metadata)
+                    
+                except Exception as e:
+                    logger.error(f"Error processing {filepath.name}: {e}")
                     continue
-                
-                # Filter by category if specified
-                if category and config.strategy_category != category:
-                    continue
-                
-                # Create metadata
-                metadata = StrategyMetadata(
-                    number=config.strategy_number,
-                    name=config.strategy_name,
-                    category=config.strategy_category,
-                    created_date=config.created_date if hasattr(config, 'created_date') else datetime.now().isoformat(),
-                    modified_date=config.modified_date if hasattr(config, 'modified_date') else datetime.now().isoformat(),
-                    file_path=str(filepath),
-                    config_path=str(filepath),  # Same as file_path for now
-                    version=config.version if hasattr(config, 'version') else 1,
-                    description=config.description if hasattr(config, 'description') else ""
-                )
-                strategies.append(metadata)
-                
-            except Exception as e:
-                logger.error(f"Error processing {filepath.name}: {e}")
-                continue
         
         return strategies
     
@@ -304,7 +355,7 @@ class StrategyRegistry:
     
     def delete_strategy(self, strategy_number: int) -> bool:
         """
-        Delete strategy by number
+        Delete strategy by number from any folder
         
         Args:
             strategy_number: Strategy number to delete
@@ -312,12 +363,15 @@ class StrategyRegistry:
         Returns:
             True if deleted, False if not found
         """
-        # Find file
+        # Search all folders
         pattern = f"strategy_{strategy_number:03d}_*.json"
-        matching_files = list(self.storage_dir.glob(pattern))
+        matching_files = []
+        
+        for folder in [self.drafts_dir, self.unpublished_dir, self.published_dir]:
+            matching_files.extend(folder.glob(pattern))
         
         if not matching_files:
-            logger.warning(f"Strategy {strategy_number} not found")
+            logger.warning(f"Strategy {strategy_number} not found in any folder")
             return False
         
         # Delete all matching files
@@ -329,12 +383,48 @@ class StrategyRegistry:
     
     def get_strategy_count(self) -> int:
         """
-        Get total number of saved strategies
+        Get total number of saved strategies across all folders
         
         Returns:
             Count of strategy files
         """
-        return len(list(self.storage_dir.glob("strategy_*.json")))
+        count = 0
+        for folder in [self.drafts_dir, self.unpublished_dir, self.published_dir]:
+            count += len(list(folder.glob("strategy_*.json")))
+        return count
+    
+    def get_next_strategy_number(self) -> int:
+        """
+        Get next available strategy number (searches all folders)
+        
+        Scans existing strategies and returns next sequential number.
+        
+        Returns:
+            Next available strategy number (1-150)
+            
+        Raises:
+            ValueError: If all 150 strategy slots are filled
+        """
+        existing_numbers = set()
+        
+        # Scan all folders for existing strategy files
+        for folder in [self.drafts_dir, self.unpublished_dir, self.published_dir]:
+            for file in folder.glob("strategy_*.json"):
+                try:
+                    # Extract number from filename: strategy_001_name.json
+                    parts = file.stem.split('_', 2)
+                    if len(parts) >= 2:
+                        num = int(parts[1])
+                        existing_numbers.add(num)
+                except (ValueError, IndexError):
+                    continue
+        
+        # Find first available number (1-150)
+        for num in range(1, 151):
+            if num not in existing_numbers:
+                return num
+        
+        raise ValueError("All 150 strategy slots are filled. Delete strategies to make room.")
     
     def get_category_counts(self) -> Dict[str, int]:
         """

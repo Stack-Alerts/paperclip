@@ -130,6 +130,13 @@ class StrategyBuilderMainWindow(QMainWindow):
         validate_btn.triggered.connect(self.validate_strategy)
         toolbar.addAction(validate_btn)
         
+        toolbar.addSeparator()
+        
+        # Publish button
+        publish_btn = QAction('✅ Publish', self)
+        publish_btn.triggered.connect(self.publish_strategy)
+        toolbar.addAction(publish_btn)
+        
         # Generate button
         generate_btn = QAction('⚙ Generate', self)
         generate_btn.triggered.connect(self.generate_files)
@@ -231,19 +238,39 @@ class StrategyBuilderMainWindow(QMainWindow):
             print(f"Warning: Could not load dark theme: {e}")
             
     def load_strategies(self):
-        """Load strategies from registry"""
+        """Load strategies from registry with folder status"""
         self.strategy_list.clear()
         strategies = self.registry.list_strategies()
         
+        # Count by folder
+        drafts_count = 0
+        unpublished_count = 0
+        published_count = 0
+        
         for strategy in sorted(strategies, key=lambda s: s.number):
-            # Show [DRAFT] indicator for draft strategies
-            draft_marker = " 💾[DRAFT]" if strategy.description and "[DRAFT]" in strategy.description else ""
-            item_text = f"{strategy.number:03d}. {strategy.name} ({strategy.category}){draft_marker}"
+            # Determine folder from file path
+            file_path = Path(strategy.file_path)
+            folder_name = file_path.parent.name
+            
+            # Set status indicator
+            if folder_name == "drafts":
+                status = " 💾[DRAFT]"
+                drafts_count += 1
+            elif folder_name == "published":
+                status = " ✅[PUBLISHED]"
+                published_count += 1
+            else:  # unpublished
+                status = " 📝[READY]"
+                unpublished_count += 1
+            
+            item_text = f"{strategy.number:03d}. {strategy.name} ({strategy.category}){status}"
             self.strategy_list.addItem(item_text)
         
         total = len(strategies)
-        drafts = sum(1 for s in strategies if s.description and "[DRAFT]" in s.description)
-        self.status_bar.showMessage(f"Ready | {total}/150 Slots | {drafts} Drafts")
+        self.status_bar.showMessage(
+            f"Ready | {total}/150 Slots | "
+            f"💾{drafts_count} Drafts | 📝{unpublished_count} Ready | ✅{published_count} Published"
+        )
         
     def on_strategy_selected(self, current, previous):
         """Handle strategy selection"""
@@ -463,6 +490,9 @@ Building Blocks ({len(config.blocks)}):
             validate_action = menu.addAction("✓ Validate")
             validate_action.triggered.connect(self.validate_strategy)
             
+            publish_action = menu.addAction("✅ Publish")
+            publish_action.triggered.connect(self.publish_strategy)
+            
             generate_action = menu.addAction("⚙ Generate Files")
             generate_action.triggered.connect(self.generate_files)
             
@@ -490,6 +520,91 @@ Building Blocks ({len(config.blocks)}):
         
         QMessageBox.information(self, "Statistics", stats_text)
         
+    def publish_strategy(self):
+        """Publish strategy (move to published folder for ITM)"""
+        current = self.strategy_list.currentItem()
+        if not current:
+            QMessageBox.warning(
+                self,
+                "No Selection",
+                "Please select a strategy to publish"
+            )
+            return
+        
+        item_text = current.text()
+        strategy_num = int(item_text.split('.')[0])
+        
+        # Check if already published
+        if "[PUBLISHED]" in item_text:
+            QMessageBox.information(
+                self,
+                "Already Published",
+                f"Strategy #{strategy_num:03d} is already published!"
+            )
+            return
+        
+        # Load strategy
+        config = self.registry.load_strategy(strategy_num)
+        if not config:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to load strategy #{strategy_num:03d}"
+            )
+            return
+        
+        # Remove [DRAFT] marker if present
+        if config.description and "[DRAFT]" in config.description:
+            config.description = config.description.replace("[DRAFT] ", "").replace("[DRAFT]", "")
+        
+        # Validate before publishing
+        result = self.validator.validate(config)
+        if not result.is_valid:
+            errors = '\n'.join(f"• {e}" for e in result.errors)
+            reply = QMessageBox.warning(
+                self,
+                "Validation Failed",
+                f"Strategy has validation errors:\n\n{errors}\n\n"
+                "Publish anyway? (Not recommended - ITM may reject it)",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.No:
+                return
+        
+        # Confirm publication
+        reply = QMessageBox.question(
+            self,
+            "Confirm Publication",
+            f"Publish Strategy #{strategy_num:03d}?\n\n"
+            f"Name: {config.strategy_name}\n"
+            f"Category: {config.strategy_category}\n"
+            f"Blocks: {len(config.blocks)}\n\n"
+            "This will make it available to the Intelligent Trade Manager.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                # Save as published (will move to published folder)
+                self.registry.save_strategy(config, validate=False, overwrite=True, is_published=True)
+                
+                self.load_strategies()
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"✅ Strategy #{strategy_num:03d} published!\n\n"
+                    "It is now available for the Intelligent Trade Manager."
+                )
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Failed to publish strategy:\n{e}"
+                )
+    
     def show_about(self):
         """Show about dialog"""
         about_text = """Strategy Builder v3.0
@@ -499,9 +614,13 @@ Professional PyQt6 Interface
 Features:
 • VSCode dark theme
 • Large, readable fonts
-• 80 production-ready building blocks
+• 83 production-ready building blocks
 • Automated code generation
 • Institutional validation
+• Organized folder structure:
+  - drafts/ (WIP strategies)
+  - unpublished/ (Complete, not published)
+  - published/ (Ready for ITM)
 
 © 2026 BTC Engine Project
 """
