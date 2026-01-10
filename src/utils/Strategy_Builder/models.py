@@ -151,11 +151,8 @@ class StrategyConfiguration(BaseModel):
     @model_validator(mode='after')
     def validate_strategy(self):
         """Validate strategy name convention and main signal block"""
-        # Fix strategy name
-        expected_prefix = f"strategy_{self.strategy_number:02d}_"
-        if not self.strategy_name.startswith(expected_prefix):
-            # Auto-fix: add correct prefix
-            self.strategy_name = f"{expected_prefix}{self.strategy_name}"
+        # Don't auto-fix strategy name - users control their own names
+        # The filename will handle the numbering format
         
         # Validate main signal block
         if not any(b.block_name == self.main_signal_block for b in self.blocks):
