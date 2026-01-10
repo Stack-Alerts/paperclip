@@ -369,6 +369,11 @@ class StrategyGenerator:
             module_path = block_metadata.module_path
             class_name = block_metadata.class_name
             
+            # WORKAROUND: Remove class name from end of module_path if present
+            # Registry incorrectly includes class name in module_path
+            if module_path.endswith(f".{class_name}"):
+                module_path = module_path[:-len(f".{class_name}")]
+            
             # Create import statement
             import_stmt = f"from {module_path} import {class_name}"
             
