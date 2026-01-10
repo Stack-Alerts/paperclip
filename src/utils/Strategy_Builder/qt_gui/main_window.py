@@ -12,7 +12,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QListWidget, QTextEdit,
-    QToolBar, QStatusBar, QMessageBox, QSplitter, QComboBox
+    QToolBar, QStatusBar, QMessageBox, QSplitter, QComboBox, QDialog
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QAction
@@ -142,6 +142,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         generate_btn.triggered.connect(self.generate_files)
         toolbar.addAction(generate_btn)
         
+        # Test button
+        test_btn = QAction('🧪 Test', self)
+        test_btn.triggered.connect(self.test_strategy)
+        toolbar.addAction(test_btn)
+        
         toolbar.addSeparator()
         
         # Refresh button
@@ -214,17 +219,17 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Buttons
         button_layout = QHBoxLayout()
         
-        validate_btn = QPushButton("✓ Validate Selected")
+        validate_btn = QPushButton("✓ Validate")
         validate_btn.clicked.connect(self.validate_strategy)
         button_layout.addWidget(validate_btn)
         
-        generate_btn = QPushButton("⚙ Generate Files")
+        test_btn = QPushButton("🧪 Test")
+        test_btn.clicked.connect(self.test_strategy)
+        button_layout.addWidget(test_btn)
+        
+        generate_btn = QPushButton("⚙ Generate")
         generate_btn.clicked.connect(self.generate_files)
         button_layout.addWidget(generate_btn)
-        
-        preview_btn = QPushButton("👁 Preview Code")
-        preview_btn.clicked.connect(self.preview_code)
-        button_layout.addWidget(preview_btn)
         
         right_layout.addLayout(button_layout)
         
@@ -462,7 +467,7 @@ Building Blocks ({len(config.blocks)}):
                 )
                 
     def generate_files(self):
-        """Generate strategy files"""
+        """Generate strategy files with feedback"""
         current = self.strategy_list.currentItem()
         if not current:
             QMessageBox.warning(
@@ -476,17 +481,148 @@ Building Blocks ({len(config.blocks)}):
         strategy_num = int(item_text.split('.')[0])
         
         try:
+            # Show progress
+            self.status_bar.showMessage(f"Generating files for strategy #{strategy_num:03d}...")
+            
             files = self.registry.generate_strategy_files(strategy_num)
             if files:
-                # Show preview dialog
-                preview = CodePreviewDialog(files, self)
-                preview.exec()
+                # Show success message with file list
+                file_list = "\n".join(f"• {Path(p).name}" for p in files.values())
+                QMessageBox.information(
+                    self,
+                    "Files Generated",
+                    f"✅ Successfully generated {len(files)} files:\n\n{file_list}\n\n"
+                    f"Location: src/strategies/ and tests/"
+                )
+                self.status_bar.showMessage(f"Generated {len(files)} files for strategy #{strategy_num:03d}")
         except Exception as e:
             QMessageBox.critical(
                 self,
                 "Error",
                 f"Generation failed:\n{e}"
             )
+            self.status_bar.showMessage("Generation failed")
+    
+    def test_strategy(self):
+        """Test strategy with Universal Optimizer v2"""
+        current = self.strategy_list.currentItem()
+        if not current:
+            QMessageBox.warning(
+                self,
+                "No Selection",
+                "Please select a strategy to test"
+            )
+            return
+            
+        item_text = current.text()
+        strategy_num = int(item_text.split('.')[0])
+        
+        # Confirm test
+        reply = QMessageBox.question(
+            self,
+            "Run Backtest",
+            f"Run Universal Optimizer v2 test on Strategy #{strategy_num:03d}?\n\n"
+            f"This will:\n"
+            f"• Generate strategy files if needed\n"
+            f"• Run walk-forward optimization\n"
+            f"• Display results in this window\n\n"
+            f"This may take several minutes.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self._run_backtest(strategy_num)
+    
+    def _run_backtest(self, strategy_num: int):
+        """Run backtest and show results"""
+        import subprocess
+        import json
+        from datetime import datetime
+        
+        try:
+            # Update status
+            self.status_bar.showMessage(f"Running backtest for strategy #{strategy_num:03d}...")
+            
+            # Generate files first
+            files = self.registry.generate_strategy_files(strategy_num)
+            
+            # Run universal optimizer v2
+            cmd = [
+                "python",
+                "scripts/universal_optimizer_v2.py",
+                f"--strategy={strategy_num:03d}",
+                "--days=90"
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=Path.cwd()
+            )
+            
+            if result.returncode == 0:
+                # Parse results and show
+                self._show_test_results(strategy_num, result.stdout)
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Test Failed",
+                    f"Backtest failed:\n\n{result.stderr}"
+                )
+                
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Test execution failed:\n{e}"
+            )
+        finally:
+            self.status_bar.showMessage("Ready")
+    
+    def _show_test_results(self, strategy_num: int, output: str):
+        """Display test results in dialog"""
+        # Create results dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Test Results - Strategy #{strategy_num:03d}")
+        dialog.setGeometry(200, 200, 800, 600)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Results text
+        results_text = QTextEdit()
+        results_text.setReadOnly(True)
+        results_text.setPlainText(output)
+        layout.addWidget(results_text)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        
+        edit_btn = QPushButton("✏️ Edit Strategy")
+        edit_btn.clicked.connect(lambda: self._edit_from_results(dialog, strategy_num))
+        button_layout.addWidget(edit_btn)
+        
+        button_layout.addStretch()
+        
+        close_btn = QPushButton("✅ Close")
+        close_btn.clicked.connect(dialog.accept)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+        
+        dialog.exec()
+    
+    def _edit_from_results(self, results_dialog, strategy_num: int):
+        """Edit strategy from test results dialog"""
+        results_dialog.close()
+        
+        # Load and edit
+        config = self.registry.load_strategy(strategy_num)
+        if config:
+            creator = StrategyCreatorDialog(self, existing_config=config)
+            if creator.exec():
+                self.load_strategies()
             
     def preview_code(self):
         """Preview code for selected strategy"""
