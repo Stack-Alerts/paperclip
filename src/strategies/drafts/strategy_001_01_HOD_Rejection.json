@@ -2,7 +2,7 @@
   "strategy_name": "strategy_01_01_HOD_Rejection",
   "strategy_number": 1,
   "strategy_category": "REVERSAL",
-  "description": "",
+  "description": "[DRAFT] Work in progress",
   "main_signal_block": "hod",
   "blocks": [
     {
@@ -20,13 +20,6 @@
         {
           "signal_name": "AT_HOD",
           "signal_display_name": "At Hod",
-          "role": "SIGNAL",
-          "required": true,
-          "min_confidence": 0.0
-        },
-        {
-          "signal_name": "HOD_REJECTION",
-          "signal_display_name": "Hod Rejection",
           "role": "SIGNAL",
           "required": true,
           "min_confidence": 0.0
@@ -110,11 +103,12 @@
   "test_days": 180,
   "optimization_configs": 48,
   "test_permutations": [],
-  "created_date": "2026-01-10T00:49:00.851423",
-  "modified_date": "2026-01-10T00:49:00.851434",
+  "created_date": "2026-01-10T01:12:40.643540",
+  "modified_date": "2026-01-10T01:12:40.643553",
   "version": 1,
   "_metadata": {
-    "saved_at": "2026-01-10T00:49:00.851699",
-    "version": "1.0"
+    "saved_at": "2026-01-10T01:12:40.643986",
+    "version": "1.0",
+    "status": "draft"
   }
 }
