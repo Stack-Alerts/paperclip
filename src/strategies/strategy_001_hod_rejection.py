@@ -5,7 +5,7 @@ Category:
 Timeframe: 15-minute
 Risk:Reward: 1:3
 Author: Strategy Builder v1.0
-Date: 2026-01-10 10:53:57
+Date: 2026-01-10 11:04:00
 
 Description:
 [DRAFT] Work in progress
@@ -45,6 +45,9 @@ from src.detectors.building_blocks.price_levels.hod import HOD
 # Import centralized confluence calculator
 from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
 
+# Import signal accumulator for sequential confluence building
+from src.strategies.signal_accumulator import SignalAccumulator
+
 
 class StrategyHodRejection(Strategy):
     """
@@ -55,7 +58,7 @@ class StrategyHodRejection(Strategy):
     """
 
 # ============================================================================
-# OPTIMIZED: 2026-01-10 10:54:01
+# OPTIMIZED: 2026-01-10 11:04:04
 # Trades: 31, Win Rate: 35.5%, PF: 0.59
 # Net PnL: $-1426.85 (-14.27%)
 # Fees: $1167.37
@@ -73,6 +76,7 @@ class StrategyHodRejection(Strategy):
         # Strategy parameters
         self.min_confluence = 40
         self.max_bars_held = 1000
+        self.accumulation_window = 20  # Bars to keep signals active
         self.capital_allocation_pct = 10.0
         
         # Risk management
@@ -92,6 +96,12 @@ class StrategyHodRejection(Strategy):
         self.wins = 0
         self.losses = 0
         self.total_confluence_scores = []
+        
+        # Initialize signal accumulator for sequential confluence
+        self.signal_accumulator = SignalAccumulator(
+            min_confluence=self.min_confluence,
+            window_bars=self.accumulation_window
+        )
         
     def _initialize_blocks(self):
         """Initialize building block detectors"""
@@ -153,7 +163,7 @@ class StrategyHodRejection(Strategy):
         self.log.info(f"Ready for trading")
         
     def on_bar(self, bar: Bar):
-        """Process each new bar"""
+        """Process each new bar with sequential signal accumulation"""
         # Update DataFrame
         df = self._update_dataframe(bar)
         
@@ -164,16 +174,30 @@ class StrategyHodRejection(Strategy):
         # Run building block analysis
         results = self._analyze_blocks(df)
         
-        # Calculate confluence
-        confluence, signals = self._calculate_confluence(results)
+        # Use signal accumulator for sequential confluence building
+        # Signals accumulate over accumulation_window bars
+        should_enter, total_confluence, active_signals = self.signal_accumulator.on_bar(
+            bar_number=len(self.bars_data),
+            block_results=results,
+            block_configs=self.blocks
+        )
         
         # Track confluence scores
-        self.total_confluence_scores.append(confluence)
+        self.total_confluence_scores.append(total_confluence)
         
-        # Check entry conditions
-        if confluence >= self.min_confluence:
+        # Check entry conditions (threshold automatically checked by accumulator)
+        if should_enter:
             if self.portfolio.is_flat(self.instrument_id):
-                self._execute_entry(confluence, results, signals)
+                # Log accumulated signals
+                self.log.info(f"🎯 CONFLUENCE THRESHOLD MET: {total_confluence} points")
+                self.log.info(f"📊 Accumulated from {len(active_signals)} signals:")
+                for signal in active_signals:
+                    self.log.info(f"  ✓ {signal}")
+                
+                self._execute_entry(total_confluence, results, active_signals)
+                
+                # Reset accumulator after entry (start fresh for next setup)
+                self.signal_accumulator.reset()
                 
     def _analyze_blocks(self, df: pd.DataFrame) -> dict:
         """Run all building blocks analysis"""
@@ -195,9 +219,7 @@ class StrategyHodRejection(Strategy):
     
     def _execute_entry(self, confluence: int, results: dict, signals: list):
         """Execute trade entry with TP/SL levels"""
-        self.log.info(f"🎯 HIGH CONFLUENCE DETECTED: {confluence} points")
-        for signal in signals:
-            self.log.info(f"  ✓ {signal}")
+        # Signals list already logged in on_bar, just execute trade
         
         # Calculate TP/SL levels
         tp1, tp2, tp3, sl = self._calculate_tp_sl(results)

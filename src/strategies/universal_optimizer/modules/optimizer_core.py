@@ -34,6 +34,45 @@ from .ui import (
 )
 
 
+def load_strategy_side_from_config(strategy_module_name: str) -> Optional[str]:
+    """
+    Load strategy side (LONG/SHORT) from YAML config file
+    
+    Args:
+        strategy_module_name: Strategy module name (e.g., 'strategy_001_hod_rejection')
+    
+    Returns:
+        'SHORT' or 'LONG' if found in config, None otherwise
+    """
+    from pathlib import Path
+    import yaml
+    
+    # Try to find config file
+    config_paths = [
+        Path('config') / f'optimizer_{strategy_module_name}.yaml',
+        Path('config') / f'{strategy_module_name}.yaml',
+    ]
+    
+    for config_path in config_paths:
+        if config_path.exists():
+            try:
+                with open(config_path, 'r') as f:
+                    config = yaml.safe_load(f)
+                
+                # Look for side in strategy section
+                if 'strategy' in config and 'side' in config['strategy']:
+                    side = config['strategy']['side'].upper()
+                    if side in ['SHORT', 'LONG']:
+                        return side
+                    else:
+                        print(f"   ⚠️  Invalid side '{side}' in config, must be SHORT or LONG")
+                        
+            except Exception as e:
+                print(f"   ⚠️  Error reading config {config_path}: {e}")
+    
+    return None  # Side not found in config
+
+
 def optimize_strategy_v2(
     strategy_module_name: str,
     test_days: int = 180,
@@ -113,7 +152,13 @@ def optimize_strategy_v2(
     
     # 4. Build 48 configs
     print(f"\n🔧 Building optimization configurations...")
-    configs = build_optimization_configs(blocks, strategy_module_name)
+    
+    # Load strategy side from config file if available
+    strategy_side = load_strategy_side_from_config(strategy_module_name)
+    if strategy_side:
+        print(f"   📍 Strategy direction: {strategy_side} (from config)")
+    
+    configs = build_optimization_configs(blocks, strategy_module_name, strategy_side)
     print(f"✅ Created {len(configs)} parameter combinations")
     
     # 5. Run ULTRA Hybrid Optimizer (MAXIMUM PARALLEL!)
@@ -265,7 +310,8 @@ def optimize_strategy_v2(
 
 def build_optimization_configs(
     blocks: dict,
-    strategy_module_name: str
+    strategy_module_name: str,
+    strategy_side: str = None
 ) -> List[OptimizationConfig]:
     """
     Build 48 optimization configurations
@@ -276,11 +322,23 @@ def build_optimization_configs(
     - Weight presets: 4
     
     Total: 4 × 3 × 4 = 48 configs
+    
+    Args:
+        blocks: Building blocks dict
+        strategy_module_name: Strategy name
+        strategy_side: Trade direction ('SHORT' or 'LONG'), read from config
     """
     configs = []
     config_id = 0
     
     weight_presets = get_weight_presets_for_blocks(list(blocks.keys()))
+    
+    # Determine side (from config or fallback to heuristic)
+    if strategy_side:
+        side = strategy_side
+    else:
+        # Fallback: Heuristic based on block names
+        side = 'SHORT' if 'double_top' in blocks else 'LONG'
     
     for confluence in [40, 50, 60, 70]:
         for rr in [2.0, 2.5, 3.0]:
@@ -301,7 +359,7 @@ def build_optimization_configs(
                     blocks=blocks_with_weights,
                     strategy_id=strategy_module_name,
                     strategy_name=strategy_module_name.replace('_', ' ').title(),
-                    side='SHORT' if 'double_top' in blocks else 'LONG'
+                    side=side  # Use determined side
                 )
                 
                 configs.append(config)
