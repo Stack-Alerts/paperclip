@@ -189,8 +189,14 @@ class StrategyRegistry:
         # Get filename in appropriate folder
         filepath = self._get_strategy_filename(config, is_draft, is_published)
         
-        # If overwriting, delete from all folders first
+        # If overwriting, check if name changed and rename associated files
         if overwrite:
+            old_config = self.load_strategy(config.strategy_number)
+            if old_config and old_config.strategy_name != config.strategy_name:
+                # Name changed - rename all associated files
+                self._rename_associated_files(config.strategy_number, old_config.strategy_name, config.strategy_name)
+            
+            # Delete from all folders
             self._delete_from_all_folders(config.strategy_number)
         
         # Check if file exists
@@ -217,6 +223,59 @@ class StrategyRegistry:
         folder_name = filepath.parent.name
         logger.info(f"Strategy saved to {folder_name}/: {filepath.name}")
         return config.strategy_number
+    
+    def _rename_associated_files(self, strategy_number: int, old_name: str, new_name: str):
+        """
+        Rename all generated files when strategy name changes
+        
+        Renames:
+        - Strategy file: src/strategies/strategy_NNN_oldname.py → strategy_NNN_newname.py
+        - Test file: tests/strategies/test_NNN_oldname.py → test_NNN_newname.py  
+        - Config file: config/optimizer_NNN_oldname.yaml → optimizer_NNN_newname.yaml
+        
+        Args:
+            strategy_number: Strategy number
+            old_name: Old strategy name
+            new_name: New strategy name
+        """
+        # Build old and new filenames (removing any strategy_NN_ prefix)
+        old_base = old_name
+        if old_base.startswith(f"strategy_{strategy_number:02d}_"):
+            old_base = old_base[len(f"strategy_{strategy_number:02d}_"):]
+        
+        new_base = new_name
+        if new_base.startswith(f"strategy_{strategy_number:02d}_"):
+            new_base = new_base[len(f"strategy_{strategy_number:02d}_"):]
+        
+        # Define file mappings: old pattern → new name
+        file_renames = [
+            # Strategy file
+            (
+                self.storage_dir / f"strategy_{strategy_number:03d}_{old_base}.py",
+                self.storage_dir / f"strategy_{strategy_number:03d}_{new_base}.py"
+            ),
+            # Test file
+            (
+                Path(__file__).parent.parent.parent / "tests" / "strategies" / f"test_{strategy_number:03d}_{old_base}.py",
+                Path(__file__).parent.parent.parent / "tests" / "strategies" / f"test_{strategy_number:03d}_{new_base}.py"
+            ),
+            # Optimizer config
+            (
+                Path(__file__).parent.parent.parent / "config" / f"optimizer_{strategy_number:03d}_{old_base}.yaml",
+                Path(__file__).parent.parent.parent / "config" / f"optimizer_{strategy_number:03d}_{new_base}.yaml"
+            ),
+        ]
+        
+        # Rename each file if it exists
+        for old_path, new_path in file_renames:
+            if old_path.exists():
+                try:
+                    old_path.rename(new_path)
+                    logger.info(f"Renamed: {old_path.name} → {new_path.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to rename {old_path.name}: {e}")
+            else:
+                logger.debug(f"File not found (skip): {old_path.name}")
     
     def _delete_from_all_folders(self, strategy_number: int):
         """Delete strategy from all folders (when moving between states)"""
