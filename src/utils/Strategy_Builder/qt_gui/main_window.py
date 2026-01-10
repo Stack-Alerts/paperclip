@@ -551,8 +551,8 @@ Building Blocks ({len(config.blocks)}):
             cmd = [
                 "python",
                 "scripts/universal_optimizer_v2.py",
-                f"--strategy={strategy_num:03d}",
-                "--days=90"
+                f"{strategy_num:03d}",  # Positional argument
+                "--days", "90"
             ]
             
             result = subprocess.run(
