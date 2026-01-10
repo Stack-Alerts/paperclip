@@ -559,11 +559,18 @@ Building Blocks ({len(config.blocks)}):
             # Generate files first
             files = self.registry.generate_strategy_files(strategy_num)
             
-            # Run universal optimizer v2
+            # Get the strategy module name from generated file
+            if not files or 'strategy' not in files:
+                raise ValueError("Strategy file generation failed")
+            
+            strategy_file = Path(files['strategy'])
+            strategy_module = strategy_file.stem  # e.g., "strategy_001_hod_rejection"
+            
+            # Run universal optimizer v2 with correct module name
             cmd = [
                 "python",
                 "scripts/universal_optimizer_v2.py",
-                f"{strategy_num:03d}",  # Positional argument
+                strategy_module,  # Full module name
                 "--days", "90"
             ]
             
