@@ -595,12 +595,13 @@ Building Blocks ({len(config.blocks)}):
             strategy_file = Path(files['strategy'])
             strategy_module = strategy_file.stem  # e.g., "strategy_001_hod_rejection"
             
-            # Build command
+            # Build command with non-interactive flag for GUI use
             cmd = [
                 "python",
                 "scripts/universal_optimizer_v2.py",
                 strategy_module,
-                "--days", "90"
+                "--days", "90",
+                "--non-interactive"  # Auto-select best config without prompts
             ]
             
             # Run in background thread - store as instance variable to prevent garbage collection
