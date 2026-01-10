@@ -59,6 +59,9 @@ class ConfluenceCalculator:
         """
         Get block configuration from BlockRegistry (REQUIRED - NO FALLBACKS)
         
+        UPDATED: Strips numeric suffixes (_0, _1, _2) before registry lookup
+        to support multiple instances of same block type (from Strategy Builder fix).
+        
         Raises:
             RegistryNotAvailableError: If BlockRegistry cannot be imported
             BlockNotRegisteredError: If block not found in registry
@@ -66,6 +69,12 @@ class ConfluenceCalculator:
         Returns:
             Block configuration with max_points and tiers
         """
+        import re
+        
+        # Strip numeric suffix before registry lookup
+        # hod_0 → hod, hod_1 → hod, fvg_0 → fvg, etc.
+        base_name = re.sub(r'_\d+$', '', block_name)
+        
         # Try to import BlockRegistry
         try:
             from src.detectors.building_blocks.registry import BlockRegistry
@@ -77,8 +86,8 @@ class ConfluenceCalculator:
                 f"   Docs: docs/v3/building_blocks/REGISTRY_ARCHITECTURE.md"
             )
         
-        # Try to get block metadata
-        metadata = BlockRegistry.get_block(block_name)
+        # Try to get block metadata using base name
+        metadata = BlockRegistry.get_block(base_name)
         
         if not metadata:
             # Block not registered - this is a configuration error!
@@ -86,7 +95,8 @@ class ConfluenceCalculator:
             available = ', '.join(sorted(all_blocks.keys())[:10])
             
             raise BlockNotRegisteredError(
-                f"❌ CRITICAL: Block '{block_name}' not registered in BlockRegistry!\n"
+                f"❌ CRITICAL: Block '{base_name}' not registered in BlockRegistry!\n"
+                f"   (Original key: '{block_name}')\n"
                 f"\n"
                 f"   This means the block is missing @register_block decorator\n"
                 f"   or the module hasn't been imported to trigger registration.\n"
@@ -287,4 +297,3 @@ def calculate_confluence(block_results: Dict[str, Dict[str, Any]],
                         block_configs: Dict[str, Dict[str, Any]]) -> Tuple[int, List[str]]:
     """Convenience wrapper for ConfluenceCalculator.calculate_confluence()"""
     return ConfluenceCalculator.calculate_confluence(block_results, block_configs)
-
