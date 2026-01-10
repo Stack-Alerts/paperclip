@@ -333,6 +333,10 @@ class StrategyCreatorDialog(QDialog):
         available_signals = self.bridge.get_signal_options(block_info.name)
         
         for signal in available_signals:
+            # Filter out defensive signals (ERROR, INSUFFICIENT_DATA)
+            if signal.name in ['ERROR', 'INSUFFICIENT_DATA']:
+                continue
+                
             item = QListWidgetItem(signal.display_name)
             item.setData(Qt.ItemDataRole.UserRole, signal)
             self.signals_list.addItem(item)
