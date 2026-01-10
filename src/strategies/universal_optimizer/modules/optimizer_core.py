@@ -375,10 +375,58 @@ def build_optimization_configs(
     else:
         tp_modes = ['PERCENTAGE']  # Legacy mode only
     
+    # TP DISTANCE SETS (Conservative, Moderate, Aggressive)
+    tp_distance_sets = [
+        {'name': 'conservative', 'tp1': 0.8, 'tp2': 1.5, 'tp3': 2.5},   # Tight TPs
+        {'name': 'moderate', 'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5},       # Balanced (default)
+        {'name': 'aggressive', 'tp1': 1.5, 'tp2': 3.0, 'tp3': 5.0},     # Wide TPs
+    ]
+    
+    # TRAILING STOP SETTINGS
+    trailing_settings = [
+        {'pct': 0.3, 'name': 'tight'},      # Tight trailing (0.3%)
+        {'pct': 0.5, 'name': 'moderate'},   # Moderate trailing (0.5%)
+        {'pct': 0.7, 'name': 'loose'},      # Loose trailing (0.7%)
+    ]
+    
+    # PARTIAL EXIT SPLITS
+    exit_splits = [
+        {'tp1': 50, 'tp2': 30, 'tp3': 20, 'name': 'standard'},     # 50/30/20
+        {'tp1': 60, 'tp2': 30, 'tp3': 10, 'name': 'aggressive'},   # 60/30/10 (take more profit early)
+        {'tp1': 40, 'tp2': 40, 'tp3': 20, 'name': 'balanced'},     # 40/40/20 (balanced partials)
+    ]
+    
+    # SELECT BEST COMBINATIONS (to avoid explosion of configs)
+    # For each TP mode, test 2 distance sets × 2 trailing × 1 exit split = 4 variations
+    tp_param_combos = []
+    for tp_mode in tp_modes:
+        # Conservative + Tight trailing
+        tp_param_combos.append({
+            'mode': tp_mode,
+            'distances': tp_distance_sets[0],
+            'trailing': trailing_settings[0],
+            'exits': exit_splits[0]
+        })
+        # Moderate + Moderate trailing (best default)
+        tp_param_combos.append({
+            'mode': tp_mode,
+            'distances': tp_distance_sets[1],
+            'trailing': trailing_settings[1],
+            'exits': exit_splits[0]
+        })
+        # Aggressive + Loose trailing
+        tp_param_combos.append({
+            'mode': tp_mode,
+            'distances': tp_distance_sets[2],
+            'trailing': trailing_settings[2],
+            'exits': exit_splits[1]
+        })
+    
+    # Build configs with TP parameter testing
     for confluence in confluence_range[:4]:  # Limit to 4 to manage config count
         for rr in rr_range:
             for weights in weight_presets:
-                for tp_mode in tp_modes:
+                for tp_combo in tp_param_combos:
                     # Build blocks with these weights
                     blocks_with_weights = {}
                     for block_name, block_info in blocks.items():
@@ -396,7 +444,12 @@ def build_optimization_configs(
                         strategy_id=strategy_module_name,
                         strategy_name=strategy_module_name.replace('_', ' ').title(),
                         side=side,
-                        tp_mode=tp_mode  # NEW: TP calculation method
+                        tp_mode=tp_combo['mode'],                        # TP calculation method
+                        tp_fallback_pcts=tp_combo['distances'],          # TP distance %s
+                        trailing_pct=tp_combo['trailing']['pct'],        # Trailing distance
+                        partial_exit_pcts=tp_combo['exits'],             # Exit split
+                        use_trailing=True,
+                        breakeven_after_tp1=True
                     )
                     
                     configs.append(config)

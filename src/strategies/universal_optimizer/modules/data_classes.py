@@ -11,7 +11,7 @@ from typing import Dict, List, Any, Optional
 
 @dataclass
 class OptimizationConfig:
-    """Configuration for a single optimization test (ENHANCED with Dynamic TPs)"""
+    """Configuration for a single optimization test (ENHANCED with Dynamic TPs + Parameter Testing)"""
     config_id: int
     min_confluence: int
     min_risk_reward: float
@@ -19,10 +19,19 @@ class OptimizationConfig:
     strategy_id: str
     strategy_name: str
     side: str
-    tp_mode: str = 'PERCENTAGE'  # NEW: 'PERCENTAGE', 'FIBONACCI', 'SWING_POINTS', 'SUPPLY_DEMAND', 'HYBRID'
-    trailing_pct: float = 0.5  # NEW: Trailing stop distance (default 0.5%)
-    use_trailing: bool = True  # NEW: Enable trailing stops
-    breakeven_after_tp1: bool = True  # NEW: Move SL to breakeven after TP1
+    tp_mode: str = 'PERCENTAGE'  # TP calculation method: 'PERCENTAGE', 'FIBONACCI', 'HYBRID'
+    trailing_pct: float = 0.5  # Trailing stop distance (0.3%, 0.5%, 0.7%)
+    use_trailing: bool = True  # Enable trailing stops
+    breakeven_after_tp1: bool = True  # Move SL to breakeven after TP1
+    tp_fallback_pcts: Dict[str, float] = None  # NEW: {'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5} - TP distances
+    partial_exit_pcts: Dict[str, int] = None  # NEW: {'tp1': 50, 'tp2': 30, 'tp3': 20} - Exit splits
+    
+    def __post_init__(self):
+        """Set default values for dict fields"""
+        if self.tp_fallback_pcts is None:
+            self.tp_fallback_pcts = {'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5}
+        if self.partial_exit_pcts is None:
+            self.partial_exit_pcts = {'tp1': 50, 'tp2': 30, 'tp3': 20}
     
     def to_dict(self) -> dict:
         """Convert to dictionary"""
