@@ -32,6 +32,7 @@ from src.utils.Strategy_Builder import (
 from src.utils.Strategy_Builder.qt_gui.block_library import BlockLibraryPanel
 from src.utils.Strategy_Builder.qt_gui.code_preview import CodePreviewDialog
 from src.utils.Strategy_Builder.qt_gui.strategy_creator import StrategyCreatorDialog
+from src.debugger_logger import ConfigDebugger
 
 
 class BacktestThread(QThread):
@@ -106,6 +107,15 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.validator = StrategyValidator()
         self.generator = StrategyGenerator()
         
+        # Initialize Config Debugger (disabled by default)
+        log_file = Path("logs/strategy_builder_debug.log")
+        self.config_debugger = ConfigDebugger(
+            name="StrategyBuilder",
+            log_file=log_file,
+            console_output=False  # Don't spam console
+        )
+        self.debugger_enabled = False
+        
         # Setup UI
         self.init_ui()
         self.apply_dark_theme()
@@ -175,6 +185,19 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.show_debug_action.setChecked(False)  # Default: hide debug messages
         self.show_debug_action.triggered.connect(self.toggle_debug_messages)
         debug_menu.addAction(self.show_debug_action)
+        
+        debug_menu.addSeparator()
+        
+        # Granular Debugger toggle (renamed from Config Debugger)
+        self.enable_debugger_action = QAction('Enable Granular Debugger', self, checkable=True)
+        self.enable_debugger_action.setChecked(False)  # Default: disabled
+        self.enable_debugger_action.triggered.connect(self.toggle_config_debugger)
+        debug_menu.addAction(self.enable_debugger_action)
+        
+        # View Debug Log
+        view_log_action = QAction('📄 View Debug Log', self)
+        view_log_action.triggered.connect(self.view_debug_log)
+        debug_menu.addAction(view_log_action)
         
         # Help menu
         help_menu = menubar.addMenu('❓ Help')
@@ -461,6 +484,28 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Load strategy details
         config = self.registry.load_strategy(strategy_num)
         if config:
+            # Log to debugger if enabled
+            if self.debugger_enabled:
+                # Register the loaded configuration
+                config_dict = {
+                    'strategy_name': config.strategy_name,
+                    'strategy_number': strategy_num,  # Use the parsed strategy_num
+                    'tp_mode': getattr(config, 'tp_mode', 'PERCENTAGE'),
+                    'min_risk_reward': getattr(config, 'min_risk_reward', 1.2),
+                    'min_confluence': getattr(config, 'min_confluence', 70),
+                    'blocks_count': len(config.blocks)
+                }
+                self.config_debugger.register_config_source(
+                    config_dict,
+                    source=f"strategy_{strategy_num:03d}.json",
+                    source_type="strategy_json"
+                )
+                self.config_debugger.log_action(
+                    action=f"Loaded strategy #{strategy_num:03d}",
+                    config_keys_used=['strategy_name', 'tp_mode', 'blocks_count'],
+                    parameters={'strategy_num': strategy_num}
+                )
+            
             # Build comprehensive details view
             details = f"""Strategy #{strategy_num:03d}
 {'='*60}
@@ -483,9 +528,11 @@ Building Blocks ({len(config.blocks)}):
             details += f"\n\n{'─'*60}\n"
             
             # Risk/Reward Settings
+            tp_mode = getattr(config, 'tp_mode', 'PERCENTAGE')
             details += f"""
 💰 RISK/REWARD SETTINGS
 {'─'*60}
+TP Mode:               {tp_mode} ⭐
 Min R:R Ratio:         {getattr(config, 'min_risk_reward', 1.2):.1f}
 Risk Per Trade:        {getattr(config, 'risk_per_trade_pct', 1.0):.1f}%
 Max Leverage:          {getattr(config, 'max_leverage', 2.0):.1f}x
@@ -781,6 +828,10 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
             if quick_test:
                 cmd.append("--quick-test")
             
+            # Add enable-debugger flag if GUI debugger is enabled
+            if self.debugger_enabled:
+                cmd.append("--enable-debugger")
+            
             # Create live output dialog
             self._create_live_output_dialog(strategy_num)
             
@@ -914,6 +965,219 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
         # Update status bar
         status = "showing" if is_checked else "hiding"
         self.status_bar.showMessage(f"Debug messages now {status}")
+    
+    def toggle_config_debugger(self):
+        """Toggle Granular Debugger on/off"""
+        is_enabled = self.enable_debugger_action.isChecked()
+        self.debugger_enabled = is_enabled
+        
+        # Update menu text
+        if is_enabled:
+            self.enable_debugger_action.setText('✓ Granular Debugger Enabled')
+            self.status_bar.showMessage("Granular Debugger ENABLED - Micro-granular logging of all TP/SL/Confluence calculations")
+            QMessageBox.information(
+                self,
+                "Granular Debugger Enabled",
+                "🔍 Granular Debugger is now ACTIVE\n\n"
+                "Micro-granular logging will track:\n"
+                "• GUI: Strategy loading and saving\n"
+                "• Optimizer: TP calculation methods and results\n"
+                "• Optimizer: SL calculation decisions and structures\n"
+                "• Optimizer: Confluence scoring and block weighting\n"
+                "• Optimizer: Config snapshots and parameter usage\n\n"
+                f"GUI Log: logs/strategy_builder_debug.log\n"
+                f"Optimizer Logs: logs/optimizer_debug_*.log"
+            )
+        else:
+            self.enable_debugger_action.setText('Granular Debugger Disabled')
+            self.status_bar.showMessage("Granular Debugger DISABLED")
+        
+        # Save preference for persistence
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        settings.setValue("debug/config_debugger_enabled", is_enabled)
+    
+    def view_debug_log(self):
+        """Open debug log files in a viewer dialog (GUI + Optimizer logs)"""
+        logs_dir = Path("logs")
+        
+        # Find all available debug logs
+        gui_log = logs_dir / "strategy_builder_debug.log"
+        optimizer_logs = sorted(logs_dir.glob("optimizer_debug_*.log"), reverse=True)
+        
+        available_logs = []
+        if gui_log.exists():
+            available_logs.append(("GUI Log", gui_log))
+        for opt_log in optimizer_logs[:5]:  # Show last 5 optimizer logs
+            available_logs.append((f"Optimizer: {opt_log.name}", opt_log))
+        
+        if not available_logs:
+            QMessageBox.information(
+                self,
+                "No Log Files",
+                f"No debug log files found.\n\n"
+                "Debug logs are created when:\n"
+                "1. Granular Debugger is enabled, AND\n"
+                "2. Operations are performed (strategy loading or optimization)\n\n"
+                "Enable Granular Debugger and run a test to generate logs."
+            )
+            return
+        
+        # If only one log, show it directly
+        if len(available_logs) == 1:
+            log_name, log_file = available_logs[0]
+            self._show_single_log(log_name, log_file)
+            return
+        
+        # Multiple logs - show selection dialog
+        from PyQt6.QtWidgets import QListWidget, QDialogButtonBox
+        
+        select_dialog = QDialog(self, Qt.WindowType.Dialog)
+        select_dialog.setWindowTitle("📄 Select Debug Log")
+        select_dialog.setGeometry(200, 200, 600, 400)
+        
+        layout = QVBoxLayout(select_dialog)
+        
+        label = QLabel("Multiple debug logs available. Select one to view:")
+        label.setStyleSheet("font-size: 10pt; padding: 5px;")
+        layout.addWidget(label)
+        
+        log_list = QListWidget()
+        for log_name, _ in available_logs:
+            log_list.addItem(log_name)
+        log_list.setCurrentRow(0)
+        log_list.itemDoubleClicked.connect(select_dialog.accept)
+        layout.addWidget(log_list)
+        
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(select_dialog.accept)
+        buttons.rejected.connect(select_dialog.reject)
+        layout.addWidget(buttons)
+        
+        if select_dialog.exec() == QDialog.DialogCode.Accepted:
+            selected_idx = log_list.currentRow()
+            log_name, log_file = available_logs[selected_idx]
+            self._show_single_log(log_name, log_file)
+    
+    def _show_single_log(self, log_name: str, log_file: Path):
+        """Show a single debug log file"""
+        try:
+            # Read log file
+            with open(log_file, 'r') as f:
+                log_content = f.read()
+            
+            # Create log viewer dialog
+            dialog = QDialog(self, Qt.WindowType.Window)
+            dialog.setWindowTitle(f"📄 {log_name}")
+            dialog.setGeometry(150, 150, 1000, 700)
+            
+            layout = QVBoxLayout(dialog)
+            
+            # Info header
+            info_label = QLabel(f"Log File: {log_file.absolute()}")
+            info_label.setStyleSheet("font-size: 10pt; font-weight: bold; padding: 5px;")
+            layout.addWidget(info_label)
+            
+            # Log content view
+            log_text = QTextEdit()
+            log_text.setReadOnly(True)
+            log_text.setPlainText(log_content)
+            log_text.setStyleSheet("font-family: monospace; font-size: 9pt;")
+            layout.addWidget(log_text)
+            
+            # Buttons
+            button_layout = QHBoxLayout()
+            
+            # Copy button
+            copy_btn = QPushButton("📋 Copy to Clipboard")
+            copy_btn.clicked.connect(lambda: self._copy_log_to_clipboard(log_content))
+            button_layout.addWidget(copy_btn)
+            
+            # Refresh button
+            refresh_btn = QPushButton("🔄 Refresh")
+            refresh_btn.clicked.connect(lambda: self._refresh_log_viewer(log_file, log_text))
+            button_layout.addWidget(refresh_btn)
+            
+            # Clear log button
+            clear_btn = QPushButton("🗑️ Clear Log")
+            clear_btn.clicked.connect(lambda: self._clear_debug_log(log_file, dialog))
+            button_layout.addWidget(clear_btn)
+            
+            button_layout.addStretch()
+            
+            # Close button
+            close_btn = QPushButton("✅ Close")
+            close_btn.clicked.connect(dialog.accept)
+            button_layout.addWidget(close_btn)
+            
+            layout.addLayout(button_layout)
+            
+            dialog.show()
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to open log file:\n{e}"
+            )
+    
+    def _copy_log_to_clipboard(self, log_content: str):
+        """Copy log content to clipboard"""
+        from PyQt6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        clipboard.setText(log_content)
+        QMessageBox.information(
+            self,
+            "Copied",
+            "📋 Debug log copied to clipboard!"
+        )
+    
+    def _refresh_log_viewer(self, log_file: Path, log_text: QTextEdit):
+        """Refresh log viewer with latest content"""
+        try:
+            with open(log_file, 'r') as f:
+                log_content = f.read()
+            log_text.setPlainText(log_content)
+            self.status_bar.showMessage("Log refreshed")
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to refresh log:\n{e}"
+            )
+    
+    def _clear_debug_log(self, log_file: Path, parent_dialog):
+        """Clear the debug log file"""
+        reply = QMessageBox.question(
+            parent_dialog,
+            "Confirm Clear Log",
+            "⚠️ Clear Debug Log?\n\n"
+            "This will permanently delete all log entries.\n\n"
+            "Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                # Clear log file
+                with open(log_file, 'w') as f:
+                    f.write("")
+                
+                QMessageBox.information(
+                    parent_dialog,
+                    "Log Cleared",
+                    "✅ Debug log has been cleared"
+                )
+                
+                # Close the dialog
+                parent_dialog.accept()
+                
+            except Exception as e:
+                QMessageBox.critical(
+                    parent_dialog,
+                    "Error",
+                    f"Failed to clear log:\n{e}"
+                )
     
     def _append_output_line(self, line: str):
         """Append a line of output to the live output dialog (with optional DEBUG filtering)"""
@@ -3265,7 +3529,7 @@ Log File: test_{timestamp}.txt
                     old_config.unlink()
             
             print(f"Saved test log: {log_file}")
-            print(f"Saved config snapshot: {config_snapshot_file if config else 'N/A'}")
+            print(f"Saved config snapshot: {config_snapshot_file if config_snapshot_file.exists() else 'N/A'}")
             print(f"Total logs for strategy {strategy_num}: {len(list(logs_dir.glob('test_*.txt')))}")
             
         except Exception as e:

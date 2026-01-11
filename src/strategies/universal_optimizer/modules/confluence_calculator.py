@@ -226,7 +226,8 @@ class ConfluenceCalculator:
     
     @classmethod
     def calculate_confluence(cls, block_results: Dict[str, Dict[str, Any]], 
-                           block_configs: Dict[str, Dict[str, Any]]) -> Tuple[int, List[str]]:
+                           block_configs: Dict[str, Dict[str, Any]],
+                           debugger = None) -> Tuple[int, List[str]]:
         """
         Calculate total confluence from all building block results
         
@@ -235,6 +236,7 @@ class ConfluenceCalculator:
         Args:
             block_results: Dict of {block_name: {'signal': str, 'confidence': float, ...}}
             block_configs: Dict of {block_name: {'weight': float, 'enabled': bool}}
+            debugger: Optional debugger for micro-granular logging
             
         Returns:
             Tuple of (total_confluence_score, list_of_signal_descriptions)
@@ -260,6 +262,16 @@ class ConfluenceCalculator:
         """
         total_confluence = 0
         signals = []
+        
+        if debugger:
+            debugger.log_action(
+                action='Calculate Confluence',
+                config_keys_used=[],
+                parameters={
+                    'active_blocks': len([b for b, c in block_configs.items() if c.get('enabled', True)]),
+                    'total_blocks': len(block_configs)
+                }
+            )
         
         for block_name, result in block_results.items():
             # Skip if block not configured or not enabled
@@ -294,6 +306,7 @@ class ConfluenceCalculator:
 
 # Convenience function for backwards compatibility
 def calculate_confluence(block_results: Dict[str, Dict[str, Any]], 
-                        block_configs: Dict[str, Dict[str, Any]]) -> Tuple[int, List[str]]:
+                        block_configs: Dict[str, Dict[str, Any]],
+                        debugger = None) -> Tuple[int, List[str]]:
     """Convenience wrapper for ConfluenceCalculator.calculate_confluence()"""
-    return ConfluenceCalculator.calculate_confluence(block_results, block_configs)
+    return ConfluenceCalculator.calculate_confluence(block_results, block_configs, debugger)

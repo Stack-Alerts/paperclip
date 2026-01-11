@@ -138,7 +138,16 @@ def test_single_config(args):
         calculate_trailing_sl
     )
     
-    config, all_results, test_df = args
+    # Safely unpack args (may have 3 or 4 elements)
+    if len(args) == 4:
+        config, all_results, test_df, debugger = args
+    else:
+        config, all_results, test_df = args
+        debugger = None
+    
+    # Register config snapshot for this test
+    if debugger:
+        debugger.register_config_source(config.to_dict(), source=f"config_{config.config_id}")
     
     trades = []
     current_position = None
@@ -170,18 +179,19 @@ def test_single_config(args):
             )
             
             # Initialize AdaptiveSLCalculator v2.0 for this entry
+            # Use values from THIS strategy's config (NO hardcoded defaults from other strategies!)
             sl_calculator = AdaptiveSLCalculator(
-                volatility_lookback=getattr(config, 'volatility_lookback', 20),
-                volatility_multiplier=getattr(config, 'volatility_multiplier', 1.2),
-                absolute_min_pct=getattr(config, 'absolute_min_sl_pct', 0.7),
-                absolute_max_pct=getattr(config, 'absolute_max_sl_pct', 2.0),
-                initial_sl_multiplier=getattr(config, 'initial_sl_multiplier', 1.5),
-                working_sl_multiplier=getattr(config, 'working_sl_multiplier', 1.0),
-                use_delayed_sl=getattr(config, 'use_delayed_sl', True),
-                delay_bars=getattr(config, 'delay_bars', 2),
-                emergency_sl_pct=getattr(config, 'emergency_sl_pct', 2.5),
-                use_structure_sl=getattr(config, 'use_structure_sl', True),
-                structure_sources=getattr(config, 'structure_sources', ['swing_points', 'supply_demand', 'fibonacci'])
+                volatility_lookback=config.volatility_lookback,
+                volatility_multiplier=config.volatility_multiplier,
+                absolute_min_pct=config.absolute_min_sl_pct,
+                absolute_max_pct=config.absolute_max_sl_pct,
+                initial_sl_multiplier=getattr(config, 'initial_sl_multiplier', 1.5),  # Optional param
+                working_sl_multiplier=getattr(config, 'working_sl_multiplier', 1.0),  # Optional param
+                use_delayed_sl=config.use_delayed_sl,
+                delay_bars=config.delay_bars,
+                emergency_sl_pct=config.emergency_sl_pct,
+                use_structure_sl=config.use_structure_sl,
+                structure_sources=config.structure_sources
             )
             
             # Calculate dynamic TPs using building blocks!
@@ -192,7 +202,8 @@ def test_single_config(args):
                 entry_price=entry_price,
                 entry_bar=len(history_for_tp) - 1,  # Last bar in history
                 side=config.side,
-                fallback_pcts=config.tp_fallback_pcts  # Use config's TP distances
+                fallback_pcts=config.tp_fallback_pcts,  # Use config's TP distances
+                debugger=debugger  # Pass debugger for micro-granular logging
             )
             
             # Calculate ADAPTIVE SL using v2.0 system!
@@ -200,7 +211,8 @@ def test_single_config(args):
                 df=history_for_tp,
                 entry_price=entry_price,
                 entry_bar=len(history_for_tp) - 1,
-                side=config.side
+                side=config.side,
+                debugger=debugger  # Pass debugger for micro-granular logging
             )
             
             # Extract TP/SL from calculated levels
@@ -218,8 +230,43 @@ def test_single_config(args):
             
             # Verify R:R meets minimum (using TP2 vs WORKING SL for realistic R:R)
             rr_ratio = abs((tp2 - entry_price) / (working_sl - entry_price))
+            
+            # CORRECT APPROACH: Simply skip trades that don't meet R:R requirement
+            # This allows different R:R configs to filter trades differently!
             if rr_ratio < config.min_risk_reward:
-                continue  # Skip this entry - R:R too low
+                # Log the rejection for debugging (optional, only if debugger enabled)
+                if debugger:
+                    debugger.log_decision(
+                        decision_type="if",
+                        condition=f"rr_ratio < min_risk_reward ({rr_ratio:.2f} < {config.min_risk_reward:.2f})",
+                        result=False,  # Condition failed → trade rejected
+                        config_keys_used=['min_risk_reward']
+                    )
+                continue  # Skip this trade - doesn't meet R:R requirement
+            
+            # If we reach here, trade meets R:R requirement naturally
+            # Log the successful trade entry (ONLY actual trades - keeps log small!)
+            if debugger:
+                debugger.log_action(
+                    action="TRADE_ENTRY",
+                    config_keys_used=['min_confluence', 'min_risk_reward', 'tp_mode', 'sl_mode'],
+                    parameters={
+                        'config_id': config.config_id,
+                        'bar_idx': bar_idx,
+                        'entry_price': entry_price,
+                        'confluence': total_confluence,
+                        'tp1': tp1,
+                        'tp2': tp2,
+                        'tp3': tp3,
+                        'working_sl': working_sl,
+                        'emergency_sl': emergency_sl,
+                        'rr_ratio': rr_ratio,
+                        'min_rr_required': config.min_risk_reward,
+                        'tp_method': tp_levels.method,
+                        'sl_method': sl_result.method,
+                        'rr_check_passed': True  # Flag that R:R check passed
+                    }
+                )
             
             current_position = {
                 'entry_bar': bar_idx,
@@ -289,10 +336,10 @@ def test_single_config(args):
                     
                     # Move SL to breakeven after TP1 if configured
                     if config.breakeven_after_tp1 and not current_position.get('breakeven_set', False):
-                        # Use config values (NO HARDCODED VALUES!)
-                        leverage = getattr(config, 'max_leverage', 10.0)
-                        starting_capital = getattr(config, 'starting_capital', 10000.0)
-                        risk_per_trade_pct = getattr(config, 'risk_per_trade_pct', 1.0)
+                        # Use THIS strategy's config values
+                        leverage = config.max_leverage
+                        starting_capital = config.starting_capital
+                        risk_per_trade_pct = config.risk_per_trade_pct
                         position_pct = risk_per_trade_pct / 100.0
                         margin_per_trade = starting_capital * position_pct
                         entry_notional = margin_per_trade * leverage
@@ -384,10 +431,10 @@ def test_single_config(args):
                     
                     # Move SL to breakeven after TP1 if configured
                     if config.breakeven_after_tp1 and not current_position.get('breakeven_set', False):
-                        # Use config values (NO HARDCODED VALUES!)
-                        leverage = getattr(config, 'max_leverage', 10.0)
-                        starting_capital = getattr(config, 'starting_capital', 10000.0)
-                        risk_per_trade_pct = getattr(config, 'risk_per_trade_pct', 1.0)
+                        # Use THIS strategy's config values
+                        leverage = config.max_leverage
+                        starting_capital = config.starting_capital
+                        risk_per_trade_pct = config.risk_per_trade_pct
                         position_pct = risk_per_trade_pct / 100.0
                         margin_per_trade = starting_capital * position_pct
                         entry_notional = margin_per_trade * leverage
@@ -399,7 +446,7 @@ def test_single_config(args):
                             position_size
                         )
                         # Only update if better than current SL
-                        if config.side == 'SHORT':
+                        if config.side == ' SHORT':
                             if breakeven_sl < current_position['sl']:
                                 current_position['sl'] = breakeven_sl
                                 current_position['breakeven_set'] = True
@@ -485,10 +532,10 @@ def test_single_config(args):
             if exit_occurred and current_position['remaining_pct'] == 0:
                 exit_time = test_df.iloc[bar_idx]['timestamp']
                 
-                # Position sizing - READ FROM CONFIG (NO HARDCODED VALUES!)
-                leverage = getattr(config, 'max_leverage', 10.0)
-                starting_capital = getattr(config, 'starting_capital', 10000.0)
-                risk_per_trade_pct = getattr(config, 'risk_per_trade_pct', 1.0)
+                # Position sizing - Use THIS strategy's config values
+                leverage = config.max_leverage
+                starting_capital = config.starting_capital
+                risk_per_trade_pct = config.risk_per_trade_pct
                 position_pct = risk_per_trade_pct / 100.0  # Convert percentage to decimal
                 margin_per_trade = starting_capital * position_pct
                 notional_per_trade = margin_per_trade * leverage
@@ -577,8 +624,8 @@ def test_single_config(args):
     net_pnl = sum(t['net_pnl'] for t in trades)
     win_rate_pct = (winning_trades / total_trades * 100) if total_trades > 0 else 0.0
     
-    # Net return percentage (use actual starting capital from config)
-    starting_capital_for_calc = getattr(config, 'starting_capital', 10000.0)
+    # Net return percentage - Use THIS strategy's config value
+    starting_capital_for_calc = config.starting_capital
     net_return_pct = (net_pnl / starting_capital_for_calc * 100) if net_pnl != 0 else 0.0
     
     # Profit factor
@@ -670,7 +717,8 @@ class UltraHybridSimulator:
         configs: List[OptimizationConfig],
         warmup_df: pd.DataFrame,
         test_df: pd.DataFrame,
-        strategy_module_name: str
+        strategy_module_name: str,
+        debugger = None  # Optional[ConfigDebugger] = None
     ) -> List[ConfigPerformance]:
         """Run ultra hybrid three-phase optimization"""
         
@@ -760,8 +808,13 @@ class UltraHybridSimulator:
         log_debug(f"Total configs to test: {len(configs)}")
         phase3_start = time.time()
         
-        test_args = [(config, all_building_block_results, test_df) for config in configs]
-        log_debug(f"Created test arguments for {len(test_args)} configs")
+        # Pass debugger as 4th element in test_args (if present)
+        if debugger:
+            test_args = [(config, all_building_block_results, test_df, debugger) for config in configs]
+            log_debug(f"Created test arguments for {len(test_args)} configs (with debugger)")
+        else:
+            test_args = [(config, all_building_block_results, test_df) for config in configs]
+            log_debug(f"Created test arguments for {len(test_args)} configs")
         
         log_debug(f"Spawning {self.num_cores} worker processes for config testing...")
         with Pool(processes=self.num_cores) as pool:

@@ -85,7 +85,8 @@ def optimize_strategy_v2(
     warmup_bars: int = 5000,
     use_multicore: bool = True,
     non_interactive: bool = False,
-    quick_test: bool = False
+    quick_test: bool = False,
+    debugger = None  # Optional[ConfigDebugger] = None (avoid import)
 ) -> Optional[OptimizationConfig]:
     """
     Universal Optimizer V2.0 - Main orchestration (WITH MULTICORE!)
@@ -189,7 +190,8 @@ def optimize_strategy_v2(
         warmup_df,
         test_df,
         strategy_module_name,
-        use_multicore
+        use_multicore,
+        debugger  # Pass debugger to simulator
     )
     
     elapsed = time.time() - start_time
@@ -324,19 +326,29 @@ def optimize_strategy_v2(
 
 def load_risk_params_from_yaml(strategy_module_name: str) -> dict:
     """
-    Load risk management parameters from YAML config
+    Load ALL configuration parameters from YAML config
+    
+    ⚠️ INSTITUTIONAL GRADE: Loads ALL 14 required parameters
     
     Returns dict with:
+    Risk Management (3):
     - starting_capital
     - max_leverage
     - risk_per_trade_pct
+    
+    Adaptive SL v2.0 (11):
+    - volatility_lookback, volatility_multiplier
+    - absolute_min_sl_pct, absolute_max_sl_pct
+    - initial_sl_multiplier, working_sl_multiplier
+    - use_delayed_sl, delay_bars, emergency_sl_pct
+    - use_structure_sl, structure_sources
     """
     from pathlib import Path
     import yaml
-    
+
     # Strip 'strategy_' prefix if present
     config_base = strategy_module_name.replace('strategy_', '')
-    
+
     # Try to find config file
     config_paths = [
         Path('config') / f'optimizer_{strategy_module_name}.yaml',
@@ -344,49 +356,60 @@ def load_risk_params_from_yaml(strategy_module_name: str) -> dict:
         Path('config') / f'{strategy_module_name}.yaml',
         Path('config') / f'{config_base}.yaml',
     ]
-    
-    # Defaults
-    risk_params = {
-        'starting_capital': 10000.0,
-        'max_leverage': 10.0,
-        'risk_per_trade_pct': 1.0
-    }
-    
+
     for config_path in config_paths:
         if config_path.exists():
             try:
                 with open(config_path, 'r') as f:
                     config = yaml.safe_load(f)
-                
-                # Read from backtest section
+
+                # Initialize params dict
+                params = {}
+
+                # Read RISK MANAGEMENT from backtest section
                 if 'backtest' in config:
                     backtest = config['backtest']
+                    params['starting_capital'] = float(backtest.get('initial_capital', 10000.0))
+                    params['max_leverage'] = float(backtest.get('max_leverage', 10.0))
+                    params['risk_per_trade_pct'] = float(backtest.get('risk_per_trade_pct', 1.0))
                     
-                    if 'initial_capital' in backtest:
-                        risk_params['starting_capital'] = float(backtest['initial_capital'])
+                    # Read TP MODE from backtest section (CRITICAL for quick_test)
+                    params['tp_mode'] = backtest.get('tp_mode', 'PERCENTAGE').upper()
                     
-                    if 'max_leverage' in backtest:
-                        risk_params['max_leverage'] = float(backtest['max_leverage'])
-                    
-                    if 'risk_per_trade_pct' in backtest:
-                        risk_params['risk_per_trade_pct'] = float(backtest['risk_per_trade_pct'])
-                
-                print(f"   📊 Loaded risk params from {config_path.name}:")
-                print(f"      - Starting Capital: ${risk_params['starting_capital']:,.2f}")
-                print(f"      - Max Leverage: {risk_params['max_leverage']}x")
-                print(f"      - Risk per Trade: {risk_params['risk_per_trade_pct']}%")
-                
-                return risk_params
-                
+                    # Read ADAPTIVE SL v2.0 from adaptive_sl subsection
+                    if 'adaptive_sl' in backtest:
+                        sl = backtest['adaptive_sl']
+                        params['volatility_lookback'] = int(sl.get('volatility_lookback', 20))
+                        params['volatility_multiplier'] = float(sl.get('volatility_multiplier', 1.0))
+                        params['absolute_min_sl_pct'] = float(sl.get('absolute_min_sl_pct', 0.6))
+                        params['absolute_max_sl_pct'] = float(sl.get('absolute_max_sl_pct', 1.5))
+                        params['initial_sl_multiplier'] = float(sl.get('initial_sl_multiplier', 1.5))
+                        params['working_sl_multiplier'] = float(sl.get('working_sl_multiplier', 1.0))
+                        params['use_delayed_sl'] = bool(sl.get('use_delayed_sl', True))
+                        params['delay_bars'] = int(sl.get('delay_bars', 1))
+                        params['emergency_sl_pct'] = float(sl.get('emergency_sl_pct', 2.0))
+                        params['use_structure_sl'] = bool(sl.get('use_structure_sl', True))
+                        params['structure_sources'] = sl.get('structure_sources', ['swing_points', 'supply_demand', 'fibonacci'])
+
+                print(f"   📊 Loaded ALL params from {config_path.name}:")
+                print(f"      - Starting Capital: ${params['starting_capital']:,.2f}")
+                print(f"      - Max Leverage: {params['max_leverage']}x")
+                print(f"      - Risk per Trade: {params['risk_per_trade_pct']}%")
+                print(f"      - TP Mode: {params['tp_mode']}")
+                print(f"      - SL Params: volatility_mult={params['volatility_multiplier']}, delay_bars={params['delay_bars']}, emergency_sl={params['emergency_sl_pct']}%")
+
+                return params
+
             except Exception as e:
                 print(f"   ⚠️  Error reading {config_path}: {e}")
-    
-    print(f"   ⚠️  No config file found, using defaults:")
-    print(f"      - Starting Capital: ${risk_params['starting_capital']:,.2f}")
-    print(f"      - Max Leverage: {risk_params['max_leverage']}x")
-    print(f"      - Risk per Trade: {risk_params['risk_per_trade_pct']}%")
-    
-    return risk_params
+                raise  # Re-raise to see the actual error
+
+    # If no config found, raise error (nuclear option - no defaults!)
+    raise FileNotFoundError(
+        f"❌ CRITICAL: No config file found for strategy '{strategy_module_name}'!\n"
+        f"Searched: {[str(p) for p in config_paths]}\n"
+        f"All parameters MUST come from YAML config file."
+    )
 
 
 def build_optimization_configs(
@@ -451,7 +474,10 @@ def build_optimization_configs(
     if test_tp_modes:
         tp_modes = ['PERCENTAGE', 'FIBONACCI', 'HYBRID']
     else:
-        tp_modes = ['PERCENTAGE']  # Legacy mode only
+        # Quick test mode: Use tp_mode from YAML config (NO EXCEPTIONS!)
+        yaml_tp_mode = risk_params.get('tp_mode', 'PERCENTAGE')
+        tp_modes = [yaml_tp_mode]  # Honor YAML setting!
+        print(f"   🎯 Quick Test: Using TP mode from YAML: {yaml_tp_mode}")
     
     # TP DISTANCE SETS (Conservative, Moderate, Aggressive)
     # CRITICAL: No 'name' field! Just TP percentages.
@@ -531,10 +557,22 @@ def build_optimization_configs(
                         partial_exit_pcts=tp_combo['exits'],     # Clean dict: {'tp1': X, 'tp2': Y, 'tp3': Z}
                         use_trailing=True,
                         breakeven_after_tp1=True,
-                        # ⭐ POPULATE RISK MANAGEMENT FROM YAML CONFIG
+                        # ⭐ POPULATE ALL PARAMS FROM YAML CONFIG (14 total)
                         starting_capital=risk_params['starting_capital'],
                         max_leverage=risk_params['max_leverage'],
-                        risk_per_trade_pct=risk_params['risk_per_trade_pct']
+                        risk_per_trade_pct=risk_params['risk_per_trade_pct'],
+                        # ⭐ ADAPTIVE SL v2.0 PARAMETERS (11 params)
+                        volatility_lookback=risk_params['volatility_lookback'],
+                        volatility_multiplier=risk_params['volatility_multiplier'],
+                        absolute_min_sl_pct=risk_params['absolute_min_sl_pct'],
+                        absolute_max_sl_pct=risk_params['absolute_max_sl_pct'],
+                        initial_sl_multiplier=risk_params['initial_sl_multiplier'],
+                        working_sl_multiplier=risk_params['working_sl_multiplier'],
+                        use_delayed_sl=risk_params['use_delayed_sl'],
+                        delay_bars=risk_params['delay_bars'],
+                        emergency_sl_pct=risk_params['emergency_sl_pct'],
+                        use_structure_sl=risk_params['use_structure_sl'],
+                        structure_sources=risk_params['structure_sources']
                     )
                     
                     configs.append(config)
@@ -552,7 +590,8 @@ def run_multi_config_optimization(
     warmup_df: pd.DataFrame,
     test_df: pd.DataFrame,
     strategy_module_name: str,
-    use_multicore: bool = True
+    use_multicore: bool = True,
+    debugger = None  # Optional[ConfigDebugger] = None
 ) -> List[ConfigPerformance]:
     """
     Run optimization with HybridConfigSimulator
@@ -563,7 +602,7 @@ def run_multi_config_optimization(
     # Use ultra hybrid for maximum parallel performance!
     from .ultra_hybrid_simulator import UltraHybridSimulator
     ultra_sim = UltraHybridSimulator()
-    return ultra_sim.optimize(configs, warmup_df, test_df, strategy_module_name)
+    return ultra_sim.optimize(configs, warmup_df, test_df, strategy_module_name, debugger=debugger)
 
 
 def export_trade_records(
@@ -994,7 +1033,29 @@ def auto_adjust_configs(
                     blocks=blocks_with_weights,
                     strategy_id=configs[0].strategy_id,
                     strategy_name=configs[0].strategy_name,
-                    side=configs[0].side
+                    side=configs[0].side,
+                    # Copy all other params from first config (same for all adjusted configs)
+                    tp_mode=configs[0].tp_mode,
+sl_mode=configs[0].sl_mode,
+                    trailing_pct=configs[0].trailing_pct,
+                    use_trailing=configs[0].use_trailing,
+                    breakeven_after_tp1=configs[0].breakeven_after_tp1,
+                    tp_fallback_pcts=configs[0].tp_fallback_pcts,
+                    partial_exit_pcts=configs[0].partial_exit_pcts,
+                    volatility_lookback=configs[0].volatility_lookback,
+                    volatility_multiplier=configs[0].volatility_multiplier,
+                    absolute_min_sl_pct=configs[0].absolute_min_sl_pct,
+                    absolute_max_sl_pct=configs[0].absolute_max_sl_pct,
+                    initial_sl_multiplier=configs[0].initial_sl_multiplier,
+                    working_sl_multiplier=configs[0].working_sl_multiplier,
+                    use_delayed_sl=configs[0].use_delayed_sl,
+                    delay_bars=configs[0].delay_bars,
+                    emergency_sl_pct=configs[0].emergency_sl_pct,
+                    use_structure_sl=configs[0].use_structure_sl,
+                    structure_sources=configs[0].structure_sources,
+                    starting_capital=configs[0].starting_capital,
+                    max_leverage=configs[0].max_leverage,
+                    risk_per_trade_pct=configs[0].risk_per_trade_pct
                 )
                 
                 adjusted_configs.append(config)

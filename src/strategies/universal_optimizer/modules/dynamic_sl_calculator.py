@@ -130,7 +130,8 @@ class AdaptiveSLCalculator:
         df: pd.DataFrame,
         entry_price: float,
         entry_bar: int,
-        side: str
+        side: str,
+        debugger = None  # Optional[ConfigDebugger]
     ) -> AdaptiveSLResult:
         """
         Calculate adaptive SL levels (emergency + working)
@@ -140,13 +141,38 @@ class AdaptiveSLCalculator:
             entry_price: Entry price
             entry_bar: Bar index of entry
             side: 'SHORT' or 'LONG'
+            debugger: Optional debugger for micro-granular logging
         
         Returns:
             AdaptiveSLResult with emergency and working SL levels
         """
         
+        # Log SL calculation start
+        if debugger:
+            debugger.log_action(
+                action='Calculate Adaptive SL v2.0',
+                config_keys_used=['use_delayed_sl', 'use_structure_sl'],
+                parameters={
+                    'entry_price': entry_price,
+                    'side': side,
+                    'delayed_sl': self.use_delayed_sl,
+                    'structure_based': self.use_structure_sl
+                }
+            )
+        
         # Step 1: Calculate volatility-based minimum
         volatility_pct = self._calculate_volatility_minimum(df, entry_bar)
+        
+        if debugger:
+            debugger.log_action(
+                action='Volatility Minimum Calculated',
+                config_keys_used=['volatility_lookback', 'volatility_multiplier'],
+                parameters={
+                    'volatility_pct': volatility_pct,
+                    'lookback': self.volatility_lookback,
+                    'multiplier': self.volatility_multiplier
+                }
+            )
         
         # Step 2: Calculate min/max bounds
         min_sl_pct = volatility_pct * self.working_sl_multiplier
@@ -159,17 +185,65 @@ class AdaptiveSLCalculator:
         # Step 3: Calculate emergency SL (wide protection)
         emergency_sl = self._calculate_emergency_sl(entry_price, side)
         
+        if debugger and self.use_delayed_sl:
+            debugger.log_decision(
+                decision_type='if',
+                condition=f'use_delayed_sl == True',
+                result=True,
+                config_keys_used=['use_delayed_sl', 'delay_bars', 'emergency_sl_pct']
+            )
+            debugger.log_action(
+                action='Emergency SL Calculated (Delayed Activation)',
+                config_keys_used=['emergency_sl_pct', 'delay_bars'],
+                parameters={
+                    'emergency_sl': emergency_sl,
+                    'emergency_pct': self.emergency_sl_pct,
+                    'delay_bars': self.delay_bars
+                }
+            )
+        
         # Step 4: Calculate working SL (optimized)
         if self.use_structure_sl:
+            if debugger:
+                debugger.log_decision(
+                    decision_type='if',
+                    condition='use_structure_sl == True',
+                    result=True,
+                    config_keys_used=['use_structure_sl', 'structure_sources']
+                )
+            
             working_sl, structure_level, structure_source = self._calculate_structure_based_sl(
                 df, entry_price, entry_bar, side, min_sl_pct, max_sl_pct
             )
+            
+            if debugger and structure_source:
+                debugger.log_action(
+                    action=f'Structure-Based SL: {structure_source}',
+                    config_keys_used=['structure_sources'],
+                    parameters={
+                        'working_sl': working_sl,
+                        'structure_level': structure_level,
+                        'structure_source': structure_source,
+                        'min_sl_pct': min_sl_pct,
+                        'max_sl_pct': max_sl_pct
+                    }
+                )
         else:
             working_sl = self._calculate_volatility_based_sl(
                 entry_price, side, min_sl_pct
             )
             structure_level = None
             structure_source = None
+            
+            if debugger:
+                debugger.log_action(
+                    action='Volatility-Based SL (No Structure)',
+                    config_keys_used=['working_sl_multiplier'],
+                    parameters={
+                        'working_sl': working_sl,
+                        'min_sl_pct': min_sl_pct
+                    }
+                )
         
         # Step 5: Build result
         method = f"ADAPTIVE_{'DELAYED' if self.use_delayed_sl else 'IMMEDIATE'}"
@@ -181,6 +255,20 @@ class AdaptiveSLCalculator:
         invalidation_reason = self._get_invalidation_reason(
             side, working_sl, entry_price, structure_source
         )
+        
+        # Log final SL result
+        if debugger:
+            debugger.log_action(
+                action='SL Calculation Complete',
+                config_keys_used=[],
+                parameters={
+                    'method': method,
+                    'emergency_sl': emergency_sl,
+                    'working_sl': working_sl,
+                    'volatility_pct': volatility_pct,
+                    'invalidation_reason': invalidation_reason
+                }
+            )
         
         return AdaptiveSLResult(
             emergency_sl=emergency_sl,
