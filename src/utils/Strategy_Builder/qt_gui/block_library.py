@@ -50,9 +50,9 @@ class BlockLibraryPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # Search bar with count (absolutely zero spacing)
+        # Search bar with count
         search_layout = QHBoxLayout()
-        search_layout.setSpacing(0)
+        search_layout.setSpacing(8)  # Add spacing between search box and label
         
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("🔍 Search blocks...")
@@ -60,7 +60,7 @@ class BlockLibraryPanel(QWidget):
         search_layout.addWidget(self.search_box)
         
         self.info_label = QLabel("80 blocks")
-        self.info_label.setStyleSheet("font-size: 8pt; color: #888;")
+        self.info_label.setStyleSheet("font-size: 8pt; color: #888; padding-left: 3px; padding-right: 8px;")
         search_layout.addWidget(self.info_label)
         
         layout.addLayout(search_layout, 0)  # 0 stretch = minimum height
