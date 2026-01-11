@@ -118,6 +118,7 @@ class StrategyConfiguration(BaseModel):
     max_bars_held: int = Field(default=1000, ge=100)
     
     # Risk Management
+    starting_capital: float = Field(default=10000.0, ge=100.0, le=1000000.0)
     risk_per_trade_pct: float = Field(default=1.0, ge=0.1, le=25.0)
     max_leverage: float = Field(default=2.0, ge=1.0, le=25.0)
     

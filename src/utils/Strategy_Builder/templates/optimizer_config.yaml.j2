@@ -73,7 +73,7 @@ walk_forward:
 # Backtest Configuration
 backtest:
   # Capital settings
-  initial_capital: 10000.0
+  initial_capital: {{ config.starting_capital }}  # Starting capital from strategy configuration
   capital_allocation_pct: 100.0
   
   # Risk management

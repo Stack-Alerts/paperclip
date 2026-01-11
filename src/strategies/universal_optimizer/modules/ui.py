@@ -6,36 +6,58 @@ Shows iteration suggestions after cycle 5.
 """
 
 from typing import List
-from .data_classes import ConfigPerformance
+from .data_classes import ConfigPerformance, OptimizationConfig
 
 
-def display_top_5_configs(results: List[ConfigPerformance], iteration: int):
+def display_top_5_configs(results: List[ConfigPerformance], iteration: int, configs: List[OptimizationConfig] = None):
     """
     Display top 5 configurations with COMPREHENSIVE institutional-grade metrics
+    
+    Args:
+        results: Top 5 performance results
+        iteration: Current iteration number
+        configs: All optimization configs (to extract actual risk params)
     """
     print("\n" + "="*80)
     print("OPTIMIZATION RESULTS - INSTITUTIONAL GRADE REPORT")
     print("="*80)
     print(f"\nIteration: {iteration} of 5")
     
-    # Display test parameters
+    # Extract actual risk params from configs (NO HARDCODING!)
+    if configs and len(configs) > 0:
+        first_config = configs[0]
+        starting_capital = getattr(first_config, 'starting_capital', 10000.0)
+        max_leverage = getattr(first_config, 'max_leverage', 10.0)
+        risk_per_trade_pct = getattr(first_config, 'risk_per_trade_pct', 1.0)
+    else:
+        # Fallback if configs not provided (backward compatibility)
+        starting_capital = 10000.0
+        max_leverage = 10.0
+        risk_per_trade_pct = 1.0
+    
+    # Calculate position sizing from ACTUAL config values
+    margin_per_trade = starting_capital * (risk_per_trade_pct / 100.0)
+    notional_per_trade = margin_per_trade * max_leverage
+    btc_position_size = notional_per_trade / 95000.0  # Approximate @ $95K BTC
+    
+    # Display test parameters (USING ACTUAL CONFIG VALUES)
     print("\n" + "-"*80)
     print("TEST PARAMETERS:")
     print("-"*80)
     print(f"   ├─ Market: BTC/USDT Perpetual (Binance Futures)")
-    print(f"   ├─ Starting Capital: $10,000.00 USDT")
+    print(f"   ├─ Starting Capital: ${starting_capital:,.2f} USDT")
     print(f"   ├─ Position Sizing:")
-    print(f"   │  ├─ Risk per trade: 25% of capital = $2,500 margin")
-    print(f"   │  ├─ Leverage: 10x")
-    print(f"   │  ├─ Notional per trade: $2,500 × 10 = $25,000")
-    print(f"   │  └─ BTC Position: ~0.263 BTC @ $95K BTC ($25,000 notional)")
+    print(f"   │  ├─ Risk per trade: {risk_per_trade_pct}% of capital = ${margin_per_trade:,.2f} margin")
+    print(f"   │  ├─ Leverage: {max_leverage:.0f}x")
+    print(f"   │  ├─ Notional per trade: ${margin_per_trade:,.2f} × {max_leverage:.0f} = ${notional_per_trade:,.2f}")
+    print(f"   │  └─ BTC Position: ~{btc_position_size:.3f} BTC @ $95K BTC (${notional_per_trade:,.2f} notional)")
     print(f"   ├─ Timeframe: 15-minute bars (primary trading timeframe)")
     print(f"   ├─ Fee Structure (Binance Perpetual):")
     print(f"   │  ├─ Maker Fee: -0.01% (rebate)")
     print(f"   │  └─ Taker Fee: 0.05%")
     print(f"   ├─ Order Type: Market Orders (Taker fees)")
     print(f"   ├─ Test Period: 180 days")
-    print(f"   └─ Total Configs Tested: 48\n")
+    print(f"   └─ Total Configs Tested: {len(configs) if configs else 48}\n")
     
     preset_names = ['Balanced', 'Event-Heavy', 'Context-Heavy', 'Conservative']
     
@@ -43,9 +65,9 @@ def display_top_5_configs(results: List[ConfigPerformance], iteration: int):
         # Determine config type from config_id
         config_type = preset_names[(result.config_id // 12) % 4]
         
-        # Calculate final capital
-        starting_capital = 10000.0
-        final_capital = starting_capital + result.net_pnl
+        # Calculate final capital (use actual starting capital from config)
+        config_starting_capital = starting_capital  # From top of function
+        final_capital = config_starting_capital + result.net_pnl
         
         if i == 1:
             label = f"#{i}: {config_type} Configuration (RECOMMENDED)"

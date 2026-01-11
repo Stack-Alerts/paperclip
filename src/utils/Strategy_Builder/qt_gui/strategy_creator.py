@@ -104,13 +104,13 @@ class StrategyCreatorDialog(QDialog):
         sl_group.setChecked(True)
         sl_group.setToolTip("Configure adaptive stop loss parameters\nUncheck to use default values")
         sl_layout = QVBoxLayout()
-        sl_layout.setContentsMargins(5, 2, 5, 2)  # Minimal margins
-        sl_layout.setSpacing(3)  # Very tight spacing
+        sl_layout.setContentsMargins(10, 8, 10, 8)  # Comfortable margins
+        sl_layout.setSpacing(8)  # Comfortable spacing
         
         # Preset buttons
         preset_layout = QHBoxLayout()
-        preset_layout.setSpacing(3)  # Very tight spacing between buttons
-        preset_layout.setContentsMargins(0, 0, 0, 0)  # No margins
+        preset_layout.setSpacing(8)  # Comfortable spacing between buttons
+        preset_layout.setContentsMargins(0, 0, 0, 8)  # Bottom margin for separation
         preset_label = QLabel("Presets:")
         preset_layout.addWidget(preset_label)
         
@@ -130,18 +130,41 @@ class StrategyCreatorDialog(QDialog):
         preset_layout.addWidget(aggressive_btn)
         
         preset_layout.addStretch()
+        
+        # Starting Capital field (aligned to right)
+        capital_label = QLabel("Starting Capital:")
+        capital_label.setStyleSheet("font-weight: bold;")
+        preset_layout.addWidget(capital_label)
+        
+        self.starting_capital_spin = QDoubleSpinBox()
+        self.starting_capital_spin.setRange(100.0, 1000000.0)
+        self.starting_capital_spin.setValue(10000.0)
+        self.starting_capital_spin.setSingleStep(1000.0)
+        self.starting_capital_spin.setPrefix("$")
+        self.starting_capital_spin.setDecimals(0)
+        self.starting_capital_spin.setToolTip(
+            "Starting Account Balance\n\n"
+            "Total capital available for trading.\n\n"
+            "Default: $10,000\n"
+            "Small Account: $1,000 - $5,000\n"
+            "Medium Account: $10,000 - $50,000\n"
+            "Large Account: $100,000+\n\n"
+            "This affects position sizing calculations."
+        )
+        preset_layout.addWidget(self.starting_capital_spin)
+        
         sl_layout.addLayout(preset_layout)
         
         # Create horizontal split: Left = SL params, Right = Risk/Reward settings
         params_split_layout = QHBoxLayout()
-        params_split_layout.setSpacing(8)  # Tighter horizontal spacing
-        params_split_layout.setContentsMargins(0, 2, 0, 0)  # Minimal top margin
+        params_split_layout.setSpacing(15)  # Comfortable horizontal spacing between columns
+        params_split_layout.setContentsMargins(0, 0, 0, 0)  # No extra margins needed
         
         # LEFT SIDE: Stop Loss Parameters
         sl_params_widget = QWidget()
         sl_params_layout = QFormLayout()
-        sl_params_layout.setVerticalSpacing(2)  # Very tight vertical spacing
-        sl_params_layout.setContentsMargins(0, 0, 0, 0)  # No margins
+        sl_params_layout.setVerticalSpacing(8)  # Comfortable vertical spacing
+        sl_params_layout.setContentsMargins(0, 0, 5, 0)  # Right margin for separation
         
         # Delayed SL Checkbox
         self.delayed_sl_check = QCheckBox("Enable Delayed SL Activation")
@@ -157,18 +180,20 @@ class StrategyCreatorDialog(QDialog):
         sl_params_layout.addRow("", self.delayed_sl_check)
         
         # Delay Bars
-        self.delay_bars_spin = QSpinBox()
-        self.delay_bars_spin.setRange(0, 5)
-        self.delay_bars_spin.setValue(2)
-        self.delay_bars_spin.setSuffix(" bars")
-        self.delay_bars_spin.setToolTip(
+        delay_label = QLabel("Delay Period: ℹ️")
+        delay_label.setToolTip(
             "Delay Period (bars)\n\n"
             "How long to use emergency SL before switching to working SL.\n"
             "Default: 2 bars\n"
             "Conservative: 3 bars\n"
             "Aggressive: 1 bar"
         )
-        sl_params_layout.addRow("Delay Period:", self.delay_bars_spin)
+        self.delay_bars_spin = QSpinBox()
+        self.delay_bars_spin.setRange(0, 5)
+        self.delay_bars_spin.setValue(2)
+        self.delay_bars_spin.setSuffix(" bars")
+        self.delay_bars_spin.setToolTip(delay_label.toolTip())
+        sl_params_layout.addRow(delay_label, self.delay_bars_spin)
         
         # Emergency SL
         self.emergency_sl_spin = QDoubleSpinBox()
@@ -261,8 +286,8 @@ class StrategyCreatorDialog(QDialog):
         # RIGHT SIDE: Risk/Reward Settings
         rr_params_widget = QWidget()
         rr_params_layout = QFormLayout()
-        rr_params_layout.setVerticalSpacing(2)  # Very tight vertical spacing
-        rr_params_layout.setContentsMargins(0, 0, 0, 0)  # No margins
+        rr_params_layout.setVerticalSpacing(8)  # Comfortable vertical spacing
+        rr_params_layout.setContentsMargins(5, 0, 0, 0)  # Left margin for separation
         
         # Section label
         rr_label = QLabel("💰 Risk/Reward Settings")
@@ -551,6 +576,7 @@ class StrategyCreatorDialog(QDialog):
         self.structure_sl_check.setChecked(getattr(self.existing_config, 'use_structure_sl', True))
         
         # Load Risk/Reward parameters
+        self.starting_capital_spin.setValue(getattr(self.existing_config, 'starting_capital', 10000.0))
         self.min_rr_spin.setValue(getattr(self.existing_config, 'min_risk_reward', 1.2))
         self.risk_per_trade_spin.setValue(getattr(self.existing_config, 'risk_per_trade_pct', 1.0))
         self.max_leverage_spin.setValue(getattr(self.existing_config, 'max_leverage', 2.0))
@@ -896,6 +922,7 @@ class StrategyCreatorDialog(QDialog):
             use_structure_sl=self.structure_sl_check.isChecked(),
             structure_sources=['swing_points', 'supply_demand', 'fibonacci'],
             # Risk/Reward parameters
+            starting_capital=self.starting_capital_spin.value(),  # CRITICAL: Save starting capital
             min_risk_reward=self.min_rr_spin.value(),
             risk_per_trade_pct=self.risk_per_trade_spin.value(),
             max_leverage=self.max_leverage_spin.value(),

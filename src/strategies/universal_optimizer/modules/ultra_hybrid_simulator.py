@@ -577,8 +577,9 @@ def test_single_config(args):
     net_pnl = sum(t['net_pnl'] for t in trades)
     win_rate_pct = (winning_trades / total_trades * 100) if total_trades > 0 else 0.0
     
-    # Net return percentage (assuming $10,000 starting capital)
-    net_return_pct = (net_pnl / 10000 * 100) if net_pnl != 0 else 0.0
+    # Net return percentage (use actual starting capital from config)
+    starting_capital_for_calc = getattr(config, 'starting_capital', 10000.0)
+    net_return_pct = (net_pnl / starting_capital_for_calc * 100) if net_pnl != 0 else 0.0
     
     # Profit factor
     gross_profit = sum(t['net_pnl'] for t in trades if t['net_pnl'] > 0)
@@ -602,7 +603,8 @@ def test_single_config(args):
         dd = peak - cumulative
         if dd > max_dd:
             max_dd = dd
-    max_drawdown_pct = (max_dd / 10000 * 100) if peak > 0 else 0.0
+    # Max drawdown as percentage of starting capital (use actual capital from config)
+    max_drawdown_pct = (max_dd / starting_capital_for_calc * 100) if peak > 0 else 0.0
     
     # Win/loss stats
     wins = [t['net_pnl'] for t in trades if t['net_pnl'] > 0]
