@@ -255,8 +255,8 @@ def optimize_strategy_v2(
     print(f"\n📊 Exporting trade records for top 5 configurations...")
     export_trade_records(results[:5], configs, strategy_module_name)
     
-    # 7. Display top 5
-    display_top_5_configs(results[:5], iteration.iteration_count + 1)
+    # 7. Display top 5 (pass configs for accurate display of risk params)
+    display_top_5_configs(results[:5], iteration.iteration_count + 1, configs)
     
     # 8. User selects (or auto-select if non-interactive)
     if non_interactive:

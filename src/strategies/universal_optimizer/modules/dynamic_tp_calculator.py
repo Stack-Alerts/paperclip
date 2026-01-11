@@ -182,7 +182,7 @@ class DynamicTPCalculator:
             
             # Validate TPs are above entry
             if tp1 <= entry_price or tp2 <= entry_price or tp3 <= entry_price:
-                print(f"   ⚠️  Fibonacci TPs invalid for LONG (below entry), using fallback")
+                # Silently fallback to percentage TPs (this happens frequently during optimization)
                 return self._calculate_percentage_tps(entry_price, side, fallback_pcts)
             
             sl_distance = min(atr * 2.0, entry_price * 0.015)

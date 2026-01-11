@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QListWidget, QTextEdit,
     QToolBar, QStatusBar, QMessageBox, QSplitter, QComboBox, QDialog,
-    QTableWidget, QTableWidgetItem, QHeaderView, QProgressBar, QCheckBox
+    QTableWidget, QTableWidgetItem, QHeaderView, QProgressBar, QCheckBox, QLineEdit
 )
 from PyQt6.QtCore import Qt, QSize, QSettings
 from PyQt6.QtGui import QAction
@@ -160,6 +160,22 @@ class StrategyBuilderMainWindow(QMainWindow):
         stats_action.triggered.connect(self.show_statistics)
         view_menu.addAction(stats_action)
         
+        view_menu.addSeparator()
+        
+        clear_cache_action = QAction('🧹 Clear Cache & Restart', self)
+        clear_cache_action.setShortcut('Ctrl+Shift+C')
+        clear_cache_action.triggered.connect(self.clear_cache_and_restart)
+        view_menu.addAction(clear_cache_action)
+        
+        # Debug menu
+        debug_menu = menubar.addMenu('🐛 Debug')
+        
+        self.show_debug_action = QAction('✓ Show Debug Messages', self, checkable=True)
+        self.show_debug_action.setShortcut('Ctrl+D')
+        self.show_debug_action.setChecked(False)  # Default: hide debug messages
+        self.show_debug_action.triggered.connect(self.toggle_debug_messages)
+        debug_menu.addAction(self.show_debug_action)
+        
         # Help menu
         help_menu = menubar.addMenu('❓ Help')
         
@@ -235,6 +251,14 @@ class StrategyBuilderMainWindow(QMainWindow):
         refresh_btn.triggered.connect(self.load_strategies)
         toolbar.addAction(refresh_btn)
         
+        toolbar.addSeparator()
+        
+        # Clear Cache & Restart button
+        clear_cache_btn = QAction('🧹 Clear Cache', self)
+        clear_cache_btn.triggered.connect(self.clear_cache_and_restart)
+        clear_cache_btn.setToolTip("Clear Python bytecode cache and restart GUI")
+        toolbar.addAction(clear_cache_btn)
+        
     def create_central_widget(self):
         """Create main content area"""
         central_widget = QWidget()
@@ -258,11 +282,13 @@ class StrategyBuilderMainWindow(QMainWindow):
         list_label.setStyleSheet("font-size: 10pt; font-weight: bold; color: #ffffff;")
         left_layout.addWidget(list_label)
         
-        # Status filter
+        # Status filter and search
         filter_layout = QHBoxLayout()
+        filter_layout.setSpacing(8)
+        
         filter_label = QLabel("Filter:")
         filter_layout.addWidget(filter_label)
-        
+
         self.status_filter = QComboBox()
         self.status_filter.addItems([
             "All Status",
@@ -272,6 +298,14 @@ class StrategyBuilderMainWindow(QMainWindow):
         ])
         self.status_filter.currentTextChanged.connect(self.load_strategies)
         filter_layout.addWidget(self.status_filter)
+        
+        # Add search box
+        self.strategy_search = QLineEdit()
+        self.strategy_search.setPlaceholderText("🔍 Search strategies...")
+        self.strategy_search.setMaximumWidth(200)
+        self.strategy_search.textChanged.connect(self.load_strategies)
+        filter_layout.addWidget(self.strategy_search)
+        
         left_layout.addLayout(filter_layout)
         
         self.strategy_list = QListWidget()
@@ -348,6 +382,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Get filter selection
         filter_text = self.status_filter.currentText() if hasattr(self, 'status_filter') else "All Status"
         
+        # Get search text
+        search_text = self.strategy_search.text().lower() if hasattr(self, 'strategy_search') else ""
+        
         # Count by folder
         drafts_count = 0
         unpublished_count = 0
@@ -373,7 +410,7 @@ class StrategyBuilderMainWindow(QMainWindow):
                 status_type = "ready"
                 unpublished_count += 1
             
-            # Apply filter
+            # Apply status filter
             show_strategy = False
             if filter_text == "All Status":
                 show_strategy = True
@@ -384,13 +421,25 @@ class StrategyBuilderMainWindow(QMainWindow):
             elif filter_text == "✅ Published Only" and status_type == "published":
                 show_strategy = True
             
+            # Apply text search filter
+            if show_strategy and search_text:
+                # Search in strategy name, number, and category
+                strategy_text = f"{strategy.number:03d} {strategy.name} {strategy.category}".lower()
+                if search_text not in strategy_text:
+                    show_strategy = False
+            
             if show_strategy:
                 item_text = f"{strategy.number:03d}. {strategy.name} ({strategy.category}){status}"
                 self.strategy_list.addItem(item_text)
                 displayed_count += 1
         
         total = len(strategies)
-        if filter_text == "All Status":
+        if search_text:
+            # Show search results
+            self.status_bar.showMessage(
+                f"Search: '{search_text}' | Found {displayed_count}/{total} strategies"
+            )
+        elif filter_text == "All Status":
             self.status_bar.showMessage(
                 f"Ready | {total}/150 Slots | "
                 f"💾{drafts_count} Drafts | 📝{unpublished_count} Ready | ✅{published_count} Published"
@@ -487,7 +536,8 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
             next_num = self.registry.get_next_strategy_number()
             
             # Launch visual creator (non-blocking)
-            creator = StrategyCreatorDialog(self)
+            # Pass refresh callback so drafts update list immediately
+            creator = StrategyCreatorDialog(self, on_draft_saved=self.load_strategies)
             creator.show()  # Non-blocking - allows multiple windows
                 
         except ValueError:
@@ -846,9 +896,36 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
         # Show dialog
         self.live_output_dialog.show()
     
+    def toggle_debug_messages(self):
+        """Toggle visibility of DEBUG messages in output"""
+        # Update the checkmark in menu
+        is_checked = self.show_debug_action.isChecked()
+        
+        # Update menu text to show current state
+        if is_checked:
+            self.show_debug_action.setText('✓ Show Debug Messages')
+        else:
+            self.show_debug_action.setText('✗ Hide Debug Messages')
+        
+        # Save preference to settings for persistence
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        settings.setValue("debug/show_messages", is_checked)
+        
+        # Update status bar
+        status = "showing" if is_checked else "hiding"
+        self.status_bar.showMessage(f"Debug messages now {status}")
+    
     def _append_output_line(self, line: str):
-        """Append a line of output to the live output dialog"""
+        """Append a line of output to the live output dialog (with optional DEBUG filtering)"""
         if hasattr(self, 'live_output_text'):
+            # Check if this is a DEBUG line and if debug messages are hidden
+            is_debug_line = 'DEBUG:' in line or line.strip().startswith('DEBUG')
+            show_debug = self.show_debug_action.isChecked() if hasattr(self, 'show_debug_action') else False
+            
+            # Skip DEBUG lines if filtering is enabled
+            if is_debug_line and not show_debug:
+                return  # Don't append debug lines when hidden
+            
             # Append line
             self.live_output_text.append(line)
             
@@ -1535,10 +1612,14 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
             # Combine all trades
             df_combined = pd.concat(all_trades, ignore_index=True)
             
+            # Rename 'reason' column to 'exit_reason' if it exists
+            if 'reason' in df_combined.columns:
+                df_combined.rename(columns={'reason': 'exit_reason'}, inplace=True)
+            
             # Create trades window
             dialog = QDialog(self.live_output_dialog, Qt.WindowType.Window)
             dialog.setWindowTitle(f"📈 Trades - Strategy #{strategy_num:03d}")
-            dialog.resize(1200, 700)
+            dialog.resize(1600, 900)  # Larger window to avoid horizontal scrolling
             
             layout = QVBoxLayout(dialog)
             
@@ -1556,9 +1637,9 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
             unique_configs = sorted(df_combined['config_id'].unique())
             self.config_checkboxes = {}
             
-            for config_id in unique_configs:
+            for idx, config_id in enumerate(unique_configs):
                 checkbox = QCheckBox(f"Config {config_id}")
-                checkbox.setChecked(True)  # All checked by default
+                checkbox.setChecked(idx == 0)  # Only first config checked by default
                 checkbox.stateChanged.connect(lambda state, dialog=dialog: self._update_trades_filter(dialog))
                 self.config_checkboxes[config_id] = checkbox
                 filter_layout.addWidget(checkbox)
@@ -1604,10 +1685,25 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     table.setItem(row_idx, col_idx, item)
             
-            # Auto-resize columns to content
+            # Auto-resize columns to content with spacing
             table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+            table.horizontalHeader().setDefaultSectionSize(120)  # Minimum width for columns
+            table.horizontalHeader().setStretchLastSection(False)
+            
+            # Add spacing between columns for better readability
+            table.setStyleSheet("""
+                QTableWidget {
+                    gridline-color: #3c3c3c;
+                }
+                QTableWidget::item {
+                    padding: 5px 10px;  /* Vertical and horizontal padding */
+                }
+            """)
             
             layout.addWidget(table)
+            
+            # Apply initial filter (show only first config)
+            self._update_trades_filter(dialog)
             
             # Buttons
             button_layout = QHBoxLayout()
@@ -1842,6 +1938,10 @@ Win Rate: {win_rate:.1f}% | Total PnL: ${total_pnl:.2f} | Avg Trade: ${avg_trade
                 newer_label = "Current Test (Just Completed)"
                 older_label = f"Previous Test: {log_files[1].name}"
             
+            # Strip log file headers for clean comparison (both sides same format)
+            newer_content = self._strip_log_header(newer_content)
+            older_content = self._strip_log_header(older_content)
+            
             # Create comparison dialog
             self._create_comparison_dialog(
                 newer_content, older_content,
@@ -1921,7 +2021,7 @@ Win Rate: {win_rate:.1f}% | Total PnL: ${total_pnl:.2f} | Avg Trade: ${avg_trade
         
         stats_btn = QPushButton("📊 Key Metrics")
         stats_btn.setToolTip("Show key metric comparison")
-        stats_btn.clicked.connect(lambda: self._show_metrics_comparison(newer_text, older_text))
+        stats_btn.clicked.connect(lambda: self._show_metrics_comparison(strategy_num))
         button_layout.addWidget(stats_btn)
         
         config_btn = QPushButton("⚙️ Compare Configurations")
@@ -1930,6 +2030,11 @@ Win Rate: {win_rate:.1f}% | Total PnL: ${total_pnl:.2f} | Avg Trade: ${avg_trade
         button_layout.addWidget(config_btn)
         
         button_layout.addStretch()
+        
+        restore_btn = QPushButton("⏮️ Restore Previous Config")
+        restore_btn.setToolTip("Restore the configuration from the previous test")
+        restore_btn.clicked.connect(lambda: self._restore_previous_config(strategy_num, dialog))
+        button_layout.addWidget(restore_btn)
         
         close_btn = QPushButton("✅ Close")
         close_btn.clicked.connect(dialog.accept)
@@ -2067,6 +2172,11 @@ Win Rate: {win_rate:.1f}% | Total PnL: ${total_pnl:.2f} | Avg Trade: ${avg_trade
             button_layout.addWidget(copy_btn)
             
             button_layout.addStretch()
+            
+            restore_btn = QPushButton("⏮️ Restore Previous Config")
+            restore_btn.setToolTip("Restore the configuration from the previous test")
+            restore_btn.clicked.connect(lambda: self._restore_previous_config(strategy_num, dialog))
+            button_layout.addWidget(restore_btn)
             
             close_btn = QPushButton("✅ Close")
             close_btn.clicked.connect(dialog.accept)
@@ -2208,99 +2318,195 @@ Win Rate: {win_rate:.1f}% | Total PnL: ${total_pnl:.2f} | Avg Trade: ${avg_trade
         """Synchronize scrollbars between two text edits"""
         left_scrollbar = left_text.verticalScrollBar()
         right_scrollbar = right_text.verticalScrollBar()
-        
+
         # Connect scrollbars
         left_scrollbar.valueChanged.connect(right_scrollbar.setValue)
         right_scrollbar.valueChanged.connect(left_scrollbar.setValue)
-    
-    def _show_metrics_comparison(self, newer_text: str, older_text: str):
-        """Extract and display key metrics comparison"""
+
+    def _strip_log_header(self, content: str) -> str:
+        """
+        Strip the header box from test log content for clean comparison.
+        
+        Removes header from:
+        ╔════════════════════════════════════════════════════════════════╗
+        ║ TEST LOG - Strategy #001                                       ║
+        ╚════════════════════════════════════════════════════════════════╝
+        
+        Test Timestamp: 2026-01-11 07:25:02
+        Test Type: Quick Test
+        Log File: test_20260111_072502.txt
+        
+        ────────────────────────────────────────────────────────────────
+        
+        Returns everything after the separator line (────).
+        If no header exists, returns content unchanged.
+        """
+        if not content or not content.strip():
+            return content
+        
+        # Check if content has header (starts with ╔)
+        if not content.lstrip().startswith('╔'):
+            return content
+        
+        # Find the separator line (────)
+        lines = content.split('\n')
+        for i, line in enumerate(lines):
+            if '────' in line:
+                # Return everything after separator line
+                # Skip the separator line itself and any empty lines immediately after
+                result_lines = lines[i+1:]
+                # Remove leading empty lines
+                while result_lines and not result_lines[0].strip():
+                    result_lines.pop(0)
+                return '\n'.join(result_lines)
+        
+        # If no separator found, return original content
+        return content
+
+    def _show_metrics_comparison(self, strategy_num: int):
+        """Extract and display key metrics comparison - loads from actual test logs"""
         import re
         
-        def extract_metrics(text: str) -> dict:
-            """Extract key metrics from test output"""
-            metrics = {}
+        # Get test logs directory
+        logs_dir = Path(f"data/test_logs/strategy_{strategy_num:03d}")
+        
+        if not logs_dir.exists():
+            QMessageBox.warning(
+                self,
+                "No Logs",
+                "No test logs found to compare metrics."
+            )
+            return
+        
+        # Get all log files sorted by timestamp (newest first)
+        log_files = sorted(logs_dir.glob("test_*.txt"), reverse=True)
+        
+        if len(log_files) < 2:
+            QMessageBox.warning(
+                self,
+                "Insufficient Data",
+                f"Need at least 2 test runs to compare metrics.\nCurrently have: {len(log_files)}"
+            )
+            return
+        
+        try:
+            # Load the two most recent test logs
+            with open(log_files[0], 'r') as f:
+                newer_text = f.read()
+            with open(log_files[1], 'r') as f:
+                older_text = f.read()
             
-            patterns = {
-                'total_trades': r'Total Trades:\s*(\d+)',
-                'win_rate': r'Win.*Rate:\s*([\d.]+)%',
-                'net_pnl': r'Net PnL:\s*\$([+-]?[\d,]+\.?\d*)',
-                'net_return': r'Net Return:\s*([+-]?[\d.]+)%',
-                'profit_factor': r'Profit Factor:\s*([\d.]+)',
-                'sharpe_ratio': r'Sharpe Ratio:\s*([\d.]+)',
-                'max_drawdown': r'Max Drawdown:\s*([\d.]+)%',
+            def extract_metrics(text: str) -> dict:
+                """Extract key metrics from test output"""
+                metrics = {}
+                
+                patterns = {
+                    'total_trades': r'Total Trades:\s*(\d+)',
+                    'win_rate': r'Win.*Rate:\s*([\d.]+)%',
+                    'net_pnl': r'Net PnL:\s*\$([+-]?[\d,]+\.?\d*)',
+                    'net_return': r'Net Return:\s*([+-]?[\d.]+)%',
+                    'profit_factor': r'Profit Factor:\s*([\d.]+)',
+                    'sharpe_ratio': r'Sharpe Ratio:\s*([\d.]+)',
+                    'max_drawdown': r'Max Drawdown:\s*([\d.]+)%',
+                }
+                
+                for key, pattern in patterns.items():
+                    match = re.search(pattern, text)
+                    if match:
+                        value_str = match.group(1).replace(',', '')
+                        try:
+                            metrics[key] = float(value_str)
+                        except:
+                            metrics[key] = value_str
+                
+                return metrics
+            
+            newer_metrics = extract_metrics(newer_text)
+            older_metrics = extract_metrics(older_text)
+            
+            # Build comparison table with HTML and color highlighting
+            comparison_html = '<pre style="margin: 0; padding: 10px; font-family: monospace; font-size: 10pt;">'
+            comparison_html += "📊 KEY METRICS COMPARISON\n"
+            comparison_html += "=" * 80 + "\n\n"
+            comparison_html += f"{'Metric':<20} {'Newer Test':>15} {'Previous Test':>15} {'Change':>15}\n"
+            comparison_html += "-" * 80 + "\n"
+            
+            metric_labels = {
+                'total_trades': 'Total Trades',
+                'win_rate': 'Win Rate (%)',
+                'net_pnl': 'Net PnL ($)',
+                'net_return': 'Net Return (%)',
+                'profit_factor': 'Profit Factor',
+                'sharpe_ratio': 'Sharpe Ratio',
+                'max_drawdown': 'Max Drawdown (%)',
             }
             
-            for key, pattern in patterns.items():
-                match = re.search(pattern, text)
-                if match:
-                    value_str = match.group(1).replace(',', '')
-                    try:
-                        metrics[key] = float(value_str)
-                    except:
-                        metrics[key] = value_str
+            # Metrics where higher = better
+            higher_is_better = {'total_trades', 'win_rate', 'net_pnl', 'net_return', 'profit_factor', 'sharpe_ratio'}
             
-            return metrics
-        
-        newer_metrics = extract_metrics(newer_text)
-        older_metrics = extract_metrics(older_text)
-        
-        # Build comparison table
-        comparison_text = "📊 KEY METRICS COMPARISON\n"
-        comparison_text += "=" * 80 + "\n\n"
-        comparison_text += f"{'Metric':<20} {'Newer Test':>15} {'Previous Test':>15} {'Change':>15}\n"
-        comparison_text += "-" * 80 + "\n"
-        
-        metric_labels = {
-            'total_trades': 'Total Trades',
-            'win_rate': 'Win Rate (%)',
-            'net_pnl': 'Net PnL ($)',
-            'net_return': 'Net Return (%)',
-            'profit_factor': 'Profit Factor',
-            'sharpe_ratio': 'Sharpe Ratio',
-            'max_drawdown': 'Max Drawdown (%)',
-        }
-        
-        for key, label in metric_labels.items():
-            if key in newer_metrics and key in older_metrics:
-                newer_val = newer_metrics[key]
-                older_val = older_metrics[key]
-                
-                try:
-                    newer_float = float(newer_val)
-                    older_float = float(older_val)
-                    change = newer_float - older_float
-                    change_pct = (change / older_float * 100) if older_float != 0 else 0
+            for key, label in metric_labels.items():
+                if key in newer_metrics and key in older_metrics:
+                    newer_val = newer_metrics[key]
+                    older_val = older_metrics[key]
                     
-                    change_str = f"{change:+.2f} ({change_pct:+.1f}%)"
-                    
-                    comparison_text += f"{label:<20} {newer_val:>15.2f} {older_val:>15.2f} {change_str:>15}\n"
-                except:
-                    comparison_text += f"{label:<20} {str(newer_val):>15} {str(older_val):>15} {'N/A':>15}\n"
-        
-        comparison_text += "\n" + "=" * 80 + "\n"
-        comparison_text += "\nLegend:\n"
-        comparison_text += "  + = Improvement\n"
-        comparison_text += "  - = Degradation\n"
-        
-        # Show in dialog
-        dialog = QDialog(self.live_output_dialog, Qt.WindowType.Window)
-        dialog.setWindowTitle("📊 Key Metrics Comparison")
-        dialog.resize(700, 500)
-        
-        layout = QVBoxLayout(dialog)
-        
-        text_edit = QTextEdit()
-        text_edit.setReadOnly(True)
-        text_edit.setPlainText(comparison_text)
-        text_edit.setStyleSheet("font-family: monospace; font-size: 10pt;")
-        layout.addWidget(text_edit)
-        
-        close_btn = QPushButton("✅ Close")
-        close_btn.clicked.connect(dialog.accept)
-        layout.addWidget(close_btn)
-        
-        dialog.show()
+                    try:
+                        newer_float = float(newer_val)
+                        older_float = float(older_val)
+                        change = newer_float - older_float
+                        change_pct = (change / older_float * 100) if older_float != 0 else 0
+                        
+                        # Determine if this is an improvement
+                        if key in higher_is_better:
+                            is_improvement = change > 0
+                        else:  # max_drawdown - lower is better
+                            is_improvement = change < 0
+                        
+                        # Format change with color
+                        change_str = f"{change:+.2f} ({change_pct:+.1f}%)"
+                        
+                        # Apply color highlighting
+                        if abs(change) < 0.01:  # No significant change
+                            color = "#cccccc"  # Gray
+                        elif is_improvement:
+                            color = "#4ec9b0"  # Green
+                        else:
+                            color = "#f48771"  # Red
+                        
+                        line = f"{label:<20} {newer_val:>15.2f} {older_val:>15.2f} "
+                        comparison_html += f'{line}<span style="color: {color}; font-weight: bold;">{change_str:>15}</span>\n'
+                    except:
+                        comparison_html += f"{label:<20} {str(newer_val):>15} {str(older_val):>15} {'N/A':>15}\n"
+            
+            comparison_html += "\n" + "=" * 80 + "\n"
+            comparison_html += '\n<span style="color: #4ec9b0;">■ Green = Improvement</span>\n'
+            comparison_html += '<span style="color: #f48771;">■ Red = Degradation</span>\n'
+            comparison_html += '<span style="color: #cccccc;">■ Gray = No Change</span>\n'
+            comparison_html += '</pre>'
+            
+            # Show in dialog
+            dialog = QDialog(self.live_output_dialog, Qt.WindowType.Window)
+            dialog.setWindowTitle("📊 Key Metrics Comparison")
+            dialog.resize(700, 500)
+            
+            layout = QVBoxLayout(dialog)
+            
+            text_edit = QTextEdit()
+            text_edit.setReadOnly(True)
+            text_edit.setHtml(comparison_html)
+            layout.addWidget(text_edit)
+            
+            close_btn = QPushButton("✅ Close")
+            close_btn.clicked.connect(dialog.accept)
+            layout.addWidget(close_btn)
+            
+            dialog.show()
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to compare metrics:\n{e}"
+            )
     
     def _copy_output_to_clipboard(self):
         """Copy all output text to clipboard"""
@@ -2753,6 +2959,76 @@ Total Configurations Tested: {len(df)}
                     f"Failed to publish strategy:\n{e}"
                 )
     
+    def clear_cache_and_restart(self):
+        """Clear Python bytecode cache and restart the GUI"""
+        reply = QMessageBox.question(
+            self,
+            "Clear Cache & Restart",
+            "🧹 Clear Python Bytecode Cache?\n\n"
+            "This will:\n"
+            "• Delete all .pyc files (compiled Python)\n"
+            "• Remove all __pycache__ directories\n"
+            "• Restart the Strategy Builder GUI\n\n"
+            "This fixes issues with stale/outdated code.\n\n"
+            "Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                # Show progress message
+                self.status_bar.showMessage("🧹 Clearing Python cache...")
+                
+                # Get project root
+                project_root = Path(__file__).parent.parent.parent.parent.parent
+                
+                # Clear cache
+                import subprocess
+                
+                # Find and delete .pyc files
+                result1 = subprocess.run(
+                    ['find', str(project_root), '-type', 'f', '-name', '*.pyc', '-delete'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                # Find and delete __pycache__ directories  
+                result2 = subprocess.run(
+                    ['find', str(project_root), '-type', 'd', '-name', '__pycache__', '-exec', 'rm', '-rf', '{}', '+'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,  # Suppress "No such file" errors
+                    text=True
+                )
+                
+                # Show success message
+                QMessageBox.information(
+                    self,
+                    "Cache Cleared",
+                    "✅ Python cache cleared successfully!\n\n"
+                    "The GUI will now restart..."
+                )
+                
+                # Save window state before restarting
+                self.save_window_state()
+                
+                # Restart the application
+                import os
+                python = sys.executable
+                os.execl(python, python, *sys.argv)
+                
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Failed to clear cache:\n{e}\n\n"
+                    "You can manually clear cache by running:\n"
+                    f"find {project_root} -name '*.pyc' -delete\n"
+                    f"find {project_root} -name '__pycache__' -exec rm -rf {{}} +"
+                )
+                self.status_bar.showMessage("Cache clear failed")
+    
     def show_about(self):
         """Show about dialog"""
         about_text = """Strategy Builder v3.0
@@ -2931,51 +3207,52 @@ Log File: test_{timestamp}.txt
                 f.write(output)
             
             # Also save config snapshot for comparison
-            # Read directly from YAML file to ensure 100% accuracy (no hardcoded defaults)
-            config = self.registry.load_strategy(strategy_num)
-            if config:
+            # Read directly from JSON file to ensure 100% accuracy (no hardcoded defaults)
+            try:
                 import yaml
+                import json
+                
                 config_snapshot_file = logs_dir / f"config_{timestamp}.yaml"
                 
-                # Get the actual strategy YAML file path
-                strategy_file = self.registry.get_strategy_file_path(strategy_num)
+                # Find the actual strategy JSON file by searching all folders
+                pattern = f"strategy_{strategy_num:03d}_*.json"
+                strategy_json_file = None
                 
-                if strategy_file and strategy_file.exists():
-                    # Read the actual YAML file directly to preserve all values exactly as configured
-                    with open(strategy_file, 'r') as f:
-                        actual_yaml_config = yaml.safe_load(f)
+                for folder in [self.registry.drafts_dir, self.registry.unpublished_dir, self.registry.published_dir]:
+                    matching_files = list(folder.glob(pattern))
+                    if matching_files:
+                        strategy_json_file = matching_files[0]
+                        break
+                
+                if strategy_json_file and strategy_json_file.exists():
+                    # Read the actual JSON file directly to preserve all values exactly as configured
+                    with open(strategy_json_file, 'r') as f:
+                        actual_json_config = json.load(f)
+                    
+                    # Remove internal metadata from original file
+                    actual_json_config.pop('_metadata', None)
                     
                     # Add test metadata to the snapshot
-                    snapshot_config = actual_yaml_config.copy()
+                    snapshot_config = actual_json_config.copy()
                     snapshot_config['_test_metadata'] = {
                         'test_type': test_type,
                         'test_timestamp': timestamp,
-                        'test_datetime': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        'test_datetime': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        'source_file': str(strategy_json_file)
                     }
                     
-                    # Save the snapshot with metadata
+                    # Save the snapshot as YAML for human readability
                     with open(config_snapshot_file, 'w') as f:
                         yaml.dump(snapshot_config, f, default_flow_style=False, sort_keys=False)
-                else:
-                    # Fallback: construct from config object if YAML file not found
-                    self.logger.warning(f"Strategy YAML file not found, using config object")
-                    config_dict = {
-                        'strategy_name': config.strategy_name,
-                        'strategy_category': config.strategy_category,
-                        'test_type': test_type,
-                        'test_timestamp': timestamp,
-                        'blocks': [
-                            {
-                                'block_name': block.block_name,
-                                'weight': block.weight,
-                                'signals': [s.signal_name for s in block.signals] if block.signals else []
-                            }
-                            for block in config.blocks
-                        ]
-                    }
                     
-                    with open(config_snapshot_file, 'w') as f:
-                        yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False)
+                    print(f"✅ Config snapshot saved from: {strategy_json_file.name}")
+                else:
+                    # This should NEVER happen - log error
+                    print(f"❌ CRITICAL: Strategy #{strategy_num:03d} JSON file not found in any folder!")
+                    print(f"   Searched: drafts/, unpublished/, published/")
+                    
+            except Exception as e:
+                print(f"⚠️ Warning: Failed to save config snapshot: {e}")
             
             # Keep only 2 most recent logs (and their configs)
             log_files = sorted(logs_dir.glob("test_*.txt"), reverse=True)
@@ -2993,6 +3270,107 @@ Log File: test_{timestamp}.txt
             
         except Exception as e:
             print(f"Warning: Failed to save test log: {e}")
+    
+    def _restore_previous_config(self, strategy_num: int, parent_dialog):
+        """Restore configuration from previous test to the selected strategy"""
+        try:
+            # Get test logs directory
+            logs_dir = Path(f"data/test_logs/strategy_{strategy_num:03d}")
+            
+            if not logs_dir.exists():
+                QMessageBox.warning(
+                    parent_dialog,
+                    "No Config Snapshots",
+                    "No config snapshots found.\n\n"
+                    "Config snapshots are saved automatically when you run tests."
+                )
+                return
+            
+            # Get all config snapshot files sorted by timestamp (newest first)
+            config_files = sorted(logs_dir.glob("config_*.yaml"), reverse=True)
+            
+            if len(config_files) < 2:
+                QMessageBox.warning(
+                    parent_dialog,
+                    "Insufficient Snapshots",
+                    f"Need at least 2 config snapshots to restore previous config.\n"
+                    f"Currently have: {len(config_files)}\n\n"
+                    "Run another test to create more snapshots."
+                )
+                return
+            
+            # Get the second most recent config (the "previous" one)
+            previous_config_file = config_files[1]
+            
+            # Confirm restoration
+            reply = QMessageBox.question(
+                parent_dialog,
+                "Confirm Config Restoration",
+                f"⏮️ Restore Previous Configuration?\n\n"
+                f"This will restore Strategy #{strategy_num:03d} to the configuration from:\n"
+                f"{previous_config_file.name}\n\n"
+                f"Current configuration will be overwritten.\n\n"
+                f"Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+            
+            # Read the previous config
+            import yaml
+            with open(previous_config_file, 'r') as f:
+                previous_config_data = yaml.safe_load(f)
+            
+            # Remove test metadata (not part of actual config)
+            previous_config_data.pop('_test_metadata', None)
+            
+            # Load the current strategy to get the file path
+            current_config = self.registry.load_strategy(strategy_num)
+            if not current_config:
+                raise ValueError(f"Failed to load current strategy #{strategy_num:03d}")
+            
+            # Find the strategy JSON file
+            pattern = f"strategy_{strategy_num:03d}_*.json"
+            strategy_json_file = None
+            
+            for folder in [self.registry.drafts_dir, self.registry.unpublished_dir, self.registry.published_dir]:
+                matching_files = list(folder.glob(pattern))
+                if matching_files:
+                    strategy_json_file = matching_files[0]
+                    break
+            
+            if not strategy_json_file or not strategy_json_file.exists():
+                raise ValueError(f"Strategy JSON file not found for #{strategy_num:03d}")
+            
+            # Write the previous config back to the JSON file
+            import json
+            with open(strategy_json_file, 'w') as f:
+                json.dump(previous_config_data, f, indent=2)
+            
+            # Refresh the strategy list to show updated config
+            self.load_strategies()
+            
+            # Show success message
+            QMessageBox.information(
+                parent_dialog,
+                "Config Restored",
+                f"✅ Configuration restored successfully!\n\n"
+                f"Strategy #{strategy_num:03d} has been restored to the\n"
+                f"configuration from the previous test.\n\n"
+                f"Source: {previous_config_file.name}"
+            )
+            
+            # Close the comparison dialog
+            parent_dialog.accept()
+            
+        except Exception as e:
+            QMessageBox.critical(
+                parent_dialog,
+                "Restoration Failed",
+                f"Failed to restore previous configuration:\n\n{e}"
+            )
     
     def closeEvent(self, event):
         """Handle window close event - save state before closing"""
