@@ -1,0 +1,2833 @@
+{
+  "metadata": {
+    "date": "2026-01-11T19:16:32.491939",
+    "total_blocks": 83,
+    "blocks_with_issues": 83,
+    "total_mismatches": 118
+  },
+  "mismatches": [
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "adaptive_momentum_oscillator",
+      "signals": [
+        "BEARISH_CROSS",
+        "BEARISH_DIVERGENCE",
+        "BULLISH_CROSS",
+        "BULLISH_DIVERGENCE"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_CROSS', 'BEARISH_DIVERGENCE', 'BULLISH_DIVERGENCE', 'BULLISH_CROSS'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "adr",
+      "signals": [
+        "ABOVE_ADR",
+        "BELOW_ADR",
+        "CALM",
+        "NEAR_ADR",
+        "VOLATILE",
+        "WITHIN_ADR"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NEAR_ADR', 'WITHIN_ADR', 'BELOW_ADR', 'CALM', 'ABOVE_ADR', 'VOLATILE'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "adr",
+      "signals": [
+        "NORMAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NORMAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "adx",
+      "signals": [
+        "BEARISH",
+        "BULLISH"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "anchored_vwap",
+      "signals": [
+        "ABOVE_ANCHORED_VWAP"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'ABOVE_ANCHORED_VWAP'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ascending_triangle",
+      "signals": [
+        "BULLISH_BREAKOUT",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_BREAKOUT', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "asfx_a2_vwap",
+      "signals": [
+        "BEARISH",
+        "BULLISH"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "asfx_a2_vwap",
+      "signals": [
+        "BULLISH_A2"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BULLISH_A2'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "asia_session_50_percent",
+      "signals": [
+        "BEARISH",
+        "BULLISH"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "atr",
+      "signals": [
+        "EXTREME_HIGH",
+        "EXTREME_LOW",
+        "VERY_HIGH",
+        "VERY_LOW"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'EXTREME_LOW', 'EXTREME_HIGH', 'VERY_HIGH', 'VERY_LOW'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "atr",
+      "signals": [
+        "STABLE"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'STABLE'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "balanced_price_range",
+      "signals": [
+        "BEARISH",
+        "BULLISH"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "bollinger_bands",
+      "signals": [
+        "BEARISH_REVERSAL",
+        "BULLISH_REVERSAL",
+        "LOWER_BAND_WALK",
+        "LOWER_HALF",
+        "MEDIUM_HIGH",
+        "MEDIUM_LOW",
+        "SQUEEZE_BREAKOUT",
+        "SQUEEZE_BREAKOUT_BEAR",
+        "SQUEEZE_BREAKOUT_BULL"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'SQUEEZE_BREAKOUT_BEAR', 'MEDIUM_HIGH', 'MEDIUM_LOW', 'BULLISH_REVERSAL', 'SQUEEZE_BREAKOUT', 'SQUEEZE_BREAKOUT_BULL', 'LOWER_BAND_WALK', 'LOWER_HALF', 'BEARISH_REVERSAL'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "bollinger_bands",
+      "signals": [
+        "UPPER_HALF"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'UPPER_HALF'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "break_of_structure",
+      "signals": [
+        "BEARISH_BOS",
+        "BULLISH_BOS"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_BOS', 'BULLISH_BOS'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "break_of_structure",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BULLISH', 'BEARISH', 'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "breaker_block",
+      "signals": [
+        "BEARISH_BREAKER",
+        "BULLISH_BREAKER"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_BREAKER', 'BEARISH_BREAKER'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "breaker_block",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BULLISH', 'BEARISH', 'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "candle_2_close",
+      "signals": [
+        "BEARISH",
+        "BULLISH"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "change_of_character",
+      "signals": [
+        "BEARISH_CHOCH",
+        "BEARISH_MSS",
+        "BULLISH_CHOCH",
+        "BULLISH_MSS",
+        "HIGH_SWEEP",
+        "LOW_SWEEP",
+        "UNUSUALLY_SLOW"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_MSS', 'UNUSUALLY_SLOW', 'BEARISH_MSS', 'BEARISH_CHOCH', 'BULLISH_CHOCH', 'LOW_SWEEP', 'HIGH_SWEEP'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "change_of_character",
+      "signals": [
+        "BEARISH",
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BEARISH', 'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "cup_and_handle",
+      "signals": [
+        "BREAKOUT_CONFIRMED",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BREAKOUT_CONFIRMED', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "descending_triangle",
+      "signals": [
+        "BEARISH_BREAKDOWN",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_BREAKDOWN', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "displacement",
+      "signals": [
+        "BEARISH_DISPLACEMENT",
+        "BEARISH_FVG",
+        "BULLISH_DISPLACEMENT",
+        "BULLISH_FVG"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_FVG', 'BULLISH_DISPLACEMENT', 'BEARISH_FVG', 'BEARISH_DISPLACEMENT'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "displacement",
+      "signals": [
+        "NO_DISPLACEMENT"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NO_DISPLACEMENT'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "double_bottom",
+      "signals": [
+        "BULLISH_BREAKOUT",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_BREAKOUT', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "double_top",
+      "signals": [
+        "BEARISH_BREAKDOWN",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_BREAKDOWN', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "elliott_wave_count",
+      "signals": [
+        "NO_PATTERN"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NO_PATTERN'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "elliott_wave_oscillator",
+      "signals": [
+        "BEARISH_DIVERGENCE",
+        "BEARISH_MOMENTUM_WEAKENING",
+        "BULLISH_DIVERGENCE"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_MOMENTUM_WEAKENING', 'BEARISH_DIVERGENCE', 'BULLISH_DIVERGENCE'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ema_200_trend",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH', 'NEUTRAL'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ema_20_50_cross",
+      "signals": [
+        "DEATH_CROSS",
+        "GOLDEN_CROSS",
+        "NO_CROSS"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'GOLDEN_CROSS', 'NO_CROSS', 'DEATH_CROSS'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "ema_20_50_cross",
+      "signals": [
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ema_20_50_trend",
+      "signals": [
+        "NEUTRAL"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NEUTRAL'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ema_255_vector",
+      "signals": [
+        "ABOVE_EMA",
+        "BELOW_EMA"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BELOW_EMA', 'ABOVE_EMA'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ema_50_vector",
+      "signals": [
+        "ABOVE_EMA",
+        "BEARISH_BREAK",
+        "BELOW_EMA",
+        "BULLISH_BREAK",
+        "NO_BREAK"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NO_BREAK', 'BEARISH_BREAK', 'BELOW_EMA', 'BULLISH_BREAK', 'ABOVE_EMA'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "ema_50_vector",
+      "signals": [
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ema_55_vector",
+      "signals": [
+        "ABOVE_EMA",
+        "BELOW_EMA"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BELOW_EMA', 'ABOVE_EMA'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "ema_55_vector",
+      "signals": [
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ema_800_vector",
+      "signals": [
+        "ABOVE_EMA",
+        "BELOW_EMA"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BELOW_EMA', 'ABOVE_EMA'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ema_crossover",
+      "signals": [
+        "BEARISH_ALIGNMENT",
+        "BULLISH_ALIGNMENT",
+        "DEATH_CROSS",
+        "GOLDEN_CROSS"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'GOLDEN_CROSS', 'BEARISH_ALIGNMENT', 'DEATH_CROSS', 'BULLISH_ALIGNMENT'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "fair_value_gap",
+      "signals": [
+        "BEARISH_FVG",
+        "BULLISH_FVG"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_FVG', 'BULLISH_FVG'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "fair_value_gap",
+      "signals": [
+        "NO_FVG"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NO_FVG'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "falling_wedge",
+      "signals": [
+        "BULLISH_BREAKOUT",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_BREAKOUT', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "fibonacci_retracements",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH', 'NEUTRAL'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "fibonacci_retracements",
+      "signals": [
+        "AT_FIB_23",
+        "AT_FIB_38",
+        "AT_FIB_50",
+        "BETWEEN_LEVELS"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'AT_FIB_38', 'AT_FIB_23', 'BETWEEN_LEVELS', 'AT_FIB_50'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "fifty_pct_hod_lod",
+      "signals": [
+        "REJECTION_AT_EQ"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'REJECTION_AT_EQ'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "fifty_pct_intra_hod_lod",
+      "signals": [
+        "ABOVE_INTRA_EQ",
+        "BELOW_INTRA_EQ",
+        "REJECTION_AT_INTRA_EQ"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BELOW_INTRA_EQ', 'ABOVE_INTRA_EQ', 'REJECTION_AT_INTRA_EQ'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "flag_pattern",
+      "signals": [
+        "BEARISH_BREAKOUT",
+        "BULLISH_BREAKOUT",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_BREAKOUT', 'BULLISH_BREAKOUT', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "head_and_shoulders",
+      "signals": [
+        "PATTERN_CONFIRMED",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'PATTERN_CONFIRMED', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "hod",
+      "signals": [
+        "ABOVE_HOD",
+        "AT_HOD",
+        "BEARISH",
+        "BELOW_HOD",
+        "HOD_REJECTION"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH', 'ABOVE_HOD', 'HOD_REJECTION', 'BELOW_HOD', 'AT_HOD'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "how",
+      "signals": [
+        "BELOW_HOW",
+        "BREAKING_OUT",
+        "BREAKOUT_CONFIRMED"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BREAKOUT_CONFIRMED', 'BELOW_HOW', 'BREAKING_OUT'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "how",
+      "signals": [
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BULLISH', 'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ichimoku_cloud",
+      "signals": [
+        "ABOVE_CLOUD",
+        "BELOW_CLOUD"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'ABOVE_CLOUD', 'BELOW_CLOUD'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "ichimoku_cloud",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BULLISH', 'BEARISH', 'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ict_silver_bullet",
+      "signals": [
+        "BEARISH_FVG_IN_ZONE",
+        "BEARISH_FVG_RETEST",
+        "BULLISH_FVG_IN_ZONE",
+        "BULLISH_FVG_RETEST"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_FVG_RETEST', 'BULLISH_FVG_RETEST', 'BEARISH_FVG_IN_ZONE', 'BULLISH_FVG_IN_ZONE'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ihod",
+      "signals": [
+        "ABOVE_IHOD",
+        "AT_IHOD",
+        "BULLISH_BREAK"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'AT_IHOD', 'ABOVE_IHOD', 'BULLISH_BREAK'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "ilod",
+      "signals": [
+        "AT_ILOD",
+        "BEARISH_BREAK",
+        "BELOW_ILOD"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_BREAK', 'BELOW_ILOD', 'AT_ILOD'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "inducement",
+      "signals": [
+        "BEARISH_INDUCEMENT",
+        "BULLISH_INDUCEMENT"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_INDUCEMENT', 'BULLISH_INDUCEMENT'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "inducement",
+      "signals": [
+        "NO_INDUCEMENT"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NO_INDUCEMENT'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "initial_balance_breakout",
+      "signals": [
+        "ABOVE_IB",
+        "BEARISH_BREAKOUT",
+        "BELOW_IB",
+        "BULLISH_BREAKOUT",
+        "LOWER_IB"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_BREAKOUT', 'LOWER_IB', 'ABOVE_IB', 'BULLISH_BREAKOUT', 'BELOW_IB'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "internal_pivot_pattern",
+      "signals": [
+        "BULLISH_PIVOT_LOW",
+        "PIVOT_HIGH",
+        "PIVOT_LOW"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'PIVOT_LOW', 'PIVOT_HIGH', 'BULLISH_PIVOT_LOW'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "internal_pivot_pattern",
+      "signals": [
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "inverse_head_and_shoulders",
+      "signals": [
+        "PATTERN_CONFIRMED",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'PATTERN_CONFIRMED', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "kill_zones",
+      "signals": [
+        "ASIAN_KZ",
+        "INACTIVE",
+        "LONDON_KZ",
+        "NY_AM_KZ",
+        "NY_PM_KZ"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NY_AM_KZ', 'NY_PM_KZ', 'LONDON_KZ', 'INACTIVE', 'ASIAN_KZ'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "liquidity",
+      "signals": [
+        "VOID_DETECTED"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'VOID_DETECTED'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "liquidity_sweep",
+      "signals": [
+        "BEARISH_SWEEP",
+        "BULLISH_SWEEP"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_SWEEP', 'BEARISH_SWEEP'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "liquidity_sweep",
+      "signals": [
+        "BEARISH",
+        "NO_SWEEP"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BEARISH', 'NO_SWEEP'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "lod",
+      "signals": [
+        "ABOVE_LOD",
+        "AT_LOD",
+        "BELOW_LOD",
+        "BULLISH",
+        "LOD_BOUNCE"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'AT_LOD', 'LOD_BOUNCE', 'BULLISH', 'BELOW_LOD', 'ABOVE_LOD'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "low",
+      "signals": [
+        "ABOVE_LOW",
+        "AT_LOW",
+        "BREAKDOWN_CONFIRMED",
+        "BREAKING_DOWN",
+        "NO_LOW",
+        "NO_LOW_DATA"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NO_LOW_DATA', 'BREAKING_DOWN', 'ABOVE_LOW', 'NO_LOW', 'BREAKDOWN_CONFIRMED', 'AT_LOW'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "low",
+      "signals": [
+        "BEARISH",
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BEARISH', 'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "macd_price_forecasting",
+      "signals": [
+        "BEARISH_FORECAST",
+        "BULLISH_FORECAST"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_FORECAST', 'BEARISH_FORECAST'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "macd_signal",
+      "signals": [
+        "BEARISH_CROSS",
+        "BEARISH_ZERO_CROSS",
+        "BULLISH_CROSS",
+        "BULLISH_ZERO_CROSS",
+        "NO_CROSS",
+        "NO_ZERO_CROSS",
+        "STRONG_BEARISH",
+        "STRONG_BULLISH",
+        "WEAKENING_BEARISH",
+        "WEAKENING_BULLISH"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NO_CROSS', 'BULLISH_CROSS', 'WEAKENING_BULLISH', 'STRONG_BULLISH', 'BULLISH_ZERO_CROSS', 'WEAKENING_BEARISH', 'BEARISH_ZERO_CROSS', 'NO_ZERO_CROSS', 'BEARISH_CROSS', 'STRONG_BEARISH'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "macd_signal",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BULLISH', 'BEARISH', 'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "market_depth",
+      "signals": [
+        "LOW_LIQUIDITY"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'LOW_LIQUIDITY'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "market_depth",
+      "signals": [
+        "NORMAL_LIQUIDITY"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NORMAL_LIQUIDITY'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "market_structure_shift",
+      "signals": [
+        "BEARISH_MSS",
+        "BEARISH_RETEST",
+        "BULLISH_MSS",
+        "BULLISH_RETEST"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_RETEST', 'BULLISH_RETEST', 'BULLISH_MSS', 'BEARISH_MSS'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "market_structure_shift",
+      "signals": [
+        "BEARISH",
+        "BULLISH"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BULLISH', 'BEARISH'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "mitigation_block",
+      "signals": [
+        "BEARISH_MITIGATION",
+        "BULLISH_MITIGATION"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_MITIGATION', 'BEARISH_MITIGATION'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "mitigation_block",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BULLISH', 'BEARISH', 'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "optimal_trade_entry",
+      "signals": [
+        "BEARISH_OTE",
+        "BULLISH_OTE"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_OTE', 'BEARISH_OTE'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "optimal_trade_entry",
+      "signals": [
+        "BULLISH",
+        "NEUTRAL",
+        "NO_OTE"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BULLISH', 'NEUTRAL', 'NO_OTE'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "order_block",
+      "signals": [
+        "BEARISH_OB",
+        "BULLISH_OB"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_OB', 'BULLISH_OB'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "order_block",
+      "signals": [
+        "NO_ORDER_BLOCK"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NO_ORDER_BLOCK'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "order_flow_imbalance",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH', 'NEUTRAL'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "order_flow_imbalance",
+      "signals": [
+        "BALANCED",
+        "BUY_IMBALANCE"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BALANCED', 'BUY_IMBALANCE'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "pennant_pattern",
+      "signals": [
+        "BEARISH_BREAKOUT",
+        "BULLISH_BREAKOUT",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_BREAKOUT', 'BULLISH_BREAKOUT', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "power_hour_trends",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH', 'NEUTRAL'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "premium_discount_zones",
+      "signals": [
+        "AT_EQUILIBRIUM",
+        "NO_ZONE"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NO_ZONE', 'AT_EQUILIBRIUM'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "range_liquidity",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH', 'NEUTRAL'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "range_liquidity",
+      "signals": [
+        "NEAR_BUY_SIDE_LIQUIDITY",
+        "NEAR_SELL_SIDE_LIQUIDITY"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NEAR_SELL_SIDE_LIQUIDITY', 'NEAR_BUY_SIDE_LIQUIDITY'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "rising_wedge",
+      "signals": [
+        "BEARISH_BREAKDOWN",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_BREAKDOWN', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "rounding_bottom",
+      "signals": [
+        "BREAKOUT_CONFIRMED",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BREAKOUT_CONFIRMED', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "rsi_divergence",
+      "signals": [
+        "BEARISH_DIVERGENCE",
+        "BULLISH_DIVERGENCE",
+        "OVERBOUGHT",
+        "OVERSOLD"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'OVERSOLD', 'OVERBOUGHT', 'BEARISH_DIVERGENCE', 'BULLISH_DIVERGENCE'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "session_time",
+      "signals": [
+        "HIGH_VOLUME_SESSION",
+        "LOW_VOLUME_SESSION",
+        "SESSION_CLOSE",
+        "SESSION_OPEN"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'HIGH_VOLUME_SESSION', 'SESSION_OPEN', 'SESSION_CLOSE', 'LOW_VOLUME_SESSION'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "stochastic_rsi",
+      "signals": [
+        "BEARISH_CROSS",
+        "BULLISH_CROSS",
+        "NEUTRAL_HIGH",
+        "NEUTRAL_LOW",
+        "NO_CROSS"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NO_CROSS', 'NEUTRAL_LOW', 'BULLISH_CROSS', 'BEARISH_CROSS', 'NEUTRAL_HIGH'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "stochastic_rsi",
+      "signals": [
+        "BEARISH",
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'BEARISH', 'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "supply_demand_zones",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH', 'NEUTRAL'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "swing_breakout_sequence",
+      "signals": [
+        "BEARISH_BREAKOUT_SEQUENCE",
+        "BULLISH_BREAKOUT_SEQUENCE"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_BREAKOUT_SEQUENCE', 'BULLISH_BREAKOUT_SEQUENCE'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "swing_breakout_sequence",
+      "signals": [
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "swing_failure_pattern",
+      "signals": [
+        "BEARISH_SFP",
+        "BULLISH_SFP"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_SFP', 'BEARISH_SFP'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "swing_failure_pattern",
+      "signals": [
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "swing_points",
+      "signals": [
+        "MAJOR_SWING_HIGH_DETECTED",
+        "MINOR_SWING_HIGH_DETECTED",
+        "MINOR_SWING_LOW_DETECTED",
+        "NO_SWINGS"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NO_SWINGS', 'MINOR_SWING_LOW_DETECTED', 'MAJOR_SWING_HIGH_DETECTED', 'MINOR_SWING_HIGH_DETECTED'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "symmetrical_triangle",
+      "signals": [
+        "BEARISH_BREAKOUT",
+        "BULLISH_BREAKOUT",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_BREAKOUT', 'BULLISH_BREAKOUT', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "three_bar_reversal",
+      "signals": [
+        "BEARISH",
+        "BULLISH"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "trailing_stop",
+      "signals": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH', 'BEARISH', 'NEUTRAL'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "trailing_stop",
+      "signals": [
+        "LONG_STOP_HOLD"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'LONG_STOP_HOLD'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "triple_bottom",
+      "signals": [
+        "BULLISH_BREAKOUT",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BULLISH_BREAKOUT', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "triple_top",
+      "signals": [
+        "BEARISH_BREAKDOWN",
+        "PATTERN_FORMING"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_BREAKDOWN', 'PATTERN_FORMING'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "us_settlement",
+      "signals": [
+        "NEUTRAL"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NEUTRAL'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "vwap",
+      "signals": [
+        "NEUTRAL"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'NEUTRAL'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "wave_consolidation",
+      "signals": [
+        "BEARISH_ZONE_BREAK",
+        "BEARISH_ZONE_REJECTION",
+        "BULLISH_ZONE_BREAK",
+        "BULLISH_ZONE_REJECTION"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'BEARISH_ZONE_BREAK', 'BULLISH_ZONE_BREAK', 'BULLISH_ZONE_REJECTION', 'BEARISH_ZONE_REJECTION'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "wave_consolidation",
+      "signals": [
+        "NEUTRAL"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NEUTRAL'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "wyckoff_accumulation",
+      "signals": [
+        "SOS_BREAKOUT",
+        "SPRING_DETECTED"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'SOS_BREAKOUT', 'SPRING_DETECTED'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "wyckoff_accumulation",
+      "signals": [
+        "ACCUMULATION_PHASE_B"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'ACCUMULATION_PHASE_B'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "wyckoff_distribution",
+      "signals": [
+        "SOW_BREAKDOWN",
+        "UTAD_DETECTED"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'UTAD_DETECTED', 'SOW_BREAKDOWN'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "wyckoff_distribution",
+      "signals": [
+        "DISTRIBUTION_PHASE_B"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'DISTRIBUTION_PHASE_B'} to valid_signals in @register_block decorator"
+    },
+    {
+      "type": "DECLARED_BUT_NEVER_EMITTED",
+      "block": "wyckoff_reaccumulation",
+      "signals": [
+        "BREAKOUT_CONTINUATION",
+        "REACCUMULATION_DETECTED",
+        "SPRING_DETECTED"
+      ],
+      "severity": "HIGH",
+      "impact": "Users can select these in GUI but they never fire - causes confusion and filter bugs",
+      "fix": "Remove {'SPRING_DETECTED', 'BREAKOUT_CONTINUATION', 'REACCUMULATION_DETECTED'} from valid_signals OR update analyze() to emit them"
+    },
+    {
+      "type": "EMITTED_BUT_NOT_DECLARED",
+      "block": "wyckoff_reaccumulation",
+      "signals": [
+        "NO_REACCUMULATION"
+      ],
+      "severity": "CRITICAL",
+      "impact": "Block emits signals not in valid_signals - breaks validation and confluence calculation",
+      "fix": "Add {'NO_REACCUMULATION'} to valid_signals in @register_block decorator"
+    }
+  ],
+  "blocks": {
+    "adaptive_momentum_oscillator": {
+      "declared": [
+        "BEARISH_CROSS",
+        "BEARISH_DIVERGENCE",
+        "BULLISH_CROSS",
+        "BULLISH_DIVERGENCE",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [],
+      "counts": {},
+      "errors": [
+        "Instantiation failed: EnumType.__call__() missing 1 required positional argument: 'value'"
+      ]
+    },
+    "adr": {
+      "declared": [
+        "ABOVE_ADR",
+        "BELOW_ADR",
+        "CALM",
+        "ERROR",
+        "NEAR_ADR",
+        "VOLATILE",
+        "WITHIN_ADR"
+      ],
+      "emitted": [
+        "NORMAL"
+      ],
+      "counts": {
+        "NORMAL": 5
+      },
+      "errors": []
+    },
+    "adx": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "anchored_vwap": {
+      "declared": [
+        "ABOVE_ANCHORED_VWAP",
+        "BELOW_ANCHORED_VWAP",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "BELOW_ANCHORED_VWAP",
+        "ERROR"
+      ],
+      "counts": {
+        "BELOW_ANCHORED_VWAP": 1,
+        "ERROR": 4
+      },
+      "errors": []
+    },
+    "ascending_triangle": {
+      "declared": [
+        "BULLISH_BREAKOUT",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "asfx_a2_vwap": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "BULLISH_A2",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 4,
+        "BULLISH_A2": 1
+      },
+      "errors": []
+    },
+    "asia_session_50_percent": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "atr": {
+      "declared": [
+        "ERROR",
+        "EXTREME_HIGH",
+        "EXTREME_LOW",
+        "INSUFFICIENT_DATA",
+        "VERY_HIGH",
+        "VERY_LOW"
+      ],
+      "emitted": [
+        "STABLE"
+      ],
+      "counts": {
+        "STABLE": 5
+      },
+      "errors": []
+    },
+    "balanced_price_range": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "bollinger_bands": {
+      "declared": [
+        "ABOVE_UPPER",
+        "BEARISH_REVERSAL",
+        "BELOW_LOWER",
+        "BULLISH_REVERSAL",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "LOWER_BAND_WALK",
+        "LOWER_HALF",
+        "MEDIUM_HIGH",
+        "MEDIUM_LOW",
+        "NEAR_LOWER",
+        "SQUEEZE_BREAKOUT",
+        "SQUEEZE_BREAKOUT_BEAR",
+        "SQUEEZE_BREAKOUT_BULL"
+      ],
+      "emitted": [
+        "ABOVE_UPPER",
+        "BELOW_LOWER",
+        "NEAR_LOWER",
+        "UPPER_HALF"
+      ],
+      "counts": {
+        "BELOW_LOWER": 2,
+        "ABOVE_UPPER": 1,
+        "UPPER_HALF": 1,
+        "NEAR_LOWER": 1
+      },
+      "errors": []
+    },
+    "break_of_structure": {
+      "declared": [
+        "BEARISH_BOS",
+        "BULLISH_BOS",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 1,
+        "BEARISH": 3,
+        "BULLISH": 1
+      },
+      "errors": []
+    },
+    "breaker_block": {
+      "declared": [
+        "BEARISH_BREAKER",
+        "BULLISH_BREAKER",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_BREAKER"
+      ],
+      "emitted": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL",
+        "NO_BREAKER"
+      ],
+      "counts": {
+        "BEARISH": 1,
+        "NO_BREAKER": 1,
+        "BULLISH": 2,
+        "NEUTRAL": 1
+      },
+      "errors": []
+    },
+    "candle_2_close": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "change_of_character": {
+      "declared": [
+        "BEARISH_CHOCH",
+        "BEARISH_MSS",
+        "BULLISH_CHOCH",
+        "BULLISH_MSS",
+        "ERROR",
+        "HIGH_SWEEP",
+        "INSUFFICIENT_DATA",
+        "LOW_SWEEP",
+        "UNUSUALLY_SLOW"
+      ],
+      "emitted": [
+        "BEARISH",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 4,
+        "BEARISH": 1
+      },
+      "errors": []
+    },
+    "cup_and_handle": {
+      "declared": [
+        "BREAKOUT_CONFIRMED",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "descending_triangle": {
+      "declared": [
+        "BEARISH_BREAKDOWN",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "displacement": {
+      "declared": [
+        "BEARISH_DISPLACEMENT",
+        "BEARISH_FVG",
+        "BULLISH_DISPLACEMENT",
+        "BULLISH_FVG",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "NO_DISPLACEMENT"
+      ],
+      "counts": {
+        "NO_DISPLACEMENT": 5
+      },
+      "errors": []
+    },
+    "double_bottom": {
+      "declared": [
+        "BULLISH_BREAKOUT",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "double_top": {
+      "declared": [
+        "BEARISH_BREAKDOWN",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "elliott_wave_count": {
+      "declared": [
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN"
+      ],
+      "emitted": [],
+      "counts": {},
+      "errors": [
+        "Window 0-100: Multi-Timeframe mode (use_mtf=True) requires both df_4h and df_1d. Got df_4h=MISSING, df_1d=MISSING.",
+        "Window 100-200: Multi-Timeframe mode (use_mtf=True) requires both df_4h and df_1d. Got df_4h=MISSING, df_1d=MISSING.",
+        "Window 200-300: Multi-Timeframe mode (use_mtf=True) requires both df_4h and df_1d. Got df_4h=MISSING, df_1d=MISSING.",
+        "Window 300-400: Multi-Timeframe mode (use_mtf=True) requires both df_4h and df_1d. Got df_4h=MISSING, df_1d=MISSING.",
+        "Window 400-500: Multi-Timeframe mode (use_mtf=True) requires both df_4h and df_1d. Got df_4h=MISSING, df_1d=MISSING."
+      ]
+    },
+    "elliott_wave_oscillator": {
+      "declared": [
+        "BEARISH_DIVERGENCE",
+        "BEARISH_MOMENTUM_INCREASING",
+        "BEARISH_MOMENTUM_WEAKENING",
+        "BULLISH_DIVERGENCE",
+        "BULLISH_MOMENTUM_INCREASING",
+        "BULLISH_MOMENTUM_WEAKENING",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "BEARISH_MOMENTUM_INCREASING",
+        "BULLISH_MOMENTUM_INCREASING",
+        "BULLISH_MOMENTUM_WEAKENING"
+      ],
+      "counts": {
+        "BEARISH_MOMENTUM_INCREASING": 2,
+        "BULLISH_MOMENTUM_WEAKENING": 2,
+        "BULLISH_MOMENTUM_INCREASING": 1
+      },
+      "errors": []
+    },
+    "ema_200_trend": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "INSUFFICIENT_DATA"
+      ],
+      "counts": {
+        "INSUFFICIENT_DATA": 5
+      },
+      "errors": []
+    },
+    "ema_20_50_cross": {
+      "declared": [
+        "DEATH_CROSS",
+        "ERROR",
+        "GOLDEN_CROSS",
+        "INSUFFICIENT_DATA",
+        "NO_CROSS"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "ema_20_50_trend": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "BEARISH",
+        "BULLISH"
+      ],
+      "counts": {
+        "BEARISH": 3,
+        "BULLISH": 2
+      },
+      "errors": []
+    },
+    "ema_255_vector": {
+      "declared": [
+        "ABOVE_EMA",
+        "BELOW_EMA",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "INSUFFICIENT_DATA"
+      ],
+      "counts": {
+        "INSUFFICIENT_DATA": 5
+      },
+      "errors": []
+    },
+    "ema_50_vector": {
+      "declared": [
+        "ABOVE_EMA",
+        "BEARISH_BREAK",
+        "BELOW_EMA",
+        "BULLISH_BREAK",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_BREAK"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "ema_55_vector": {
+      "declared": [
+        "ABOVE_EMA",
+        "BELOW_EMA",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "ema_800_vector": {
+      "declared": [
+        "ABOVE_EMA",
+        "BELOW_EMA",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "INSUFFICIENT_DATA"
+      ],
+      "counts": {
+        "INSUFFICIENT_DATA": 5
+      },
+      "errors": []
+    },
+    "ema_crossover": {
+      "declared": [
+        "BEARISH_ALIGNMENT",
+        "BULLISH_ALIGNMENT",
+        "DEATH_CROSS",
+        "ERROR",
+        "GOLDEN_CROSS",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "INSUFFICIENT_DATA"
+      ],
+      "counts": {
+        "INSUFFICIENT_DATA": 5
+      },
+      "errors": []
+    },
+    "fair_value_gap": {
+      "declared": [
+        "BEARISH_FVG",
+        "BULLISH_FVG",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "NO_FVG"
+      ],
+      "counts": {
+        "NO_FVG": 5
+      },
+      "errors": []
+    },
+    "falling_wedge": {
+      "declared": [
+        "BULLISH_BREAKOUT",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "fibonacci_retracements": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "AT_FIB_23",
+        "AT_FIB_38",
+        "AT_FIB_50",
+        "BETWEEN_LEVELS"
+      ],
+      "counts": {
+        "BETWEEN_LEVELS": 2,
+        "AT_FIB_38": 1,
+        "AT_FIB_50": 1,
+        "AT_FIB_23": 1
+      },
+      "errors": []
+    },
+    "fifty_pct_hod_lod": {
+      "declared": [
+        "ABOVE_EQUILIBRIUM",
+        "AT_EQUILIBRIUM",
+        "BELOW_EQUILIBRIUM",
+        "ERROR",
+        "NEUTRAL",
+        "REJECTION_AT_EQ"
+      ],
+      "emitted": [
+        "ABOVE_EQUILIBRIUM",
+        "AT_EQUILIBRIUM",
+        "BELOW_EQUILIBRIUM",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "BELOW_EQUILIBRIUM": 2,
+        "ABOVE_EQUILIBRIUM": 1,
+        "NEUTRAL": 1,
+        "AT_EQUILIBRIUM": 1
+      },
+      "errors": []
+    },
+    "fifty_pct_intra_hod_lod": {
+      "declared": [
+        "ABOVE_INTRA_EQ",
+        "AT_INTRA_EQ",
+        "BELOW_INTRA_EQ",
+        "ERROR",
+        "NEUTRAL",
+        "REJECTION_AT_INTRA_EQ"
+      ],
+      "emitted": [
+        "AT_INTRA_EQ",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "AT_INTRA_EQ": 1,
+        "NEUTRAL": 4
+      },
+      "errors": []
+    },
+    "flag_pattern": {
+      "declared": [
+        "BEARISH_BREAKOUT",
+        "BULLISH_BREAKOUT",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "head_and_shoulders": {
+      "declared": [
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_CONFIRMED",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "hod": {
+      "declared": [
+        "ABOVE_HOD",
+        "AT_HOD",
+        "BEARISH",
+        "BELOW_HOD",
+        "BULLISH",
+        "ERROR",
+        "HOD_REJECTION",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 4,
+        "BULLISH": 1
+      },
+      "errors": []
+    },
+    "how": {
+      "declared": [
+        "BELOW_HOW",
+        "BREAKING_OUT",
+        "BREAKOUT_CONFIRMED",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 4,
+        "BULLISH": 1
+      },
+      "errors": []
+    },
+    "ichimoku_cloud": {
+      "declared": [
+        "ABOVE_CLOUD",
+        "BELOW_CLOUD",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "BEARISH": 2,
+        "NEUTRAL": 2,
+        "BULLISH": 1
+      },
+      "errors": []
+    },
+    "ict_silver_bullet": {
+      "declared": [
+        "BEARISH_FVG_IN_ZONE",
+        "BEARISH_FVG_RETEST",
+        "BULLISH_FVG_IN_ZONE",
+        "BULLISH_FVG_RETEST",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [],
+      "counts": {},
+      "errors": [
+        "Instantiation failed: EnumType.__call__() missing 1 required positional argument: 'value'"
+      ]
+    },
+    "ihod": {
+      "declared": [
+        "ABOVE_IHOD",
+        "AT_IHOD",
+        "BEARISH_REJECTION",
+        "BELOW_IHOD",
+        "BULLISH_BREAK",
+        "ERROR",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "BEARISH_REJECTION",
+        "BELOW_IHOD",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 2,
+        "BELOW_IHOD": 2,
+        "BEARISH_REJECTION": 1
+      },
+      "errors": []
+    },
+    "ilod": {
+      "declared": [
+        "ABOVE_ILOD",
+        "AT_ILOD",
+        "BEARISH_BREAK",
+        "BELOW_ILOD",
+        "BULLISH_BOUNCE",
+        "ERROR",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "ABOVE_ILOD",
+        "BULLISH_BOUNCE",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 1,
+        "BULLISH_BOUNCE": 1,
+        "ABOVE_ILOD": 3
+      },
+      "errors": []
+    },
+    "inducement": {
+      "declared": [
+        "BEARISH_INDUCEMENT",
+        "BULLISH_INDUCEMENT",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "NO_INDUCEMENT"
+      ],
+      "counts": {
+        "NO_INDUCEMENT": 5
+      },
+      "errors": []
+    },
+    "initial_balance_breakout": {
+      "declared": [
+        "ABOVE_IB",
+        "BEARISH_BREAKOUT",
+        "BELOW_IB",
+        "BULLISH_BREAKOUT",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "LOWER_IB"
+      ],
+      "emitted": [],
+      "counts": {},
+      "errors": [
+        "Instantiation failed: InitialBalanceRange.__init__() missing 7 required positional arguments: 'session_start', 'session_end', 'high', 'low', 'range_size', 'midpoint', and 'volume_total'"
+      ]
+    },
+    "internal_pivot_pattern": {
+      "declared": [
+        "BEARISH_PIVOT_HIGH",
+        "BULLISH_PIVOT_LOW",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "PIVOT_HIGH",
+        "PIVOT_LOW"
+      ],
+      "emitted": [
+        "BEARISH_PIVOT_HIGH",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 4,
+        "BEARISH_PIVOT_HIGH": 1
+      },
+      "errors": []
+    },
+    "inverse_head_and_shoulders": {
+      "declared": [
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_CONFIRMED",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "kill_zones": {
+      "declared": [
+        "ACTIVE",
+        "ASIAN_KZ",
+        "ERROR",
+        "INACTIVE",
+        "LONDON_KZ",
+        "NO_SIGNAL",
+        "NY_AM_KZ",
+        "NY_PM_KZ"
+      ],
+      "emitted": [
+        "ACTIVE"
+      ],
+      "counts": {
+        "ACTIVE": 5
+      },
+      "errors": []
+    },
+    "liquidity": {
+      "declared": [
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "VOID_DETECTED"
+      ],
+      "emitted": [],
+      "counts": {},
+      "errors": [
+        "Instantiation failed: LiquidityZone.__init__() missing 8 required positional arguments: 'zone_type', 'high', 'low', 'center', 'strength', 'first_seen', 'touch_count', and 'breached'"
+      ]
+    },
+    "liquidity_sweep": {
+      "declared": [
+        "BEARISH_SWEEP",
+        "BULLISH_SWEEP",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "BEARISH",
+        "NO_SWEEP"
+      ],
+      "counts": {
+        "NO_SWEEP": 2,
+        "BEARISH": 3
+      },
+      "errors": []
+    },
+    "lod": {
+      "declared": [
+        "ABOVE_LOD",
+        "AT_LOD",
+        "BEARISH",
+        "BELOW_LOD",
+        "BULLISH",
+        "ERROR",
+        "LOD_BOUNCE",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "BEARISH",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 4,
+        "BEARISH": 1
+      },
+      "errors": []
+    },
+    "low": {
+      "declared": [
+        "ABOVE_LOW",
+        "AT_LOW",
+        "BREAKDOWN_CONFIRMED",
+        "BREAKING_DOWN",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_LOW",
+        "NO_LOW_DATA"
+      ],
+      "emitted": [
+        "BEARISH",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 4,
+        "BEARISH": 1
+      },
+      "errors": []
+    },
+    "macd_price_forecasting": {
+      "declared": [
+        "BEARISH_FORECAST",
+        "BULLISH_FORECAST",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [],
+      "counts": {},
+      "errors": [
+        "Instantiation failed: EnumType.__call__() missing 1 required positional argument: 'value'"
+      ]
+    },
+    "macd_signal": {
+      "declared": [
+        "BEARISH_CROSS",
+        "BEARISH_ZERO_CROSS",
+        "BULLISH_CROSS",
+        "BULLISH_ZERO_CROSS",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_CROSS",
+        "NO_ZERO_CROSS",
+        "STRONG_BEARISH",
+        "STRONG_BULLISH",
+        "WEAKENING_BEARISH",
+        "WEAKENING_BULLISH"
+      ],
+      "emitted": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 3,
+        "BULLISH": 1,
+        "BEARISH": 1
+      },
+      "errors": []
+    },
+    "market_depth": {
+      "declared": [
+        "ERROR",
+        "HIGH_LIQUIDITY",
+        "INSUFFICIENT_DATA",
+        "LOW_LIQUIDITY"
+      ],
+      "emitted": [
+        "HIGH_LIQUIDITY",
+        "NORMAL_LIQUIDITY"
+      ],
+      "counts": {
+        "NORMAL_LIQUIDITY": 4,
+        "HIGH_LIQUIDITY": 1
+      },
+      "errors": []
+    },
+    "market_structure_shift": {
+      "declared": [
+        "BEARISH_MSS",
+        "BEARISH_RETEST",
+        "BULLISH_MSS",
+        "BULLISH_RETEST",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "BEARISH",
+        "BULLISH"
+      ],
+      "counts": {
+        "BEARISH": 3,
+        "BULLISH": 2
+      },
+      "errors": []
+    },
+    "mitigation_block": {
+      "declared": [
+        "BEARISH_MITIGATION",
+        "BULLISH_MITIGATION",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "BEARISH",
+        "BULLISH",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 1,
+        "BEARISH": 1,
+        "BULLISH": 3
+      },
+      "errors": []
+    },
+    "optimal_trade_entry": {
+      "declared": [
+        "BEARISH_OTE",
+        "BULLISH_OTE",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "BULLISH",
+        "NEUTRAL",
+        "NO_OTE"
+      ],
+      "counts": {
+        "NEUTRAL": 1,
+        "NO_OTE": 3,
+        "BULLISH": 1
+      },
+      "errors": []
+    },
+    "order_block": {
+      "declared": [
+        "BEARISH_OB",
+        "BULLISH_OB",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "NO_ORDER_BLOCK"
+      ],
+      "counts": {
+        "NO_ORDER_BLOCK": 5
+      },
+      "errors": []
+    },
+    "order_flow_imbalance": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "BALANCED",
+        "BUY_IMBALANCE"
+      ],
+      "counts": {
+        "BALANCED": 4,
+        "BUY_IMBALANCE": 1
+      },
+      "errors": []
+    },
+    "pennant_pattern": {
+      "declared": [
+        "BEARISH_BREAKOUT",
+        "BULLISH_BREAKOUT",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "power_hour_trends": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [],
+      "counts": {},
+      "errors": [
+        "Instantiation failed: EnumType.__call__() missing 1 required positional argument: 'value'"
+      ]
+    },
+    "premium_discount_zones": {
+      "declared": [
+        "AT_EQUILIBRIUM",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_ZONE",
+        "PRICE_IN_DISCOUNT",
+        "PRICE_IN_PREMIUM"
+      ],
+      "emitted": [
+        "PRICE_IN_DISCOUNT",
+        "PRICE_IN_PREMIUM"
+      ],
+      "counts": {
+        "PRICE_IN_DISCOUNT": 3,
+        "PRICE_IN_PREMIUM": 2
+      },
+      "errors": []
+    },
+    "range_liquidity": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "NEAR_BUY_SIDE_LIQUIDITY",
+        "NEAR_SELL_SIDE_LIQUIDITY"
+      ],
+      "counts": {
+        "NEAR_SELL_SIDE_LIQUIDITY": 3,
+        "NEAR_BUY_SIDE_LIQUIDITY": 2
+      },
+      "errors": []
+    },
+    "rising_wedge": {
+      "declared": [
+        "BEARISH_BREAKDOWN",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "rounding_bottom": {
+      "declared": [
+        "BREAKOUT_CONFIRMED",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "rsi_divergence": {
+      "declared": [
+        "BEARISH_DIVERGENCE",
+        "BULLISH_DIVERGENCE",
+        "ERROR",
+        "NEUTRAL",
+        "OVERBOUGHT",
+        "OVERSOLD"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "session_time": {
+      "declared": [
+        "ERROR",
+        "HIGH_VOLUME_SESSION",
+        "LOW_VOLUME_SESSION",
+        "MODERATE_SESSION",
+        "NO_SIGNAL",
+        "SESSION_CLOSE",
+        "SESSION_OPEN"
+      ],
+      "emitted": [
+        "MODERATE_SESSION"
+      ],
+      "counts": {
+        "MODERATE_SESSION": 5
+      },
+      "errors": []
+    },
+    "stochastic_rsi": {
+      "declared": [
+        "BEARISH_CROSS",
+        "BULLISH_CROSS",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL_HIGH",
+        "NEUTRAL_LOW",
+        "NO_CROSS"
+      ],
+      "emitted": [
+        "BEARISH",
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 4,
+        "BEARISH": 1
+      },
+      "errors": []
+    },
+    "supply_demand_zones": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [],
+      "counts": {},
+      "errors": [
+        "Instantiation failed: VolumeZone.__init__() missing 10 required positional arguments: 'zone_type', 'high', 'low', 'poc', 'vah', 'val', 'total_volume', 'buying_volume', 'selling_volume', and 'formation_bar'"
+      ]
+    },
+    "swing_breakout_sequence": {
+      "declared": [
+        "BEARISH_BREAKOUT_SEQUENCE",
+        "BULLISH_BREAKOUT_SEQUENCE",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "swing_failure_pattern": {
+      "declared": [
+        "BEARISH_SFP",
+        "BULLISH_SFP",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "swing_points": {
+      "declared": [
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "MAJOR_SWING_HIGH_DETECTED",
+        "MAJOR_SWING_LOW_DETECTED",
+        "MINOR_SWING_HIGH_DETECTED",
+        "MINOR_SWING_LOW_DETECTED",
+        "NO_SWINGS",
+        "SWING_HIGH_DETECTED",
+        "SWING_LOW_DETECTED"
+      ],
+      "emitted": [
+        "MAJOR_SWING_LOW_DETECTED",
+        "SWING_HIGH_DETECTED",
+        "SWING_LOW_DETECTED"
+      ],
+      "counts": {
+        "SWING_HIGH_DETECTED": 2,
+        "MAJOR_SWING_LOW_DETECTED": 2,
+        "SWING_LOW_DETECTED": 1
+      },
+      "errors": []
+    },
+    "symmetrical_triangle": {
+      "declared": [
+        "BEARISH_BREAKOUT",
+        "BULLISH_BREAKOUT",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "three_bar_reversal": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "trailing_stop": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "LONG_STOP_HOLD"
+      ],
+      "counts": {
+        "LONG_STOP_HOLD": 5
+      },
+      "errors": []
+    },
+    "triple_bottom": {
+      "declared": [
+        "BULLISH_BREAKOUT",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "triple_top": {
+      "declared": [
+        "BEARISH_BREAKDOWN",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NO_PATTERN",
+        "PATTERN_FORMING"
+      ],
+      "emitted": [
+        "NO_PATTERN"
+      ],
+      "counts": {
+        "NO_PATTERN": 5
+      },
+      "errors": []
+    },
+    "us_settlement": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "BEARISH",
+        "BULLISH"
+      ],
+      "counts": {
+        "BEARISH": 3,
+        "BULLISH": 2
+      },
+      "errors": []
+    },
+    "vwap": {
+      "declared": [
+        "BEARISH",
+        "BULLISH",
+        "ERROR",
+        "NEUTRAL"
+      ],
+      "emitted": [
+        "BEARISH",
+        "BULLISH"
+      ],
+      "counts": {
+        "BEARISH": 2,
+        "BULLISH": 3
+      },
+      "errors": []
+    },
+    "wave_consolidation": {
+      "declared": [
+        "BEARISH_ZONE_BREAK",
+        "BEARISH_ZONE_REJECTION",
+        "BULLISH_ZONE_BREAK",
+        "BULLISH_ZONE_REJECTION",
+        "ERROR",
+        "INSUFFICIENT_DATA"
+      ],
+      "emitted": [
+        "NEUTRAL"
+      ],
+      "counts": {
+        "NEUTRAL": 5
+      },
+      "errors": []
+    },
+    "wyckoff_accumulation": {
+      "declared": [
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "SOS_BREAKOUT",
+        "SPRING_DETECTED"
+      ],
+      "emitted": [
+        "ACCUMULATION_PHASE_B"
+      ],
+      "counts": {
+        "ACCUMULATION_PHASE_B": 5
+      },
+      "errors": []
+    },
+    "wyckoff_distribution": {
+      "declared": [
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "SOW_BREAKDOWN",
+        "UTAD_DETECTED"
+      ],
+      "emitted": [
+        "DISTRIBUTION_PHASE_B"
+      ],
+      "counts": {
+        "DISTRIBUTION_PHASE_B": 5
+      },
+      "errors": []
+    },
+    "wyckoff_reaccumulation": {
+      "declared": [
+        "BREAKOUT_CONTINUATION",
+        "ERROR",
+        "INSUFFICIENT_DATA",
+        "REACCUMULATION_DETECTED",
+        "SPRING_DETECTED"
+      ],
+      "emitted": [
+        "NO_REACCUMULATION"
+      ],
+      "counts": {
+        "NO_REACCUMULATION": 5
+      },
+      "errors": []
+    }
+  }
+}
