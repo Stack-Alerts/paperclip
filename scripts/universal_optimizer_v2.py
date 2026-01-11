@@ -27,7 +27,9 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import argparse
+from pathlib import Path
 from src.strategies.universal_optimizer.modules.optimizer_core import optimize_strategy_v2
+from src.debugger_logger import ConfigDebugger, DebugLevel
 
 
 def main():
@@ -96,8 +98,30 @@ The 48x Innovation:
         default=False,
         help='Quick test mode: skip TP/SL optimization, use current config values (FAST)'
     )
+    
+    parser.add_argument(
+        '--enable-debugger',
+        action='store_true',
+        default=False,
+        help='Enable micro-granular config debugger (logs every config read, decision, action)'
+    )
 
     args = parser.parse_args()
+    
+    # Initialize config debugger if requested
+    debugger = None
+    if args.enable_debugger:
+        log_file = Path(f"logs/optimizer_debug_{args.strategy}.log")
+        debugger = ConfigDebugger(
+            name="UniversalOptimizer",
+            level=DebugLevel.MEDIUM,
+            log_file=log_file,
+            console_output=False  # Write to file only (console gets cluttered)
+        )
+        print(f"\n🔍 Config Debugger ENABLED")
+        print(f"   Log file: {log_file}")
+        print(f"   Level: MEDIUM (config reads, decisions, actions)")
+        print(f"   All configuration operations will be tracked and validated\n")
     
     # Run optimization
     print("\n" + "="*80)
@@ -111,8 +135,15 @@ The 48x Innovation:
         warmup_bars=args.warmup,
         use_multicore=args.multicore,
         non_interactive=args.non_interactive,
-        quick_test=args.quick_test
+        quick_test=args.quick_test,
+        debugger=debugger  # Pass debugger for micro-granular logging
     )
+    
+    # Generate debug report if debugger was used
+    if debugger:
+        report_file = Path(f"logs/optimizer_debug_{args.strategy}_report.txt")
+        debugger.save_report(report_file)
+        print(f"\n📋 Debug report saved: {report_file}")
     
     if result:
         print("\n✅ Optimization successful!")

@@ -83,7 +83,8 @@ class DynamicTPCalculator:
         entry_price: float,
         entry_bar: int,
         side: str,
-        fallback_pcts: Dict[str, float] = None
+        fallback_pcts: Dict[str, float] = None,
+        debugger = None  # Optional[ConfigDebugger]
     ) -> TPLevels:
         """
         Calculate TP1, TP2, TP3 using building blocks
@@ -94,6 +95,7 @@ class DynamicTPCalculator:
             entry_bar: Bar index of entry
             side: 'SHORT' or 'LONG'
             fallback_pcts: {'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5}
+            debugger: Optional debugger for micro-granular logging
         
         Returns:
             TPLevels object with all TP info
@@ -102,21 +104,53 @@ class DynamicTPCalculator:
         if fallback_pcts is None:
             fallback_pcts = {'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5}
         
+        # Log TP mode selection
+        if debugger:
+            debugger.log_decision(
+                decision_type='if',
+                condition=f'tp_mode == {self.tp_mode}',
+                result=True,
+                config_keys_used=['tp_mode']
+            )
+            debugger.log_action(
+                action=f'Calculate {self.tp_mode} TPs',
+                config_keys_used=['tp_mode'],
+                parameters={
+                    'entry_price': entry_price,
+                    'side': side,
+                    'fallback_pcts': fallback_pcts
+                }
+            )
+        
         # Try to calculate using blocks
         if self.tp_mode == 'FIBONACCI':
-            result = self._calculate_fibonacci_tps(df, entry_price, entry_bar, side, fallback_pcts)
+            result = self._calculate_fibonacci_tps(df, entry_price, entry_bar, side, fallback_pcts, debugger)
         
         elif self.tp_mode == 'SWING_POINTS':
-            result = self._calculate_swing_tps(df, entry_price, entry_bar, side, fallback_pcts)
+            result = self._calculate_swing_tps(df, entry_price, entry_bar, side, fallback_pcts, debugger)
         
         elif self.tp_mode == 'SUPPLY_DEMAND':
-            result = self._calculate_sd_tps(df, entry_price, entry_bar, side, fallback_pcts)
+            result = self._calculate_sd_tps(df, entry_price, entry_bar, side, fallback_pcts, debugger)
         
         elif self.tp_mode == 'HYBRID':
-            result = self._calculate_hybrid_tps(df, entry_price, entry_bar, side, fallback_pcts)
+            result = self._calculate_hybrid_tps(df, entry_price, entry_bar, side, fallback_pcts, debugger)
         
         else:  # PERCENTAGE
-            result = self._calculate_percentage_tps(entry_price, side, fallback_pcts)
+            result = self._calculate_percentage_tps(entry_price, side, fallback_pcts, debugger)
+        
+        # Log calculation results
+        if debugger:
+            debugger.log_action(
+                action='TP Calculation Complete',
+                config_keys_used=[],
+                parameters={
+                    'method': result.method,
+                    'tp1': result.tp1,
+                    'tp2': result.tp2,
+                    'tp3': result.tp3,
+                    'confidence': result.confidence
+                }
+            )
         
         # INTELLIGENT TP ZONE SELECTION
         result = self._decide_which_tps_to_use(result, entry_price, side)
@@ -134,7 +168,8 @@ class DynamicTPCalculator:
         entry_price: float,
         entry_bar: int,
         side: str,
-        fallback_pcts: dict
+        fallback_pcts: dict,
+        debugger = None
     ) -> TPLevels:
         """
         Calculate TPs using Fibonacci PROJECTIONS (FIXED v2.0)
@@ -351,7 +386,8 @@ class DynamicTPCalculator:
         entry_price: float,
         entry_bar: int,
         side: str,
-        fallback_pcts: dict
+        fallback_pcts: dict,
+        debugger=None
     ) -> TPLevels:
         """
         Calculate TPs using multiple blocks with quality scoring
@@ -385,13 +421,26 @@ class DynamicTPCalculator:
         self,
         entry_price: float,
         side: str,
-        fallback_pcts: dict
+        fallback_pcts: dict,
+        debugger = None
     ) -> TPLevels:
         """Fallback: Calculate TPs using percentages"""
         
         tp1_pct = fallback_pcts.get('tp1', 1.0) / 100
         tp2_pct = fallback_pcts.get('tp2', 2.0) / 100
         tp3_pct = fallback_pcts.get('tp3', 3.5) / 100
+        
+        # Log fallback usage
+        if debugger:
+            debugger.log_action(
+                action='Using PERCENTAGE fallback for TPs',
+                config_keys_used=['tp_fallback_pcts'],
+                parameters={
+                    'tp1_pct': fallback_pcts.get('tp1', 1.0),
+                    'tp2_pct': fallback_pcts.get('tp2', 2.0),
+                    'tp3_pct': fallback_pcts.get('tp3', 3.5)
+                }
+            )
         
         if side == 'SHORT':
             tp1 = entry_price * (1 - tp1_pct)

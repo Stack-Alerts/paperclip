@@ -11,57 +11,87 @@ from typing import Dict, List, Any, Optional
 
 @dataclass
 class OptimizationConfig:
-    """Configuration for a single optimization test (ENHANCED with Dynamic TPs + Parameter Testing)"""
+    """
+    Configuration for a single optimization test - INSTITUTIONAL GRADE
+    
+    ⚠️ CRITICAL: NO DEFAULTS! All values MUST come from strategy YAML config.
+    This ensures 100% parameter integrity with zero cross-contamination.
+    """
+    # Required core parameters
     config_id: int
     min_confluence: int
     min_risk_reward: float
-    blocks: Dict[str, Dict]  # {block_name: {name, weight, enabled}}
+    blocks: Dict[str, Dict]
     strategy_id: str
     strategy_name: str
     side: str
-    tp_mode: str = 'PERCENTAGE'  # TP calculation method: 'PERCENTAGE', 'FIBONACCI', 'HYBRID'
-    sl_mode: str = 'ADAPTIVE'  # SL calculation method: 'ADAPTIVE' (v2.0), 'HYBRID' (v1.0 - deprecated)
-    trailing_pct: float = 0.6  # Trailing stop distance after TP2 (0.5%, 0.6%, 0.8%)
-    use_trailing: bool = True  # Enable trailing stops
-    breakeven_after_tp1: bool = True  # Move SL to breakeven after TP1
-    tp_fallback_pcts: Dict[str, float] = None  # {'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5} - TP distances
-    partial_exit_pcts: Dict[str, int] = None  # {'tp1': 50, 'tp2': 30, 'tp3': 20} - Exit splits
     
-    # ⭐ ADAPTIVE SL v2.0 PARAMETERS (NEW)
-    # Volatility Settings
-    volatility_lookback: int = 20  # Bars for volatility calculation
-    volatility_multiplier: float = 1.2  # Min SL = avg_range * this
+    # TP/SL modes (MUST be from YAML)
+    tp_mode: str
+    sl_mode: str
     
-    # Bounds
-    absolute_min_sl_pct: float = 0.7  # Never tighter than 0.7%
-    absolute_max_sl_pct: float = 2.0  # Never wider than 2.0%
+    # Trailing & breakeven (MUST be from YAML)
+    trailing_pct: float
+    use_trailing: bool
+    breakeven_after_tp1: bool
     
-    # Two-Stage SL
-    initial_sl_multiplier: float = 1.5  # Initial SL = volatility * 1.5
-    working_sl_multiplier: float = 1.0  # Working SL = volatility * 1.0
+    # TP/Exit settings (MUST be from YAML)
+    tp_fallback_pcts: Dict[str, float]
+    partial_exit_pcts: Dict[str, int]
     
-    # Delayed SL Activation (Your Enhancement!)
-    use_delayed_sl: bool = True  # Enable delayed SL activation
-    delay_bars: int = 2  # Wait N bars before tight SL (2-3 recommended for BTC 15min)
-    emergency_sl_pct: float = 2.5  # Wide emergency SL during delay period
+    # Adaptive SL v2.0 - Volatility (MUST be from YAML)
+    volatility_lookback: int
+    volatility_multiplier: float
     
-    # Structure-Based SL
-    use_structure_sl: bool = True  # Use market structure when available
-    structure_sources: List[str] = None  # ['swing_points', 'supply_demand', 'fibonacci']
+    # Adaptive SL v2.0 - Bounds (MUST be from YAML)
+    absolute_min_sl_pct: float
+    absolute_max_sl_pct: float
     
-    # ⭐ RISK MANAGEMENT PARAMETERS (CRITICAL - READ FROM YAML CONFIG)
-    starting_capital: float = 10000.0  # Starting account balance
-    max_leverage: float = 10.0  # Maximum leverage allowed
-    risk_per_trade_pct: float = 1.0  # Risk per trade as percentage of capital
+    # Adaptive SL v2.0 - Two-Stage SL (MUST be from YAML)
+    initial_sl_multiplier: float
+    working_sl_multiplier: float
+    
+    # Adaptive SL v2.0 - Delayed Activation (MUST be from YAML)
+    use_delayed_sl: bool
+    delay_bars: int
+    emergency_sl_pct: float
+    
+    # Adaptive SL v2.0 - Structure-Based (MUST be from YAML)
+    use_structure_sl: bool
+    structure_sources: List[str]
+    
+    # Risk Management (MUST be from YAML - CRITICAL!)
+    starting_capital: float
+    max_leverage: float
+    risk_per_trade_pct: float
     
     def __post_init__(self):
-        """Set default values for dict fields and lists"""
-        if self.tp_fallback_pcts is None:
-            self.tp_fallback_pcts = {'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5}
-        if self.partial_exit_pcts is None:
-            self.partial_exit_pcts = {'tp1': 50, 'tp2': 30, 'tp3': 20}
-        if self.structure_sources is None:
-            self.structure_sources = ['swing_points', 'supply_demand', 'fibonacci']
+        """
+        Validate that all required parameters are present.
+        NO DEFAULTS - all values must come from YAML config!
+        """
+        # Validate critical parameters are not None
+        required_params = [
+            'config_id', 'min_confluence', 'min_risk_reward', 'blocks',
+            'strategy_id', 'strategy_name', 'side', 'tp_mode', 'sl_mode',
+            'trailing_pct', 'use_trailing', 'breakeven_after_tp1',
+            'tp_fallback_pcts', 'partial_exit_pcts',
+            'volatility_lookback', 'volatility_multiplier',
+            'absolute_min_sl_pct', 'absolute_max_sl_pct',
+            'initial_sl_multiplier', 'working_sl_multiplier',
+            'use_delayed_sl', 'delay_bars', 'emergency_sl_pct',
+            'use_structure_sl', 'structure_sources',
+            'starting_capital', 'max_leverage', 'risk_per_trade_pct'
+        ]
+        
+        for param in required_params:
+            value = getattr(self, param, None)
+            if value is None:
+                raise ValueError(
+                    f"❌ CRITICAL: Parameter '{param}' is None! "
+                    f"All parameters must be explicitly provided from YAML config. "
+                    f"Strategy: {self.strategy_name} (ID: {self.strategy_id})"
+                )
     
     def to_dict(self) -> dict:
         """Convert to dictionary"""

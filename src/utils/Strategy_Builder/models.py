@@ -121,6 +121,7 @@ class StrategyConfiguration(BaseModel):
     starting_capital: float = Field(default=10000.0, ge=100.0, le=1000000.0)
     risk_per_trade_pct: float = Field(default=1.0, ge=0.1, le=25.0)
     max_leverage: float = Field(default=2.0, ge=1.0, le=25.0)
+    tp_mode: str = Field(default="PERCENTAGE")  # TP calculation mode: PERCENTAGE, FIBONACCI, HYBRID
     
     # Adaptive SL v2.0 Parameters
     volatility_lookback: int = Field(default=20, ge=5, le=100)

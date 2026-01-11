@@ -81,6 +81,9 @@ backtest:
   risk_per_trade_pct: {{ config.risk_per_trade_pct }}
   max_position_size: 1.0  # BTC
   
+  # Take Profit Mode (CRITICAL: Determines TP calculation method)
+  tp_mode: "{{ config.tp_mode }}"  # PERCENTAGE (fixed), FIBONACCI (dynamic), HYBRID (adaptive)
+  
   # Fees
   maker_fee_pct: 0.02
   taker_fee_pct: 0.05
