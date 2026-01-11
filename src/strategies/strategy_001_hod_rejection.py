@@ -5,15 +5,16 @@ Category:
 Timeframe: 15-minute
 Risk:Reward: 1:3
 Author: Strategy Builder v1.0
-Date: 2026-01-11 18:46:11
+Date: 2026-01-11 18:53:20
 
 Description:
 [DRAFT] Work in progress
 
 Building Blocks Used:
 - Hod: 20 points
-- Rsi Divergence: 25 points
-  * Bearish Divergence ()
+  * Hod Rejection ()
+- Hod: 20 points
+  * At Hod ()
 
 Entry Logic:
 - Minimum 40 confluence points required
@@ -39,7 +40,6 @@ from datetime import datetime
 from typing import Optional
 
 # Import building blocks
-from src.detectors.building_blocks.oscillators.rsi_divergence import RSIDivergence
 from src.detectors.building_blocks.price_levels.hod import HOD
 
 # Import centralized confluence calculator
@@ -58,11 +58,11 @@ class StrategyHodRejection(Strategy):
     """
 
 # ============================================================================
-# OPTIMIZED: 2026-01-11 18:46:20
-# Trades: 9, Win Rate: 66.7%, PF: 2.33
-# Net PnL: $1579.35 (+6.32%)
-# Fees: $820.05
-# Sharpe: 6.46, Max DD: 1.60%
+# OPTIMIZED: 2026-01-11 18:53:37
+# Trades: 22, Win Rate: 45.5%, PF: 0.92
+# Net PnL: $-365.15 (-1.46%)
+# Fees: $2934.97
+# Sharpe: -0.60, Max DD: 7.96%
 # ============================================================================
 
     
@@ -74,7 +74,7 @@ class StrategyHodRejection(Strategy):
         self.strategy_name = "HOD Rejection"
         
         # Strategy parameters
-        self.min_confluence = 20
+        self.min_confluence = 25
         self.max_bars_held = 100
         self.accumulation_window = 20  # Bars to keep signals active
         self.capital_allocation_pct = 10.0
@@ -82,7 +82,7 @@ class StrategyHodRejection(Strategy):
         # Risk management
         self.max_leverage = 15.0
         self.risk_per_trade_pct = 15.0
-        self.min_risk_reward = 2.0
+        self.min_risk_reward = 2.5
         
         # Initialize building blocks
         self.blocks = {}
@@ -109,18 +109,18 @@ class StrategyHodRejection(Strategy):
         # Initialize detector instances
         self.detectors = {
             'hod_0': HOD(timeframe='15min'),
-            'rsi_divergence_1': RSIDivergence(timeframe='15min'),
+            'hod_1': HOD(timeframe='15min'),
         }
         
         # Block weights configuration
         self.blocks['hod_0'] = {
             'name': 'Hod',
-            'weight': 25,
+            'weight': 15,
             'enabled': True
         }
-        self.blocks['rsi_divergence_1'] = {
-            'name': 'Rsi Divergence',
-            'weight': 25,
+        self.blocks['hod_1'] = {
+            'name': 'Hod',
+            'weight': 15,
             'enabled': True
         }
         
@@ -205,8 +205,8 @@ class StrategyHodRejection(Strategy):
         
         # Hod
         results['hod_0'] = self.detectors['hod_0'].analyze(df)
-        # Rsi Divergence
-        results['rsi_divergence_1'] = self.detectors['rsi_divergence_1'].analyze(df)
+        # Hod
+        results['hod_1'] = self.detectors['hod_1'].analyze(df)
         
         return results
     
