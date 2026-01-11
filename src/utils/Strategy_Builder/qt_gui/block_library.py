@@ -197,10 +197,16 @@ class BlockLibraryPanel(QWidget):
 <ul style='color: #d4d4d4;'>
 """
         
-        # Add signals
+        # Add signals (filter out error states)
         if block.signals:
-            for signal in block.signals:
-                details += f"<li><b>{signal}</b></li>\n"
+            # Filter out error states that shouldn't be shown as valid signals
+            valid_signals = [s for s in block.signals if s not in ['ERROR', 'INSUFFICIENT_DATA']]
+            
+            if valid_signals:
+                for signal in valid_signals:
+                    details += f"<li><b>{signal}</b></li>\n"
+            else:
+                details += "<li><i>No specific signals (context block)</i></li>\n"
         else:
             details += "<li><i>No specific signals (context block)</i></li>\n"
         
