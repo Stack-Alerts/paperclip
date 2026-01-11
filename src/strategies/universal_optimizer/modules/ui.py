@@ -9,13 +9,14 @@ from typing import List
 from .data_classes import ConfigPerformance, OptimizationConfig
 
 
-def display_top_5_configs(results: List[ConfigPerformance], iteration: int, configs: List[OptimizationConfig] = None):
+def display_top_5_configs(results: List[ConfigPerformance], iteration: int, test_days: int, configs: List[OptimizationConfig] = None):
     """
     Display top 5 configurations with COMPREHENSIVE institutional-grade metrics
     
     Args:
         results: Top 5 performance results
         iteration: Current iteration number
+        test_days: Test period in days (for accurate reporting)
         configs: All optimization configs (to extract actual risk params)
     """
     print("\n" + "="*80)
@@ -56,7 +57,7 @@ def display_top_5_configs(results: List[ConfigPerformance], iteration: int, conf
     print(f"   │  ├─ Maker Fee: -0.01% (rebate)")
     print(f"   │  └─ Taker Fee: 0.05%")
     print(f"   ├─ Order Type: Market Orders (Taker fees)")
-    print(f"   ├─ Test Period: 180 days")
+    print(f"   ├─ Test Period: {test_days} days")
     print(f"   └─ Total Configs Tested: {len(configs) if configs else 48}\n")
     
     preset_names = ['Balanced', 'Event-Heavy', 'Context-Heavy', 'Conservative']

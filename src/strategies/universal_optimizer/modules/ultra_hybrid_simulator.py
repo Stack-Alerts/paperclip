@@ -504,8 +504,9 @@ def test_single_config(args):
                     current_position['remaining_pct'] = 0
                     exit_occurred = True
             
-            # Max hold time (1000 bars = ~10 days at 15min)
-            if bars_held >= 1000 and not exit_occurred and current_position['remaining_pct'] > 0:
+            # Max hold time - USE CONFIG VALUE with fallback (default 1000 bars = ~10 days)
+            max_bars_held = getattr(config, 'max_bars_held', 1000)
+            if bars_held >= max_bars_held and not exit_occurred and current_position['remaining_pct'] > 0:
                 exit_price = bar['close']
                 exit_reason = 'MAX_HOLD'
                 current_position['exits'].append({

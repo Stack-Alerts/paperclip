@@ -170,9 +170,9 @@ def optimize_strategy_v2(
     # Quick test mode: skip TP/SL optimization
     if quick_test:
         print(f"   ⚡ QUICK TEST MODE: Skipping TP/SL optimization")
-        configs = build_optimization_configs(blocks, strategy_module_name, strategy_side, test_tp_modes=False)
+        configs = build_optimization_configs(blocks, strategy_module_name, strategy_side, test_tp_modes=False, debugger=debugger)
     else:
-        configs = build_optimization_configs(blocks, strategy_module_name, strategy_side, test_tp_modes=True)
+        configs = build_optimization_configs(blocks, strategy_module_name, strategy_side, test_tp_modes=True, debugger=debugger)
     
     print(f"✅ Created {len(configs)} parameter combinations")
     
@@ -258,7 +258,7 @@ def optimize_strategy_v2(
     export_trade_records(results[:5], configs, strategy_module_name)
     
     # 7. Display top 5 (pass configs for accurate display of risk params)
-    display_top_5_configs(results[:5], iteration.iteration_count + 1, configs)
+    display_top_5_configs(results[:5], iteration.iteration_count + 1, test_days, configs)
     
     # 8. User selects (or auto-select if non-interactive)
     if non_interactive:
@@ -416,7 +416,8 @@ def build_optimization_configs(
     blocks: dict,
     strategy_module_name: str,
     strategy_side: str = None,
-    test_tp_modes: bool = True
+    test_tp_modes: bool = True,
+    debugger = None  # Optional[ConfigDebugger] = None
 ) -> List[OptimizationConfig]:
     """
     Build optimization configurations with DYNAMIC TP TESTING
@@ -448,9 +449,24 @@ def build_optimization_configs(
     # ⭐ CRITICAL: Load risk management parameters from YAML config
     risk_params = load_risk_params_from_yaml(strategy_module_name)
     
+    # Log risk params to debugger if enabled
+    if debugger:
+        debugger.register_config_source(
+            risk_params,
+            source=f"{strategy_module_name}_config.yaml",
+            source_type="yaml_config"
+        )
+        debugger.log_action(
+            action="Loaded risk management parameters from YAML",
+            config_keys_used=list(risk_params.keys()),
+            parameters={'strategy': strategy_module_name}
+        )
+    
     # Determine side (from config or fallback to heuristic)
     if strategy_side:
         side = strategy_side
+        # Note: Direction is already logged to console above ("📍 Strategy direction: SHORT")
+        # No need for debugger logging since side isn't in risk_params registry
     else:
         # Fallback: Heuristic based on block names
         side = 'SHORT' if 'double_top' in blocks else 'LONG'
@@ -591,18 +607,22 @@ def run_multi_config_optimization(
     test_df: pd.DataFrame,
     strategy_module_name: str,
     use_multicore: bool = True,
-    debugger = None  # Optional[ConfigDebugger] = None
+    debugger = None  # Optional[ConfigDebugger] = None (NOT passed to simulator - would create millions of logs!)
 ) -> List[ConfigPerformance]:
     """
     Run optimization with HybridConfigSimulator
    
     Hybrid = building blocks once + parallel config testing = BEST performance!
+    
+    NOTE: Debugger is NOT passed to simulator to avoid log explosion.
+    Debugger is only for config loading/setup, not runtime calculations.
     """
     
     # Use ultra hybrid for maximum parallel performance!
+    # DO NOT pass debugger - it would log every TP/SL calc = millions of lines!
     from .ultra_hybrid_simulator import UltraHybridSimulator
     ultra_sim = UltraHybridSimulator()
-    return ultra_sim.optimize(configs, warmup_df, test_df, strategy_module_name, debugger=debugger)
+    return ultra_sim.optimize(configs, warmup_df, test_df, strategy_module_name)
 
 
 def export_trade_records(

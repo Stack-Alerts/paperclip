@@ -199,6 +199,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         view_log_action.triggered.connect(self.view_debug_log)
         debug_menu.addAction(view_log_action)
         
+        # Clear All Logs
+        clear_logs_action = QAction('🗑️ Clear All Logs', self)
+        clear_logs_action.triggered.connect(self.clear_all_logs)
+        debug_menu.addAction(clear_logs_action)
+        
         # Help menu
         help_menu = menubar.addMenu('❓ Help')
         
@@ -519,8 +524,13 @@ Building Blocks ({len(config.blocks)}):
             for i, block in enumerate(config.blocks, 1):
                 details += f"\n{i}. {block.block_name} (Weight: {block.weight})"
                 if block.signals:
-                    for signal in block.signals:
-                        details += f"\n   - {signal.signal_name}"
+                    # Filter out error states that shouldn't be shown as valid signals
+                    valid_signals = [s for s in block.signals if s.signal_name not in ['ERROR', 'INSUFFICIENT_DATA']]
+                    if valid_signals:
+                        for signal in valid_signals:
+                            details += f"\n   - {signal.signal_name}"
+                    else:
+                        details += f"\n   - (No signals configured)"
                 else:
                     details += f"\n   - (No signals configured)"
             
@@ -805,6 +815,14 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
             # Update status
             self.status_bar.showMessage(f"Running backtest for strategy #{strategy_num:03d}...")
             
+            # Load strategy config to get testing_window_days
+            config = self.registry.load_strategy(strategy_num)
+            if not config:
+                raise ValueError(f"Failed to load strategy #{strategy_num:03d} configuration")
+            
+            # Get test period from config (default to 90 if not specified)
+            test_days = getattr(config, 'testing_window_days', 90)
+            
             # Generate files first
             files = self.registry.generate_strategy_files(strategy_num)
             
@@ -820,7 +838,7 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
                 "python",
                 "scripts/universal_optimizer_v2.py",
                 strategy_module,
-                "--days", "90",
+                "--days", str(test_days),  # NOW READS FROM STRATEGY CONFIG!
                 "--non-interactive"  # Auto-select best config without prompts
             ]
             
@@ -1092,6 +1110,11 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
             copy_btn.clicked.connect(lambda: self._copy_log_to_clipboard(log_content))
             button_layout.addWidget(copy_btn)
             
+            # Copy Log Path button
+            copy_path_btn = QPushButton("📂 Copy Log Path")
+            copy_path_btn.clicked.connect(lambda: self._copy_log_path_to_clipboard(log_file))
+            button_layout.addWidget(copy_path_btn)
+            
             # Refresh button
             refresh_btn = QPushButton("🔄 Refresh")
             refresh_btn.clicked.connect(lambda: self._refresh_log_viewer(log_file, log_text))
@@ -1129,6 +1152,17 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
             self,
             "Copied",
             "📋 Debug log copied to clipboard!"
+        )
+    
+    def _copy_log_path_to_clipboard(self, log_file: Path):
+        """Copy log file path to clipboard"""
+        from PyQt6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        clipboard.setText(str(log_file.absolute()))
+        QMessageBox.information(
+            self,
+            "Copied",
+            f"📂 Log path copied to clipboard!\n\n{log_file.absolute()}"
         )
     
     def _refresh_log_viewer(self, log_file: Path, log_text: QTextEdit):
@@ -1178,6 +1212,97 @@ Structure-Based SL:    {'✅ Enabled' if use_structure_sl else '❌ Disabled'}
                     "Error",
                     f"Failed to clear log:\n{e}"
                 )
+    
+    def clear_all_logs(self):
+        """Clear all log files and debug reports in the logs directory"""
+        logs_dir = Path("logs")
+        
+        if not logs_dir.exists():
+            QMessageBox.information(
+                self,
+                "No Logs",
+                "No logs directory found.\n\n"
+                "No logs to clear."
+            )
+            return
+        
+        # Find ALL log files and debug reports in the logs directory
+        all_log_files = list(logs_dir.glob("*.log"))
+        debug_reports = list(logs_dir.glob("optimizer_debug_*_report.txt"))
+        
+        # Combine all files to delete
+        all_log_files.extend(debug_reports)
+        
+        if not all_log_files:
+            QMessageBox.information(
+                self,
+                "No Logs",
+                "No log files found in logs directory.\n\n"
+                "Nothing to clear."
+            )
+            return
+        
+        # Build list of log files for confirmation dialog
+        log_file_names = [f.name for f in sorted(all_log_files)]
+        
+        # Show first 10 files in the dialog, plus count if more
+        if len(log_file_names) <= 10:
+            file_list = "\n".join(f"  • {name}" for name in log_file_names)
+        else:
+            file_list = "\n".join(f"  • {name}" for name in log_file_names[:10])
+            file_list += f"\n  ... and {len(log_file_names) - 10} more"
+        
+        # Confirm clearing all logs
+        reply = QMessageBox.question(
+            self,
+            "Confirm Clear All Logs",
+            f"⚠️ Clear All Log Files?\n\n"
+            f"This will permanently delete all log entries from {len(all_log_files)} file(s):\n\n"
+            f"{file_list}\n\n"
+            f"Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                cleared_count = 0
+                failed_files = []
+                
+                # Delete all log files
+                for log_file in all_log_files:
+                    try:
+                        log_file.unlink()  # Delete the file
+                        cleared_count += 1
+                    except Exception as e:
+                        failed_files.append((log_file.name, str(e)))
+                
+                # Show result
+                if failed_files:
+                    error_list = "\n".join(f"  • {name}: {error}" for name, error in failed_files)
+                    QMessageBox.warning(
+                        self,
+                        "Partially Cleared",
+                        f"✅ Successfully deleted {cleared_count} log file(s)\n"
+                        f"❌ Failed to delete {len(failed_files)} file(s):\n\n{error_list}"
+                    )
+                else:
+                    QMessageBox.information(
+                        self,
+                        "Logs Cleared",
+                        f"✅ Successfully deleted {cleared_count} log file(s)!\n\n"
+                        f"All log files have been removed."
+                    )
+                
+                self.status_bar.showMessage(f"Deleted {cleared_count}/{len(all_log_files)} log file(s)")
+                
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Failed to clear logs:\n{e}"
+                )
+                self.status_bar.showMessage("Failed to clear logs")
     
     def _append_output_line(self, line: str):
         """Append a line of output to the live output dialog (with optional DEBUG filtering)"""
