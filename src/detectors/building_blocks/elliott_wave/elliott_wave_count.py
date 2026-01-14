@@ -200,7 +200,7 @@ class ElliottWaveCount:
     Success rate: High when properly identified (higher with MTF)
     """
     
-    def __init__(self, timeframe: str = '15min', use_mtf: bool = True, **kwargs):
+    def __init__(self, timeframe: str = '15min', use_mtf: bool = False, **kwargs):
         self.timeframe = timeframe
         self.use_mtf = use_mtf
     
@@ -420,10 +420,14 @@ class ElliottWaveCount:
         
         if wave_info['wave'] == 'UNKNOWN' or wave_info['wave'] == 'UNCERTAIN':
             # Not enough data for wave count
+            granular_signal, simple_signal = self._determine_dual_signals('WAVE_UNCERTAIN')
             return {
-                'signal': 'WAVE_UNCERTAIN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': wave_info.get('confidence', 34),
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'wave_count': wave_info.get('wave', 'UNKNOWN'),
                     'pivot_count': len(pivots),
                     'phase': wave_info.get('phase', 'UNCLEAR'),
