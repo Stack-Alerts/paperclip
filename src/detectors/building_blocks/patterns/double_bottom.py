@@ -30,10 +30,10 @@ import numpy as np
     class_name='DoubleBottomPattern',
     default_weight=30,
     valid_signals=[
-        # Granular pattern signals
+        # Granular pattern signals (Double Bottom is bullish-only)
         'BULLISH_BREAKOUT', 'PATTERN_FORMING', 'NO_PATTERN',
-        # Simple directional - SIMPLE
-        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Simple directional - SIMPLE (bullish-only pattern)
+        'BULLISH', 'NEUTRAL',
         # Status
         'ERROR', 'INSUFFICIENT_DATA'
     ],
@@ -51,12 +51,8 @@ import numpy as np
                 'points': 0
         },
         
-        # Simple directional - SIMPLE
+        # Simple directional - SIMPLE (bullish-only)
         'BULLISH': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
-        'BEARISH': {
                 'base_points': 30,
                 'formula': 'scaled'
         },
@@ -232,14 +228,15 @@ class DoubleBottomPattern:
                 # Pattern expired without breakout
                 self.reset_pattern_state()
                 granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
-            return {
-                'signal': granular_signal,
-                'signal_simple': simple_signal,
-                'confidence': 0,
-                'metadata': {
+                return {
+                    'signal': granular_signal,
                     'signal_simple': simple_signal,
-                    'signal_granular': granular_signal,'reason': 'Pattern expired (>100 bars)'
-                },
+                    'confidence': 0,
+                    'metadata': {
+                        'signal_simple': simple_signal,
+                        'signal_granular': granular_signal,
+                        'reason': 'Pattern expired (>100 bars)'
+                    },
                     'timestamp': df['timestamp'].iloc[-1],
                     'timeframe': self.timeframe,
                     'confluence_factors': []
@@ -435,14 +432,15 @@ class DoubleBottomPattern:
                     # Breakout complete - reset
                     self.reset_pattern_state()
                     granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
-            return {
-                'signal': granular_signal,
-                'signal_simple': simple_signal,
-                'confidence': 0,
-                'metadata': {
-                    'signal_simple': simple_signal,
-                    'signal_granular': granular_signal,'reason': 'Breakout completed (>20 bars)'
-                },
+                    return {
+                        'signal': granular_signal,
+                        'signal_simple': simple_signal,
+                        'confidence': 0,
+                        'metadata': {
+                            'signal_simple': simple_signal,
+                            'signal_granular': granular_signal,
+                            'reason': 'Breakout completed (>20 bars)'
+                        },
                         'timestamp': df['timestamp'].iloc[-1],
                         'timeframe': self.timeframe,
                         'confluence_factors': []
@@ -456,14 +454,15 @@ class DoubleBottomPattern:
                 # Was in breakout but price dropped back - pattern invalidated
                 self.reset_pattern_state()
                 granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
-            return {
-                'signal': granular_signal,
-                'signal_simple': simple_signal,
-                'confidence': 0,
-                'metadata': {
+                return {
+                    'signal': granular_signal,
                     'signal_simple': simple_signal,
-                    'signal_granular': granular_signal,'reason': 'Price dropped back below neckline'
-                },
+                    'confidence': 0,
+                    'metadata': {
+                        'signal_simple': simple_signal,
+                        'signal_granular': granular_signal,
+                        'reason': 'Price dropped back below neckline'
+                    },
                     'timestamp': df['timestamp'].iloc[-1],
                     'timeframe': self.timeframe,
                     'confluence_factors': []
