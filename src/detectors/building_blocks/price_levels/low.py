@@ -216,25 +216,52 @@ class LOW:
         else:
             return 'FAR'
     
+    def _determine_dual_signals(self, current_price: float, low: float,
+                                 distance_pct: float, distance_class: str,
+                                 breakdown_status: str, reversal_bounce: bool,
+                                 reversal_breakdown: bool) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        if reversal_bounce:
+            granular = 'AT_LOW'
+            simple = 'BULLISH'
+        elif reversal_breakdown:
+            granular = 'BREAKDOWN_CONFIRMED'
+            simple = 'BEARISH'
+        elif breakdown_status == 'BREAKDOWN_CONFIRMED':
+            granular = 'BREAKDOWN_CONFIRMED'
+            simple = 'BEARISH'
+        elif breakdown_status == 'BREAKING_DOWN':
+            granular = 'BREAKING_DOWN'
+            simple = 'NEUTRAL'
+        elif distance_class in ['AT_LOW', 'VERY_CLOSE'] and distance_pct > 0:
+            granular = 'AT_LOW'
+            simple = 'BULLISH'
+        elif current_price > low:
+            granular = 'ABOVE_LOW'
+            simple = 'NEUTRAL'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def calculate_variable_confidence(self, signal: str, distance_class: str, is_new_event: bool) -> float:
-        """
-        OPTIMIZED V2: Further reduced to hit 85-88% average for weekly
-        """
-        # Base confidence by signal (FURTHER OPTIMIZED)
-        if signal == 'BEARISH':
-            base = 60  # Breakdown (reduced from 65)
-        elif signal == 'BULLISH':
-            base = 65  # Bounce from LOW (reduced from 70)
-        else:  # NEUTRAL
-            base = 50  # Neutral (reduced from 55)
+        """OPTIMIZED V2: Variable confidence for both granular and simple signals"""
+        if signal in ['BREAKDOWN_CONFIRMED', 'BEARISH']:
+            base = 60
+        elif signal in ['AT_LOW', 'ABOVE_LOW', 'BULLISH']:
+            base = 65
+        elif signal == 'BREAKING_DOWN':
+            base = 55
+        else:
+            base = 50
         
-        # Adjust by distance (±15% for variation)
         if distance_class in ['AT_LOW', 'VERY_CLOSE']:
-            base = min(95, base + 15)  # Near LOW
+            base = min(95, base + 15)
         elif distance_class == 'FAR':
-            base = max(40, base - 15)  # Far from LOW
+            base = max(40, base - 15)
         
-        # Fresh event boost (+15% for new events)
         if is_new_event:
             base = min(95, base + 15)
         
@@ -343,19 +370,14 @@ class LOW:
                     if lower_highs and lower_lows:
                         reversal_breakdown = True
         
-        # Determine signal (ENHANCED with reversal confirmation)
-        if reversal_bounce:
-            signal = 'BULLISH'
-        elif reversal_breakdown:
-            signal = 'BEARISH'
-        elif breakdown_status == 'BREAKDOWN_CONFIRMED' or is_new_low:
-            signal = 'BEARISH'
-        elif breakdown_status == 'BREAKING_DOWN':
-            signal = 'NEUTRAL'
-        elif distance_class == 'AT_LOW' and distance_pct > 0:
-            signal = 'BULLISH'
-        else:
-            signal = 'NEUTRAL'
+        # DUAL SIGNAL ARCHITECTURE: Determine both granular and simple signals
+        granular_signal, simple_signal = self._determine_dual_signals(
+            current_price, low, distance_pct, distance_class,
+            breakdown_status, reversal_bounce, reversal_breakdown
+        )
+        
+        # Use granular signal as primary
+        signal = granular_signal
         
         # ENHANCEMENT 2: Event tracking
         is_new_event = False
@@ -425,11 +447,15 @@ class LOW:
             'reversal_bounce': reversal_bounce,
             'reversal_breakdown': reversal_breakdown,
             'reversal_candles': self.reversal_candles,
-            'bars_monitored': len(self.bars_since_test)
+            'bars_monitored': len(self.bars_since_test),
+            # DUAL SIGNAL ARCHITECTURE
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],

@@ -98,6 +98,30 @@ class IHOD:
         self.timeframe = timeframe
         self.prev_ihod = None
         self.proximity_threshold = 0.15  # 0.15% = ~$67 on $45k BTC
+    
+    def _determine_dual_signals(self, distance_pct: float, is_new_ihod: bool) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        if is_new_ihod and distance_pct > 0:
+            granular = 'BULLISH_BREAK'
+            simple = 'BULLISH'
+        elif abs(distance_pct) < self.proximity_threshold and distance_pct < 0:
+            granular = 'BEARISH_REJECTION'
+            simple = 'BEARISH'
+        elif abs(distance_pct) < self.proximity_threshold:
+            granular = 'AT_IHOD'
+            simple = 'NEUTRAL'
+        elif distance_pct < -0.5:
+            granular = 'BELOW_IHOD'
+            simple = 'NEUTRAL'
+        elif distance_pct > 0:
+            granular = 'ABOVE_IHOD'
+            simple = 'BULLISH'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        
+        return granular, simple
         
     def calculate_ihod(self, df: pd.DataFrame) -> float:
         """Calculate INTRADAY High of Day (today's high so far)"""
@@ -158,39 +182,39 @@ class IHOD:
         if self.prev_ihod is not None and ihod > self.prev_ihod:
             is_new_ihod = True
         
-        # Determine signal
-        if is_new_ihod and distance_pct > 0:
-            signal = 'BULLISH_BREAK'
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(distance_pct, is_new_ihod)
+        signal = granular_signal
+        
+        # Determine confidence
+        if signal == 'BULLISH_BREAK':
             confidence = 85
-        elif abs(distance_pct) < self.proximity_threshold and distance_pct < 0:
-            # At IHOD from below - rejection zone
-            signal = 'BEARISH_REJECTION'
+        elif signal == 'BEARISH_REJECTION':
             confidence = 80
-        elif abs(distance_pct) < self.proximity_threshold:
-            signal = 'AT_IHOD'
+        elif signal == 'AT_IHOD':
             confidence = 70
-        elif distance_pct < -0.5:
-            signal = 'BELOW_IHOD'
-            confidence = 60
-        elif distance_pct > 0:
-            signal = 'ABOVE_IHOD'
+        elif signal == 'ABOVE_IHOD':
             confidence = 65
+        elif signal == 'BELOW_IHOD':
+            confidence = 60
         else:
-            signal = 'NEUTRAL'
             confidence = 50
         
         # Update tracking
         self.prev_ihod = ihod
         
         return {
-            'signal': signal,
+            'signal': signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': confidence,
             'metadata': {
                 'ihod': round(ihod, 2),
                 'current_price': round(current_price, 2),
                 'distance_pct': round(distance_pct, 2),
                 'is_new_ihod': is_new_ihod,
-                'description': f"Today's high: ${ihod:.2f}, Price: ${current_price:.2f} ({distance_pct:+.2f}%)"
+                'description': f"Today's high: ${ihod:.2f}, Price: ${current_price:.2f} ({distance_pct:+.2f}%)",
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
             },
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe

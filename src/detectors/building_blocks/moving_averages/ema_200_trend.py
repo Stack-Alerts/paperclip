@@ -30,14 +30,38 @@ import numpy as np
     category='MOVING_AVERAGES',
     class_name='EMA200Trend',
     default_weight=12,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'INSUFFICIENT_DATA', 'ERROR'],
+    valid_signals=[
+        # Granular signals
+        'BULLISH_CROSS', 'BEARISH_CROSS', 'ABOVE_200EMA', 'BELOW_200EMA', 'AT_200EMA',
+        # Simple signals
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'INSUFFICIENT_DATA', 'ERROR'
+    ],
     signal_tiers={
-        'ERROR': {
-                'points': 0
+        # Granular cross events
+        'BULLISH_CROSS': {
+                'base_points': 15,
+                'formula': 'scaled'
         },
-        'INSUFFICIENT_DATA': {
-                'points': 0
+        'BEARISH_CROSS': {
+                'base_points': 15,
+                'formula': 'scaled'
         },
+        # Granular position
+        'ABOVE_200EMA': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'BELOW_200EMA': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'AT_200EMA': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        # Simple signals
         'BULLISH': {
                 'base_points': 12,
                 'formula': 'scaled'
@@ -49,6 +73,13 @@ import numpy as np
         'NEUTRAL': {
                 'max_points': 6,
                 'formula': 'scaled'
+        },
+        # Status
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
         }
 }
 )
@@ -90,6 +121,24 @@ class EMA200Trend:
         self.tracking_bearish_reversal = False
         self.reversal_bars_monitored = 0
         self.reversal_start_bar = None
+    
+    def _determine_dual_signals(self, crossed_above: bool, crossed_below: bool, 
+                                 current_position: str, simple_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        # Granular: specific event or position
+        if crossed_above:
+            granular = 'BULLISH_CROSS'
+        elif crossed_below:
+            granular = 'BEARISH_CROSS'
+        else:
+            # Use position when no cross
+            granular = current_position  # ABOVE_200EMA, BELOW_200EMA, or AT_200EMA
+        
+        # Simple: keep existing logic (BULLISH, BEARISH, NEUTRAL)
+        simple = simple_signal
+        
+        return granular, simple
     
     def calculate_ema(self, close: pd.Series) -> pd.Series:
         """Calculate 200 EMA"""
@@ -388,6 +437,11 @@ class EMA200Trend:
         elif slope == 'SIDEWAYS':
             confluence_factors.append('200 EMA flat - ranging market')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(
+            crossed_above, crossed_below, current_position, signal
+        )
+        
         # Metadata
         metadata = {
             'ema_200': round(current_ema, 2),
@@ -406,11 +460,15 @@ class EMA200Trend:
             'reversal_continuation': reversal_confirmed,
             'reversal_type': reversal_type if reversal_confirmed else None,
             'reversal_candles': self.reversal_candles,
-            'bars_monitored': bars_monitored
+            'bars_monitored': bars_monitored,
+            # DUAL SIGNAL ARCHITECTURE
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),

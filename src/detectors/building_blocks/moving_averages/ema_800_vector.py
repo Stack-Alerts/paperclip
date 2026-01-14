@@ -148,6 +148,17 @@ class EMA800VectorBreak:
             'very_far': 3.0
         }
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BULLISH_CLIMAX', 'BULLISH_PSEUDO']:
+            simple = 'BULLISH'
+        elif granular in ['BEARISH_CLIMAX', 'BEARISH_PSEUDO']:
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def calculate_ema(self, close: pd.Series) -> pd.Series:
         """Calculate Exponential Moving Average"""
         return close.ewm(span=self.period, adjust=False).mean()
@@ -374,6 +385,9 @@ class EMA800VectorBreak:
         elif slope == 'FLAT':
             confluence_factors.append('800 EMA flat - accumulation/distribution phase')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Metadata
         metadata = {
             'ema_value': round(current_ema, 2),
@@ -389,11 +403,14 @@ class EMA800VectorBreak:
             'vector_tier': vector_tier,
             'period': self.period,
             'is_new_event': is_new_event,
-            'bars_in_state': self.bars_in_state
+            'bars_in_state': self.bars_in_state,
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),

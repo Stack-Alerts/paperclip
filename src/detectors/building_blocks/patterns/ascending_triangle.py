@@ -100,6 +100,15 @@ class AscendingTrianglePattern:
         self.prev_pattern_id = None
         self.bars_in_state = 0
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BULLISH_BREAKOUT', 'PATTERN_FORMING']:
+            simple = 'BULLISH'  # Ascending triangle is bullish
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def find_swing_points(self, df: pd.DataFrame, lookback: int = 5):
         """Find swing highs and lows"""
         highs = []
@@ -304,7 +313,12 @@ class AscendingTrianglePattern:
         confluence_factors.append(f"Target: ${target_price:.2f}")
         confluence_factors.append("Success rate: 72% bullish")
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'pattern_type': 'ASCENDING_TRIANGLE',
             'resistance_level': round(pattern['resistance_level'], 2),
             'support_start': round(pattern['support_start'], 2),
@@ -326,7 +340,8 @@ class AscendingTrianglePattern:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],

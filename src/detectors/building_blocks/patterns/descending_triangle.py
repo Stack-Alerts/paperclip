@@ -113,6 +113,15 @@ class DescendingTrianglePattern:
         # Breakout requirements
         self.BREAK_MARGIN = 0.005  # Must break 0.5% below support
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BEARISH_BREAKDOWN', 'PATTERN_FORMING']:
+            simple = 'BEARISH'  # Descending triangle is bearish
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def find_swing_points(self, df: pd.DataFrame, lookback: int = 5):
         """Find swing highs and lows"""
         highs = []
@@ -320,10 +329,16 @@ class DescendingTrianglePattern:
         pattern_height = pattern['resistance_start'] - pattern['support_level']
         target_price = pattern['support_level'] - pattern_height
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': final_confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pattern_type': 'DESCENDING_TRIANGLE_INSTITUTIONAL',
                 'direction': 'BEARISH',
                 'support_level': round(pattern['support_level'], 2),

@@ -107,6 +107,15 @@ class DoubleBottomPattern:
         
         # Breakout requirements (stricter)
         self.BREAK_MARGIN = 0.005  # Must break 0.5% above neckline
+    
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BULLISH_BREAKOUT', 'PATTERN_FORMING']:
+            simple = 'BULLISH'  # Double bottom is bullish pattern
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for oversold detection"""
@@ -436,10 +445,16 @@ class DoubleBottomPattern:
         avg_price = (t1['price'] + t2['price']) / 2
         target = neckline + (neckline - avg_price)
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': final_confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pattern_type': 'DOUBLE_BOTTOM_INSTITUTIONAL',
                 'troughs': [round(t1['price'], 2), round(t2['price'], 2)],
                 'trough_rsi': [round(t1['rsi'], 1), round(t2['rsi'], 1)],

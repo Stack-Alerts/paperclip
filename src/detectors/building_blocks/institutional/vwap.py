@@ -113,6 +113,22 @@ class VWAP:
         """
         self.timeframe = timeframe
     
+    def _determine_dual_signals(self, current_price: float, current_vwap: float, distance_pct: float) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        # Granular: specific position relative to VWAP
+        if abs(distance_pct) < 0.15:  # Within 0.15% = at VWAP
+            granular = 'AT_VWAP'
+            simple = 'NEUTRAL'
+        elif current_price > current_vwap:
+            granular = 'ABOVE_VWAP'
+            simple = 'BULLISH'
+        else:
+            granular = 'BELOW_VWAP'
+            simple = 'BEARISH'
+        
+        return granular, simple
+    
     def calculate_distance_bands(self, df: pd.DataFrame, vwap: pd.Series) -> Dict[str, Any]:
         """
         ENHANCEMENT 1: Distance Bands (2026-01-04)
@@ -251,17 +267,14 @@ class VWAP:
         # ENHANCEMENT 2: Analyze volume context
         volume_data = self.analyze_volume_context(df, vwap)
         
-        # CRITICAL FIX: Return directional signals for validation
-        # Price above VWAP = bullish (premium zone)
-        # Price below VWAP = bearish (discount zone)
+        # Calculate distance percentage
         distance_pct = abs(current_price - current_vwap) / current_vwap * 100
         
-        if current_price > current_vwap:
-            signal = 'BULLISH'
-            confidence = min(90, 60 + distance_pct * 10)  # More distance = higher confidence
-        else:
-            signal = 'BEARISH'
-            confidence = min(90, 60 + distance_pct * 10)  # More distance = higher confidence
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(current_price, current_vwap, distance_pct)
+        
+        # Confidence calculation
+        confidence = min(90, 60 + distance_pct * 10)  # More distance = higher confidence
         
         # Fresh cross boost
         if is_new_event:
@@ -287,12 +300,12 @@ class VWAP:
         
         # Event-specific confluence
         if is_new_event:
-            if signal == 'BULLISH':
+            if simple_signal == 'BULLISH':
                 confluence_factors.append('⭐ VWAP CROSS ABOVE (fresh bullish momentum!)')
             else:
                 confluence_factors.append('⭐ VWAP CROSS BELOW (fresh bearish momentum!)')
         elif bars_since_cross > 0:
-            confluence_factors.append(f'Continuing {"above" if signal == "BULLISH" else "below"} VWAP ({bars_since_cross} bars)')
+            confluence_factors.append(f'Continuing {"above" if simple_signal == "BULLISH" else "below"} VWAP ({bars_since_cross} bars)')
         
         if current_price > current_vwap:
             confluence_factors.append(f'Price above VWAP (${current_vwap:.2f}) - premium zone')
@@ -320,7 +333,8 @@ class VWAP:
                 confluence_factors.append(f'VWAP strength: {volume_data["vwap_strength"]} (+5 confidence)')
         
         return {
-            'signal': signal,
+            'signal': granular_signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': {
                 'vwap': round(current_vwap, 2),
@@ -338,7 +352,10 @@ class VWAP:
                 'lower_2sd': bands_data.get('lower_2sd'),
                 'has_volume_context': volume_data.get('has_volume_context', False),
                 'volume_ratio': volume_data.get('volume_ratio'),
-                'vwap_strength': volume_data.get('vwap_strength')
+                'vwap_strength': volume_data.get('vwap_strength'),
+                # DUAL SIGNAL ARCHITECTURE
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
             },
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe,

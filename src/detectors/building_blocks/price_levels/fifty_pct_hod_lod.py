@@ -93,6 +93,25 @@ class FiftyPctHODLOD:
         self.timeframe = timeframe
         self.proximity_threshold = 0.15  # 0.15% proximity to equilibrium
         self.prev_fifty_pct = None
+    
+    def _determine_dual_signals(self, distance_pct: float) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        # Granular: specific position relative to equilibrium
+        if abs(distance_pct) < self.proximity_threshold:
+            granular = 'AT_EQUILIBRIUM'
+            simple = 'NEUTRAL'
+        elif distance_pct > 0.5:
+            granular = 'ABOVE_EQUILIBRIUM'
+            simple = 'BULLISH'
+        elif distance_pct < -0.5:
+            granular = 'BELOW_EQUILIBRIUM'
+            simple = 'BEARISH'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        
+        return granular, simple
         
     def calculate_fifty_pct(self, df: pd.DataFrame) -> tuple:
         """
@@ -173,19 +192,15 @@ class FiftyPctHODLOD:
         current_price = float(df['close'].iloc[-1])
         distance_pct = ((current_price - fifty_pct) / fifty_pct) * 100
         
-        # Determine signal
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(distance_pct)
+        
+        # Determine confidence
         if abs(distance_pct) < self.proximity_threshold:
-            # At equilibrium - high value signal
-            signal = 'AT_EQUILIBRIUM'
             confidence = 85
-        elif distance_pct > 0.5:
-            signal = 'ABOVE_EQUILIBRIUM'
-            confidence = 75
-        elif distance_pct < -0.5:
-            signal = 'BELOW_EQUILIBRIUM'
+        elif abs(distance_pct) > 0.5:
             confidence = 75
         else:
-            signal = 'NEUTRAL'
             confidence = 60
         
         # Build description
@@ -193,7 +208,8 @@ class FiftyPctHODLOD:
         position_in_range = ((current_price - lod) / range_size) * 100 if range_size > 0 else 50
         
         return {
-            'signal': signal,
+            'signal': granular_signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': confidence,
             'metadata': {
                 'fifty_pct': round(fifty_pct, 2),
@@ -202,7 +218,9 @@ class FiftyPctHODLOD:
                 'current_price': round(current_price, 2),
                 'distance_pct': round(distance_pct, 2),
                 'position_in_range_pct': round(position_in_range, 2),
-                'description': f"Yesterday 50%: ${fifty_pct:.2f}, Price: ${current_price:.2f} ({distance_pct:+.2f}%, {position_in_range:.1f}% of range)"
+                'description': f"Yesterday 50%: ${fifty_pct:.2f}, Price: ${current_price:.2f} ({distance_pct:+.2f}%, {position_in_range:.1f}% of range)",
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
             },
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe

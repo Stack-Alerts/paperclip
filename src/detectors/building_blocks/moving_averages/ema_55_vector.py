@@ -144,6 +144,17 @@ class EMA55VectorBreak:
             'very_far': 3.0
         }
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        granular = granular_signal
+        if granular in ['BULLISH_CLIMAX', 'BULLISH_PSEUDO']:
+            simple = 'BULLISH'
+        elif granular in ['BEARISH_CLIMAX', 'BEARISH_PSEUDO']:
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def calculate_ema(self, close: pd.Series) -> pd.Series:
         """Calculate Exponential Moving Average"""
         return close.ewm(span=self.period, adjust=False).mean()
@@ -354,6 +365,9 @@ class EMA55VectorBreak:
         elif slope == 'FLAT':
             confluence_factors.append('55 EMA flat - ranging market')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Metadata
         metadata = {
             'ema_value': round(current_ema, 2),
@@ -367,11 +381,15 @@ class EMA55VectorBreak:
             'distance_class': distance_class,
             'is_vector_candle': is_vector_candle,
             'vector_tier': vector_tier,
-            'period': self.period
+            'period': self.period,
+            # DUAL SIGNAL ARCHITECTURE
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),

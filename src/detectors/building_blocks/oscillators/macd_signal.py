@@ -159,6 +159,17 @@ class MACDSignal:
             '1D': {'weak': 500, 'moderate': 1000, 'strong': 2000}
         }
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BULLISH_DIVERGENCE', 'BULLISH_ZERO_CROSS', 'BULLISH_CROSS']:
+            simple = 'BULLISH'
+        elif granular in ['BEARISH_DIVERGENCE', 'BEARISH_ZERO_CROSS', 'BEARISH_CROSS']:
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def calculate_ema(self, data: pd.Series, period: int) -> pd.Series:
         """
         Calculate Exponential Moving Average
@@ -486,6 +497,9 @@ class MACDSignal:
         
         # Else: NEUTRAL (no signal)
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Prepare metadata
         metadata = {
             'macd_line': round(current_macd, 2),
@@ -502,11 +516,14 @@ class MACDSignal:
             'signal_period': self.signal_period,
             'recent_macd': macd_line.tail(10).tolist(),
             'recent_signal': signal_line.tail(10).tolist(),
-            'recent_histogram': histogram.tail(10).tolist()
+            'recent_histogram': histogram.tail(10).tolist(),
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),
