@@ -492,8 +492,14 @@ class ChangeOfCharacter:
         if trend == 'NEUTRAL':
             return {
                 'signal': 'NEUTRAL',
+                'signal_simple': 'NEUTRAL',
                 'confidence': 0,
-                'metadata': {'trend': 'NEUTRAL', 'message': 'No clear trend for CHOCH detection'},
+                'metadata': {
+                    'signal_simple': 'NEUTRAL',
+                    'signal_granular': 'NEUTRAL',
+                    'trend': 'NEUTRAL',
+                    'message': 'No clear trend for CHOCH detection'
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['No clear trend - CHOCH requires established trend']
@@ -591,8 +597,14 @@ class ChangeOfCharacter:
         if not choch:
             return {
                 'signal': 'NEUTRAL',
+                'signal_simple': 'NEUTRAL',
                 'confidence': 0,
-                'metadata': {'trend': trend, 'message': 'No change of character detected'},
+                'metadata': {
+                    'signal_simple': 'NEUTRAL',
+                    'signal_granular': 'NEUTRAL',
+                    'trend': trend,
+                    'message': 'No change of character detected'
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': [f'Trend: {trend}', 'No CHOCH - trend character stable']
