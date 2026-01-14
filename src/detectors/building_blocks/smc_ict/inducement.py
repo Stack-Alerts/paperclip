@@ -119,6 +119,19 @@ class Inducement:
         self.lookback = lookback
         self.reversal_threshold = trap_threshold_pct  # Map to internal name
     
+    def _determine_dual_signals(self, ind_type: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        if ind_type == 'BULLISH_INDUCEMENT':
+            granular = 'BULLISH_INDUCEMENT'
+            simple = 'BULLISH'
+        elif ind_type == 'BEARISH_INDUCEMENT':
+            granular = 'BEARISH_INDUCEMENT'
+            simple = 'BEARISH'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def classify_trap_strength(self, reversal_pct: float) -> str:
         """
         Classify trap strength into tiers (Priority 1.1 Enhancement)
@@ -309,9 +322,14 @@ class Inducement:
         confluence_factors.append('Breakout traders trapped')
         confluence_factors.append('High probability reversal setup')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(active_ind['type'])
+        
         # **ENHANCED:** Metadata with trap strength
         if active_ind['type'] == 'BULLISH_INDUCEMENT':
             metadata = {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'inducement_type': active_ind['type'],
                 'swing_low': active_ind['swing_low'],
                 'break_low': active_ind['break_low'],
@@ -332,7 +350,8 @@ class Inducement:
             }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
