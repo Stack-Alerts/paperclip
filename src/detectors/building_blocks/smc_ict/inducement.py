@@ -287,10 +287,16 @@ class Inducement:
             signal = 'BEARISH'
         
         if not active_ind:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_INDUCEMENT')
             return {
-                'signal': 'NO_INDUCEMENT',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'No inducement pattern detected'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': 'No inducement pattern detected'
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['No inducement - clean price action']
