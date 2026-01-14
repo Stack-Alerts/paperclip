@@ -243,10 +243,16 @@ class EMA800VectorBreak:
         
         # Check minimum data
         if len(df) < self.period + 10:
+            granular_signal, simple_signal = self._determine_dual_signals('INSUFFICIENT_DATA')
             return {
-                'signal': 'INSUFFICIENT_DATA',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': f'Need {self.period + 10} periods, got {len(df)}'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': f'Need {self.period + 10} periods, got {len(df)}'
+                },
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
