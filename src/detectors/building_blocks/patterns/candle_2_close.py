@@ -110,6 +110,17 @@ class Candle2Close:
         self.reversal_lookback = reversal_lookback
         self.min_strength = min_strength
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular == 'BULLISH_C2_CLOSE':
+            simple = 'BULLISH'
+        elif granular == 'BEARISH_C2_CLOSE':
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
         Analyze dataframe for Candle 2 Close patterns.
@@ -354,10 +365,16 @@ class Candle2Close:
         reward = abs(target - current_price)
         risk_reward = reward / risk if risk > 0 else 0
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(pattern['type'])
+        
         return {
-            'signal': pattern['type'],
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pattern_confirmed': pattern['has_c3'],
                 'strength': round(pattern['strength'], 1),
                 'current_price': round(current_price, 2),

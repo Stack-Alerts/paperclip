@@ -117,6 +117,20 @@ class FlagPattern:
         
         # Breakout requirements (relaxed to allow more signals)
         self.BREAK_MARGIN = 0.003  # Must break 0.3% beyond channel (relaxed)
+    
+    def _determine_dual_signals(self, granular_signal: str, direction: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Bilateral continuation pattern"""
+        granular = granular_signal
+        if granular == 'BULLISH_BREAKOUT':
+            simple = 'BULLISH'
+        elif granular == 'BEARISH_BREAKOUT':
+            simple = 'BEARISH'
+        elif granular == 'PATTERN_FORMING':
+            # Forming: use flagpole direction (continuation expected)
+            simple = direction  # 'BULLISH' or 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for momentum alignment"""
@@ -370,10 +384,16 @@ class FlagPattern:
         # Cap confidence at 95%
         final_confidence = min(base_confidence, 95)
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal, flagpole['direction'])
+        
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': final_confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pattern_type': 'FLAG_INSTITUTIONAL',
                 'direction': flagpole['direction'],
                 'flagpole_strength': round(flagpole['strength'] * 100, 2),

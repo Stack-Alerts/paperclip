@@ -108,6 +108,15 @@ class RoundingBottomPattern:
         
         # Breakout requirements (stricter)
         self.BREAK_MARGIN = 0.009  # Must break 0.9% above initial
+    
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BREAKOUT_CONFIRMED', 'PATTERN_FORMING']:
+            simple = 'BULLISH'  # Rounding bottom is bullish reversal
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for oversold recovery detection"""
@@ -277,10 +286,16 @@ class RoundingBottomPattern:
         depth = pattern_high - pattern_low
         target = pattern_high + (depth * 0.5)
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': final_confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pattern_type': 'ROUNDING_BOTTOM_INSTITUTIONAL',
                 'depth_pct': round(depth_pct * 100, 2),
                 'pattern_low': round(pattern_low, 2),

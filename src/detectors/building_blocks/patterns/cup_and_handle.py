@@ -116,6 +116,15 @@ class CupAndHandlePattern:
         
         # Breakout requirements (stricter)
         self.BREAK_MARGIN = 0.005  # Must break 0.5% above rim
+    
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BREAKOUT_CONFIRMED', 'CUP_FORMING', 'PATTERN_FORMING']:
+            simple = 'BULLISH'  # Cup & Handle is bullish pattern
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for bullish confirmation"""
@@ -299,10 +308,16 @@ class CupAndHandlePattern:
         pattern_height = high_val - low_after_high
         target_price = rim_level + pattern_height
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': final_confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pattern_type': 'CUP_AND_HANDLE_INSTITUTIONAL',
                 'cup_depth_pct': round(dip_pct * 100, 2),
                 'recovery_pct': round(recovery_pct * 100, 2),
