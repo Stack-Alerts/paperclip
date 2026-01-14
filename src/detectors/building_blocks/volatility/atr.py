@@ -159,12 +159,20 @@ class ATR:
             '1D': {'calm': 1500, 'normal': 3000, 'high': 6000, 'extreme': 12000},
         }
     
-    def _determine_dual_signals(self, signal: str) -> tuple:
+    def _determine_dual_signals(self, signal: str, atr_trend: str = 'STABLE') -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
-        # ATR is a volatility/context block - doesn't provide directional bias
-        # All volatility regimes map to NEUTRAL for simple users
         granular = signal
-        simple = 'NEUTRAL'  # Volatility context only, no directional signal
+        
+        # Map volatility expansion/contraction to directional signals
+        # EXPANDING volatility = BULLISH (energy building, favorable for breakouts)
+        # CONTRACTING volatility = BEARISH (consolidation, unfavorable for entries)
+        if atr_trend == 'RISING':
+            simple = 'BULLISH'
+        elif atr_trend == 'FALLING':
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        
         return granular, simple
     
     def calculate_true_range(self, df: pd.DataFrame) -> pd.Series:
@@ -266,7 +274,7 @@ class ATR:
         # Calculate percentile rank
         percentile = (sum(1 for atr in self.atr_history if atr < current_atr) / len(self.atr_history)) * 100
         
-        # Classify relative level
+        # Classify relative level (only use registered signals)
         if percentile >= 95:
             relative_level = 'EXTREME_HIGH'
         elif percentile >= 85:
@@ -275,8 +283,6 @@ class ATR:
             relative_level = 'HIGH'
         elif percentile >= 30:
             relative_level = 'NORMAL'
-        elif percentile >= 15:
-            relative_level = 'LOW'
         elif percentile >= 5:
             relative_level = 'VERY_LOW'
         else:
@@ -467,19 +473,23 @@ class ATR:
         current_price = float(df['close'].iloc[-1])
         atr_percent = (current_atr / current_price) * 100
         
-        # **DEFINE SIGNAL FIRST** - based on ATR trend (EXPANDING/CONTRACTING)
-        # Primary use case: Detect volatility expansion (breakouts) or contraction (consolidation)
-        if atr_trend == 'RISING':
-            signal = 'EXPANDING'  # Volatility increasing - breakout potential
-        elif atr_trend == 'FALLING':
-            signal = 'CONTRACTING'  # Volatility decreasing - consolidation
-        elif atr_trend == 'STABLE':
-            signal = 'STABLE'  # Volatility stable - range-bound
+        # **DEFINE SIGNAL** - Use percentile-based level if available, otherwise use regime
+        # Percentile signals: EXTREME_HIGH, VERY_HIGH, HIGH, NORMAL, VERY_LOW, EXTREME_LOW
+        # Regime signals: EXPANDING, CONTRACTING, STABLE
+        
+        if atr_percentile_data.get('has_percentile'):
+            # Use percentile-based level signals (preferred - more context)
+            signal = atr_percentile_data['relative_level']
         else:
-            signal = 'NEUTRAL'  # Insufficient data
+            # Fall back to absolute volatility level mapping
+            signal = volatility_level
         
         # ENHANCEMENT 1: Calculate variable confidence
-        confidence = self.calculate_variable_confidence(signal, volatility_level, atr_percentile_data)
+        confidence = self.calculate_variable_confidence(
+            'EXPANDING' if atr_trend == 'RISING' else 'CONTRACTING' if atr_trend == 'FALLING' else 'STABLE',
+            volatility_level,
+            atr_percentile_data
+        )
         
         # Fresh regime change boost
         if is_new_event:
@@ -521,8 +531,8 @@ class ATR:
             elif relative_level in ['EXTREME_LOW', 'VERY_LOW']:
                 confluence_factors.append(f'ATR at {percentile:.0f}th percentile - VERY LOW volatility')
         
-        # DUAL SIGNAL ARCHITECTURE
-        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        # DUAL SIGNAL ARCHITECTURE - pass atr_trend for directional mapping
+        granular_signal, simple_signal = self._determine_dual_signals(signal, atr_trend)
         
         # Prepare metadata (ENHANCED)
         metadata = {
