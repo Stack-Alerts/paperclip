@@ -39,54 +39,58 @@ import numpy as np
     default_weight=16,
     valid_signals=[
         # Granular session signals
-        'ACTIVE', 'LONDON_KZ', 'NY_AM_KZ', 'NY_PM_KZ', 'ASIAN_KZ', 'INACTIVE',
-        # Simple directional - SIMPLE
-        'BULLISH', 'BEARISH', 'NEUTRAL',
+        'LONDON_KZ', 'NY_AM_KZ', 'NY_PM_KZ', 'ASIAN_KZ', 'LONDON_OPEN_KZ',
+        'PRIME_TIME', 'WAIT', 'NO_KZ',
+        # Simple TIME QUALITY - SIMPLE (timing, not direction!)
+        'ACTIVE', 'INACTIVE', 'NO_SIGNAL',
         # Status
-        'NO_SIGNAL', 'ERROR'
+        'ERROR'
     ],
     signal_tiers={
-        'ERROR': {
+        # Simple time quality signals
+        'ACTIVE': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'INACTIVE': {
                 'points': 0
         },
         'NO_SIGNAL': {
                 'points': 0
         },
-        'ACTIVE': {
-                'base_points': 16,
-                'formula': 'scaled'
+        'ERROR': {
+                'points': 0
         },
+        
+        # Granular zone signals
         'LONDON_KZ': {
                 'base_points': 16,
                 'formula': 'scaled'
         },
+        'LONDON_OPEN_KZ': {
+                'base_points': 14,
+                'formula': 'scaled'
+        },
         'NY_AM_KZ': {
-                'base_points': 16,
+                'base_points': 18,
                 'formula': 'scaled'
         },
         'NY_PM_KZ': {
-                'base_points': 16,
+                'base_points': 14,
                 'formula': 'scaled'
         },
         'ASIAN_KZ': {
-                'base_points': 16,
+                'base_points': 10,
                 'formula': 'scaled'
         },
-        'INACTIVE': {
-                'base_points': 16,
+        'PRIME_TIME': {
+                'base_points': 18,
                 'formula': 'scaled'
         },
-        
-        # Simple directional - SIMPLE
-        'BULLISH': {
-                'base_points': 16,
-                'formula': 'scaled'
+        'WAIT': {
+                'points': 0
         },
-        'BEARISH': {
-                'base_points': 16,
-                'formula': 'scaled'
-        },
-        'NEUTRAL': {
+        'NO_KZ': {
                 'points': 0
         }
 }
@@ -156,6 +160,32 @@ class KillZones:
             'NY_PM_KZ': {'strength': 'MODERATE', 'direction': 'CONTINUATION', 'notes': 'Afternoon continuation moves'},
             'NO_KZ': {'strength': 'MINIMAL', 'direction': 'AVOID', 'notes': 'Low probability period'}
         }
+    
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)
+        
+        Kill zones provide TIMING quality context, not directional bias.
+        Maps to ACTIVE (good time) or INACTIVE (avoid time).
+        """
+        granular = signal
+        
+        # High-quality time windows
+        if signal in ['NY_AM_KZ', 'LONDON_KZ', 'PRIME_TIME']:
+            simple = 'ACTIVE'  # ✅ Optimal trading windows
+        
+        # Medium-quality time windows
+        elif signal in ['NY_PM_KZ', 'LONDON_OPEN_KZ']:
+            simple = 'ACTIVE'  # ✅ Good trading windows
+        
+        # Low-quality or inactive windows
+        elif signal in ['ASIAN_KZ', 'NO_KZ', 'WAIT']:
+            simple = 'INACTIVE'  # ⚠️ Avoid trading
+        
+        # Errors/edge cases
+        else:
+            simple = 'NO_SIGNAL'
+        
+        return granular, simple
     
     def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:
         """Calculate ATR for volatility awareness (quality block integration)"""
@@ -431,8 +461,13 @@ class KillZones:
         else:
             signal = 'WAIT'
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Rich metadata for confluence
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'kill_zone': current_kz,
             'hour_utc': current_time.hour,
             'priority': priority,
@@ -461,7 +496,8 @@ class KillZones:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': current_time,
