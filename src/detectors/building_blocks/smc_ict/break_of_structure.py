@@ -123,6 +123,22 @@ class BreakOfStructure:
         self.volume_confirmation = volume_confirmation
         self.bos_history = []  # Track BOS events for momentum
     
+    def _determine_dual_signals(self, bos_type: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        if bos_type == 'BULLISH_BOS':
+            granular = 'BULLISH_BOS'
+            simple = 'BULLISH'
+        elif bos_type == 'BEARISH_BOS':
+            granular = 'BEARISH_BOS'
+            simple = 'BEARISH'
+        elif bos_type == 'NO_BOS':
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def classify_break_strength(self, break_pct: float) -> str:
         """
         Classify break strength into tiers (Priority 1.2 Enhancement)
@@ -396,9 +412,14 @@ class BreakOfStructure:
             confluence_factors.append('Continuing BOS state (structure already broken)')
         confluence_factors.append('Trend continuation signal - high probability')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(active_bos['type'])
+        
         # **ENHANCED:** Metadata with new tracking
         if active_bos['type'] == 'BULLISH_BOS':
             metadata = {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'bos_type': active_bos['type'],
                 'trend': active_bos['trend'],
                 'swing_high': active_bos['swing_high'],
@@ -425,7 +446,8 @@ class BreakOfStructure:
             }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
