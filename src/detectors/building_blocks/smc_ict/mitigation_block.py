@@ -113,6 +113,19 @@ class MitigationBlock:
         self.mitigation_history = []  # Track mitigations and fills
         self.max_history = 50
     
+    def _determine_dual_signals(self, mit_type: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        if mit_type == 'BULLISH_MITIGATION':
+            granular = 'BULLISH_MITIGATION'
+            simple = 'BULLISH'
+        elif mit_type == 'BEARISH_MITIGATION':
+            granular = 'BEARISH_MITIGATION'
+            simple = 'BEARISH'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def detect_bullish_mitigation(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """
         Detect bullish mitigation zone (unfilled buy orders below)
@@ -533,8 +546,13 @@ class MitigationBlock:
         confluence_factors.append('Unfilled institutional orders - expect retracement')
         confluence_factors.append('High probability entry on mitigation')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(active_mit['type'])
+        
         # Metadata (ENHANCED)
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'mitigation_type': active_mit['type'],
             'mitigation_high': active_mit['mitigation_high'],
             'mitigation_low': active_mit['mitigation_low'],
@@ -557,7 +575,8 @@ class MitigationBlock:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
