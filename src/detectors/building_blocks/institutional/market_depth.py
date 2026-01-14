@@ -136,6 +136,14 @@ class MarketDepth:
         self.atr_period = atr_period
         self.use_dynamic_thresholds = use_dynamic_thresholds
     
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        # Liquidity signals are non-directional (context only)
+        granular = signal
+        # Market depth doesn't provide directional bias - it's execution quality context
+        simple = 'NEUTRAL'
+        return granular, simple
+    
     def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:
         """
         Calculate Average True Range for volatility context
@@ -454,8 +462,13 @@ class MarketDepth:
         elif quality_score <= 30:
             confluence_factors.append(f'⚠️ Low liquidity quality (score: {quality_score})')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Metadata (much richer than basic version!)
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'volume_ratio': round(volume_ratio, 2),
             'avg_volume': round(float(avg_volume), 2),
             'recent_volume': round(float(recent_volume), 2),
@@ -470,7 +483,8 @@ class MarketDepth:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
