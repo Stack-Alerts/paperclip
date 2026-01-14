@@ -314,10 +314,16 @@ class LiquiditySweep:
             signal = 'BEARISH'
         
         if not active_sweep:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_SWEEP')
             return {
-                'signal': 'NO_SWEEP',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'No liquidity sweep detected'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': 'No liquidity sweep detected'
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
