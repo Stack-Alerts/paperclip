@@ -209,10 +209,15 @@ class DoubleBottomPattern:
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """INSTITUTIONAL GRADE: Double bottom with multi-block validation + PHASE 1 improvements"""
         if len(df) < 30:  # Need more data for quality validation
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
                 'timestamp': df['timestamp'].iloc[-1] if len(df) > 0 else datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -226,10 +231,15 @@ class DoubleBottomPattern:
             if bars_since_pattern_start > self.PATTERN_MAX_DURATION:
                 # Pattern expired without breakout
                 self.reset_pattern_state()
-                return {
-                    'signal': 'NO_PATTERN',
-                    'confidence': 0,
-                    'metadata': {'reason': 'Pattern expired (>100 bars)'},
+                granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
+            return {
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
+                'confidence': 0,
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,'reason': 'Pattern expired (>100 bars)'
+                },
                     'timestamp': df['timestamp'].iloc[-1],
                     'timeframe': self.timeframe,
                     'confluence_factors': []
@@ -243,10 +253,15 @@ class DoubleBottomPattern:
         troughs = self.find_troughs(df, rsi)
         
         if len(troughs) < 2:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -260,13 +275,18 @@ class DoubleBottomPattern:
         bars_between = t2['idx'] - t1['idx']
         
         if bars_between < self.MIN_BARS_BETWEEN_TROUGHS:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'reason': 'Pattern forming too quickly',
                     'bars_between': bars_between,
                     'min_required': self.MIN_BARS_BETWEEN_TROUGHS
+                
                 },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
@@ -274,13 +294,18 @@ class DoubleBottomPattern:
             }
         
         if bars_between > self.MAX_BARS_BETWEEN_TROUGHS:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'reason': 'Troughs too far apart',
                     'bars_between': bars_between,
                     'max_allowed': self.MAX_BARS_BETWEEN_TROUGHS
+                
                 },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
@@ -290,13 +315,18 @@ class DoubleBottomPattern:
         # Check: Similar price (REQUIRED - tightened to 2%)
         price_diff = abs(t1['price'] - t2['price']) / t1['price']
         if price_diff > self.trough_tolerance:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'reason': 'Troughs not similar enough',
                     'trough_diff_pct': round(price_diff * 100, 2),
                     'max_allowed': round(self.trough_tolerance * 100, 2)
+                
                 },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
@@ -356,13 +386,18 @@ class DoubleBottomPattern:
         
         # MINIMUM THRESHOLD: Require at least 3 confluences (PHASE 1: increased from 2)
         if len(confluences) < self.MIN_CONFLUENCES:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'reason': 'Insufficient validation',
                     'confluences_found': len(confluences),
                     'confluences_required': self.MIN_CONFLUENCES
+                
                 },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
@@ -399,10 +434,15 @@ class DoubleBottomPattern:
                 if bars_since_breakout > self.BREAKOUT_MAX_DURATION:
                     # Breakout complete - reset
                     self.reset_pattern_state()
-                    return {
-                        'signal': 'NO_PATTERN',
-                        'confidence': 0,
-                        'metadata': {'reason': 'Breakout completed (>20 bars)'},
+                    granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
+            return {
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
+                'confidence': 0,
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,'reason': 'Breakout completed (>20 bars)'
+                },
                         'timestamp': df['timestamp'].iloc[-1],
                         'timeframe': self.timeframe,
                         'confluence_factors': []
@@ -415,10 +455,15 @@ class DoubleBottomPattern:
             if self.breakout_start_idx is not None:
                 # Was in breakout but price dropped back - pattern invalidated
                 self.reset_pattern_state()
-                return {
-                    'signal': 'NO_PATTERN',
-                    'confidence': 0,
-                    'metadata': {'reason': 'Price dropped back below neckline'},
+                granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
+            return {
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
+                'confidence': 0,
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,'reason': 'Price dropped back below neckline'
+                },
                     'timestamp': df['timestamp'].iloc[-1],
                     'timeframe': self.timeframe,
                     'confluence_factors': []
