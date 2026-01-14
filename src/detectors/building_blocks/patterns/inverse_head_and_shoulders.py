@@ -321,10 +321,15 @@ class InverseHeadAndShouldersPattern:
         pattern = self.detect_pattern(df, rsi)
         
         if pattern is None:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -395,10 +400,14 @@ class InverseHeadAndShouldersPattern:
         
         # MINIMUM THRESHOLD: Require at least 5 confluences (PHASE 1: same as H&S)
         if len(confluences) < self.MIN_CONFLUENCES:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'reason': 'Insufficient validation',
                     'confluences_found': len(confluences),
                     'confluences_required': self.MIN_CONFLUENCES
