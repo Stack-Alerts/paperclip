@@ -277,10 +277,16 @@ class EMA200Trend:
         # Check minimum data
         min_required = self.period + 20
         if len(df) < min_required:
+            granular_signal, simple_signal = self._determine_dual_signals('INSUFFICIENT_DATA')
             return {
-                'signal': 'INSUFFICIENT_DATA',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': f'Need {min_required} periods, got {len(df)}'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': f'Need {min_required} periods, got {len(df)}'
+                },
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
