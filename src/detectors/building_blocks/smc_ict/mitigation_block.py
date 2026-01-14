@@ -446,10 +446,17 @@ class MitigationBlock:
             signal = 'BEARISH'  # confidence = 60 for valid signal
         
         if not active_mit:
+            granular_signal, simple_signal = self._determine_dual_signals('NEUTRAL')
             return {
-                'signal': 'NEUTRAL',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'message': 'No mitigation zones detected', 'is_new_event': False},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'message': 'No mitigation zones detected',
+                    'is_new_event': False
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['No unfilled gaps - clean price action']
