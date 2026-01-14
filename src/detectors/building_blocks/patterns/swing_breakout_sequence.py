@@ -115,6 +115,26 @@ class SwingBreakoutSequence:
         self.active_sequences = []
         self.completed_sequences = []
     
+    def _determine_dual_signals(self, signal_type: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        # Map pattern-specific signals to simple directions
+        if signal_type == 'BULLISH_BREAKOUT_SEQUENCE':
+            granular = 'BULLISH_BREAKOUT_SEQUENCE'
+            simple = 'BULLISH'
+        elif signal_type == 'BEARISH_BREAKOUT_SEQUENCE':
+            granular = 'BEARISH_BREAKOUT_SEQUENCE'
+            simple = 'BEARISH'
+        elif signal_type == 'NEUTRAL':
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        elif signal_type == 'ERROR':
+            granular = 'ERROR'
+            simple = 'NEUTRAL'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
         Analyze dataframe for swing breakout sequences.
@@ -500,10 +520,16 @@ class SwingBreakoutSequence:
         reward = abs(target - entry)
         risk_reward = reward / risk if risk > 0 else 0
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal_type)
+        
         return {
-            'signal': signal_type,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'sequence_type': 'bullish' if sequence['is_bullish'] else 'bearish',
                 'swing_price': round(sequence['swing_price'], 2),
                 'has_point_4': sequence.get('point_4') is not None,
