@@ -119,6 +119,20 @@ class IchimokuCloud:
         self.kijun_period = kijun_period
         self.senkou_period = senkou_period
     
+    def _determine_dual_signals(self, position: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        granular = position  # ABOVE_CLOUD, BELOW_CLOUD, IN_CLOUD
+        
+        # Map to simple directional signals
+        if position == 'ABOVE_CLOUD':
+            simple = 'BULLISH'
+        elif position == 'BELOW_CLOUD':
+            simple = 'BEARISH'
+        else:  # IN_CLOUD
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def calculate_ichimoku(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Calculate all Ichimoku components"""
         if len(df) < self.senkou_period:
@@ -302,8 +316,13 @@ class IchimokuCloud:
         if cloud_thickness > price * 0.02:
             confluence_factors.append('Thick cloud - strong support/resistance')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(position)
+        
         # Metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'tenkan': round(tenkan, 2),
             'kijun': round(kijun, 2),
             'senkou_a': round(senkou_a, 2),
@@ -313,12 +332,13 @@ class IchimokuCloud:
             'cloud_color': cloud_color,
             'position': position,
             'cloud_thickness_pct': round((cloud_thickness / price) * 100, 2),
-            'is_new_event': is_new_event,  # NEW: Event tracking
-            'bars_in_current_position': bars_in_current_position  # NEW: Age tracking
+            'is_new_event': is_new_event,
+            'bars_in_current_position': bars_in_current_position
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
