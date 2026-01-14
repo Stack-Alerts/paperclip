@@ -30,10 +30,10 @@ import numpy as np
     class_name='DoubleTopPattern',
     default_weight=30,
     valid_signals=[
-        # Granular pattern signals
+        # Granular pattern signals (Double Top is bearish-only)
         'BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN',
-        # Simple directional - SIMPLE
-        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Simple directional - SIMPLE (bearish-only pattern)
+        'BEARISH', 'NEUTRAL',
         # Status
         'ERROR', 'INSUFFICIENT_DATA'
     ],
@@ -51,11 +51,7 @@ import numpy as np
                 'points': 0
         },
         
-        # Simple directional - SIMPLE
-        'BULLISH': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
+        # Simple directional - SIMPLE (bearish-only)
         'BEARISH': {
                 'base_points': 30,
                 'formula': 'scaled'
@@ -209,10 +205,15 @@ class DoubleTopPattern:
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """INSTITUTIONAL GRADE: Double top with multi-block validation + PHASE 1 improvements"""
         if len(df) < 30:  # Need more data for quality validation
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
                 'timestamp': df['timestamp'].iloc[-1] if len(df) > 0 else datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -226,10 +227,16 @@ class DoubleTopPattern:
             if bars_since_pattern_start > self.PATTERN_MAX_DURATION:
                 # Pattern expired without breakdown
                 self.reset_pattern_state()
+                granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
                 return {
-                    'signal': 'NO_PATTERN',
+                    'signal': granular_signal,
+                    'signal_simple': simple_signal,
                     'confidence': 0,
-                    'metadata': {'reason': 'Pattern expired (>100 bars)'},
+                    'metadata': {
+                        'signal_simple': simple_signal,
+                        'signal_granular': granular_signal,
+                        'reason': 'Pattern expired (>100 bars)'
+                    },
                     'timestamp': df['timestamp'].iloc[-1],
                     'timeframe': self.timeframe,
                     'confluence_factors': []
@@ -243,10 +250,15 @@ class DoubleTopPattern:
         peaks = self.find_peaks(df, rsi)
         
         if len(peaks) < 2:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -260,10 +272,14 @@ class DoubleTopPattern:
         bars_between = p2['idx'] - p1['idx']
         
         if bars_between < self.MIN_BARS_BETWEEN_PEAKS:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'reason': 'Pattern forming too quickly',
                     'bars_between': bars_between,
                     'min_required': self.MIN_BARS_BETWEEN_PEAKS
@@ -274,10 +290,14 @@ class DoubleTopPattern:
             }
         
         if bars_between > self.MAX_BARS_BETWEEN_PEAKS:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'reason': 'Peaks too far apart',
                     'bars_between': bars_between,
                     'max_allowed': self.MAX_BARS_BETWEEN_PEAKS
@@ -290,10 +310,14 @@ class DoubleTopPattern:
         # Check: Similar price (REQUIRED - tightened to 2%)
         price_diff = abs(p1['price'] - p2['price']) / p1['price']
         if price_diff > self.peak_tolerance:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'reason': 'Peaks not similar enough',
                     'peak_diff_pct': round(price_diff * 100, 2),
                     'max_allowed': round(self.peak_tolerance * 100, 2)
@@ -356,10 +380,14 @@ class DoubleTopPattern:
         
         # MINIMUM THRESHOLD: Require at least 4 confluences for institutional grade
         if len(confluences) < self.MIN_CONFLUENCES:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'reason': 'Insufficient validation',
                     'confluences_found': len(confluences),
                     'confluences_required': self.MIN_CONFLUENCES
@@ -399,10 +427,16 @@ class DoubleTopPattern:
                 if bars_since_breakdown > self.BREAKDOWN_MAX_DURATION:
                     # Breakdown complete - reset
                     self.reset_pattern_state()
+                    granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
                     return {
-                        'signal': 'NO_PATTERN',
+                        'signal': granular_signal,
+                        'signal_simple': simple_signal,
                         'confidence': 0,
-                        'metadata': {'reason': 'Breakdown completed (>20 bars)'},
+                        'metadata': {
+                            'signal_simple': simple_signal,
+                            'signal_granular': granular_signal,
+                            'reason': 'Breakdown completed (>20 bars)'
+                        },
                         'timestamp': df['timestamp'].iloc[-1],
                         'timeframe': self.timeframe,
                         'confluence_factors': []
@@ -415,10 +449,16 @@ class DoubleTopPattern:
             if self.breakdown_start_idx is not None:
                 # Was in breakdown but price recovered - pattern invalidated
                 self.reset_pattern_state()
+                granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
                 return {
-                    'signal': 'NO_PATTERN',
+                    'signal': granular_signal,
+                    'signal_simple': simple_signal,
                     'confidence': 0,
-                    'metadata': {'reason': 'Price recovered above neckline'},
+                    'metadata': {
+                        'signal_simple': simple_signal,
+                        'signal_granular': granular_signal,
+                        'reason': 'Price recovered above neckline'
+                    },
                     'timestamp': df['timestamp'].iloc[-1],
                     'timeframe': self.timeframe,
                     'confluence_factors': []
