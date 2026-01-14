@@ -231,13 +231,17 @@ class ADR:
         percentile = (np.sum(daily_ranges < current_range) / len(daily_ranges)) * 100
         return percentile
     
-    def classify_range(self, current_range: float, adr_value: float) -> str:
+    def classify_range(self, current_range: float, adr_value: float, range_trend: str = 'STABLE') -> str:
         """
-        FIXED: Classify daily range relative to ADR, not absolute thresholds
+        Enhanced: Classify daily range with ALL registered signal types
+        
+        Returns one of: CALM, NORMAL, ELEVATED, HIGH, EXTREME, VOLATILE, 
+                       NEAR_ADR, ABOVE_ADR, BELOW_ADR, WITHIN_ADR
         
         Args:
             current_range: Current day's range (dollars)
             adr_value: Average daily range (dollars)
+            range_trend: EXPANDING/CONTRACTING/STABLE
             
         Returns:
             Range classification
@@ -248,17 +252,38 @@ class ADR:
         # Calculate ratio to ADR
         adr_ratio = current_range / adr_value
         
-        # Classify based on ADR ratio
-        if adr_ratio < self.adr_relative_thresholds['calm']:
-            return 'CALM'
-        elif adr_ratio < self.adr_relative_thresholds['normal']:
-            return 'NORMAL'
-        elif adr_ratio < self.adr_relative_thresholds['elevated']:
-            return 'ELEVATED'
-        elif adr_ratio < self.adr_relative_thresholds['high']:
-            return 'HIGH'
-        else:
+        # High volatility classifications first (most extreme)
+        if adr_ratio > 2.0:
             return 'EXTREME'
+        elif adr_ratio > 1.7:
+            return 'HIGH'
+        # VOLATILE: High volatility with expansion (>1.5 and expanding)
+        elif adr_ratio > 1.5 and range_trend == 'EXPANDING':
+            return 'VOLATILE'
+        elif adr_ratio > 1.5:
+            return 'ELEVATED'
+        
+        # ADR relationship signals (near/above/within ADR)
+        # ABOVE_ADR: significantly above ADR (105-150%)
+        elif 1.05 < adr_ratio <= 1.5:
+            return 'ABOVE_ADR'
+        # NEAR_ADR: within 5% of ADR value
+        elif 0.95 <= adr_ratio <= 1.05:
+            return 'NEAR_ADR'
+        # WITHIN_ADR: within normal ADR range (70-95%)
+        elif 0.7 <= adr_ratio < 0.95:
+            return 'WITHIN_ADR'
+        
+        # Low volatility classifications
+        # NORMAL: Below ADR but not extremely low (50-70%)
+        elif 0.5 <= adr_ratio < 0.7:
+            return 'NORMAL'
+        # BELOW_ADR: Low range (30-50%)
+        elif 0.3 <= adr_ratio < 0.5:
+            return 'BELOW_ADR'
+        # CALM: Very low volatility (<30%)
+        else:
+            return 'CALM'
     
     def calculate_adr_percentile(self, current_adr: float) -> Dict[str, Any]:
         """
@@ -504,8 +529,11 @@ class ADR:
         adr_percent = (adr_value / current_price) * 100
         current_range_percent = (current_range / current_price) * 100
         
-        # FIXED: Classify range using ADR-relative thresholds
-        range_classification = self.classify_range(current_range, adr_value)
+        # Calculate range trend FIRST (needed for classification)
+        range_trend = self.calculate_expansion_contraction(daily_ranges, lookback=5)
+        
+        # Classify range with trend context
+        range_classification = self.classify_range(current_range, adr_value, range_trend)
         
         # **NEW:** Event tracking - detect volatility LEVEL changes
         is_new_event = False
@@ -544,9 +572,6 @@ class ADR:
         
         # Calculate range percentile
         range_percentile = self.calculate_range_percentile(current_range, daily_ranges)
-        
-        # Determine expansion/contraction
-        range_trend = self.calculate_expansion_contraction(daily_ranges, lookback=5)
         
         # Suggest targets
         targets = self.suggest_targets(adr_value, current_price)
