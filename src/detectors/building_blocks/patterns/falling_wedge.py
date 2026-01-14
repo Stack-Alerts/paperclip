@@ -32,8 +32,8 @@ import numpy as np
     valid_signals=[
         # Granular pattern signals
         'BULLISH_BREAKOUT', 'PATTERN_FORMING', 'NO_PATTERN',
-        # Simple directional - SIMPLE
-        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Simple directional - SIMPLE (falling wedge = bullish only!)
+        'BULLISH', 'NEUTRAL',
         # Status
         'ERROR', 'INSUFFICIENT_DATA'
     ],
@@ -51,12 +51,8 @@ import numpy as np
                 'points': 0
         },
         
-        # Simple directional - SIMPLE
+        # Simple directional - SIMPLE (falling wedge = bullish only!)
         'BULLISH': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
-        'BEARISH': {
                 'base_points': 30,
                 'formula': 'scaled'
         },
