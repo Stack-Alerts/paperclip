@@ -358,8 +358,11 @@ class InternalPivotPattern:
         """Generate neutral response."""
         return {
             'signal': 'NEUTRAL',
+            'signal_simple': 'NEUTRAL',
             'confidence': 50,
             'metadata': {
+                'signal_simple': 'NEUTRAL',
+                'signal_granular': 'NEUTRAL',
                 'current_price': round(price, 2),
                 'reason': reason or 'No internal pivot detected',
                 'is_new_event': False,
