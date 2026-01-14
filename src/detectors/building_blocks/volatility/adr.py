@@ -154,6 +154,14 @@ class ADR:
             'extreme': 2.0    # > 200% of ADR
         }
     
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        # ADR is volatility context - doesn't provide directional bias
+        # All volatility levels map to NEUTRAL for simple users
+        granular = signal
+        simple = 'NEUTRAL'  # Volatility context only
+        return granular, simple
+    
     def calculate_daily_range(self, df: pd.DataFrame) -> pd.Series:
         """
         Calculate daily range (high - low) for each day
@@ -588,8 +596,13 @@ class ADR:
         elif position_sizing > 1.0:
             confluence_factors.append(f'Position sizing: {position_sizing}x - can increase size due to low volatility')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(range_classification)
+        
         # Prepare metadata (ENHANCED)
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'adr_value': round(adr_value, 2),
             'adr_percent': round(adr_percent, 2),
             'current_range': round(current_range, 2),
@@ -614,7 +627,8 @@ class ADR:
         }
         
         return {
-            'signal': range_classification,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),
