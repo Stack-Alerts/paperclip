@@ -127,6 +127,19 @@ class SwingFailurePattern:
         self.sfp_history = []  # Track recent SFPs for multiple failure detection
         self.max_history = 5   # Keep last 5 SFPs
     
+    def _determine_dual_signals(self, sfp_type: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        if sfp_type == 'BULLISH_SFP':
+            granular = 'BULLISH_SFP'
+            simple = 'BULLISH'
+        elif sfp_type == 'BEARISH_SFP':
+            granular = 'BEARISH_SFP'
+            simple = 'BEARISH'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def classify_penetration_strength(self, penetration_pct: float) -> str:
         """
         Classify penetration strength - Priority 1.1
@@ -469,9 +482,14 @@ class SwingFailurePattern:
         confluence_factors.append('Breakout traders trapped')
         confluence_factors.append('High probability counter-trend entry')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(active_sfp['type'])
+        
         # **ENHANCED:** Metadata with quality metrics
         if active_sfp['type'] == 'BULLISH_SFP':
             metadata = {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'sfp_type': active_sfp['type'],
                 'swing_low': active_sfp['swing_low'],
                 'failure_low': active_sfp['failure_low'],
@@ -496,7 +514,8 @@ class SwingFailurePattern:
             }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
