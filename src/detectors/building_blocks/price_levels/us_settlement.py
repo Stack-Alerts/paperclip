@@ -105,6 +105,32 @@ class USSettlement:
             'far': 3.0
         }
     
+    def _determine_dual_signals(self, distance_pct: float, distance_class: str,
+                                 reversal_bounce: bool, reversal_rejection: bool) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        # Granular: specific position relative to settlement
+        if distance_class == 'AT_SETTLEMENT':
+            granular = 'AT_SETTLEMENT'
+        elif distance_pct > 0:
+            granular = 'ABOVE_SETTLEMENT'
+        else:
+            granular = 'BELOW_SETTLEMENT'
+        
+        # Simple: directional bias
+        if reversal_bounce:
+            simple = 'BULLISH'
+        elif reversal_rejection:
+            simple = 'BEARISH'
+        elif distance_pct > 0 and distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE']:
+            simple = 'BULLISH'
+        elif distance_pct < 0 and distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE']:
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def find_settlement_price(self, df: pd.DataFrame) -> float:
         """Find most recent settlement price (21:00 UTC / 4 PM ET)"""
         if 'timestamp' not in df.columns or 'close' not in df.columns:
@@ -225,17 +251,10 @@ class USSettlement:
                 self.last_settlement_test_bar = None
                 self.bars_since_test = []
         
-        # Determine signal (ENHANCED with reversal confirmation)
-        if reversal_bounce:
-            signal = 'BULLISH'  # Support holding at settlement
-        elif reversal_rejection:
-            signal = 'BEARISH'  # Resistance holding at settlement
-        elif distance_pct > 0 and distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE']:
-            signal = 'BULLISH'  # Above settlement (support)
-        elif distance_pct < 0 and distance_class in ['AT_SETTLEMENT', 'VERY_CLOSE']:
-            signal = 'BEARISH'  # Below settlement (resistance)
-        else:
-            signal = 'NEUTRAL'
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(
+            distance_pct, distance_class, reversal_bounce, reversal_rejection
+        )
         
         # Confidence calculation (BOOSTED for reversal confirmation)
         confidence = 70
@@ -275,11 +294,15 @@ class USSettlement:
             'reversal_bounce': reversal_bounce,
             'reversal_rejection': reversal_rejection,
             'reversal_candles': self.reversal_candles,
-            'bars_monitored': len(self.bars_since_test)
+            'bars_monitored': len(self.bars_since_test),
+            # DUAL SIGNAL ARCHITECTURE
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],

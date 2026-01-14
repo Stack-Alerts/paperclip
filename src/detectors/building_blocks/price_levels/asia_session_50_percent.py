@@ -119,6 +119,39 @@ class AsiaSession50Percent:
             'far': 5.0
         }
     
+    def _determine_dual_signals(self, distance_pct: float, distance_class: str,
+                                 in_asia_session: bool, in_london_us_session: bool,
+                                 confirmed_bounce: bool, confirmed_rejection: bool,
+                                 breached_50: bool, crossed_50_up: bool, crossed_50_down: bool) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        # Granular signal: position relative to Asia 50%
+        if distance_class == 'AT_ASIA_50':
+            granular = 'AT_ASIA_50'
+        elif distance_pct > 0:
+            granular = 'ABOVE_ASIA_50'
+        else:
+            granular = 'BELOW_ASIA_50'
+        
+        # Simple signal: directional bias
+        if in_asia_session:
+            simple = 'NEUTRAL'  # No signals during Asia (50% forming)
+        elif in_london_us_session:
+            if confirmed_bounce:
+                simple = 'BULLISH'
+            elif confirmed_rejection:
+                simple = 'BEARISH'
+            elif breached_50:
+                simple = 'BULLISH' if crossed_50_up else 'BEARISH'
+            elif distance_class == 'AT_ASIA_50':
+                simple = 'BULLISH' if distance_pct > 0 else 'BEARISH'
+            else:
+                simple = 'NEUTRAL'
+        else:
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def calculate_asia_50(self, df: pd.DataFrame) -> float:
         """Calculate 50% of Asia session range"""
         if 'timestamp' not in df.columns or 'high' not in df.columns or 'low' not in df.columns:
@@ -433,6 +466,16 @@ class AsiaSession50Percent:
         else:
             current_session = 'AFTER_HOURS'
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(
+            distance_pct, distance_class, in_asia_session, in_london_us_session,
+            confirmed_bounce, confirmed_rejection, breached_50, crossed_50_up, crossed_50_down
+        )
+        
+        # Override signal with granular for consistency
+        signal = granular_signal if signal != 'NEUTRAL' else granular_signal
+        # But use simple_signal for simple mode compatibility
+        
         metadata = {
             'asia_50': round(asia_50, 2),
             'current_price': round(current_price, 2),
@@ -449,11 +492,15 @@ class AsiaSession50Percent:
             'confirmed_bounce': confirmed_bounce,
             'confirmed_rejection': confirmed_rejection,
             'confirmation_candles': self.confirmation_candles,
-            'price_above_50': price_above
+            'price_above_50': price_above,
+            # DUAL SIGNAL ARCHITECTURE
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],

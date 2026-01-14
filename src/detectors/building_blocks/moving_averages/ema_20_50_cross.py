@@ -117,6 +117,22 @@ class EMA2050Cross:
         self.cross_lookback = cross_lookback
         self.volume_threshold = volume_threshold
     
+    def _determine_dual_signals(self, cross: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        # Granular: specific cross event
+        if cross == 'GOLDEN_CROSS':
+            granular = 'GOLDEN_CROSS'
+            simple = 'BULLISH'
+        elif cross == 'DEATH_CROSS':
+            granular = 'DEATH_CROSS'
+            simple = 'BEARISH'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def calculate_ema(self, close: pd.Series, period: int) -> pd.Series:
         """Calculate Exponential Moving Average"""
         return close.ewm(span=period, adjust=False).mean()
@@ -304,6 +320,9 @@ class EMA2050Cross:
         elif signal != 'NEUTRAL' and bars_in_state > 0:
             confluence_factors.insert(0, f'Continuing {cross.replace("_", " ").lower()} confirmation ({bars_in_state} bars)')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(cross)
+        
         # Metadata
         metadata = {
             'fast_ema': round(current_fast, 2),
@@ -316,11 +335,15 @@ class EMA2050Cross:
             'slow_period': self.slow_period,
             'cross_lookback': self.cross_lookback,
             'is_new_event': is_new_event,  # EVENT TRACKING
-            'bars_in_state': bars_in_state   # EVENT TRACKING
+            'bars_in_state': bars_in_state,   # EVENT TRACKING
+            # DUAL SIGNAL ARCHITECTURE
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),

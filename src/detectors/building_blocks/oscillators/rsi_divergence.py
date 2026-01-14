@@ -125,6 +125,20 @@ class RSIDivergence:
             'extreme_overbought': 80
         }
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        granular = granular_signal
+        
+        # Map granular to simple
+        if granular in ['BULLISH_DIVERGENCE', 'OVERSOLD']:
+            simple = 'BULLISH'
+        elif granular in ['BEARISH_DIVERGENCE', 'OVERBOUGHT']:
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def calculate_rsi(self, close: pd.Series) -> pd.Series:
         """Calculate RSI using Wilder's smoothing"""
         delta = close.diff()
@@ -275,13 +289,20 @@ class RSIDivergence:
         if divergences['hidden_bearish']:
             confluence_factors.append('Hidden bearish divergence - trend continuation')
         
-        # Determine signal
-        if divergences['bullish_divergence'] or level in ['EXTREME_OVERSOLD', 'OVERSOLD']:
-            signal = 'BULLISH'
-        elif divergences['bearish_divergence'] or level in ['EXTREME_OVERBOUGHT', 'OVERBOUGHT']:
-            signal = 'BEARISH'
+        # Determine GRANULAR signal
+        if divergences['bullish_divergence']:
+            signal = 'BULLISH_DIVERGENCE'
+        elif divergences['bearish_divergence']:
+            signal = 'BEARISH_DIVERGENCE'
+        elif level in ['EXTREME_OVERSOLD', 'OVERSOLD']:
+            signal = 'OVERSOLD'
+        elif level in ['EXTREME_OVERBOUGHT', 'OVERBOUGHT']:
+            signal = 'OVERBOUGHT'
         else:
             signal = 'NEUTRAL'
+        
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
         
         # Metadata
         metadata = {
@@ -292,11 +313,14 @@ class RSIDivergence:
             'period': self.period,
             'overbought_threshold': self.overbought,
             'oversold_threshold': self.oversold,
-            'recent_rsi': rsi.tail(10).tolist()
+            'recent_rsi': rsi.tail(10).tolist(),
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),

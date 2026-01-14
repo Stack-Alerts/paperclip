@@ -107,6 +107,15 @@ class DoubleTopPattern:
         
         # Breakdown requirements (PHASE 1: stricter)
         self.BREAK_MARGIN = 0.005  # Must break 0.5% below neckline
+    
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BEARISH_BREAKDOWN', 'PATTERN_FORMING']:
+            simple = 'BEARISH'  # Double top is bearish pattern
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for overbought detection"""
@@ -436,10 +445,16 @@ class DoubleTopPattern:
         avg_price = (p1['price'] + p2['price']) / 2
         target = neckline - (avg_price - neckline)
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': final_confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pattern_type': 'DOUBLE_TOP_INSTITUTIONAL',
                 'peaks': [round(p1['price'], 2), round(p2['price'], 2)],
                 'peak_rsi': [round(p1['rsi'], 1), round(p2['rsi'], 1)],

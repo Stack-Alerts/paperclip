@@ -227,27 +227,74 @@ class HOD:
         else:
             return 'FAR'
     
+    def _determine_dual_signals(self, current_price: float, hod: float,
+                                 distance_pct: float, distance_class: str,
+                                 breakout_status: str, reversal_rejection: bool,
+                                 reversal_breakthrough: bool) -> tuple:
+        """
+        DUAL SIGNAL ARCHITECTURE - Returns both granular and simple signals
+        
+        For strategy builder:
+        - Simple mode uses simple_signal: BULLISH, BEARISH, NEUTRAL
+        - Advanced mode uses granular_signal: ABOVE_HOD, AT_HOD, BELOW_HOD, HOD_REJECTION
+        - Combined mode uses both with confluence logic
+        
+        Returns: (granular_signal, simple_signal)
+        """
+        
+        # Determine granular signal based on price relationship to HOD
+        if reversal_breakthrough:
+            granular = 'ABOVE_HOD'
+            simple = 'BULLISH'
+        elif reversal_rejection:
+            granular = 'HOD_REJECTION'
+            simple = 'BEARISH'
+        elif breakout_status == 'BREAKOUT_CONFIRMED' and current_price > hod:
+            granular = 'ABOVE_HOD'
+            simple = 'BULLISH'
+        elif distance_class == 'AT_HOD' and abs(distance_pct) < 0.3:
+            granular = 'AT_HOD'
+            simple = 'NEUTRAL' if distance_pct >= 0 else 'BEARISH'
+        elif distance_class == 'AT_HOD' and distance_pct < 0:
+            granular = 'HOD_REJECTION'
+            simple = 'BEARISH'
+        elif current_price > hod and distance_class != 'FAR':
+            granular = 'ABOVE_HOD'
+            simple = 'BULLISH'
+        elif current_price < hod:
+            granular = 'BELOW_HOD'
+            simple = 'BEARISH' if distance_class == 'FAR' else 'NEUTRAL'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def calculate_variable_confidence(self, signal: str, distance_class: str, is_new_event: bool) -> float:
         """
         OPTIMIZED: Variable confidence targeting 75-85% average with better variation
         """
-        # Base confidence by signal (OPTIMIZED for target range)
-        if signal == 'BULLISH':
-            base = 75  # Breakout (reduced from 80 → target avg)
-        elif signal == 'BEARISH':
-            base = 65  # Rejection at HOD (reduced from 70 → target avg)
+        # Base confidence by signal (works for both granular and simple)
+        if signal in ['ABOVE_HOD', 'BULLISH']:
+            base = 75
+        elif signal in ['HOD_REJECTION', 'BEARISH']:
+            base = 65
+        elif signal == 'AT_HOD':
+            base = 70  # Testing key level
+        elif signal == 'BELOW_HOD':
+            base = 60  # Below resistance
         else:  # NEUTRAL
-            base = 55  # Neutral (reduced from 60)
+            base = 55
         
         # Adjust by distance (±10% for variation)
         if distance_class in ['AT_HOD', 'VERY_CLOSE']:
-            base = min(95, base + 10)  # Near HOD (cap at 95, not 100)
+            base = min(95, base + 10)
         elif distance_class == 'FAR':
-            base = max(50, base - 10)  # Far from HOD
+            base = max(50, base - 10)
         
         # Fresh event boost (+10% for new events)
         if is_new_event:
-            base = min(95, base + 10)  # Cap at 95
+            base = min(95, base + 10)
         
         return base
     
@@ -379,23 +426,14 @@ class HOD:
                     if higher_highs and higher_lows:
                         reversal_breakthrough = True
         
-        # Determine signal (ENHANCED with reversal confirmation)
-        if reversal_breakthrough:
-            # REVERSAL BREAKTHROUGH - strong bullish continuation after HOD break
-            signal = 'BULLISH'
-        elif reversal_rejection:
-            # REVERSAL REJECTION - bearish reversal after testing HOD
-            signal = 'BEARISH'
-        elif breakout_status == 'BREAKOUT_CONFIRMED' or is_new_hod:
-            signal = 'BULLISH'
-        elif breakout_status == 'BREAKING_OUT':
-            signal = 'NEUTRAL'
-        elif distance_class == 'AT_HOD' and distance_pct < 0:
-            # More selective: Only signal BEARISH if AT_HOD (not VERY_CLOSE)
-            # This is within 0.2% of HOD (9-18 points on BTC)
-            signal = 'BEARISH'  # Rejection at HOD
-        else:
-            signal = 'NEUTRAL'
+        # DUAL SIGNAL ARCHITECTURE: Determine both granular and simple signals
+        granular_signal, simple_signal = self._determine_dual_signals(
+            current_price, hod, distance_pct, distance_class,
+            breakout_status, reversal_rejection, reversal_breakthrough
+        )
+        
+        # Use granular signal as primary
+        signal = granular_signal
         
         # ENHANCEMENT 2: Event tracking
         is_new_event = False
@@ -452,7 +490,7 @@ class HOD:
         self.prev_hod = hod
         self.prev_signal = signal
         
-        # Metadata (ENHANCED with retest confirmation)
+        # Metadata (ENHANCED with retest confirmation + DUAL SIGNALS)
         metadata = {
             'hod': round(hod, 2),
             'current_price': round(current_price, 2),
@@ -464,14 +502,18 @@ class HOD:
             'is_at_resistance': distance_class in ['AT_HOD', 'VERY_CLOSE'] and distance_pct < 0,
             'is_breaking_out': breakout_status in ['BREAKING_OUT', 'BREAKOUT_CONFIRMED'],
             'is_new_event': is_new_event,
-            'reversal_rejection': reversal_rejection,  # NEW: Bearish reversal after testing HOD
-            'reversal_breakthrough': reversal_breakthrough,  # NEW: Bullish continuation after breaking HOD
+            'reversal_rejection': reversal_rejection,
+            'reversal_breakthrough': reversal_breakthrough,
             'reversal_candles': self.reversal_candles,
-            'bars_monitored': len(self.bars_since_test)
+            'bars_monitored': len(self.bars_since_test),
+            # DUAL SIGNAL ARCHITECTURE
+            'signal_simple': simple_signal,  # For simple mode strategies
+            'signal_granular': granular_signal,  # For advanced mode strategies
         }
         
         return {
-            'signal': signal,
+            'signal': signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],

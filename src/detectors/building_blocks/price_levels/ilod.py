@@ -98,6 +98,30 @@ class ILOD:
         self.timeframe = timeframe
         self.prev_ilod = None
         self.proximity_threshold = 0.15  # 0.15% = ~$67 on $45k BTC
+    
+    def _determine_dual_signals(self, distance_pct: float, is_new_ilod: bool) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        if is_new_ilod and distance_pct < 0:
+            granular = 'BEARISH_BREAK'
+            simple = 'BEARISH'
+        elif abs(distance_pct) < self.proximity_threshold and distance_pct > 0:
+            granular = 'BULLISH_BOUNCE'
+            simple = 'BULLISH'
+        elif abs(distance_pct) < self.proximity_threshold:
+            granular = 'AT_ILOD'
+            simple = 'NEUTRAL'
+        elif distance_pct > 0.5:
+            granular = 'ABOVE_ILOD'
+            simple = 'NEUTRAL'
+        elif distance_pct < 0:
+            granular = 'BELOW_ILOD'
+            simple = 'BEARISH'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        
+        return granular, simple
         
     def calculate_ilod(self, df: pd.DataFrame) -> float:
         """Calculate INTRADAY Low of Day (today's low so far)"""
@@ -158,39 +182,39 @@ class ILOD:
         if self.prev_ilod is not None and ilod < self.prev_ilod:
             is_new_ilod = True
         
-        # Determine signal
-        if is_new_ilod and distance_pct < 0:
-            signal = 'BEARISH_BREAK'
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(distance_pct, is_new_ilod)
+        signal = granular_signal
+        
+        # Determine confidence
+        if signal == 'BEARISH_BREAK':
             confidence = 85
-        elif abs(distance_pct) < self.proximity_threshold and distance_pct > 0:
-            # At ILOD from above - bounce zone
-            signal = 'BULLISH_BOUNCE'
+        elif signal == 'BULLISH_BOUNCE':
             confidence = 80
-        elif abs(distance_pct) < self.proximity_threshold:
-            signal = 'AT_ILOD'
+        elif signal == 'AT_ILOD':
             confidence = 70
-        elif distance_pct > 0.5:
-            signal = 'ABOVE_ILOD'
+        elif signal == 'ABOVE_ILOD':
             confidence = 60
-        elif distance_pct < 0:
-            signal = 'BELOW_ILOD'
+        elif signal == 'BELOW_ILOD':
             confidence = 65
         else:
-            signal = 'NEUTRAL'
             confidence = 50
         
         # Update tracking
         self.prev_ilod = ilod
         
         return {
-            'signal': signal,
+            'signal': signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': confidence,
             'metadata': {
                 'ilod': round(ilod, 2),
                 'current_price': round(current_price, 2),
                 'distance_pct': round(distance_pct, 2),
                 'is_new_ilod': is_new_ilod,
-                'description': f"Today's low: ${ilod:.2f}, Price: ${current_price:.2f} ({distance_pct:+.2f}%)"
+                'description': f"Today's low: ${ilod:.2f}, Price: ${current_price:.2f} ({distance_pct:+.2f}%)",
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
             },
             'timestamp': df['timestamp'].iloc[-1],
             'timeframe': self.timeframe

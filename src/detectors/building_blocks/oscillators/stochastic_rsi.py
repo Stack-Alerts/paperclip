@@ -131,6 +131,17 @@ class StochasticRSI:
             'extreme_overbought': 90
         }
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BULLISH_CROSS', 'NEUTRAL_LOW']:
+            simple = 'BULLISH'
+        elif granular in ['BEARISH_CROSS', 'NEUTRAL_HIGH']:
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def calculate_rsi(self, close: pd.Series) -> pd.Series:
         """Calculate RSI"""
         delta = close.diff()
@@ -257,13 +268,20 @@ class StochasticRSI:
         
         confluence_factors.append(f'StochRSI level: {level} (%K: {current_k:.1f})')
         
-        # Determine signal
-        if crossover == 'BULLISH_CROSS' or (level in ['EXTREME_OVERSOLD', 'OVERSOLD'] and current_k > current_d):
-            signal = 'BULLISH'
-        elif crossover == 'BEARISH_CROSS' or (level in ['EXTREME_OVERBOUGHT', 'OVERBOUGHT'] and current_k < current_d):
-            signal = 'BEARISH'
+        # Determine GRANULAR signal
+        if crossover == 'BULLISH_CROSS':
+            signal = 'BULLISH_CROSS'
+        elif crossover == 'BEARISH_CROSS':
+            signal = 'BEARISH_CROSS'
+        elif level in ['NEUTRAL_HIGH', 'OVERBOUGHT', 'EXTREME_OVERBOUGHT']:
+            signal = 'NEUTRAL_HIGH'
+        elif level in ['NEUTRAL_LOW', 'OVERSOLD', 'EXTREME_OVERSOLD']:
+            signal = 'NEUTRAL_LOW'
         else:
-            signal = 'NEUTRAL'
+            signal = 'NO_CROSS'
+        
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
         
         # Metadata
         metadata = {
@@ -275,11 +293,14 @@ class StochasticRSI:
             'rsi_period': self.rsi_period,
             'stoch_period': self.stoch_period,
             'recent_k': k_line.tail(10).tolist(),
-            'recent_d': d_line.tail(10).tolist()
+            'recent_d': d_line.tail(10).tolist(),
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),

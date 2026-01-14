@@ -27,9 +27,9 @@ Reference: docs/DAY8_PATH_B_PLAN.md
 __version__ = "2.0.0"  # Sophisticated V2
 __author__ = "BTC_Engine_v3"
 
-# Core detectors (Day 8)
-from .zigzag_detector import ZigzagDetector, Pivot, GhostLevel
-from .divergence_detector import DivergenceDetector, DivergenceSignal
+# Core detectors (Day 8) - Now in utilities
+from .utilities.zigzag_detector import ZigzagDetector, Pivot, GhostLevel
+from .utilities.divergence_detector import DivergenceDetector, DivergenceSignal
 
 # Statistical components (Day 9)
 # from .pattern_statistics import PatternStatistics

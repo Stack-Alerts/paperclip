@@ -114,6 +114,15 @@ class InverseHeadAndShouldersPattern:
         
         # Breakout requirements (stricter)
         self.BREAK_MARGIN = 0.005  # Must break 0.5% above neckline
+    
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['PATTERN_CONFIRMED', 'PATTERN_FORMING']:
+            simple = 'BULLISH'  # Inverse H&S is bullish pattern
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for oversold detection"""
@@ -416,10 +425,16 @@ class InverseHeadAndShouldersPattern:
         # Calculate target
         target_price = neckline_price + pattern['pattern_height']
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': final_confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pattern_type': 'INVERSE_HEAD_AND_SHOULDERS_INSTITUTIONAL',
                 'left_shoulder_price': round(ls['price'], 2),
                 'left_shoulder_rsi': round(ls.get('rsi', 50), 1),

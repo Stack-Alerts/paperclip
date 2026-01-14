@@ -141,6 +141,22 @@ class AnchoredVWAP:
         self.swing_lookback = swing_lookback
         self.touch_threshold_atr = touch_threshold_atr
     
+    def _determine_dual_signals(self, granular_signal: str, above_vwap: bool, at_vwap: bool) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        # Granular stays as-is
+        granular = granular_signal
+        
+        # Simple: directional bias
+        if at_vwap or granular_signal in ['AT_VWAP', 'NEAR_VWAP']:
+            simple = 'NEUTRAL'
+        elif above_vwap or granular_signal == 'ABOVE_ANCHORED_VWAP':
+            simple = 'BULLISH'
+        else:
+            simple = 'BEARISH'
+        
+        return granular, simple
+    
     def detect_swing_low(self, df: pd.DataFrame, lookback: int) -> Optional[int]:
         """
         Detect swing low for uptrend anchor
@@ -408,6 +424,9 @@ class AnchoredVWAP:
         else:
             confluence_factors.append(f'⚠️ Counter-trend ({sr_role})')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal, above_vwap, at_vwap)
+        
         # Metadata (much richer than stub!)
         metadata = {
             'anchored_vwap': round(vwap, 2),
@@ -420,11 +439,15 @@ class AnchoredVWAP:
             'support_resistance': sr_role,
             'trend': 'UPTREND' if is_uptrend else 'DOWNTREND',
             'trend_aligned': trend_aligned,
-            'atr': round(atr, 2)
+            'atr': round(atr, 2),
+            # DUAL SIGNAL ARCHITECTURE
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],

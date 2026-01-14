@@ -30,14 +30,33 @@ import numpy as np
     category='MOVING_AVERAGES',
     class_name='EMA2050Trend',
     default_weight=12,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'INSUFFICIENT_DATA', 'ERROR'],
+    valid_signals=[
+        # Granular trend states
+        'STRONG_UPTREND', 'EARLY_UPTREND', 'STRONG_DOWNTREND', 'EARLY_DOWNTREND',
+        # Simple signals
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'INSUFFICIENT_DATA', 'ERROR'
+    ],
     signal_tiers={
-        'ERROR': {
-                'points': 0
+        # Granular trend states
+        'STRONG_UPTREND': {
+                'base_points': 15,
+                'formula': 'scaled'
         },
-        'INSUFFICIENT_DATA': {
-                'points': 0
+        'EARLY_UPTREND': {
+                'base_points': 10,
+                'formula': 'scaled'
         },
+        'STRONG_DOWNTREND': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'EARLY_DOWNTREND': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        # Simple signals
         'BULLISH': {
                 'base_points': 12,
                 'formula': 'scaled'
@@ -49,6 +68,13 @@ import numpy as np
         'NEUTRAL': {
                 'max_points': 6,
                 'formula': 'scaled'
+        },
+        # Status
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
         }
 }
 )
@@ -99,6 +125,20 @@ class EMA2050Trend:
             'wide': 2.0,
             'very_wide': 2.0
         }
+    
+    def _determine_dual_signals(self, trend: str, simple_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        # Granular: specific trend state
+        if trend in ['STRONG_UPTREND', 'EARLY_UPTREND', 'STRONG_DOWNTREND', 'EARLY_DOWNTREND']:
+            granular = trend
+        else:
+            granular = 'NEUTRAL'
+        
+        # Simple: directional (BULLISH, BEARISH, NEUTRAL)
+        simple = simple_signal
+        
+        return granular, simple
     
     def calculate_ema(self, close: pd.Series, period: int) -> pd.Series:
         """Calculate Exponential Moving Average"""
@@ -325,6 +365,9 @@ class EMA2050Trend:
         confluence_factors.append(f'Fast EMA ({self.fast_period}): ${current_fast:.2f}')
         confluence_factors.append(f'Slow EMA ({self.slow_period}): ${current_slow:.2f}')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(trend, signal)
+        
         # Metadata
         metadata = {
             'fast_ema': round(current_fast, 2),
@@ -338,11 +381,15 @@ class EMA2050Trend:
             'fast_period': self.fast_period,
             'slow_period': self.slow_period,
             'is_new_event': is_new_event,  # NEW: Event tracking
-            'bars_since_trend_change': bars_since_trend_change  # NEW: Age tracking
+            'bars_since_trend_change': bars_since_trend_change,  # NEW: Age tracking
+            # DUAL SIGNAL ARCHITECTURE
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),

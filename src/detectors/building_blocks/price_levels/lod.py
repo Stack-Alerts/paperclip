@@ -219,23 +219,70 @@ class LOD:
         else:
             return 'FAR'
     
+    def _determine_dual_signals(self, current_price: float, lod: float,
+                                 distance_pct: float, distance_class: str,
+                                 breakdown_status: str, reversal_bounce: bool,
+                                 reversal_breakdown: bool) -> tuple:
+        """
+        DUAL SIGNAL ARCHITECTURE - Returns both granular and simple signals
+        
+        For strategy builder:
+        - Simple mode uses simple_signal: BULLISH, BEARISH, NEUTRAL
+        - Advanced mode uses granular_signal: BELOW_LOD, AT_LOD, ABOVE_LOD, LOD_BOUNCE
+        - Combined mode uses both with confluence logic
+        
+        Returns: (granular_signal, simple_signal)
+        """
+        
+        # Determine granular signal based on price relationship to LOD
+        if reversal_bounce:
+            granular = 'LOD_BOUNCE'
+            simple = 'BULLISH'
+        elif reversal_breakdown:
+            granular = 'BELOW_LOD'
+            simple = 'BEARISH'
+        elif breakdown_status == 'BREAKDOWN_CONFIRMED' and current_price < lod:
+            granular = 'BELOW_LOD'
+            simple = 'BEARISH'
+        elif distance_class == 'AT_LOD' and abs(distance_pct) < 0.3:
+            granular = 'AT_LOD'
+            simple = 'NEUTRAL' if distance_pct <= 0 else 'BULLISH'
+        elif distance_class == 'AT_LOD' and distance_pct > 0:
+            granular = 'LOD_BOUNCE'
+            simple = 'BULLISH'
+        elif current_price < lod and distance_class != 'FAR':
+            granular = 'BELOW_LOD'
+            simple = 'BEARISH'
+        elif current_price > lod:
+            granular = 'ABOVE_LOD'
+            simple = 'BULLISH' if distance_class == 'FAR' else 'NEUTRAL'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def calculate_variable_confidence(self, signal: str, distance_class: str, is_new_event: bool) -> float:
         """
-        OPTIMIZED V2: Further reduced to hit 80-85% average
+        OPTIMIZED V2: Variable confidence for both granular and simple signals
         """
-        # Base confidence by signal (FURTHER OPTIMIZED)
-        if signal == 'BEARISH':
-            base = 60  # Breakdown (reduced from 65)
-        elif signal == 'BULLISH':
-            base = 65  # Bounce from LOD (reduced from 70)
+        # Base confidence by signal (works for both granular and simple)
+        if signal in ['BELOW_LOD', 'BEARISH']:
+            base = 60
+        elif signal in ['LOD_BOUNCE', 'BULLISH']:
+            base = 65
+        elif signal == 'AT_LOD':
+            base = 70  # Testing key level
+        elif signal == 'ABOVE_LOD':
+            base = 60  # Above support
         else:  # NEUTRAL
-            base = 50  # Neutral (reduced from 55)
+            base = 50
         
         # Adjust by distance (±15% for variation)
         if distance_class in ['AT_LOD', 'VERY_CLOSE']:
-            base = min(95, base + 15)  # Near LOD
+            base = min(95, base + 15)
         elif distance_class == 'FAR':
-            base = max(40, base - 15)  # Far from LOD
+            base = max(40, base - 15)
         
         # Fresh event boost (+15% for new events)
         if is_new_event:
@@ -349,23 +396,14 @@ class LOD:
                     if lower_highs and lower_lows:
                         reversal_breakdown = True
         
-        # Determine signal (ENHANCED with reversal confirmation)
-        if reversal_bounce:
-            # REVERSAL BOUNCE - support holding with bullish continuation
-            signal = 'BULLISH'
-        elif reversal_breakdown:
-            # REVERSAL BREAKDOWN - support broken with bearish continuation
-            signal = 'BEARISH'
-        elif breakdown_status == 'BREAKDOWN_CONFIRMED' or is_new_lod:
-            signal = 'BEARISH'
-        elif breakdown_status == 'BREAKING_DOWN':
-            signal = 'NEUTRAL'
-        elif distance_class == 'AT_LOD' and distance_pct > 0:
-            # More selective: Only AT_LOD (not VERY_CLOSE)
-            # This is within 0.2% of LOD (9-18 points on BTC)
-            signal = 'BULLISH'  # Bounce from LOD
-        else:
-            signal = 'NEUTRAL'
+        # DUAL SIGNAL ARCHITECTURE: Determine both granular and simple signals
+        granular_signal, simple_signal = self._determine_dual_signals(
+            current_price, lod, distance_pct, distance_class,
+            breakdown_status, reversal_bounce, reversal_breakdown
+        )
+        
+        # Use granular signal as primary
+        signal = granular_signal
         
         # ENHANCEMENT 2: Event tracking
         is_new_event = False
@@ -422,7 +460,7 @@ class LOD:
         self.prev_lod = lod
         self.prev_signal = signal
         
-        # Metadata (ENHANCED with retest confirmation)
+        # Metadata (ENHANCED with retest confirmation + DUAL SIGNALS)
         metadata = {
             'lod': round(lod, 2),
             'current_price': round(current_price, 2),
@@ -434,14 +472,18 @@ class LOD:
             'is_at_support': distance_class in ['AT_LOD', 'VERY_CLOSE'] and distance_pct > 0,
             'is_breaking_down': breakdown_status in ['BREAKING_DOWN', 'BREAKDOWN_CONFIRMED'],
             'is_new_event': is_new_event,
-            'reversal_bounce': reversal_bounce,  # NEW: Bullish reversal after testing LOD
-            'reversal_breakdown': reversal_breakdown,  # NEW: Bearish continuation after breaking LOD
+            'reversal_bounce': reversal_bounce,
+            'reversal_breakdown': reversal_breakdown,
             'reversal_candles': self.reversal_candles,
-            'bars_monitored': len(self.bars_since_test)
+            'bars_monitored': len(self.bars_since_test),
+            # DUAL SIGNAL ARCHITECTURE
+            'signal_simple': simple_signal,  # For simple mode strategies
+            'signal_granular': granular_signal,  # For advanced mode strategies
         }
         
         return {
-            'signal': signal,
+            'signal': signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],

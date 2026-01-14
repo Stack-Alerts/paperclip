@@ -210,25 +210,52 @@ class HOW:
         else:
             return 'FAR'
     
+    def _determine_dual_signals(self, current_price: float, how: float,
+                                 distance_pct: float, distance_class: str,
+                                 breakout_status: str, reversal_rejection: bool,
+                                 reversal_breakthrough: bool) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        if reversal_breakthrough:
+            granular = 'BREAKOUT_CONFIRMED'
+            simple = 'BULLISH'
+        elif reversal_rejection:
+            granular = 'BELOW_HOW'
+            simple = 'BEARISH'
+        elif breakout_status == 'BREAKOUT_CONFIRMED':
+            granular = 'BREAKOUT_CONFIRMED'
+            simple = 'BULLISH'
+        elif breakout_status == 'BREAKING_OUT':
+            granular = 'BREAKING_OUT'
+            simple = 'NEUTRAL'
+        elif distance_class in ['AT_HOW', 'VERY_CLOSE'] and distance_pct < 0:
+            granular = 'BELOW_HOW'
+            simple = 'BEARISH'
+        elif current_price < how:
+            granular = 'BELOW_HOW'
+            simple = 'NEUTRAL'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def calculate_variable_confidence(self, signal: str, distance_class: str, is_new_event: bool) -> float:
-        """
-        OPTIMIZED V2: Further reduced bases to hit 80-85% average
-        """
-        # Base confidence by signal (FURTHER OPTIMIZED)
-        if signal == 'BULLISH':
-            base = 70  # Weekly breakout (reduced from 75)
-        elif signal == 'BEARISH':
-            base = 60  # Rejection at HOW (reduced from 65)
-        else:  # NEUTRAL
-            base = 50  # Neutral (reduced from 55)
+        """OPTIMIZED V2: Variable confidence for both granular and simple signals"""
+        if signal in ['BREAKOUT_CONFIRMED', 'BULLISH']:
+            base = 70
+        elif signal in ['BELOW_HOW', 'BEARISH']:
+            base = 60
+        elif signal == 'BREAKING_OUT':
+            base = 65
+        else:
+            base = 50
         
-        # Adjust by distance (±15% for variation)
         if distance_class in ['AT_HOW', 'VERY_CLOSE']:
-            base = min(95, base + 15)  # Near HOW
+            base = min(95, base + 15)
         elif distance_class == 'FAR':
-            base = max(40, base - 15)  # Far from HOW
+            base = max(40, base - 15)
         
-        # Fresh event boost (+15% for new events)
         if is_new_event:
             base = min(95, base + 15)
         
@@ -340,19 +367,14 @@ class HOW:
                     if higher_highs and higher_lows:
                         reversal_breakthrough = True
         
-        # Determine signal (ENHANCED with reversal confirmation)
-        if reversal_breakthrough:
-            signal = 'BULLISH'
-        elif reversal_rejection:
-            signal = 'BEARISH'
-        elif breakout_status == 'BREAKOUT_CONFIRMED' or is_new_how:
-            signal = 'BULLISH'
-        elif breakout_status == 'BREAKING_OUT':
-            signal = 'NEUTRAL'
-        elif distance_class == 'AT_HOW' and distance_pct < 0:
-            signal = 'BEARISH'
-        else:
-            signal = 'NEUTRAL'
+        # DUAL SIGNAL ARCHITECTURE: Determine both granular and simple signals
+        granular_signal, simple_signal = self._determine_dual_signals(
+            current_price, how, distance_pct, distance_class,
+            breakout_status, reversal_rejection, reversal_breakthrough
+        )
+        
+        # Use granular signal as primary
+        signal = granular_signal
         
         # ENHANCEMENT 2: Event tracking
         is_new_event = False
@@ -408,7 +430,7 @@ class HOW:
         self.prev_how = how
         self.prev_signal = signal
         
-        # Metadata (ENHANCED with retest confirmation)
+        # Metadata (ENHANCED with retest confirmation + DUAL SIGNALS)
         metadata = {
             'how': round(how, 2),
             'current_price': round(current_price, 2),
@@ -420,14 +442,18 @@ class HOW:
             'is_major_resistance': distance_class in ['AT_HOW', 'VERY_CLOSE'] and distance_pct < 0,
             'is_breaking_out': breakout_status in ['BREAKING_OUT', 'BREAKOUT_CONFIRMED'],
             'is_new_event': is_new_event,
-            'reversal_rejection': reversal_rejection,  # NEW: Bearish reversal after testing HOW
-            'reversal_breakthrough': reversal_breakthrough,  # NEW: Bullish continuation after breaking HOW
+            'reversal_rejection': reversal_rejection,
+            'reversal_breakthrough': reversal_breakthrough,
             'reversal_candles': self.reversal_candles,
-            'bars_monitored': len(self.bars_since_test)
+            'bars_monitored': len(self.bars_since_test),
+            # DUAL SIGNAL ARCHITECTURE
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
         }
         
         return {
-            'signal': signal,
+            'signal': signal,  # Granular signal (primary)
+            'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
