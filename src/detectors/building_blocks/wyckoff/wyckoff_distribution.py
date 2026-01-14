@@ -167,6 +167,22 @@ class WyckoffDistribution:
         self.sow_breakdown_pct = sow_breakdown_pct
         self.sow_volume_ratio = sow_volume_ratio
     
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        granular = signal
+        
+        # Map Wyckoff distribution phases to directional signals
+        if signal in ['SOW_BREAKDOWN', 'UTAD_DETECTED', 'DISTRIBUTION_PHASE_A']:
+            # Phase D (SOW), Phase C (UTAD), Phase A (Climax) = BEARISH
+            simple = 'BEARISH'
+        elif signal == 'DISTRIBUTION_PHASE_B':
+            # Phase B (consolidation at top) = NEUTRAL
+            simple = 'NEUTRAL'
+        else:  # NO_DISTRIBUTION
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def detect_buying_climax(self, df: pd.DataFrame) -> tuple:
         """
         Detect buying climax (Phase A):
@@ -384,8 +400,13 @@ class WyckoffDistribution:
             confluence_factors.append('📉 Price trending - not consolidating at top')
             confluence_factors.append('❌ No distribution pattern detected')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Build metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'phase': phase,
             'utad_detected': utad,
             'sow_detected': sow,
@@ -396,7 +417,8 @@ class WyckoffDistribution:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': int(confidence),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
