@@ -129,6 +129,31 @@ class OrderFlowImbalance:
         self.atr_period = atr_period
         self.imbalance_threshold = imbalance_threshold
     
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        # Imbalance signals (granular) map to simple directional
+        if signal == 'BUY_IMBALANCE':
+            granular = signal
+            simple = 'BULLISH'
+        elif signal == 'SELL_IMBALANCE':
+            granular = signal
+            simple = 'BEARISH'
+        elif signal == 'BALANCED':
+            granular = signal
+            simple = 'NEUTRAL'
+        # Already simple signals
+        elif signal in ['BULLISH', 'BEARISH', 'NEUTRAL']:
+            granular = signal
+            simple = signal
+        # Status signals
+        elif signal in ['ERROR', 'INSUFFICIENT_DATA']:
+            granular = signal
+            simple = 'NEUTRAL'
+        else:
+            granular = signal
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:
         """
         Calculate Average True Range for volume normalization
@@ -480,8 +505,13 @@ class OrderFlowImbalance:
         elif acceleration['status'] == 'DECELERATING':
             confluence_factors.append(f'⚠️ Pressure DECELERATING ({acceleration["acceleration"]:.0f} strength decrease)')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Metadata (much richer!)
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'up_volume': round(up_volume, 2),
             'down_volume': round(down_volume, 2),
             'total_volume': round(total_volume, 2),
@@ -499,7 +529,8 @@ class OrderFlowImbalance:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
