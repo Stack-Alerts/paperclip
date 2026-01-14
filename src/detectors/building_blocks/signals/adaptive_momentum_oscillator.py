@@ -33,10 +33,18 @@ import pandas as pd
 import numpy as np
 
 
+class SignalType(Enum):
+    """Signal types"""
+    BULLISH_CROSS = "bullish_cross"
+    BEARISH_CROSS = "bearish_cross"
+    BULLISH_DIVERGENCE = "bullish_divergence"
+    BEARISH_DIVERGENCE = "bearish_divergence"
+
+
 @register_block(
     name='adaptive_momentum_oscillator',
     category='SIGNALS',
-    class_name='SignalType',
+    class_name='AdaptiveMomentumOscillator',
     default_weight=20,
     valid_signals=[
         # Granular momentum signals
@@ -84,14 +92,6 @@ import numpy as np
         }
 }
 )
-class SignalType(Enum):
-    """Signal types"""
-    BULLISH_CROSS = "bullish_cross"
-    BEARISH_CROSS = "bearish_cross"
-    BULLISH_DIVERGENCE = "bullish_divergence"
-    BEARISH_DIVERGENCE = "bearish_divergence"
-
-
 class AdaptiveMomentumOscillator:
     """
     Adaptive Momentum Oscillator Detector
@@ -136,6 +136,20 @@ class AdaptiveMomentumOscillator:
         self.slow_period = slow_period
         self.min_signal_strength = min_signal_strength
     
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        granular = signal
+        
+        # Map momentum signals to directional signals
+        if signal in ['BULLISH_CROSS', 'BULLISH_DIVERGENCE']:
+            simple = 'BULLISH'
+        elif signal in ['BEARISH_CROSS', 'BEARISH_DIVERGENCE']:
+            simple = 'BEARISH'
+        else:  # NEUTRAL, ERROR, INSUFFICIENT_DATA
+            simple = signal
+        
+        return granular, simple
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
         Analyze dataframe for momentum signals.
@@ -147,6 +161,7 @@ class AdaptiveMomentumOscillator:
         if not required_cols.issubset(df.columns):
             return {
                 'signal': 'ERROR',
+                'signal_simple': 'ERROR',
                 'confidence': 0,
                 'metadata': {'error': 'Missing required columns'},
                 'timestamp': datetime.now(),
@@ -158,6 +173,7 @@ class AdaptiveMomentumOscillator:
         if len(df) < min_bars:
             return {
                 'signal': 'INSUFFICIENT_DATA',
+                'signal_simple': 'INSUFFICIENT_DATA',
                 'confidence': 0,
                 'metadata': {'error': f'Need at least {min_bars} bars'},
                 'timestamp': datetime.now(),
@@ -369,10 +385,16 @@ class AdaptiveMomentumOscillator:
             SignalType.BEARISH_DIVERGENCE: 'BEARISH_DIVERGENCE',
         }
         
+        granular_signal = signal_names[signal_type]
+        _, simple_signal = self._determine_dual_signals(granular_signal)
+        
         return {
-            'signal': signal_names[signal_type],
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': quality,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'signal_type': signal_type.value,
                 'current_price': round(current_price, 2),
                 'momentum': round(signal_meta.get('momentum', signal_meta.get('momentum_low', signal_meta.get('momentum_high', 0))), 4),
@@ -464,8 +486,11 @@ class AdaptiveMomentumOscillator:
         
         return {
             'signal': 'NEUTRAL',
+            'signal_simple': 'NEUTRAL',
             'confidence': 50,
             'metadata': {
+                'signal_simple': 'NEUTRAL',
+                'signal_granular': 'NEUTRAL',
                 'current_price': round(current_price, 2),
                 'momentum': round(curr_momentum, 4),
                 'histogram': round(curr_histogram, 4),
