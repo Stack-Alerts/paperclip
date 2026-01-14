@@ -327,8 +327,15 @@ class BreakOfStructure:
         if trend == 'NEUTRAL':
             return {
                 'signal': 'NEUTRAL',
+                'signal_simple': 'NEUTRAL',
                 'confidence': 0,
-                'metadata': {'trend': 'NEUTRAL', 'error': 'No clear trend for BOS detection', 'is_new_event': False},
+                'metadata': {
+                    'signal_simple': 'NEUTRAL',
+                    'signal_granular': 'NEUTRAL',
+                    'trend': 'NEUTRAL',
+                    'error': 'No clear trend for BOS detection',
+                    'is_new_event': False
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['No clear trend - BOS requires established trend']
@@ -350,10 +357,18 @@ class BreakOfStructure:
             signal = 'BEARISH'
         
         if not active_bos:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_BOS')
             return {
-                'signal': 'NO_BOS',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'trend': trend, 'error': 'No break of structure detected', 'is_new_event': False},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'trend': trend,
+                    'error': 'No break of structure detected',
+                    'is_new_event': False
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': [f'Trend: {trend}', 'No BOS yet - waiting for structure break']
