@@ -31,8 +31,8 @@ import numpy as np
     class_name='ChangeOfCharacter',
     default_weight=20,
     valid_signals=[
-        # Granular SMC signals
-        'BEARISH_CHOCH', 'BEARISH_MSS', 'BULLISH_CHOCH', 'BULLISH_MSS', 'HIGH_SWEEP', 'LOW_SWEEP', 'UNUSUALLY_SLOW',
+        # Granular SMC signals (CHOCH only - MSS/SWEEP are metadata enhancements)
+        'BEARISH_CHOCH', 'BULLISH_CHOCH',
         # Simple directional - SIMPLE
         'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
@@ -43,27 +43,7 @@ import numpy as np
                 'base_points': 20,
                 'formula': 'scaled'
         },
-        'BEARISH_MSS': {
-                'base_points': 20,
-                'formula': 'scaled'
-        },
         'BULLISH_CHOCH': {
-                'base_points': 20,
-                'formula': 'scaled'
-        },
-        'BULLISH_MSS': {
-                'base_points': 20,
-                'formula': 'scaled'
-        },
-        'HIGH_SWEEP': {
-                'base_points': 20,
-                'formula': 'scaled'
-        },
-        'LOW_SWEEP': {
-                'base_points': 20,
-                'formula': 'scaled'
-        },
-        'UNUSUALLY_SLOW': {
                 'base_points': 20,
                 'formula': 'scaled'
         },
@@ -73,7 +53,6 @@ import numpy as np
         'INSUFFICIENT_DATA': {
                 'points': 0
         },
-        
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
