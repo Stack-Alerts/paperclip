@@ -108,6 +108,35 @@ class EMACrossover:
         self.fast = fast
         self.slow = slow
     
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        # Cross events (granular) map to simple directional
+        if signal == 'GOLDEN_CROSS':
+            granular = signal
+            simple = 'BULLISH'
+        elif signal == 'DEATH_CROSS':
+            granular = signal
+            simple = 'BEARISH'
+        # Alignment states (granular) map to simple directional
+        elif signal == 'BULLISH_ALIGNMENT':
+            granular = signal
+            simple = 'BULLISH'
+        elif signal == 'BEARISH_ALIGNMENT':
+            granular = signal
+            simple = 'BEARISH'
+        # Already simple signals
+        elif signal in ['BULLISH', 'BEARISH', 'NEUTRAL']:
+            granular = signal
+            simple = signal
+        # Status signals
+        elif signal in ['ERROR', 'INSUFFICIENT_DATA']:
+            granular = signal
+            simple = 'NEUTRAL'
+        else:
+            granular = signal
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def calculate_separation_strength(self, fast_ema: float, slow_ema: float) -> dict:
         """
         Measure EMA separation strength
@@ -214,8 +243,13 @@ class EMACrossover:
                 f'Trend strength: {separation["strength"]} ({separation["separation_pct"]:.2f}%)'
             ]
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Enhanced metadata (NEW)
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'fast_ema': round(current_fast, 2),
             'slow_ema': round(current_slow, 2),
             'separation_pct': round(separation['separation_pct'], 3),
@@ -224,7 +258,8 @@ class EMACrossover:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
