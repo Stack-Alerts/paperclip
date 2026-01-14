@@ -159,6 +159,14 @@ class ATR:
             '1D': {'calm': 1500, 'normal': 3000, 'high': 6000, 'extreme': 12000},
         }
     
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        # ATR is a volatility/context block - doesn't provide directional bias
+        # All volatility regimes map to NEUTRAL for simple users
+        granular = signal
+        simple = 'NEUTRAL'  # Volatility context only, no directional signal
+        return granular, simple
+    
     def calculate_true_range(self, df: pd.DataFrame) -> pd.Series:
         """
         Calculate True Range for each period
@@ -513,8 +521,13 @@ class ATR:
             elif relative_level in ['EXTREME_LOW', 'VERY_LOW']:
                 confluence_factors.append(f'ATR at {percentile:.0f}th percentile - VERY LOW volatility')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Prepare metadata (ENHANCED)
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'atr_value': current_atr,
             'atr_percent': round(atr_percent, 2),
             'volatility_level': volatility_level,
@@ -559,7 +572,8 @@ class ATR:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),
