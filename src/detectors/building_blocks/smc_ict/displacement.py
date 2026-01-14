@@ -144,6 +144,25 @@ class Displacement:
         self.track_gaps = track_gaps
         self.displacement_history = []  # Track displacement events for consecutive detection
     
+    def _determine_dual_signals(self, disp_type: str, has_gap: bool = False, gap_type: str = None) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        if disp_type == 'BULLISH_DISPLACEMENT':
+            if has_gap and gap_type == 'BULLISH_FVG':
+                granular = 'BULLISH_FVG'
+            else:
+                granular = 'BULLISH_DISPLACEMENT'
+            simple = 'BULLISH'
+        elif disp_type == 'BEARISH_DISPLACEMENT':
+            if has_gap and gap_type == 'BEARISH_FVG':
+                granular = 'BEARISH_FVG'
+            else:
+                granular = 'BEARISH_DISPLACEMENT'
+            simple = 'BEARISH'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def count_consecutive_displacement(self, current_signal: str) -> int:
         """
         Count consecutive displacement candles (Priority 1.1 Enhancement)
@@ -420,8 +439,15 @@ class Displacement:
         confluence_factors.append('Institutional activity detected')
         confluence_factors.append('Strong momentum - expect continuation')
         
+        # DUAL SIGNAL ARCHITECTURE
+        has_gap = gap_info.get('has_gap', False) if gap_info else False
+        gap_type = gap_info.get('gap_type') if gap_info else None
+        granular_signal, simple_signal = self._determine_dual_signals(disp['type'], has_gap, gap_type)
+        
         # **ENHANCED:** Metadata with new tracking
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'displacement_type': disp['type'],
             'body_pct': disp['body_pct'],
             'size_vs_avg': disp['size_vs_avg'],
@@ -439,7 +465,8 @@ class Displacement:
             metadata.update(gap_info)
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
