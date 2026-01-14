@@ -126,6 +126,34 @@ class ElliottWaveOscillator:
         self.fast_period = fast_period
         self.slow_period = slow_period
     
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        # Divergence signals (granular)
+        if signal in ['BEARISH_DIVERGENCE', 'BULLISH_DIVERGENCE']:
+            granular = signal
+            simple = 'BEARISH' if 'BEARISH' in signal else 'BULLISH'
+        # Momentum direction signals (granular)
+        elif 'MOMENTUM' in signal:
+            granular = signal
+            if 'BULLISH' in signal:
+                simple = 'BULLISH'
+            elif 'BEARISH' in signal:
+                simple = 'BEARISH'
+            else:
+                simple = 'NEUTRAL'
+        # Already simple signals
+        elif signal in ['BULLISH', 'BEARISH', 'NEUTRAL']:
+            granular = signal
+            simple = signal
+        # Status signals
+        elif signal in ['NEUTRAL_MOMENTUM', 'ERROR', 'INSUFFICIENT_DATA']:
+            granular = signal
+            simple = 'NEUTRAL'
+        else:
+            granular = signal
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """Main analysis method"""
         if not all(col in df.columns for col in ['open', 'high', 'low', 'close', 'volume', 'timestamp']):
@@ -206,7 +234,12 @@ class ElliottWaveOscillator:
         momentum_dir = 'INCREASING' if abs(current_ewo) > abs(prev_ewo) else 'DECREASING'
         confluence_factors.append(f"Momentum: {momentum_dir}")
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'ewo_value': round(current_ewo, 2),
             'prev_ewo_value': round(prev_ewo, 2),
             'zero_line_position': 'ABOVE' if current_ewo > 0 else 'BELOW',
@@ -217,7 +250,8 @@ class ElliottWaveOscillator:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': min(95, confidence),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
