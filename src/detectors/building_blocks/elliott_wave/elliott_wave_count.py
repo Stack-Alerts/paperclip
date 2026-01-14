@@ -204,6 +204,34 @@ class ElliottWaveCount:
         self.timeframe = timeframe
         self.use_mtf = use_mtf
     
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        # Wave-specific signals (granular) map to simple directional
+        if 'BULLISH' in signal and 'WAVE_' in signal:
+            granular = signal  # Keep specific wave (e.g., WAVE_3_BULLISH)
+            simple = 'BULLISH'
+        elif 'BEARISH' in signal and 'WAVE_' in signal:
+            granular = signal  # Keep specific wave (e.g., WAVE_5_BEARISH)
+            simple = 'BEARISH'
+        # Phase signals (also granular)
+        elif signal in ['WAVE_1_FORMING', 'WAVE_2_CORRECTION', 'WAVE_UNCLEAR']:
+            granular = signal
+            # Infer simple direction from context if possible, else NEUTRAL
+            simple = 'NEUTRAL'
+        # Already simple directional signals
+        elif signal in ['BULLISH', 'BEARISH', 'NEUTRAL']:
+            granular = signal  # Simple signal is also granular in this case
+            simple = signal
+        # Status signals (non-directional)
+        elif signal in ['WAVE_UNCERTAIN', 'INSUFFICIENT_PIVOTS', 'NO_PATTERN', 'ERROR', 'INSUFFICIENT_DATA']:
+            granular = signal
+            simple = 'NEUTRAL'
+        else:
+            # Fallback
+            granular = signal
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def find_pivots(self, df: pd.DataFrame, lookback: int = 5) -> List[Dict]:
         """Find swing points"""
         pivots = []
@@ -452,7 +480,12 @@ class ElliottWaveCount:
             signal = f'{phase}'
             confluence_factors = [f'Wave position: {phase}']
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'wave_count': wave_num,
             'direction': direction,
             'phase': phase,
@@ -462,7 +495,8 @@ class ElliottWaveCount:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
@@ -609,8 +643,13 @@ class ElliottWaveCount:
         if booster_value > 0:
             confluence_factors.append(f"MTF Booster: +{booster_value} points")
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Build metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'mtf_analysis': True,
             'htf_only': True,  # Indicates HTF focus
             'alignment_score': alignment_score,
@@ -623,7 +662,8 @@ class ElliottWaveCount:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(mtf_confidence, 2),
             'booster_value': booster_value,
             'metadata': metadata,
