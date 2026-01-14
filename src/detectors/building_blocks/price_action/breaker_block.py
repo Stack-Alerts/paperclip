@@ -233,10 +233,17 @@ class BreakerBlock:
                 signal = 'BEARISH'
         
         if not active_breaker:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_BREAKER', None)
             return {
-                'signal': 'NO_BREAKER',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'No breaker block detected', 'is_new_event': False},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': 'No breaker block detected',
+                    'is_new_event': False
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
