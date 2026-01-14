@@ -200,7 +200,19 @@ class ElliottWaveCount:
     Success rate: High when properly identified (higher with MTF)
     """
     
-    def __init__(self, timeframe: str = '2h', use_mtf: bool = True, **kwargs):
+    def __init__(self, timeframe: str = '15min', use_mtf: bool = True, **kwargs):
+        """
+        Initialize Elliott Wave Count
+        
+        Args:
+            timeframe: Input timeframe (default '15min')
+            use_mtf: Enable MTF analysis with internal resampling (default True)
+        
+        When use_mtf=True:
+            - Accepts 15min data and internally resamples to 2hr, 4hr, Daily
+            - Provides institutional-grade Elliott Wave counts
+            - No external MTF data needed - all handled internally
+        """
         self.timeframe = timeframe
         self.use_mtf = use_mtf
     
@@ -231,6 +243,34 @@ class ElliottWaveCount:
             granular = signal
             simple = 'NEUTRAL'
         return granular, simple
+    
+    def resample_timeframe(self, df: pd.DataFrame, target_tf: str) -> pd.DataFrame:
+        """
+        Resample 15min data to higher timeframe for MTF analysis
+        
+        Args:
+            df: Source dataframe (15min)
+            target_tf: Target timeframe ('2h', '4h', '1D')
+        
+        Returns:
+            Resampled dataframe with OHLCV data
+        """
+        df_copy = df.copy()
+        df_copy.set_index('timestamp', inplace=True)
+        
+        # Resample OHLCV
+        resampled = df_copy.resample(target_tf).agg({
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }).dropna()
+        
+        # Reset index to get timestamp back as column
+        resampled.reset_index(inplace=True)
+        
+        return resampled
     
     def find_pivots(self, df: pd.DataFrame, lookback: int = 5) -> List[Dict]:
         """Find swing points"""
@@ -726,20 +766,21 @@ class ElliottWaveCount:
         
         # Route to appropriate analysis method
         if self.use_mtf:
-            # MTF MODE - Requires df_4h and df_1d (STRICT)
+            # MTF MODE - Check if external MTF data provided, otherwise resample internally
             df_4h = kwargs.get('df_4h')
             df_1d = kwargs.get('df_1d')
             
             if df_4h is None or df_1d is None:
-                raise ValueError(
-                    "Multi-Timeframe mode (use_mtf=True) requires both df_4h and df_1d. "
-                    f"Got df_4h={'provided' if df_4h is not None else 'MISSING'}, "
-                    f"df_1d={'provided' if df_1d is not None else 'MISSING'}. "
-                    "Either provide both datasets or set use_mtf=False for single timeframe mode."
-                )
-            
-            # Multi-Timeframe analysis (HTF only: Daily + 4H)
-            return self.analyze_multi_timeframe(df_4h, df_1d)
+                # No external MTF data - resample internally from 15min
+                df_2h = self.resample_timeframe(df, '2h')
+                df_4h_resampled = self.resample_timeframe(df, '4h')
+                df_1d_resampled = self.resample_timeframe(df, '1D')
+                
+                # Use resampled data for MTF analysis
+                return self.analyze_multi_timeframe(df_4h_resampled, df_1d_resampled)
+            else:
+                # External MTF data provided - use it directly
+                return self.analyze_multi_timeframe(df_4h, df_1d)
         else:
             # Single Timeframe analysis (original logic)
             return self.analyze_single_timeframe(df)
