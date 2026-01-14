@@ -39,50 +39,46 @@ import numpy as np
     default_weight=15,
     valid_signals=[
         # Granular session signals
-        'MODERATE_SESSION', 'HIGH_VOLUME_SESSION', 'LOW_VOLUME_SESSION', 'SESSION_OPEN', 'SESSION_CLOSE',
-        # Simple directional - SIMPLE
-        'BULLISH', 'BEARISH', 'NEUTRAL',
+        'PEAK_HOURS', 'ACTIVE_SESSION', 'MODERATE_SESSION', 'QUIET_SESSION', 'OFF_SESSION',
+        # Simple TIME QUALITY - SIMPLE (timing, not direction!)
+        'ACTIVE', 'INACTIVE', 'NO_SIGNAL',
         # Status
-        'NO_SIGNAL', 'ERROR'
+        'ERROR'
     ],
     signal_tiers={
-        'ERROR': {
+        # Simple time quality signals
+        'ACTIVE': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'INACTIVE': {
                 'points': 0
         },
         'NO_SIGNAL': {
                 'points': 0
         },
-        'MODERATE_SESSION': {
-                'max_points': 7,
-                'formula': 'scaled'
-        },
-        'HIGH_VOLUME_SESSION': {
-                'base_points': 15,
-                'formula': 'scaled'
-        },
-        'LOW_VOLUME_SESSION': {
-                'base_points': 15,
-                'formula': 'scaled'
-        },
-        'SESSION_OPEN': {
-                'base_points': 15,
-                'formula': 'scaled'
-        },
-        'SESSION_CLOSE': {
-                'base_points': 15,
-                'formula': 'scaled'
+        'ERROR': {
+                'points': 0
         },
         
-        # Simple directional - SIMPLE
-        'BULLISH': {
+        # Granular session signals
+        'PEAK_HOURS': {
+                'base_points': 18,
+                'formula': 'scaled'
+        },
+        'ACTIVE_SESSION': {
                 'base_points': 15,
                 'formula': 'scaled'
         },
-        'BEARISH': {
-                'base_points': 15,
+        'MODERATE_SESSION': {
+                'base_points': 12,
                 'formula': 'scaled'
         },
-        'NEUTRAL': {
+        'QUIET_SESSION': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'OFF_SESSION': {
                 'points': 0
         }
 }
@@ -128,6 +124,32 @@ class SessionTime:
             'SYDNEY': {'volatility': 'VERY_LOW', 'volume': 'LOW', 'typical_range': 'VERY_TIGHT'},
             'OFF_SESSION': {'volatility': 'MINIMAL', 'volume': 'VERY_LOW', 'typical_range': 'MINIMAL'}
         }
+    
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)
+        
+        Session time provides TIMING quality context, not directional bias.
+        Maps to ACTIVE (good time) or INACTIVE (avoid time).
+        """
+        granular = signal
+        
+        # High-quality trading sessions
+        if signal in ['PEAK_HOURS', 'ACTIVE_SESSION']:
+            simple = 'ACTIVE'  # ✅ Optimal trading sessions
+        
+        # Moderate-quality sessions
+        elif signal == 'MODERATE_SESSION':
+            simple = 'ACTIVE'  # ✅ Good enough for trading
+        
+        # Low-quality or inactive sessions
+        elif signal in ['QUIET_SESSION', 'OFF_SESSION']:
+            simple = 'INACTIVE'  # ⚠️ Avoid trading
+        
+        # Errors/edge cases
+        else:
+            simple = 'NO_SIGNAL'
+        
+        return granular, simple
     
     def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:
         """Calculate ATR for volatility awareness (quality block integration)"""
@@ -350,8 +372,13 @@ class SessionTime:
         else:
             signal = 'OFF_SESSION'  # Outside sessions
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Rich metadata for confluence
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'session': current_session,
             'hour_utc': current_time.hour,
             'volatility': characteristics['volatility'],
@@ -374,7 +401,8 @@ class SessionTime:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': current_time,
