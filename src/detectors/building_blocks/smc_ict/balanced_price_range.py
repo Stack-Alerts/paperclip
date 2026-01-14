@@ -30,8 +30,28 @@ import numpy as np
     category='SMC_ICT',
     class_name='BalancedPriceRange',
     default_weight=20,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular position signals
+        'IN_RANGE_LOW', 'IN_RANGE_HIGH', 'NOT_IN_RANGE',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Granular signals
+        'IN_RANGE_LOW': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'IN_RANGE_HIGH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'NOT_IN_RANGE': {
+                'points': 0
+        },
+        # Simple directional
         'BULLISH': {
                 'base_points': 20,
                 'formula': 'scaled'
@@ -97,6 +117,19 @@ class BalancedPriceRange:
         # ENHANCEMENT 3: Breakout Proximity (2026-01-04)
         self.range_history = []  # Track range durations
         self.max_history = 20
+    
+    def _determine_dual_signals(self, position_in_range: float, in_range: bool) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        if not in_range:
+            granular = 'NOT_IN_RANGE'
+            simple = 'NEUTRAL'
+        elif position_in_range <= 50:
+            granular = 'IN_RANGE_LOW'
+            simple = 'BULLISH'
+        else:
+            granular = 'IN_RANGE_HIGH'
+            simple = 'BEARISH'
+        return granular, simple
     
     def detect_compression(self, df: pd.DataFrame, range_size: float) -> Dict[str, Any]:
         """
@@ -410,8 +443,13 @@ class BalancedPriceRange:
         
         confluence_factors.append('Institutional accumulation/distribution zone')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(balanced['position_in_range'], True)
+        
         # Metadata (ENHANCED)
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'range_type': balanced['type'],
             'range_high': balanced['range_high'],
             'range_low': balanced['range_low'],
@@ -448,7 +486,8 @@ class BalancedPriceRange:
                     self.range_history.pop(0)
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
