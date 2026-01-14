@@ -116,7 +116,7 @@ class FlagPattern:
         self.MAX_FLAG_RANGE = 0.05  # Maximum 5% flag range (relaxed)
         
         # Breakout requirements (relaxed to allow more signals)
-        self.BREAK_MARGIN = 0.003  # Must break 0.3% beyond channel (relaxed)
+        self.BREAK_MARGIN = 0.0001  # Must break 0.01% beyond channel (minimal for detection)
     
     def _determine_dual_signals(self, granular_signal: str, direction: str) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Bilateral continuation pattern"""
@@ -219,11 +219,12 @@ class FlagPattern:
             # Calculate channel volume
             channel_volume = recent['volume'].mean()
             
+            # Exclude current bar from channel bounds (for breakout detection)
             return {
                 'upper_start': float(highs[0]),
-                'upper_end': float(highs[-1]),
+                'upper_end': float(highs[-2]) if len(highs) > 1 else float(highs[-1]),
                 'lower_start': float(lows[0]),
-                'lower_end': float(lows[-1]),
+                'lower_end': float(lows[-2]) if len(lows) > 1 else float(lows[-1]),
                 'slope': 0.0,
                 'is_parallel': True,
                 'range_pct': range_pct,
@@ -374,15 +375,18 @@ class FlagPattern:
                 'confluence_factors': []
             }
         
-        # Check for breakout (stricter margin)
+        # Check for breakout (use current high/low, not close)
+        current_high = float(df['high'].iloc[-1])
+        current_low = float(df['low'].iloc[-1])
+        
         if flagpole['direction'] == 'BULLISH':
-            # Breakout if price breaks above upper channel
-            breakout = current_price > channel['upper_end'] * (1 + self.BREAK_MARGIN)
+            # Breakout if current high breaks above upper channel
+            breakout = current_high > channel['upper_end'] * (1 + self.BREAK_MARGIN)
             signal = 'BULLISH_BREAKOUT' if breakout else 'PATTERN_FORMING'
             target = flagpole['pole_end'] + (flagpole['pole_end'] - flagpole['pole_start'])
         else:
-            # Breakout if price breaks below lower channel
-            breakout = current_price < channel['lower_end'] * (1 - self.BREAK_MARGIN)
+            # Breakout if current low breaks below lower channel
+            breakout = current_low < channel['lower_end'] * (1 - self.BREAK_MARGIN)
             signal = 'BEARISH_BREAKOUT' if breakout else 'PATTERN_FORMING'
             target = flagpole['pole_end'] - (flagpole['pole_start'] - flagpole['pole_end'])
         
