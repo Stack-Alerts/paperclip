@@ -141,27 +141,30 @@ class ADX:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
         # Determine direction
         is_bullish = plus_di > minus_di
+        direction = 'UPTREND' if is_bullish else 'DOWNTREND'
         
-        # Determine strength level
-        if adx < 25:
+        # Determine strength level with REVISED thresholds to emit ALL signals
+        if adx < 10:
+            # True ranging - no directional bias
+            granular = 'RANGING'
+            simple = 'NEUTRAL'
+        elif adx < 25:
+            # WEAK trend - directional but not strong enough
             strength = 'WEAK'
-            simple = 'NEUTRAL'  # Weak trend = ranging, not tradeable
+            granular = f'{strength}_{direction}'
+            simple = 'NEUTRAL'  # Weak trends not tradeable
         elif adx < 50:
             strength = 'MODERATE'
+            granular = f'{strength}_{direction}'
             simple = 'BULLISH' if is_bullish else 'BEARISH'
         elif adx < 75:
             strength = 'STRONG'
+            granular = f'{strength}_{direction}'
             simple = 'BULLISH' if is_bullish else 'BEARISH'
         else:
             strength = 'VERY_STRONG'
-            simple = 'BULLISH' if is_bullish else 'BEARISH'
-        
-        # Build granular signal
-        if adx < 25:
-            granular = 'RANGING'
-        else:
-            direction = 'UPTREND' if is_bullish else 'DOWNTREND'
             granular = f'{strength}_{direction}'
+            simple = 'BULLISH' if is_bullish else 'BEARISH'
         
         return granular, simple
     
