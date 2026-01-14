@@ -419,10 +419,14 @@ class Candle2Close:
     
     def _neutral_response(self, timestamp: datetime, price: float, reason: str = None) -> Dict[str, Any]:
         """Generate neutral response."""
+        granular_signal, simple_signal = self._determine_dual_signals('NEUTRAL')
         return {
-            'signal': 'NEUTRAL',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 50,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'current_price': round(price, 2),
                 'reason': reason or 'No C2 Close pattern detected',
                 'is_new_event': False,
