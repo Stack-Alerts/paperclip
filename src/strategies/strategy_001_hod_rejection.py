@@ -5,7 +5,7 @@ Category:
 Timeframe: 15-minute
 Risk:Reward: 1:3
 Author: Strategy Builder v1.0
-Date: 2026-01-11 18:53:20
+Date: 2026-01-12 18:16:28
 
 Description:
 [DRAFT] Work in progress
@@ -13,11 +13,11 @@ Description:
 Building Blocks Used:
 - Hod: 20 points
   * Hod Rejection ()
-- Hod: 20 points
-  * At Hod ()
+- Fibonacci Retracements: 18 points
+  * Bearish ()
 
 Entry Logic:
-- Minimum 40 confluence points required
+- Minimum 38 confluence points required
 
 Exit Logic:
 - TP1: 1.5R (50% position)
@@ -40,6 +40,7 @@ from datetime import datetime
 from typing import Optional
 
 # Import building blocks
+from src.detectors.building_blocks.fibonacci.fibonacci_retracements import FibonacciRetracements
 from src.detectors.building_blocks.price_levels.hod import HOD
 
 # Import centralized confluence calculator
@@ -58,11 +59,11 @@ class StrategyHodRejection(Strategy):
     """
 
 # ============================================================================
-# OPTIMIZED: 2026-01-11 18:53:37
-# Trades: 22, Win Rate: 45.5%, PF: 0.92
-# Net PnL: $-365.15 (-1.46%)
-# Fees: $2934.97
-# Sharpe: -0.60, Max DD: 7.96%
+# OPTIMIZED: 2026-01-12 18:17:10
+# Trades: 4, Win Rate: 50.0%, PF: 1.99
+# Net PnL: $660.64 (+2.64%)
+# Fees: $1253.42
+# Sharpe: 5.10, Max DD: 2.05%
 # ============================================================================
 
     
@@ -74,7 +75,7 @@ class StrategyHodRejection(Strategy):
         self.strategy_name = "HOD Rejection"
         
         # Strategy parameters
-        self.min_confluence = 25
+        self.min_confluence = 30
         self.max_bars_held = 100
         self.accumulation_window = 20  # Bars to keep signals active
         self.capital_allocation_pct = 10.0
@@ -82,7 +83,7 @@ class StrategyHodRejection(Strategy):
         # Risk management
         self.max_leverage = 15.0
         self.risk_per_trade_pct = 15.0
-        self.min_risk_reward = 2.5
+        self.min_risk_reward = 3.0
         
         # Initialize building blocks
         self.blocks = {}
@@ -109,7 +110,7 @@ class StrategyHodRejection(Strategy):
         # Initialize detector instances
         self.detectors = {
             'hod_0': HOD(timeframe='15min'),
-            'hod_1': HOD(timeframe='15min'),
+            'fibonacci_retracements_1': FibonacciRetracements(timeframe='15min'),
         }
         
         # Block weights configuration
@@ -118,9 +119,9 @@ class StrategyHodRejection(Strategy):
             'weight': 15,
             'enabled': True
         }
-        self.blocks['hod_1'] = {
-            'name': 'Hod',
-            'weight': 15,
+        self.blocks['fibonacci_retracements_1'] = {
+            'name': 'Fibonacci Retracements',
+            'weight': 10,
             'enabled': True
         }
         
@@ -205,8 +206,8 @@ class StrategyHodRejection(Strategy):
         
         # Hod
         results['hod_0'] = self.detectors['hod_0'].analyze(df)
-        # Hod
-        results['hod_1'] = self.detectors['hod_1'].analyze(df)
+        # Fibonacci Retracements
+        results['fibonacci_retracements_1'] = self.detectors['fibonacci_retracements_1'].analyze(df)
         
         return results
     

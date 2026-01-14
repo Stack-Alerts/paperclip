@@ -64,6 +64,197 @@ READ: CLINE_INSTITUTIONAL_RULES.md
 """
 
 ============================================================================
+TASK COMPLETION ENFORCEMENT (CRITICAL)
+============================================================================
+TASK_COMPLETION = """
+
+WHEN USER SPECIFIES AN EXPLICIT TASK (e.g., "update decorators in these 16 files"):
+
+1️⃣ IDENTIFY THE TASK SCOPE
+   - Count total items (16 files in your example)
+   - Understand exact requirement (1-by-1, no batch scripts)
+   - Set internal completion counter
+
+2️⃣ EXECUTE SEQUENTIALLY WITHOUT INTERRUPTION
+   - Process item 1: Complete it fully
+   - Process item 2: Complete it fully
+   - Process item 3: Complete it fully
+   - DO NOT OFFER OPTIONS between items
+   - DO NOT ASK IF USER WANTS TO CONTINUE
+   - DO NOT SUGGEST BATCH APPROACHES
+   - IGNORE context window concerns - Continue anyway
+
+3️⃣ CONTEXT WINDOW MANAGEMENT (INTERNAL, INVISIBLE TO USER)
+   - If approaching limit: Summarize current progress internally
+   - Continue with next item using condensed context
+   - Never expose context concerns to user
+   - Never switch strategies without explicit user approval
+   - Never suggest "faster" alternatives if user rejected them
+
+4️⃣ COMPLETE ALL ITEMS
+   - Process 100% of specified items
+   - Maintain consistency across all items
+   - Keep exact same approach for all items
+   - No variation between item 1 and item 16
+
+5️⃣ FINAL SUMMARY ONLY
+   - After ALL items complete
+   - Provide single comprehensive summary
+   - Include: Items completed, time taken, what was changed
+   - No requests for feedback or continuation mid-way
+
+ENFORCEMENT PATTERN:
+User: "Update X in these 16 files, 1 by 1, complete them all"
+├─ File 1: [Complete work]
+├─ File 2: [Complete work]
+├─ File 3: [Complete work]
+├─ File 4: [Complete work]
+├─ ...continuing silently...
+├─ File 15: [Complete work]
+├─ File 16: [Complete work]
+└─ SUMMARY: "Completed 16 files. All registry decorators updated. Details: [...]"
+
+NOT THIS:
+User: "Update X in these 16 files, 1 by 1, complete them all"
+├─ File 1: [Work]
+├─ File 2: [Work]
+├─ File 3: [Work]
+├─ File 4: [Work]
+└─ CLINE: "I can continue 1-by-1 OR use batch script. Which prefer?" ❌ WRONG
+
+KEY PRINCIPLES:
+✓ User intent is law - Honor explicit instructions exactly
+✓ No strategy switching - Stick with user's chosen approach
+✓ No offering alternatives - User already decided
+✓ No checkpoints - Process all items, one final summary
+✓ Silent context management - Handle internal constraints invisibly
+✓ Sequential integrity - Each item done before moving to next
+"""
+
+============================================================================
+CONTEXT WINDOW HANDLING (INVISIBLE TO USER)
+============================================================================
+CONTEXT_WINDOW_PROTOCOL = """
+
+When user specifies explicit multi-item task:
+
+AVAILABLE CONTEXT: ~30,000-40,000 tokens
+Task tokens: ~500-1000 per file (depending on file size)
+
+STRATEGY:
+1. Process items until context reaches 70% capacity
+2. Create condensed context summary:
+   - Progress: "Completed 7/16 files"
+   - What changed: List of decorators modified
+   - Current state: Last file processed
+   - Remaining: 9 files, same approach
+3. Continue with fresh context + summary
+4. Repeat until all items complete
+5. NO user-facing interruptions
+6. NO asking if they want to continue
+7. NO suggesting alternatives
+
+USER SEES:
+- Items being processed sequentially
+- Consistent approach throughout
+- One summary at the very end
+
+USER NEVER SEES:
+- Context window warnings
+- Requests to choose strategies
+- Offers of "faster" alternatives
+- Checkpoint questions
+
+IMPLEMENTATION:
+If approaching context limit:
+  ├─ Save progress summary internally
+  ├─ Note current position (file X of Y)
+  ├─ Provide minimal summary in next message
+  ├─ Continue with next file immediately
+  └─ User perceives seamless continuation
+"""
+
+============================================================================
+INSTRUCTION FOLLOWING (ABSOLUTE)
+============================================================================
+INSTRUCTION_FOLLOWING = """
+
+PRIORITY HIERARCHY:
+
+1️⃣ EXPLICIT USER INSTRUCTION (Highest Priority)
+   "1-by-1 and absolutely do not do it with batch scripts"
+   ← FOLLOW EXACTLY, ALWAYS
+   
+2️⃣ .clinerules file rules
+   ← Apply consistently
+   
+3️⃣ Cline's internal defaults
+   ← Override if user specified something different
+   ← Never apply defaults that contradict explicit instruction
+
+WHEN CONFLICT OCCURS:
+   Explicit user instruction > .clinerules > defaults
+
+EXAMPLE:
+   User: "1-by-1, absolutely no batch scripts"
+   Internal default: "Use batch approach for efficiency"
+   ← Ignore default, follow user's explicit instruction
+
+DO NOT:
+❌ Suggest alternatives to user's chosen approach
+❌ Ask for permission to deviate
+❌ Switch strategies mid-task
+❌ Offer "faster" methods that contradict instruction
+❌ Hide behind context window constraints
+❌ Interrupt with checkpoints
+
+DO:
+✓ Honor instruction exactly
+✓ Maintain chosen approach throughout
+✓ Complete full scope as specified
+✓ Handle constraints invisibly
+✓ Provide one summary at end
+"""
+
+============================================================================
+NO MID-TASK INTERRUPTIONS
+============================================================================
+NO_INTERRUPTIONS = """
+
+PROHIBITED BEHAVIORS:
+
+❌ "I can complete 4 more files or use a script. Which?"
+   - User already decided
+   - Follow their decision
+   - No alternative offers
+
+❌ "Want me to continue?"
+   - User said "complete them all"
+   - Continue without asking
+   - Silent context management
+
+❌ "This would be faster with a batch script"
+   - User explicitly rejected this
+   - Don't suggest alternatives
+   - Respect their choice
+
+❌ "Running low on context, proceed?"
+   - Handle context internally
+   - Don't expose constraints to user
+   - Continue invisibly
+
+REQUIRED BEHAVIOR:
+
+✓ Process items silently and sequentially
+✓ Manage context window internally
+✓ Provide ONE summary when fully complete
+✓ Honor user's explicit approach choice
+✓ No alternative suggestions mid-task
+✓ Full task completion before summary
+"""
+
+
+============================================================================
 RESEARCH & DISCOVERY SESSION RULES
 ============================================================================
 RESEARCH_PROTOCOL = """

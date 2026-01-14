@@ -38,7 +38,7 @@ except ImportError:
     import sys
     import os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from detectors.zigzag_detector import Pivot, PivotType, PatternDirection
+    from .zigzag_detector import Pivot, PivotType, PatternDirection
 
 
 class DivergenceType(Enum):
@@ -419,8 +419,8 @@ def quick_test(data_path: str = 'data/raw/BTC_USDT_PERP_30m.pkl', n_bars: int = 
     import sys
     sys.path.insert(0, '/home/sirrus/projects/BTC_Engine_v3')
     
-    from src.detectors.zigzag_detector import ZigzagDetector
-    from src.detectors.oscillators import calculate_rsi, calculate_cci
+    from src.detectors.utilities.zigzag_detector import ZigzagDetector
+    from src.detectors.utilities.oscillators import calculate_rsi, calculate_cci
     
     print("="*60)
     print("DIVERGENCE DETECTOR TEST")
