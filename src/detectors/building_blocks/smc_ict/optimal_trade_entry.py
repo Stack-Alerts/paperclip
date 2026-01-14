@@ -362,10 +362,17 @@ class OptimalTradeEntry:
         trend = self.detect_trend(df)
         
         if trend == 'NEUTRAL':
+            granular_signal, simple_signal = self._determine_dual_signals('NO_OTE')
             return {
-                'signal': 'NEUTRAL',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'trend': 'NEUTRAL', 'error': 'No clear trend'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'trend': 'NEUTRAL',
+                    'error': 'No clear trend'
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['No clear trend for OTE']
@@ -387,10 +394,17 @@ class OptimalTradeEntry:
             signal = 'BEARISH'
         
         if not active_ote:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_OTE')
             return {
-                'signal': 'NO_OTE',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'trend': trend, 'error': 'Not in OTE zone'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'trend': trend,
+                    'error': 'Not in OTE zone'
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': [f'Trend: {trend}', 'Waiting for OTE zone entry']
