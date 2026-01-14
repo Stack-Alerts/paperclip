@@ -198,7 +198,19 @@ class EMACrossover:
             return {'signal': 'ERROR', 'confidence': 0, 'metadata': {}, 'timestamp': datetime.now(), 'timeframe': self.timeframe, 'confluence_factors': []}
         
         if len(df) < self.slow:
-            return {'signal': 'INSUFFICIENT_DATA', 'confidence': 0, 'metadata': {}, 'timestamp': datetime.now(), 'timeframe': self.timeframe, 'confluence_factors': []}
+            granular_signal, simple_signal = self._determine_dual_signals('INSUFFICIENT_DATA')
+            return {
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
+                'confidence': 0,
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
+                'timestamp': datetime.now(),
+                'timeframe': self.timeframe,
+                'confluence_factors': []
+            }
         
         ema_fast = df['close'].ewm(span=self.fast).mean()
         ema_slow = df['close'].ewm(span=self.slow).mean()
