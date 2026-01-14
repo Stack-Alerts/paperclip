@@ -369,9 +369,14 @@ class Displacement:
         
         if not disp:
             return {
-                'signal': 'NO_DISPLACEMENT',
+                'signal': 'NEUTRAL',
+                'signal_simple': 'NEUTRAL',
                 'confidence': 0,
-                'metadata': {'error': 'No displacement detected'},
+                'metadata': {
+                    'signal_simple': 'NEUTRAL',
+                    'signal_granular': 'NEUTRAL',
+                    'error': 'No displacement detected'
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['No displacement - normal price action']

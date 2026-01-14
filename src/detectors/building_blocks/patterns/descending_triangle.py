@@ -217,10 +217,16 @@ class DescendingTrianglePattern:
             }
         
         if len(df) < 50:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'Need at least 50 bars'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': 'Need at least 50 bars'
+                },
                 'timestamp': df['timestamp'].iloc[-1] if len(df) > 0 else datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -229,10 +235,15 @@ class DescendingTrianglePattern:
         pattern = self.detect_pattern(df)
         
         if pattern is None:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -240,10 +251,15 @@ class DescendingTrianglePattern:
         
         # Validate slope is descending enough
         if pattern['resistance_slope'] > self.MIN_SLOPE:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -297,13 +313,18 @@ class DescendingTrianglePattern:
         
         # MINIMUM THRESHOLD: Require at least 3 confluences
         if len(confluences) < self.MIN_CONFLUENCES:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'reason': 'Insufficient validation',
                     'confluences_found': len(confluences),
                     'confluences_required': self.MIN_CONFLUENCES
+                
                 },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
