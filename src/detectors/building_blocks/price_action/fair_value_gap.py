@@ -31,7 +31,14 @@ from src.utils.advanced_data_loader import advanced_data
     category='PRICE_ACTION',
     class_name='FairValueGap',
     default_weight=25,
-    valid_signals=['BEARISH_FVG', 'BULLISH_FVG', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular signals
+        'BEARISH_FVG', 'BULLISH_FVG', 'NO_FVG',
+        # Simple directional - SIMPLE (what code actually emits!)
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
         'BEARISH_FVG': {
                 'base_points': 25,
@@ -45,6 +52,22 @@ from src.utils.advanced_data_loader import advanced_data
                 'points': 0
         },
         'INSUFFICIENT_DATA': {
+                'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
+        },
+        'NO_FVG': {
                 'points': 0
         }
 }

@@ -30,13 +30,34 @@ import numpy as np
     category='VOLATILITY',
     class_name='ADR',
     default_weight=8,
-    valid_signals=['CALM', 'VOLATILE', 'NEAR_ADR', 'ABOVE_ADR', 'BELOW_ADR', 'WITHIN_ADR', 'ERROR'],
+    valid_signals=[
+        # Granular volatility level signals
+        'CALM', 'NORMAL', 'ELEVATED', 'HIGH', 'EXTREME', 'VOLATILE', 'NEAR_ADR', 'ABOVE_ADR', 'BELOW_ADR', 'WITHIN_ADR',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
-        'ERROR': {
-                'points': 0
-        },
+        # Granular volatility signals
         'CALM': {
                 'max_points': 4,
+                'formula': 'scaled'
+        },
+        'NORMAL': {
+                'base_points': 6,
+                'formula': 'scaled'
+        },
+        'ELEVATED': {
+                'base_points': 7,
+                'formula': 'scaled'
+        },
+        'HIGH': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'EXTREME': {
+                'base_points': 10,
                 'formula': 'scaled'
         },
         'VOLATILE': {
@@ -58,6 +79,25 @@ import numpy as np
         'WITHIN_ADR': {
                 'base_points': 8,
                 'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
         }
 }
 )

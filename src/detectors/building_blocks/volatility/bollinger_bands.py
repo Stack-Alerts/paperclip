@@ -30,9 +30,49 @@ import numpy as np
     category='VOLATILITY',
     class_name='BollingerBands',
     default_weight=10,
-    valid_signals=['ABOVE_UPPER', 'BEARISH_REVERSAL', 'BELOW_LOWER', 'BULLISH_REVERSAL', 'LOWER_BAND_WALK', 'LOWER_HALF', 'MEDIUM_HIGH', 'MEDIUM_LOW', 'NEAR_LOWER', 'SQUEEZE_BREAKOUT', 'SQUEEZE_BREAKOUT_BEAR', 'SQUEEZE_BREAKOUT_BULL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular BB position signals
+        'ABOVE_UPPER', 'NEAR_UPPER', 'UPPER_HALF', 'LOWER_HALF', 'NEAR_LOWER', 'BELOW_LOWER',
+        # Granular BB pattern signals
+        'BULLISH_REVERSAL', 'BEARISH_REVERSAL', 'UPPER_BAND_WALK', 'LOWER_BAND_WALK',
+        # Granular BB squeeze signals
+        'SQUEEZE_BREAKOUT', 'SQUEEZE_BREAKOUT_BULL', 'SQUEEZE_BREAKOUT_BEAR',
+        # Granular volatility regime signals
+        'MEDIUM_HIGH', 'MEDIUM_LOW',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Position signals
         'ABOVE_UPPER': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'NEAR_UPPER': {
+                'base_points': 9,
+                'formula': 'scaled'
+        },
+        'UPPER_HALF': {
+                'base_points': 7,
+                'formula': 'scaled'
+        },
+        'LOWER_HALF': {
+                'base_points': 7,
+                'formula': 'scaled'
+        },
+        'NEAR_LOWER': {
+                'base_points': 9,
+                'formula': 'scaled'
+        },
+        'BELOW_LOWER': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        
+        # Pattern signals
+        'BULLISH_REVERSAL': {
                 'base_points': 10,
                 'formula': 'scaled'
         },
@@ -40,11 +80,7 @@ import numpy as np
                 'base_points': 10,
                 'formula': 'scaled'
         },
-        'BELOW_LOWER': {
-                'base_points': 10,
-                'formula': 'scaled'
-        },
-        'BULLISH_REVERSAL': {
+        'UPPER_BAND_WALK': {
                 'base_points': 10,
                 'formula': 'scaled'
         },
@@ -52,23 +88,13 @@ import numpy as np
                 'base_points': 10,
                 'formula': 'scaled'
         },
-        'LOWER_HALF': {
-                'base_points': 10,
-                'formula': 'scaled'
-        },
-        'MEDIUM_HIGH': {
-                'base_points': 10,
-                'formula': 'scaled'
-        },
-        'MEDIUM_LOW': {
-                'base_points': 10,
-                'formula': 'scaled'
-        },
-        'NEAR_LOWER': {
-                'base_points': 10,
-                'formula': 'scaled'
-        },
+        
+        # Squeeze signals
         'SQUEEZE_BREAKOUT': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'SQUEEZE_BREAKOUT_BULL': {
                 'base_points': 10,
                 'formula': 'scaled'
         },
@@ -76,9 +102,28 @@ import numpy as np
                 'base_points': 10,
                 'formula': 'scaled'
         },
-        'SQUEEZE_BREAKOUT_BULL': {
+        
+        # Volatility regime
+        'MEDIUM_HIGH': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'MEDIUM_LOW': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
                 'base_points': 10,
                 'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         },
         'ERROR': {
                 'points': 0

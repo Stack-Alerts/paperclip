@@ -54,26 +54,84 @@ import pandas as pd
     category='FIBONACCI',
     class_name='FibonacciRetracements',
     default_weight=18,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Fibonacci Level Signals (price AT specific Fib level) - GRANULAR
+        'AT_FIB_23', 'AT_FIB_38', 'AT_FIB_50', 'AT_FIB_61', 'AT_FIB_78',
+        # Position Signals - GRANULAR
+        'BETWEEN_LEVELS',
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status Signals
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Golden Ratio - Strongest Fibonacci level (highest value)
+        'AT_FIB_61': {
+            'base_points': 30,
+            'formula': 'scaled',
+            'description': 'Price at 61.8% Golden Ratio - strongest reversal level'
+        },
+        
+        # Major Fibonacci levels
+        'AT_FIB_50': {
+            'base_points': 25,
+            'formula': 'scaled',
+            'description': 'Price at 50% retracement - key psychological level'
+        },
+        'AT_FIB_38': {
+            'base_points': 22,
+            'formula': 'scaled',
+            'description': 'Price at 38.2% retracement - shallow reversal level'
+        },
+        'AT_FIB_78': {
+            'base_points': 22,
+            'formula': 'scaled',
+            'description': 'Price at 78.6% retracement - deep reversal level'
+        },
+        
+        # Minor Fibonacci level
+        'AT_FIB_23': {
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'Price at 23.6% retracement - minor level'
+        },
+        
+        # Between levels (lower value - not at key level)
+        'BETWEEN_LEVELS': {
+            'base_points': 8,
+            'formula': 'scaled',
+            'description': 'Price between Fibonacci levels - weaker signal'
+        },
+        
+        # Simple directional signals - SIMPLE for basic users
         'BULLISH': {
-                'base_points': 18,
-                'formula': 'scaled'
+            'base_points': 25,
+            'formula': 'scaled',
+            'description': 'At bullish Fib level - any level (simple)'
         },
         'BEARISH': {
-                'base_points': 18,
-                'formula': 'scaled'
+            'base_points': 25,
+            'formula': 'scaled',
+            'description': 'At bearish Fib level - any level (simple)'
         },
         'NEUTRAL': {
-                'points': 0
+            'base_points': 8,
+            'formula': 'scaled',
+            'description': 'Between Fib levels (simple)'
         },
+        
+        # Status signals
         'ERROR': {
-                'points': 0
+            'points': 0,
+            'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='Fibonacci Retracements - Identifies reversal levels using Golden Ratio and Fib levels (23.6%, 38.2%, 50%, 61.8%, 78.6%)',
+    tags=['fibonacci', 'retracement', 'reversal_levels', 'context_block', 'golden_ratio', 'multi_swing']
 )
 class FibonacciRetracements:
     """

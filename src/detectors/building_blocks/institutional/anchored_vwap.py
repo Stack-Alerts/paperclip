@@ -41,23 +41,70 @@ import numpy as np
     category='INSTITUTIONAL',
     class_name='AnchoredVWAP',
     default_weight=15,
-    valid_signals=['ABOVE_ANCHORED_VWAP', 'BELOW_ANCHORED_VWAP', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Touch Events (highest priority - reversal zones) - GRANULAR
+        'AT_VWAP', 'NEAR_VWAP',
+        # Position Signals - GRANULAR
+        'ABOVE_ANCHORED_VWAP', 'BELOW_ANCHORED_VWAP',
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status Signals
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Touch events - Highest value (institutional reversal zones)
+        'AT_VWAP': {
+            'base_points': 28,
+            'formula': 'scaled',
+            'description': 'Price touching anchored VWAP - high probability reversal zone'
+        },
+        'NEAR_VWAP': {
+            'base_points': 22,
+            'formula': 'scaled',
+            'description': 'Price within 1% of anchored VWAP - approaching key level'
+        },
+        
+        # Position signals - Standard institutional levels
         'ABOVE_ANCHORED_VWAP': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Price above anchored VWAP - bullish positioning'
         },
         'BELOW_ANCHORED_VWAP': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Price below anchored VWAP - bearish positioning'
         },
+        
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Above or at VWAP - bullish (simple)'
+        },
+        'BEARISH': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Below or at VWAP - bearish (simple)'
+        },
+        'NEUTRAL': {
+            'base_points': 10,
+            'formula': 'scaled',
+            'description': 'Near VWAP - neutral zone (simple)'
+        },
+        
+        # Status signals
         'ERROR': {
-                'points': 0
+            'points': 0,
+            'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='Anchored VWAP - Volume-weighted average price from smart anchor points (swing highs/lows)',
+    tags=['institutional', 'vwap', 'volume_profile', 'context_block', 'smart_anchors', 'reversal_zones']
 )
 class AnchoredVWAP:
     """
@@ -313,19 +360,34 @@ class AnchoredVWAP:
         
         # Touch detection (within threshold)
         at_vwap = distance_atr < self.touch_threshold_atr
+        near_vwap = distance_pct < 1.0  # Within 1%
         
         # Detect trend
         is_uptrend, trend_conf = self.detect_trend(df)
         
-        # Determine signal
+        # Determine signal - CRITICAL FIX: Prioritize touch events!
         above_vwap = current_price > vwap
-        signal = 'ABOVE_ANCHORED_VWAP' if above_vwap else 'BELOW_ANCHORED_VWAP'
         
-        # Trend alignment
+        # Trend alignment (needed for confidence calculation)
         trend_aligned = (above_vwap and is_uptrend) or (not above_vwap and not is_uptrend)
         
-        # VARIABLE CONFIDENCE (key enhancement!)
-        confidence = self.calculate_variable_confidence(distance_pct, at_vwap, trend_aligned)
+        if at_vwap:
+            # CRITICAL FIX: Actually emit the AT_VWAP signal!
+            signal = 'AT_VWAP'
+            confidence = 80  # High confidence for touch events
+        elif near_vwap:
+            # CRITICAL FIX: Emit NEAR_VWAP signal!
+            signal = 'NEAR_VWAP'
+            confidence = 72  # Good confidence approaching VWAP
+        else:
+            # Standard position signals
+            signal = 'ABOVE_ANCHORED_VWAP' if above_vwap else 'BELOW_ANCHORED_VWAP'
+            # Variable confidence based on context
+            confidence = self.calculate_variable_confidence(distance_pct, at_vwap, trend_aligned)
+        
+        # Boost confidence for trend alignment
+        if trend_aligned:
+            confidence = min(85, confidence + 5)
         
         # Support/Resistance classification
         if above_vwap:

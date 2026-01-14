@@ -30,23 +30,61 @@ import numpy as np
     category='MOVING_AVERAGES',
     class_name='EMA55VectorBreak',
     default_weight=12,
-    valid_signals=['ABOVE_EMA', 'BELOW_EMA', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=['BULLISH_CLIMAX', 'BEARISH_CLIMAX', 'BULLISH_PSEUDO', 'BEARISH_PSEUDO', 'BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
     signal_tiers={
-        'ABOVE_EMA': {
-                'base_points': 12,
-                'formula': 'scaled'
+        # Granular signals (advanced users) - PVSRA tiers
+        'BULLISH_CLIMAX': {
+            'base_points': 22,
+            'formula': 'scaled',
+            'description': 'Bullish climax vector - crossed above 55 EMA with 160%+ volume (high conviction)'
         },
-        'BELOW_EMA': {
-                'base_points': 12,
-                'formula': 'scaled'
+        'BEARISH_CLIMAX': {
+            'base_points': 22,
+            'formula': 'scaled',
+            'description': 'Bearish climax vector - crossed below 55 EMA with 160%+ volume (high conviction)'
         },
+        'BULLISH_PSEUDO': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Bullish pseudo vector - crossed above 55 EMA with 120%+ volume (moderate conviction)'
+        },
+        'BEARISH_PSEUDO': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Bearish pseudo vector - crossed below 55 EMA with 120%+ volume (moderate conviction)'
+        },
+        
+        # Simple signals (basic users)
+        'BULLISH': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Bullish vector break - any volume (simple)'
+        },
+        'BEARISH': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Bearish vector break - any volume (simple)'
+        },
+        
+        # Neutral
+        'NEUTRAL': {
+            'base_points': 5,
+            'formula': 'scaled',
+            'description': 'No vector break - holding position'
+        },
+        
+        # Status
         'ERROR': {
-                'points': 0
+            'points': 0,
+            'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='EMA 55 Vector - Detects high-volume breaks through 55 EMA with PVSRA/TBD methodology (differentiated thresholds)',
+    tags=['moving_averages', 'ema', 'vector', 'pvsra', 'volume', 'signal_block']
 )
 class EMA55VectorBreak:
     """
@@ -249,53 +287,54 @@ class EMA55VectorBreak:
         confluence_factors = []
         
         # PVSRA/TBD VECTOR CROSS DETECTION
+        # Emit GRANULAR signals for advanced users
         if crossed_above and is_vector_candle:
             # Bullish vector break
             
-            # CLIMAX vectors (200%+): Always take
+            # CLIMAX vectors (160%+): Always take
             if "CLIMAX" in vector_tier:
-                signal = 'BULLISH'
+                signal = 'BULLISH_CLIMAX'  # GRANULAR
                 confidence = 95
-                confluence_factors.append(f'⚡ CLIMAX VECTOR: {vector_tier} (200%+ volume)')
+                confluence_factors.append(f'⚡ CLIMAX VECTOR: {vector_tier} (160%+ volume)')
                 
                 if slope in ['RISING', 'STRONG_RISING']:
                     confidence += 5
                     confluence_factors.append('✅ 55 EMA slope confirming uptrend')
                     
-                confluence_factors.append('📈 BULLISH: Climax vector crossed above 55 EMA')
+                confluence_factors.append('📈 BULLISH CLIMAX: Climax vector crossed above 55 EMA')
             
-            # PSEUDO vectors (150%+): Require slope confirmation
+            # PSEUDO vectors (120%+): Require slope confirmation
             elif "PSEUDO" in vector_tier:
                 if slope in ['RISING', 'STRONG_RISING']:
-                    signal = 'BULLISH'
+                    signal = 'BULLISH_PSEUDO'  # GRANULAR
                     confidence = 90
-                    confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (150%+ volume)')
+                    confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (120%+ volume)')
                     confluence_factors.append('✅ 55 EMA slope confirming uptrend - CONFIRMED')
-                    confluence_factors.append('📈 BULLISH: Confirmed pseudo vector crossed above 55 EMA')
+                    confluence_factors.append('📈 BULLISH PSEUDO: Confirmed pseudo vector crossed above 55 EMA')
                 
         elif crossed_below and is_vector_candle:
             # Bearish vector break
             
-            # CLIMAX vectors (200%+): Always take
+            # CLIMAX vectors (160%+): Always take
             if "CLIMAX" in vector_tier:
-                signal = 'BEARISH'
+                signal = 'BEARISH_CLIMAX'  # GRANULAR
                 confidence = 95
-                confluence_factors.append(f'⚡ CLIMAX VECTOR: {vector_tier} (200%+ volume)')
+                confluence_factors.append(f'⚡ CLIMAX VECTOR: {vector_tier} (160%+ volume)')
                 
                 if slope in ['FALLING', 'STRONG_FALLING']:
                     confidence += 5
                     confluence_factors.append('✅ 55 EMA slope confirming downtrend')
                     
-                confluence_factors.append('📉 BEARISH: Climax vector crossed below 55 EMA')
+                confluence_factors.append('📉 BEARISH CLIMAX: Climax vector crossed below 55 EMA')
             
-            # PSEUDO vectors (150%+): Require slope confirmation
+            # PSEUDO vectors (120%+): Require slope confirmation
             elif "PSEUDO" in vector_tier:
                 if slope in ['FALLING', 'STRONG_FALLING']:
-                    signal = 'BEARISH'
+                    signal = 'BEARISH_PSEUDO'  # GRANULAR
                     confidence = 90
-                    confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (150%+ volume)')
+                    confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (120%+ volume)')
                     confluence_factors.append('✅ 55 EMA slope confirming downtrend - CONFIRMED')
-                    confluence_factors.append('📉 BEARISH: Confirmed pseudo vector crossed below 55 EMA')
+                    confluence_factors.append('📉 BEARISH PSEUDO: Confirmed pseudo vector crossed below 55 EMA')
         
         # Status information  
         if signal == 'NEUTRAL':

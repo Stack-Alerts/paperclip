@@ -85,8 +85,16 @@ import numpy as np
     category='WYCKOFF',
     class_name='WyckoffDistribution',
     default_weight=28,
-    valid_signals=['SOW_BREAKDOWN', 'UTAD_DETECTED', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular Wyckoff distribution signals
+        'SOW_BREAKDOWN', 'UTAD_DETECTED', 'DISTRIBUTION_PHASE_A', 'DISTRIBUTION_PHASE_B', 'NO_DISTRIBUTION',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Wyckoff distribution signals
         'SOW_BREAKDOWN': {
                 'base_points': 28,
                 'formula': 'scaled'
@@ -94,6 +102,31 @@ import numpy as np
         'UTAD_DETECTED': {
                 'base_points': 28,
                 'formula': 'scaled'
+        },
+        'DISTRIBUTION_PHASE_A': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'DISTRIBUTION_PHASE_B': {
+                'base_points': 22,
+                'formula': 'scaled'
+        },
+        'NO_DISTRIBUTION': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         },
         'ERROR': {
                 'points': 0

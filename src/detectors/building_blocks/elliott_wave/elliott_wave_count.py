@@ -44,18 +44,141 @@ import numpy as np
     category='ELLIOTT_WAVE',
     class_name='ElliottWaveCount',
     default_weight=22,
-    valid_signals=['NO_PATTERN', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Wave Position Signals (1-5) - GRANULAR for advanced users
+        'WAVE_1_BULLISH', 'WAVE_1_BEARISH',
+        'WAVE_2_BULLISH', 'WAVE_2_BEARISH',
+        'WAVE_3_BULLISH', 'WAVE_3_BEARISH',
+        'WAVE_4_BULLISH', 'WAVE_4_BEARISH',
+        'WAVE_5_BULLISH', 'WAVE_5_BEARISH',
+        # Phase Signals (from identify_current_wave) - GRANULAR
+        'WAVE_1_FORMING', 'WAVE_2_CORRECTION', 
+        'WAVE_UNCLEAR',
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status Signals
+        'WAVE_UNCERTAIN', 'INSUFFICIENT_PIVOTS',
+        'NO_PATTERN', 'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Wave 5 signals - Highest booster (reversal imminent)
+        'WAVE_5_BULLISH': {
+            'base_points': 50,
+            'formula': 'scaled',
+            'description': 'Wave 5 complete - bearish reversal expected'
+        },
+        'WAVE_5_BEARISH': {
+            'base_points': 50,
+            'formula': 'scaled',
+            'description': 'Wave 5 complete - bullish reversal expected'
+        },
+        
+        # Wave 3 signals - Strong trend continuation
+        'WAVE_3_BULLISH': {
+            'base_points': 40,
+            'formula': 'scaled',
+            'description': 'Wave 3 in progress - strongest bullish wave'
+        },
+        'WAVE_3_BEARISH': {
+            'base_points': 40,
+            'formula': 'scaled',
+            'description': 'Wave 3 in progress - strongest bearish wave'
+        },
+        
+        # Wave 4 signals - Correction before Wave 5
+        'WAVE_4_BULLISH': {
+            'base_points': 25,
+            'formula': 'scaled',
+            'description': 'Wave 4 correction - Wave 5 next (bullish)'
+        },
+        'WAVE_4_BEARISH': {
+            'base_points': 25,
+            'formula': 'scaled',
+            'description': 'Wave 4 correction - Wave 5 next (bearish)'
+        },
+        
+        # Wave 2 signals - Early correction
+        'WAVE_2_BULLISH': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Wave 2 correction - Wave 3 coming (bullish)'
+        },
+        'WAVE_2_BEARISH': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Wave 2 correction - Wave 3 coming (bearish)'
+        },
+        
+        # Wave 1 signals - Trend initiation
+        'WAVE_1_BULLISH': {
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Wave 1 forming - new bullish impulse starting'
+        },
+        'WAVE_1_BEARISH': {
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Wave 1 forming - new bearish impulse starting'
+        },
+        
+        # Phase signals (lower confidence states)
+        'WAVE_1_FORMING': {
+            'base_points': 10,
+            'formula': 'scaled',
+            'description': 'Early Wave 1 formation detected'
+        },
+        'WAVE_2_CORRECTION': {
+            'base_points': 12,
+            'formula': 'scaled',
+            'description': 'Wave 2 correction in progress'
+        },
+        'WAVE_UNCLEAR': {
+            'base_points': 5,
+            'formula': 'scaled',
+            'description': 'Wave position unclear - developing pattern'
+        },
+        
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH': {
+            'base_points': 30,
+            'formula': 'scaled',
+            'description': 'Bullish wave structure - any wave (simple)'
+        },
+        'BEARISH': {
+            'base_points': 30,
+            'formula': 'scaled',
+            'description': 'Bearish wave structure - any wave (simple)'
+        },
+        'NEUTRAL': {
+            'base_points': 5,
+            'formula': 'scaled',
+            'description': 'No clear wave direction (simple)'
+        },
+        
+        # Status signals (no points)
+        'WAVE_UNCERTAIN': {
+            'points': 0,
+            'description': 'Not enough data for wave count'
+        },
+        'INSUFFICIENT_PIVOTS': {
+            'points': 0,
+            'description': 'Too few pivots for pattern detection'
+        },
         'NO_PATTERN': {
-                'points': 0
+            'points': 0,
+            'description': 'No Elliott Wave pattern detected'
         },
         'ERROR': {
-                'points': 0
+            'points': 0,
+            'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='Elliott Wave Count - Identifies 5-wave impulse patterns with MTF context',
+    tags=['elliott_wave', 'pattern_recognition', 'context_block', 'mtf_capable']
 )
 class ElliottWaveCount:
     """

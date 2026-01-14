@@ -29,18 +29,39 @@ import numpy as np
     category='PATTERNS',
     class_name='RoundingBottomPattern',
     default_weight=30,
-    valid_signals=['BREAKOUT_CONFIRMED', 'NO_PATTERN', 'PATTERN_FORMING', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular pattern signals
+        'BREAKOUT_CONFIRMED', 'PATTERN_FORMING', 'NO_PATTERN',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Pattern signals
         'BREAKOUT_CONFIRMED': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'PATTERN_FORMING': {
                 'base_points': 30,
                 'formula': 'scaled'
         },
         'NO_PATTERN': {
                 'points': 0
         },
-        'PATTERN_FORMING': {
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
                 'base_points': 30,
                 'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         },
         'ERROR': {
                 'points': 0

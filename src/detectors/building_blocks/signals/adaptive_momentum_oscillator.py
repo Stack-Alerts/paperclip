@@ -38,7 +38,14 @@ import numpy as np
     category='SIGNALS',
     class_name='SignalType',
     default_weight=20,
-    valid_signals=['BEARISH_CROSS', 'BEARISH_DIVERGENCE', 'BULLISH_CROSS', 'BULLISH_DIVERGENCE', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular momentum signals
+        'BEARISH_CROSS', 'BEARISH_DIVERGENCE', 'BULLISH_CROSS', 'BULLISH_DIVERGENCE',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
         'BEARISH_CROSS': {
                 'base_points': 20,
@@ -60,6 +67,19 @@ import numpy as np
                 'points': 0
         },
         'INSUFFICIENT_DATA': {
+                'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
                 'points': 0
         }
 }

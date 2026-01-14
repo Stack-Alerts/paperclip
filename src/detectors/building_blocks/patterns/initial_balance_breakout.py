@@ -36,7 +36,14 @@ import numpy as np
     category='PATTERNS',
     class_name='InitialBalanceRange',
     default_weight=30,
-    valid_signals=['ABOVE_IB', 'BEARISH_BREAKOUT', 'BELOW_IB', 'BULLISH_BREAKOUT', 'LOWER_IB', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular pattern signals
+        'BULLISH_BREAKOUT', 'BEARISH_BREAKOUT', 'ABOVE_IB', 'BELOW_IB', 'LOWER_IB',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
         'ABOVE_IB': {
                 'base_points': 30,
@@ -57,6 +64,19 @@ import numpy as np
         'LOWER_IB': {
                 'base_points': 30,
                 'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         },
         'ERROR': {
                 'points': 0

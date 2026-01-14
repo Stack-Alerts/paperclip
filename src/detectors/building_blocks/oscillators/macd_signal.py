@@ -30,53 +30,75 @@ import numpy as np
     category='OSCILLATORS',
     class_name='MACDSignal',
     default_weight=25,
-    valid_signals=['BEARISH_CROSS', 'BEARISH_ZERO_CROSS', 'BULLISH_CROSS', 'BULLISH_ZERO_CROSS', 'NO_CROSS', 'NO_ZERO_CROSS', 'STRONG_BEARISH', 'STRONG_BULLISH', 'WEAKENING_BEARISH', 'WEAKENING_BULLISH', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=['BULLISH_DIVERGENCE', 'BEARISH_DIVERGENCE', 'BULLISH_ZERO_CROSS', 'BEARISH_ZERO_CROSS', 'BULLISH_CROSS', 'BEARISH_CROSS', 'BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
     signal_tiers={
-        'BEARISH_CROSS': {
-                'base_points': 25,
-                'formula': 'scaled'
+        # Divergences - Highest value (reversal signals, rare) - ADVANCED
+        'BULLISH_DIVERGENCE': {
+            'base_points': 22,
+            'formula': 'scaled',
+            'description': 'Bullish divergence - price lower low, MACD higher low (reversal signal)'
+        },
+        'BEARISH_DIVERGENCE': {
+            'base_points': 22,
+            'formula': 'scaled',
+            'description': 'Bearish divergence - price higher high, MACD lower high (reversal signal)'
+        },
+        
+        # Zero crosses - Major trend confirmation - ADVANCED
+        'BULLISH_ZERO_CROSS': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'MACD crossed above zero - bullish trend confirmation'
         },
         'BEARISH_ZERO_CROSS': {
-                'base_points': 25,
-                'formula': 'scaled'
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'MACD crossed below zero - bearish trend confirmation'
         },
+        
+        # Regular crossovers - Standard signals - ADVANCED
         'BULLISH_CROSS': {
-                'base_points': 25,
-                'formula': 'scaled'
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'MACD crossed above signal line - bullish momentum'
         },
-        'BULLISH_ZERO_CROSS': {
-                'base_points': 25,
-                'formula': 'scaled'
+        'BEARISH_CROSS': {
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'MACD crossed below signal line - bearish momentum'
         },
-        'NO_CROSS': {
-                'points': 0
+        
+        # Simple directional signals - BASIC (for simple users)
+        'BULLISH': {
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'Bullish MACD signal - any bullish event (simple)'
         },
-        'NO_ZERO_CROSS': {
-                'points': 0
+        'BEARISH': {
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'Bearish MACD signal - any bearish event (simple)'
         },
-        'STRONG_BEARISH': {
-                'base_points': 25,
-                'formula': 'scaled'
+        
+        # Neutral
+        'NEUTRAL': {
+            'base_points': 5,
+            'formula': 'scaled',
+            'description': 'No MACD signal - holding position'
         },
-        'STRONG_BULLISH': {
-                'base_points': 25,
-                'formula': 'scaled'
-        },
-        'WEAKENING_BEARISH': {
-                'base_points': 25,
-                'formula': 'scaled'
-        },
-        'WEAKENING_BULLISH': {
-                'base_points': 25,
-                'formula': 'scaled'
-        },
+        
+        # Status
         'ERROR': {
-                'points': 0
+            'points': 0,
+            'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='MACD Signal - Moving Average Convergence Divergence crossover detector with divergence detection',
+    tags=['oscillators', 'macd', 'momentum', 'crossover', 'divergence', 'signal_block']
 )
 class MACDSignal:
     """
@@ -438,14 +460,31 @@ class MACDSignal:
         confluence_factors.append(f'Trend: {trend}')
         confluence_factors.append(f'Signal strength: {strength}')
         
-        # Determine primary signal - ONLY on crosses, not continuous momentum
-        # This prevents signaling on every bar (reduces noise)
-        if crossover == 'BULLISH_CROSS' or divergences['bullish_divergence']:
-            signal = 'BULLISH'
-        elif crossover == 'BEARISH_CROSS' or divergences['bearish_divergence']:
-            signal = 'BEARISH'
-        else:
-            signal = 'NEUTRAL'
+        # Determine primary signal with PRIORITY ORDER (rare signals first)
+        # Priority: Divergence > Zero Cross > Regular Cross > Neutral
+        signal = 'NEUTRAL'
+        
+        # Highest priority: Divergences (rare, reversal signals)
+        if divergences['bullish_divergence']:
+            signal = 'BULLISH_DIVERGENCE'
+            confidence = min(100, confidence + 5)  # Boost for rare signal
+        elif divergences['bearish_divergence']:
+            signal = 'BEARISH_DIVERGENCE'
+            confidence = min(100, confidence + 5)  # Boost for rare signal
+        
+        # Next priority: Zero line crosses (major trend confirmation)
+        elif zero_cross == 'BULLISH_ZERO_CROSS':
+            signal = 'BULLISH_ZERO_CROSS'
+        elif zero_cross == 'BEARISH_ZERO_CROSS':
+            signal = 'BEARISH_ZERO_CROSS'
+        
+        # Standard priority: Regular crossovers
+        elif crossover == 'BULLISH_CROSS':
+            signal = 'BULLISH_CROSS'
+        elif crossover == 'BEARISH_CROSS':
+            signal = 'BEARISH_CROSS'
+        
+        # Else: NEUTRAL (no signal)
         
         # Prepare metadata
         metadata = {

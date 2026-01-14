@@ -30,8 +30,16 @@ import numpy as np
     category='PATTERNS',
     class_name='InternalPivotPattern',
     default_weight=30,
-    valid_signals=['BEARISH_PIVOT_HIGH', 'BULLISH_PIVOT_LOW', 'PIVOT_HIGH', 'PIVOT_LOW', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular pattern signals
+        'BEARISH_PIVOT_HIGH', 'BULLISH_PIVOT_LOW', 'PIVOT_HIGH', 'PIVOT_LOW',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Pattern signals
         'BEARISH_PIVOT_HIGH': {
                 'base_points': 30,
                 'formula': 'scaled'
@@ -47,6 +55,19 @@ import numpy as np
         'PIVOT_LOW': {
                 'base_points': 30,
                 'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         },
         'ERROR': {
                 'points': 0

@@ -29,31 +29,70 @@ import pandas as pd
     category='INSTITUTIONAL',
     class_name='EMACrossover',
     default_weight=15,
-    valid_signals=['BEARISH_ALIGNMENT', 'BULLISH_ALIGNMENT', 'DEATH_CROSS', 'GOLDEN_CROSS', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Cross Events (rare - 0.58% of time - highest value) - GRANULAR
+        'GOLDEN_CROSS', 'DEATH_CROSS',
+        # Alignment States (continuous - 99.4% of time - standard value) - GRANULAR
+        'BULLISH_ALIGNMENT', 'BEARISH_ALIGNMENT',
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status Signals
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
-        'BEARISH_ALIGNMENT': {
-                'base_points': 15,
-                'formula': 'scaled'
-        },
-        'BULLISH_ALIGNMENT': {
-                'base_points': 15,
-                'formula': 'scaled'
+        # Cross events - RARE and significant (0.58% occurrence)
+        'GOLDEN_CROSS': {
+            'base_points': 35,
+            'formula': 'scaled',
+            'description': 'EMA 50/200 golden cross - rare bullish reversal signal'
         },
         'DEATH_CROSS': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 35,
+            'formula': 'scaled',
+            'description': 'EMA 50/200 death cross - rare bearish reversal signal'
         },
-        'GOLDEN_CROSS': {
-                'base_points': 15,
-                'formula': 'scaled'
+        
+        # Alignment states - Continuous trend confirmation (99.4% occurrence)
+        'BULLISH_ALIGNMENT': {
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Fast EMA above slow EMA - bullish trend alignment'
         },
+        'BEARISH_ALIGNMENT': {
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Fast EMA below slow EMA - bearish trend alignment'
+        },
+        
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Bullish EMA setup - any alignment (simple)'
+        },
+        'BEARISH': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Bearish EMA setup - any alignment (simple)'
+        },
+        'NEUTRAL': {
+            'base_points': 10,
+            'formula': 'scaled',
+            'description': 'EMAs converging - neutral (simple)'
+        },
+        
+        # Status signals
         'ERROR': {
-                'points': 0
+            'points': 0,
+            'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='EMA Crossover - Fast/slow EMA crosses (rare events) and trend alignment (continuous state)',
+    tags=['institutional', 'ema', 'trend', 'crossover', 'hybrid_block', 'rare_events']
 )
 class EMACrossover:
     """

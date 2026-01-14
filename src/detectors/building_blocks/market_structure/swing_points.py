@@ -37,42 +37,85 @@ from src.detectors.building_blocks.registry import register_block
     category='MARKET_STRUCTURE',
     class_name='SwingPoints',
     default_weight=15,
-    valid_signals=['SWING_HIGH_DETECTED', 'SWING_LOW_DETECTED', 'MINOR_SWING_HIGH_DETECTED', 'MINOR_SWING_LOW_DETECTED', 'MAJOR_SWING_HIGH_DETECTED', 'MAJOR_SWING_LOW_DETECTED', 'NO_SWINGS', 'INSUFFICIENT_DATA', 'ERROR'],
+    valid_signals=[
+        # Swing events - GRANULAR
+        'SWING_HIGH_DETECTED', 'SWING_LOW_DETECTED', 'MINOR_SWING_HIGH_DETECTED', 'MINOR_SWING_LOW_DETECTED', 'MAJOR_SWING_HIGH_DETECTED', 'MAJOR_SWING_LOW_DETECTED', 'NO_SWINGS',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'INSUFFICIENT_DATA', 'ERROR'
+    ],
     signal_tiers={
-        'ERROR': {
-                'points': 0
-        },
-        'INSUFFICIENT_DATA': {
-                'points': 0
-        },
-        'NO_SWINGS': {
-                'points': 0
-        },
-        'SWING_HIGH_DETECTED': {
-                'base_points': 15,
-                'formula': 'scaled'
-        },
-        'SWING_LOW_DETECTED': {
-                'base_points': 15,
-                'formula': 'scaled'
-        },
-        'MINOR_SWING_HIGH_DETECTED': {
-                'base_points': 15,
-                'formula': 'scaled'
-        },
-        'MINOR_SWING_LOW_DETECTED': {
-                'base_points': 15,
-                'formula': 'scaled'
-        },
+        # Major swings - Rare, high-strength (80+) - Booster quality
         'MAJOR_SWING_HIGH_DETECTED': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 25,
+            'formula': 'scaled',
+            'description': 'Major swing high (strength 80+) - strong resistance zone'
         },
         'MAJOR_SWING_LOW_DETECTED': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 25,
+            'formula': 'scaled',
+            'description': 'Major swing low (strength 80+) - strong support zone'
+        },
+        
+        # Regular swings - Medium strength (40-79) - Primary component
+        'SWING_HIGH_DETECTED': {
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'Regular swing high (strength 40-79) - resistance zone'
+        },
+        'SWING_LOW_DETECTED': {
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'Regular swing low (strength 40-79) - support zone'
+        },
+        
+        # Minor swings - Low strength (<40) - Confirmation only
+        'MINOR_SWING_HIGH_DETECTED': {
+            'base_points': 12,
+            'formula': 'scaled',
+            'description': 'Minor swing high (strength <40) - weak resistance'
+        },
+        'MINOR_SWING_LOW_DETECTED': {
+            'base_points': 12,
+            'formula': 'scaled',
+            'description': 'Minor swing low (strength <40) - weak support'
+        },
+        
+        # Status signals
+        'NO_SWINGS': {
+            'points': 0,
+            'description': 'No swing points detected'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'Swing low detected - bullish (simple)'
+        },
+        'BEARISH': {
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'Swing high detected - bearish (simple)'
+        },
+        'NEUTRAL': {
+            'base_points': 10,
+            'formula': 'scaled',
+            'description': 'No swings - neutral (simple)'
+        },
+        
+        'ERROR': {
+            'points': 0,
+            'description': 'Analysis error occurred'
+        },
+        'INSUFFICIENT_DATA': {
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='Swing Points - Identifies swing highs/lows with strength-based scoring and major/minor classification',
+    tags=['market_structure', 'swing_points', 'support_resistance', 'pivot', 'context_block']
 )
 class SwingPoints:
     """

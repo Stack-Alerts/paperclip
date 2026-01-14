@@ -38,7 +38,14 @@ from src.utils.advanced_data_loader import advanced_data
     category='PRICE_ACTION',
     class_name='LiquiditySweep',
     default_weight=25,
-    valid_signals=['BEARISH_SWEEP', 'BULLISH_SWEEP', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular signals
+        'BEARISH_SWEEP', 'BULLISH_SWEEP', 'NO_SWEEP',
+        # Simple directional - SIMPLE (what code actually emits!)
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
         'BEARISH_SWEEP': {
                 'base_points': 25,
@@ -52,6 +59,22 @@ from src.utils.advanced_data_loader import advanced_data
                 'points': 0
         },
         'INSUFFICIENT_DATA': {
+                'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
+        },
+        'NO_SWEEP': {
                 'points': 0
         }
 }

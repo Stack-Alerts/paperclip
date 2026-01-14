@@ -30,8 +30,26 @@ import numpy as np
     category='PATTERNS',
     class_name='Candle2Close',
     default_weight=30,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular pattern signals
+        'BULLISH_C2_CLOSE', 'BEARISH_C2_CLOSE',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Pattern signals
+        'BULLISH_C2_CLOSE': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BEARISH_C2_CLOSE': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
                 'formula': 'scaled'

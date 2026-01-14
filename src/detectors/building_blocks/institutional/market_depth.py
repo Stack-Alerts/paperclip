@@ -50,23 +50,59 @@ from src.utils.advanced_data_loader import advanced_data
     category='INSTITUTIONAL',
     class_name='MarketDepth',
     default_weight=15,
-    valid_signals=['HIGH_LIQUIDITY', 'LOW_LIQUIDITY', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Liquidity levels - GRANULAR
+        'HIGH_LIQUIDITY', 'NORMAL_LIQUIDITY', 'LOW_LIQUIDITY',
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status signals
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
         'HIGH_LIQUIDITY': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'High volume/liquidity - excellent execution conditions'
+        },
+        'NORMAL_LIQUIDITY': {
+            'base_points': 12,
+            'formula': 'scaled',
+            'description': 'Normal liquidity conditions - standard execution'
         },
         'LOW_LIQUIDITY': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 8,
+            'formula': 'scaled',
+            'description': 'Low liquidity warning - poor execution risk'
         },
+        
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH': {
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Good liquidity conditions - bullish (simple)'
+        },
+        'BEARISH': {
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Good liquidity conditions - bearish (simple)'
+        },
+        'NEUTRAL': {
+            'base_points': 10,
+            'formula': 'scaled',
+            'description': 'Normal liquidity - neutral (simple)'
+        },
+        
         'ERROR': {
-                'points': 0
+            'points': 0,
+            'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='Market Depth - Volume-based liquidity analysis with spread estimation',
+    tags=['institutional', 'liquidity', 'volume', 'context_block', 'execution_quality']
 )
 class MarketDepth:
     """

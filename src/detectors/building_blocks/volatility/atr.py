@@ -30,8 +30,32 @@ import numpy as np
     category='VOLATILITY',
     class_name='ATR',
     default_weight=10,
-    valid_signals=['EXTREME_HIGH', 'EXTREME_LOW', 'VERY_HIGH', 'VERY_LOW', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular volatility regime signals
+        'EXPANDING', 'CONTRACTING', 'STABLE',
+        # Granular volatility level signals
+        'EXTREME_HIGH', 'EXTREME_LOW', 'VERY_HIGH', 'VERY_LOW', 'HIGH', 'NORMAL', 'CALM', 'EXTREME',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Volatility regime signals
+        'EXPANDING': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'CONTRACTING': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'STABLE': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        
+        # Volatility level signals
         'EXTREME_HIGH': {
                 'base_points': 10,
                 'formula': 'scaled'
@@ -47,6 +71,35 @@ import numpy as np
         'VERY_LOW': {
                 'base_points': 10,
                 'formula': 'scaled'
+        },
+        'HIGH': {
+                'base_points': 9,
+                'formula': 'scaled'
+        },
+        'NORMAL': {
+                'base_points': 7,
+                'formula': 'scaled'
+        },
+        'CALM': {
+                'base_points': 6,
+                'formula': 'scaled'
+        },
+        'EXTREME': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         },
         'ERROR': {
                 'points': 0

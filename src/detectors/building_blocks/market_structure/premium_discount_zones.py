@@ -46,30 +46,59 @@ import numpy as np
     category='MARKET_STRUCTURE',
     class_name='PremiumDiscountZones',
     default_weight=14,
-    valid_signals=['PRICE_IN_PREMIUM', 'PRICE_IN_DISCOUNT', 'AT_EQUILIBRIUM', 'NO_ZONE', 'INSUFFICIENT_DATA', 'ERROR'],
+    valid_signals=[
+        # Zone locations - GRANULAR
+        'PRICE_IN_PREMIUM', 'PRICE_IN_DISCOUNT', 'PRICE_AT_EQUILIBRIUM',
+        # Simple directional signals - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'INSUFFICIENT_DATA', 'ERROR'
+    ],
     signal_tiers={
-        'ERROR': {
-                'points': 0
-        },
-        'INSUFFICIENT_DATA': {
-                'points': 0
-        },
-        'NO_ZONE': {
-                'points': 0
-        },
         'PRICE_IN_PREMIUM': {
-                'base_points': 14,
-                'formula': 'scaled'
+            'base_points': 14,
+            'formula': 'scaled',
+            'description': 'Price in premium zone - expensive, potential reversal down'
         },
         'PRICE_IN_DISCOUNT': {
-                'base_points': 14,
-                'formula': 'scaled'
+            'base_points': 14,
+            'formula': 'scaled',
+            'description': 'Price in discount zone - cheap, potential reversal up'
         },
-        'AT_EQUILIBRIUM': {
-                'base_points': 14,
-                'formula': 'scaled'
+        'PRICE_AT_EQUILIBRIUM': {
+            'base_points': 10,
+            'formula': 'scaled',
+            'description': 'Price at equilibrium - fair value zone'
+        },
+        
+        # Simple directional signals - SIMPLE
+        'BULLISH': {
+            'base_points': 14,
+            'formula': 'scaled',
+            'description': 'In discount - bullish (simple)'
+        },
+        'BEARISH': {
+            'base_points': 14,
+            'formula': 'scaled',
+            'description': 'In premium - bearish (simple)'
+        },
+        'NEUTRAL': {
+            'base_points': 10,
+            'formula': 'scaled',
+            'description': 'At equilibrium - neutral (simple)'
+        },
+        
+        'ERROR': {
+            'points': 0,
+            'description': 'Analysis error occurred'
+        },
+        'INSUFFICIENT_DATA': {
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='Premium/Discount Zones - ICT premium/discount analysis with multi-timeframe alignment',
+    tags=['market_structure', 'premium_discount', 'ict', 'value_zones', 'equilibrium', 'context_block']
 )
 class PremiumDiscountZones:
     """

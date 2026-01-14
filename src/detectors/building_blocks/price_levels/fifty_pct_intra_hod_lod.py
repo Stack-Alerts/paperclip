@@ -20,11 +20,14 @@ import numpy as np
     class_name='FiftyPctIntraHODLOD',
     default_weight=18,
     valid_signals=[
+        # Granular position signals
         'ABOVE_INTRA_EQ',         # Price above today's 50%
         'BELOW_INTRA_EQ',         # Price below today's 50%
         'AT_INTRA_EQ',            # Price at today's 50%
         'REJECTION_AT_INTRA_EQ',  # Rejected at today's equilibrium
-        'NEUTRAL',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
         'ERROR'
     ],
     signal_tiers={
@@ -49,6 +52,16 @@ import numpy as np
         },
         'ERROR': {
             'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+            'base_points': 14,
+            'formula': 'scaled'
+        },
+        'BEARISH': {
+            'base_points': 14,
+            'formula': 'scaled'
         }
     }
 )

@@ -29,17 +29,16 @@ import numpy as np
     category='PATTERNS',
     class_name='DoubleTopPattern',
     default_weight=30,
-    valid_signals=['BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN', 'INSUFFICIENT_DATA', 'ERROR'],
+    valid_signals=[
+        # Granular pattern signals
+        'BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
-        'ERROR': {
-                'points': 0
-        },
-        'INSUFFICIENT_DATA': {
-                'points': 0
-        },
-        'NO_PATTERN': {
-                'points': 0
-        },
+        # Pattern signals
         'BEARISH_BREAKDOWN': {
                 'base_points': 30,
                 'formula': 'scaled'
@@ -47,6 +46,28 @@ import numpy as np
         'PATTERN_FORMING': {
                 'base_points': 30,
                 'formula': 'scaled'
+        },
+        'NO_PATTERN': {
+                'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
+        },
+        'ERROR': {
+                'points': 0
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0
         }
 }
 )

@@ -106,8 +106,16 @@ import numpy as np
     category='WYCKOFF',
     class_name='WyckoffAccumulation',
     default_weight=28,
-    valid_signals=['SOS_BREAKOUT', 'SPRING_DETECTED', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular Wyckoff accumulation signals
+        'SOS_BREAKOUT', 'SPRING_DETECTED', 'ACCUMULATION_PHASE_A', 'ACCUMULATION_PHASE_B', 'NO_ACCUMULATION',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Wyckoff accumulation signals
         'SOS_BREAKOUT': {
                 'base_points': 28,
                 'formula': 'scaled'
@@ -115,6 +123,31 @@ import numpy as np
         'SPRING_DETECTED': {
                 'base_points': 28,
                 'formula': 'scaled'
+        },
+        'ACCUMULATION_PHASE_A': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'ACCUMULATION_PHASE_B': {
+                'base_points': 22,
+                'formula': 'scaled'
+        },
+        'NO_ACCUMULATION': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         },
         'ERROR': {
                 'points': 0

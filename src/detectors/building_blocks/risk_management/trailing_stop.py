@@ -38,8 +38,33 @@ import numpy as np
     category='RISK_MANAGEMENT',
     class_name='TrailingStop',
     default_weight=8,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular risk signals
+        'STOP_TRIGGERED', 'STOP_UPDATED', 'STOP_ACTIVE', 'NO_STOP',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Granular risk signals
+        'STOP_TRIGGERED': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'STOP_UPDATED': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'STOP_ACTIVE': {
+                'base_points': 5,
+                'formula': 'scaled'
+        },
+        'NO_STOP': {
+                'points': 0
+        },
+        
+        # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 8,
                 'formula': 'scaled'
@@ -51,6 +76,8 @@ import numpy as np
         'NEUTRAL': {
                 'points': 0
         },
+        
+        # Status
         'ERROR': {
                 'points': 0
         },
