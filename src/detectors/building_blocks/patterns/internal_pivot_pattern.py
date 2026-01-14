@@ -111,6 +111,17 @@ class InternalPivotPattern:
         self.recent_pivots = []
         self.accuracy_stats = {'correct': 0, 'total': 0}
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BULLISH_PIVOT_LOW', 'PIVOT_LOW']:
+            simple = 'BULLISH'
+        elif granular in ['BEARISH_PIVOT_HIGH', 'PIVOT_HIGH']:
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
         Analyze dataframe for internal pivot patterns.
@@ -297,10 +308,16 @@ class InternalPivotPattern:
         reward = abs(target - current_price)
         risk_reward = reward / risk if risk > 0 else 0
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal_type)
+        
         return {
-            'signal': signal_type,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pivot_type': 'low' if pivot['is_bullish'] else 'high',
                 'pivot_price': round(pivot['pivot_price'], 2),
                 'pivot_depth': round(pivot['depth'], 2),

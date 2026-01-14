@@ -155,6 +155,19 @@ class InitialBalanceBreakout:
         self.last_ib_date: Optional[datetime] = None
         self.breakout_detected = False
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BULLISH_BREAKOUT', 'ABOVE_IB']:
+            simple = 'BULLISH'
+        elif granular in ['BEARISH_BREAKOUT', 'BELOW_IB']:
+            simple = 'BEARISH'
+        elif granular == 'LOWER_IB':
+            simple = 'BEARISH'  # In lower IB, bias bearish breakout
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
         Analyze dataframe for Initial Balance and breakouts.
@@ -392,10 +405,16 @@ class InitialBalanceBreakout:
         # Calculate strength score (fine-grained)
         strength_score = round(distance_pct * 100, 1)  # 0-100 scale
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal_type)
+        
         return {
-            'signal': signal_type,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': min(85, confidence),
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'ib_high': round(ib.high, 2),
                 'ib_low': round(ib.low, 2),
                 'ib_midpoint': round(ib.midpoint, 2),

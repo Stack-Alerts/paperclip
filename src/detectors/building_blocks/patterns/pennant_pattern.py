@@ -113,6 +113,20 @@ class PennantPattern:
         
         # Breakout requirements
         self.BREAK_MARGIN = 0.005  # Must break 0.5% beyond channel
+    
+    def _determine_dual_signals(self, granular_signal: str, direction: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Bilateral continuation pattern"""
+        granular = granular_signal
+        if granular == 'BULLISH_BREAKOUT':
+            simple = 'BULLISH'
+        elif granular == 'BEARISH_BREAKOUT':
+            simple = 'BEARISH'
+        elif granular == 'PATTERN_FORMING':
+            # Forming: use pole direction (continuation expected)
+            simple = direction  # 'BULLISH' or 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for momentum alignment"""
@@ -315,10 +329,16 @@ class PennantPattern:
         
         target = pole_end + (pole_end - pole_start)
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal, direction)
+        
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': final_confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pattern_type': 'PENNANT_INSTITUTIONAL',
                 'direction': direction,
                 'pole_strength_pct': round(abs(pole_move_pct) * 100, 2),

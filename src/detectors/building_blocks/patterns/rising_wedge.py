@@ -106,6 +106,15 @@ class RisingWedgePattern:
         
         # Breakout requirements
         self.BREAK_MARGIN = 0.005  # Must break 0.5% below support
+    
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BEARISH_BREAKDOWN', 'PATTERN_FORMING']:
+            simple = 'BEARISH'  # Rising wedge is bearish reversal
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
         
     def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
         """Calculate RSI for overbought exhaustion"""
@@ -273,10 +282,16 @@ class RisingWedgePattern:
 
         target = support - first_range
 
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': final_confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pattern_type': 'RISING_WEDGE_INSTITUTIONAL',
                 'current_rsi': round(current_rsi, 1),
                 'vwap': round(vwap, 2),
