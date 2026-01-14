@@ -200,7 +200,7 @@ class ElliottWaveCount:
     Success rate: High when properly identified (higher with MTF)
     """
     
-    def __init__(self, timeframe: str = '15min', use_mtf: bool = False, **kwargs):
+    def __init__(self, timeframe: str = '2h', use_mtf: bool = True, **kwargs):
         self.timeframe = timeframe
         self.use_mtf = use_mtf
     
