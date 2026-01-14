@@ -112,6 +112,26 @@ class ASFXA2VWAP:
         self.ema_period = ema_period
         self.vwap_filter = vwap_filter
         self.min_strength = min_strength
+        self.prev_vwap_relation = None  # For cross detection
+    
+    def _determine_dual_signals(self, vwap_relation: str, is_cross: bool = False) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        if is_cross:
+            # Cross signals
+            if vwap_relation == 'VWAP_CROSS_UP':
+                return 'VWAP_CROSS_UP', 'BULLISH'
+            elif vwap_relation == 'VWAP_CROSS_DOWN':
+                return 'VWAP_CROSS_DOWN', 'BEARISH'
+        
+        # Position relative to VWAP
+        if vwap_relation == 'ABOVE_VWAP':
+            return 'ABOVE_VWAP', 'BULLISH'
+        elif vwap_relation == 'BELOW_VWAP':
+            return 'BELOW_VWAP', 'BEARISH'
+        elif vwap_relation == 'AT_VWAP':
+            return 'AT_VWAP', 'NEUTRAL'
+        else:
+            return 'NEUTRAL', 'NEUTRAL'
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
@@ -144,49 +164,67 @@ class ASFXA2VWAP:
             if np.isnan(current_ema) or np.isnan(current_vwap):
                 return self._neutral_response(current_bar['timestamp'], current_price)
             
-            # Detect A2 signals
-            bullish_signal = self._detect_bullish_a2(current_bar, current_ema)
-            bearish_signal = self._detect_bearish_a2(current_bar, current_ema)
+            # Determine VWAP relationship
+            vwap_distance_pct = abs(current_price - current_vwap) / current_vwap * 100
             
-            signal = bullish_signal or bearish_signal
-            
-            if not signal:
-                return self._neutral_response(current_bar['timestamp'], current_price)
-            
-            # Apply VWAP filter if enabled
-            if self.vwap_filter:
-                if signal['type'] == 'BULLISH_A2':
-                    if current_price <= current_vwap:
-                        return self._neutral_response(current_bar['timestamp'], current_price,
-                                                     reason='Failed VWAP filter (below VWAP)')
-                else:  # BEARISH
-                    if current_price >= current_vwap:
-                        return self._neutral_response(current_bar['timestamp'], current_price,
-                                                     reason='Failed VWAP filter (above VWAP)')
-            
-            # Check strength threshold
-            if signal['strength'] < self.min_strength:
-                return self._neutral_response(current_bar['timestamp'], current_price,
-                                             reason=f'Low strength ({signal["strength"]:.1f}%)')
-            
-            # Calculate stop-loss
-            daily_high = df['high'].tail(96).max()  # Last day (96 bars for 15min)
-            daily_low = df['low'].tail(96).min()
-            
-            if signal['type'] == 'BULLISH_A2':
-                stop_loss = self._calculate_bullish_stop(current_bar, daily_high)
+            if vwap_distance_pct < 0.5:  # Within 0.5% of VWAP
+                vwap_relation = 'AT_VWAP'
+            elif current_price > current_vwap:
+                vwap_relation = 'ABOVE_VWAP'
             else:
-                stop_loss = self._calculate_bearish_stop(current_bar, daily_low)
+                vwap_relation = 'BELOW_VWAP'
             
-            # Generate signal response
-            return self._generate_signal(
-                signal,
-                current_bar['timestamp'],
-                current_price,
-                current_ema,
-                current_vwap,
-                stop_loss
+            # Detect VWAP crosses
+            is_cross = False
+            prev_relation = self.prev_vwap_relation
+            
+            if prev_relation and prev_relation != vwap_relation:
+                if prev_relation == 'BELOW_VWAP' and vwap_relation == 'ABOVE_VWAP':
+                    vwap_relation = 'VWAP_CROSS_UP'
+                    is_cross = True
+                elif prev_relation == 'ABOVE_VWAP' and vwap_relation == 'BELOW_VWAP':
+                    vwap_relation = 'VWAP_CROSS_DOWN'
+                    is_cross = True
+            
+            self.prev_vwap_relation = vwap_relation if not is_cross else (
+                'ABOVE_VWAP' if vwap_relation == 'VWAP_CROSS_UP' else 'BELOW_VWAP'
             )
+            
+            # DUAL SIGNAL ARCHITECTURE
+            granular_signal, simple_signal = self._determine_dual_signals(vwap_relation, is_cross)
+            
+            # Calculate confidence
+            base_confidence = 60
+            if is_cross:
+                base_confidence = 75  # Crosses are stronger signals
+            elif vwap_relation == 'AT_VWAP':
+                base_confidence = 70  # At VWAP is a key level
+            
+            confidence = base_confidence
+            
+            # Generate signal response with VWAP signals
+            return {
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
+                'confidence': confidence,
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'current_price': round(current_price, 2),
+                    'ema_21': round(current_ema, 2),
+                    'vwap': round(current_vwap, 2),
+                    'vwap_distance_pct': round(vwap_distance_pct, 2),
+                    'is_cross': is_cross,
+                    'vwap_relation': vwap_relation,
+                },
+                'timestamp': current_bar['timestamp'],
+                'timeframe': '15min',
+                'confluence_factors': [
+                    f'Price {vwap_relation.lower().replace("_", " ")}',
+                    f'VWAP: ${current_vwap:.2f}',
+                    f'Distance: {vwap_distance_pct:.2f}%'
+                ]
+            }
             
         except Exception as e:
             return self._error_response(f'Analysis error: {str(e)[:100]}')
