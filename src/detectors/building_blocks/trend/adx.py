@@ -30,8 +30,55 @@ import numpy as np
     category='TREND',
     class_name='ADX',
     default_weight=16,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular trend strength signals
+        'WEAK_UPTREND', 'MODERATE_UPTREND', 'STRONG_UPTREND', 'VERY_STRONG_UPTREND',
+        'WEAK_DOWNTREND', 'MODERATE_DOWNTREND', 'STRONG_DOWNTREND', 'VERY_STRONG_DOWNTREND',
+        'RANGING',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Granular uptrend signals
+        'WEAK_UPTREND': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'MODERATE_UPTREND': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'STRONG_UPTREND': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'VERY_STRONG_UPTREND': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        # Granular downtrend signals
+        'WEAK_DOWNTREND': {
+                'base_points': 8,
+                'formula': 'scaled'
+        },
+        'MODERATE_DOWNTREND': {
+                'base_points': 12,
+                'formula': 'scaled'
+        },
+        'STRONG_DOWNTREND': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'VERY_STRONG_DOWNTREND': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'RANGING': {
+                'points': 0
+        },
+        # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 16,
                 'formula': 'scaled'
@@ -89,6 +136,34 @@ class ADX:
         """
         self.timeframe = timeframe
         self.period = period
+    
+    def _determine_dual_signals(self, adx: float, plus_di: float, minus_di: float) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        # Determine direction
+        is_bullish = plus_di > minus_di
+        
+        # Determine strength level
+        if adx < 25:
+            strength = 'WEAK'
+            simple = 'NEUTRAL'  # Weak trend = ranging, not tradeable
+        elif adx < 50:
+            strength = 'MODERATE'
+            simple = 'BULLISH' if is_bullish else 'BEARISH'
+        elif adx < 75:
+            strength = 'STRONG'
+            simple = 'BULLISH' if is_bullish else 'BEARISH'
+        else:
+            strength = 'VERY_STRONG'
+            simple = 'BULLISH' if is_bullish else 'BEARISH'
+        
+        # Build granular signal
+        if adx < 25:
+            granular = 'RANGING'
+        else:
+            direction = 'UPTREND' if is_bullish else 'DOWNTREND'
+            granular = f'{strength}_{direction}'
+        
+        return granular, simple
     
     def calculate_adx(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Calculate ADX, +DI, -DI"""
@@ -205,6 +280,9 @@ class ADX:
             # Only signal when trend is strong enough (ADX >= 25)
             signal = 'BEARISH' if adx >= 25 else 'NEUTRAL'
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(adx, plus_di, minus_di)
+        
         # Confidence based on ADX strength
         confidence = min(100, adx * 1.2)  # Scale ADX to 0-100
         
@@ -224,6 +302,8 @@ class ADX:
         
         # Metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'adx': round(adx, 2),
             'plus_di': round(plus_di, 2),
             'minus_di': round(minus_di, 2),
@@ -233,7 +313,8 @@ class ADX:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
