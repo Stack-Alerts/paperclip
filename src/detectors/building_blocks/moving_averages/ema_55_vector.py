@@ -46,12 +46,12 @@ import numpy as np
         'BULLISH_PSEUDO': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Bullish pseudo vector - crossed above 55 EMA with 120%+ volume (moderate conviction)'
+            'description': 'Bullish pseudo vector - crossed above 55 EMA with 100%+ volume AND rising EMA slope (RARE: requires trend confirmation)'
         },
         'BEARISH_PSEUDO': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Bearish pseudo vector - crossed below 55 EMA with 120%+ volume (moderate conviction)'
+            'description': 'Bearish pseudo vector - crossed below 55 EMA with 100%+ volume AND falling EMA slope (RARE: requires trend confirmation)'
         },
         
         # Simple signals (basic users)
