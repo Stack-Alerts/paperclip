@@ -108,6 +108,24 @@ class OrderBlock:
         self.min_impulse_pct = min_impulse_pct
         self.lookback = lookback
     
+    def _determine_dual_signals(self, signal: str, active_ob: Dict = None) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Map current state to granular + simple"""
+        # Current logic returns BULLISH/BEARISH/NEUTRAL
+        # Map to granular OB type + simple directional
+        if signal == 'BULLISH' and active_ob:
+            granular = 'BULLISH_OB'
+            simple = 'BULLISH'
+        elif signal == 'BEARISH' and active_ob:
+            granular = 'BEARISH_OB'
+            simple = 'BEARISH'
+        elif signal == 'NO_ORDER_BLOCK':
+            granular = 'NO_OB'
+            simple = 'NEUTRAL'
+        else:  # NEUTRAL
+            granular = 'NO_OB'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def detect_bullish_order_block(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Detect bullish order block (demand zone)"""
         if len(df) < 3:
@@ -261,8 +279,13 @@ class OrderBlock:
         if signal != 'NEUTRAL':
             confluence_factors.append(f'Price in OB zone - high probability reversal')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal, active_ob)
+        
         # Metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'order_block_type': active_ob['type'],
             'ob_high': active_ob['high'],
             'ob_low': active_ob['low'],
@@ -274,7 +297,8 @@ class OrderBlock:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],

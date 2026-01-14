@@ -31,8 +31,25 @@ import numpy as np
     category='PATTERNS',
     class_name='ThreeBarReversal',
     default_weight=30,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular pattern signals
+        'BULLISH_3BAR', 'BEARISH_3BAR',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Granular signals
+        'BULLISH_3BAR': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BEARISH_3BAR': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        # Simple directional
         'BULLISH': {
                 'base_points': 30,
                 'formula': 'scaled'
@@ -89,6 +106,26 @@ class ThreeBarReversal:
         self.ema_fast = ema_fast
         self.ema_slow = ema_slow
         self.min_strength = min_strength
+    
+    def _determine_dual_signals(self, pattern_type: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        # Map pattern-specific signals to simple directions
+        if pattern_type == 'BULLISH_3BAR':
+            granular = 'BULLISH_3BAR'
+            simple = 'BULLISH'
+        elif pattern_type == 'BEARISH_3BAR':
+            granular = 'BEARISH_3BAR'
+            simple = 'BEARISH'
+        elif pattern_type == 'NEUTRAL':
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        elif pattern_type == 'ERROR':
+            granular = 'ERROR'
+            simple = 'NEUTRAL'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        return granular, simple
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
@@ -295,10 +332,16 @@ class ThreeBarReversal:
         reward = abs(target - current_price)
         risk_reward = reward / risk if risk > 0 else 0
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(pattern['type'])
+        
         return {
-            'signal': pattern['type'],
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'pattern_type': 'enhanced' if pattern['is_enhanced'] else 'normal',
                 'strength': round(pattern['strength'], 1),
                 'current_price': round(current_price, 2),
