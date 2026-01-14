@@ -154,12 +154,20 @@ class ADR:
             'extreme': 2.0    # > 200% of ADR
         }
     
-    def _determine_dual_signals(self, signal: str) -> tuple:
+    def _determine_dual_signals(self, signal: str, range_trend: str = 'STABLE') -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
-        # ADR is volatility context - doesn't provide directional bias
-        # All volatility levels map to NEUTRAL for simple users
         granular = signal
-        simple = 'NEUTRAL'  # Volatility context only
+        
+        # Map volatility expansion/contraction to directional signals
+        # EXPANDING volatility = BULLISH (energy building, favorable for breakouts)
+        # CONTRACTING volatility = BEARISH (consolidation, unfavorable  for entries)
+        if range_trend == 'EXPANDING':
+            simple = 'BULLISH'
+        elif range_trend == 'CONTRACTING':
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        
         return granular, simple
     
     def calculate_daily_range(self, df: pd.DataFrame) -> pd.Series:
@@ -596,8 +604,8 @@ class ADR:
         elif position_sizing > 1.0:
             confluence_factors.append(f'Position sizing: {position_sizing}x - can increase size due to low volatility')
         
-        # DUAL SIGNAL ARCHITECTURE
-        granular_signal, simple_signal = self._determine_dual_signals(range_classification)
+        # DUAL SIGNAL ARCHITECTURE - pass range_trend for directional mapping
+        granular_signal, simple_signal = self._determine_dual_signals(range_classification, range_trend)
         
         # Prepare metadata (ENHANCED)
         metadata = {
