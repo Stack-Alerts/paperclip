@@ -187,6 +187,22 @@ class WyckoffAccumulation:
         self.sos_breakout_pct = sos_breakout_pct
         self.sos_volume_ratio = sos_volume_ratio
     
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        granular = signal
+        
+        # Map Wyckoff phases to directional signals
+        if signal in ['SOS_BREAKOUT', 'SPRING_DETECTED', 'ACCUMULATION_PHASE_A']:
+            # Phase D (SOS), Phase C (Spring), Phase A (Climax) = BULLISH
+            simple = 'BULLISH'
+        elif signal == 'ACCUMULATION_PHASE_B':
+            # Phase B (consolidation) = NEUTRAL
+            simple = 'NEUTRAL'
+        else:  # NO_ACCUMULATION
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def detect_selling_climax(self, df: pd.DataFrame) -> tuple:
         """
         Detect selling climax (Phase A):
@@ -404,8 +420,13 @@ class WyckoffAccumulation:
             confluence_factors.append('📈 Price trending - not consolidating')
             confluence_factors.append('❌ No accumulation pattern detected')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Build metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'phase': phase,
             'spring_detected': spring,
             'sos_detected': sos,
@@ -416,7 +437,8 @@ class WyckoffAccumulation:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': int(confidence),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
