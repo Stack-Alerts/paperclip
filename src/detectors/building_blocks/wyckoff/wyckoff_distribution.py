@@ -183,6 +183,52 @@ class WyckoffDistribution:
         
         return granular, simple
     
+    def _detect_timeframe(self, df: pd.DataFrame) -> str:
+        """Detect actual timeframe from data by analyzing timestamp intervals"""
+        if len(df) < 2:
+            return 'unknown'
+        
+        # Get time difference between consecutive rows
+        time_diff = (df['timestamp'].iloc[-1] - df['timestamp'].iloc[-2]).total_seconds() / 60
+        
+        # Map to timeframe
+        if 14 <= time_diff <= 16:
+            return '15min'
+        elif 59 <= time_diff <= 61:
+            return '1hr'
+        elif 119 <= time_diff <= 121:
+            return '2hr'
+        elif 239 <= time_diff <= 241:
+            return '4hr'
+        else:
+            return f'{int(time_diff)}min'
+    
+    def _resample_to_2hr(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Resample any timeframe to 2HR for Wyckoff analysis
+        
+        AUTOMATIC TIMEFRAME ENFORCEMENT:
+        - Wyckoff is designed for 2HR (65.1% NO_DISTRIBUTION - clean trending)
+        - 15min produces too many false distribution ranges (micro-ranges)
+        - This method ensures consistent 2HR analysis regardless of input
+        """
+        if 'timestamp' not in df.columns:
+            return df  # Can't resample without timestamp
+        
+        # Set timestamp as index for resampling
+        df_indexed = df.set_index('timestamp')
+        
+        # Resample to 2HR
+        df_2hr = df_indexed.resample('2H').agg({
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }).dropna().reset_index()
+        
+        return df_2hr
+    
     def detect_buying_climax(self, df: pd.DataFrame) -> tuple:
         """
         Detect buying climax (Phase A):
@@ -324,6 +370,11 @@ class WyckoffDistribution:
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
         Main analysis method - Comprehensive Wyckoff distribution detection
+        
+        AUTOMATIC 2HR ENFORCEMENT (2026-01-14):
+        This block automatically resamples input data to 2HR before analysis.
+        Wyckoff is designed for 2HR (65.1% NO_DISTRIBUTION on 2HR vs false ranges on 15min).
+        You can now safely use this block in any timeframe strategy!
         """
         # Input validation
         if not all(col in df.columns for col in ['open', 'high', 'low', 'close', 'volume', 'timestamp']):
@@ -336,17 +387,27 @@ class WyckoffDistribution:
                 'confluence_factors': []
             }
         
+        # AUTOMATIC TIMEFRAME ENFORCEMENT - Resample to 2HR
+        detected_tf = self._detect_timeframe(df)
+        if detected_tf not in ['2hr', '4hr']:
+            # Not already 2HR/4HR - resample to 2HR
+            df = self._resample_to_2hr(df)
+            # Update timeframe metadata to reflect actual analysis
+            actual_tf = '2hr (auto-resampled)'
+        else:
+            actual_tf = detected_tf
+        
         if len(df) < self.range_lookback:
             return {
                 'signal': 'INSUFFICIENT_DATA',
                 'confidence': 0,
                 'metadata': {},
                 'timestamp': datetime.now(),
-                'timeframe': self.timeframe,
+                'timeframe': actual_tf,
                 'confluence_factors': []
             }
         
-        # Detect Wyckoff events
+        # Detect Wyckoff events (now on 2HR data!)
         buying_climax, bc_conf = self.detect_buying_climax(df)
         in_range, range_conf, resistance = self.detect_range(df)
         
