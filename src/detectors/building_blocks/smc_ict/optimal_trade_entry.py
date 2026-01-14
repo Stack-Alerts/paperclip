@@ -125,6 +125,19 @@ class OptimalTradeEntry:
         self.ote_max = ote_max
         self.precise_ote = 0.705  # 70.5% equilibrium (ICT)
     
+    def _determine_dual_signals(self, ote_type: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        if ote_type == 'BULLISH_OTE':
+            granular = 'BULLISH_OTE'
+            simple = 'BULLISH'
+        elif ote_type == 'BEARISH_OTE':
+            granular = 'BEARISH_OTE'
+            simple = 'BEARISH'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def is_precise_ote(self, retracement_pct: float) -> bool:
         """
         Check if at precise OTE (70.5% ± 2%) - Priority 1.1
@@ -419,8 +432,13 @@ class OptimalTradeEntry:
         confluence_factors.append('Optimal entry zone - institutional interest')
         confluence_factors.append('High probability continuation setup')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(active_ote['type'])
+        
         # **ENHANCED:** Metadata with quality metrics
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'ote_type': active_ote['type'],
             'ote_high': active_ote['ote_high'],
             'ote_low': active_ote['ote_low'],
@@ -435,7 +453,8 @@ class OptimalTradeEntry:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
