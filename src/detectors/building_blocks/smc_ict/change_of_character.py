@@ -161,6 +161,25 @@ class ChangeOfCharacter:
         self.continuation_bars_monitored = 0
         self.continuation_start_bar = None
     
+    def _determine_dual_signals(self, choch_type: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        if choch_type in ['BULLISH_CHOCH', 'BULLISH_MSS']:
+            granular = choch_type
+            simple = 'BULLISH'
+        elif choch_type in ['BEARISH_CHOCH', 'BEARISH_MSS']:
+            granular = choch_type
+            simple = 'BEARISH'
+        elif choch_type in ['HIGH_SWEEP', 'LOW_SWEEP']:
+            granular = choch_type
+            simple = 'BULLISH' if choch_type == 'LOW_SWEEP' else 'BEARISH'
+        elif choch_type == 'UNUSUALLY_SLOW':
+            granular = 'UNUSUALLY_SLOW'
+            simple = 'NEUTRAL'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def determine_trend(self, df: pd.DataFrame) -> str:
         """Determine current trend"""
         if len(df) < 15:
@@ -644,9 +663,14 @@ class ChangeOfCharacter:
         if continuation_confirmed:
             confluence_factors.append(f'⭐ 5-bar {continuation_type.replace("_", " ")} CONFIRMED! (+15 confidence)')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(choch['type'])
+        
         # Metadata (ENHANCED)
         if choch['type'] == 'BULLISH_CHOCH':
             metadata = {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'choch_type': choch['type'],
                 'previous_trend': choch['previous_trend'],
                 'swing_high': choch['swing_high'],
@@ -700,7 +724,8 @@ class ChangeOfCharacter:
             self.choch_history.pop(0)
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
