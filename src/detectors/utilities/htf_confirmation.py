@@ -32,9 +32,9 @@ except ImportError:
     import sys
     import os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from detectors.pattern_encoder import PatternEncoder, EncodedPattern, TrendDirection
-    from detectors.pattern_statistics import PivotPrediction
-    from detectors.zigzag_detector import ZigzagDetector, Pivot, PivotType
+    from .pattern_encoder import PatternEncoder, EncodedPattern, TrendDirection
+    from .pattern_statistics import PivotPrediction
+    from .zigzag_detector import ZigzagDetector, Pivot, PivotType
 
 
 class HTFConfirmation:

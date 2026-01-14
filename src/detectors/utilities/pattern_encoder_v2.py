@@ -33,7 +33,7 @@ except ImportError:
     import sys
     import os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from detectors.pattern_encoder import Pivot, PivotType, PriceDirection, OscillatorDirection
+    from .pattern_encoder import Pivot, PivotType, PriceDirection, OscillatorDirection
 
 
 class CorePattern(Enum):
