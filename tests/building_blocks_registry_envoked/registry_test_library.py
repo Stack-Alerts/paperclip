@@ -248,10 +248,17 @@ def test_building_block_registry(block_name: str, days: int = 180, use_multicore
                 print(f"      Bar {err['bar_index']}: {err['error']}")
         return None
     
-    # Extract signal statistics
+    # Extract signal statistics from BOTH signal and signal_simple fields
     signals = [r.get('signal', 'UNKNOWN') for r in all_results]
+    signals_simple = [r.get('signal_simple', 'UNKNOWN') for r in all_results]
+    
     signal_counts = {}
     for sig in signals:
+        signal_counts[sig] = signal_counts.get(sig, 0) + 1
+    
+    # Add signal_simple counts (count ALL occurrences, not just unique)
+    for sig in signals_simple:
+        # Count all signal_simple occurrences separately
         signal_counts[sig] = signal_counts.get(sig, 0) + 1
     
     # Check which valid_signals were found
