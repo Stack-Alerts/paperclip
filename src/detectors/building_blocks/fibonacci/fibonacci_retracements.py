@@ -154,7 +154,32 @@ class FibonacciRetracements:
         self.use_multi_swing = use_multi_swing
         self.fib_levels = [0.236, 0.382, 0.5, 0.618, 0.786]
     
-    def score_swing_significance(self, df: pd.DataFrame, 
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        # AT_FIB_XX signals are granular, map to simple based on context
+        if signal.startswith('AT_FIB_'):
+            granular = signal
+            # Fibonacci levels are typically support/resistance
+            # If at fib level, it's a potential reversal - direction is neutral at the level
+            # User should combine with trend/price action for direction
+            simple = 'NEUTRAL'  # At a level, waiting for reaction
+        elif signal == 'BETWEEN_LEVELS':
+            granular = signal
+            simple = 'NEUTRAL'  # Between levels, no clear signal
+        # Already simple signals
+        elif signal in ['BULLISH', 'BEARISH', 'NEUTRAL']:
+            granular = signal
+            simple = signal
+        # Status signals
+        elif signal in ['ERROR', 'INSUFFICIENT_DATA']:
+            granular = signal
+            simple = 'NEUTRAL'
+        else:
+            granular = signal
+            simple = 'NEUTRAL'
+        return granular, simple
+    
+    def score_swing_significance(self, df: pd.DataFrame,
                                  high: float, low: float,
                                  high_idx, low_idx) -> float:
         """
@@ -486,10 +511,16 @@ class FibonacciRetracements:
         if closest_level == 'fib_61':
             confluence_factors.append('⭐ Golden Ratio (61.8%) - strongest level')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'fib_levels': fib_prices,
                 'closest_level': closest_level,
                 'at_level': at_level,
