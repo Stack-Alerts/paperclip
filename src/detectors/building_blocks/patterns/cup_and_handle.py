@@ -30,10 +30,10 @@ import numpy as np
     class_name='CupAndHandlePattern',
     default_weight=30,
     valid_signals=[
-        # Granular pattern signals
+        # Granular pattern signals (Cup&Handle is bullish-only)
         'BREAKOUT_CONFIRMED', 'CUP_FORMING', 'PATTERN_FORMING', 'NO_PATTERN',
-        # Simple directional - SIMPLE
-        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Simple directional - SIMPLE (bullish-only pattern)
+        'BULLISH', 'NEUTRAL',
         # Status
         'ERROR', 'INSUFFICIENT_DATA'
     ],
@@ -54,13 +54,8 @@ import numpy as np
         'NO_PATTERN': {
                 'points': 0
         },
-        
-        # Simple directional - SIMPLE
+        # Simple directional - SIMPLE (bullish-only)
         'BULLISH': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
-        'BEARISH': {
                 'base_points': 30,
                 'formula': 'scaled'
         },
@@ -114,8 +109,8 @@ class CupAndHandlePattern:
         self.MIN_CONFLUENCES = 4  # Back to 4 for better selectivity
         self.MIN_RECOVERY_PCT = 0.38  # Minimum 38% recovery (middle ground)
         
-        # Breakout requirements (stricter)
-        self.BREAK_MARGIN = 0.005  # Must break 0.5% above rim
+        # Breakout requirements (realistic for 15min)
+        self.BREAK_MARGIN = 0.001  # Must break 0.1% above rim (realistic for 15min)
     
     def _determine_dual_signals(self, granular_signal: str) -> tuple:
         """DUAL SIGNAL ARCHITECTURE"""
