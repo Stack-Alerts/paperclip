@@ -123,6 +123,24 @@ class LiquiditySweep:
         self.lookback = lookback
         self.last_confirmed_sweep = None
     
+    def _determine_dual_signals(self, signal: str, active_sweep: Dict = None) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Map current state to granular + simple"""
+        # Current logic returns BULLISH/BEARISH/NEUTRAL
+        # Map to granular sweep type + simple directional
+        if signal == 'BULLISH' and active_sweep:
+            granular = 'BULLISH_SWEEP'
+            simple = 'BULLISH'
+        elif signal == 'BEARISH' and active_sweep:
+            granular = 'BEARISH_SWEEP'
+            simple = 'BEARISH'
+        elif signal == 'NO_SWEEP':
+            granular = 'NO_SWEEP'
+            simple = 'NEUTRAL'
+        else:  # NEUTRAL
+            granular = 'NO_SWEEP'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def check_liquidation_confirmation(self, timestamp: datetime, sweep_price: float) -> Dict:
         """
         Check if liquidation data confirms the sweep
@@ -341,9 +359,14 @@ class LiquiditySweep:
         confluence_factors.append('Liquidity hunted - institutional manipulation')
         confluence_factors.append('High probability reversal setup')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal, active_sweep)
+        
         # Enhanced metadata with liquidation info
         if active_sweep['type'] == 'BULLISH_SWEEP':
             metadata = {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'sweep_type': active_sweep['type'],
                 'support_level': active_sweep['support_level'],
                 'sweep_low': active_sweep['sweep_low'],
@@ -357,6 +380,8 @@ class LiquiditySweep:
             }
         else:
             metadata = {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'sweep_type': active_sweep['type'],
                 'resistance_level': active_sweep['resistance_level'],
                 'sweep_high': active_sweep['sweep_high'],
@@ -370,7 +395,8 @@ class LiquiditySweep:
             }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],

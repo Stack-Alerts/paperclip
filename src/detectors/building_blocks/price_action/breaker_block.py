@@ -109,6 +109,24 @@ class BreakerBlock:
         self.min_break_pct = min_break_pct
         self.lookback = lookback
     
+    def _determine_dual_signals(self, signal: str, active_breaker: Dict = None) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Map current state to granular + simple"""
+        # Current logic returns BULLISH/BEARISH/NEUTRAL for price in zone
+        # We need to map to granular breaker type + simple directional
+        if signal == 'BULLISH' and active_breaker:
+            granular = 'BULLISH_BREAKER'
+            simple = 'BULLISH'
+        elif signal == 'BEARISH' and active_breaker:
+            granular = 'BEARISH_BREAKER'
+            simple = 'BEARISH'
+        elif signal == 'NO_BREAKER':
+            granular = 'NO_BREAKER'
+            simple = 'NEUTRAL'
+        else:  # NEUTRAL (breaker exists but price not in zone)
+            granular = 'NO_BREAKER'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def detect_bullish_breaker(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Detect bullish breaker (bearish OB broken up)"""
         if len(df) < 5:
@@ -266,8 +284,13 @@ class BreakerBlock:
         if signal != 'NEUTRAL':
             confluence_factors.append('Price at breaker zone - high probability setup')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal, active_breaker)
+        
         # Metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'breaker_type': active_breaker['type'],
             'breaker_high': active_breaker['high'],
             'breaker_low': active_breaker['low'],
@@ -281,7 +304,8 @@ class BreakerBlock:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
