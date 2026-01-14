@@ -113,6 +113,24 @@ class FairValueGap:
         self.min_gap_pct = min_gap_pct
         self.lookback = lookback
     
+    def _determine_dual_signals(self, signal: str, active_fvg: Dict = None) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Map current state to granular + simple"""
+        # Current logic returns BULLISH/BEARISH/NEUTRAL for price in gap
+        # Map to granular FVG type + simple directional
+        if signal == 'BULLISH' and active_fvg:
+            granular = 'BULLISH_FVG'
+            simple = 'BULLISH'
+        elif signal == 'BEARISH' and active_fvg:
+            granular = 'BEARISH_FVG'
+            simple = 'BEARISH'
+        elif signal == 'NO_FVG':
+            granular = 'NO_FVG'
+            simple = 'NEUTRAL'
+        else:  # NEUTRAL (gap exists but price not in gap)
+            granular = 'NO_FVG'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def detect_bullish_fvg(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Detect bullish FVG (gap up)"""
         if len(df) < 3:
@@ -289,8 +307,13 @@ class FairValueGap:
         else:
             confluence_factors.append('FVG present - watch for price return to gap')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal, active_fvg)
+        
         # Metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'fvg_type': active_fvg['type'],
             'gap_high': active_fvg['gap_high'],
             'gap_low': active_fvg['gap_low'],
@@ -305,7 +328,8 @@ class FairValueGap:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
