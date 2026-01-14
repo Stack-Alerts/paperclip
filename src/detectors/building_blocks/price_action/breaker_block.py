@@ -30,7 +30,14 @@ import numpy as np
     category='PRICE_ACTION',
     class_name='BreakerBlock',
     default_weight=25,
-    valid_signals=['BEARISH_BREAKER', 'BULLISH_BREAKER', 'NO_BREAKER', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular signals
+        'BEARISH_BREAKER', 'BULLISH_BREAKER', 'NO_BREAKER',
+        # Simple directional - SIMPLE (what code actually emits!)
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
         'BEARISH_BREAKER': {
                 'base_points': 25,
@@ -47,6 +54,19 @@ import numpy as np
                 'points': 0
         },
         'INSUFFICIENT_DATA': {
+                'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
                 'points': 0
         }
 }

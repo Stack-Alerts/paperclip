@@ -30,8 +30,30 @@ import numpy as np
     category='PRICE_LEVELS',
     class_name='AsiaSession50Percent',
     default_weight=20,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular position signals
+        'ABOVE_ASIA_50', 'AT_ASIA_50', 'BELOW_ASIA_50',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Granular position signals
+        'ABOVE_ASIA_50': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'AT_ASIA_50': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BELOW_ASIA_50': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
                 'formula': 'scaled'
@@ -43,6 +65,8 @@ import numpy as np
         'NEUTRAL': {
                 'points': 0
         },
+        
+        # Status
         'ERROR': {
                 'points': 0
         },

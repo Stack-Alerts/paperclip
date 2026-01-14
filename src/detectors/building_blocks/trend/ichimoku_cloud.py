@@ -30,8 +30,16 @@ import numpy as np
     category='TREND',
     class_name='IchimokuCloud',
     default_weight=16,
-    valid_signals=['ABOVE_CLOUD', 'BELOW_CLOUD', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular cloud position signals
+        'ABOVE_CLOUD', 'BELOW_CLOUD', 'IN_CLOUD',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Granular cloud signals
         'ABOVE_CLOUD': {
                 'base_points': 16,
                 'formula': 'scaled'
@@ -39,6 +47,22 @@ import numpy as np
         'BELOW_CLOUD': {
                 'base_points': 16,
                 'formula': 'scaled'
+        },
+        'IN_CLOUD': {
+                'points': 8
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         },
         'ERROR': {
                 'points': 0

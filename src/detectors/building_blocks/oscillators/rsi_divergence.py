@@ -30,7 +30,14 @@ import numpy as np
     category='OSCILLATORS',
     class_name='RSIDivergence',
     default_weight=25,
-    valid_signals=['BEARISH_DIVERGENCE', 'BULLISH_DIVERGENCE', 'OVERBOUGHT', 'OVERSOLD', 'NEUTRAL', 'ERROR'],
+    valid_signals=[
+        # Granular signals
+        'BEARISH_DIVERGENCE', 'BULLISH_DIVERGENCE', 'OVERBOUGHT', 'OVERSOLD',
+        # Simple directional - SIMPLE (what the code actually emits!)
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR'
+    ],
     signal_tiers={
         'ERROR': {
                 'points': 0
@@ -53,6 +60,16 @@ import numpy as np
         },
         'NEUTRAL': {
                 'max_points': 12,
+                'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 25,
                 'formula': 'scaled'
         }
 }

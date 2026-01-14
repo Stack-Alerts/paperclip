@@ -20,12 +20,15 @@ import numpy as np
     class_name='ILOD',
     default_weight=20,
     valid_signals=[
+        # Granular event signals
         'BEARISH_BREAK',      # Broke below previous ILOD
         'BULLISH_BOUNCE',     # Bounced at ILOD
         'AT_ILOD',           # Price at ILOD
         'ABOVE_ILOD',        # Price above ILOD
         'BELOW_ILOD',        # Price below ILOD (new ILOD)
-        'NEUTRAL',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
         'ERROR'
     ],
     signal_tiers={
@@ -54,6 +57,16 @@ import numpy as np
         },
         'ERROR': {
             'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+            'base_points': 20,
+            'formula': 'scaled'
+        },
+        'BEARISH': {
+            'base_points': 20,
+            'formula': 'scaled'
         }
     }
 )

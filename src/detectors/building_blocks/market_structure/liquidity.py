@@ -37,25 +37,6 @@ import numpy as np
 
 
 @dataclass
-@register_block(
-    name='liquidity',
-    category='MARKET_STRUCTURE',
-    class_name='LiquidityZone',
-    default_weight=15,
-    valid_signals=['VOID_DETECTED', 'ERROR', 'INSUFFICIENT_DATA'],
-    signal_tiers={
-        'VOID_DETECTED': {
-                'base_points': 15,
-                'formula': 'scaled'
-        },
-        'ERROR': {
-                'points': 0
-        },
-        'INSUFFICIENT_DATA': {
-                'points': 0
-        }
-}
-)
 class LiquidityZone:
     """Represents a liquidity zone."""
     zone_type: str  # 'buyside' or 'sellside'
@@ -76,6 +57,101 @@ class LiquidityZone:
         return self.high - self.low
 
 
+@register_block(
+    name='liquidity',
+    category='MARKET_STRUCTURE',
+    class_name='Liquidity',
+    default_weight=15,
+    valid_signals=[
+        # Zone Touch Events (highest value) - GRANULAR
+        'BUYSIDE_ZONE_TOUCH', 'SELLSIDE_ZONE_TOUCH',
+        # Breach Events (momentum) - GRANULAR
+        'BUYSIDE_BREACH', 'SELLSIDE_BREACH',
+        # Void Detection - GRANULAR
+        'VOID_DETECTED',
+        # Proximity Signals - GRANULAR
+        'NEAR_BUYSIDE', 'NEAR_SELLSIDE',
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
+    signal_tiers={
+        # Zone touches - Institutional reversal zones (highest value)
+        'BUYSIDE_ZONE_TOUCH': {
+            'base_points': 25,
+            'formula': 'scaled',
+            'description': 'Price touching buyside liquidity - potential bounce/reversal up'
+        },
+        'SELLSIDE_ZONE_TOUCH': {
+            'base_points': 25,
+            'formula': 'scaled',
+            'description': 'Price touching sellside liquidity - potential reversal down'
+        },
+        
+        # Breaches - Momentum continuation
+        'BUYSIDE_BREACH': {
+            'base_points': 22,
+            'formula': 'scaled',
+            'description': 'Bearish breach below buyside - stop hunt complete'
+        },
+        'SELLSIDE_BREACH': {
+            'base_points': 22,
+            'formula': 'scaled',
+            'description': 'Bullish breach above sellside - stop hunt complete'
+        },
+        
+        # Void - Aggressive institutional move
+        'VOID_DETECTED': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Liquidity void detected - rapid price movement'
+        },
+        
+        # Proximity - Approaching zones
+        'NEAR_BUYSIDE': {
+            'base_points': 12,
+            'formula': 'scaled',
+            'description': 'Approaching buyside liquidity zone'
+        },
+        'NEAR_SELLSIDE': {
+            'base_points': 12,
+            'formula': 'scaled',
+            'description': 'Approaching sellside liquidity zone'
+        },
+        
+        # Neutral - Between zones
+        'NEUTRAL': {
+            'base_points': 5,
+            'formula': 'scaled',
+            'description': 'Between liquidity zones - no clear setup'
+        },
+        
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Bullish liquidity setup - any event (simple)'
+        },
+        'BEARISH': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Bearish liquidity setup - any event (simple)'
+        },
+        
+        # Status
+        'ERROR': {
+            'points': 0,
+            'description': 'Analysis error occurred'
+        },
+        'INSUFFICIENT_DATA': {
+            'points': 0,
+            'description': 'Not enough data for analysis'
+        }
+    },
+    description='Liquidity - ICT/LuxAlgo institutional liquidity zones (buyside/sellside stops, voids, breaches)',
+    tags=['market_structure', 'liquidity', 'ict', 'luxalgo', 'institutional', 'stop_hunt', 'context_block']
+)
 class Liquidity:
     """
     Liquidity Detector

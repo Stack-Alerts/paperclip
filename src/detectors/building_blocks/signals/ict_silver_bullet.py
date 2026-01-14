@@ -32,7 +32,14 @@ import numpy as np
     category='SIGNALS',
     class_name='SessionType',
     default_weight=20,
-    valid_signals=['BEARISH_FVG_IN_ZONE', 'BEARISH_FVG_RETEST', 'BULLISH_FVG_IN_ZONE', 'BULLISH_FVG_RETEST', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular ICT signals
+        'BEARISH_FVG_IN_ZONE', 'BEARISH_FVG_RETEST', 'BULLISH_FVG_IN_ZONE', 'BULLISH_FVG_RETEST',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
         'BEARISH_FVG_IN_ZONE': {
                 'base_points': 20,
@@ -54,6 +61,19 @@ import numpy as np
                 'points': 0
         },
         'INSUFFICIENT_DATA': {
+                'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
                 'points': 0
         }
 }

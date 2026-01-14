@@ -30,7 +30,14 @@ import numpy as np
     category='PRICE_LEVELS',
     class_name='HOW',
     default_weight=20,
-    valid_signals=['BELOW_HOW', 'BREAKING_OUT', 'BREAKOUT_CONFIRMED', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular event signals
+        'BELOW_HOW', 'BREAKING_OUT', 'BREAKOUT_CONFIRMED',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
         'BELOW_HOW': {
                 'base_points': 20,
@@ -49,6 +56,20 @@ import numpy as np
         },
         'INSUFFICIENT_DATA': {
                 'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'max_points': 10,
+                'formula': 'scaled'
         }
 }
 )

@@ -42,26 +42,59 @@ from src.utils.advanced_data_loader import advanced_data
     category='INSTITUTIONAL',
     class_name='OrderFlowImbalance',
     default_weight=15,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Flow imbalances - GRANULAR
+        'BUY_IMBALANCE', 'SELL_IMBALANCE', 'BALANCED',
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status signals
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        'BUY_IMBALANCE': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Strong buy pressure - volume weighted to upside (>65%)'
+        },
+        'SELL_IMBALANCE': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Strong sell pressure - volume weighted to downside (>65%)'
+        },
+        'BALANCED': {
+            'base_points': 8,
+            'formula': 'scaled',
+            'description': 'Balanced order flow - no clear directional pressure'
+        },
+        
+        # Simple directional signals - SIMPLE for basic users
         'BULLISH': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Buy pressure detected - bullish (simple)'
         },
         'BEARISH': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Sell pressure detected - bearish (simple)'
         },
         'NEUTRAL': {
-                'points': 0
+            'base_points': 8,
+            'formula': 'scaled',
+            'description': 'Balanced flow - neutral (simple)'
         },
+        
         'ERROR': {
-                'points': 0
+            'points': 0,
+            'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='Order Flow Imbalance - Buy/sell pressure detection from volume-weighted bar analysis',
+    tags=['institutional', 'order_flow', 'pressure', 'volume', 'hybrid_block', 'liquidations']
 )
 class OrderFlowImbalance:
     """

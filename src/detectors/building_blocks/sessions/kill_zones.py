@@ -37,7 +37,14 @@ import numpy as np
     category='SESSIONS',
     class_name='KillZones',
     default_weight=16,
-    valid_signals=['ACTIVE', 'LONDON_KZ', 'NY_AM_KZ', 'NY_PM_KZ', 'ASIAN_KZ', 'INACTIVE', 'NO_SIGNAL', 'ERROR'],
+    valid_signals=[
+        # Granular session signals
+        'ACTIVE', 'LONDON_KZ', 'NY_AM_KZ', 'NY_PM_KZ', 'ASIAN_KZ', 'INACTIVE',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'NO_SIGNAL', 'ERROR'
+    ],
     signal_tiers={
         'ERROR': {
                 'points': 0
@@ -68,6 +75,19 @@ import numpy as np
         'INACTIVE': {
                 'base_points': 16,
                 'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 16,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         }
 }
 )

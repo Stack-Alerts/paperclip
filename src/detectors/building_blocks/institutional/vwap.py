@@ -30,24 +30,60 @@ import numpy as np
     category='INSTITUTIONAL',
     class_name='VWAP',
     default_weight=15,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR'],
+    valid_signals=[
+        # Position signals - GRANULAR
+        'ABOVE_VWAP', 'BELOW_VWAP', 'AT_VWAP',
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status signals
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
-        'ERROR': {
-                'points': 0
+        # Position signals - GRANULAR
+        'ABOVE_VWAP': {
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Price above VWAP - premium zone'
         },
+        'BELOW_VWAP': {
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Price below VWAP - discount zone'
+        },
+        'AT_VWAP': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Price at VWAP - high probability reversal zone'
+        },
+        
+        # Simple directional signals - SIMPLE for basic users
         'BULLISH': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Above VWAP - bullish (simple)'
         },
         'BEARISH': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 15,
+            'formula': 'scaled',
+            'description': 'Below VWAP - bearish (simple)'
         },
         'NEUTRAL': {
-                'max_points': 7,
-                'formula': 'scaled'
+            'base_points': 7,
+            'formula': 'scaled',
+            'description': 'At VWAP - neutral (simple)'
+        },
+        
+        'ERROR': {
+            'points': 0,
+            'description': 'Analysis error occurred'
+        },
+        'INSUFFICIENT_DATA': {
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='VWAP - Volume-weighted average price, institutional benchmark for premium/discount zones',
+    tags=['institutional', 'vwap', 'volume_profile', 'context_block', 'mean_reversion']
 )
 class VWAP:
     """Volume Weighted Average Price (ENHANCED 2026-01-04)"""

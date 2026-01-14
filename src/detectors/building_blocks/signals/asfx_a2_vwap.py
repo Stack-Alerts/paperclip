@@ -28,8 +28,38 @@ import numpy as np
     category='SIGNALS',
     class_name='ASFXA2VWAP',
     default_weight=20,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular VWAP signals
+        'ABOVE_VWAP', 'BELOW_VWAP', 'AT_VWAP', 'VWAP_CROSS_UP', 'VWAP_CROSS_DOWN',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Granular VWAP signals
+        'ABOVE_VWAP': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'BELOW_VWAP': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'AT_VWAP': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'VWAP_CROSS_UP': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'VWAP_CROSS_DOWN': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
                 'formula': 'scaled'
@@ -41,6 +71,8 @@ import numpy as np
         'NEUTRAL': {
                 'points': 0
         },
+        
+        # Status
         'ERROR': {
                 'points': 0
         },

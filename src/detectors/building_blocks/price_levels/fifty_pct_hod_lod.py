@@ -19,11 +19,14 @@ import numpy as np
     class_name='FiftyPctHODLOD',
     default_weight=18,
     valid_signals=[
+        # Granular position signals
         'ABOVE_EQUILIBRIUM',      # Price above yesterday's 50%
         'BELOW_EQUILIBRIUM',      # Price below yesterday's 50%
         'AT_EQUILIBRIUM',         # Price at yesterday's 50%
         'REJECTION_AT_EQ',        # Rejected at equilibrium
-        'NEUTRAL',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
         'ERROR'
     ],
     signal_tiers={
@@ -48,6 +51,16 @@ import numpy as np
         },
         'ERROR': {
             'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+            'base_points': 14,
+            'formula': 'scaled'
+        },
+        'BEARISH': {
+            'base_points': 14,
+            'formula': 'scaled'
         }
     }
 )

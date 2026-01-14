@@ -37,7 +37,14 @@ import numpy as np
     category='SESSIONS',
     class_name='SessionTime',
     default_weight=15,
-    valid_signals=['MODERATE_SESSION', 'HIGH_VOLUME_SESSION', 'LOW_VOLUME_SESSION', 'SESSION_OPEN', 'SESSION_CLOSE', 'NO_SIGNAL', 'ERROR'],
+    valid_signals=[
+        # Granular session signals
+        'MODERATE_SESSION', 'HIGH_VOLUME_SESSION', 'LOW_VOLUME_SESSION', 'SESSION_OPEN', 'SESSION_CLOSE',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'NO_SIGNAL', 'ERROR'
+    ],
     signal_tiers={
         'ERROR': {
                 'points': 0
@@ -64,6 +71,19 @@ import numpy as np
         'SESSION_CLOSE': {
                 'base_points': 15,
                 'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         }
 }
 )

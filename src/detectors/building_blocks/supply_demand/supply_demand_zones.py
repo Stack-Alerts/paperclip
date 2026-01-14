@@ -41,8 +41,37 @@ import numpy as np
     category='SUPPLY_DEMAND',
     class_name='VolumeZone',
     default_weight=24,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular supply/demand zone signals
+        'DEMAND_ZONE', 'SUPPLY_ZONE', 'NEAR_DEMAND', 'NEAR_SUPPLY', 'NO_ZONE',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Granular zone signals
+        'DEMAND_ZONE': {
+                'base_points': 24,
+                'formula': 'scaled'
+        },
+        'SUPPLY_ZONE': {
+                'base_points': 24,
+                'formula': 'scaled'
+        },
+        'NEAR_DEMAND': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'NEAR_SUPPLY': {
+                'base_points': 15,
+                'formula': 'scaled'
+        },
+        'NO_ZONE': {
+                'points': 0
+        },
+        
+        # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 24,
                 'formula': 'scaled'

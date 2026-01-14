@@ -94,8 +94,16 @@ import numpy as np
     category='WYCKOFF',
     class_name='WyckoffReaccumulation',
     default_weight=28,
-    valid_signals=['BREAKOUT_CONTINUATION', 'REACCUMULATION_DETECTED', 'SPRING_DETECTED', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular Wyckoff reaccumulation signals
+        'BREAKOUT_CONTINUATION', 'REACCUMULATION_DETECTED', 'SPRING_DETECTED', 'NO_REACCUMULATION',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Wyckoff reaccumulation signals
         'BREAKOUT_CONTINUATION': {
                 'base_points': 28,
                 'formula': 'scaled'
@@ -107,6 +115,23 @@ import numpy as np
         'SPRING_DETECTED': {
                 'base_points': 28,
                 'formula': 'scaled'
+        },
+        'NO_REACCUMULATION': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 28,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         },
         'ERROR': {
                 'points': 0

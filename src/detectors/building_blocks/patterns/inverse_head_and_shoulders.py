@@ -29,7 +29,14 @@ import numpy as np
     category='PATTERNS',
     class_name='InverseHeadAndShouldersPattern',
     default_weight=30,
-    valid_signals=['NO_PATTERN', 'PATTERN_CONFIRMED', 'PATTERN_FORMING', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular pattern signals
+        'PATTERN_CONFIRMED', 'PATTERN_FORMING', 'NO_PATTERN',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
         'NO_PATTERN': {
                 'points': 0
@@ -41,6 +48,19 @@ import numpy as np
         'PATTERN_FORMING': {
                 'base_points': 30,
                 'formula': 'scaled'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         },
         'ERROR': {
                 'points': 0

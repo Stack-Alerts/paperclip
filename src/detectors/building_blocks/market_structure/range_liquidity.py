@@ -37,26 +37,54 @@ from src.utils.advanced_data_loader import advanced_data
     category='MARKET_STRUCTURE',
     class_name='RangeLiquidity',
     default_weight=15,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Range positions - GRANULAR
+        'NEAR_BUY_SIDE_LIQUIDITY', 'NEAR_SELL_SIDE_LIQUIDITY',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        'NEAR_BUY_SIDE_LIQUIDITY': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Approaching buy-side liquidity (range high) - potential reversal down'
+        },
+        'NEAR_SELL_SIDE_LIQUIDITY': {
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Approaching sell-side liquidity (range low) - potential reversal up'
+        },
+        
+        # Simple directional - SIMPLE
         'BULLISH': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Near sell-side liquidity - bullish (simple)'
         },
         'BEARISH': {
-                'base_points': 15,
-                'formula': 'scaled'
+            'base_points': 20,
+            'formula': 'scaled',
+            'description': 'Near buy-side liquidity - bearish (simple)'
         },
         'NEUTRAL': {
-                'points': 0
+            'base_points': 10,
+            'formula': 'scaled',
+            'description': 'Mid-range - neutral (simple)'
         },
+        
         'ERROR': {
-                'points': 0
+            'points': 0,
+            'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='Range Liquidity - Detects proximity to buy/sell-side liquidity with optional orderbook depth analysis',
+    tags=['market_structure', 'liquidity', 'range', 'orderbook', 'depth', 'context_block']
 )
 class RangeLiquidity:
     """

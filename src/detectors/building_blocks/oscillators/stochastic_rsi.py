@@ -30,7 +30,14 @@ import numpy as np
     category='OSCILLATORS',
     class_name='StochasticRSI',
     default_weight=25,
-    valid_signals=['BEARISH_CROSS', 'BULLISH_CROSS', 'NEUTRAL_HIGH', 'NEUTRAL_LOW', 'NO_CROSS', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular signals
+        'BEARISH_CROSS', 'BULLISH_CROSS', 'NEUTRAL_HIGH', 'NEUTRAL_LOW', 'NO_CROSS',
+        # Simple directional - SIMPLE (what code actually emits!)
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
         'BEARISH_CROSS': {
                 'base_points': 25,
@@ -56,6 +63,20 @@ import numpy as np
         },
         'INSUFFICIENT_DATA': {
                 'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 25,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'max_points': 12,
+                'formula': 'scaled'
         }
 }
 )

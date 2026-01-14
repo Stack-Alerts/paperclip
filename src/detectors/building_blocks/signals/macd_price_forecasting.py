@@ -36,7 +36,14 @@ from collections import deque
     category='SIGNALS',
     class_name='SignalType',
     default_weight=20,
-    valid_signals=['BEARISH_FORECAST', 'BULLISH_FORECAST', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular forecast signals
+        'BEARISH_FORECAST', 'BULLISH_FORECAST',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
         'BEARISH_FORECAST': {
                 'base_points': 20,
@@ -50,6 +57,19 @@ from collections import deque
                 'points': 0
         },
         'INSUFFICIENT_DATA': {
+                'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 20,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
                 'points': 0
         }
 }

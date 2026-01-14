@@ -30,18 +30,39 @@ import numpy as np
     category='PATTERNS',
     class_name='DescendingTrianglePattern',
     default_weight=30,
-    valid_signals=['BEARISH_BREAKDOWN', 'NO_PATTERN', 'PATTERN_FORMING', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Granular pattern signals
+        'BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
+        # Pattern signals
         'BEARISH_BREAKDOWN': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'PATTERN_FORMING': {
                 'base_points': 30,
                 'formula': 'scaled'
         },
         'NO_PATTERN': {
                 'points': 0
         },
-        'PATTERN_FORMING': {
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
                 'base_points': 30,
                 'formula': 'scaled'
+        },
+        'BEARISH': {
+                'base_points': 30,
+                'formula': 'scaled'
+        },
+        'NEUTRAL': {
+                'points': 0
         },
         'ERROR': {
                 'points': 0

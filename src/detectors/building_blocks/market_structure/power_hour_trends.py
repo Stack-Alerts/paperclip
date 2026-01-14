@@ -27,32 +27,6 @@ import pandas as pd
 import numpy as np
 
 
-@register_block(
-    name='power_hour_trends',
-    category='MARKET_STRUCTURE',
-    class_name='TrendDirection',
-    default_weight=15,
-    valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
-    signal_tiers={
-        'BULLISH': {
-                'base_points': 15,
-                'formula': 'scaled'
-        },
-        'BEARISH': {
-                'base_points': 15,
-                'formula': 'scaled'
-        },
-        'NEUTRAL': {
-                'points': 0
-        },
-        'ERROR': {
-                'points': 0
-        },
-        'INSUFFICIENT_DATA': {
-                'points': 0
-        }
-}
-)
 class TrendDirection(Enum):
     """Trend direction classification."""
     UPTREND = "uptrend"
@@ -68,6 +42,55 @@ class VolatilityRegime(Enum):
     EXTREME = "extreme"
 
 
+@register_block(
+    name='power_hour_trends',
+    category='MARKET_STRUCTURE',
+    class_name='PowerHourTrends',
+    default_weight=15,
+    valid_signals=[
+        # Uptrend combinations - GRANULAR
+        'UPTREND_LOW', 'UPTREND_MODERATE', 'UPTREND_HIGH', 'UPTREND_EXTREME',
+        # Downtrend combinations - GRANULAR
+        'DOWNTREND_LOW', 'DOWNTREND_MODERATE', 'DOWNTREND_HIGH', 'DOWNTREND_EXTREME',
+        # Ranging combinations - GRANULAR
+        'RANGING_LOW', 'RANGING_MODERATE', 'RANGING_HIGH', 'RANGING_EXTREME',
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status signals
+        'INSUFFICIENT_POWER_HOURS', 'ERROR', 'INSUFFICIENT_DATA'
+    ],
+    signal_tiers={
+        # Uptrend signals (bullish bias)
+        'UPTREND_LOW': {'base_points': 20, 'formula': 'scaled', 'description': 'Uptrend with low volatility - stable bullish'},
+        'UPTREND_MODERATE': {'base_points': 18, 'formula': 'scaled', 'description': 'Uptrend with moderate volatility'},
+        'UPTREND_HIGH': {'base_points': 15, 'formula': 'scaled', 'description': 'Uptrend with high volatility'},
+        'UPTREND_EXTREME': {'base_points': 12, 'formula': 'scaled', 'description': 'Uptrend with extreme volatility - risky'},
+        
+        # Downtrend signals (bearish bias)
+        'DOWNTREND_LOW': {'base_points': 20, 'formula': 'scaled', 'description': 'Downtrend with low volatility - stable bearish'},
+        'DOWNTREND_MODERATE': {'base_points': 18, 'formula': 'scaled', 'description': 'Downtrend with moderate volatility'},
+        'DOWNTREND_HIGH': {'base_points': 15, 'formula': 'scaled', 'description': 'Downtrend with high volatility'},
+        'DOWNTREND_EXTREME': {'base_points': 12, 'formula': 'scaled', 'description': 'Downtrend with extreme volatility - risky'},
+        
+        # Ranging signals (neutral)
+        'RANGING_LOW': {'base_points': 10, 'formula': 'scaled', 'description': 'Ranging with low volatility - consolidation'},
+        'RANGING_MODERATE': {'base_points': 8, 'formula': 'scaled', 'description': 'Ranging with moderate volatility'},
+        'RANGING_HIGH': {'base_points': 6, 'formula': 'scaled', 'description': 'Ranging with high volatility - choppy'},
+        'RANGING_EXTREME': {'base_points': 4, 'formula': 'scaled', 'description': 'Ranging with extreme volatility - avoid'},
+        
+        # Simple directional signals - SIMPLE for basic users
+        'BULLISH': {'base_points': 18, 'formula': 'scaled', 'description': 'Uptrend - bullish (simple)'},
+        'BEARISH': {'base_points': 18, 'formula': 'scaled', 'description': 'Downtrend - bearish (simple)'},
+        'NEUTRAL': {'base_points': 8, 'formula': 'scaled', 'description': 'Ranging - neutral (simple)'},
+        
+        # Status signals
+        'INSUFFICIENT_POWER_HOURS': {'points': 0, 'description': 'Not enough power hour data'},
+        'ERROR': {'points': 0, 'description': 'Analysis error occurred'},
+        'INSUFFICIENT_DATA': {'points': 0, 'description': 'Not enough data for analysis'}
+    },
+    description='Power Hour Trends - Institutional trading hour trendline analysis with volatility regimes',
+    tags=['market_structure', 'power_hour', 'trendline', 'volatility', 'luxalgo', 'context_block']
+)
 class PowerHourTrends:
     """
     Power Hour Trends Detector

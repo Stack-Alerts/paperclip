@@ -20,12 +20,15 @@ import numpy as np
     class_name='IHOD',
     default_weight=20,
     valid_signals=[
+        # Granular event signals
         'BULLISH_BREAK',      # Broke above previous IHOD
-        'BEARISH_REJECTION',  # Rejected at IHOD  
+        'BEARISH_REJECTION',  # Rejected at IHOD
         'AT_IHOD',           # Price at IHOD
         'BELOW_IHOD',        # Price below IHOD
         'ABOVE_IHOD',        # Price above IHOD (new IHOD)
-        'NEUTRAL',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
         'ERROR'
     ],
     signal_tiers={
@@ -54,6 +57,16 @@ import numpy as np
         },
         'ERROR': {
             'points': 0
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+            'base_points': 20,
+            'formula': 'scaled'
+        },
+        'BEARISH': {
+            'base_points': 20,
+            'formula': 'scaled'
         }
     }
 )

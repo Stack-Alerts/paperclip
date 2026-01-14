@@ -30,26 +30,54 @@ import numpy as np
     category='MOVING_AVERAGES',
     class_name='EMA2050Cross',
     default_weight=12,
-    valid_signals=['DEATH_CROSS', 'GOLDEN_CROSS', 'NO_CROSS', 'ERROR', 'INSUFFICIENT_DATA'],
+    valid_signals=[
+        # Cross events - GRANULAR
+        'GOLDEN_CROSS', 'DEATH_CROSS',
+        # Simple directional - SIMPLE
+        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Status
+        'ERROR', 'INSUFFICIENT_DATA'
+    ],
     signal_tiers={
-        'DEATH_CROSS': {
-                'base_points': 12,
-                'formula': 'scaled'
-        },
         'GOLDEN_CROSS': {
-                'base_points': 12,
-                'formula': 'scaled'
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'Golden cross - Fast EMA crossed above Slow EMA (bullish)'
         },
-        'NO_CROSS': {
-                'points': 0
+        'DEATH_CROSS': {
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'Death cross - Fast EMA crossed below Slow EMA (bearish)'
         },
+        'NEUTRAL': {
+            'base_points': 5,
+            'formula': 'scaled',
+            'description': 'No crossover detected - monitoring EMAs'
+        },
+        
+        # Simple directional - SIMPLE
+        'BULLISH': {
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'Golden cross - bullish (simple)'
+        },
+        'BEARISH': {
+            'base_points': 18,
+            'formula': 'scaled',
+            'description': 'Death cross - bearish (simple)'
+        },
+        
         'ERROR': {
-                'points': 0
+            'points': 0,
+            'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+            'points': 0,
+            'description': 'Not enough data for analysis'
         }
-}
+    },
+    description='EMA 20/50 Cross - Event-driven golden/death cross detector with volume confirmation',
+    tags=['moving_averages', 'ema', 'crossover', 'golden_cross', 'death_cross', 'signal_block']
 )
 class EMA2050Cross:
     """
@@ -199,7 +227,7 @@ class EMA2050Cross:
         
         if cross == 'GOLDEN_CROSS':
             # Bullish cross detected
-            signal = 'BULLISH'
+            signal = 'GOLDEN_CROSS'
             confidence = 85
             confluence_factors.append('✅ GOLDEN CROSS - Fast EMA crossed above Slow EMA (bullish)')
             
@@ -214,7 +242,7 @@ class EMA2050Cross:
                 
         elif cross == 'DEATH_CROSS':
             # Bearish cross detected
-            signal = 'BEARISH'
+            signal = 'DEATH_CROSS'
             confidence = 85
             confluence_factors.append('❌ DEATH CROSS - Fast EMA crossed below Slow EMA (bearish)')
             
