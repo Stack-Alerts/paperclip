@@ -198,6 +198,19 @@ class Liquidity:
         self.sellside_zones: List[LiquidityZone] = []
         self.last_void_check: Optional[datetime] = None
     
+    def _determine_dual_signals(self, granular_signal: str, direction: str = None) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular in ['BUYSIDE_ZONE_TOUCH', 'SELLSIDE_BREACH']:
+            simple = 'BULLISH'
+        elif granular in ['SELLSIDE_ZONE_TOUCH', 'BUYSIDE_BREACH']:
+            simple = 'BEARISH'
+        elif granular == 'VOID_DETECTED' and direction:
+            simple = 'BULLISH' if direction == 'BULLISH' else 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
         Analyze dataframe for liquidity zones and events.
@@ -443,16 +456,20 @@ class Liquidity:
         else:
             void_fill_potential = 'LOW'
         
+        granular_signal, simple_signal = self._determine_dual_signals('VOID_DETECTED', void_info['direction'])
         return {
-            'signal': 'VOID_DETECTED',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 70,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'void_direction': void_info['direction'],
                 'void_size': round(void_info['size'], 2),
                 'void_size_pct': round(void_info['size_pct'], 2),
                 'void_range_low': round(void_info['price_range'][0], 2),
                 'void_range_high': round(void_info['price_range'][1], 2),
-                'void_fill_potential': void_fill_potential,  # For void fill trading
+                'void_fill_potential': void_fill_potential,
                 'is_new_event': True,
             },
             'timestamp': timestamp,
@@ -468,10 +485,14 @@ class Liquidity:
         self, timestamp: datetime, price: float, zone: LiquidityZone
     ) -> Dict[str, Any]:
         """Generate signal when price touches buyside zone."""
+        granular_signal, simple_signal = self._determine_dual_signals('BUYSIDE_ZONE_TOUCH')
         return {
-            'signal': 'BUYSIDE_ZONE_TOUCH',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 60 + int(zone.strength * 15),
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'zone_center': round(zone.center, 2),
                 'zone_high': round(zone.high, 2),
                 'zone_low': round(zone.low, 2),
@@ -494,10 +515,14 @@ class Liquidity:
         self, timestamp: datetime, price: float, zone: LiquidityZone
     ) -> Dict[str, Any]:
         """Generate signal when price touches sellside zone."""
+        granular_signal, simple_signal = self._determine_dual_signals('SELLSIDE_ZONE_TOUCH')
         return {
-            'signal': 'SELLSIDE_ZONE_TOUCH',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 60 + int(zone.strength * 15),
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'zone_center': round(zone.center, 2),
                 'zone_high': round(zone.high, 2),
                 'zone_low': round(zone.low, 2),
@@ -521,10 +546,14 @@ class Liquidity:
     ) -> Dict[str, Any]:
         """Generate signal when price breaks below buyside."""
         distance = zone.low - price
+        granular_signal, simple_signal = self._determine_dual_signals('BUYSIDE_BREACH')
         return {
-            'signal': 'BUYSIDE_BREACH',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 70,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'zone_center': round(zone.center, 2),
                 'breach_distance': round(distance, 2),
                 'is_new_event': True,
@@ -543,10 +572,14 @@ class Liquidity:
     ) -> Dict[str, Any]:
         """Generate signal when price breaks above sellside."""
         distance = price - zone.high
+        granular_signal, simple_signal = self._determine_dual_signals('SELLSIDE_BREACH')
         return {
-            'signal': 'SELLSIDE_BREACH',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 70,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'zone_center': round(zone.center, 2),
                 'breach_distance': round(distance, 2),
                 'is_new_event': True,
@@ -565,10 +598,14 @@ class Liquidity:
     ) -> Dict[str, Any]:
         """Generate signal when approaching buyside zone."""
         distance = abs(price - zone.center)
+        granular_signal, simple_signal = self._determine_dual_signals('NEAR_BUYSIDE')
         return {
-            'signal': 'NEAR_BUYSIDE',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 55,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'zone_center': round(zone.center, 2),
                 'distance': round(distance, 2),
                 'is_new_event': False,
@@ -586,10 +623,14 @@ class Liquidity:
     ) -> Dict[str, Any]:
         """Generate signal when approaching sellside zone."""
         distance = abs(price - zone.center)
+        granular_signal, simple_signal = self._determine_dual_signals('NEAR_SELLSIDE')
         return {
-            'signal': 'NEAR_SELLSIDE',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 55,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'zone_center': round(zone.center, 2),
                 'distance': round(distance, 2),
                 'is_new_event': False,
@@ -610,7 +651,11 @@ class Liquidity:
         nearest_sellside: Optional[LiquidityZone]
     ) -> Dict[str, Any]:
         """Generate neutral signal when between zones."""
+        granular_signal, simple_signal = self._determine_dual_signals('NEUTRAL')
+        
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'buyside_zones': len(self.buyside_zones),
             'sellside_zones': len(self.sellside_zones),
             'is_new_event': False,
@@ -628,7 +673,8 @@ class Liquidity:
         ]
         
         return {
-            'signal': 'NEUTRAL',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 50,
             'metadata': metadata,
             'timestamp': timestamp,
