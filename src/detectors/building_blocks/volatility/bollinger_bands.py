@@ -175,6 +175,13 @@ class BollingerBands:
             '1D': {'tight': 1.5, 'normal': 3.5, 'wide': 7.0},
         }
     
+    def _determine_dual_signals(self, signal: str, percent_b: float, 
+                                squeeze_breakout: Dict, w_bottom: bool, m_top: bool) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        granular = signal
+        simple = self.map_to_simple_signal(signal, percent_b, squeeze_breakout, w_bottom, m_top)
+        return granular, simple
+    
     def calculate_bands(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series, pd.Series]:
         """
         Calculate Bollinger Bands (Upper, Middle, Lower)
@@ -889,17 +896,19 @@ class BollingerBands:
         if is_new_event:
             confidence = min(100, confidence + 5)
         
-        # EXPANSION: Map to simple signal (maintains all original functionality)
-        simple_signal = self.map_to_simple_signal(signal, current_percent_b, squeeze_breakout, w_bottom, m_top)
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal, current_percent_b, squeeze_breakout, w_bottom, m_top)
         
         # Update confluence with event info
         if is_new_event:
-            confluence_factors.insert(0, f'⭐ NEW STATE: {signal} (BB signal changed!)')
+            confluence_factors.insert(0, f'⭐ NEW STATE: {granular_signal} (BB signal changed!)')
         elif bars_in_state > 0:
-            confluence_factors.insert(0, f'Continuing {signal.lower().replace("_", " ")} state ({bars_in_state} bars)')
+            confluence_factors.insert(0, f'Continuing {granular_signal.lower().replace("_", " ")} state ({bars_in_state} bars)')
         
         # Prepare metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'upper_band': round(current_upper, 2),
             'middle_band': round(current_middle, 2),
             'lower_band': round(current_lower, 2),
@@ -920,14 +929,13 @@ class BollingerBands:
             'distance_from_middle': round(((current_price - current_middle) / current_middle) * 100, 2),
             'recent_band_widths': band_width_series.tail(10).tolist(),
             'recent_percent_b': percent_b_series.tail(10).tolist(),
-            'simple_signal': simple_signal,  # EXPANSION: Added for validator compatibility
-            'original_signal': signal,  # EXPANSION: Preserve original for reference
-            'is_new_event': is_new_event,  # NEW: Event tracking
-            'bars_in_state': bars_in_state  # NEW: Age tracking
+            'is_new_event': is_new_event,
+            'bars_in_state': bars_in_state
         }
         
         return {
-            'signal': signal,  # UNCHANGED: Original complex signal preserved
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now(),
