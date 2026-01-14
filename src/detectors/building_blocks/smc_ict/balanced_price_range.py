@@ -319,10 +319,18 @@ class BalancedPriceRange:
         balanced = self.detect_balanced_range(df)
         
         if not balanced:
+            # Not in balanced range - use dual signal architecture
+            granular_signal, simple_signal = self._determine_dual_signals(0, False)
             return {
-                'signal': 'NEUTRAL',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'message': 'No balanced range detected', 'is_new_event': False},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'message': 'No balanced range detected',
+                    'is_new_event': False
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': ['Not in balanced range - trending or expanding']
