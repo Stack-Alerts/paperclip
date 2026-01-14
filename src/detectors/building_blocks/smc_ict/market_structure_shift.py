@@ -126,6 +126,23 @@ class MarketStructureShift:
         self.detect_retest = detect_retest
         self.mss_history = []  # Track MSS events for confirmation
     
+    def _determine_dual_signals(self, mss_type: str, has_retest: bool = False, retest_type: str = None) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        if has_retest and retest_type:
+            # Retest signals are more specific
+            granular = retest_type  # BULLISH_RETEST or BEARISH_RETEST
+            simple = 'BULLISH' if 'BULLISH' in retest_type else 'BEARISH'
+        elif mss_type == 'BULLISH_MSS':
+            granular = 'BULLISH_MSS'
+            simple = 'BULLISH'
+        elif mss_type == 'BEARISH_MSS':
+            granular = 'BEARISH_MSS'
+            simple = 'BEARISH'
+        else:
+            granular = 'NEUTRAL'
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def classify_break_strength(self, break_pct: float) -> str:
         """
         Classify break strength into tiers (Priority 1.2 Enhancement)
@@ -397,9 +414,16 @@ class MarketStructureShift:
             confluence_factors.append('Continuing MSS state (structure already shifted)')
         confluence_factors.append('Institutional positioning shift likely')
         
+        # DUAL SIGNAL ARCHITECTURE
+        has_retest = retest_info.get('has_retest', False) if retest_info else False
+        retest_type = retest_info.get('retest_type') if retest_info else None
+        granular_signal, simple_signal = self._determine_dual_signals(active_mss['type'], has_retest, retest_type)
+        
         # **ENHANCED:** Metadata with new tracking
         if active_mss['type'] == 'BULLISH_MSS':
             metadata = {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'mss_type': active_mss['type'],
                 'swing_high': active_mss['swing_high'],
                 'break_high': active_mss['break_high'],
@@ -430,7 +454,8 @@ class MarketStructureShift:
                 metadata.update(retest_info)
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': round(confidence, 2),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
