@@ -51,9 +51,6 @@ import numpy as np
         'WAVE_3_BULLISH', 'WAVE_3_BEARISH',
         'WAVE_4_BULLISH', 'WAVE_4_BEARISH',
         'WAVE_5_BULLISH', 'WAVE_5_BEARISH',
-        # Phase Signals (from identify_current_wave) - GRANULAR
-        'WAVE_1_FORMING', 'WAVE_2_CORRECTION', 
-        'WAVE_UNCLEAR',
         # Simple directional signals - SIMPLE for basic users
         'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status Signals
@@ -119,23 +116,6 @@ import numpy as np
             'base_points': 15,
             'formula': 'scaled',
             'description': 'Wave 1 forming - new bearish impulse starting'
-        },
-        
-        # Phase signals (lower confidence states)
-        'WAVE_1_FORMING': {
-            'base_points': 10,
-            'formula': 'scaled',
-            'description': 'Early Wave 1 formation detected'
-        },
-        'WAVE_2_CORRECTION': {
-            'base_points': 12,
-            'formula': 'scaled',
-            'description': 'Wave 2 correction in progress'
-        },
-        'WAVE_UNCLEAR': {
-            'base_points': 5,
-            'formula': 'scaled',
-            'description': 'Wave position unclear - developing pattern'
         },
         
         # Simple directional signals - SIMPLE for basic users
@@ -426,6 +406,66 @@ class ElliottWaveCount:
                         'confidence': 70,
                         'w3_extension': round((w3 / w1 - 1) * 100, 2),
                         'pattern': 'IMPULSE_FORMING'
+                    }
+        
+        # Check for Wave 4 (5 pivots: L H L H L for bullish, H L H L H for bearish)
+        if len(pivots) >= 5:
+            recent5 = pivots[-5:]
+            structure5 = [p['type'] for p in recent5]
+            
+            # Bullish Wave 4: L H L H L (correction after Wave 3)
+            if structure5 == ['LOW', 'HIGH', 'LOW', 'HIGH', 'LOW']:
+                w1 = recent5[1]['price'] - recent5[0]['price']
+                w3 = recent5[3]['price'] - recent5[2]['price']
+                w4_retracement = recent5[3]['price'] - recent5[4]['price']
+                # Wave 4 should retrace less than Wave 3
+                if w3 > w1 and w4_retracement < w3 * 0.6:
+                    return {
+                        'wave': 4,
+                        'direction': 'BULLISH',
+                        'confidence': 65,
+                        'pattern': 'CORRECTION_WAVE4'
+                    }
+            
+            # Bearish Wave 4: H L H L H (correction after Wave 3)
+            elif structure5 == ['HIGH', 'LOW', 'HIGH', 'LOW', 'HIGH']:
+                w1 = recent5[0]['price'] - recent5[1]['price']
+                w3 = recent5[2]['price'] - recent5[3]['price']
+                w4_retracement = recent5[4]['price'] - recent5[3]['price']
+                if w3 > w1 and w4_retracement < w3 * 0.6:
+                    return {
+                        'wave': 4,
+                        'direction': 'BEARISH',
+                        'confidence': 65,
+                        'pattern': 'CORRECTION_WAVE4'
+                    }
+        
+        # Check for Wave 1 (2 pivots minimum: L H for bullish, H L for bearish)
+        if len(pivots) >= 2:
+            recent2 = pivots[-2:]
+            structure2 = [p['type'] for p in recent2]
+            
+            # Bullish Wave 1: L H (new impulse starting)
+            if structure2 == ['LOW', 'HIGH']:
+                w1_size = recent2[1]['price'] - recent2[0]['price']
+                # Require meaningful move (> 2%)
+                if w1_size > recent2[0]['price'] * 0.02:
+                    return {
+                        'wave': 1,
+                        'direction': 'BULLISH',
+                        'confidence': 55,
+                        'pattern': 'IMPULSE_STARTING'
+                    }
+            
+            # Bearish Wave 1: H L (new impulse starting)
+            elif structure2 == ['HIGH', 'LOW']:
+                w1_size = recent2[0]['price'] - recent2[1]['price']
+                if w1_size > recent2[0]['price'] * 0.02:
+                    return {
+                        'wave': 1,
+                        'direction': 'BEARISH',
+                        'confidence': 55,
+                        'pattern': 'IMPULSE_STARTING'
                     }
         
         return {'wave': None, 'direction': None, 'confidence': 0}
