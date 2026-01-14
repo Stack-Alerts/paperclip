@@ -31,10 +31,10 @@ import numpy as np
     class_name='DescendingTrianglePattern',
     default_weight=30,
     valid_signals=[
-        # Granular pattern signals
+        # Granular pattern signals (Descending Triangle is bearish-only)
         'BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN',
-        # Simple directional - SIMPLE
-        'BULLISH', 'BEARISH', 'NEUTRAL',
+        # Simple directional - SIMPLE (bearish-only pattern)
+        'BEARISH', 'NEUTRAL',
         # Status
         'ERROR', 'INSUFFICIENT_DATA'
     ],
@@ -52,11 +52,7 @@ import numpy as np
                 'points': 0
         },
         
-        # Simple directional - SIMPLE
-        'BULLISH': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
+        # Simple directional - SIMPLE (bearish-only)
         'BEARISH': {
                 'base_points': 30,
                 'formula': 'scaled'
