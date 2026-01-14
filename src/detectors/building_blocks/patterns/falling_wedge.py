@@ -101,7 +101,7 @@ class FallingWedgePattern:
         self.MIN_COMPRESSION = 0.25  # Minimum 25% compression
         
         # Breakout requirements
-        self.BREAK_MARGIN = 0.005  # Must break 0.5% above resistance
+        self.BREAK_MARGIN = 0.0001  # Must break 0.01% above resistance (minimal for detection)
     
     def _determine_dual_signals(self, granular_signal: str) -> tuple:
         """DUAL SIGNAL ARCHITECTURE"""
@@ -265,9 +265,10 @@ class FallingWedgePattern:
                 'confluence_factors': []
             }
 
-        # Check for breakout
-        resistance = second['high'].max()
-        breakout = current_price > resistance * (1 + self.BREAK_MARGIN)
+        # Check for breakout (exclude current bar from resistance to detect breaks)
+        resistance = second['high'].iloc[:-1].max() if len(second) > 1 else second['high'].max()
+        current_high = float(df['high'].iloc[-1])
+        breakout = current_high > resistance * (1 + self.BREAK_MARGIN)
 
         if breakout:
             signal = 'BULLISH_BREAKOUT'
