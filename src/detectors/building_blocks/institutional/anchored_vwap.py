@@ -170,7 +170,9 @@ class AnchoredVWAP:
         if len(recent_data) == 0:
             return None
         
-        swing_idx = recent_data['low'].idxmin()
+        # Get the label index, then convert to positional index
+        swing_label_idx = recent_data['low'].idxmin()
+        swing_idx = df.index.get_loc(swing_label_idx)
         return swing_idx
     
     def detect_swing_high(self, df: pd.DataFrame, lookback: int) -> Optional[int]:
@@ -184,7 +186,9 @@ class AnchoredVWAP:
         if len(recent_data) == 0:
             return None
         
-        swing_idx = recent_data['high'].idxmax()
+        # Get the label index, then convert to positional index
+        swing_label_idx = recent_data['high'].idxmax()
+        swing_idx = df.index.get_loc(swing_label_idx)
         return swing_idx
     
     def detect_trend(self, df: pd.DataFrame) -> tuple:
