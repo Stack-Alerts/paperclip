@@ -172,6 +172,19 @@ class WyckoffReaccumulation:
         self.breakout_volume_ratio = breakout_volume_ratio
         self.uptrend_lookback = uptrend_lookback
     
+    def _determine_dual_signals(self, signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        granular = signal
+        
+        # Map Wyckoff reaccumulation phases to directional signals
+        if signal in ['BREAKOUT_CONTINUATION', 'SPRING_DETECTED', 'REACCUMULATION_DETECTED']:
+            # Continuation patterns in uptrend = BULLISH
+            simple = 'BULLISH'
+        else:  # NO_REACCUMULATION
+            simple = 'NEUTRAL'
+        
+        return granular, simple
+    
     def detect_uptrend(self, df: pd.DataFrame) -> tuple:
         """
         Detect if price is in STRONG uptrend (IMPROVED)
@@ -509,8 +522,13 @@ class WyckoffReaccumulation:
             phase = 'NONE'
             confluence_factors.append('❌ Conditions not met')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Build metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'phase': phase,
             'spring_detected': spring,
             'breakout_detected': breakout,
@@ -521,7 +539,8 @@ class WyckoffReaccumulation:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': int(confidence),
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
