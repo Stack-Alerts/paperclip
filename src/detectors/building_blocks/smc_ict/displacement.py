@@ -35,8 +35,8 @@ import numpy as np
     class_name='Displacement',
     default_weight=20,
     valid_signals=[
-        # Granular SMC signals
-        'BEARISH_DISPLACEMENT', 'BEARISH_FVG', 'BULLISH_DISPLACEMENT', 'BULLISH_FVG',
+        # Granular SMC signals (FVG removed - too rare for 15min, tracked in metadata)
+        'BEARISH_DISPLACEMENT', 'BULLISH_DISPLACEMENT',
         # Simple directional - SIMPLE
         'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
@@ -44,19 +44,11 @@ import numpy as np
     ],
     signal_tiers={
         'BEARISH_DISPLACEMENT': {
-                'base_points': 20,
-                'formula': 'scaled'
-        },
-        'BEARISH_FVG': {
-                'base_points': 20,
+                'base_points': 25,
                 'formula': 'scaled'
         },
         'BULLISH_DISPLACEMENT': {
-                'base_points': 20,
-                'formula': 'scaled'
-        },
-        'BULLISH_FVG': {
-                'base_points': 20,
+                'base_points': 25,
                 'formula': 'scaled'
         },
         'ERROR': {
