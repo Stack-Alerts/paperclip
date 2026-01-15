@@ -387,10 +387,17 @@ class ATR:
         """
         # Validate input data
         if not self.validate_data(df):
+            granular_signal, simple_signal = self._determine_dual_signals('ERROR')
             return {
-                'signal': 'ERROR',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'Invalid data format', 'is_new_event': False},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': 'Invalid data format',
+                    'is_new_event': False
+                },
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -398,10 +405,14 @@ class ATR:
         
         # Need minimum periods for ATR calculation (need extra period for change detection)
         if len(df) < self.period + 2:
+            granular_signal, simple_signal = self._determine_dual_signals('INSUFFICIENT_DATA')
             return {
-                'signal': 'INSUFFICIENT_DATA',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'error': f'Need at least {self.period + 2} periods, got {len(df)}',
                     'required_periods': self.period + 2,
                     'provided_periods': len(df)
