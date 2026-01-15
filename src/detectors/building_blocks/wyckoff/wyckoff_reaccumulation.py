@@ -170,9 +170,9 @@ class WyckoffReaccumulation:
                  range_lookback: int = 50,           # Lookback for range detection
                  volume_lookback: int = 50,
                  range_threshold_pct: float = 5.0,   # Tight range for consolidation
-                 spring_breakdown_pct: float = 2.0,  # False breakdown threshold
+                 spring_breakdown_pct: float = 1.0,  # RELAXED: 2% → 1% for crypto
                  spring_volume_ratio: float = 0.85,  # Lower volume on spring (weak)
-                 breakout_volume_ratio: float = 1.15, # Higher volume on breakout
+                 breakout_volume_ratio: float = 1.0, # RELAXED: 1.15 → 1.0 for crypto
                  uptrend_lookback: int = 30,         # Bars to confirm uptrend
                  **kwargs):
         self.timeframe = timeframe
@@ -183,8 +183,13 @@ class WyckoffReaccumulation:
         self.spring_volume_ratio = spring_volume_ratio
         self.breakout_volume_ratio = breakout_volume_ratio
         self.uptrend_lookback = uptrend_lookback
+        
+        # STATE TRACKING - Critical for spring/breakout detection
+        self.last_range_support = None
+        self.last_range_resistance = None
+        self.bars_since_range = 999  # Large number = no recent range
     
-    def _determine_dual_signals(self, signal: str) -> tuple:
+    def _determine_dual_signals(self, signal: str, df: pd.DataFrame = None) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
         granular = signal
         
@@ -192,7 +197,19 @@ class WyckoffReaccumulation:
         if signal in ['BREAKOUT_CONTINUATION', 'SPRING_DETECTED', 'REACCUMULATION_DETECTED']:
             # Continuation patterns in uptrend = BULLISH
             simple = 'BULLISH'
-        else:  # NO_REACCUMULATION
+        elif signal == 'NO_REACCUMULATION' and df is not None:
+            # Check trend direction to determine BEARISH vs NEUTRAL
+            if len(df) >= 20:
+                # Downtrend detection: current price < 20-bar average
+                sma_20 = df['close'].iloc[-20:].mean()
+                current_price = df['close'].iloc[-1]
+                if current_price < sma_20 * 0.98:  # 2% below SMA = downtrend
+                    simple = 'BEARISH'
+                else:
+                    simple = 'NEUTRAL'
+            else:
+                simple = 'NEUTRAL'
+        else:
             simple = 'NEUTRAL'
         
         return granular, simple
@@ -355,83 +372,76 @@ class WyckoffReaccumulation:
     
     def detect_spring(self, df: pd.DataFrame, support_level: float) -> tuple:
         """
-        Detect spring pattern (false breakdown below support)
+        Detect spring pattern (false breakdown below support): EVENT DETECTION
         Critical signal for re-accumulation continuation
         
-        Spring characteristics:
-        - Brief move below support
-        - Lower volume (weak move - trap)
-        - Quick reversal back into range
+        FIX: Scan recent history for completed spring events (last 20 bars)
         """
-        if len(df) < 10 or support_level == 0:
+        if len(df) < 15 or support_level == 0:
             return False, 0
         
-        # Check for breakdown below support in last 10 bars
-        recent_lows = df['low'].iloc[-10:]
-        breakdown_threshold = 1.0 - (self.spring_breakdown_pct / 100.0)
-        broke_support = recent_lows.min() < support_level * breakdown_threshold
+        # CRITICAL FIX: Scan recent history for SPRING EVENTS (last 20 bars)
+        scan_window = min(20, len(df) - 3)
         
-        if not broke_support:
-            return False, 0
-        
-        # Volume should be LOWER on breakdown (weak move - trap!)
-        if len(df) >= 60:
-            volume_avg = df['volume'].iloc[-60:-10].mean()
-            breakdown_volume = df['volume'].iloc[-10:].mean()
-            low_volume_breakdown = breakdown_volume < volume_avg * self.spring_volume_ratio
-        else:
-            low_volume_breakdown = False
-        
-        # Quick reversal back above support
-        current_price = df['close'].iloc[-1]
-        reversed = current_price > support_level * 1.002  # Back above support
-        
-        if broke_support and low_volume_breakdown and reversed:
-            # SPRING DETECTED - Major continuation signal!
-            return True, 85
-        elif broke_support and reversed:
-            # Reversed but volume not ideal
-            return True, 70
+        for i in range(len(df) - scan_window, len(df)):
+            if i < 5:
+                continue
+            
+            # Look at 5-bar window before this point
+            window_start = max(0, i - 5)
+            window = df.iloc[window_start:i+1]
+            
+            # Did price break BELOW support in this window?
+            breakdown_threshold = support_level * 0.99  # 1% below (relaxed for crypto)
+            broke_support = window['low'].min() < breakdown_threshold
+            
+            if not broke_support:
+                continue
+            
+            # Did price RECOVER above support by end of window?
+            final_close = window['close'].iloc[-1]
+            recovered = final_close > support_level * 0.998  # Back above support
+            
+            if broke_support and recovered:
+                # Spring event found in recent history!
+                return True, 75
         
         return False, 0
     
     def detect_breakout(self, df: pd.DataFrame, resistance_level: float) -> tuple:
         """
-        Detect breakout above range (continuation confirmed)
+        Detect breakout above range (continuation confirmed): EVENT DETECTION
         
-        Breakout characteristics:
-        - Break above resistance
-        - Strong volume (institutional buying)
-        - Sustained move
+        FIX: Scan recent history for completed breakout events (last 20 bars)
         """
-        if len(df) < 10 or resistance_level == 0:
+        if len(df) < 15 or resistance_level == 0:
             return False, 0
         
-        # Check for breakout above resistance
-        recent_highs = df['high'].iloc[-10:]
-        broke_resistance = recent_highs.max() > resistance_level * 1.01
+        # CRITICAL FIX: Scan recent history for BREAKOUT EVENTS (last 20 bars)
+        scan_window = min(20, len(df) - 3)
         
-        if not broke_resistance:
-            return False, 0
-        
-        # Volume should be HIGHER on breakout (strong move)
-        if len(df) >= 60:
-            volume_avg = df['volume'].iloc[-60:-10].mean()
-            breakout_volume = df['volume'].iloc[-10:].mean()
-            high_volume_breakout = breakout_volume > volume_avg * self.breakout_volume_ratio
-        else:
-            high_volume_breakout = False
-        
-        # Sustained move (close above resistance)
-        current_price = df['close'].iloc[-1]
-        sustained = current_price > resistance_level * 1.005
-        
-        if broke_resistance and high_volume_breakout and sustained:
-            # BREAKOUT CONFIRMED - Strong continuation!
-            return True, 80
-        elif broke_resistance and sustained:
-            # Breakout but volume not ideal
-            return True, 65
+        for i in range(len(df) - scan_window, len(df)):
+            if i < 5:
+                continue
+            
+            # Look at 5-bar window before this point
+            window_start = max(0, i - 5)
+            window = df.iloc[window_start:i+1]
+            
+            # Did price break ABOVE resistance in this window?
+            breakout_threshold = resistance_level * 1.01  # 1% above (relaxed for crypto)
+            broke_resistance = window['high'].max() > breakout_threshold
+            
+            if not broke_resistance:
+                continue
+            
+            # Did price SUSTAIN above resistance by end of window?
+            final_close = window['close'].iloc[-1]
+            sustained = final_close > resistance_level * 1.002  # Sustained above resistance
+            
+            if broke_resistance and sustained:
+                # Breakout event found in recent history!
+                return True, 75
         
         return False, 0
     
@@ -495,27 +505,54 @@ class WyckoffReaccumulation:
         # Detect consolidation range
         in_range, range_conf, resistance, support = self.detect_range(df)
         
-        if not in_range:
-            # Trending, not consolidating - not re-accumulation
-            granular_signal, simple_signal = self._determine_dual_signals('NO_REACCUMULATION')
-            return {
-                'signal': granular_signal,
-                'signal_simple': simple_signal,
-                'confidence': 50,
-                'metadata': {
-                    'signal_simple': simple_signal,
-                    'signal_granular': granular_signal,
-                    'phase': 'TRENDING',
-                    'reason': 'Uptrend but not consolidating'
-                },
-                'timestamp': df['timestamp'].iloc[-1],
-                'timeframe': self.timeframe,
-                'confluence_factors': ['✅ Uptrend confirmed', '📈 Trending - not in range']
-            }
+        # STATE MANAGEMENT - Critical for spring/breakout detection!
+        if in_range and resistance > 0:
+            # Currently in range - update state
+            self.last_range_support = support
+            self.last_range_resistance = resistance
+            self.bars_since_range = 0
+        else:
+            # Not in range - increment counter
+            self.bars_since_range += 1
         
-        # Detect spring and breakout
-        spring, spring_conf = self.detect_spring(df, support)
-        breakout, breakout_conf = self.detect_breakout(df, resistance)
+        # USE CORRECT LEVELS FOR SPRING/BREAKOUT DETECTION
+        # If recently left range (within 20 bars), use those levels
+        if self.bars_since_range <= 20 and self.last_range_support is not None:
+            # Use remembered range levels
+            spring_support = self.last_range_support
+            breakout_resistance = self.last_range_resistance
+        else:
+            # Too far from range or never had one, use current levels
+            spring_support = support if support > 0 else df['low'].iloc[-self.range_lookback:].min()
+            breakout_resistance = resistance if resistance > 0 else df['high'].iloc[-self.range_lookback:].max()
+        
+        # CRITICAL FIX: Check spring/breakout BEFORE returning NO_REACCUMULATION
+        # Events can occur AFTER leaving range (using state-managed levels)
+        spring, spring_conf = self.detect_spring(df, spring_support)
+        breakout, breakout_conf = self.detect_breakout(df, breakout_resistance)
+        
+        if not in_range:
+            # Check if spring/breakout detected even though not in range now
+            if spring or breakout:
+                # Event detected after leaving range - continue to signal processing
+                pass  # Fall through to signal determination below
+            else:
+                # Trending, not consolidating - not re-accumulation
+                granular_signal, simple_signal = self._determine_dual_signals('NO_REACCUMULATION', df)
+                return {
+                    'signal': granular_signal,
+                    'signal_simple': simple_signal,
+                    'confidence': 50,
+                    'metadata': {
+                        'signal_simple': simple_signal,
+                        'signal_granular': granular_signal,
+                        'phase': 'TRENDING',
+                        'reason': 'Uptrend but not consolidating'
+                    },
+                    'timestamp': df['timestamp'].iloc[-1],
+                    'timeframe': self.timeframe,
+                    'confluence_factors': ['✅ Uptrend confirmed', '📈 Trending - not in range']
+                }
         
         # Determine signal and phase
         confluence_factors = []
@@ -554,7 +591,7 @@ class WyckoffReaccumulation:
             confluence_factors.append('❌ Conditions not met')
         
         # DUAL SIGNAL ARCHITECTURE
-        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        granular_signal, simple_signal = self._determine_dual_signals(signal, df)
         
         # Build metadata
         metadata = {
