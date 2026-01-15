@@ -132,7 +132,15 @@ class PowerHourTrends:
     def _determine_dual_signals(self, granular_signal: str) -> tuple:
         """DUAL SIGNAL ARCHITECTURE"""
         granular = granular_signal
-        simple = 'NEUTRAL'
+        # Map trend+volatility combinations to simple directional
+        if granular.startswith('UPTREND'):
+            simple = 'BULLISH'
+        elif granular.startswith('DOWNTREND'):
+            simple = 'BEARISH'
+        elif granular.startswith('RANGING'):
+            simple = 'NEUTRAL'
+        else:
+            simple = 'NEUTRAL'
         return granular, simple
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
@@ -372,10 +380,16 @@ class PowerHourTrends:
         
         confidence = max(40, min(85, base_confidence))
         
+        granular_signal = f'{trend.value.upper()}_{volatility.value.upper()}'
+        granular_signal, simple_signal = self._determine_dual_signals(granular_signal)
+        
         return {
-            'signal': f'{trend.value.upper()}_{volatility.value.upper()}',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'trend_direction': trend.value,
                 'volatility_regime': volatility.value,
                 'current_price': round(current_price, 2),
