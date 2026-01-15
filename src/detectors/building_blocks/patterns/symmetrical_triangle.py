@@ -157,10 +157,16 @@ class SymmetricalTrianglePattern:
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """INSTITUTIONAL GRADE: Symmetrical Triangle with multi-block validation"""
         if len(df) < 50:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'Need at least 50 bars'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': 'Need at least 50 bars'
+                },
                 'timestamp': df['timestamp'].iloc[-1] if len(df) > 0 else datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -175,10 +181,15 @@ class SymmetricalTrianglePattern:
 
         # Require minimum compression for triangle
         if last_range >= first_range * (1 - self.MIN_COMPRESSION):
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -246,10 +257,14 @@ class SymmetricalTrianglePattern:
 
         # MINIMUM THRESHOLD: Require at least 3 confluences (PHASE 1: institutional grade)
         if len(confluences) < self.MIN_CONFLUENCES:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'reason': 'Insufficient validation',
                     'confluences_found': len(confluences),
                     'confluences_required': self.MIN_CONFLUENCES
