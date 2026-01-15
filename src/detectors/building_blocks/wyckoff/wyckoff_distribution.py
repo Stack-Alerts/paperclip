@@ -165,10 +165,10 @@ class WyckoffDistribution:
     def __init__(self, timeframe: str = '15min', 
                  range_lookback: int = 50,           # Optimized for 2HR/4HR
                  volume_lookback: int = 50,
-                 range_threshold_pct: float = 5.0,   # Tight range for true consolidation
-                 utad_breakout_pct: float = 2.0,     # False breakout threshold
+                 range_threshold_pct: float = 10.0,  # RELAXED: 5% → 10% (match accumulation)
+                 utad_breakout_pct: float = 1.0,     # RELAXED: 2% → 1% for crypto
                  utad_volume_ratio: float = 0.90,    # Lower volume on UTAD (weak)
-                 sow_breakdown_pct: float = 2.0,     # Breakdown threshold
+                 sow_breakdown_pct: float = 1.0,     # RELAXED: 2% → 1% for crypto
                  sow_volume_ratio: float = 1.15,     # High volume on SOW (strong)
                  **kwargs):
         self.timeframe = timeframe
@@ -179,8 +179,13 @@ class WyckoffDistribution:
         self.utad_volume_ratio = utad_volume_ratio
         self.sow_breakdown_pct = sow_breakdown_pct
         self.sow_volume_ratio = sow_volume_ratio
+        
+        # STATE TRACKING - Critical for UTAD/SOW detection
+        self.last_phase_b_resistance = None
+        self.last_phase_b_support = None
+        self.bars_since_phase_b = 999  # Large number = no recent Phase B
     
-    def _determine_dual_signals(self, signal: str) -> tuple:
+    def _determine_dual_signals(self, signal: str, df: pd.DataFrame = None) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
         granular = signal
         
@@ -191,7 +196,19 @@ class WyckoffDistribution:
         elif signal == 'DISTRIBUTION_PHASE_B':
             # Phase B (consolidation at top) = NEUTRAL
             simple = 'NEUTRAL'
-        else:  # NO_DISTRIBUTION
+        elif signal == 'NO_DISTRIBUTION' and df is not None:
+            # Check trend direction to determine BULLISH vs NEUTRAL
+            if len(df) >= 20:
+                # Uptrend detection: current price > 20-bar average
+                sma_20 = df['close'].iloc[-20:].mean()
+                current_price = df['close'].iloc[-1]
+                if current_price > sma_20 * 1.02:  # 2% above SMA = uptrend
+                    simple = 'BULLISH'
+                else:
+                    simple = 'NEUTRAL'
+            else:
+                simple = 'NEUTRAL'
+        else:
             simple = 'NEUTRAL'
         
         return granular, simple
@@ -433,13 +450,35 @@ class WyckoffDistribution:
         
         # Detect Wyckoff events (now on 2HR data!)
         buying_climax, bc_conf = self.detect_buying_climax(df)
-        in_range, range_conf, resistance = self.detect_range(df)
+        in_range, range_conf, resistance_from_range = self.detect_range(df)
         
-        # Calculate support for SOW detection
-        support = df['low'].iloc[-self.range_lookback:].min() if in_range else 0
+        # Calculate support
+        support = df['low'].iloc[-self.range_lookback:].min()
         
-        utad, utad_conf = self.detect_utad(df, resistance)
-        sow, sow_conf = self.detect_sign_of_weakness(df, support)
+        # STATE MANAGEMENT - Critical for UTAD/SOW detection!
+        if in_range and resistance_from_range > 0:
+            # Currently in Phase B - update state
+            self.last_phase_b_resistance = resistance_from_range
+            self.last_phase_b_support = support
+            self.bars_since_phase_b = 0
+        else:
+            # Not in Phase B - increment counter
+            self.bars_since_phase_b += 1
+        
+        # USE CORRECT LEVELS FOR UTAD/SOW DETECTION
+        # If recently left Phase B (within 20 bars), use those levels
+        if self.bars_since_phase_b <= 20 and self.last_phase_b_resistance is not None:
+            # Use remembered Phase B levels (CRITICAL FIX!)
+            utad_resistance = self.last_phase_b_resistance
+            sow_support = self.last_phase_b_support
+        else:
+            # Too far from Phase B or never had one, use current levels
+            utad_resistance = resistance_from_range if resistance_from_range > 0 else df['high'].iloc[-self.range_lookback:].max()
+            sow_support = support
+        
+        #  Check UTAD/SOW with CORRECT levels
+        utad, utad_conf = self.detect_utad(df, utad_resistance)
+        sow, sow_conf = self.detect_sign_of_weakness(df, sow_support)
         
         # Determine signal and phase
         confluence_factors = []
@@ -473,7 +512,7 @@ class WyckoffDistribution:
             signal = 'DISTRIBUTION_PHASE_B'
             confidence = range_conf
             phase = 'B'
-            range_pct = ((resistance - support) / df['close'].iloc[-1]) * 100
+            range_pct = ((resistance_from_range - support) / df['close'].iloc[-1]) * 100
             confluence_factors.append(f'📦 Distribution range: {range_pct:.1f}% of price')
             confluence_factors.append('🔇 Volume declining - quiet distribution')
             
@@ -486,7 +525,7 @@ class WyckoffDistribution:
             confluence_factors.append('❌ No distribution pattern detected')
         
         # DUAL SIGNAL ARCHITECTURE
-        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        granular_signal, simple_signal = self._determine_dual_signals(signal, df)
         
         # Build metadata
         metadata = {
@@ -497,7 +536,7 @@ class WyckoffDistribution:
             'sow_detected': sow,
             'buying_climax': buying_climax,
             'in_range': in_range,
-            'resistance_level': float(resistance) if resistance > 0 else 0,
+            'resistance_level': float(utad_resistance) if utad_resistance > 0 else 0,
             'support_level': float(support) if support > 0 else 0
         }
         
