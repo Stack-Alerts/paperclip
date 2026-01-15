@@ -96,7 +96,7 @@ class TripleTopPattern:
                  peak_tolerance: float = 0.025, **kwargs):
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
-        self.peak_tolerance = peak_tolerance  # 2.5% max difference (middle ground for triple)
+        self.peak_tolerance = 0.015  # 1.5% max difference (VERY STRICT)
         
         # Pattern lifecycle tracking (PHASE 1 improvements)
         self.active_pattern = None  # Track current pattern ID for event detection
@@ -335,7 +335,7 @@ class TripleTopPattern:
         base_confidence = 50  # Start at 50%
         confluences = []
         
-        # CONFLUENCE 1: RSI Overbought at ALL 3 peaks (+20 points)
+        # CONFLUENCE 1: RSI Overbought at ALL 3 peaks - REQUIRED (no partial credit)
         p1_overbought = p1['rsi'] > 70
         p2_overbought = p2['rsi'] > 70
         p3_overbought = p3['rsi'] > 70
@@ -343,12 +343,7 @@ class TripleTopPattern:
         if p1_overbought and p2_overbought and p3_overbought:
             base_confidence += 20
             confluences.append(f"RSI overbought all 3 peaks ({p1['rsi']:.1f}, {p2['rsi']:.1f}, {p3['rsi']:.1f})")
-        elif (p1_overbought and p2_overbought) or (p2_overbought and p3_overbought):
-            base_confidence += 12
-            confluences.append(f"RSI overbought 2 peaks")
-        elif p1_overbought or p2_overbought or p3_overbought:
-            base_confidence += 6
-            confluences.append(f"RSI overbought 1 peak")
+        # No partial credit - all 3 required for confluence
         
         # CONFLUENCE 2: VWAP Premium Zone (+15 points)
         in_premium = avg_price > vwap * 1.02  # 2% above VWAP

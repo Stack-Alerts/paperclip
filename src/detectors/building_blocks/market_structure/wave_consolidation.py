@@ -457,13 +457,15 @@ class WaveConsolidation:
         
         confidence = min(95, base_confidence)
         
-        # Signal type
+        # DUAL SIGNAL ARCHITECTURE
         if interaction['direction'] == 'BULLISH':
+            simple_signal = 'BULLISH'
             if interaction['type'] == 'REJECTION':
                 signal_type = 'BULLISH_ZONE_REJECTION'
             else:
                 signal_type = 'BULLISH_ZONE_BREAK'
         else:
+            simple_signal = 'BEARISH'
             if interaction['type'] == 'REJECTION':
                 signal_type = 'BEARISH_ZONE_REJECTION'
             else:
@@ -499,8 +501,11 @@ class WaveConsolidation:
         
         return {
             'signal': signal_type,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': signal_type,
                 'interaction_type': interaction['type'].lower(),
                 'zone_bias': 'bullish' if zone['is_bullish'] else 'bearish',
                 'zone_high': round(zone_high, 2),
@@ -547,8 +552,11 @@ class WaveConsolidation:
         """Generate neutral response."""
         return {
             'signal': 'NEUTRAL',
+            'signal_simple': 'NEUTRAL',
             'confidence': 50,
             'metadata': {
+                'signal_simple': 'NEUTRAL',
+                'signal_granular': 'NEUTRAL',
                 'current_price': round(price, 2),
                 'reason': reason or 'No wave consolidation zone interaction',
                 'active_zones': len(self.active_zones),
