@@ -200,7 +200,7 @@ class WyckoffAccumulation:
         self.sos_breakout_pct = sos_breakout_pct
         self.sos_volume_ratio = sos_volume_ratio
     
-    def _determine_dual_signals(self, signal: str) -> tuple:
+    def _determine_dual_signals(self, signal: str, df: pd.DataFrame = None) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
         granular = signal
         
@@ -211,7 +211,19 @@ class WyckoffAccumulation:
         elif signal == 'ACCUMULATION_PHASE_B':
             # Phase B (consolidation) = NEUTRAL
             simple = 'NEUTRAL'
-        else:  # NO_ACCUMULATION
+        elif signal == 'NO_ACCUMULATION' and df is not None:
+            # Check trend direction to determine BEARISH vs NEUTRAL
+            if len(df) >= 20:
+                # Downtrend detection: current price < 20-bar average
+                sma_20 = df['close'].iloc[-20:].mean()
+                current_price = df['close'].iloc[-1]
+                if current_price < sma_20 * 0.98:  # 2% below SMA = downtrend
+                    simple = 'BEARISH'
+                else:
+                    simple = 'NEUTRAL'
+            else:
+                simple = 'NEUTRAL'
+        else:
             simple = 'NEUTRAL'
         
         return granular, simple
@@ -506,7 +518,7 @@ class WyckoffAccumulation:
             confluence_factors.append('❌ No accumulation pattern detected')
         
         # DUAL SIGNAL ARCHITECTURE
-        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        granular_signal, simple_signal = self._determine_dual_signals(signal, df)
         
         # Build metadata
         metadata = {
