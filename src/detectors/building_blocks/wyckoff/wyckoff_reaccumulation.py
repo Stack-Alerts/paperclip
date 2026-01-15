@@ -429,20 +429,31 @@ class WyckoffReaccumulation:
         """
         # Input validation
         if not all(col in df.columns for col in ['open', 'high', 'low', 'close', 'volume', 'timestamp']):
+            granular_signal, simple_signal = self._determine_dual_signals('ERROR')
             return {
-                'signal': 'ERROR',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': 'Missing required columns'
+                },
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
         
         if len(df) < self.range_lookback:
+            granular_signal, simple_signal = self._determine_dual_signals('INSUFFICIENT_DATA')
             return {
-                'signal': 'INSUFFICIENT_DATA',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -453,10 +464,14 @@ class WyckoffReaccumulation:
         
         if not in_uptrend:
             # Not in uptrend - no re-accumulation possible
+            granular_signal, simple_signal = self._determine_dual_signals('NO_REACCUMULATION')
             return {
-                'signal': 'NO_REACCUMULATION',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 45,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'phase': 'NONE',
                     'reason': 'Not in uptrend'
                 },
@@ -470,10 +485,14 @@ class WyckoffReaccumulation:
         
         if not in_range:
             # Trending, not consolidating - not re-accumulation
+            granular_signal, simple_signal = self._determine_dual_signals('NO_REACCUMULATION')
             return {
-                'signal': 'NO_REACCUMULATION',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 50,
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
                     'phase': 'TRENDING',
                     'reason': 'Uptrend but not consolidating'
                 },
