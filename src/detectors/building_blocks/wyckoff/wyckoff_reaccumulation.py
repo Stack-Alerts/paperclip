@@ -357,18 +357,18 @@ class WyckoffReaccumulation:
         # NEW: Assess range quality
         quality, score, quality_factors = self.assess_range_quality(df, range_high, range_low)
         
-        # Only signal GOOD or EXCELLENT ranges (filter out POOR/FAIR)
+        # Accept ALL ranges (even POOR) for bear market bounces - SPRING detection needs this
         if quality in ['GOOD', 'EXCELLENT']:
             # Confidence based on quality score
             confidence = min(85, 50 + (score - 40))  # 60-85 range
-            return True, confidence, range_high, range_low
         elif quality == 'FAIR':
             # Borderline - lower confidence
             confidence = 55
-            return True, confidence, range_high, range_low
         else:
-            # POOR quality - reject
-            return False, 0, 0, 0
+            # POOR quality - but accept it (for SPRING detection in bear markets)
+            confidence = 45
+        
+        return True, confidence, range_high, range_low
     
     def detect_spring(self, df: pd.DataFrame, support_level: float) -> tuple:
         """
