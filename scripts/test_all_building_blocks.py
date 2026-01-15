@@ -23,6 +23,8 @@ from tests.building_blocks_registry_envoked.registry_test_library import test_bu
 from src.detectors.building_blocks.registry import BlockRegistry
 from datetime import datetime
 import argparse
+import time
+import traceback
 
 
 def generate_markdown_report(results, output_file, test_days, start_time, end_time):
@@ -79,15 +81,51 @@ def generate_markdown_report(results, output_file, test_days, start_time, end_ti
     
     md.append("")
     
-    md.append("## Failed Blocks")
+    md.append("## Test Performance")
     md.append("")
     
-    failed = [name for name, result in results.items() if result is None]
-    if failed:
-        md.append("| Block | Status |")
-        md.append("|-------|--------|")
-        for name in failed:
-            md.append(f"| {name} | ❌ Test Failed |")
+    # Calculate timing statistics
+    all_durations = [r['test_duration_seconds'] for r in results.values() if r and 'test_duration_seconds' in r]
+    if all_durations:
+        total_test_time = sum(all_durations)
+        avg_time = total_test_time / len(all_durations)
+        md.append(f"- **Total Test Time:** {total_test_time/60:.1f} min ({total_test_time/3600:.2f} hours)")
+        md.append(f"- **Average per Block:** {avg_time:.1f}s ({avg_time/60:.2f} min)")
+        md.append(f"- **Fastest Test:** {min(all_durations):.1f}s")
+        md.append(f"- **Slowest Test:** {max(all_durations):.1f}s")
+        md.append("")
+    
+    md.append("## Failed/Crashed Blocks")
+    md.append("")
+    
+    failed_blocks = [(name, result) for name, result in results.items() 
+                     if result and result.get('test_status') in ['FAILED', 'CRASHED']]
+    
+    if failed_blocks:
+        md.append("| Block | Status | Duration | Error |")
+        md.append("|-------|--------|----------|-------|")
+        for name, result in failed_blocks:
+            status = result.get('test_status', 'UNKNOWN')
+            duration = result.get('test_duration_seconds', 0)
+            error = result.get('error_details', 'No details')[:100]  # Truncate long errors
+            md.append(f"| {name} | ❌ {status} | {duration:.1f}s | {error} |")
+        
+        md.append("")
+        md.append("### Crash Details")
+        md.append("")
+        
+        for name, result in failed_blocks:
+            if result.get('test_status') == 'CRASHED':
+                md.append(f"#### {name}")
+                md.append("")
+                md.append(f"**Error:** {result.get('error_details', 'Unknown')}")
+                md.append("")
+                if 'error_traceback' in result:
+                    md.append("**Traceback:**")
+                    md.append("```python")
+                    md.append(result['error_traceback'])
+                    md.append("```")
+                md.append("")
     else:
         md.append("✅ **All blocks passed!**")
     
@@ -243,24 +281,57 @@ def main():
         print(f"[{idx}/{total_blocks}] Testing: {block_name}")
         print(f"{'='*80}")
         
+        block_start = time.time()
+        
         try:
             result = test_building_block_registry(
                 block_name=block_name,
                 days=args.days,
                 use_multicore=True
             )
-            results[block_name] = result
+            
+            block_duration = time.time() - block_start
             
             if result:
+                # Add timing to result
+                result['test_duration_seconds'] = block_duration
+                result['test_status'] = 'SUCCESS'
+                result['error_details'] = None
+                
                 coverage = result['coverage']['coverage_pct']
                 signals = result['results']['total_results']
                 print(f"\n✅ {block_name}: {coverage:.1f}% coverage, {signals:,} signals")
+                print(f"⏱️  Duration: {block_duration:.1f}s ({block_duration/60:.2f} min)")
             else:
+                # Test returned None (failed)
+                result = {
+                    'test_duration_seconds': block_duration,
+                    'test_status': 'FAILED',
+                    'error_details': 'Test returned None - check building block implementation',
+                    'block_metadata': BlockRegistry.get_block(block_name).__dict__ if BlockRegistry.get_block(block_name) else {}
+                }
                 print(f"\n❌ {block_name}: Test failed")
+                print(f"⏱️  Duration: {block_duration:.1f}s ({block_duration/60:.2f} min)")
+            
+            results[block_name] = result
                 
         except Exception as e:
-            print(f"\n❌ {block_name}: Exception: {e}")
-            results[block_name] = None
+            block_duration = time.time() - block_start
+            error_trace = traceback.format_exc()
+            
+            print(f"\n❌ {block_name}: Exception: {str(e)}")
+            print(f"⏱️  Duration: {block_duration:.1f}s ({block_duration/60:.2f} min)")
+            print(f"\n📋 Traceback:")
+            print(error_trace)
+            
+            # Store crash details
+            results[block_name] = {
+                'test_duration_seconds': block_duration,
+                'test_status': 'CRASHED',
+                'error_details': str(e),
+                'error_traceback': error_trace,
+                'block_metadata': BlockRegistry.get_block(block_name).__dict__ if BlockRegistry.get_block(block_name) else {}
+            }
         
         print(f"\nProgress: {idx}/{total_blocks} ({idx/total_blocks*100:.1f}%)")
     
