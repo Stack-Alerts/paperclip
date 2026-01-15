@@ -481,28 +481,7 @@ class WyckoffReaccumulation:
                 'confluence_factors': []
             }
         
-        # Detect uptrend context (required!)
-        in_uptrend, uptrend_conf = self.detect_uptrend(df)
-        
-        if not in_uptrend:
-            # Not in uptrend - no re-accumulation possible
-            granular_signal, simple_signal = self._determine_dual_signals('NO_REACCUMULATION', df)
-            return {
-                'signal': granular_signal,
-                'signal_simple': simple_signal,
-                'confidence': 45,
-                'metadata': {
-                    'signal_simple': simple_signal,
-                    'signal_granular': granular_signal,
-                    'phase': 'NONE',
-                    'reason': 'Not in uptrend'
-                },
-                'timestamp': df['timestamp'].iloc[-1],
-                'timeframe': self.timeframe,
-                'confluence_factors': ['❌ No uptrend detected', 'Re-accumulation requires uptrend context']
-            }
-        
-        # Detect consolidation range
+        # Detect consolidation range FIRST
         in_range, range_conf, resistance, support = self.detect_range(df)
         
         # STATE MANAGEMENT - Critical for spring/breakout detection!
@@ -526,10 +505,54 @@ class WyckoffReaccumulation:
             spring_support = support if support > 0 else df['low'].iloc[-self.range_lookback:].min()
             breakout_resistance = resistance if resistance > 0 else df['high'].iloc[-self.range_lookback:].max()
         
-        # CRITICAL FIX: Check spring/breakout BEFORE returning NO_REACCUMULATION
-        # Events can occur AFTER leaving range (using state-managed levels)
+        # CRITICAL FIX: Check spring/breakout BEFORE uptrend check!
+        # Spring can occur when breakdown KILLS the uptrend
         spring, spring_conf = self.detect_spring(df, spring_support)
         breakout, breakout_conf = self.detect_breakout(df, breakout_resistance)
+        
+        # If SPRING detected, return it immediately (even if no longer in uptrend)
+        if spring:
+            granular_signal, simple_signal = self._determine_dual_signals('SPRING_DETECTED', df)
+            return {
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
+                'confidence': spring_conf,
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'phase': 'SPRING',
+                    'spring_detected': True,
+                    'breakout_detected': False,
+                    'in_uptrend': False,  # Spring breakdown kills uptrend
+                    'in_range': in_range,
+                    'resistance_level': float(breakout_resistance) if breakout_resistance > 0 else 0,
+                    'support_level': float(spring_support) if spring_support > 0 else 0
+                },
+                'timestamp': df['timestamp'].iloc[-1],
+                'timeframe': self.timeframe,
+                'confluence_factors': ['⭐ Spring: False breakdown - trap set!', '✅ Quick recovery - continuation likely']
+            }
+        
+        # Now check uptrend (after spring check!)
+        in_uptrend, uptrend_conf = self.detect_uptrend(df)
+        
+        if not in_uptrend:
+            # Not in uptrend - no re-accumulation possible
+            granular_signal, simple_signal = self._determine_dual_signals('NO_REACCUMULATION', df)
+            return {
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
+                'confidence': 45,
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'phase': 'NONE',
+                    'reason': 'Not in uptrend'
+                },
+                'timestamp': df['timestamp'].iloc[-1],
+                'timeframe': self.timeframe,
+                'confluence_factors': ['❌ No uptrend detected', 'Re-accumulation requires uptrend context']
+            }
         
         if not in_range:
             # Check if spring/breakout detected even though not in range now
