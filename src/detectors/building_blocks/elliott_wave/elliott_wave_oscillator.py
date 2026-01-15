@@ -46,68 +46,68 @@ import numpy as np
         'BEARISH_DIVERGENCE': {
             'base_points': 35,
             'formula': 'scaled',
-            'description': 'Price rising but EWO falling - bearish reversal warning'
+            'description': 'Bearish divergence - Price making higher highs but EWO making lower highs. Reversal imminent. Take profit on longs, prepare shorts.'
         },
         'BULLISH_DIVERGENCE': {
             'base_points': 35,
             'formula': 'scaled',
-            'description': 'Price falling but EWO rising - bullish reversal warning'
+            'description': 'Bullish divergence - Price making lower lows but EWO making higher lows. Reversal imminent. Take profit on shorts, prepare longs.'
         },
         
         # Momentum increasing signals - Strong trend confirmation
         'BEARISH_MOMENTUM_INCREASING': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Bearish momentum accelerating'
+            'description': 'Bearish momentum accelerating - EWO diving deeper below zero. Strong downtrend. Add to shorts. Trail stops.'
         },
         'BULLISH_MOMENTUM_INCREASING': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Bullish momentum accelerating'
+            'description': 'Bullish momentum accelerating - EWO rising higher above zero. Strong uptrend. Add to longs. Trail stops.'
         },
         
         # Momentum weakening signals - Trend losing strength
         'BEARISH_MOMENTUM_WEAKENING': {
             'base_points': 10,
             'formula': 'scaled',
-            'description': 'Bearish momentum decelerating - potential reversal'
+            'description': 'Bearish momentum weakening - EWO rising toward zero. Downtrend losing steam. Tighten stops on shorts. Reversal possible.'
         },
         'BULLISH_MOMENTUM_WEAKENING': {
             'base_points': 10,
             'formula': 'scaled',
-            'description': 'Bullish momentum decelerating - potential reversal'
+            'description': 'Bullish momentum weakening - EWO falling toward zero. Uptrend losing steam. Tighten stops on longs. Reversal possible.'
         },
         
         # Simple directional signals - SIMPLE for basic users
         'BULLISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Bullish EWO momentum - any condition (simple)'
+            'description': 'Bullish EWO - Oscillator above zero line. Bullish momentum detected. Long positions favorable.'
         },
         'BEARISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Bearish EWO momentum - any condition (simple)'
+            'description': 'Bearish EWO - Oscillator below zero line. Bearish momentum detected. Short positions favorable.'
         },
         'NEUTRAL': {
             'base_points': 5,
             'formula': 'scaled',
-            'description': 'No clear EWO momentum (simple)'
+            'description': 'Neutral EWO - Oscillator near zero line. No clear momentum. Wait for decisive move before entering.'
         },
         
         # Neutral/Status signals
         'NEUTRAL_MOMENTUM': {
             'base_points': 5,
             'formula': 'scaled',
-            'description': 'EWO near zero - no clear momentum'
+            'description': 'Neutral momentum - EWO hovering near zero. Market in equilibrium. No clear trend. Avoid entries until breakout.'
         },
         'ERROR': {
             'points': 0,
-            'description': 'Analysis error occurred'
+            'description': 'Analysis error - Cannot calculate Elliott Wave Oscillator. Check data quality and SMA periods.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
-            'description': 'Not enough data for analysis'
+            'description': 'Insufficient data - Need at least 35 candles for EWO calculation. Wait for more price history.'
         }
     },
     description='Elliott Wave Oscillator - Momentum indicator (5-SMA minus 35-SMA) for wave confirmation',
