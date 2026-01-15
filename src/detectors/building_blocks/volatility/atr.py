@@ -31,8 +31,12 @@ import numpy as np
     class_name='ATR',
     default_weight=10,
     valid_signals=[
-        # Granular volatility regime signals (primary signals)
+        # Granular volatility regime signals
         'EXPANDING', 'CONTRACTING', 'STABLE',
+        # Granular volatility level signals (absolute)
+        'EXTREME', 'VERY_HIGH', 'HIGH', 'NORMAL', 'CALM',
+        # Granular volatility level signals (percentile-based)
+        'EXTREME_HIGH', 'EXTREME_LOW', 'VERY_LOW',
         # Simple directional - SIMPLE
         'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
@@ -50,6 +54,42 @@ import numpy as np
         },
         'STABLE': {
                 'base_points': 8,
+                'formula': 'scaled'
+        },
+        
+        # Volatility level signals (absolute)
+        'EXTREME': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'VERY_HIGH': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'HIGH': {
+                'base_points': 9,
+                'formula': 'scaled'
+        },
+        'NORMAL': {
+                'base_points': 7,
+                'formula': 'scaled'
+        },
+        'CALM': {
+                'base_points': 6,
+                'formula': 'scaled'
+        },
+        
+        # Volatility level signals (percentile)
+        'EXTREME_HIGH': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'EXTREME_LOW': {
+                'base_points': 10,
+                'formula': 'scaled'
+        },
+        'VERY_LOW': {
+                'base_points': 10,
                 'formula': 'scaled'
         },
         
@@ -448,19 +488,34 @@ class ATR:
         current_price = float(df['close'].iloc[-1])
         atr_percent = (current_atr / current_price) * 100
         
-        # **DEFINE SIGNAL** - Use regime signals (EXPANDING/CONTRACTING/STABLE)
-        # These are the primary signals declared in valid_signals
+        # **DEFINE SIGNAL** - Use volatility level as primary signal
+        # ATR is a CONTEXT BLOCK - volatility level is what traders need
+        # Prioritize percentile-based signals when available (more context)
         
-        if atr_trend == 'RISING':
-            signal = 'EXPANDING'
-        elif atr_trend == 'FALLING':
-            signal = 'CONTRACTING'
+        if atr_percentile_data.get('has_percentile'):
+            # Use percentile-based signal when available (better context)
+            percentile_signal = atr_percentile_data['relative_level']
+            # Use percentile signal if it's more extreme than absolute level
+            if percentile_signal in ['EXTREME_HIGH', 'EXTREME_LOW', 'VERY_LOW']:
+                signal = percentile_signal
+            else:
+                # Otherwise use absolute volatility level
+                signal = volatility_level
         else:
-            signal = 'STABLE'
+            # No percentile data yet - use absolute volatility level
+            signal = volatility_level
+        
+        # Determine regime for metadata and simple signal mapping
+        if atr_trend == 'RISING':
+            regime_signal = 'EXPANDING'
+        elif atr_trend == 'FALLING':
+            regime_signal = 'CONTRACTING'
+        else:
+            regime_signal = 'STABLE'
         
         # ENHANCEMENT 1: Calculate variable confidence
         confidence = self.calculate_variable_confidence(
-            signal,
+            regime_signal,  # Use regime for confidence calculation
             volatility_level,
             atr_percentile_data
         )
