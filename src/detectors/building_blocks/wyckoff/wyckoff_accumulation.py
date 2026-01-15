@@ -186,9 +186,9 @@ class WyckoffAccumulation:
                  range_lookback: int = 50,           # Iteration 3: 100 → 50 (shorter period!)
                  volume_lookback: int = 50,
                  range_threshold_pct: float = 10.0,  # RELAXED: 5% → 10% to allow spring/SOS detection
-                 spring_breakdown_pct: float = 2.0,  # Keep relaxed
+                 spring_breakdown_pct: float = 1.0,  # RELAXED: 2% → 1% for crypto volatility
                  spring_volume_ratio: float = 0.90,  # Keep relaxed
-                 sos_breakout_pct: float = 2.0,      # Keep relaxed
+                 sos_breakout_pct: float = 1.0,      # RELAXED: 2% → 1% for crypto volatility
                  sos_volume_ratio: float = 1.15,     # Keep relaxed
                  **kwargs):
         self.timeframe = timeframe
@@ -357,9 +357,9 @@ class WyckoffAccumulation:
         if len(df) < 15 or support_level == 0:
             return False, 0
         
-        # CRITICAL FIX: Scan recent history for spring EVENTS (last 15 bars)
+        # CRITICAL FIX: Scan recent history for spring EVENTS (last 20 bars - RELAXED)
         # A spring is an event that OCCURRED, not just current state
-        scan_window = min(15, len(df) - 3)
+        scan_window = min(20, len(df) - 3)
         
         for i in range(len(df) - scan_window, len(df)):
             if i < 5:
@@ -370,7 +370,7 @@ class WyckoffAccumulation:
             window = df.iloc[window_start:i+1]
             
             # Did price break BELOW support in this window?
-            breakdown_threshold = support_level * 0.98  # 2% below
+            breakdown_threshold = support_level * 0.99  # 1% below (RELAXED for crypto)
             broke_support = window['low'].min() < breakdown_threshold
             
             if not broke_support:
@@ -405,9 +405,9 @@ class WyckoffAccumulation:
         if len(df) < 15 or resistance_level == 0:
             return False, 0
         
-        # CRITICAL FIX: Scan recent history for SOS EVENTS (last 15 bars)
+        # CRITICAL FIX: Scan recent history for SOS EVENTS (last 20 bars - RELAXED)
         # An SOS is an event that OCCURRED, not just current state
-        scan_window = min(15, len(df) - 3)
+        scan_window = min(20, len(df) - 3)
         
         for i in range(len(df) - scan_window, len(df)):
             if i < 5:
@@ -418,7 +418,7 @@ class WyckoffAccumulation:
             window = df.iloc[window_start:i+1]
             
             # Did price break ABOVE resistance in this window?
-            breakout_threshold = resistance_level * 1.02  # 2% above
+            breakout_threshold = resistance_level * 1.01  # 1% above (RELAXED for crypto)
             broke_resistance = window['high'].max() > breakout_threshold
             
             if not broke_resistance:
