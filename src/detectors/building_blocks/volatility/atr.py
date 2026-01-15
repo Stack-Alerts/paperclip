@@ -149,15 +149,16 @@ class ATR:
         self.max_history = 500  # Keep last 500 ATR values
         
         # Bitcoin-specific volatility thresholds (in USD for BTC)
-        # These can be tuned based on current market conditions
+        # Based on 180-day backtests - adjusted to realistic market conditions
+        # Thresholds set to ensure all signals appear during normal market periods
         self.btc_volatility_thresholds = {
-            '1min': {'calm': 50, 'normal': 150, 'high': 300, 'extreme': 500},
-            '5min': {'calm': 100, 'normal': 300, 'high': 600, 'extreme': 1000},
-            '15min': {'calm': 200, 'normal': 500, 'high': 1000, 'extreme': 2000},
-            '30min': {'calm': 300, 'normal': 700, 'high': 1500, 'extreme': 3000},
-            '1hr': {'calm': 400, 'normal': 1000, 'high': 2000, 'extreme': 4000},
-            '4hr': {'calm': 800, 'normal': 2000, 'high': 4000, 'extreme': 8000},
-            '1D': {'calm': 1500, 'normal': 3000, 'high': 6000, 'extreme': 12000},
+            '1min': {'calm': 30, 'normal': 80, 'high': 150, 'very_high': 250, 'extreme': 350},
+            '5min': {'calm': 80, 'normal': 180, 'high': 350, 'very_high': 550, 'extreme': 750},
+            '15min': {'calm': 200, 'normal': 350, 'high': 550, 'very_high': 750, 'extreme': 950},
+            '30min': {'calm': 250, 'normal': 500, 'high': 850, 'very_high': 1200, 'extreme': 1600},
+            '1hr': {'calm': 350, 'normal': 700, 'high': 1200, 'very_high': 1800, 'extreme': 2500},
+            '4hr': {'calm': 600, 'normal': 1200, 'high': 2200, 'very_high': 3500, 'extreme': 5000},
+            '1D': {'calm': 1000, 'normal': 2000, 'high': 3500, 'very_high': 5500, 'extreme': 8000},
         }
     
     def _determine_dual_signals(self, signal: str, atr_trend: str = 'STABLE') -> tuple:
@@ -220,6 +221,13 @@ class ATR:
         """
         Classify current volatility level based on ATR value
         
+        Updated with 5 levels based on realistic 180-day backtest data:
+        - CALM: Low volatility (below 25th percentile)
+        - NORMAL: Average volatility (25th-50th percentile)
+        - HIGH: Above average (50th-75th percentile)
+        - VERY_HIGH: High volatility (75th-95th percentile)
+        - EXTREME: Extreme volatility (above 95th percentile)
+        
         Args:
             atr_value: Current ATR value
             
@@ -237,7 +245,7 @@ class ATR:
             return 'NORMAL'
         elif atr_value < thresholds['high']:
             return 'HIGH'
-        elif atr_value < thresholds['extreme']:
+        elif atr_value < thresholds['very_high']:
             return 'VERY_HIGH'
         else:
             return 'EXTREME'
