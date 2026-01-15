@@ -229,10 +229,10 @@ class WyckoffReaccumulation:
         ma = df['close'].iloc[-self.uptrend_lookback:].mean()
         above_ma = df['close'].iloc[-1] > ma
         
-        # 2. Uptrend slope (STRONG requirement - NEW)
+        # 2. Uptrend slope (RELAXED for bear markets)
         price_change = (df['close'].iloc[-1] / df['close'].iloc[-self.uptrend_lookback] - 1) * 100
-        strong_momentum = price_change > 5.0  # At least 5% gain over period
-        moderate_momentum = price_change > 2.0  # Moderate gain
+        strong_momentum = price_change > 3.0  # RELAXED: 5% → 3% (bear market adjustment)
+        moderate_momentum = price_change > 1.0  # RELAXED: 2% → 1% (any upward move)
         
         # 3. Multiple higher highs (structure - IMPROVED)
         highs = df['high'].iloc[-self.uptrend_lookback:]
@@ -486,7 +486,7 @@ class WyckoffReaccumulation:
         
         if not in_uptrend:
             # Not in uptrend - no re-accumulation possible
-            granular_signal, simple_signal = self._determine_dual_signals('NO_REACCUMULATION')
+            granular_signal, simple_signal = self._determine_dual_signals('NO_REACCUMULATION', df)
             return {
                 'signal': granular_signal,
                 'signal_simple': simple_signal,
