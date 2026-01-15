@@ -11,11 +11,19 @@ Key Benefits:
 - Add blocks in ONE place (the detector file)
 - Automatic validation at import time
 - ConfluenceCalculator auto-adapts
+- Dual signal architecture (granular + simple)
 - Scalable to 1000+ blocks
+
+DUAL SIGNAL ARCHITECTURE (2026-01-15):
+All building blocks must emit TWO signals:
+- signal (granular): Detailed pattern/event specific signal
+- signal_simple (simple): BULLISH/BEARISH/NEUTRAL directional signal
+
+This enables both pattern-specific logic AND simple directional strategies.
 
 Author: BTC_Engine_v3
 Date: 2026-01-09
-Version: 1.0
+Version: 1.1 (Updated 2026-01-15 - Dual Signal Architecture)
 """
 
 from typing import Dict, Any, List, Optional, Type
@@ -51,23 +59,82 @@ class BlockRegistry:
     and provides a query interface for strategies, ConfluenceCalculator,
     and other tools.
     
-    Usage:
-        # Register a block (done in detector file)
-        @register_block(
-            name='double_top',
-            category='PATTERNS',
-            class_name='DoubleTopPattern',
-            default_weight=30,
-            valid_signals=['BEARISH_BREAKDOWN', 'PATTERN_FORMING'],
-            signal_tiers={...}
-        )
-        class DoubleTopPattern:
-            pass
+    DUAL SIGNAL ARCHITECTURE EXAMPLE:
+    =================================
+    
+    @register_block(
+        name='double_top',
+        category='PATTERNS',
+        class_name='DoubleTopPattern',
+        default_weight=30,
+        valid_signals=[
+            # Granular pattern signals
+            'BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN',
+            # Simple directional signals
+            'BULLISH', 'BEARISH', 'NEUTRAL',
+            # Status signals
+            'ERROR', 'INSUFFICIENT_DATA'
+        ],
+        signal_tiers={
+            'BEARISH_BREAKDOWN': {'base_points': 30, 'formula': 'scaled'},
+            'PATTERN_FORMING': {'base_points': 15, 'formula': 'scaled'},
+            'NO_PATTERN': {'points': 0},
+            'BULLISH': {'base_points': 30, 'formula': 'scaled'},
+            'BEARISH': {'base_points': 30, 'formula': 'scaled'},
+            'NEUTRAL': {'points': 0},
+            'ERROR': {'points': 0},
+            'INSUFFICIENT_DATA': {'points': 0}
+        }
+    )
+    class DoubleTopPattern:
+        def _determine_dual_signals(self, granular_signal: str) -> tuple:
+            \"\"\"Map granular signals to simple directional signals\"\"\"
+            if granular_signal == 'BEARISH_BREAKDOWN':
+                return 'BEARISH_BREAKDOWN', 'BEARISH'
+            elif granular_signal == 'PATTERN_FORMING':
+                return 'PATTERN_FORMING', 'BEARISH'  # Bearish pattern
+            else:
+                return granular_signal, 'NEUTRAL'
         
-        # Query registry
-        metadata = BlockRegistry.get_block('double_top')
-        detector = BlockRegistry.instantiate('double_top', timeframe='15min')
-        signals = BlockRegistry.get_valid_signals('double_top')
+        def analyze(self, df):
+            # Detect pattern
+            if self.detect_breakdown():
+                granular, simple = self._determine_dual_signals('BEARISH_BREAKDOWN')
+                return {
+                    'signal': granular,           # e.g., 'BEARISH_BREAKDOWN'
+                    'signal_simple': simple,      # e.g., 'BEARISH'
+                    'confidence': 95,
+                    'metadata': {
+                        'signal_granular': granular,
+                        'signal_simple': simple
+                    }
+                }
+            else:
+                granular, simple = self._determine_dual_signals('NO_PATTERN')
+                return {
+                    'signal': granular,
+                    'signal_simple': simple,
+                    'confidence': 0,
+                    'metadata': {
+                        'signal_granular': granular,
+                        'signal_simple': simple
+                    }
+                }
+    
+    QUERY EXAMPLES:
+    ===============
+    
+    # Get metadata
+    metadata = BlockRegistry.get_block('double_top')
+    
+    # Instantiate block
+    detector = BlockRegistry.instantiate('double_top', timeframe='15min')
+    
+    # Get valid signals
+    signals = BlockRegistry.get_valid_signals('double_top')
+    
+    # Get signal tiers for confluence calculation
+    tiers = BlockRegistry.get_block('double_top').signal_tiers
     """
     
     _blocks: Dict[str, BlockMetadata] = {}
@@ -126,6 +193,10 @@ class BlockRegistry:
         """
         Validate block metadata is complete and correct
         
+        DUAL SIGNAL VALIDATION (2026-01-15):
+        Now enforces that BULLISH, BEARISH, NEUTRAL must be in valid_signals
+        for all blocks to support dual signal architecture.
+        
         Raises:
             ValueError: If metadata is invalid
         """
@@ -134,6 +205,18 @@ class BlockRegistry:
         for field in required:
             if field not in metadata:
                 raise ValueError(f"Block registration missing required field: {field}")
+        
+        # DUAL SIGNAL ARCHITECTURE: Validate simple signals are present
+        valid_signals = set(metadata['valid_signals'])
+        simple_signals = {'BULLISH', 'BEARISH', 'NEUTRAL'}
+        missing_simple = simple_signals - valid_signals
+        
+        if missing_simple:
+            raise ValueError(
+                f"Block '{metadata['name']}': "
+                f"Missing required simple signals: {missing_simple}\n"
+                f"All blocks must support dual signal architecture (BULLISH/BEARISH/NEUTRAL)"
+            )
         
         # Validate signals are defined in tiers
         if 'signal_tiers' in metadata:
@@ -222,6 +305,14 @@ class BlockRegistry:
                 'VOLATILITY': 'volatility',
                 'INSTITUTIONAL': 'institutional',
                 'SMC_ICT': 'smc_ict',
+                'ELLIOTT_WAVE': 'elliott_wave',
+                'FIBONACCI': 'fibonacci',
+                'PRICE_ACTION': 'price_action',
+                'RISK_MANAGEMENT': 'risk_management',
+                'SIGNALS': 'signals',
+                'SUPPLY_DEMAND': 'supply_demand',
+                'TREND': 'trend',
+                'WYCKOFF': 'wyckoff'
             }
             category_path = category_to_module.get(metadata.category, metadata.category.lower())
             module_name = f'src.detectors.building_blocks.{category_path}.{name}'
@@ -314,25 +405,63 @@ def register_block(**metadata):
     """
     Decorator to register a building block with the registry
     
-    Usage:
-        @register_block(
-            name='double_top',
-            category='PATTERNS',
-            class_name='DoubleTopPattern',
-            default_weight=30,
-            valid_signals=['BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN'],
-            signal_tiers={
-                'BEARISH_BREAKDOWN': {'base_points': 30, 'formula': 'quality_thresholds'},
-                'PATTERN_FORMING': {'max_points': 15, 'formula': 'scaled'},
-                'NO_PATTERN': {'points': 0}
-            },
-            description='Double top bearish reversal pattern',
-            tags=['reversal', 'bearish']
-        )
-        class DoubleTopPattern:
-            def analyze(self, df):
-                # Must return signal from valid_signals
-                return {'signal': 'BEARISH_BREAKDOWN', 'confidence': 95}
+    DUAL SIGNAL ARCHITECTURE (2026-01-15):
+    All blocks must include BULLISH, BEARISH, NEUTRAL in valid_signals.
+    
+    Usage Example:
+    ==============
+    
+    @register_block(
+        name='m_pattern',
+        category='PATTERNS',
+        class_name='MPatternDetector',
+        default_weight=25,
+        valid_signals=[
+            # Granular pattern signals (specific events)
+            'M_TOP_CONFIRMED', 'M_FORMING', 'NO_PATTERN',
+            # Simple directional signals (REQUIRED)
+            'BULLISH', 'BEARISH', 'NEUTRAL',
+            # Status signals
+            'ERROR', 'INSUFFICIENT_DATA'
+        ],
+        signal_tiers={
+            # Granular signals
+            'M_TOP_CONFIRMED': {'base_points': 25, 'formula': 'scaled'},
+            'M_FORMING': {'base_points': 12, 'formula': 'scaled'},
+            'NO_PATTERN': {'points': 0},
+            # Simple signals (REQUIRED)
+            'BULLISH': {'base_points': 25, 'formula': 'scaled'},
+            'BEARISH': {'base_points': 25, 'formula': 'scaled'},
+            'NEUTRAL': {'points': 0},
+            # Status signals
+            'ERROR': {'points': 0},
+            'INSUFFICIENT_DATA': {'points': 0}
+        },
+        description='M pattern (double top) bearish reversal',
+        tags=['reversal', 'bearish', 'pattern']
+    )
+    class MPatternDetector:
+        def _determine_dual_signals(self, granular_signal: str) -> tuple:
+            \"\"\"Map granular to simple signals\"\"\"
+            if granular_signal == 'M_TOP_CONFIRMED':
+                return 'M_TOP_CONFIRMED', 'BEARISH'
+            elif granular_signal == 'M_FORMING':
+                return 'M_FORMING', 'BEARISH'
+            else:
+                return granular_signal, 'NEUTRAL'
+        
+        def analyze(self, df):
+            # Dual signal emission
+            granular, simple = self._determine_dual_signals('M_TOP_CONFIRMED')
+            return {
+                'signal': granular,        # Granular: 'M_TOP_CONFIRMED'
+                'signal_simple': simple,   # Simple: 'BEARISH'
+                'confidence': 85,
+                'metadata': {
+                    'signal_granular': granular,
+                    'signal_simple': simple
+                }
+            }
     
     Args:
         **metadata: Block metadata (see BlockMetadata for required fields)
@@ -381,7 +510,7 @@ def auto_discover_blocks(base_path: Optional[Path] = None):
                 importlib.import_module(module_name)
             except Exception:
                 # Silently skip modules that fail to import
-                # (they may not be ready or have dependencies)
+                # (they may not have dependencies yet)
                 pass
 
 
