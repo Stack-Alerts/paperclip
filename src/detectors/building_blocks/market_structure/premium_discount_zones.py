@@ -141,6 +141,17 @@ class PremiumDiscountZones:
         self.zone_history = []  # Track recent zones for historical analysis
         self.max_history = 20   # Keep last 20 zone changes
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular == 'PRICE_IN_DISCOUNT':
+            simple = 'BULLISH'
+        elif granular == 'PRICE_IN_PREMIUM':
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def calculate_multi_timeframe_alignment(self, df: pd.DataFrame) -> dict:
         """
         Priority 1.1: Multi-timeframe alignment
@@ -737,8 +748,13 @@ class PremiumDiscountZones:
         elif strength <= 25:
             confluence_factors.append(f'⚠️ Weak zone (strength: {strength})')
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # **ENHANCED:** Metadata with all new fields!
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'zone': zone,
             'equilibrium': round(equilibrium, 2),
             'high': round(recent_high, 2),
@@ -771,7 +787,8 @@ class PremiumDiscountZones:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
