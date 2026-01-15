@@ -145,6 +145,17 @@ class SwingPoints:
         self.last_swing_idx = None
         self.last_swing_type = None
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if 'HIGH' in granular:
+            simple = 'BEARISH'  # Swing high = resistance = bearish
+        elif 'LOW' in granular:
+            simple = 'BULLISH'  # Swing low = support = bullish
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:
         """Calculate ATR for magnitude normalization"""
         if len(df) < period + 1:
@@ -365,8 +376,13 @@ class SwingPoints:
             if is_new_event:
                 confluence_factors.append(f"🆕 NEW swing detected")
             
+            # DUAL SIGNAL ARCHITECTURE
+            granular_signal, simple_signal = self._determine_dual_signals(signal)
+            
             # Rich metadata for other blocks and confluence
             metadata = {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'swing_count': len(swings),
                 'swing_type': swing_type,
                 'swing_price': last_swing['price'],
@@ -392,7 +408,8 @@ class SwingPoints:
             }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],
