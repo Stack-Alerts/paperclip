@@ -48,88 +48,100 @@ import numpy as np
         # Position signals
         'ABOVE_UPPER': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Above upper band - Price extended beyond upper Bollinger Band. Overbought. Consider shorts or take profit on longs. Mean reversion likely.'
         },
         'NEAR_UPPER': {
                 'base_points': 9,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Near upper band - Price approaching upper band. Strong uptrend. Momentum favors longs but watch for reversal. Consider partial profits.'
         },
         'UPPER_HALF': {
                 'base_points': 7,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Upper half - Price in upper half of bands. Bullish bias. Above middle band. Trend strength moderate. Continue longs.'
         },
         'LOWER_HALF': {
                 'base_points': 7,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Lower half - Price in lower half of bands. Bearish bias. Below middle band. Trend weakness. Consider shorts or wait.'
         },
         'NEAR_LOWER': {
                 'base_points': 9,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Near lower band - Price approaching lower band. Strong downtrend or oversold. Watch for reversal. Potential long entries forming.'
         },
         'BELOW_LOWER': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Below lower band - Price extended beyond lower Bollinger Band. Oversold. Consider longs or take profit on shorts. Mean reversion likely.'
         },
         
         # Pattern signals
         'BULLISH_REVERSAL': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish reversal - Price bounced from lower band. Reversal signal. Enter longs. Stop below recent low. Target middle or upper band.'
         },
         'BEARISH_REVERSAL': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish reversal - Price rejected from upper band. Reversal signal. Enter shorts. Stop above recent high. Target middle or lower band.'
         },
         'UPPER_BAND_WALK': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Upper band walk - Price riding upper band. Strong bullish trend. Stay in longs. Trend continuation pattern. Exit on close below middle band.'
         },
         'LOWER_BAND_WALK': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Lower band walk - Price riding lower band. Strong bearish trend. Stay in shorts. Trend continuation pattern. Exit on close above middle band.'
         },
         
         # Squeeze signals
         'SQUEEZE_BREAKOUT': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Squeeze breakout - Bollinger squeeze broken. Volatility expansion starting. Major move beginning. Trade breakout direction aggressively.'
         },
         'SQUEEZE_BREAKOUT_BULL': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish squeeze breakout - Squeeze broken upward. Enter longs aggressively. Strong momentum expected. Volatility expansion bullish.'
         },
         'SQUEEZE_BREAKOUT_BEAR': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish squeeze breakout - Squeeze broken downward. Enter shorts aggressively. Strong momentum expected. Volatility expansion bearish.'
         },
         
         # Volatility regime
         'MEDIUM_HIGH': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Medium-high volatility - Bollinger bands widening. Volatility increasing. Good for trend trading. Wider stops required.'
         },
         'MEDIUM_LOW': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Medium-low volatility - Bollinger bands narrowing. Volatility decreasing. Consolidation phase. Watch for squeeze breakout.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish - Price action bullish vs Bollinger Bands. Long positions favorable. Trend or reversal favors upside.'
         },
         'BEARISH': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish - Price action bearish vs Bollinger Bands. Short positions favorable. Trend or reversal favors downside.'
         },
         'NEUTRAL': {
-                'points': 0
-        },
-        'ERROR': {
-                'points': 0
-        },
-        'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral - Price near middle band. No clear bias. Wait for directional signal before trading.'
         }
 }
 )

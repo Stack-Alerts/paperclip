@@ -41,33 +41,41 @@ import numpy as np
         # Pattern signals
         'BEARISH_BREAKDOWN': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Rising wedge breakdown - Support broken with compression release. Enter shorts aggressively. Bearish reversal confirmed. Target = wedge height projected down. 70% success rate.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Rising wedge forming - Converging rising highs and lows. Bearish reversal pattern. Wait for downside breakdown. Volume declining into apex.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No rising wedge - Pattern conditions not met. No converging rising trendlines detected. Wait for pattern formation.'
         },
         
         # Simple directional - SIMPLE
-        'BULLISH': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish rising wedge - Pattern forming or broken down. Short positions favorable. Classic bearish reversal. 70% success rate.'
+        },
+        'BULLISH': {
+                'base_points': 30,
+                'formula': 'scaled',
+                'description': 'Bullish (rare scenario) - Rising wedge typically bearish. Verify pattern structure. Most rising wedges break downward.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No rising wedge pattern - Market not forming bearish reversal. Wait for converging rising wedge before entering shorts.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect rising wedge pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 50 candles for rising wedge detection. Wait for more price history to form pattern.'
         }
 }
 )

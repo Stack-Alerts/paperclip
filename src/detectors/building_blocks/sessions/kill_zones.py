@@ -50,48 +50,60 @@ import numpy as np
         # Simple time quality signals
         'ACTIVE': {
                 'base_points': 16,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Active kill zone - Optimal trading window. High probability session. Institutional activity high. Take trades with confidence.'
         },
         'INACTIVE': {
-                'points': 0
+                'points': 0,
+                'description': 'Inactive period - Outside kill zones. Low probability time. Institutional activity minimal. Avoid trading. Wait for next zone.'
         },
         'NO_SIGNAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No time signal - Cannot determine session quality. Default to manual time management.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate kill zones. Check timestamp data availability.'
         },
         
         # Granular zone signals
         'LONDON_KZ': {
                 'base_points': 16,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'London kill zone (07:00-10:00 UTC) - Strong trending moves. European institutional activity. High probability window. Good for breakouts.'
         },
         'LONDON_OPEN_KZ': {
                 'base_points': 14,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'London open kill zone (02:00-05:00 UTC) - Pre-London positioning. Setup phase. Medium probability. Watch for London open direction.'
         },
         'NY_AM_KZ': {
                 'base_points': 18,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'NY AM kill zone (12:00-15:00 UTC) - OPTIMAL WINDOW. London/NY overlap. Maximum liquidity. Explosive moves. Highest probability trades.'
         },
         'NY_PM_KZ': {
                 'base_points': 14,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'NY PM kill zone (18:00-21:00 UTC) - Afternoon continuation. Medium probability. Follow AM session direction. Good for trend continuation.'
         },
         'ASIAN_KZ': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Asian kill zone (00:00-03:00 UTC) - Low volume ranging. Weak probability. Range-bound trading. Avoid strong directional trades.'
         },
         'PRIME_TIME': {
                 'base_points': 18,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Prime time - High-priority kill zone active. Optimal trading conditions. Maximum institutional participation. Take high-quality setups.'
         },
         'WAIT': {
-                'points': 0
+                'points': 0,
+                'description': 'Wait period - Between kill zones. Low probability time. Stay patient. Preserve capital. Wait for next high-quality window.'
         },
         'NO_KZ': {
-                'points': 0
+                'points': 0,
+                'description': 'No kill zone - Outside all defined sessions. Minimal institutional activity. Avoid trading. Wait for recognized time window.'
         }
 }
 )

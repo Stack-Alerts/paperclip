@@ -38,35 +38,43 @@ import numpy as np
         'ERROR', 'INSUFFICIENT_DATA'
     ],
     signal_tiers={
-        'NO_PATTERN': {
-                'points': 0
-        },
         'PATTERN_CONFIRMED': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Inverse H&S confirmed - Neckline broken. Enter longs aggressively. Target = pattern height above neckline. Stop below right shoulder. 86% success rate.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Inverse H&S forming - Three troughs detected (left shoulder, head, right shoulder). Bullish reversal pattern. Wait for neckline break. Prepare long entry.'
+        },
+        'NO_PATTERN': {
+                'points': 0,
+                'description': 'No Inverse H&S - Pattern conditions not met. Need three troughs with head lower than shoulders. Wait for pattern formation.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish Inverse H&S pattern - Classic bottoming pattern detected. Long positions favorable. Major trend reversal signal. Use measured move for targets.'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish (inverse scenario) - Rare for Inverse H&S. Pattern typically bullish. Verify if standard H&S pattern instead.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No Inverse H&S pattern - Market not forming bullish reversal. Wait for three-trough formation with neckline before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect Inverse H&S pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 40 candles for Inverse H&S detection. Wait for more price history to form three-trough pattern.'
         }
 }
 )

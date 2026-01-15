@@ -41,33 +41,41 @@ import numpy as np
         # Pattern signals
         'BREAKOUT_CONFIRMED': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Rounding bottom breakout - U-shaped recovery complete. Enter longs aggressively. Bullish reversal confirmed. Target = half pattern depth projected up. 63% success rate.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Rounding bottom forming - Smooth U-shaped bottom detected. Bullish saucer pattern. Price recovering from lows. Wait for breakout. Volume increasing.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No rounding bottom - Pattern conditions not met. No smooth U-shaped recovery detected. Wait for saucer pattern formation.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish rounding bottom - Saucer pattern forming or broken out. Long positions favorable. Classic bullish reversal. Gradual accumulation pattern.'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish (inverse scenario) - Rounding bottom typically bullish. Verify pattern structure. Pattern indicates accumulation.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No rounding bottom - Market not forming bullish saucer. Wait for smooth U-shaped recovery before entering longs.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect rounding bottom pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 40 candles for rounding bottom detection. Wait for more price history to form U-shaped pattern.'
         }
 }
 )

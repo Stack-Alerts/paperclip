@@ -44,30 +44,37 @@ import numpy as np
     signal_tiers={
         'BEARISH_INDUCEMENT': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish inducement - False breakout up then reversal down. Retail trapped long. Enter shorts. Smart money manipulation. Liquidity grab complete.'
         },
         'BULLISH_INDUCEMENT': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish inducement - False breakdown then reversal up. Retail trapped short. Enter longs. Smart money manipulation. Liquidity grab complete.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate inducement. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for inducement detection. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish inducement - Bullish inducement trap detected. Long positions favorable. Reversal up confirmed. Smart money buying.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish inducement - Bearish inducement trap detected. Short positions favorable. Reversal down confirmed. Smart money selling.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral inducement - No inducement traps detected. Wait for false moves and reversals.'
         }
 }
 )

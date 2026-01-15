@@ -49,33 +49,41 @@ from src.utils.advanced_data_loader import advanced_data
     signal_tiers={
         'BEARISH_SWEEP': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish liquidity sweep - High swept then reversed down. Stop hunt complete. Retail trapped long. Enter shorts. Institutional selling. Reversal confirmed.'
         },
         'BULLISH_SWEEP': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish liquidity sweep - Low swept then reversed up. Stop hunt complete. Retail trapped short. Enter longs. Institutional buying. Reversal confirmed.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate liquidity sweeps. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 20 bars for liquidity sweep detection. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish sweep - Bullish liquidity sweep detected. Lows swept. Reversal up confirmed. Long positions highly favorable. Stop hunt complete.'
         },
         'BEARISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish sweep - Bearish liquidity sweep detected. Highs swept. Reversal down confirmed. Short positions highly favorable. Stop hunt complete.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral sweep - No active liquidity sweep. Wait for stop hunts and reversals.'
         },
         'NO_SWEEP': {
-                'points': 0
+                'points': 0,
+                'description': 'No sweep - No liquidity sweeps detected. No stop hunts. No sweep setups available.'
         }
 }
 )

@@ -106,38 +106,47 @@ import numpy as np
         # Wyckoff reaccumulation signals
         'BREAKOUT_CONTINUATION': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Breakout continuation - Price breaks above consolidation range with high volume. Re-accumulation complete. Uptrend resumes. Add to longs. Trail stops. Strong continuation signal.'
         },
         'REACCUMULATION_DETECTED': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Re-accumulation detected - Consolidation within uptrend. Smart money adding positions. Range building. Hold longs. Wait for Spring or Breakout before adding.'
         },
         'SPRING_DETECTED': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Spring detected - False breakdown in uptrend consolidation. Weak hands shaken out. Quick recovery. Major continuation signal. Add to longs aggressively. Stop below spring low.'
         },
         'NO_REACCUMULATION': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'No re-accumulation - Either not in uptrend or not consolidating. No mid-trend accumulation pattern. Use trend following strategies instead.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish Wyckoff - Re-accumulation, Spring, or Breakout detected. Uptrend continuation highly probable. Long positions favorable. Major upside continuation.'
         },
         'BEARISH': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish Wyckoff - Re-accumulation failure or distribution detected. Uptrend in doubt. Exit longs. Consider shorts.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral Wyckoff - No clear re-accumulation pattern. Either trending or unclear consolidation. Wait for clearer signals.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate Wyckoff re-accumulation. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 50+ candles for Wyckoff re-accumulation analysis. Wait for more price history.'
         }
 }
 )

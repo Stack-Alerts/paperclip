@@ -97,42 +97,52 @@ import numpy as np
         # Wyckoff distribution signals
         'SOW_BREAKDOWN': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Sign of Weakness breakdown (Phase D) - Smart money selling. Price breaks below support with high volume. Distribution complete. Enter shorts aggressively. Markdown phase begins.'
         },
         'UTAD_DETECTED': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'UTAD detected (Phase C) - Upthrust After Distribution. False breakout above resistance. Retail trapped long. Quick reversal. Major shorting opportunity. Stop above UTAD high.'
         },
         'DISTRIBUTION_PHASE_A': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Distribution Phase A - Buying climax. High volume euphoria at top. Reversal beginning. Smart money distributing to retail. Early distribution. Monitor for Phase B.'
         },
         'DISTRIBUTION_PHASE_B': {
                 'base_points': 22,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Distribution Phase B - Range building at top. Quiet consolidation. Smart money distributing. Volume declining on rallies. Wait for UTAD (Phase C) or SOW (Phase D) before shorting.'
         },
         'NO_DISTRIBUTION': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'No distribution - Price trending. Not consolidating at top. No Wyckoff distribution patterns. Use trend strategies instead. No topping pattern.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish Wyckoff - No distribution detected. Market trending upward. Long positions favorable. Not at distributional top.'
         },
         'BEARISH': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish Wyckoff - UTAD or SOW detected. Smart money distribution confirmed. Short positions highly favorable. Major downside potential.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral Wyckoff - In Phase B consolidation or no pattern. Wait for UTAD/SOW signals before trading. Patient observation phase.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate Wyckoff distribution. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 50+ candles for Wyckoff analysis. Wait for more price history.'
         }
 }
 )

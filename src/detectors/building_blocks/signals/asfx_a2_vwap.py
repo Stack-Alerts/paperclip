@@ -40,44 +40,54 @@ import numpy as np
         # Granular VWAP signals
         'ABOVE_VWAP': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Above VWAP - Price trading above institutional average. Bullish context. Longs favorable. Institutional buying zone. VWAP acts as support.'
         },
         'BELOW_VWAP': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Below VWAP - Price trading below institutional average. Bearish context. Shorts favorable. Institutional selling zone. VWAP acts as resistance.'
         },
         'AT_VWAP': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'At VWAP - Price testing institutional average (within 0.5%). Key decision level. Watch for bounce or rejection. High-quality entry zone. Tight stops possible.'
         },
         'VWAP_CROSS_UP': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'VWAP cross above - Price crossed above institutional average. Bullish momentum. Enter longs. Institutional buying inflection. Strong continuation signal.'
         },
         'VWAP_CROSS_DOWN': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'VWAP cross below - Price crossed below institutional average. Bearish momentum. Enter shorts. Institutional selling inflection. Strong reversal signal.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish VWAP - Above VWAP or crossed up. Institutional buyers active. Long positions favorable. VWAP supporting price.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish VWAP - Below VWAP or crossed down. Institutional sellers active. Short positions favorable. VWAP resisting price.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral VWAP - At VWAP equilibrium. No directional bias. Wait for cross or rejection. Key decision level forming.'
         },
         
         # Status
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate VWAP. Check data quality, volume data, and timestamp availability.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for VWAP calculation. Wait for more price history with volume.'
         }
 }
 )

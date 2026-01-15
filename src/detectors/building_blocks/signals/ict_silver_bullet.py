@@ -43,38 +43,47 @@ import numpy as np
     signal_tiers={
         'BEARISH_FVG_IN_ZONE': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish FVG in zone - Price in bearish Fair Value Gap. Institutional selling imbalance. Enter shorts. Silver Bullet setup. Stop above gap. Target gap fill.'
         },
         'BEARISH_FVG_RETEST': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish FVG retest - Price retesting bearish Fair Value Gap. High-probability short entry. Institutional distribution zone. Premium signal. Tight stop above gap.'
         },
         'BULLISH_FVG_IN_ZONE': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish FVG in zone - Price in bullish Fair Value Gap. Institutional buying imbalance. Enter longs. Silver Bullet setup. Stop below gap. Target gap fill.'
         },
         'BULLISH_FVG_RETEST': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish FVG retest - Price retesting bullish Fair Value Gap. High-probability long entry. Institutional accumulation zone. Premium signal. Tight stop below gap.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate ICT Silver Bullet signals. Check data quality and timestamp availability.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 50 bars for FVG detection. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish Silver Bullet - Bullish FVG detected or retested. Long positions highly favorable. ICT institutional buy zone. High probability setup.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish Silver Bullet - Bearish FVG detected or retested. Short positions highly favorable. ICT institutional sell zone. High probability setup.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral Silver Bullet - No Fair Value Gaps detected. No institutional imbalances. Wait for Silver Bullet sessions and FVG formation.'
         }
 }
 )

@@ -45,44 +45,54 @@ import numpy as np
         'ERROR', 'INSUFFICIENT_DATA'
     ],
     signal_tiers={
-        'ABOVE_IB': {
+        'BULLISH_BREAKOUT': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Initial Balance bullish breakout - Price broke above IB high. Enter longs on continuation. Target = IB range extensions (25%, 50%, 100%). Volume confirmation ideal.'
         },
         'BEARISH_BREAKOUT': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Initial Balance bearish breakout - Price broke below IB low. Enter shorts on continuation. Target = IB range extensions downward. Volume confirmation ideal.'
+        },
+        'ABOVE_IB': {
+                'base_points': 30,
+                'formula': 'scaled',
+                'description': 'Above Initial Balance - Price continuing above IB high. Bullish momentum. Hold longs or add on pullbacks to IB high (support).'
         },
         'BELOW_IB': {
                 'base_points': 30,
-                'formula': 'scaled'
-        },
-        'BULLISH_BREAKOUT': {
-                'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Below Initial Balance - Price continuing below IB low. Bearish momentum. Hold shorts or add on rallies to IB low (resistance).'
         },
         'LOWER_IB': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Lower Initial Balance zone - Price in bottom 30% of IB range. Bearish bias. Watch for breakdown below IB low. Prepare for short entry.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish Initial Balance setup - Above IB or bullish breakout. Long positions favorable. Use IB high as support, target range extensions.'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish Initial Balance setup - Below IB or bearish breakout. Short positions favorable. Use IB low as resistance, target range extensions down.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Inside Initial Balance - Price consolidating within IB range. No directional bias. Wait for breakout above high or below low before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect Initial Balance. Check data quality and timestamp requirements.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 20 candles for IB detection. Wait for more price history to form IB session.'
         }
 }
 )

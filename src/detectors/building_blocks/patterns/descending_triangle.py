@@ -42,29 +42,36 @@ import numpy as np
         # Pattern signals
         'BEARISH_BREAKDOWN': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Descending triangle breakdown - Support broken with volume. Enter shorts aggressively. Target = pattern height. Stop above resistance line. 68% success rate.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Descending triangle forming - Falling highs + flat support. Bearish continuation pattern. Wait for breakdown below support. Prepare short entry.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No descending triangle - Pattern conditions not met. No falling highs or flat support detected. Wait for pattern formation.'
         },
         
         # Simple directional - SIMPLE (bearish-only)
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish triangle pattern - Descending triangle detected or broken down. Short positions favorable. Use support breakdown for entry.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No triangle pattern - Market structure unclear. No descending triangle setup. Wait for pattern formation before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 50 candles for descending triangle detection. Wait for more price history.'
         }
 }
 )

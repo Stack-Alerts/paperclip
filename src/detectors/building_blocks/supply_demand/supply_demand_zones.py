@@ -53,41 +53,51 @@ import numpy as np
         # Granular zone signals
         'DEMAND_ZONE': {
                 'base_points': 24,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Inside demand zone - Price at institutional buying level. Strong support. Enter longs. Volume accumulation zone. Expect bounce. Stop below zone.'
         },
         'SUPPLY_ZONE': {
                 'base_points': 24,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Inside supply zone - Price at institutional selling level. Strong resistance. Enter shorts. Distribution zone. Expect rejection. Stop above zone.'
         },
         'NEAR_DEMAND': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Near demand zone - Approaching institutional support. Prepare long entries. Watch for bounce. Set alerts. Zone within 5% of price.'
         },
         'NEAR_SUPPLY': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Near supply zone - Approaching institutional resistance. Prepare short entries. Watch for rejection. Set alerts. Zone within 5% of price.'
         },
         'NO_ZONE': {
-                'points': 0
+                'points': 0,
+                'description': 'No zone detected - Price far from supply/demand zones. No institutional footprint. Wait for next zone. Avoid random entries.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 24,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish supply/demand - At demand zone. Institutional buyers present. Long positions favorable. Support established.'
         },
         'BEARISH': {
                 'base_points': 24,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish supply/demand - At supply zone. Institutional sellers present. Short positions favorable. Resistance established.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral supply/demand - Between zones. No institutional presence. Wait for zone approach before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate supply/demand zones. Check data quality and volume data availability.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 50 candles for supply/demand zone identification. Wait for more price history.'
         }
 }
 )

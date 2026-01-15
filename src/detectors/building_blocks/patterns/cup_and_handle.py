@@ -41,32 +41,40 @@ import numpy as np
         # Pattern signals
         'BREAKOUT_CONFIRMED': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Cup & Handle breakout - Rim resistance broken with volume. Enter longs aggressively. Target = cup depth projection. Stop below handle. 65% success rate.'
         },
         'CUP_FORMING': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Cup forming - Rounded bottom recovery >60% complete. Bullish continuation developing. Wait for handle formation. Prepare long entry on breakout.'
         },
         'PATTERN_FORMING': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Cup & Handle forming - Early pattern structure. Cup depth confirmed. Waiting for recovery and handle. Monitor for completion.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No Cup & Handle - Pattern conditions not met. Insufficient cup depth or recovery. Cup & Handle patterns are rare. Wait for formation.'
         },
         # Simple directional - SIMPLE (bullish-only)
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish Cup & Handle - Pattern forming or broken out. Long positions favorable. Bullish continuation pattern. Use cup depth for targets.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No Cup & Handle pattern - Market not forming bullish continuation. Wait for cup formation and breakout before entering longs.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect Cup & Handle pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 40 candles for Cup & Handle detection. Wait for more price history to form pattern.'
         }
 }
 )

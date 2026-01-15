@@ -42,30 +42,37 @@ import numpy as np
         # Pattern signals
         'BULLISH_C2_CLOSE': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish C2 Close - Failed downside breakout with bullish reversal. Enter longs at C2 zone. Stop below C2 low. Target C3 expansion high.'
         },
         'BEARISH_C2_CLOSE': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish C2 Close - Failed upside breakout with bearish reversal. Enter shorts at C2 zone. Stop above C2 high. Target C3 expansion low.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish C2 pattern - Failed breakdown with reversal. Long positions favorable. Use C2 equilibrium zone for entry. Stop below pattern.'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish C2 pattern - Failed breakout with reversal. Short positions favorable. Use C2 equilibrium zone for entry. Stop above pattern.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No C2 Close pattern - Failed breakout conditions not met. No reversal signal. Wait for 4-candle pattern formation.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect Candle 2 Close pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 4 candles for C2 Close pattern detection. Wait for more price history.'
         }
 }
 )

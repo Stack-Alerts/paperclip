@@ -45,30 +45,37 @@ import numpy as np
     signal_tiers={
         'BEARISH_BOS': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish BOS - Break of structure downward. Downtrend continuation confirmed. Enter shorts. Trend strength. Lower lows forming. ICT sell signal.'
         },
         'BULLISH_BOS': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish BOS - Break of structure upward. Uptrend continuation confirmed. Enter longs. Trend strength. Higher highs forming. ICT buy signal.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate break of structure. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for BOS detection. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish BOS - Bullish break of structure detected. Long positions highly favorable. Uptrend continuation. Strong momentum.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish BOS - Bearish break of structure detected. Short positions highly favorable. Downtrend continuation. Strong momentum.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral BOS - No break of structure. Wait for trend continuation or reversal signals.'
         }
 }
 )

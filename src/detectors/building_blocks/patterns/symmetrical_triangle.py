@@ -39,39 +39,48 @@ import numpy as np
     ],
     signal_tiers={
         # Pattern signals
-        'BEARISH_BREAKOUT': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
         'BULLISH_BREAKOUT': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Symmetrical triangle bullish breakout - Upper bound broken. Enter longs on continuation. Bilateral pattern resolving bullish. 60% base success rate.'
+        },
+        'BEARISH_BREAKOUT': {
+                'base_points': 30,
+                'formula': 'scaled',
+                'description': 'Symmetrical triangle bearish breakout - Lower bound broken. Enter shorts on continuation. Bilateral pattern resolving bearish. 60% base success rate.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Symmetrical triangle forming - Converging support and resistance. Bilateral pattern. No directional bias yet. Wait for breakout. Volume declining typical.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No symmetrical triangle - Pattern conditions not met. No converging bilateral trendlines detected. Wait for pattern formation.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish symmetrical triangle breakout - Pattern resolving upward. Long positions favorable. Exit = triangle height projected up from breakout.'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish symmetrical triangle breakout - Pattern resolving downward. Short positions favorable. Target = triangle height projected down from breakout.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Symmetrical triangle forming - No breakout yet. Bilateral consolidation pattern. Equal probability up or down. Wait for directional break before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect symmetrical triangle pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 50 candles for symmetrical triangle detection. Wait for more price history to form pattern.'
         }
 }
 )

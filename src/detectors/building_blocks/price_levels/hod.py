@@ -29,35 +29,43 @@ import numpy as np
     valid_signals=['BEARISH', 'BULLISH', 'NEUTRAL', 'HOD_REJECTION', 'AT_HOD', 'BELOW_HOD', 'ABOVE_HOD', 'ERROR'],
     signal_tiers={
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate HOD. Check data quality and timestamp availability.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish HOD - Price rejected from or below yesterday\'s high. Short positions favorable. Resistance holding.'
         },
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish HOD - Price broke above yesterday\'s high. Long positions favorable. Breakout confirmed. New highs forming.'
         },
         'NEUTRAL': {
                 'max_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Neutral HOD - Price near yesterday\'s high equilibrium. Wait for breakout or rejection confirmation.'
         },
         'HOD_REJECTION': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'HOD rejection - Price rejected from yesterday\'s high. Confirmed reversal pattern. Enter shorts. Resistance confirmed.'
         },
         'AT_HOD': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'At HOD - Price testing yesterday\'s high. Key decision level. Watch for breakout or rejection. High probability setup.'
         },
         'BELOW_HOD': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Below HOD - Price below yesterday\'s high. HOD acting as resistance. Wait for breakout or support bounces.'
         },
         'ABOVE_HOD': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Above HOD - Price broke above yesterday\'s high. Bullish breakthrough confirmed. New highs. Trend continuation.'
         }
 }
 )

@@ -46,30 +46,37 @@ import numpy as np
     signal_tiers={
         'BEARISH_OTE': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish OTE - Price in optimal trade entry zone bearish. 62-79% Fib retracement. Enter shorts. ICT sweet spot. High probability reversal down.'
         },
         'BULLISH_OTE': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish OTE - Price in optimal trade entry zone bullish. 62-79% Fib retracement. Enter longs. ICT sweet spot. High probability reversal up.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate optimal trade entry. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for OTE calculation. Wait for more price action and swing detection.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish OTE - In optimal trade entry zone for longs. 62-79% retracement complete. Long positions highly favorable. ICT entry zone.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish OTE - In optimal trade entry zone for shorts. 62-79% retracement complete. Short positions highly favorable. ICT entry zone.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral OTE - Not in optimal trade entry zone. Wait for 62-79% retracement or better entry levels.'
         }
 }
 )

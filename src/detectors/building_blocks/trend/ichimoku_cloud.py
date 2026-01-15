@@ -42,33 +42,41 @@ import numpy as np
         # Granular cloud signals
         'ABOVE_CLOUD': {
                 'base_points': 16,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Above Ichimoku cloud - Price above kumo. Strong bullish signal. Trend confirmed. Enter/hold longs. Cloud acts as support. Green cloud ideal.'
         },
         'BELOW_CLOUD': {
                 'base_points': 16,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Below Ichimoku cloud - Price below kumo. Strong bearish signal. Downtrend confirmed. Enter/hold shorts. Cloud acts as resistance. Red cloud ideal.'
         },
         'IN_CLOUD': {
-                'points': 8
+                'points': 8,
+                'description': 'Inside Ichimoku cloud - Price in kumo. Neutral/consolidation. No clear trend. Wait for breakout above or breakdown below cloud. Choppy conditions.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 16,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish Ichimoku - Price above cloud. Uptrend confirmed by all Ichimoku components. Long positions favorable. Cloud support below.'
         },
         'BEARISH': {
                 'base_points': 16,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish Ichimoku - Price below cloud. Downtrend confirmed by all Ichimoku components. Short positions favorable. Cloud resistance above.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral Ichimoku - Price in cloud. Consolidation phase. No clear directional bias. Wait for cloud breakout before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate Ichimoku Cloud. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least (senkou_period + 10) candles for Ichimoku calculation. Wait for more price history.'
         }
 }
 )

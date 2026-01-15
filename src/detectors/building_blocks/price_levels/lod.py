@@ -29,35 +29,43 @@ import numpy as np
     valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'LOD_BOUNCE', 'AT_LOD', 'ABOVE_LOD', 'BELOW_LOD', 'ERROR'],
     signal_tiers={
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate LOD. Check data quality and timestamp availability.'
         },
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish LOD - Price bounced from yesterday\'s low. Long positions favorable. Support confirmed. Reversal setup.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish LOD - Price broke below yesterday\'s low. Short positions favorable. Breakdown confirmed. Support broken.'
         },
         'NEUTRAL': {
                 'max_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Neutral LOD - Price near yesterday\'s low equilibrium. Wait for bounce or breakdown confirmation.'
         },
         'LOD_BOUNCE': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'LOD bounce - Price bounced from yesterday\'s low. Confirmed reversal pattern. Enter longs. Support confirmed. Bullish setup.'
         },
         'AT_LOD': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'At LOD - Price testing yesterday\'s low. Key decision level. Watch for bounce or breakdown. High probability setup.'
         },
         'ABOVE_LOD': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Above LOD - Price above yesterday\'s low. LOD acting as support. Bullish bias. Range trades or continuation.'
         },
         'BELOW_LOD': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Below LOD - Price broke below yesterday\'s low. Bearish breakdown. Support broken. Downtrend continuation.'
         }
 }
 )

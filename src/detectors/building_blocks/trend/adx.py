@@ -44,57 +44,71 @@ import numpy as np
         # Granular uptrend signals
         'WEAK_UPTREND': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Weak uptrend - ADX <25, +DI > -DI. Emerging bullish bias but not strong. Not tradeable yet. Wait for ADX to strengthen above 25.'
         },
         'MODERATE_UPTREND': {
                 'base_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Moderate uptrend - ADX 25-50, +DI > -DI. Tradeable bullish trend. Enter longs. Good trend strength. Follow trend strategies.'
         },
         'STRONG_UPTREND': {
                 'base_points': 16,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Strong uptrend - ADX 50-75, +DI > -DI. Powerful bullish trend. Stay in longs aggressively. Optimal for trend-following. High conviction.'
         },
         'VERY_STRONG_UPTREND': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Very strong uptrend - ADX >75, +DI > -DI. Exceptional bullish momentum. Maximum position size. Ride trend. Rare powerful move.'
         },
         # Granular downtrend signals
         'WEAK_DOWNTREND': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Weak downtrend - ADX <25, -DI > +DI. Emerging bearish bias but not strong. Not tradeable yet. Wait for ADX to strengthen above 25.'
         },
         'MODERATE_DOWNTREND': {
                 'base_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Moderate downtrend - ADX 25-50, -DI > +DI. Tradeable bearish trend. Enter shorts. Good trend strength. Follow trend strategies.'
         },
         'STRONG_DOWNTREND': {
                 'base_points': 16,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Strong downtrend - ADX 50-75, -DI > +DI. Powerful bearish trend. Stay in shorts aggressively. Optimal for trend-following. High conviction.'
         },
         'VERY_STRONG_DOWNTREND': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Very strong downtrend - ADX >75, -DI > +DI. Exceptional bearish momentum. Maximum position size. Ride trend. Rare powerful move.'
         },
         'RANGING': {
-                'points': 0
+                'points': 0,
+                'description': 'Ranging market - ADX <10. No directional trend. Choppy consolidation. Avoid trend strategies. Wait for breakout. Use range-bound trading.'
         },
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 16,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish trend - ADX ≥25, +DI > -DI. Tradeable uptrend confirmed. Long positions favorable. Trend strength sufficient for entries.'
         },
         'BEARISH': {
                 'base_points': 16,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish trend - ADX ≥25, -DI > +DI. Tradeable downtrend confirmed. Short positions favorable. Trend strength sufficient for entries.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral/weak trend - ADX <25. No strong directional trend. Ranging or consolidating. Avoid trend trades until ADX strengthens.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate ADX. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least (period × 2) candles for ADX calculation. Wait for more price history.'
         }
 }
 )

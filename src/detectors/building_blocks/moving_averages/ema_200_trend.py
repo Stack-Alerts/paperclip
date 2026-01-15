@@ -42,44 +42,54 @@ import numpy as np
         # Granular cross events
         'BULLISH_CROSS': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish cross above 200 EMA - Major trend reversal. Long-term uptrend starting. Enter longs. Stop below 200 EMA.'
         },
         'BEARISH_CROSS': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish cross below 200 EMA - Major trend reversal. Long-term downtrend starting. Enter shorts. Stop above 200 EMA.'
         },
         # Granular position
         'ABOVE_200EMA': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Price above 200 EMA - Long-term bullish trend. Favor longs only. 200 EMA acts as support. Avoid shorts.'
         },
         'BELOW_200EMA': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Price below 200 EMA - Long-term bearish trend. Favor shorts only. 200 EMA acts as resistance. Avoid longs.'
         },
         'AT_200EMA': {
                 'base_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Price at 200 EMA - Major support/resistance test. Wait for breakout or rejection. Set stops beyond 200 EMA.'
         },
         # Simple signals
         'BULLISH': {
                 'base_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish 200 EMA trend - Above 200 EMA or bullish cross. Long positions favorable. Use 200 EMA as trailing stop.'
         },
         'BEARISH': {
                 'base_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish 200 EMA trend - Below 200 EMA or bearish cross. Short positions favorable. Use 200 EMA as trailing stop.'
         },
         'NEUTRAL': {
                 'max_points': 6,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Neutral 200 EMA - No clear long-term trend. Market ranging. Wait for decisive break above or below 200 EMA.'
         },
         # Status
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate 200 EMA. Check data quality and minimum period requirements.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 220 candles for 200 EMA calculation. Wait for more price history.'
         }
 }
 )

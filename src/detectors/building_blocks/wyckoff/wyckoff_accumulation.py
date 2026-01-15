@@ -118,42 +118,52 @@ import numpy as np
         # Wyckoff accumulation signals
         'SOS_BREAKOUT': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Sign of Strength breakout (Phase D) - Smart money buying. Price breaks above resistance with high volume. Accumulation complete. Enter longs aggressively. Markup phase begins.'
         },
         'SPRING_DETECTED': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Spring detected (Phase C) - False breakdown below support. Weak hands shaken out. Quick recovery. Major buying opportunity. Enter longs. Stop below spring low.'
         },
         'ACCUMULATION_PHASE_A': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Accumulation Phase A - Selling climax. High volume panic. Reversal beginning. Smart money absorbing supply. Early accumulation. Monitor for Phase B.'
         },
         'ACCUMULATION_PHASE_B': {
                 'base_points': 22,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Accumulation Phase B - Range building. Quiet consolidation. Smart money accumulating. Volume declining. Wait for Spring (Phase C) or SOS (Phase D) before entering.'
         },
         'NO_ACCUMULATION': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'No accumulation - Price trending. Not consolidating. No Wyckoff patterns detected. Use trend strategies instead. No accumulation opportunity.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish Wyckoff - Spring or SOS detected. Smart money accumulation confirmed. Long positions highly favorable. Major upside potential.'
         },
         'BEARISH': {
                 'base_points': 28,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish Wyckoff - Distribution patterns detected. Smart money distributing. Short positions favorable. Downside risk present.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral Wyckoff - In Phase B consolidation or no pattern. Wait for Spring/SOS signals before trading. Patient accumulation phase.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate Wyckoff accumulation. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 50+ candles for Wyckoff analysis. Wait for more price history.'
         }
 }
 )

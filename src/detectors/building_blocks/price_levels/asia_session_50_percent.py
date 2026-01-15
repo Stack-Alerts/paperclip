@@ -42,36 +42,44 @@ import numpy as np
         # Granular position signals
         'ABOVE_ASIA_50': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Above Asia 50% - Price above Asia session midpoint. Bullish bias. Asia highs target. Mean reversion down possible. ICT key level.'
         },
         'AT_ASIA_50': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'At Asia 50% - Price at Asia session equilibrium. Key decision level. High-probability bounce or rejection. Mean reversion target. ICT pivot.'
         },
         'BELOW_ASIA_50': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Below Asia 50% - Price below Asia session midpoint. Bearish bias. Asia lows target. Mean reversion up possible. ICT key level.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish Asia - Above or at Asia 50%. Long positions favorable. Asia session liquidity supporting price.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish Asia - Below Asia 50%. Short positions favorable. Asia session liquidity resisting price.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral Asia - At equilibrium. No clear bias from Asia session. Wait for direction.'
         },
         
         # Status
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate Asia session 50%. Check data quality and timestamp availability.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need Asia session data. Wait for Asia session completion.'
         }
 }
 )

@@ -41,29 +41,36 @@ import numpy as np
         # Pattern signals
         'BEARISH_BREAKDOWN': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Double top breakdown - Neckline support broken. Enter shorts aggressively. Target = neckline to peak distance projected down. Stop above second peak.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Double top forming - Two equal highs detected. Bearish reversal pattern. Wait for neckline breakdown. Prepare short entry on confirmation.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No double top - Pattern conditions not met. Need two similar peaks with proper spacing. Wait for pattern formation.'
         },
         
         # Simple directional - SIMPLE (bearish-only)
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish double top - Pattern forming or broken down. Short positions favorable. Classic reversal pattern. Use measured move for targets.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No double top pattern - Market not forming bearish reversal. Wait for two equal highs and neckline break before entering shorts.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect double top pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 30 candles for double top detection. Wait for more price history to form pattern.'
         }
 }
 )

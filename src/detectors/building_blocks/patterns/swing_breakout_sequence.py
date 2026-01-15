@@ -42,32 +42,39 @@ import numpy as np
     ],
     signal_tiers={
         # Pattern signals
-        'BEARISH_BREAKOUT_SEQUENCE': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
         'BULLISH_BREAKOUT_SEQUENCE': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish 5-point sequence confirmed - Two failed breakouts + liquidity trap (Point 4) + reversal pattern (Point 5). Enter longs. 70-78% win rate.'
+        },
+        'BEARISH_BREAKOUT_SEQUENCE': {
+                'base_points': 30,
+                'formula': 'scaled',
+                'description': 'Bearish 5-point sequence confirmed - Two failed breakdowns + liquidity trap (Point 4) + reversal pattern (Point 5). Enter shorts. 70-78% win rate.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish swing breakout - 5-point sequence from swing low. Long positions favorable. Wait for Point 5 reversal pattern before entry.'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish swing breakout - 5-point sequence from swing high. Short positions favorable. Wait for Point 5 reversal pattern before entry.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No swing breakout sequence - Pattern incomplete. Need 5 points: initial breakout, pullback, second breakout, liquidity trap, reversal pattern.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect swing breakout sequence. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 100 candles for swing breakout sequence detection. Wait for more price history.'
         }
 }
 )

@@ -45,30 +45,37 @@ import numpy as np
     signal_tiers={
         'BEARISH_DISPLACEMENT': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish displacement - Fast downmove rejecting consolidation. Strong bearish momentum. Enter shorts. Institutional selling. Trend acceleration down.'
         },
         'BULLISH_DISPLACEMENT': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish displacement - Fast upmove rejecting consolidation. Strong bullish momentum. Enter longs. Institutional buying. Trend acceleration up.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate displacement. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for displacement detection. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish displacement - Strong upward momentum detected. Long positions highly favorable. Institutional buying surge.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish displacement - Strong downward momentum detected. Short positions highly favorable. Institutional selling surge.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral displacement - No strong displacement. Wait for momentum surge or consolidation break.'
         }
 }
 )

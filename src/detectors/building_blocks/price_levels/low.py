@@ -41,45 +41,56 @@ import numpy as np
     signal_tiers={
         'ABOVE_LOW': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Above LOW - Price above weekly low. LOW acting as major support. Bullish bias. Support holding. Range trades or continuation.'
         },
         'AT_LOW': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'At LOW - Price testing weekly low. Key decision level. Watch for bounce or breakdown. High probability setup. Major support test.'
         },
         'BREAKDOWN_CONFIRMED': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'LOW breakdown confirmed - Price broke below weekly low. Strong bearish signal. Enter shorts. New weekly lows. Breakdown confirmed.'
         },
         'BREAKING_DOWN': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Breaking down LOW - Price attempting weekly low breakdown. Watch for confirmation. Potential bearish momentum. Key support test.'
         },
         'NO_LOW': {
-                'points': 0
+                'points': 0,
+                'description': 'No LOW - No weekly low detected. Wait for more price data or check calculation.'
         },
         'NO_LOW_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'No LOW data - Cannot calculate weekly low. Check data quality and availability.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate LOW. Check data quality and timestamp availability.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least one week of data for LOW calculation. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish LOW - Above weekly low or bouncing. Long positions favorable. Weekly support confirmed. Strong weekly bias up.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish LOW - Breaking down or below weekly low. Short positions favorable. Major support broken. Strong weekly momentum down.'
         },
         'NEUTRAL': {
                 'max_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Neutral LOW - Near weekly low equilibrium. Wait for bounce or breakdown confirmation. Key weekly decision point.'
         }
 }
 )

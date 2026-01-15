@@ -38,35 +38,43 @@ import numpy as np
         'ERROR', 'INSUFFICIENT_DATA'
     ],
     signal_tiers={
-        'NO_PATTERN': {
-                'points': 0
-        },
         'PATTERN_CONFIRMED': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Head & Shoulders confirmed - Neckline broken. Enter shorts aggressively. Target = pattern height below neckline. Stop above right shoulder. 75-82% success rate.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Head & Shoulders forming - Three peaks detected (left shoulder, head, right shoulder). Bearish reversal pattern. Wait for neckline break. Prepare short entry.'
+        },
+        'NO_PATTERN': {
+                'points': 0,
+                'description': 'No Head & Shoulders - Pattern conditions not met. Need three peaks with head higher than shoulders. Wait for pattern formation.'
         },
         
         # Simple directional - SIMPLE
-        'BULLISH': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish H&S pattern - Classic topping pattern detected. Short positions favorable. Major trend reversal signal. Use measured move for targets.'
+        },
+        'BULLISH': {
+                'base_points': 30,
+                'formula': 'scaled',
+                'description': 'Bullish (inverse scenario) - Rare for standard H&S. Pattern typically bearish. Verify if inverse H&S pattern instead.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No Head & Shoulders pattern - Market not forming bearish reversal. Wait for three-peak formation with neckline before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect Head & Shoulders pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 40 candles for H&S detection. Wait for more price history to form three-peak pattern.'
         }
 }
 )
