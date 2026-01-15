@@ -185,7 +185,7 @@ class WyckoffAccumulation:
     def __init__(self, timeframe: str = '15min', 
                  range_lookback: int = 50,           # Iteration 3: 100 → 50 (shorter period!)
                  volume_lookback: int = 50,
-                 range_threshold_pct: float = 5.0,   # Iteration 3: 7% → 5% (VERY tight!)
+                 range_threshold_pct: float = 10.0,  # RELAXED: 5% → 10% to allow spring/SOS detection
                  spring_breakdown_pct: float = 2.0,  # Keep relaxed
                  spring_volume_ratio: float = 0.90,  # Keep relaxed
                  sos_breakout_pct: float = 2.0,      # Keep relaxed
@@ -350,29 +350,31 @@ class WyckoffAccumulation:
         if len(df) < 10 or support_level == 0:
             return False, 0
         
-        # Check for breakdown below support in last 10 bars (optimized threshold)
-        recent_lows = df['low'].iloc[-10:]
+        # Check for breakdown in recent range period (not just last 20)
+        # Use last 50 bars to match range detection
+        lookback_bars = min(50, len(df))
+        recent_lows = df['low'].iloc[-lookback_bars:]
         breakdown_threshold = 1.0 - (self.spring_breakdown_pct / 100.0)
         broke_support = recent_lows.min() < support_level * breakdown_threshold
         
         if not broke_support:
             return False, 0
         
-        # Volume should be LOWER (weak hands, not institutional) - optimized ratio
-        volume_avg = df['volume'].iloc[-50:-10].mean()
-        breakdown_volume = df['volume'].iloc[-10:].mean()
-        low_volume_breakdown = breakdown_volume < volume_avg * self.spring_volume_ratio
+        # RELAXED: Volume check is optional (many springs don't have low volume)  
+        volume_avg = df['volume'].iloc[-lookback_bars-10:-10].mean() if len(df) > lookback_bars+10 else df['volume'].mean()
+        breakdown_volume = df['volume'].iloc[-lookback_bars:].mean()
+        low_volume_breakdown = breakdown_volume < volume_avg * 1.1  # Very relaxed (110%)
         
         # Quick recovery back above support
         current_price = df['close'].iloc[-1]
-        recovered = current_price > support_level
+        recovered = current_price > support_level * 0.998  # Allow slight below (0.2%)
         
-        if broke_support and low_volume_breakdown and recovered:
-           # SPRING DETECTED - Major buying opportunity!
-            return True, 90
-        elif broke_support and recovered:
-            # Recovered but volume not ideal
-            return True, 75
+        if broke_support and recovered:
+            # Spring detected! Confidence based on volume
+            if low_volume_breakdown:
+                return True, 85  # Perfect spring
+            else:
+                return True, 70  # Spring with higher volume (still valid)
         
         return False, 0
     
@@ -386,29 +388,31 @@ class WyckoffAccumulation:
         if len(df) < 10 or resistance_level == 0:
             return False, 0
         
-        # Check for breakout above resistance (optimized threshold)
-        recent_highs = df['high'].iloc[-10:]
+        # Check for breakout in recent range period (not just last 20)
+        # Use last 50 bars to match range detection
+        lookback_bars = min(50, len(df))
+        recent_highs = df['high'].iloc[-lookback_bars:]
         breakout_threshold = 1.0 + (self.sos_breakout_pct / 100.0)
         broke_resistance = recent_highs.max() > resistance_level * breakout_threshold
         
         if not broke_resistance:
             return False, 0
         
-        # Volume should be HIGH (institutional buying) - optimized ratio
-        volume_avg = df['volume'].iloc[-50:-10].mean()
-        breakout_volume = df['volume'].iloc[-10:].mean()
-        high_volume_breakout = breakout_volume > volume_avg * self.sos_volume_ratio
+        # RELAXED: Volume check is optional (many breakouts occur without high volume initially)
+        volume_avg = df['volume'].iloc[-lookback_bars-10:-10].mean() if len(df) > lookback_bars+10 else df['volume'].mean()
+        breakout_volume = df['volume'].iloc[-lookback_bars:].mean()
+        high_volume_breakout = breakout_volume > volume_avg * 1.0  # Relaxed to equal (100%)
         
         # Sustained move (close above resistance)
         current_price = df['close'].iloc[-1]
-        sustained = current_price > resistance_level * 1.002
+        sustained = current_price > resistance_level * 0.998  # Allow slight below (0.2%)
         
-        if broke_resistance and high_volume_breakout and sustained:
-            # SOS DETECTED - Breakout confirmed!
-            return True, 85
-        elif broke_resistance and sustained:
-            # Breakout but volume not ideal
-            return True, 70
+        if broke_resistance and sustained:
+            # SOS detected! Confidence based on volume
+            if high_volume_breakout:
+                return True, 85  # Perfect SOS with volume
+            else:
+                return True, 70  # SOS without volume confirmation (still valid)
         
         return False, 0
     
@@ -465,11 +469,14 @@ class WyckoffAccumulation:
         
         # Detect Wyckoff events (now on 2HR data!)
         selling_climax, sc_conf = self.detect_selling_climax(df)
-        in_range, range_conf, support = self.detect_range(df)
+        in_range, range_conf, support_from_range = self.detect_range(df)
         
-        # Calculate resistance for SOS detection
-        resistance = df['high'].iloc[-self.range_lookback:].max() if in_range else 0
+        # CRITICAL FIX: ALWAYS calculate support/resistance (not just when in_range)
+        # Spring and SOS can occur outside of ranges (exits from past ranges)
+        support = df['low'].iloc[-self.range_lookback:].min() if support_from_range == 0 else support_from_range
+        resistance = df['high'].iloc[-self.range_lookback:].max()
         
+        # Check spring/SOS ALWAYS using calculated support/resistance
         spring, spring_conf = self.detect_spring(df, support)
         sos, sos_conf = self.detect_sign_of_strength(df, resistance)
         
