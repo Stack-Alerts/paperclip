@@ -132,6 +132,17 @@ class TrailingStop:
         ]
         self.test_threshold = test_threshold
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if 'LONG' in granular:
+            simple = 'BULLISH'  # Long stops = bullish context
+        elif 'SHORT' in granular:
+            simple = 'BEARISH'  # Short stops = bearish context
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
         Analyze dataframe for trailing stop levels and signals.
@@ -141,20 +152,32 @@ class TrailingStop:
         # Validation
         required_cols = {'open', 'high', 'low', 'close', 'timestamp'}
         if not required_cols.issubset(df.columns):
+            granular_signal, simple_signal = self._determine_dual_signals('ERROR')
             return {
-                'signal': 'ERROR',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': 'Missing required columns'
+                },
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
         
         if len(df) < self.atr_period + 10:
+            granular_signal, simple_signal = self._determine_dual_signals('INSUFFICIENT_DATA')
             return {
-                'signal': 'INSUFFICIENT_DATA',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': f'Need at least {self.atr_period + 10} bars'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': f'Need at least {self.atr_period + 10} bars'
+                },
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -292,10 +315,15 @@ class TrailingStop:
         else:
             confidence = 60
         
+        granular_signal, simple_signal = self._determine_dual_signals('LONG_STOP_TEST')
+        
         return {
-            'signal': 'LONG_STOP_TEST',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'tested_level': level,
                 'level_name': ['Tight', 'Standard', 'Balanced', 'Wide'][level],
                 'stop_long_0': round(stops_long[0], 2),
@@ -340,10 +368,15 @@ class TrailingStop:
         else:
             confidence = 60
         
+        granular_signal, simple_signal = self._determine_dual_signals('SHORT_STOP_TEST')
+        
         return {
-            'signal': 'SHORT_STOP_TEST',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'tested_level': level,
                 'level_name': ['Tight', 'Standard', 'Balanced', 'Wide'][level],
                 'stop_short_0': round(stops_short[0], 2),
@@ -376,10 +409,14 @@ class TrailingStop:
         atr: float
     ) -> Dict[str, Any]:
         """Generate signal when holding above long stop."""
+        granular_signal, simple_signal = self._determine_dual_signals('LONG_STOP_HOLD')
         return {
-            'signal': 'LONG_STOP_HOLD',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 55,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'stop_long_0': round(stops_long[0], 2),
                 'stop_long_1': round(stops_long[1], 2),
                 'stop_long_2': round(stops_long[2], 2),
@@ -406,10 +443,14 @@ class TrailingStop:
         atr: float
     ) -> Dict[str, Any]:
         """Generate signal when holding below short stop."""
+        granular_signal, simple_signal = self._determine_dual_signals('SHORT_STOP_HOLD')
         return {
-            'signal': 'SHORT_STOP_HOLD',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 55,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'stop_short_0': round(stops_short[0], 2),
                 'stop_short_1': round(stops_short[1], 2),
                 'stop_short_2': round(stops_short[2], 2),
@@ -436,10 +477,14 @@ class TrailingStop:
         atr: float
     ) -> Dict[str, Any]:
         """Generate neutral signal."""
+        granular_signal, simple_signal = self._determine_dual_signals('NEUTRAL')
         return {
-            'signal': 'NEUTRAL',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 50,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'stop_long_2': round(stops_long[2], 2),
                 'stop_short_2': round(stops_short[2], 2),
                 'atr': round(atr, 2),
