@@ -129,6 +129,12 @@ class PowerHourTrends:
         self.start_time = time(power_hour_start, 0)
         self.end_time = time(power_hour_end, 0)
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        simple = 'NEUTRAL'
+        return granular, simple
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
         Analyze dataframe for power hour trends.
@@ -425,10 +431,14 @@ class PowerHourTrends:
         current_price: float
     ) -> Dict[str, Any]:
         """Generate signal when insufficient power hours."""
+        granular_signal, simple_signal = self._determine_dual_signals('INSUFFICIENT_POWER_HOURS')
         return {
-            'signal': 'INSUFFICIENT_POWER_HOURS',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 0,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'current_price': round(current_price, 2),
                 'error': f'Need {self.sessions_memory} power hour sessions',
                 'is_new_event': False,
