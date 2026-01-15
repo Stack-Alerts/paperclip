@@ -185,7 +185,7 @@ class WyckoffAccumulation:
     def __init__(self, timeframe: str = '15min', 
                  range_lookback: int = 50,           # Iteration 3: 100 → 50 (shorter period!)
                  volume_lookback: int = 50,
-                 range_threshold_pct: float = 10.0,  # RELAXED: 5% → 10% to allow spring/SOS detection
+                 range_threshold_pct: float = 5.0,   # Optimized for 2HR (30% Phase B, not 73%!)
                  spring_breakdown_pct: float = 1.0,  # RELAXED: 2% → 1% for crypto volatility
                  spring_volume_ratio: float = 0.90,  # Keep relaxed
                  sos_breakout_pct: float = 1.0,      # RELAXED: 2% → 1% for crypto volatility
