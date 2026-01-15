@@ -31,32 +31,16 @@ import numpy as np
     class_name='ATR',
     default_weight=10,
     valid_signals=[
-        # Granular volatility regime signals
-        'EXPANDING', 'CONTRACTING', 'STABLE',
-        # Granular volatility level signals (absolute)
+        # Granular volatility level signals (absolute) - PRIMARY SIGNALS
         'EXTREME', 'VERY_HIGH', 'HIGH', 'NORMAL', 'CALM',
-        # Granular volatility level signals (percentile-based)
+        # Granular volatility level signals (percentile-based) - EMITTED AFTER WARM-UP
         'EXTREME_HIGH', 'EXTREME_LOW', 'VERY_LOW',
         # Simple directional - SIMPLE
         'BULLISH', 'BEARISH', 'NEUTRAL',
-        # Status
+        # Status (conditional)
         'ERROR', 'INSUFFICIENT_DATA'
     ],
     signal_tiers={
-        # Volatility regime signals
-        'EXPANDING': {
-                'base_points': 10,
-                'formula': 'scaled'
-        },
-        'CONTRACTING': {
-                'base_points': 10,
-                'formula': 'scaled'
-        },
-        'STABLE': {
-                'base_points': 8,
-                'formula': 'scaled'
-        },
-        
         # Volatility level signals (absolute)
         'EXTREME': {
                 'base_points': 10,
