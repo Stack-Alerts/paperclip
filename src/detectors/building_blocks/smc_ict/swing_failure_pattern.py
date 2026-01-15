@@ -46,30 +46,37 @@ import numpy as np
     signal_tiers={
         'BEARISH_SFP': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish SFP - Swing failure pattern bearish. Failed breakout up then reversal. Enter shorts. Stop hunt complete. Liquidity grabbed. Reversal confirmed.'
         },
         'BULLISH_SFP': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish SFP - Swing failure pattern bullish. Failed breakdown then reversal. Enter longs. Stop hunt complete. Liquidity grabbed. Reversal confirmed.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate swing failure pattern. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for SFP detection. Wait for more price history and swing points.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish SFP - Bullish swing failure detected. Long positions highly favorable. Failed low, reversal up. Stop hunt complete.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish SFP - Bearish swing failure detected. Short positions highly favorable. Failed high, reversal down. Stop hunt complete.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral SFP - No swing failure patterns detected. Wait for failed breakouts or stop hunts.'
         }
 }
 )

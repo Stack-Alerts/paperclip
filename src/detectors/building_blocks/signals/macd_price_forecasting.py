@@ -47,30 +47,37 @@ from collections import deque
     signal_tiers={
         'BEARISH_FORECAST': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish MACD forecast - MACD prediction shows bearish trend. Downside momentum forecasted. Enter shorts or take profit on longs. Machine learning price prediction bearish.'
         },
         'BULLISH_FORECAST': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish MACD forecast - MACD prediction shows bullish trend. Upside momentum forecasted. Enter longs or take profit on shorts. Machine learning price prediction bullish.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate MACD forecasting. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for MACD calculation and forecasting. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish MACD - MACD forecast shows upside. Momentum prediction bullish. Long positions favorable. ML-predicted uptrend.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish MACD - MACD forecast shows downside. Momentum prediction bearish. Short positions favorable. ML-predicted downtrend.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral MACD - No clear MACD forecast direction. No momentum prediction. Wait for clearer signals.'
         }
 }
 )

@@ -42,36 +42,44 @@ import numpy as np
         # Granular position signals
         'ABOVE_SETTLEMENT': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Above settlement - Price above CME settlement (4 PM ET). Bullish bias. Institutional buying. Premium to futures. Long favorable.'
         },
         'BELOW_SETTLEMENT': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Below settlement - Price below CME settlement (4 PM ET). Bearish bias. Institutional selling. Discount to futures. Short favorable.'
         },
         'AT_SETTLEMENT': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'At settlement - Price at CME settlement equilibrium. Key institutional level. Watch for bounce or rejection. High-probability setup. Futures alignment.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish settlement - Above or testing settlement from above. Long positions favorable. Institutional support present.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish settlement - Below settlement. Short positions favorable. Institutional resistance overhead. Futures discount.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral settlement - At equilibrium. No clear bias from settlement. Wait for direction or institutional activity.'
         },
         
         # Status
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate US settlement. Check data quality and timestamp availability.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need settlement time data. Wait for 4 PM ET settlement calculation.'
         }
 }
 )

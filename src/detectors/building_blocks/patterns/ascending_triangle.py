@@ -42,33 +42,41 @@ import numpy as np
         # Pattern signals
         'BULLISH_BREAKOUT': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Ascending triangle breakout - Resistance broken with volume. Enter longs aggressively. Target = pattern height. Stop below support line. 72% success rate.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Ascending triangle forming - Rising lows + flat resistance. Bullish continuation pattern. Wait for breakout above resistance. Prepare long entry.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No ascending triangle - Pattern conditions not met. No rising lows or flat resistance detected. Wait for pattern formation.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish triangle pattern - Ascending triangle detected or broken out. Long positions favorable. Use resistance breakout for entry.'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish triangle (rare) - Unexpected breakdown from ascending triangle. Exit longs immediately. Consider short with tight stop.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No triangle pattern - Market structure unclear. No ascending triangle setup. Wait for pattern formation before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 15 candles for ascending triangle detection. Wait for more price history.'
         }
 }
 )

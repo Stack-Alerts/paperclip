@@ -39,39 +39,48 @@ import numpy as np
     ],
     signal_tiers={
         # Pattern signals
-        'BEARISH_BREAKOUT': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
         'BULLISH_BREAKOUT': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish pennant breakout - Upper triangle broken after consolidation. Enter longs aggressively. Target = pole height projected up. 65% success rate.'
+        },
+        'BEARISH_BREAKOUT': {
+                'base_points': 30,
+                'formula': 'scaled',
+                'description': 'Bearish pennant breakout - Lower triangle broken after consolidation. Enter shorts aggressively. Target = pole height projected down. 65% success rate.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Pennant forming - Strong move (pole) followed by converging triangle. Continuation pattern. Wait for breakout. Volume declining typical.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No pennant pattern - Missing strong directional move or converging triangle. Wait for pole and pennant formation.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish pennant pattern - Upward pole with converging consolidation. Long positions favorable. Bullish continuation expected. Use pole height for targets.'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish pennant pattern - Downward pole with converging consolidation. Short positions favorable. Bearish continuation expected. Use pole height for targets.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No pennant pattern - Market not forming continuation pattern. Wait for strong move followed by converging triangle before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect pennant pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 50 candles for pennant detection. Wait for more price history to form pattern.'
         }
 }
 )

@@ -38,37 +38,47 @@ import numpy as np
         'ERROR', 'INSUFFICIENT_DATA'
     ],
     signal_tiers={
+    signal_tiers={
         # Pattern signals
         'BEARISH_BREAKDOWN': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Triple top breakdown - Neckline broken. Enter shorts aggressively. Three tests of resistance confirmed. Target = pattern height below neckline. 70%+ success rate.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Triple top forming - Three similar peaks detected. Bearish reversal pattern. Wait for neckline break. Multiple resistance tests strengthen pattern.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No triple top - Pattern conditions not met. Need exactly 3 similar peaks with proper spacing. Wait for pattern formation.'
         },
         
         # Simple directional - SIMPLE
-        'BULLISH': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish triple top - Classic topping pattern. Short positions favorable. Strong resistance confirmed by triple test. Major reversal signal.'
+        },
+        'BULLISH': {
+                'base_points': 30,
+                'formula': 'scaled',
+                'description': 'Bullish (inverse scenario) - Triple top typically bearish. Verify pattern structure. Pattern indicates strong resistance level.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No triple top - Market not forming bearish reversal. Wait for three similar peaks with neckline before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect triple top pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 40 candles for triple top detection. Wait for more price history to form three-peak pattern.'
         }
+}
 }
 )
 class TripleTopPattern:

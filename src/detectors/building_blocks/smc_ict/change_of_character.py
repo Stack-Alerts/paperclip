@@ -41,29 +41,36 @@ import numpy as np
     signal_tiers={
         'BEARISH_CHOCH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish CHOCH - Change of character bearish. Early reversal signal. Uptrend weakening. Enter shorts. Market character shift. Trend exhaustion.'
         },
         'BULLISH_CHOCH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish CHOCH - Change of character bullish. Early reversal signal. Downtrend weakening. Enter longs. Market character shift. Trend exhaustion.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate change of character. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for CHOCH detection. Wait for more price history.'
         },
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish CHOCH - Bullish change of character detected. Long positions favorable. Early reversal up. Downtrend weakness showing.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish CHOCH - Bearish change of character detected. Short positions favorable. Early reversal down. Uptrend weakness showing.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral CHOCH - No change of character. Wait for trend weakness or reversal signals.'
         }
 }
 )

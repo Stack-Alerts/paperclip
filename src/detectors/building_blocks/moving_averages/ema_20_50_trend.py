@@ -42,39 +42,48 @@ import numpy as np
         # Granular trend states
         'STRONG_UPTREND': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Strong uptrend - Price > Fast EMA > Slow EMA. Perfect bullish alignment. Add to longs. Trail stops below fast EMA.'
         },
         'EARLY_UPTREND': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Early uptrend - Price above fast EMA, awaiting slow EMA cross. Early bullish signal. Consider long entry. Stop below fast EMA.'
         },
         'STRONG_DOWNTREND': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Strong downtrend - Price < Fast EMA < Slow EMA. Perfect bearish alignment. Add to shorts. Trail stops above fast EMA.'
         },
         'EARLY_DOWNTREND': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Early downtrend - Price below fast EMA, awaiting slow EMA cross. Early bearish signal. Consider short entry. Stop above fast EMA.'
         },
         # Simple signals
         'BULLISH': {
                 'base_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish EMA trend - Fast above slow or strong uptrend. Long positions favorable. Use fast EMA as support.'
         },
         'BEARISH': {
                 'base_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish EMA trend - Fast below slow or strong downtrend. Short positions favorable. Use fast EMA as resistance.'
         },
         'NEUTRAL': {
                 'max_points': 6,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Neutral EMA trend - EMAs converging or mixed alignment. No clear trend. Wait for alignment before entering.'
         },
         # Status
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate EMAs. Check data quality and EMA period configuration.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 55 candles for EMA calculation. Wait for more price history.'
         }
 }
 )

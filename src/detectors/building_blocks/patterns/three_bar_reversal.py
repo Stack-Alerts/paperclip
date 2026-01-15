@@ -43,29 +43,36 @@ import numpy as np
         # Granular signals
         'BULLISH_3BAR': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish 3-bar reversal - Bar 3 made new low but closed higher. Bullish reversal confirmed. Enter longs. Stop below Bar 3 low.'
         },
         'BEARISH_3BAR': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish 3-bar reversal - Bar 3 made new high but closed lower. Bearish reversal confirmed. Enter shorts. Stop above Bar 3 high.'
         },
         # Simple directional
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish 3-bar pattern - Short-term reversal signal to upside. Long positions favorable. Quick reversal pattern (3 candles).'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish 3-bar pattern - Short-term reversal signal to downside. Short positions favorable. Quick reversal pattern (3 candles).'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No 3-bar reversal - Pattern conditions not met. Need 3 candles with trend continuation then reversal close.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect 3-bar reversal. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least minimum bars for 3-bar reversal detection. Wait for more price history.'
         }
 }
 )

@@ -41,30 +41,37 @@ import numpy as np
     signal_tiers={
         'BEARISH_MITIGATION': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish mitigation - Order block tested bearish. Institutional resistance tested. Enter shorts. Unfilled orders present. Reversal zone.'
         },
         'BULLISH_MITIGATION': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish mitigation - Order block tested bullish. Institutional support tested. Enter longs. Unfilled orders present. Reversal zone.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate mitigation block. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for mitigation detection. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish mitigation - Bullish order block tested. Long positions favorable. Institutional support zone. High probability bounce.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish mitigation - Bearish order block tested. Short positions favorable. Institutional resistance zone. High probability rejection.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral mitigation - No order block tests detected. Wait for institutional zones or key level tests.'
         }
 }
 )

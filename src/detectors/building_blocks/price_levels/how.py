@@ -41,35 +41,43 @@ import numpy as np
     signal_tiers={
         'BELOW_HOW': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Below HOW - Price below weekly high. HOW acting as major resistance. Wait for breakout confirmation or range trades.'
         },
         'BREAKING_OUT': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Breaking out HOW - Price attempting weekly high breakout. Watch for confirmation. Potential bullish momentum. Key resistance test.'
         },
         'BREAKOUT_CONFIRMED': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'HOW breakout confirmed - Price broke above weekly high. Strong bullish signal. Enter longs. New weekly highs. Momentum confirmed.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate HOW. Check data quality and timestamp availability.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least one week of data for HOW calculation. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish HOW - Breaking out or above weekly high. Long positions favorable. Strong weekly momentum confirmed.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish HOW - Below weekly high. Short positions favorable or wait. Major resistance overhead. Weekly range bound.'
         },
         'NEUTRAL': {
                 'max_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Neutral HOW - Near weekly high equilibrium. Wait for breakout or rejection confirmation. Key decision point.'
         }
 }
 )

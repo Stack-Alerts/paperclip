@@ -41,29 +41,36 @@ import numpy as np
         # Pattern signals
         'BULLISH_BREAKOUT': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Falling wedge breakout - Resistance broken with compression release. Enter longs aggressively. Bullish reversal confirmed. Target = wedge height projection.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Falling wedge forming - Converging falling highs and lows. Bullish reversal pattern. Wait for upside breakout. Volume declining into apex.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No falling wedge - Pattern conditions not met. No converging falling trendlines detected. Wait for pattern formation.'
         },
         
         # Simple directional - SIMPLE (falling wedge = bullish only!)
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish falling wedge - Pattern forming or broken out. Long positions favorable. Classic bullish reversal. 68% success rate.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No falling wedge pattern - Market not forming bullish reversal. Wait for converging falling wedge before entering longs.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect falling wedge pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 50 candles for falling wedge detection. Wait for more price history to form pattern.'
         }
 }
 )

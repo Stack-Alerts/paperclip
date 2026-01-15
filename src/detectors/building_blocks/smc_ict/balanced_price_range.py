@@ -42,32 +42,40 @@ import numpy as np
         # Granular signals
         'IN_RANGE_LOW': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'In range low - Price in lower half of balanced price range. Bullish setup. Buy at discount. Mean reversion up expected. ICT accumulation zone.'
         },
         'IN_RANGE_HIGH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'In range high - Price in upper half of balanced price range. Bearish setup. Sell at premium. Mean reversion down expected. ICT distribution zone.'
         },
         'NOT_IN_RANGE': {
-                'points': 0
+                'points': 0,
+                'description': 'Not in range - Price outside balanced price range. No range setups. Wait for reentry or new range formation.'
         },
         # Simple directional
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish range - In lower half of balance. Long positions favorable. Discount pricing. Mean reversion up.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish range - In upper half of balance. Short positions favorable. Premium pricing. Mean reversion down.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral range - Outside balanced price range. No clear bias. Wait for range reentry.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate balanced price range. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for range detection. Wait for more price history.'
         }
 }
 )

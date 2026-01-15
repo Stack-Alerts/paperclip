@@ -41,29 +41,36 @@ import numpy as np
         # Pattern signals
         'BULLISH_BREAKOUT': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Double bottom breakout - Neckline resistance broken. Enter longs aggressively. Target = neckline to trough distance projected up. Stop below second trough.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Double bottom forming - Two equal lows detected. Bullish reversal pattern. Wait for neckline breakout. Prepare long entry on confirmation.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No double bottom - Pattern conditions not met. Need two similar troughs with proper spacing. Wait for pattern formation.'
         },
         
         # Simple directional - SIMPLE (bullish-only)
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish double bottom - Pattern forming or broken out. Long positions favorable. Classic reversal pattern. Use measured move for targets.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No double bottom pattern - Market not forming bullish reversal. Wait for two equal lows and neckline break before entering.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect double bottom pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 30 candles for double bottom detection. Wait for more price history to form pattern.'
         }
 }
 )

@@ -41,33 +41,41 @@ import numpy as np
         # Pattern signals
         'BULLISH_BREAKOUT': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Triple bottom breakout - Neckline broken. Enter longs aggressively. Three tests of support confirmed. Target = pattern height above neckline. 70%+ success rate.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Triple bottom forming - Three similar troughs detected. Bullish reversal pattern. Wait for neckline break. Multiple support tests strengthen pattern.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No triple bottom - Pattern conditions not met. Need exactly 3 similar troughs with proper spacing. Wait for pattern formation.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish triple bottom - Classic bottoming pattern. Long positions favorable. Strong support confirmed by triple test. Major reversal signal.'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish (inverse scenario) - Triple bottom typically bullish. Verify pattern structure. Pattern indicates strong support level.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No triple bottom - Market not forming bullish reversal. Wait for three similar troughs with neckline before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect triple bottom pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 40 candles for triple bottom detection. Wait for more price history to form three-trough pattern.'
         }
 }
 )

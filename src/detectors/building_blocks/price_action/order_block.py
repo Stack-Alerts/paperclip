@@ -42,33 +42,41 @@ from src.utils.advanced_data_loader import advanced_data
     signal_tiers={
         'BEARISH_OB': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish order block - Institutional selling zone. Last up-candle before downmove. Enter shorts on retest. Smart money distribution. High probability resistance.'
         },
         'BULLISH_OB': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish order block - Institutional buying zone. Last down-candle before upmove. Enter longs on retest. Smart money accumulation. High probability support.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate order blocks. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 10 bars for order block detection. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish OB - Bullish order block detected. Long positions highly favorable. Institutional buy zone. Support likely to hold.'
         },
         'BEARISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish OB - Bearish order block detected. Short positions highly favorable. Institutional sell zone. Resistance likely to hold.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral OB - Not at order block zone currently. Wait for price to retest OB or new OB to form.'
         },
         'NO_OB': {
-                'points': 0
+                'points': 0,
+                'description': 'No OB - No order blocks detected. No institutional zones. No OB setups available.'
         }
 }
 )

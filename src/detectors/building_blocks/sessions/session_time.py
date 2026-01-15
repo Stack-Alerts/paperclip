@@ -49,37 +49,46 @@ import numpy as np
         # Simple time quality signals
         'ACTIVE': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Active trading session - Good trading window. Major session open. Liquidity high. Take quality setups.'
         },
         'INACTIVE': {
-                'points': 0
+                'points': 0,
+                'description': 'Inactive session - Outside major trading hours. Low liquidity. Avoid trading. Wait for active session.'
         },
         'NO_SIGNAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No session signal - Cannot determine session quality. Default to manual time management.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate session time. Check timestamp data availability.'
         },
         
         # Granular session signals
         'PEAK_HOURS': {
                 'base_points': 18,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Peak hours (13:00-16:00 UTC) - London/NY overlap. Maximum liquidity. Explosive moves. Optimal trading window. Highest probability.'
         },
         'ACTIVE_SESSION': {
                 'base_points': 15,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Active session - London or New York open. High volume and volatility. Good trading conditions. Take quality setups.'
         },
         'MODERATE_SESSION': {
                 'base_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Moderate session - Asian hours. Moderate activity. Range-bound typically. Trade with caution. Smaller positions.'
         },
         'QUIET_SESSION': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Quiet session - Sydney hours. Low volume. Minimal volatility. Very tight ranges. Avoid most trades.'
         },
         'OFF_SESSION': {
-                'points': 0
+                'points': 0,
+                'description': 'Off-session - Between major sessions. Very low activity. Avoid trading. Wait for London or NY open.'
         }
 }
 )

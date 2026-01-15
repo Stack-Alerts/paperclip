@@ -42,33 +42,41 @@ from src.utils.advanced_data_loader import advanced_data
     signal_tiers={
         'BEARISH_FVG': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish Fair Value Gap - Price inefficiency from fast downmove. Gap unfilled. Enter shorts on retest. Institutional selling imbalance. Gap acts as resistance. Fill likely.'
         },
         'BULLISH_FVG': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish Fair Value Gap - Price inefficiency from fast upmove. Gap unfilled. Enter longs on retest. Institutional buying imbalance. Gap acts as support. Fill likely.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate Fair Value Gaps. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 10 bars for FVG detection. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish FVG - Bullish Fair Value Gap detected. Long positions favorable. Price inefficiency upside. Gap support likely.'
         },
         'BEARISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish FVG - Bearish Fair Value Gap detected. Short positions favorable. Price inefficiency downside. Gap resistance likely.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral FVG - Not in FVG zone currently. Wait for price to retest gaps or new gaps to form.'
         },
         'NO_FVG': {
-                'points': 0
+                'points': 0,
+                'description': 'No FVG - No Fair Value Gaps detected. No price inefficiencies. No gap setups available.'
         }
 }
 )

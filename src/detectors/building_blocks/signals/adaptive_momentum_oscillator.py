@@ -57,38 +57,47 @@ class SignalType(Enum):
     signal_tiers={
         'BEARISH_CROSS': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish momentum cross - Adaptive momentum crossed below signal line. Downside momentum building. Enter shorts or take profit on longs. Adaptive smoothing reduces false signals.'
         },
         'BEARISH_DIVERGENCE': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish momentum divergence - Price making higher highs but momentum making lower highs. Uptrend losing strength. Reversal warning. Take profit on longs. Prepare shorts.'
         },
         'BULLISH_CROSS': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish momentum cross - Adaptive momentum crossed above signal line. Upside momentum building. Enter longs or take profit on shorts. Adaptive smoothing reduces false signals.'
         },
         'BULLISH_DIVERGENCE': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish momentum divergence - Price making lower lows but momentum making higher lows. Downtrend losing strength. Reversal warning. Take profit on shorts. Prepare longs.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate adaptive momentum oscillator. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for momentum calculation. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish momentum - Adaptive momentum showing upside. Cross or divergence detected. Long positions favorable. Momentum confirming uptrend.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish momentum - Adaptive momentum showing downside. Cross or divergence detected. Short positions favorable. Momentum confirming downtrend.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral momentum - No significant momentum signals. No crosses or divergences detected. Wait for clearer momentum direction.'
         }
 }
 )

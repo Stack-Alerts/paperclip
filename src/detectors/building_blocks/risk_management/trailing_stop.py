@@ -50,39 +50,48 @@ import numpy as np
         # Granular risk signals
         'STOP_TRIGGERED': {
                 'base_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Stop triggered - Price hit trailing stop level. Exit position immediately. Protect capital. Move to next opportunity.'
         },
         'STOP_UPDATED': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Stop updated - Trailing stop moved higher/lower. Lock in profits. Position still valid. Tighten risk management.'
         },
         'STOP_ACTIVE': {
                 'base_points': 5,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Stop active - Trailing stop in place. Monitor position. Price healthy distance from stop. Continue trade management.'
         },
         'NO_STOP': {
-                'points': 0
+                'points': 0,
+                'description': 'No stop - No trailing stop signal. Set appropriate stops manually. Risk management required.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish stop context - Long stop levels active. Hold long positions. Price above trailing stop. Uptrend protected.'
         },
         'BEARISH': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish stop context - Short stop levels active. Hold short positions. Price below trailing stop. Downtrend protected.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral stop - Between stop levels. No clear risk signal. Manual risk management needed. Wait for directional clarity.'
         },
         
         # Status
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate trailing stops. Check data quality and ATR calculation.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least (ATR period + 10) candles for trailing stop calculation. Wait for more price history.'
         }
 }
 )

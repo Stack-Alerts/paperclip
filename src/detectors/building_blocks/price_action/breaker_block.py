@@ -41,33 +41,41 @@ import numpy as np
     signal_tiers={
         'BEARISH_BREAKER': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish breaker block - Failed bullish order block broken down. Market structure shift. Institutional selling zone. Enter shorts on retest. Reversal confirmed. High probability.'
         },
         'BULLISH_BREAKER': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish breaker block - Failed bearish order block broken up. Market structure shift. Institutional buying zone. Enter longs on retest. Reversal confirmed. High probability.'
         },
         'NO_BREAKER': {
-                'points': 0
+                'points': 0,
+                'description': 'No breaker block - No failed order blocks detected. No market structure shift. No breaker setups available.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate breaker blocks. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for breaker block detection. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish breaker - Bullish breaker block detected. Market structure shift to upside. Long positions highly favorable. Failed bearish OB now support.'
         },
         'BEARISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish breaker - Bearish breaker block detected. Market structure shift to downside. Short positions highly favorable. Failed bullish OB now resistance.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral breaker - No breaker blocks detected. No market structure shifts. Wait for failed order blocks.'
         }
 }
 )

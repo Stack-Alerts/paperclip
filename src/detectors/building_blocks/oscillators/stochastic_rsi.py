@@ -41,42 +41,52 @@ import numpy as np
     signal_tiers={
         'BEARISH_CROSS': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish cross - %K crossed below %D signal line. Momentum turning down. Enter shorts or take profit on longs. Best in overbought zone.'
         },
         'BULLISH_CROSS': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish cross - %K crossed above %D signal line. Momentum turning up. Enter longs or take profit on shorts. Best in oversold zone.'
         },
         'NEUTRAL_HIGH': {
                 'max_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Overbought zone (>60) - No cross yet. Uptrend exhausting. Watch for bearish cross. Tighten stops on longs, prepare shorts.'
         },
         'NEUTRAL_LOW': {
                 'max_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Oversold zone (<40) - No cross yet. Downtrend exhausting. Watch for bullish cross. Tighten stops on shorts, prepare longs.'
         },
         'NO_CROSS': {
-                'points': 0
+                'points': 0,
+                'description': 'No cross detected - Stochastic RSI in neutral zone. No extreme momentum. Wait for overbought/oversold or crossover.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate Stochastic RSI. Check data quality and parameter configuration.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 30 candles for Stochastic RSI calculation. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish Stochastic RSI - Bullish cross or oversold. Long positions favorable. Use %K/%D for entry timing.'
         },
         'BEARISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish Stochastic RSI - Bearish cross or overbought. Short positions favorable. Use %K/%D for entry timing.'
         },
         'NEUTRAL': {
                 'max_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Neutral Stochastic RSI - No extreme momentum or cross. Market in equilibrium. Wait for extreme levels or crossover.'
         }
 }
 )

@@ -40,40 +40,49 @@ import numpy as np
     ],
     signal_tiers={
         # Pattern signals
-        'BEARISH_PIVOT_HIGH': {
-                'base_points': 30,
-                'formula': 'scaled'
-        },
         'BULLISH_PIVOT_LOW': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish pivot low detected - Price made swing low with higher lows before and after. Bullish reversal signal. Enter longs. Use pivot low as stop.'
         },
-        'PIVOT_HIGH': {
+        'BEARISH_PIVOT_HIGH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish pivot high detected - Price made swing high with lower highs before and after. Bearish reversal signal. Enter shorts. Use pivot high as stop.'
         },
         'PIVOT_LOW': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Pivot low formed - Swing low confirmed. Bullish reversal potential. Wait for price confirmation before entering longs. Monitor for breakdown.'
+        },
+        'PIVOT_HIGH': {
+                'base_points': 30,
+                'formula': 'scaled',
+                'description': 'Pivot high formed - Swing high confirmed. Bearish reversal potential. Wait for price confirmation before entering shorts. Monitor for breakout.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish pivot detected - Swing low reversal identified. Long positions favorable. 70-80% faster detection than traditional pivots. Use pivot as support.'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish pivot detected - Swing high reversal identified. Short positions favorable. Early reversal signal. Use pivot as resistance.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No pivot detected - Market not forming clear swing high or low. Wait for pivot confirmation before trading reversals.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect internal pivot pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need sufficient bars for pivot detection. Wait for more price history to identify swing points.'
         }
 }
 )

@@ -42,62 +42,77 @@ import numpy as np
         # Granular volatility signals
         'CALM': {
                 'max_points': 4,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Calm - Very low volatility. Daily range <30% of ADR. Potential compression before breakout. Increase position size. Tight stops possible.'
         },
         'NORMAL': {
                 'base_points': 6,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Normal - Typical daily range. 50-70% of ADR. Standard volatility conditions. Normal position sizing. Regular stop placement.'
         },
         'ELEVATED': {
                 'base_points': 7,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Elevated - Higher than normal volatility. 130-170% of ADR. Widen stops. Adjust position size. Increased risk environment.'
         },
         'HIGH': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'High - Significant volatility. 170-200% of ADR. Widen stops significantly. Reduce position size 25-50%. Major price movement underway.'
         },
         'EXTREME': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Extreme - Exceptional volatility. >200% of ADR. Maximum caution. Reduce position size 50%. Very wide stops required. News event likely.'
         },
         'VOLATILE': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Volatile - High volatility expanding. >150% of ADR and increasing. Breakout in progress. Momentum environment. Adjust risk parameters.'
         },
         'NEAR_ADR': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Near ADR - Daily range at average. 95-105% of ADR. Perfect normal volatility. Standard position sizing. Typical trading conditions.'
         },
         'ABOVE_ADR': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Above ADR - Moderately elevated range. 105-150% of ADR. Slightly higher volatility. Consider 10-20% position reduction. Widen stops moderately.'
         },
         'BELOW_ADR': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Below ADR - Low daily range. 30-50% of ADR. Consolidation phase. Can increase position size 25%. Tighter stops. Watch for breakout.'
         },
         'WITHIN_ADR': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Within ADR - Range below average. 70-95% of ADR. Slightly quieter than typical. Normal position sizing. Standard stop placement.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish volatility - Ranges expanding. Energy building. Favorable for breakouts. Momentum increasing. Good for trending strategies.'
         },
         'BEARISH': {
                 'base_points': 8,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish volatility - Ranges contracting. Consolidation phase. Unfavorable for entries. Wait for expansion. Compression before move.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral volatility - Stable range conditions. No significant expansion or contraction. Standard trading environment.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate ADR. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 2 periods for ADR calculation. Wait for more price history.'
         }
 }
 )

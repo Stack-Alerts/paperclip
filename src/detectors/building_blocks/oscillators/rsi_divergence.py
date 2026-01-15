@@ -40,37 +40,45 @@ import numpy as np
     ],
     signal_tiers={
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate RSI. Check data quality and minimum period requirements.'
         },
         'BEARISH_DIVERGENCE': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish divergence - Price making higher highs but RSI making lower highs. Reversal imminent. Take profit on longs, enter shorts.'
         },
         'BULLISH_DIVERGENCE': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish divergence - Price making lower lows but RSI making higher lows. Reversal imminent. Take profit on shorts, enter longs.'
         },
         'OVERBOUGHT': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'RSI overbought (>75) - Uptrend exhausting. Consider taking profit on longs. Short entry favorable. Wait for confirmation.'
         },
         'OVERSOLD': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'RSI oversold (<25) - Downtrend exhausting. Consider taking profit on shorts. Long entry favorable. Wait for confirmation.'
         },
         'NEUTRAL': {
                 'max_points': 12,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'RSI neutral (25-75) - No extreme momentum condition. Market in equilibrium. Wait for overbought/oversold or divergence.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish RSI signal - Oversold or bullish divergence detected. Long positions favorable. Reversal or bounce expected.'
         },
         'BEARISH': {
                 'base_points': 25,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish RSI signal - Overbought or bearish divergence detected. Short positions favorable. Reversal or pullback expected.'
         }
 }
 )

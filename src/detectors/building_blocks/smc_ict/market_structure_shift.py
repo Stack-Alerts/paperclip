@@ -45,38 +45,47 @@ import numpy as np
     signal_tiers={
         'BEARISH_MSS': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish MSS - Market structure shift bearish. Trend reversal confirmed. Uptrend broken. Enter shorts. Institutional distribution. Strong reversal signal.'
         },
         'BEARISH_RETEST': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish retest - MSS retest bearish. Retesting broken structure. Enter shorts on confirmation. Secondary entry opportunity. Structure holding as resistance.'
         },
         'BULLISH_MSS': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish MSS - Market structure shift bullish. Trend reversal confirmed. Downtrend broken. Enter longs. Institutional accumulation. Strong reversal signal.'
         },
         'BULLISH_RETEST': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish retest - MSS retest bullish. Retesting broken structure. Enter longs on confirmation. Secondary entry opportunity. Structure holding as support.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot calculate market structure shift. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need enough bars for MSS detection. Wait for more price history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish MSS - Bullish market structure shift or retest. Long positions favorable. Trend reversal up confirmed.'
         },
         'BEARISH': {
                 'base_points': 20,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish MSS - Bearish market structure shift or retest. Short positions favorable. Trend reversal down confirmed.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Neutral MSS - No market structure shift. Wait for trend reversal or structure break.'
         }
 }
 )

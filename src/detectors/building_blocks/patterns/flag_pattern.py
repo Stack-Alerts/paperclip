@@ -40,40 +40,46 @@ import numpy as np
     signal_tiers={
         'BEARISH_BREAKOUT': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish flag breakout - Lower channel broken after consolidation. Enter shorts aggressively. Target = flagpole height projected down. 68% success rate.'
         },
         'BULLISH_BREAKOUT': {
                 'base_points': 30,
-                'formula': 'scaled'
-        },
-        'NO_PATTERN': {
-                'points': 0
+                'formula': 'scaled',
+                'description': 'Bullish flag breakout - Upper channel broken after consolidation. Enter longs aggressively. Target = flagpole height projected up. 68% success rate.'
         },
         'PATTERN_FORMING': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Flag forming - Strong move (flagpole) followed by tight consolidation (flag). Continuation pattern. Wait for breakout. Declining volume typical.'
         },
         'NO_PATTERN': {
-                'points': 0
+                'points': 0,
+                'description': 'No flag pattern - Missing strong directional move or consolidation channel. Wait for flagpole and flag formation.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bullish flag pattern - Upward flagpole with consolidation. Long positions favorable. Bullish continuation expected. Use flagpole height for targets.'
         },
         'BEARISH': {
                 'base_points': 30,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Bearish flag pattern - Downward flagpole with consolidation. Short positions favorable. Bearish continuation expected. Use flagpole height for targets.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'No flag pattern - Market not forming continuation pattern. Wait for strong move followed by consolidation before trading.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Analysis error - Cannot detect flag pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need at least 50 candles for flag pattern detection. Wait for more price history to form pattern.'
         }
 }
 )
