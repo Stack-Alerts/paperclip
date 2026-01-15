@@ -199,6 +199,11 @@ class WyckoffAccumulation:
         self.spring_volume_ratio = spring_volume_ratio
         self.sos_breakout_pct = sos_breakout_pct
         self.sos_volume_ratio = sos_volume_ratio
+        
+        # STATE TRACKING - Critical for spring/SOS detection
+        self.last_phase_b_support = None
+        self.last_phase_b_resistance = None
+        self.bars_since_phase_b = 999  # Large number = no recent Phase B
     
     def _determine_dual_signals(self, signal: str, df: pd.DataFrame = None) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
@@ -491,14 +496,34 @@ class WyckoffAccumulation:
         selling_climax, sc_conf = self.detect_selling_climax(df)
         in_range, range_conf, support_from_range = self.detect_range(df)
         
-        # CRITICAL FIX: ALWAYS calculate support/resistance (not just when in_range)
-        # Spring and SOS can occur outside of ranges (exits from past ranges)
-        support = df['low'].iloc[-self.range_lookback:].min() if support_from_range == 0 else support_from_range
+        # Calculate current resistance
         resistance = df['high'].iloc[-self.range_lookback:].max()
         
-        # Check spring/SOS ALWAYS using calculated support/resistance
-        spring, spring_conf = self.detect_spring(df, support)
-        sos, sos_conf = self.detect_sign_of_strength(df, resistance)
+        # STATE MANAGEMENT - Critical for spring/SOS detection!
+        if in_range and support_from_range > 0:
+            # Currently in Phase B - update state
+            self.last_phase_b_support = support_from_range
+            self.last_phase_b_resistance = resistance
+            self.bars_since_phase_b = 0
+        else:
+            # Not in Phase B - increment counter
+            self.bars_since_phase_b += 1
+        
+        # USE CORRECT LEVELS FOR SPRING/SOS DETECTION
+        # If recently left Phase B (within 20 bars), use those levels
+        # Otherwise use current global levels
+        if self.bars_since_phase_b <= 20 and self.last_phase_b_support is not None:
+            # Use remembered Phase B levels (CRITICAL FIX!)
+            spring_support = self.last_phase_b_support
+            sos_resistance = self.last_phase_b_resistance
+        else:
+            # Too far from Phase B or never had one, use current levels
+            spring_support = df['low'].iloc[-self.range_lookback:].min() if support_from_range == 0 else support_from_range
+            sos_resistance = resistance
+        
+        # Check spring/SOS with CORRECT levels
+        spring, spring_conf = self.detect_spring(df, spring_support)
+        sos, sos_conf = self.detect_sign_of_strength(df, sos_resistance)
         
         # Determine signal and phase
         confluence_factors = []
@@ -532,7 +557,7 @@ class WyckoffAccumulation:
             signal = 'ACCUMULATION_PHASE_B'
             confidence = range_conf
             phase = 'B'
-            range_pct = ((resistance - support) / df['close'].iloc[-1]) * 100
+            range_pct = ((resistance - support_from_range) / df['close'].iloc[-1]) * 100
             confluence_factors.append(f'📦 Consolidation range: {range_pct:.1f}% of price')
             confluence_factors.append('🔇 Volume declining - quiet accumulation')
             
@@ -556,7 +581,7 @@ class WyckoffAccumulation:
             'sos_detected': sos,
             'selling_climax': selling_climax,
             'in_range': in_range,
-            'support_level': float(support) if support > 0 else 0,
+            'support_level': float(spring_support) if spring_support > 0 else 0,
             'resistance_level': float(resistance) if resistance > 0 else 0
         }
         
