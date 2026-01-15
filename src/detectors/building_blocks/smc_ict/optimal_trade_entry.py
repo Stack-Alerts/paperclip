@@ -56,10 +56,12 @@ import numpy as np
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate optimal trade entry. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need enough bars for OTE calculation. Wait for more price action and swing detection.'
         },
         
@@ -76,6 +78,7 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral OTE - Not in optimal trade entry zone. Wait for 62-79% retracement or better entry levels.'
         }
 }

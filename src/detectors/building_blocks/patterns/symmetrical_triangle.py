@@ -56,6 +56,7 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No symmetrical triangle - Pattern conditions not met. No converging bilateral trendlines detected. Wait for pattern formation.'
         },
         
@@ -72,14 +73,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Symmetrical triangle forming - No breakout yet. Bilateral consolidation pattern. Equal probability up or down. Wait for directional break before trading.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect symmetrical triangle pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 50 candles for symmetrical triangle detection. Wait for more price history to form pattern.'
         }
 }
@@ -113,12 +117,12 @@ class SymmetricalTrianglePattern:
         self.MAX_TRIANGLE_DURATION = 80  # 20 hours maximum
         self.BREAKOUT_MAX_DURATION = 20  # Breakout confirmed for 20 bars
         
-        # Validation requirements (STRICTER for better selectivity)
-        self.MIN_CONFLUENCES = 5  # Increased to 5 (21.54% still too high)
-        self.MIN_COMPRESSION = 0.40  # Minimum 40% compression (even tighter)
+        # Validation requirements (VERY RELAXED for realistic detection)
+        self.MIN_CONFLUENCES = 2  # Relaxed to 2 (more realistic)
+        self.MIN_COMPRESSION = 0.25  # Minimum 25% compression (was 40% - too strict!)
         
-        # Breakout requirements
-        self.BREAK_MARGIN = 0.005  # Must break 0.5% beyond bounds
+        # Breakout requirements (looser for 15min timeframe)
+        self.BREAK_MARGIN = 0.001  # Must break 0.1% beyond bounds (very relaxed)
     
     def _determine_dual_signals(self, granular_signal: str) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Bilateral pattern"""
@@ -283,10 +287,13 @@ class SymmetricalTrianglePattern:
                 'confluence_factors': []
             }
 
-        # Check for breakout (RELAXED for 15min)
-        upper = last_5['high'].max()
-        lower = last_5['low'].min()
+        # Check for breakout (use PREVIOUS bars, not including current)
+        # This prevents comparing current bar against itself
+        triangle_section = section.iloc[:-1]  # Exclude current bar
+        upper = triangle_section['high'].max()
+        lower = triangle_section['low'].min()
 
+        # Breakout detection: current price breaks triangle bounds
         if current_price > upper * (1 + self.BREAK_MARGIN):
             signal = 'BULLISH_BREAKOUT'
             breakout = True

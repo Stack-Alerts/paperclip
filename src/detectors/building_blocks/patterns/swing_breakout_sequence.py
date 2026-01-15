@@ -66,14 +66,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No swing breakout sequence - Pattern incomplete. Need 5 points: initial breakout, pullback, second breakout, liquidity trap, reversal pattern.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect swing breakout sequence. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 100 candles for swing breakout sequence detection. Wait for more price history.'
         }
 }

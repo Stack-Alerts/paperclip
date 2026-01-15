@@ -117,16 +117,20 @@ import pandas as pd
         'NEUTRAL': {
             'base_points': 8,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'Between Fibonacci levels - No clear support/resistance. Wait for next key level before entering positions.'
         },
         
         # Status signals
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error - Cannot calculate Fibonacci levels. Check swing point detection and data quality.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient data - Need at least 20 candles for Fibonacci analysis. Wait for more swing points.'
         }
     },
@@ -154,15 +158,18 @@ class FibonacciRetracements:
         self.use_multi_swing = use_multi_swing
         self.fib_levels = [0.236, 0.382, 0.5, 0.618, 0.786]
     
-    def _determine_dual_signals(self, signal: str) -> tuple:
+    def _determine_dual_signals(self, signal: str, trend: str = None) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
-        # AT_FIB_XX signals are granular, map to simple based on context
+        # AT_FIB_XX signals are granular, map to simple based on trend
         if signal.startswith('AT_FIB_'):
             granular = signal
-            # Fibonacci levels are typically support/resistance
-            # If at fib level, it's a potential reversal - direction is neutral at the level
-            # User should combine with trend/price action for direction
-            simple = 'NEUTRAL'  # At a level, waiting for reaction
+            # Map to BULLISH/BEARISH based on trend direction
+            if trend == 'UPTREND':
+                simple = 'BULLISH'  # At Fib support in uptrend
+            elif trend == 'DOWNTREND':
+                simple = 'BEARISH'  # At Fib resistance in downtrend
+            else:
+                simple = 'NEUTRAL'  # No trend info
         elif signal == 'BETWEEN_LEVELS':
             granular = signal
             simple = 'NEUTRAL'  # Between levels, no clear signal
@@ -435,13 +442,14 @@ class FibonacciRetracements:
                 all_fib_sets.append(fib_set)
         
         # Fallback to single swing if multi-swing disabled or not enough data
+        primary_trend = None
         if len(all_fib_sets) == 0:
             swing_high, swing_low, high_idx, low_idx = self.find_swing_points(df)
-            trend = self.determine_trend_direction(high_idx, low_idx)
+            primary_trend = self.determine_trend_direction(high_idx, low_idx)
             price_range = swing_high - swing_low
             fib_prices = {}
             
-            if trend == 'UPTREND':
+            if primary_trend == 'UPTREND':
                 for level in self.fib_levels:
                     fib_price = swing_high - (price_range * level)
                     fib_prices[f'fib_{int(level*100)}'] = round(fib_price, 2)
@@ -451,6 +459,10 @@ class FibonacciRetracements:
                     fib_prices[f'fib_{int(level*100)}'] = round(fib_price, 2)
             
             all_fib_sets.append(fib_prices)
+        else:
+            # Get trend from first (most significant) swing
+            first_swing = swings[0]
+            primary_trend = self.determine_trend_direction(first_swing['high_idx'], first_swing['low_idx'])
         
         # Use primary (most significant) swing for main signal
         fib_prices = all_fib_sets[0]
@@ -511,8 +523,8 @@ class FibonacciRetracements:
         if closest_level == 'fib_61':
             confluence_factors.append('⭐ Golden Ratio (61.8%) - strongest level')
         
-        # DUAL SIGNAL ARCHITECTURE
-        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        # DUAL SIGNAL ARCHITECTURE - Pass trend for proper BULLISH/BEARISH mapping
+        granular_signal, simple_signal = self._determine_dual_signals(signal, trend=primary_trend)
         
         return {
             'signal': granular_signal,

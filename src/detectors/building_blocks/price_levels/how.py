@@ -56,10 +56,12 @@ import numpy as np
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate HOW. Check data quality and timestamp availability.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least one week of data for HOW calculation. Wait for more price history.'
         },
         
@@ -77,6 +79,8 @@ import numpy as np
         'NEUTRAL': {
                 'max_points': 10,
                 'formula': 'scaled',
+                'ui_visible': False,  # Filter from Strategy Builder UI
+
                 'description': 'Neutral HOW - Near weekly high equilibrium. Wait for breakout or rejection confirmation. Key decision point.'
         }
 }

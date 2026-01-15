@@ -59,10 +59,12 @@ from src.utils.advanced_data_loader import advanced_data
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate liquidity sweeps. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 20 bars for liquidity sweep detection. Wait for more price history.'
         },
         
@@ -79,10 +81,12 @@ from src.utils.advanced_data_loader import advanced_data
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral sweep - No active liquidity sweep. Wait for stop hunts and reversals.'
         },
         'NO_SWEEP': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No sweep - No liquidity sweeps detected. No stop hunts. No sweep setups available.'
         }
 }

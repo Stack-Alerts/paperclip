@@ -31,14 +31,37 @@ import numpy as np
 
 
 @dataclass
+class InitialBalanceRange:
+    """Represents an Initial Balance period."""
+    session_start: datetime
+    session_end: datetime
+    high: float
+    low: float
+    range_size: float
+    midpoint: float
+    volume_total: float
+    
+    def contains_price(self, price: float) -> bool:
+        """Check if price is within IB range."""
+        return self.low <= price <= self.high
+    
+    def is_above(self, price: float) -> bool:
+        """Check if price is above IB high."""
+        return price > self.high
+    
+    def is_below(self, price: float) -> bool:
+        """Check if price is below IB low."""
+        return price < self.low
+
+
 @register_block(
     name='initial_balance_breakout',
     category='PATTERNS',
-    class_name='InitialBalanceRange',
+    class_name='InitialBalanceBreakout',
     default_weight=30,
     valid_signals=[
         # Granular pattern signals
-        'BULLISH_BREAKOUT', 'BEARISH_BREAKOUT', 'ABOVE_IB', 'BELOW_IB', 'LOWER_IB',
+        'BULLISH_BREAKOUT', 'BEARISH_BREAKOUT', 'ABOVE_IB', 'BELOW_IB', 'INSIDE_IB', 'LOWER_IB', 'IB_FORMED', 'NO_IB',
         # Simple directional - SIMPLE
         'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
@@ -70,6 +93,21 @@ import numpy as np
                 'formula': 'scaled',
                 'description': 'Lower Initial Balance zone - Price in bottom 30% of IB range. Bearish bias. Watch for breakdown below IB low. Prepare for short entry.'
         },
+        'INSIDE_IB': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
+                'description': 'Inside Initial Balance - Price consolidating within IB range. No clear bias. Wait for breakout above IB high or breakdown below IB low.'
+        },
+        'IB_FORMED': {
+                'base_points': 15,
+                'formula': 'scaled',
+                'description': 'Initial Balance formed - 2-hour IB range established. Track IB high and low. Wait for price to approach edges for breakout setups.'
+        },
+        'NO_IB': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
+                'description': 'No Initial Balance - IB session hasn\'t completed yet. Wait for IB period to finish before trading IB breakouts.'
+        },
         
         # Simple directional - SIMPLE
         'BULLISH': {
@@ -84,41 +122,21 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Inside Initial Balance - Price consolidating within IB range. No directional bias. Wait for breakout above high or below low before trading.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect Initial Balance. Check data quality and timestamp requirements.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 20 candles for IB detection. Wait for more price history to form IB session.'
         }
 }
 )
-class InitialBalanceRange:
-    """Represents an Initial Balance period."""
-    session_start: datetime
-    session_end: datetime
-    high: float
-    low: float
-    range_size: float
-    midpoint: float
-    volume_total: float
-    
-    def contains_price(self, price: float) -> bool:
-        """Check if price is within IB range."""
-        return self.low <= price <= self.high
-    
-    def is_above(self, price: float) -> bool:
-        """Check if price is above IB high."""
-        return price > self.high
-    
-    def is_below(self, price: float) -> bool:
-        """Check if price is below IB low."""
-        return price < self.low
-
-
 class InitialBalanceBreakout:
     """
     Initial Balance Breakout Detector
@@ -491,26 +509,32 @@ class InitialBalanceBreakout:
         else:
             position_pct = 50
         
-        # Determine zone
-        if position_pct > 70:
-            zone = 'UPPER_IB'
-            confidence = 55
-        elif position_pct < 30:
-            zone = 'LOWER_IB'
-            confidence = 55
+        # Determine zone and signal
+        if position_pct < 30:
+            # Lower IB zone - bearish signal
+            signal = 'LOWER_IB'
+            simple_signal = 'BEARISH'
+            confidence = 60
+            zone_description = 'lower 30%'
         else:
-            zone = 'MID_IB'
+            # Mid/upper IB - neutral
+            signal = 'INSIDE_IB'
+            simple_signal = 'NEUTRAL'
             confidence = 50
+            zone_description = f'{position_pct:.0f}%'
         
         return {
-            'signal': 'INSIDE_IB',
+            'signal': signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': signal,
                 'ib_high': round(ib.high, 2),
                 'ib_low': round(ib.low, 2),
                 'ib_midpoint': round(ib.midpoint, 2),
                 'position_pct': round(position_pct, 1),
-                'zone': zone,
+                'zone_description': zone_description,
                 'is_new_event': False,
             },
             'timestamp': timestamp,
@@ -518,7 +542,7 @@ class InitialBalanceBreakout:
             'confluence_factors': [
                 f'Price inside IB: {price:.2f}',
                 f'IB: {ib.low:.2f} - {ib.high:.2f}',
-                f'Position: {position_pct:.0f}% of range',
+                f'Position: {zone_description}',
             ]
         }
 

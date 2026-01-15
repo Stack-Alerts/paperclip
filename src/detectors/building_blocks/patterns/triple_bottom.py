@@ -51,6 +51,7 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No triple bottom - Pattern conditions not met. Need exactly 3 similar troughs with proper spacing. Wait for pattern formation.'
         },
         
@@ -61,20 +62,23 @@ import numpy as np
                 'description': 'Bullish triple bottom - Classic bottoming pattern. Long positions favorable. Strong support confirmed by triple test. Major reversal signal.'
         },
         'BEARISH': {
-                'base_points': 30,
-                'formula': 'scaled',
-                'description': 'Bearish (inverse scenario) - Triple bottom typically bullish. Verify pattern structure. Pattern indicates strong support level.'
+                'points': 0,
+                'ui_visible': False,  # Hidden - bullish pattern only
+                'description': 'Not applicable - Triple bottom is bullish pattern only'
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No triple bottom - Market not forming bullish reversal. Wait for three similar troughs with neckline before trading.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect triple bottom pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 40 candles for triple bottom detection. Wait for more price history to form three-trough pattern.'
         }
 }

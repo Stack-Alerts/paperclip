@@ -41,28 +41,31 @@ import numpy as np
         # Granular session signals
         'LONDON_KZ', 'NY_AM_KZ', 'NY_PM_KZ', 'ASIAN_KZ', 'LONDON_OPEN_KZ',
         'PRIME_TIME', 'WAIT', 'NO_KZ',
-        # Simple TIME QUALITY - SIMPLE (timing, not direction!)
-        'ACTIVE', 'INACTIVE', 'NO_SIGNAL',
+        # Simple directional - SIMPLE (required by registry)
+        'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
         'ERROR'
     ],
     signal_tiers={
-        # Simple time quality signals
-        'ACTIVE': {
+        # Simple directional signals (required by registry)
+        'BULLISH': {
                 'base_points': 16,
                 'formula': 'scaled',
-                'description': 'Active kill zone - Optimal trading window. High probability session. Institutional activity high. Take trades with confidence.'
+                'description': 'Active kill zone - Optimal trading time. High probability session. Institutional activity high. Take quality setups with confidence.'
         },
-        'INACTIVE': {
+        'BEARISH': {
                 'points': 0,
-                'description': 'Inactive period - Outside kill zones. Low probability time. Institutional activity minimal. Avoid trading. Wait for next zone.'
+                'ui_visible': False,  # Filter from Strategy Builder UI
+                'description': 'Inactive kill zone  - Low probability time. Outside optimal trading windows. Institutional activity minimal. Avoid trading.'
         },
-        'NO_SIGNAL': {
+        'NEUTRAL': {
                 'points': 0,
-                'description': 'No time signal - Cannot determine session quality. Default to manual time management.'
+                'ui_visible': False,  # Filter from Strategy Builder UI
+                'description': 'Medium kill zone - Moderate probability time. Medium quality trading window. Consider selective trades. Monitor for next optimal zone.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate kill zones. Check timestamp data availability.'
         },
         
@@ -99,10 +102,12 @@ import numpy as np
         },
         'WAIT': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Wait period - Between kill zones. Low probability time. Stay patient. Preserve capital. Wait for next high-quality window.'
         },
         'NO_KZ': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No kill zone - Outside all defined sessions. Minimal institutional activity. Avoid trading. Wait for recognized time window.'
         }
 }
@@ -177,25 +182,25 @@ class KillZones:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)
         
         Kill zones provide TIMING quality context, not directional bias.
-        Maps to ACTIVE (good time) or INACTIVE (avoid time).
+        Maps to BULLISH (good time), NEUTRAL (medium), BEARISH (avoid).
         """
         granular = signal
         
-        # High-quality time windows
+        # High-quality time windows - BULLISH (good to trade)
         if signal in ['NY_AM_KZ', 'LONDON_KZ', 'PRIME_TIME']:
-            simple = 'ACTIVE'  # ✅ Optimal trading windows
+            simple = 'BULLISH'  # ✅ Optimal trading windows
         
-        # Medium-quality time windows
-        elif signal in ['NY_PM_KZ', 'LONDON_OPEN_KZ']:
-            simple = 'ACTIVE'  # ✅ Good trading windows
+        # Medium-quality time windows - NEUTRAL (selective trading)
+        elif signal in ['NY_PM_KZ', 'LONDON_OPEN_KZ', 'ASIAN_KZ']:
+            simple = 'NEUTRAL'  # ⚠️ Medium quality windows
         
-        # Low-quality or inactive windows
-        elif signal in ['ASIAN_KZ', 'NO_KZ', 'WAIT']:
-            simple = 'INACTIVE'  # ⚠️ Avoid trading
+        # Low-quality or inactive windows - BEARISH (avoid trading)
+        elif signal in ['NO_KZ', 'WAIT']:
+            simple = 'BEARISH'  # ❌ Avoid trading
         
         # Errors/edge cases
         else:
-            simple = 'NO_SIGNAL'
+            simple = 'NEUTRAL'
         
         return granular, simple
     
@@ -465,13 +470,15 @@ class KillZones:
         elif day_of_week in [4, 5, 6]:  # Friday-Sunday
             confluence_factors.append(f'📅 {day_profile["name"]} - {day_profile["behavior"]} ({day_profile["adjustment"]}% conf)')
         
-        # Signal
-        if is_high_priority:
+        # Signal - emit PRIME_TIME for high-priority zone entries, otherwise emit kill zone
+        if is_new_event and is_high_priority:
+            # New entry into high-priority zone - emit PRIME_TIME
             signal = 'PRIME_TIME'
-        elif priority in ['MEDIUM', 'LOW']:
-            signal = 'ACTIVE'
+        elif current_kz == 'NO_KZ':
+            signal = 'NO_KZ'
         else:
-            signal = 'WAIT'
+            # Emit the specific kill zone signal
+            signal = current_kz
         
         # DUAL SIGNAL ARCHITECTURE
         granular_signal, simple_signal = self._determine_dual_signals(signal)

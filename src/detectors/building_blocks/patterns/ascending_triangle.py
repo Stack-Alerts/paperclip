@@ -52,6 +52,7 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No ascending triangle - Pattern conditions not met. No rising lows or flat resistance detected. Wait for pattern formation.'
         },
         
@@ -68,14 +69,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No triangle pattern - Market structure unclear. No ascending triangle setup. Wait for pattern formation before trading.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 15 candles for ascending triangle detection. Wait for more price history.'
         }
 }

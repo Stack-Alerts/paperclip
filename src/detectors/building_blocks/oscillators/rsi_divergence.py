@@ -41,6 +41,7 @@ import numpy as np
     signal_tiers={
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate RSI. Check data quality and minimum period requirements.'
         },
         'BEARISH_DIVERGENCE': {
@@ -66,6 +67,8 @@ import numpy as np
         'NEUTRAL': {
                 'max_points': 12,
                 'formula': 'scaled',
+                'ui_visible': False,  # Filter from Strategy Builder UI
+
                 'description': 'RSI neutral (25-75) - No extreme momentum condition. Market in equilibrium. Wait for overbought/oversold or divergence.'
         },
         

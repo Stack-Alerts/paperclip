@@ -65,6 +65,7 @@ import numpy as np
         },
         'NO_STOP': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No stop - No trailing stop signal. Set appropriate stops manually. Risk management required.'
         },
         
@@ -81,16 +82,19 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral stop - Between stop levels. No clear risk signal. Manual risk management needed. Wait for directional clarity.'
         },
         
         # Status
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate trailing stops. Check data quality and ATR calculation.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least (ATR period + 10) candles for trailing stop calculation. Wait for more price history.'
         }
 }
@@ -141,13 +145,14 @@ class TrailingStop:
         ]
         self.test_threshold = test_threshold
     
-    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+    def _determine_dual_signals(self, granular_signal: str, direction: str = 'NEUTRAL') -> tuple:
         """DUAL SIGNAL ARCHITECTURE"""
         granular = granular_signal
-        if 'LONG' in granular:
-            simple = 'BULLISH'  # Long stops = bullish context
-        elif 'SHORT' in granular:
-            simple = 'BEARISH'  # Short stops = bearish context
+        # Use direction parameter passed from generator methods
+        if direction == 'BULLISH':
+            simple = 'BULLISH'
+        elif direction == 'BEARISH':
+            simple = 'BEARISH'
         else:
             simple = 'NEUTRAL'
         return granular, simple
@@ -324,7 +329,7 @@ class TrailingStop:
         else:
             confidence = 60
         
-        granular_signal, simple_signal = self._determine_dual_signals('LONG_STOP_TEST')
+        granular_signal, simple_signal = self._determine_dual_signals('STOP_TRIGGERED', 'BULLISH')
         
         return {
             'signal': granular_signal,
@@ -377,7 +382,7 @@ class TrailingStop:
         else:
             confidence = 60
         
-        granular_signal, simple_signal = self._determine_dual_signals('SHORT_STOP_TEST')
+        granular_signal, simple_signal = self._determine_dual_signals('STOP_TRIGGERED', 'BEARISH')
         
         return {
             'signal': granular_signal,
@@ -418,7 +423,7 @@ class TrailingStop:
         atr: float
     ) -> Dict[str, Any]:
         """Generate signal when holding above long stop."""
-        granular_signal, simple_signal = self._determine_dual_signals('LONG_STOP_HOLD')
+        granular_signal, simple_signal = self._determine_dual_signals('STOP_ACTIVE', 'BULLISH')
         return {
             'signal': granular_signal,
             'signal_simple': simple_signal,
@@ -452,7 +457,7 @@ class TrailingStop:
         atr: float
     ) -> Dict[str, Any]:
         """Generate signal when holding below short stop."""
-        granular_signal, simple_signal = self._determine_dual_signals('SHORT_STOP_HOLD')
+        granular_signal, simple_signal = self._determine_dual_signals('STOP_ACTIVE', 'BEARISH')
         return {
             'signal': granular_signal,
             'signal_simple': simple_signal,

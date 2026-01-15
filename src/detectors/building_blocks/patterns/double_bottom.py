@@ -32,11 +32,12 @@ import numpy as np
     valid_signals=[
         # Granular pattern signals (Double Bottom is bullish-only)
         'BULLISH_BREAKOUT', 'PATTERN_FORMING', 'NO_PATTERN',
-        # Simple directional - SIMPLE (bullish-only pattern)
-        'BULLISH', 'NEUTRAL',
+        # Simple directional - SIMPLE (required for dual signal architecture)
+        'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
         'ERROR', 'INSUFFICIENT_DATA'
     ],
+    tags=['bullish_only_pattern'],  # BEARISH signal will never fire - bullish reversal pattern
     signal_tiers={
         # Pattern signals
         'BULLISH_BREAKOUT': {
@@ -51,25 +52,34 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No double bottom - Pattern conditions not met. Need two similar troughs with proper spacing. Wait for pattern formation.'
         },
         
-        # Simple directional - SIMPLE (bullish-only)
+        # Simple directional - SIMPLE (required for dual signal architecture)
         'BULLISH': {
                 'base_points': 30,
                 'formula': 'scaled',
                 'description': 'Bullish double bottom - Pattern forming or broken out. Long positions favorable. Classic reversal pattern. Use measured move for targets.'
         },
+        'BEARISH': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
+                'description': 'No bearish signal - Double Bottom is a bullish-only pattern. This signal never fires.'
+        },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No double bottom pattern - Market not forming bullish reversal. Wait for two equal lows and neckline break before entering.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect double bottom pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 30 candles for double bottom detection. Wait for more price history to form pattern.'
         }
 }

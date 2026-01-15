@@ -29,11 +29,12 @@ import numpy as np
     category='PATTERNS',
     class_name='FallingWedgePattern',
     default_weight=30,
+    tags=['patterns', 'wedge', 'reversal', 'bullish_only_pattern', 'event_block'],
     valid_signals=[
         # Granular pattern signals
         'BULLISH_BREAKOUT', 'PATTERN_FORMING', 'NO_PATTERN',
         # Simple directional - SIMPLE (falling wedge = bullish only!)
-        'BULLISH', 'NEUTRAL',
+        'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
         'ERROR', 'INSUFFICIENT_DATA'
     ],
@@ -51,6 +52,7 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No falling wedge - Pattern conditions not met. No converging falling trendlines detected. Wait for pattern formation.'
         },
         
@@ -60,16 +62,24 @@ import numpy as np
                 'formula': 'scaled',
                 'description': 'Bullish falling wedge - Pattern forming or broken out. Long positions favorable. Classic bullish reversal. 68% success rate.'
         },
+        'BEARISH': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
+                'description': 'Not applicable - Falling wedge is bullish reversal only. Never emits BEARISH. Marked for system compatibility.'
+        },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No falling wedge pattern - Market not forming bullish reversal. Wait for converging falling wedge before entering longs.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect falling wedge pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 50 candles for falling wedge detection. Wait for more price history to form pattern.'
         }
 }

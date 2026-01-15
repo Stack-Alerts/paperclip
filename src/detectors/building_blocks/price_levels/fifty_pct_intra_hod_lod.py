@@ -33,35 +33,45 @@ import numpy as np
     signal_tiers={
         'ABOVE_INTRA_EQ': {
             'base_points': 14,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Above intraday equilibrium - Price above today\'s 50% level. Bullish intraday bias. Premium zone. Enter longs on pullbacks. Stop below intraday 50%. Scalp to IHOD.'
         },
         'BELOW_INTRA_EQ': {
             'base_points': 14,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Below intraday equilibrium - Price below today\'s 50% level. Bearish intraday bias. Discount zone. Enter shorts on rallies. Stop above intraday 50%. Scalp to ILOD.'
         },
         'AT_INTRA_EQ': {
             'base_points': 18,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'At intraday equilibrium - Price at today\'s 50% fair value. Dynamic pivot point. Mean reversion zone. Watch for rejection. High probability scalp setup.'
         },
         'REJECTION_AT_INTRA_EQ': {
             'base_points': 18,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Rejection at intraday equilibrium - Price rejected at today\'s 50% level. Strong intraday reversal. Enter in rejection direction. Tight stop. Premium scalp signal.'
         },
         'NEUTRAL': {
-            'points': 0
+            'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
+            'description': 'Neutral intraday equilibrium - Price not near today\'s 50% level. No clear intraday bias. Wait for price to approach dynamic fair value.'
         },
         'ERROR': {
-            'points': 0
+            'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
+            'description': 'Analysis error - Cannot calculate intraday 50% equilibrium. Check data quality and sufficient intraday history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
             'base_points': 14,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Bullish intraday 50% - Price holding above today\'s equilibrium. Bullish intraday structure. Long scalps favored. Premium zone active.'
         },
         'BEARISH': {
             'base_points': 14,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Bearish intraday 50% - Price holding below today\'s equilibrium. Bearish intraday structure. Short scalps favored. Discount zone active.'
         }
     }
 )
@@ -98,6 +108,8 @@ class FiftyPctIntraHODLOD:
         self.timeframe = timeframe
         self.proximity_threshold = 0.15  # 0.15% proximity to equilibrium
         self.prev_fifty_pct = None
+        self.prev_at_eq = False  # Track if we were at equilibrium before
+        self.prev_price = None
     
     def _determine_dual_signals(self, distance_pct: float) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
@@ -183,11 +195,35 @@ class FiftyPctIntraHODLOD:
         current_price = float(df['close'].iloc[-1])
         distance_pct = ((current_price - fifty_pct) / fifty_pct) * 100
         
+        # Check if currently at equilibrium
+        at_equilibrium = abs(distance_pct) < self.proximity_threshold
+        
+        # REJECTION DETECTION: Was at EQ before, now moved away
+        rejected = False
+        if self.prev_at_eq and not at_equilibrium and self.prev_price is not None:
+            # Check if price moved away from equilibrium (rejection)
+            rejected = True
+        
         # DUAL SIGNAL ARCHITECTURE
-        granular_signal, simple_signal = self._determine_dual_signals(distance_pct)
+        if rejected:
+            # Override with rejection signal
+            granular_signal = 'REJECTION_AT_INTRA_EQ'
+            # Determine simple signal based on which direction it rejected
+            if distance_pct > 0:
+                simple_signal = 'BULLISH'  # Rejected upward
+            else:
+                simple_signal = 'BEARISH'  # Rejected downward
+        else:
+            granular_signal, simple_signal = self._determine_dual_signals(distance_pct)
+        
+        # Update state for next iteration
+        self.prev_at_eq = at_equilibrium
+        self.prev_price = current_price
         
         # Determine confidence
-        if abs(distance_pct) < self.proximity_threshold:
+        if rejected:
+            confidence = 90  # High confidence on rejection
+        elif abs(distance_pct) < self.proximity_threshold:
             confidence = 85
         elif abs(distance_pct) > 0.5:
             confidence = 75

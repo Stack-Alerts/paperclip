@@ -280,7 +280,14 @@ def test_building_block_registry(block_name: str, days: int = 180, use_multicore
     if missing_signals:
         print(f"\n⚠️  Missing Signals (not found in test):")
         for sig in sorted(missing_signals):
-            print(f"      - {sig}")
+            # Check if signal is hidden from UI (points: 0 or ui_visible: False)
+            signal_config = metadata.signal_tiers.get(sig, {})
+            is_hidden = signal_config.get('ui_visible', True) == False or signal_config.get('points', 1) == 0
+            
+            if is_hidden:
+                print(f"      - {sig} - Hidden from UI (points: 0)")
+            else:
+                print(f"      - {sig} - ❌ ERROR MISSING")
     
     print(f"\n📈 Signal Distribution:")
     for sig, count in sorted(signal_counts.items(), key=lambda x: -x[1]):

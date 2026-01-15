@@ -32,11 +32,12 @@ import numpy as np
     valid_signals=[
         # Granular pattern signals (Double Top is bearish-only)
         'BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN',
-        # Simple directional - SIMPLE (bearish-only pattern)
-        'BEARISH', 'NEUTRAL',
+        # Simple directional - SIMPLE (required for dual signal architecture)
+        'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
         'ERROR', 'INSUFFICIENT_DATA'
     ],
+    tags=['bearish_only_pattern'],  # BULLISH signal will never fire - bearish reversal pattern
     signal_tiers={
         # Pattern signals
         'BEARISH_BREAKDOWN': {
@@ -51,10 +52,16 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No double top - Pattern conditions not met. Need two similar peaks with proper spacing. Wait for pattern formation.'
         },
         
-        # Simple directional - SIMPLE (bearish-only)
+        # Simple directional - SIMPLE (required for dual signal architecture)
+        'BULLISH': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
+                'description': 'No bullish signal - Double Top is a bearish-only pattern. This signal never fires.'
+        },
         'BEARISH': {
                 'base_points': 30,
                 'formula': 'scaled',
@@ -62,14 +69,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No double top pattern - Market not forming bearish reversal. Wait for two equal highs and neckline break before entering shorts.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect double top pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 30 candles for double top detection. Wait for more price history to form pattern.'
         }
 }

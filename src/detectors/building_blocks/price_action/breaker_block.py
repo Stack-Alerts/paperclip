@@ -51,14 +51,17 @@ import numpy as np
         },
         'NO_BREAKER': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No breaker block - No failed order blocks detected. No market structure shift. No breaker setups available.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate breaker blocks. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need enough bars for breaker block detection. Wait for more price history.'
         },
         
@@ -75,6 +78,7 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral breaker - No breaker blocks detected. No market structure shifts. Wait for failed order blocks.'
         }
 }

@@ -31,10 +31,16 @@ import numpy as np
 from collections import deque
 
 
+class SignalType(Enum):
+    """MACD signal types"""
+    BULLISH = "bullish"
+    BEARISH = "bearish"
+
+
 @register_block(
     name='macd_price_forecasting',
     category='SIGNALS',
-    class_name='SignalType',
+    class_name='MACDPriceForecasting',
     default_weight=20,
     valid_signals=[
         # Granular forecast signals
@@ -57,10 +63,12 @@ from collections import deque
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate MACD forecasting. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need enough bars for MACD calculation and forecasting. Wait for more price history.'
         },
         
@@ -77,16 +85,11 @@ from collections import deque
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral MACD - No clear MACD forecast direction. No momentum prediction. Wait for clearer signals.'
         }
 }
 )
-class SignalType(Enum):
-    """MACD signal types"""
-    BULLISH = "bullish"
-    BEARISH = "bearish"
-
-
 class MACDPriceForecasting:
     """
     MACD Price Forecasting Detector
@@ -143,6 +146,17 @@ class MACDPriceForecasting:
         # Historical trajectories storage
         self.bullish_trajectories = deque(maxlen=max_memory)
         self.bearish_trajectories = deque(maxlen=max_memory)
+    
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        if granular == 'BULLISH_FORECAST':
+            simple = 'BULLISH'
+        elif granular == 'BEARISH_FORECAST':
+            simple = 'BEARISH'
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
     
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
@@ -299,12 +313,18 @@ class MACDPriceForecasting:
             trajectories = list(self.bearish_trajectories)
             signal_name = 'BEARISH_FORECAST'
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal_name)
+        
         # Check if we have enough data
         if len(trajectories) < self.min_trajectories:
             return {
                 'signal': signal_name,
+                'signal_simple': simple_signal,
                 'confidence': 40,  # Low confidence, insufficient history
                 'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': signal_name,
                     'signal_type': signal_type.value,
                     'current_price': round(current_price, 2),
                     'insufficient_history': True,
@@ -337,8 +357,11 @@ class MACDPriceForecasting:
         
         return {
             'signal': signal_name,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': signal_name,
                 'signal_type': signal_type.value,
                 'current_price': round(current_price, 2),
                 'forecast_upper': round(percentiles['upper'], 2),

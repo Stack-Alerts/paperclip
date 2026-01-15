@@ -50,6 +50,7 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No Inverse H&S - Pattern conditions not met. Need three troughs with head lower than shoulders. Wait for pattern formation.'
         },
         
@@ -66,14 +67,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No Inverse H&S pattern - Market not forming bullish reversal. Wait for three-trough formation with neckline before trading.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect Inverse H&S pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 40 candles for Inverse H&S detection. Wait for more price history to form three-trough pattern.'
         }
 }

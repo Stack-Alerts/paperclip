@@ -85,6 +85,7 @@ from src.detectors.building_blocks.registry import register_block
         # Status signals
         'NO_SWINGS': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'No swing points detected'
         },
         
@@ -102,15 +103,19 @@ from src.detectors.building_blocks.registry import register_block
         'NEUTRAL': {
             'base_points': 10,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'No swings - neutral (simple)'
         },
         
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Not enough data for analysis'
         }
     },
@@ -311,7 +316,7 @@ class SwingPoints:
         # Calculate ATR for magnitude normalization (quality block integration!)
         atr = self.calculate_atr(df, period=14)
         
-        # Find all swings
+        # Find swings
         swings = []
         for i in range(self.lookback, len(df) - self.lookback):
             # Swing high: highest point in window
@@ -402,7 +407,13 @@ class SwingPoints:
             confidence = 30
             confluence_factors = ['No swing points detected in recent history']
             is_new_event = False
+            
+            # DUAL SIGNAL ARCHITECTURE (must set both!)
+            granular_signal, simple_signal = self._determine_dual_signals(signal)
+            
             metadata = {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'swing_count': 0,
                 'is_new_event': False
             }

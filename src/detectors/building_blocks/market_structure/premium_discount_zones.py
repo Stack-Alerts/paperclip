@@ -85,15 +85,19 @@ import numpy as np
         'NEUTRAL': {
             'base_points': 10,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'At equilibrium - Fair value. No clear edge. Wait for discount to buy or premium to sell. Patient positioning required.'
         },
         
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error - Cannot calculate premium/discount zones. Check range calculation and data quality.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient data - Need at least 20 candles for premium/discount analysis. Wait for wider price range to develop.'
         }
     },

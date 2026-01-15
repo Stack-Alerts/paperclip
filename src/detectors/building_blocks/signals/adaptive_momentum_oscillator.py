@@ -77,10 +77,12 @@ class SignalType(Enum):
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate adaptive momentum oscillator. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need enough bars for momentum calculation. Wait for more price history.'
         },
         
@@ -97,6 +99,7 @@ class SignalType(Enum):
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral momentum - No significant momentum signals. No crosses or divergences detected. Wait for clearer momentum direction.'
         }
 }

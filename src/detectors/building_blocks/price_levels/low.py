@@ -61,19 +61,23 @@ import numpy as np
         },
         'NO_LOW': {
                 'points': 0,
-                'description': 'No LOW - No weekly low detected. Wait for more price data or check calculation.'
+                'description': 'No LOW - No weekly low detected. Wait for more price data or check calculation.',
+                'ui_visible': False  # Filter from Strategy Builder UI
         },
         'NO_LOW_DATA': {
                 'points': 0,
-                'description': 'No LOW data - Cannot calculate weekly low. Check data quality and availability.'
+                'description': 'No LOW data - Cannot calculate weekly low. Check data quality and availability.',
+                'ui_visible': False  # Filter from Strategy Builder UI
         },
         'ERROR': {
                 'points': 0,
-                'description': 'Analysis error - Cannot calculate LOW. Check data quality and timestamp availability.'
+                'description': 'Analysis error - Cannot calculate LOW. Check data quality and timestamp availability.',
+                'ui_visible': False  # Filter from Strategy Builder UI
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
-                'description': 'Insufficient data - Need at least one week of data for LOW calculation. Wait for more price history.'
+                'description': 'Insufficient data - Need at least one week of data for LOW calculation. Wait for more price history.',
+                'ui_visible': False  # Filter from Strategy Builder UI
         },
         
         # Simple directional - SIMPLE
@@ -90,6 +94,8 @@ import numpy as np
         'NEUTRAL': {
                 'max_points': 10,
                 'formula': 'scaled',
+                'ui_visible': False,  # Filter from Strategy Builder UI
+
                 'description': 'Neutral LOW - Near weekly low equilibrium. Wait for bounce or breakdown confirmation. Key weekly decision point.'
         }
 }

@@ -77,16 +77,19 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral VWAP - At VWAP equilibrium. No directional bias. Wait for cross or rejection. Key decision level forming.'
         },
         
         # Status
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate VWAP. Check data quality, volume data, and timestamp availability.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need enough bars for VWAP calculation. Wait for more price history with volume.'
         }
 }

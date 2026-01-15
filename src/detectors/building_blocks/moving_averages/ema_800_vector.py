@@ -70,16 +70,20 @@ import numpy as np
         'NEUTRAL': {
             'base_points': 5,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'No vector break - holding position'
         },
         
         # Status
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Not enough data for analysis'
         }
     },
@@ -328,15 +332,17 @@ class EMA800VectorBreak:
                     
                 confluence_factors.append('📈 BULLISH CLIMAX: Climax vector crossed above 800 EMA - MACRO regime shift')
             
-            # PSEUDO vectors (150%+): Require slope confirmation
+            # PSEUDO vectors (150%+): Take if slope not STRONGLY opposing
             elif "PSEUDO" in vector_tier:
-                if slope in ['RISING', 'STRONG_RISING']:
+                # Accept if slope is not STRONGLY falling (more permissive)
+                if slope != 'STRONG_FALLING':
                     signal = 'BULLISH_PSEUDO'  # GRANULAR (MACRO)
-                    confidence = 90
+                    confidence = 85 if slope in ['RISING', 'STRONG_RISING', 'FLAT'] else 75
                     is_new_event = True  # Fresh vector cross
                     confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (150%+ volume)')
-                    confluence_factors.append('✅ 800 EMA slope confirming uptrend - CONFIRMED')
-                    confluence_factors.append('📈 BULLISH PSEUDO: Confirmed pseudo vector crossed above 800 EMA - MACRO regime shift')
+                    if slope in ['RISING', 'STRONG_RISING']:
+                        confluence_factors.append('✅ 800 EMA slope confirming uptrend')
+                    confluence_factors.append('📈 BULLISH PSEUDO: Pseudo vector crossed above 800 EMA - MACRO regime shift')
                 
         elif crossed_below and is_vector_candle:
             # Bearish vector break
@@ -354,15 +360,17 @@ class EMA800VectorBreak:
                     
                 confluence_factors.append('📉 BEARISH CLIMAX: Climax vector crossed below 800 EMA - MACRO regime shift')
             
-            # PSEUDO vectors (150%+): Require slope confirmation
+            # PSEUDO vectors (150%+): Take if slope not STRONGLY opposing
             elif "PSEUDO" in vector_tier:
-                if slope in ['FALLING', 'STRONG_FALLING']:
+                # Accept if slope is not STRONGLY rising (more permissive)
+                if slope != 'STRONG_RISING':
                     signal = 'BEARISH_PSEUDO'  # GRANULAR (MACRO)
-                    confidence = 90
+                    confidence = 85 if slope in ['FALLING', 'STRONG_FALLING', 'FLAT'] else 75
                     is_new_event = True  # Fresh vector cross
                     confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (150%+ volume)')
-                    confluence_factors.append('✅ 800 EMA slope confirming downtrend - CONFIRMED')
-                    confluence_factors.append('📉 BEARISH PSEUDO: Confirmed pseudo vector crossed below 800 EMA - MACRO regime shift')
+                    if slope in ['FALLING', 'STRONG_FALLING']:
+                        confluence_factors.append('✅ 800 EMA slope confirming downtrend')
+                    confluence_factors.append('📉 BEARISH PSEUDO: Pseudo vector crossed below 800 EMA - MACRO regime shift')
         
         # Update event tracking state
         if signal != self.prev_signal:

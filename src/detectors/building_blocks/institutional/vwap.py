@@ -70,15 +70,19 @@ import numpy as np
         'NEUTRAL': {
             'base_points': 7,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'At VWAP - Fair value zone. No bias. Wait for breakout above or breakdown below before entering. High probability pivot.'
         },
         
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error - Cannot calculate VWAP. Check volume data quality and price completeness.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient data - Need at least 10 candles for VWAP calculation. Wait for more price and volume history.'
         }
     },

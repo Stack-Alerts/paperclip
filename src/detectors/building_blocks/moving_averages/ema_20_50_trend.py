@@ -74,15 +74,19 @@ import numpy as np
         'NEUTRAL': {
                 'max_points': 6,
                 'formula': 'scaled',
+                'ui_visible': False,  # Filter from Strategy Builder UI
+
                 'description': 'Neutral EMA trend - EMAs converging or mixed alignment. No clear trend. Wait for alignment before entering.'
         },
         # Status
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate EMAs. Check data quality and EMA period configuration.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 55 candles for EMA calculation. Wait for more price history.'
         }
 }

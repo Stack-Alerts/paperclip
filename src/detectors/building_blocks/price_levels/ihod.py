@@ -25,7 +25,6 @@ import numpy as np
         'BEARISH_REJECTION',  # Rejected at IHOD
         'AT_IHOD',           # Price at IHOD
         'BELOW_IHOD',        # Price below IHOD
-        'ABOVE_IHOD',        # Price above IHOD (new IHOD)
         # Simple directional - SIMPLE
         'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
@@ -34,39 +33,45 @@ import numpy as np
     signal_tiers={
         'BULLISH_BREAK': {
             'base_points': 22,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Bullish IHOD break - Price broke above previous intraday high. New IHOD made. Bullish momentum signal. Enter longs on breakout. Stop below previous IHOD. Target next resistance.'
         },
         'BEARISH_REJECTION': {
             'base_points': 20,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Bearish IHOD rejection - Price rejected at intraday high. Failed breakout. Reversal signal. Enter shorts on rejection. Stop above IHOD. Target support levels.'
         },
         'AT_IHOD': {
             'max_points': 15,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'At IHOD - Price testing intraday high. Consolidation at resistance. Watch for breakout or rejection. Wait for confirmation before entry. Key decision point.'
         },
         'BELOW_IHOD': {
             'max_points': 10,
-            'formula': 'scaled'
-        },
-        'ABOVE_IHOD': {
-            'max_points': 10,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Below IHOD - Price below intraday high. Normal state. IHOD acting as resistance. Watch for move back toward IHOD or continuation lower.'
         },
         'NEUTRAL': {
-            'points': 0
+            'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
+            'description': 'Neutral IHOD - No clear signal from intraday high. Price not near IHOD. Wait for price to approach resistance or establish new range.'
         },
         'ERROR': {
-            'points': 0
+            'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
+            'description': 'Analysis error - Cannot calculate IHOD signals. Check data quality, timestamp availability, and sufficient bar history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
             'base_points': 20,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Bullish IHOD - Intraday high breakout confirmed. Strong bullish signal. Long positions favored. Momentum building. High probability continuation.'
         },
         'BEARISH': {
             'base_points': 20,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Bearish IHOD - Rejection at intraday high confirmed. Bearish reversal signal. Short positions favored. Resistance holding. High probability decline.'
         }
     }
 )
@@ -91,7 +96,6 @@ class IHOD:
     - BEARISH_REJECTION: Rejected at IHOD (reversal)
     - AT_IHOD: Price testing IHOD
     - BELOW_IHOD: Price below today's high
-    - ABOVE_IHOD: Price at new high
     """
     
     def __init__(self, timeframe: str = '15min', **kwargs):
@@ -102,22 +106,24 @@ class IHOD:
     def _determine_dual_signals(self, distance_pct: float, is_new_ihod: bool) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
         
-        if is_new_ihod and distance_pct > 0:
+        if is_new_ihod:
+            # Breaking to new IHOD
             granular = 'BULLISH_BREAK'
             simple = 'BULLISH'
         elif abs(distance_pct) < self.proximity_threshold and distance_pct < 0:
+            # At IHOD with rejection
             granular = 'BEARISH_REJECTION'
             simple = 'BEARISH'
         elif abs(distance_pct) < self.proximity_threshold:
+            # At IHOD (testing)
             granular = 'AT_IHOD'
             simple = 'NEUTRAL'
         elif distance_pct < -0.5:
+            # Below IHOD (normal state)
             granular = 'BELOW_IHOD'
             simple = 'NEUTRAL'
-        elif distance_pct > 0:
-            granular = 'ABOVE_IHOD'
-            simple = 'BULLISH'
         else:
+            # Fallback
             granular = 'NEUTRAL'
             simple = 'NEUTRAL'
         
@@ -162,8 +168,14 @@ class IHOD:
                 'timeframe': self.timeframe
             }
         
-        # Calculate IHOD
-        ihod = self.calculate_ihod(df)
+        # Calculate IHOD from bars BEFORE current bar to detect breaks
+        ihod_prev = self.calculate_ihod(df.iloc[:-1])
+        
+        # Calculate IHOD including current bar
+        ihod_current = self.calculate_ihod(df)
+        
+        # Use previous IHOD for comparison, current for tracking
+        ihod = ihod_prev if ihod_prev is not None else ihod_current
         
         if ihod is None:
             return {
@@ -175,12 +187,11 @@ class IHOD:
             }
         
         current_price = float(df['close'].iloc[-1])
+        current_high = float(df['high'].iloc[-1])
         distance_pct = ((current_price - ihod) / ihod) * 100
         
-        # Detect events
-        is_new_ihod = False
-        if self.prev_ihod is not None and ihod > self.prev_ihod:
-            is_new_ihod = True
+        # Detect events: new IHOD if current bar's high breaks previous IHOD
+        is_new_ihod = current_high > ihod
         
         # DUAL SIGNAL ARCHITECTURE
         granular_signal, simple_signal = self._determine_dual_signals(distance_pct, is_new_ihod)
@@ -193,8 +204,6 @@ class IHOD:
             confidence = 80
         elif signal == 'AT_IHOD':
             confidence = 70
-        elif signal == 'ABOVE_IHOD':
-            confidence = 65
         elif signal == 'BELOW_IHOD':
             confidence = 60
         else:

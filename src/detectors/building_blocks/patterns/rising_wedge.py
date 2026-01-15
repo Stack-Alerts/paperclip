@@ -51,6 +51,7 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No rising wedge - Pattern conditions not met. No converging rising trendlines detected. Wait for pattern formation.'
         },
         
@@ -63,19 +64,23 @@ import numpy as np
         'BULLISH': {
                 'base_points': 30,
                 'formula': 'scaled',
-                'description': 'Bullish (rare scenario) - Rising wedge typically bearish. Verify pattern structure. Most rising wedges break downward.'
+                'description': 'Bullish (rare scenario) - Rising wedge typically bearish. Verify pattern structure. Most rising wedges break downward.',
+                'ui_visible': False  # Filter from Strategy Builder UI - never fires for bearish pattern
         },
         'NEUTRAL': {
                 'points': 0,
-                'description': 'No rising wedge pattern - Market not forming bearish reversal. Wait for converging rising wedge before entering shorts.'
+                'description': 'No rising wedge pattern - Market not forming bearish reversal. Wait for converging rising wedge before entering shorts.',
+                'ui_visible': False  # Filter from Strategy Builder UI
         },
         'ERROR': {
                 'points': 0,
-                'description': 'Analysis error - Cannot detect rising wedge pattern. Check data quality and minimum bars requirement.'
+                'description': 'Analysis error - Cannot detect rising wedge pattern. Check data quality and minimum bars requirement.',
+                'ui_visible': False  # Filter from Strategy Builder UI
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
-                'description': 'Insufficient data - Need at least 50 candles for rising wedge detection. Wait for more price history to form pattern.'
+                'description': 'Insufficient data - Need at least 50 candles for rising wedge detection. Wait for more price history to form pattern.',
+                'ui_visible': False  # Filter from Strategy Builder UI
         }
 }
 )
@@ -108,12 +113,12 @@ class RisingWedgePattern:
         self.MAX_WEDGE_DURATION = 80  # 20 hours maximum
         self.BREAKOUT_MAX_DURATION = 20  # Breakout confirmed for 20 bars
         
-        # Validation requirements (STRICTER for better selectivity)
-        self.MIN_CONFLUENCES = 6  # Very strict for rising wedge (final)
+        # Validation requirements (RELAXED for 15min timeframe)
+        self.MIN_CONFLUENCES = 3  # Reasonable for rising wedge (relaxed from 6)
         self.MIN_COMPRESSION = 0.30  # Minimum 30% compression (tight)
         
-        # Breakout requirements
-        self.BREAK_MARGIN = 0.005  # Must break 0.5% below support
+        # Breakout requirements (REMOVED margin for 15min - just needs to break)
+        self.BREAK_MARGIN = 0.0  # No margin - just break support
     
     def _determine_dual_signals(self, granular_signal: str) -> tuple:
         """DUAL SIGNAL ARCHITECTURE"""
@@ -269,9 +274,13 @@ class RisingWedgePattern:
                 'confluence_factors': []
             }
 
-        # Check for breakdown
-        support = second['low'].min()
-        breakdown = current_price < support * (1 - self.BREAK_MARGIN)
+        # Check for breakdown (FIXED: use current bar's low, exclude current from support calc)
+        support_section = section.iloc[:-1]  # All but current bar
+        support = support_section['low'].min()
+        
+        # Current bar's low for breakdown check
+        current_low = float(df['low'].iloc[-1])
+        breakdown = current_low < support * (1 - self.BREAK_MARGIN)
 
         if breakdown:
             signal = 'BEARISH_BREAKDOWN'

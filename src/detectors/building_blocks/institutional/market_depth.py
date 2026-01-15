@@ -89,15 +89,19 @@ from src.utils.advanced_data_loader import advanced_data
         'NEUTRAL': {
             'base_points': 10,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'Normal liquidity - Standard market conditions. Neither advantage nor disadvantage. Use baseline position sizing.'
         },
         
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error - Cannot calculate market depth. Check volume data quality and completeness.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient data - Need at least 10 candles for liquidity analysis. Wait for more volume history.'
         }
     },
@@ -137,11 +141,23 @@ class MarketDepth:
         self.use_dynamic_thresholds = use_dynamic_thresholds
     
     def _determine_dual_signals(self, signal: str) -> tuple:
-        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
-        # Liquidity signals are non-directional (context only)
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)
+        
+        Maps liquidity conditions to trading quality bias:
+        - HIGH_LIQUIDITY → BULLISH (good trading conditions, favorable execution)
+        - LOW_LIQUIDITY → BEARISH (poor trading conditions, risky execution)
+        - NORMAL_LIQUIDITY → NEUTRAL (standard conditions)
+        """
         granular = signal
-        # Market depth doesn't provide directional bias - it's execution quality context
-        simple = 'NEUTRAL'
+        
+        # Map liquidity to execution quality bias
+        if granular == 'HIGH_LIQUIDITY':
+            simple = 'BULLISH'  # Good execution conditions
+        elif granular == 'LOW_LIQUIDITY':
+            simple = 'BEARISH'  # Poor execution conditions
+        else:  # NORMAL_LIQUIDITY
+            simple = 'NEUTRAL'  # Standard conditions
+        
         return granular, simple
     
     def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:

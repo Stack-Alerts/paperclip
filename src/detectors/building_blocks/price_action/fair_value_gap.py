@@ -52,10 +52,12 @@ from src.utils.advanced_data_loader import advanced_data
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate Fair Value Gaps. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 10 bars for FVG detection. Wait for more price history.'
         },
         
@@ -72,10 +74,12 @@ from src.utils.advanced_data_loader import advanced_data
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral FVG - Not in FVG zone currently. Wait for price to retest gaps or new gaps to form.'
         },
         'NO_FVG': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No FVG - No Fair Value Gaps detected. No price inefficiencies. No gap setups available.'
         }
 }

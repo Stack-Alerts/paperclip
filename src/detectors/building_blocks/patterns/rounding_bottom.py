@@ -51,6 +51,7 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No rounding bottom - Pattern conditions not met. No smooth U-shaped recovery detected. Wait for saucer pattern formation.'
         },
         
@@ -63,18 +64,22 @@ import numpy as np
         'BEARISH': {
                 'base_points': 30,
                 'formula': 'scaled',
-                'description': 'Bearish (inverse scenario) - Rounding bottom typically bullish. Verify pattern structure. Pattern indicates accumulation.'
+                'description': 'Bearish (inverse scenario) - Rounding bottom typically bullish. Verify pattern structure. Pattern indicates accumulation.',
+                'ui_visible': False  # Filter from Strategy Builder UI - bullish pattern, won't fire
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No rounding bottom - Market not forming bullish saucer. Wait for smooth U-shaped recovery before entering longs.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect rounding bottom pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 40 candles for rounding bottom detection. Wait for more price history to form U-shaped pattern.'
         }
 }
@@ -95,10 +100,10 @@ class RoundingBottomPattern:
     """
     
     def __init__(self, timeframe: str = '15min', min_pattern_bars: int = 15,
-                 depth_min: float = 0.11, **kwargs):
+                 depth_min: float = 0.03, **kwargs):
         self.timeframe = timeframe
         self.min_pattern_bars = min_pattern_bars
-        self.depth_min = depth_min  # 11% minimum depth (tighter than 10%, less than 12%)
+        self.depth_min = depth_min  # 3% minimum depth (relaxed for 15min)
         
         # Pattern lifecycle tracking (PHASE 1 improvements)
         self.active_pattern = None
@@ -110,12 +115,12 @@ class RoundingBottomPattern:
         self.MAX_PATTERN_DURATION = 120  # 30 hours maximum
         self.BREAKOUT_MAX_DURATION = 20   # Breakout confirmed for 20 bars
         
-        # Validation requirements (STRICTER for better selectivity)
-        self.MIN_CONFLUENCES = 4  # Keep at 4 (5 causes 0%)
+        # Validation requirements (RELAXED for 15min timeframe)
+        self.MIN_CONFLUENCES = 2  # Relaxed from 4 to 2
         self.MIN_RECOVERY_PCT = 0.50  # Minimum 50% recovery
         
-        # Breakout requirements (stricter)
-        self.BREAK_MARGIN = 0.009  # Must break 0.9% above initial
+        # Breakout requirements (removed margin)
+        self.BREAK_MARGIN = 0.0  # No margin - just break initial
     
     def _determine_dual_signals(self, granular_signal: str) -> tuple:
         """DUAL SIGNAL ARCHITECTURE"""

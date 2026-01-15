@@ -36,7 +36,7 @@ import numpy as np
         # Granular BB pattern signals
         'BULLISH_REVERSAL', 'BEARISH_REVERSAL', 'UPPER_BAND_WALK', 'LOWER_BAND_WALK',
         # Granular BB squeeze signals
-        'SQUEEZE_BREAKOUT', 'SQUEEZE_BREAKOUT_BULL', 'SQUEEZE_BREAKOUT_BEAR',
+        'SQUEEZE_BREAKOUT_BULL', 'SQUEEZE_BREAKOUT_BEAR',
         # Granular volatility regime signals
         'MEDIUM_HIGH', 'MEDIUM_LOW',
         # Simple directional - SIMPLE
@@ -100,11 +100,6 @@ import numpy as np
         },
         
         # Squeeze signals
-        'SQUEEZE_BREAKOUT': {
-                'base_points': 10,
-                'formula': 'scaled',
-                'description': 'Squeeze breakout - Bollinger squeeze broken. Volatility expansion starting. Major move beginning. Trade breakout direction aggressively.'
-        },
         'SQUEEZE_BREAKOUT_BULL': {
                 'base_points': 10,
                 'formula': 'scaled',
@@ -141,6 +136,7 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral - Price near middle band. No clear bias. Wait for directional signal before trading.'
         }
 }
@@ -842,20 +838,42 @@ class BollingerBands:
             else:
                 confluence_factors.append(f"Volatility regime: {regime} ({percentile}th percentile) - Normal conditions")
         
-        # Determine signal
+        # Determine signal - PRIORITY ORDER
+        # Priority 1: Squeeze breakout (highest priority - rare events)
         if squeeze_breakout['breakout_detected']:
             # Squeeze breakout takes priority as it's a strong signal
             if squeeze_breakout['breakout_direction'] == 'BULLISH':
                 signal = 'SQUEEZE_BREAKOUT_BULL'
-            elif squeeze_breakout['breakout_direction'] == 'BEARISH':
+            else:  # Must be BEARISH
                 signal = 'SQUEEZE_BREAKOUT_BEAR'
-            else:
-                signal = position
+        
+        # Priority 2: Band walk (strong trending behavior)
+        elif band_walk == 'UPPER_BAND_WALK':
+            signal = 'UPPER_BAND_WALK'
+        elif band_walk == 'LOWER_BAND_WALK':
+            signal = 'LOWER_BAND_WALK'
+        
+        # Priority 3: Reversal patterns
         elif w_bottom:
             signal = 'BULLISH_REVERSAL'
         elif m_top:
             signal = 'BEARISH_REVERSAL'
+        
+        # Priority 4: Volatility regime signals (when no other patterns present)
+        elif volatility_regime['regime'] == 'MEDIUM_HIGH':
+            signal = 'MEDIUM_HIGH'
+        elif volatility_regime['regime'] == 'MEDIUM_LOW':
+            signal = 'MEDIUM_LOW'
+        
+        # Priority 5: Position-based signals
+        elif position == 'UPPER_HALF' and current_percent_b >= 0.49 and current_percent_b <= 0.51:
+            # Very close to middle band = neutral
+            signal = 'NEUTRAL'
+        elif position == 'LOWER_HALF' and current_percent_b >= 0.49 and current_percent_b <= 0.51:
+            # Very close to middle band = neutral
+            signal = 'NEUTRAL'
         else:
+            # Default to position-based classification
             signal = position
         
         # ENHANCEMENT: Calculate variable confidence based on signal type

@@ -85,6 +85,7 @@ import numpy as np
         },
         'RANGING': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Ranging market - ADX <10. No directional trend. Choppy consolidation. Avoid trend strategies. Wait for breakout. Use range-bound trading.'
         },
         # Simple directional - SIMPLE
@@ -100,14 +101,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral/weak trend - ADX <25. No strong directional trend. Ranging or consolidating. Avoid trend trades until ADX strengthens.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate ADX. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least (period × 2) candles for ADX calculation. Wait for more price history.'
         }
 }

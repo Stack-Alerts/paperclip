@@ -81,12 +81,25 @@ class VolatilityRegime(Enum):
         # Simple directional signals - SIMPLE for basic users
         'BULLISH': {'base_points': 18, 'formula': 'scaled', 'description': 'Power hour uptrend - Institutional buying during peak hours. Long positions favorable. Use power hour trendline as support.'},
         'BEARISH': {'base_points': 18, 'formula': 'scaled', 'description': 'Power hour downtrend - Institutional selling during peak hours. Short positions favorable. Use power hour trendline as resistance.'},
-        'NEUTRAL': {'base_points': 8, 'formula': 'scaled', 'description': 'Power hour ranging - No clear institutional direction. Sideways action. Trade channel or wait for breakout.'},
+        'NEUTRAL': {'base_points': 8, 'formula': 'scaled', 'ui_visible': False,  # Filter from Strategy Builder UI
+ 'description': 'Power hour ranging - No clear institutional direction. Sideways action. Trade channel or wait for breakout.'},
         
         # Status signals
-        'INSUFFICIENT_POWER_HOURS': {'points': 0, 'description': 'Insufficient power hours - Need at least 20 power hour sessions for trendline analysis. Wait for more institutional hour data.'},
-        'ERROR': {'points': 0, 'description': 'Analysis error - Cannot build power hour trendlines. Check timestamp format and hour filtering.'},
-        'INSUFFICIENT_DATA': {'points': 0, 'description': 'Insufficient data - Need minimum 80 bars for power hour analysis. Wait for more historical data.'}
+        'INSUFFICIENT_POWER_HOURS': {
+            'points': 0,
+            'description': 'Insufficient power hours - Need at least 20 power hour sessions for trendline analysis. Wait for more institutional hour data.',
+            'ui_visible': False
+        },
+        'ERROR': {
+            'points': 0,
+            'description': 'Analysis error - Cannot build power hour trendlines. Check timestamp format and hour filtering.',
+            'ui_visible': False
+        },
+        'INSUFFICIENT_DATA': {
+            'points': 0,
+            'description': 'Insufficient data - Need minimum 80 bars for power hour analysis. Wait for more historical data.',
+            'ui_visible': False
+        }
     },
     description='Power Hour Trends - Institutional trading hour trendline analysis with volatility regimes',
     tags=['market_structure', 'power_hour', 'trendline', 'volatility', 'luxalgo', 'context_block']
@@ -318,8 +331,13 @@ class PowerHourTrends:
         return abs(final_upper - final_lower)
     
     def _classify_trend(self, slope: float) -> TrendDirection:
-        """Classify trend direction from slope."""
-        threshold = 0.0001
+        """Classify trend direction from slope.
+        
+        Threshold adjusted for BTC price levels ($40k-$100k):
+        - Slope < 50 per session = ranging (< $1000 per 20 sessions)
+        - This allows markets with weak trends to be classified as ranging
+        """
+        threshold = 50.0  # $50 per power hour session (relaxed for ranging detection)
         
         if abs(slope) < threshold:
             return TrendDirection.RANGING

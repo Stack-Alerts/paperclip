@@ -84,16 +84,20 @@ import numpy as np
         'NEUTRAL': {
             'base_points': 5,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'No MACD signal - holding position'
         },
         
         # Status
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Not enough data for analysis'
         }
     },
@@ -285,28 +289,55 @@ class MACDSignal:
         if len(price) < lookback:
             return {'bullish_divergence': False, 'bearish_divergence': False}
         
-        recent_price = price.iloc[-lookback:]
-        recent_macd = macd.iloc[-lookback:]
+        recent_price = price.iloc[-lookback:].reset_index(drop=True)
+        recent_macd = macd.iloc[-lookback:].reset_index(drop=True)
         
-        # Find lows and highs
-        price_lows = recent_price.nsmallest(2)
-        price_highs = recent_price.nlargest(2)
-        macd_lows = recent_macd.nsmallest(2)
-        macd_highs = recent_macd.nlargest(2)
-        
-        # Bullish divergence: price lower low, MACD higher low
+        # Find pivot lows and highs (local extremes)
         bullish_div = False
-        if len(price_lows) == 2 and len(macd_lows) == 2:
-            price_making_lower_low = price_lows.iloc[1] < price_lows.iloc[0]
-            macd_making_higher_low = macd_lows.iloc[1] > macd_lows.iloc[0]
-            bullish_div = price_making_lower_low and macd_making_higher_low
-        
-        # Bearish divergence: price higher high, MACD lower high
         bearish_div = False
-        if len(price_highs) == 2 and len(macd_highs) == 2:
-            price_making_higher_high = price_highs.iloc[1] > price_highs.iloc[0]
-            macd_making_lower_high = macd_highs.iloc[1] < macd_highs.iloc[0]
-            bearish_div = price_making_higher_high and macd_making_lower_high
+        
+        # Look for divergence in recent data
+        # Check middle section for pivots to ensure we have context before and after
+        for i in range(5, len(recent_price) - 5):
+            # Current pivot
+            current_price = recent_price.iloc[i]
+            current_macd = recent_macd.iloc[i]
+            
+            # Check if this is a pivot low (lower than neighbors)
+            is_price_low = (current_price < recent_price.iloc[i-1] and 
+                           current_price < recent_price.iloc[i+1])
+            
+            if is_price_low:
+                # Look for previous pivot low
+                for j in range(max(0, i-15), i-2):
+                    prev_price = recent_price.iloc[j]
+                    prev_macd = recent_macd.iloc[j]
+                    
+                    is_prev_low = (prev_price < recent_price.iloc[j+1] if j < len(recent_price)-1 else True)
+                    
+                    if is_prev_low:
+                        # Bullish divergence: price lower low, MACD higher low
+                        if current_price < prev_price and current_macd > prev_macd:
+                            bullish_div = True
+                            break
+            
+            # Check if this is a pivot high (higher than neighbors)
+            is_price_high = (current_price > recent_price.iloc[i-1] and 
+                            current_price > recent_price.iloc[i+1])
+            
+            if is_price_high:
+                # Look for previous pivot high
+                for j in range(max(0, i-15), i-2):
+                    prev_price = recent_price.iloc[j]
+                    prev_macd = recent_macd.iloc[j]
+                    
+                    is_prev_high = (prev_price > recent_price.iloc[j+1] if j < len(recent_price)-1 else True)
+                    
+                    if is_prev_high:
+                        # Bearish divergence: price higher high, MACD lower high
+                        if current_price > prev_price and current_macd < prev_macd:
+                            bearish_div = True
+                            break
         
         return {
             'bullish_divergence': bullish_div,

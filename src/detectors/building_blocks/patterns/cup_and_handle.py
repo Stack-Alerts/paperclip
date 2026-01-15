@@ -32,11 +32,12 @@ import numpy as np
     valid_signals=[
         # Granular pattern signals (Cup&Handle is bullish-only)
         'BREAKOUT_CONFIRMED', 'CUP_FORMING', 'PATTERN_FORMING', 'NO_PATTERN',
-        # Simple directional - SIMPLE (bullish-only pattern)
-        'BULLISH', 'NEUTRAL',
+        # Simple directional - SIMPLE (required for dual signal architecture)
+        'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
         'ERROR', 'INSUFFICIENT_DATA'
     ],
+    tags=['bullish_only_pattern'],  # BEARISH signal will never fire - bullish continuation pattern
     signal_tiers={
         # Pattern signals
         'BREAKOUT_CONFIRMED': {
@@ -56,24 +57,33 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No Cup & Handle - Pattern conditions not met. Insufficient cup depth or recovery. Cup & Handle patterns are rare. Wait for formation.'
         },
-        # Simple directional - SIMPLE (bullish-only)
+        # Simple directional - SIMPLE (required for dual signal architecture)
         'BULLISH': {
                 'base_points': 30,
                 'formula': 'scaled',
                 'description': 'Bullish Cup & Handle - Pattern forming or broken out. Long positions favorable. Bullish continuation pattern. Use cup depth for targets.'
         },
+        'BEARISH': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
+                'description': 'No bearish signal - Cup & Handle is a bullish-only pattern. This signal never fires.'
+        },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No Cup & Handle pattern - Market not forming bullish continuation. Wait for cup formation and breakout before entering longs.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect Cup & Handle pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 40 candles for Cup & Handle detection. Wait for more price history to form pattern.'
         }
 }
@@ -118,7 +128,7 @@ class CupAndHandlePattern:
         self.MIN_RECOVERY_PCT = 0.38  # Minimum 38% recovery (middle ground)
         
         # Breakout requirements (realistic for 15min)
-        self.BREAK_MARGIN = 0.001  # Must break 0.1% above rim (realistic for 15min)
+        self.BREAK_MARGIN = 0.0002  # Must break 0.02% above rim (sensitive for 15min patterns)
     
     def _determine_dual_signals(self, granular_signal: str) -> tuple:
         """DUAL SIGNAL ARCHITECTURE"""
@@ -292,8 +302,15 @@ class CupAndHandlePattern:
             base_confidence += 5
             confluences.append("Handle forming near rim")
         
-        # MINIMUM THRESHOLD: Require at least 4 confluences (PHASE 1: institutional grade)
-        if len(confluences) < self.MIN_CONFLUENCES:
+        # Check if breakout confirmed (price at/above rim OR 95%+ recovery)
+        breakout = current_price >= rim_level or recovery_pct >= 0.95
+        
+        # BREAKOUT PRIORITY: Allow breakout with fewer confluences (3 minimum)
+        if breakout and len(confluences) >= 3:
+            base_confidence +=10
+            signal = 'BREAKOUT_CONFIRMED'
+        # PATTERN FORMING: Require 4 confluences for non-breakout patterns
+        elif len(confluences) < self.MIN_CONFLUENCES:
             granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
                 'signal': granular_signal,
@@ -310,14 +327,6 @@ class CupAndHandlePattern:
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
-        
-        # Check if breakout confirmed (stricter margin)
-        breakout = current_price > rim_level * (1 + self.BREAK_MARGIN)  # 0.5% above rim
-        
-        # BREAKOUT gets additional confidence boost
-        if breakout:
-            base_confidence += 10
-            signal = 'BREAKOUT_CONFIRMED'
         elif recovery_pct > 0.60:
             signal = 'CUP_FORMING'
         else:

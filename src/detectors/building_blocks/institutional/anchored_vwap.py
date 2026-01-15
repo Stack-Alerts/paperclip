@@ -90,16 +90,20 @@ import numpy as np
         'NEUTRAL': {
             'base_points': 10,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'At anchored VWAP - Institutional equilibrium. No clear bias. Wait for acceptance above or rejection below before entering.'
         },
         
         # Status signals
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error - Cannot calculate anchored VWAP. Check anchor point selection and volume data quality.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient data - Need at least 20 candles for anchored VWAP calculation. Wait for more price history from anchor.'
         }
     },

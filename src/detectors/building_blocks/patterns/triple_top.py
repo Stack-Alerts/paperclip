@@ -38,7 +38,6 @@ import numpy as np
         'ERROR', 'INSUFFICIENT_DATA'
     ],
     signal_tiers={
-    signal_tiers={
         # Pattern signals
         'BEARISH_BREAKDOWN': {
                 'base_points': 30,
@@ -62,9 +61,9 @@ import numpy as np
                 'description': 'Bearish triple top - Classic topping pattern. Short positions favorable. Strong resistance confirmed by triple test. Major reversal signal.'
         },
         'BULLISH': {
-                'base_points': 30,
-                'formula': 'scaled',
-                'description': 'Bullish (inverse scenario) - Triple top typically bearish. Verify pattern structure. Pattern indicates strong resistance level.'
+                'points': 0,
+                'ui_visible': False,  # Hidden - bearish pattern only
+                'description': 'Not applicable - Triple top is bearish pattern only'
         },
         'NEUTRAL': {
                 'points': 0,
@@ -78,8 +77,7 @@ import numpy as np
                 'points': 0,
                 'description': 'Insufficient data - Need at least 40 candles for triple top detection. Wait for more price history to form three-peak pattern.'
         }
-}
-}
+    }
 )
 class TripleTopPattern:
     """
@@ -112,7 +110,7 @@ class TripleTopPattern:
         self.BREAKDOWN_MAX_DURATION = 20   # Breakdown confirmed for 20 bars
         
         # Validation requirements (STRICTER for better selectivity)
-        self.MIN_CONFLUENCES = 4  # Increased from 3 for institutional grade
+        self.MIN_CONFLUENCES = 5  # VERY STRICT - need 5 of 6
         self.MIN_PEAK_SPACING = 7  # 7 bars minimum between peaks
         
         # Breakdown requirements (stricter)

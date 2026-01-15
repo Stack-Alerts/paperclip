@@ -80,15 +80,19 @@ import numpy as np
         'NEUTRAL': {
                 'max_points': 6,
                 'formula': 'scaled',
+                'ui_visible': False,  # Filter from Strategy Builder UI
+
                 'description': 'Neutral 200 EMA - No clear long-term trend. Market ranging. Wait for decisive break above or below 200 EMA.'
         },
         # Status
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate 200 EMA. Check data quality and minimum period requirements.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 220 candles for 200 EMA calculation. Wait for more price history.'
         }
 }
@@ -135,6 +139,10 @@ class EMA200Trend:
     def _determine_dual_signals(self, crossed_above: bool, crossed_below: bool, 
                                  current_position: str, simple_signal: str) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        
+        # Handle status signals first (ERROR, INSUFFICIENT_DATA)
+        if simple_signal in ['ERROR', 'INSUFFICIENT_DATA']:
+            return simple_signal, 'NEUTRAL'
         
         # Granular: specific event or position
         if crossed_above:
@@ -185,13 +193,16 @@ class EMA200Trend:
             return 'SIDEWAYS'
     
     def classify_position(self, price: float, ema: float) -> str:
-        """Classify price position relative to 200 EMA"""
-        if price > ema:
-            return 'ABOVE_200EMA'
-        elif price < ema:
-            return 'BELOW_200EMA'
-        else:
+        """Classify price position relative to 200 EMA (with threshold for AT_200EMA)"""
+        # Use 0.5% threshold for "AT" (touching) detection
+        distance_pct = abs((price - ema) / ema * 100)
+        
+        if distance_pct < self.btc_distance_thresholds['touching']:  # < 0.5%
             return 'AT_200EMA'
+        elif price > ema:
+            return 'ABOVE_200EMA'
+        else:  # price < ema
+            return 'BELOW_200EMA'
     
     def calculate_distance(self, price: float, ema: float) -> float:
         """Calculate percentage distance from 200 EMA"""
@@ -277,8 +288,13 @@ class EMA200Trend:
         if 'close' not in df.columns:
             return {
                 'signal': 'ERROR',
+                'signal_simple': 'NEUTRAL',
                 'confidence': 0,
-                'metadata': {'error': 'Invalid data format'},
+                'metadata': {
+                    'signal_simple': 'NEUTRAL',
+                    'signal_granular': 'ERROR',
+                    'error': 'Invalid data format'
+                },
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -328,9 +344,16 @@ class EMA200Trend:
         signal = 'NEUTRAL'
         confidence = 70  # Base institutional confidence
         
-        # Detect EMA cross events
-        crossed_above = (prev_position == 'BELOW_200EMA' and current_position == 'ABOVE_200EMA')
-        crossed_below = (prev_position == 'ABOVE_200EMA' and current_position == 'BELOW_200EMA')
+        # Detect EMA cross events (AT_200EMA should not break cross detection)
+        # Treat AT_200EMA as neutral - check if we crossed from below to above or vice versa
+        crossed_above = (
+            (prev_position == 'BELOW_200EMA' and current_position in ['ABOVE_200EMA', 'AT_200EMA']) or
+            (prev_position == 'AT_200EMA' and current_position == 'ABOVE_200EMA' and prev_price < prev_ema)
+        )
+        crossed_below = (
+            (prev_position == 'ABOVE_200EMA' and current_position in ['BELOW_200EMA', 'AT_200EMA']) or
+            (prev_position == 'AT_200EMA' and current_position == 'BELOW_200EMA' and prev_price > prev_ema)
+        )
         
         # Initialize reversal tracking variables
         reversal_confirmed = False

@@ -25,7 +25,6 @@ import numpy as np
         'BULLISH_BOUNCE',     # Bounced at ILOD
         'AT_ILOD',           # Price at ILOD
         'ABOVE_ILOD',        # Price above ILOD
-        'BELOW_ILOD',        # Price below ILOD (new ILOD)
         # Simple directional - SIMPLE
         'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
@@ -34,39 +33,45 @@ import numpy as np
     signal_tiers={
         'BEARISH_BREAK': {
             'base_points': 22,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Bearish ILOD break - Price broke below previous intraday low. New ILOD made. Bearish momentum signal. Enter shorts on breakdown. Stop above previous ILOD. Target next support.'
         },
         'BULLISH_BOUNCE': {
             'base_points': 20,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Bullish ILOD bounce - Price bounced at intraday low. Failed breakdown. Reversal signal. Enter longs on bounce. Stop below ILOD. Target resistance levels.'
         },
         'AT_ILOD': {
             'max_points': 15,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'At ILOD - Price testing intraday low. Consolidation at support. Watch for breakdown or bounce. Wait for confirmation before entry. Key decision point.'
         },
         'ABOVE_ILOD': {
             'max_points': 10,
-            'formula': 'scaled'
-        },
-        'BELOW_ILOD': {
-            'max_points': 10,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Above ILOD - Price above intraday low. Normal state. ILOD acting as support. Watch for move back toward ILOD or continuation higher.'
         },
         'NEUTRAL': {
-            'points': 0
+            'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
+            'description': 'Neutral ILOD - No clear signal from intraday low. Price not near ILOD. Wait for price to approach support or establish new range.'
         },
         'ERROR': {
-            'points': 0
+            'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
+            'description': 'Analysis error - Cannot calculate ILOD signals. Check data quality, timestamp availability, and sufficient bar history.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
             'base_points': 20,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Bullish ILOD - Bounce at intraday low confirmed. Strong bullish reversal signal. Long positions favored. Support holding. High probability rally.'
         },
         'BEARISH': {
             'base_points': 20,
-            'formula': 'scaled'
+            'formula': 'scaled',
+            'description': 'Bearish ILOD - Intraday low breakdown confirmed. Bearish momentum signal. Short positions favored. Support broken. High probability continuation.'
         }
     }
 )
@@ -91,7 +96,6 @@ class ILOD:
     - BULLISH_BOUNCE: Bounced at ILOD (reversal)
     - AT_ILOD: Price testing ILOD
     - ABOVE_ILOD: Price above today's low
-    - BELOW_ILOD: Price at new low
     """
     
     def __init__(self, timeframe: str = '15min', **kwargs):
@@ -102,22 +106,24 @@ class ILOD:
     def _determine_dual_signals(self, distance_pct: float, is_new_ilod: bool) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
         
-        if is_new_ilod and distance_pct < 0:
+        if is_new_ilod:
+            # Breaking to new ILOD
             granular = 'BEARISH_BREAK'
             simple = 'BEARISH'
         elif abs(distance_pct) < self.proximity_threshold and distance_pct > 0:
+            # At ILOD with bounce
             granular = 'BULLISH_BOUNCE'
             simple = 'BULLISH'
         elif abs(distance_pct) < self.proximity_threshold:
+            # At ILOD (testing)
             granular = 'AT_ILOD'
             simple = 'NEUTRAL'
         elif distance_pct > 0.5:
+            # Above ILOD (normal state)
             granular = 'ABOVE_ILOD'
             simple = 'NEUTRAL'
-        elif distance_pct < 0:
-            granular = 'BELOW_ILOD'
-            simple = 'BEARISH'
         else:
+            # Fallback
             granular = 'NEUTRAL'
             simple = 'NEUTRAL'
         
@@ -162,8 +168,14 @@ class ILOD:
                 'timeframe': self.timeframe
             }
         
-        # Calculate ILOD
-        ilod = self.calculate_ilod(df)
+        # Calculate ILOD from bars BEFORE current bar to detect breaks
+        ilod_prev = self.calculate_ilod(df.iloc[:-1])
+        
+        # Calculate ILOD including current bar
+        ilod_current = self.calculate_ilod(df)
+        
+        # Use previous ILOD for comparison, current for tracking
+        ilod = ilod_prev if ilod_prev is not None else ilod_current
         
         if ilod is None:
             return {
@@ -175,12 +187,11 @@ class ILOD:
             }
         
         current_price = float(df['close'].iloc[-1])
+        current_low = float(df['low'].iloc[-1])
         distance_pct = ((current_price - ilod) / ilod) * 100
         
-        # Detect events
-        is_new_ilod = False
-        if self.prev_ilod is not None and ilod < self.prev_ilod:
-            is_new_ilod = True
+        # Detect events: new ILOD if current bar's low breaks previous ILOD
+        is_new_ilod = current_low < ilod
         
         # DUAL SIGNAL ARCHITECTURE
         granular_signal, simple_signal = self._determine_dual_signals(distance_pct, is_new_ilod)
@@ -195,8 +206,6 @@ class ILOD:
             confidence = 70
         elif signal == 'ABOVE_ILOD':
             confidence = 60
-        elif signal == 'BELOW_ILOD':
-            confidence = 65
         else:
             confidence = 50
         

@@ -52,6 +52,7 @@ import numpy as np
         },
         'NOT_IN_RANGE': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Not in range - Price outside balanced price range. No range setups. Wait for reentry or new range formation.'
         },
         # Simple directional
@@ -67,14 +68,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral range - Outside balanced price range. No clear bias. Wait for range reentry.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate balanced price range. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need enough bars for range detection. Wait for more price history.'
         }
 }

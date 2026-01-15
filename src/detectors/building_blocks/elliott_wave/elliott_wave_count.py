@@ -132,28 +132,35 @@ import numpy as np
         'NEUTRAL': {
             'base_points': 5,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'No clear wave structure - Market in transition or corrective phase. Wait for impulse wave to form before entering.'
         },
         
         # Status signals (no points)
         'WAVE_UNCERTAIN': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Wave count uncertain - Insufficient pivots or ambiguous structure. Wait for clearer wave pattern before trading.'
         },
         'INSUFFICIENT_PIVOTS': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient pivots - Need more price swings to identify wave structure. Monitor for swing points developing.'
         },
         'NO_PATTERN': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'No Elliott Wave pattern - Market not in clear impulse or corrective wave. Wait for structure to develop.'
         },
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error - Cannot calculate Elliott Wave count. Check data quality and timeframe completeness.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient data - Need at least 50 candles for Elliott Wave analysis. Wait for more price history.'
         }
     },
@@ -356,7 +363,7 @@ class ElliottWaveCount:
                     'pattern': 'IMPULSE'
                 }
         
-        # BEARISH 5-wave impulse: H L H L H L
+        # BEARISH 5-wave impulse: H L H L H L (BALANCED - realistic but flexible)
         elif structure == ['HIGH', 'LOW', 'HIGH', 'LOW', 'HIGH', 'LOW']:
             w1_size = recent[0]['price'] - recent[1]['price']
             w2_size = recent[2]['price'] - recent[1]['price']  # Retracement
@@ -364,16 +371,20 @@ class ElliottWaveCount:
             w4_size = recent[4]['price'] - recent[3]['price']  # Retracement
             w5_size = recent[4]['price'] - recent[5]['price']
             
-            valid_w3 = w3_size > w1_size
-            valid_w2 = w2_size < w1_size * 0.9
-            valid_w4 = w4_size < w3_size * 0.5
+            # BALANCED RULES: Relaxed but still meaningful
+            # Wave 3 >= 70% of Wave 1 (relaxed from 100% but realistic)
+            valid_w3 = w3_size >= w1_size * 0.7
+            # Wave 2 < 120% of Wave 1 (relaxed from 90% but not excessive)
+            valid_w2 = w2_size < w1_size * 1.2
+            # Wave 4 < 75% of Wave 3 (relaxed from 50% but reasonable)
+            valid_w4 = w4_size < w3_size * 0.75
             
             if valid_w3 and valid_w2 and valid_w4:
                 return {
                     'wave': 5,
                     'direction': 'BEARISH',
-                    'confidence': 80,
-                    'w3_extension': round((w3_size / w1_size - 1) * 100, 2),
+                    'confidence': 70,  # Reasonable confidence with balanced rules
+                    'w3_extension': round((w3_size / w1_size - 1) * 100, 2) if w1_size > 0 else 0,
                     'pattern': 'IMPULSE'
                 }
         
@@ -498,8 +509,27 @@ class ElliottWaveCount:
         # ENHANCED: Always identify current wave position
         wave_info = self.identify_current_wave(pivots)
         
-        if wave_info['wave'] == 'UNKNOWN' or wave_info['wave'] == 'UNCERTAIN':
-            # Not enough data for wave count
+        if wave_info['wave'] == 'UNKNOWN':
+            # Not enough pivots or structure for wave count
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
+            return {
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
+                'confidence': 0,
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'wave_count': 'UNKNOWN',
+                    'pivot_count': len(pivots),
+                    'phase': 'NO_PATTERN',
+                    'last_6_pivots': [p['type'] for p in pivots[-6:]] if len(pivots) >= 6 else [p['type'] for p in pivots]
+                },
+                'timestamp': df['timestamp'].iloc[-1],
+                'timeframe': self.timeframe,
+                'confluence_factors': [f'{len(pivots)} pivots - no clear pattern']
+            }
+        elif wave_info['wave'] == 'UNCERTAIN':
+            # Structure exists but unclear which wave
             granular_signal, simple_signal = self._determine_dual_signals('WAVE_UNCERTAIN')
             return {
                 'signal': granular_signal,
@@ -508,7 +538,7 @@ class ElliottWaveCount:
                 'metadata': {
                     'signal_simple': simple_signal,
                     'signal_granular': granular_signal,
-                    'wave_count': wave_info.get('wave', 'UNKNOWN'),
+                    'wave_count': 'UNCERTAIN',
                     'pivot_count': len(pivots),
                     'phase': wave_info.get('phase', 'UNCLEAR'),
                     'last_6_pivots': [p['type'] for p in pivots[-6:]] if len(pivots) >= 6 else [p['type'] for p in pivots]
