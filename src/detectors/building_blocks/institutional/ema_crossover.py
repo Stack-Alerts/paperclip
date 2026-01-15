@@ -78,16 +78,20 @@ import pandas as pd
         'NEUTRAL': {
             'base_points': 10,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'EMAs converging - Trend weakening or reversal imminent. Reduce positions. Wait for clear cross before re-entering.'
         },
         
         # Status signals
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error - Cannot calculate EMAs. Check data quality and EMA periods configuration.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient data - Need at least 200 candles for EMA calculation. Wait for more price history.'
         }
     },

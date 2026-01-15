@@ -124,6 +124,8 @@ class LiquidityZone:
         'NEUTRAL': {
             'base_points': 5,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'Between liquidity zones - No clear institutional zones nearby. Range-bound. Wait for zone interaction before entering positions.'
         },
         
@@ -142,10 +144,12 @@ class LiquidityZone:
         # Status
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error - Cannot detect liquidity zones. Check swing point calculation and data quality.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient data - Need at least 40 candles for liquidity zone detection. Wait for more price history.'
         }
     },

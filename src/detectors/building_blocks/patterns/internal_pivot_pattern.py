@@ -74,14 +74,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No pivot detected - Market not forming clear swing high or low. Wait for pivot confirmation before trading reversals.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect internal pivot pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need sufficient bars for pivot detection. Wait for more price history to identify swing points.'
         }
 }
@@ -301,14 +304,19 @@ class InternalPivotPattern:
         
         confidence = max(50, min(95, base_confidence))
         
-        # Calculate targets
+        # Determine signal types based on confidence/accuracy
+        # High confidence: use directional signals
+        # Medium confidence: use general pivot signals
+        use_directional = (base_confidence >= 75 and accuracy >= 70)
+        
+        # Calculate targets and determine signal types
         if pivot['is_bullish']:
-            signal_type = 'BULLISH_PIVOT_LOW'
+            signal_type = 'BULLISH_PIVOT_LOW' if use_directional else 'PIVOT_LOW'
             stop_loss = pivot['pivot_price'] * 0.995
             # Target next resistance (approximate)
             target = current_price * 1.02
         else:
-            signal_type = 'BEARISH_PIVOT_HIGH'
+            signal_type = 'BEARISH_PIVOT_HIGH' if use_directional else 'PIVOT_HIGH'
             stop_loss = pivot['pivot_price'] * 1.005
             # Target next support (approximate)
             target = current_price * 0.98

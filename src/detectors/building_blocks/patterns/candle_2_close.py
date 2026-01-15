@@ -64,14 +64,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No C2 Close pattern - Failed breakout conditions not met. No reversal signal. Wait for 4-candle pattern formation.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect Candle 2 Close pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 4 candles for C2 Close pattern detection. Wait for more price history.'
         }
 }

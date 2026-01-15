@@ -52,10 +52,12 @@ from src.utils.advanced_data_loader import advanced_data
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate order blocks. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 10 bars for order block detection. Wait for more price history.'
         },
         
@@ -72,10 +74,12 @@ from src.utils.advanced_data_loader import advanced_data
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral OB - Not at order block zone currently. Wait for price to retest OB or new OB to form.'
         },
         'NO_OB': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No OB - No order blocks detected. No institutional zones. No OB setups available.'
         }
 }

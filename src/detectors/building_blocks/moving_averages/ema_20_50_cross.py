@@ -52,6 +52,8 @@ import numpy as np
         'NEUTRAL': {
             'base_points': 5,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'No crossover detected - monitoring EMAs'
         },
         
@@ -69,10 +71,12 @@ import numpy as np
         
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Not enough data for analysis'
         }
     },

@@ -71,15 +71,19 @@ from src.utils.advanced_data_loader import advanced_data
         'NEUTRAL': {
             'base_points': 10,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'Mid-range - Between liquidity zones. No clear magnet. Range-bound. Wait for approach to buy or sell-side before entering.'
         },
         
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error - Cannot calculate range liquidity. Check range calculation and data quality.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient data - Need at least 20 candles for range liquidity analysis. Wait for wider price range to develop.'
         }
     },
@@ -110,6 +114,18 @@ class RangeLiquidity:
         self.timeframe = timeframe
         self.lookback = lookback
         self.orderbook_levels = min(orderbook_levels, 20)
+    
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE"""
+        granular = granular_signal
+        # Map liquidity proximity to directional bias
+        if granular == 'NEAR_SELL_SIDE_LIQUIDITY':
+            simple = 'BULLISH'  # Near support - bullish bias
+        elif granular == 'NEAR_BUY_SIDE_LIQUIDITY':
+            simple = 'BEARISH'  # Near resistance - bearish bias
+        else:
+            simple = 'NEUTRAL'
+        return granular, simple
     
     def load_orderbook_snapshot(self, timestamp: pd.Timestamp, orderbook_file: str) -> pd.Series:
         """Load closest orderbook snapshot to given timestamp"""
@@ -519,9 +535,13 @@ class RangeLiquidity:
             elif momentum < -0.05:
                 confluence_factors.append(f'⚠️ Momentum away from target ({int(momentum*100)} confidence)')
         
-        # Metadata
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'buy_side': round(range_high, 2),
             'sell_side': round(range_low, 2),
             'target_liquidity': round(target_liquidity, 2),
@@ -539,7 +559,8 @@ class RangeLiquidity:
         }
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': df['timestamp'].iloc[-1],

@@ -33,11 +33,12 @@ import numpy as np
     valid_signals=[
         # Granular pattern signals (Descending Triangle is bearish-only)
         'BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN',
-        # Simple directional - SIMPLE (bearish-only pattern)
-        'BEARISH', 'NEUTRAL',
+        # Simple directional - SIMPLE (required for dual signal architecture)
+        'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
         'ERROR', 'INSUFFICIENT_DATA'
     ],
+    tags=['bearish_only_pattern'],  # BULLISH signal will never fire - bearish continuation pattern
     signal_tiers={
         # Pattern signals
         'BEARISH_BREAKDOWN': {
@@ -52,10 +53,16 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No descending triangle - Pattern conditions not met. No falling highs or flat support detected. Wait for pattern formation.'
         },
         
-        # Simple directional - SIMPLE (bearish-only)
+        # Simple directional - SIMPLE (required for dual signal architecture)
+        'BULLISH': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
+                'description': 'No bullish signal - Descending Triangle is a bearish-only pattern. This signal never fires.'
+        },
         'BEARISH': {
                 'base_points': 30,
                 'formula': 'scaled',
@@ -63,14 +70,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No triangle pattern - Market structure unclear. No descending triangle setup. Wait for pattern formation before trading.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 50 candles for descending triangle detection. Wait for more price history.'
         }
 }

@@ -42,6 +42,8 @@ import numpy as np
         'PEAK_HOURS', 'ACTIVE_SESSION', 'MODERATE_SESSION', 'QUIET_SESSION', 'OFF_SESSION',
         # Simple TIME QUALITY - SIMPLE (timing, not direction!)
         'ACTIVE', 'INACTIVE', 'NO_SIGNAL',
+        # Required dual signal architecture (even though session time provides timing, not direction)
+        'BULLISH', 'BEARISH', 'NEUTRAL',
         # Status
         'ERROR'
     ],
@@ -54,14 +56,17 @@ import numpy as np
         },
         'INACTIVE': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Inactive session - Outside major trading hours. Low liquidity. Avoid trading. Wait for active session.'
         },
         'NO_SIGNAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No session signal - Cannot determine session quality. Default to manual time management.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate session time. Check timestamp data availability.'
         },
         
@@ -88,7 +93,25 @@ import numpy as np
         },
         'OFF_SESSION': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Off-session - Between major sessions. Very low activity. Avoid trading. Wait for London or NY open.'
+        },
+        
+        # Required dual signal architecture (session time is timing-based, not directional)
+        'BULLISH': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI - timing block doesn't emit directional signals
+                'description': 'Session time provides timing context, not directional bias. Use ACTIVE/INACTIVE instead.'
+        },
+        'BEARISH': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI - timing block doesn't emit directional signals
+                'description': 'Session time provides timing context, not directional bias. Use ACTIVE/INACTIVE instead.'
+        },
+        'NEUTRAL': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI - timing block doesn't emit directional signals
+                'description': 'Session time provides timing context, not directional bias. Use ACTIVE/INACTIVE instead.'
         }
 }
 )

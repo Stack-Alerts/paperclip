@@ -30,6 +30,7 @@ import numpy as np
     signal_tiers={
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate HOD. Check data quality and timestamp availability.'
         },
         'BEARISH': {
@@ -45,6 +46,8 @@ import numpy as np
         'NEUTRAL': {
                 'max_points': 10,
                 'formula': 'scaled',
+                'ui_visible': False,  # Filter from Strategy Builder UI
+
                 'description': 'Neutral HOD - Price near yesterday\'s high equilibrium. Wait for breakout or rejection confirmation.'
         },
         'HOD_REJECTION': {

@@ -98,14 +98,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Volatility stable - No directional bias. Market in equilibrium. Monitor for regime change.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Data validation error - Cannot calculate ATR. Check data quality and completeness.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need 14+ candles to calculate ATR. Wait for more data.'
         }
 }

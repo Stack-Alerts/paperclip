@@ -36,10 +36,38 @@ import numpy as np
 
 
 @dataclass
+class VolumeZone:
+    """Represents a single supply or demand zone from volume profile."""
+    zone_type: str  # 'SUPPLY' or 'DEMAND'
+    high: float
+    low: float
+    poc: float  # Point of Control (max volume price)
+    vah: float  # Value Area High
+    val: float  # Value Area Low
+    total_volume: float
+    buying_volume: float
+    selling_volume: float
+    formation_bar: int
+    
+    def get_width(self) -> float:
+        """Zone width in price units."""
+        return self.high - self.low
+    
+    def get_buy_ratio(self) -> float:
+        """Buying percentage (0.0 to 1.0)."""
+        if self.total_volume == 0:
+            return 0.5
+        return self.buying_volume / self.total_volume
+    
+    def contains_price(self, price: float) -> bool:
+        """Check if price is inside zone."""
+        return self.low <= price <= self.high
+
+
 @register_block(
     name='supply_demand_zones',
     category='SUPPLY_DEMAND',
-    class_name='VolumeZone',
+    class_name='SupplyDemandZones',
     default_weight=24,
     valid_signals=[
         # Granular supply/demand zone signals
@@ -73,6 +101,7 @@ import numpy as np
         },
         'NO_ZONE': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No zone detected - Price far from supply/demand zones. No institutional footprint. Wait for next zone. Avoid random entries.'
         },
         
@@ -89,46 +118,21 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral supply/demand - Between zones. No institutional presence. Wait for zone approach before trading.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate supply/demand zones. Check data quality and volume data availability.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 50 candles for supply/demand zone identification. Wait for more price history.'
         }
 }
 )
-class VolumeZone:
-    """Represents a single supply or demand zone from volume profile."""
-    zone_type: str  # 'SUPPLY' or 'DEMAND'
-    high: float
-    low: float
-    poc: float  # Point of Control (max volume price)
-    vah: float  # Value Area High
-    val: float  # Value Area Low
-    total_volume: float
-    buying_volume: float
-    selling_volume: float
-    formation_bar: int
-    
-    def get_width(self) -> float:
-        """Zone width in price units."""
-        return self.high - self.low
-    
-    def get_buy_ratio(self) -> float:
-        """Buying percentage (0.0 to 1.0)."""
-        if self.total_volume == 0:
-            return 0.5
-        return self.buying_volume / self.total_volume
-    
-    def contains_price(self, price: float) -> bool:
-        """Check if price is inside zone."""
-        return self.low <= price <= self.high
-
-
 class SupplyDemandZones:
     """
     Supply & Demand Zone Detector - LuxAlgo Volume Profile Methodology

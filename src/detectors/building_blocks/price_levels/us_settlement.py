@@ -69,16 +69,19 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral settlement - At equilibrium. No clear bias from settlement. Wait for direction or institutional activity.'
         },
         
         # Status
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate US settlement. Check data quality and timestamp availability.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need settlement time data. Wait for 4 PM ET settlement calculation.'
         }
 }

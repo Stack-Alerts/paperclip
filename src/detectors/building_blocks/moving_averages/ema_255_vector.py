@@ -70,16 +70,20 @@ import numpy as np
         'NEUTRAL': {
             'base_points': 5,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'No vector break - holding position'
         },
         
         # Status
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error occurred'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Not enough data for analysis'
         }
     },
@@ -320,14 +324,18 @@ class EMA255VectorBreak:
                     
                 confluence_factors.append('📈 BULLISH CLIMAX: Climax vector crossed above 255 EMA - MAJOR HTF trend shift')
             
-            # PSEUDO vectors (100%+): Require slope confirmation
+            # PSEUDO vectors (100%+): Require slope NOT opposing (more lenient)
             elif "PSEUDO" in vector_tier:
-                if slope in ['RISING', 'STRONG_RISING']:
+                # Accept if slope is not falling (RISING, STRONG_RISING, or FLAT)
+                if slope not in ['FALLING', 'STRONG_FALLING']:
                     signal = 'BULLISH_PSEUDO'  # GRANULAR (HTF)
-                    confidence = 90
+                    confidence = 85 if slope in ['RISING', 'STRONG_RISING'] else 80
                     confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (100%+ volume)')
-                    confluence_factors.append('✅ 255 EMA slope confirming uptrend - CONFIRMED')
-                    confluence_factors.append('📈 BULLISH PSEUDO: Confirmed pseudo vector crossed above 255 EMA - HTF trend shift')
+                    if slope in ['RISING', 'STRONG_RISING']:
+                        confluence_factors.append('✅ 255 EMA slope confirming uptrend')
+                    else:
+                        confluence_factors.append('⚠️  255 EMA slope neutral - moderate conviction')
+                    confluence_factors.append('📈 BULLISH PSEUDO: Pseudo vector crossed above 255 EMA - HTF trend shift')
                 
         elif crossed_below and is_vector_candle:
             # Bearish vector break
@@ -344,14 +352,18 @@ class EMA255VectorBreak:
                     
                 confluence_factors.append('📉 BEARISH CLIMAX: Climax vector crossed below 255 EMA - MAJOR HTF trend shift')
             
-            # PSEUDO vectors (100%+): Require slope confirmation
+            # PSEUDO vectors (100%+): Require slope NOT opposing (more lenient)
             elif "PSEUDO" in vector_tier:
-                if slope in ['FALLING', 'STRONG_FALLING']:
+                # Accept if slope is not rising (FALLING, STRONG_FALLING, or FLAT)
+                if slope not in ['RISING', 'STRONG_RISING']:
                     signal = 'BEARISH_PSEUDO'  # GRANULAR (HTF)
-                    confidence = 90
+                    confidence = 85 if slope in ['FALLING', 'STRONG_FALLING'] else 80
                     confluence_factors.append(f'📊 PSEUDO VECTOR: {vector_tier} (100%+ volume)')
-                    confluence_factors.append('✅ 255 EMA slope confirming downtrend - CONFIRMED')
-                    confluence_factors.append('📉 BEARISH PSEUDO: Confirmed pseudo vector crossed below 255 EMA - HTF trend shift')
+                    if slope in ['FALLING', 'STRONG_FALLING']:
+                        confluence_factors.append('✅ 255 EMA slope confirming downtrend')
+                    else:
+                        confluence_factors.append('⚠️  255 EMA slope neutral - moderate conviction')
+                    confluence_factors.append('📉 BEARISH PSEUDO: Pseudo vector crossed below 255 EMA - HTF trend shift')
         
         # Status information  
         if signal == 'NEUTRAL':

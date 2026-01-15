@@ -69,16 +69,19 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral Asia - At equilibrium. No clear bias from Asia session. Wait for direction.'
         },
         
         # Status
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate Asia session 50%. Check data quality and timestamp availability.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need Asia session data. Wait for Asia session completion.'
         }
 }

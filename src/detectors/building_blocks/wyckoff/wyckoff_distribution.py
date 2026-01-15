@@ -134,14 +134,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral Wyckoff - In Phase B consolidation or no pattern. Wait for UTAD/SOW signals before trading. Patient observation phase.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate Wyckoff distribution. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 50+ candles for Wyckoff analysis. Wait for more price history.'
         }
 }

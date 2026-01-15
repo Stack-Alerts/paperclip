@@ -54,10 +54,12 @@ import numpy as np
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate inducement. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need enough bars for inducement detection. Wait for more price history.'
         },
         
@@ -74,6 +76,7 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral inducement - No inducement traps detected. Wait for false moves and reversals.'
         }
 }

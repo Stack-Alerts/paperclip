@@ -61,14 +61,17 @@ import numpy as np
         },
         'NO_CROSS': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No cross detected - Stochastic RSI in neutral zone. No extreme momentum. Wait for overbought/oversold or crossover.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate Stochastic RSI. Check data quality and parameter configuration.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 30 candles for Stochastic RSI calculation. Wait for more price history.'
         },
         
@@ -86,6 +89,8 @@ import numpy as np
         'NEUTRAL': {
                 'max_points': 12,
                 'formula': 'scaled',
+                'ui_visible': False,  # Filter from Strategy Builder UI
+
                 'description': 'Neutral Stochastic RSI - No extreme momentum or cross. Market in equilibrium. Wait for extreme levels or crossover.'
         }
 }

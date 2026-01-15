@@ -55,10 +55,12 @@ import numpy as np
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate displacement. Check data quality and required columns.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need enough bars for displacement detection. Wait for more price history.'
         },
         
@@ -75,6 +77,7 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral displacement - No strong displacement. Wait for momentum surge or consolidation break.'
         }
 }

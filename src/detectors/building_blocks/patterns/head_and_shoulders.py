@@ -50,6 +50,7 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No Head & Shoulders - Pattern conditions not met. Need three peaks with head higher than shoulders. Wait for pattern formation.'
         },
         
@@ -66,14 +67,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No Head & Shoulders pattern - Market not forming bearish reversal. Wait for three-peak formation with neckline before trading.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect Head & Shoulders pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 40 candles for H&S detection. Wait for more price history to form three-peak pattern.'
         }
 }

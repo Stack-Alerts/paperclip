@@ -27,10 +27,18 @@ import pandas as pd
 import numpy as np
 
 
+class SessionType(Enum):
+    """Silver Bullet session types."""
+    LONDON_OPEN = "london_open"
+    AM_SESSION = "am_session"
+    PM_SESSION = "pm_session"
+    OTHER = "other"
+
+
 @register_block(
     name='ict_silver_bullet',
     category='SIGNALS',
-    class_name='SessionType',
+    class_name='ICTSilverBullet',
     default_weight=20,
     valid_signals=[
         # Granular ICT signals
@@ -63,10 +71,12 @@ import numpy as np
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate ICT Silver Bullet signals. Check data quality and timestamp availability.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 50 bars for FVG detection. Wait for more price history.'
         },
         
@@ -83,18 +93,11 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral Silver Bullet - No Fair Value Gaps detected. No institutional imbalances. Wait for Silver Bullet sessions and FVG formation.'
         }
 }
 )
-class SessionType(Enum):
-    """Silver Bullet session types."""
-    LONDON_OPEN = "london_open"
-    AM_SESSION = "am_session"
-    PM_SESSION = "pm_session"
-    OTHER = "other"
-
-
 class ICTSilverBullet:
     """
     ICT Silver Bullet Detector
@@ -432,11 +435,13 @@ class ICTSilverBullet:
         fvg = retest_setup['fvg']
         is_retest = retest_setup['is_retest']
         
-        # Determine signal type
+        # Determine signal type (granular)
         if fvg['type'] == 'bullish':
-            signal = 'BULLISH_FVG_RETEST' if is_retest else 'BULLISH_FVG_IN_ZONE'
+            granular_signal = 'BULLISH_FVG_RETEST' if is_retest else 'BULLISH_FVG_IN_ZONE'
+            simple_signal = 'BULLISH'
         else:
-            signal = 'BEARISH_FVG_RETEST' if is_retest else 'BEARISH_FVG_IN_ZONE'
+            granular_signal = 'BEARISH_FVG_RETEST' if is_retest else 'BEARISH_FVG_IN_ZONE'
+            simple_signal = 'BEARISH'
         
         # Calculate confidence
         base_confidence = 65
@@ -468,9 +473,12 @@ class ICTSilverBullet:
         risk_reward = reward / risk if risk > 0 else 0
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': {
+                'signal_simple': simple_signal,
+               'signal_granular': granular_signal,
                 'fvg_type': fvg['type'],
                 'fvg_size': round(fvg['size'], 2),
                 'fvg_size_pct': round(fvg['size_pct'], 3),

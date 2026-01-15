@@ -92,6 +92,8 @@ import numpy as np
         'NEUTRAL': {
             'base_points': 5,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'Neutral EWO - Oscillator near zero line. No clear momentum. Wait for decisive move before entering.'
         },
         
@@ -103,10 +105,12 @@ import numpy as np
         },
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error - Cannot calculate Elliott Wave Oscillator. Check data quality and SMA periods.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient data - Need at least 35 candles for EWO calculation. Wait for more price history.'
         }
     },

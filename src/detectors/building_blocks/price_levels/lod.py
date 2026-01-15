@@ -30,6 +30,7 @@ import numpy as np
     signal_tiers={
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot calculate LOD. Check data quality and timestamp availability.'
         },
         'BULLISH': {
@@ -45,6 +46,8 @@ import numpy as np
         'NEUTRAL': {
                 'max_points': 10,
                 'formula': 'scaled',
+                'ui_visible': False,  # Filter from Strategy Builder UI
+
                 'description': 'Neutral LOD - Price near yesterday\'s low equilibrium. Wait for bounce or breakdown confirmation.'
         },
         'LOD_BOUNCE': {

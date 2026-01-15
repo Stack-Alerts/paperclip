@@ -56,6 +56,7 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No pennant pattern - Missing strong directional move or converging triangle. Wait for pole and pennant formation.'
         },
         
@@ -72,14 +73,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'No pennant pattern - Market not forming continuation pattern. Wait for strong move followed by converging triangle before trading.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Analysis error - Cannot detect pennant pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Insufficient data - Need at least 50 candles for pennant detection. Wait for more price history to form pattern.'
         }
 }
@@ -120,8 +124,8 @@ class PennantPattern:
         self.MIN_POLE_STRENGTH = 0.010  # Minimum 1.0% move (relaxed)
         self.MIN_CONVERGENCE = 0.15     # Minimum 15% convergence (relaxed)
         
-        # Breakout requirements
-        self.BREAK_MARGIN = 0.005  # Must break 0.5% beyond channel
+        # Breakout requirements (RELAXED for 15min timeframe)
+        self.BREAK_MARGIN = 0.0  # No margin required - just needs to break channel bounds
     
     def _determine_dual_signals(self, granular_signal: str, direction: str) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Bilateral continuation pattern"""
@@ -329,15 +333,21 @@ class PennantPattern:
                 'confluence_factors': []
             }
         
-        # Check for breakout (RELAXED for 15min)
-        upper = last_5['high'].max()
-        lower = last_5['low'].min()
+        # Check for breakout (FIXED: use current bar's high/low, not close)
+        # Pennant range from pennant section (excluding current bar for proper comparison)
+        pennant_range = pennant_section.iloc[:-1]  # All but current bar
+        upper = pennant_range['high'].max()
+        lower = pennant_range['low'].min()
+        
+        # Current bar for breakout check
+        current_high = float(df['high'].iloc[-1])
+        current_low = float(df['low'].iloc[-1])
         
         if direction == 'BULLISH':
-            breakout = current_price > upper * (1 + self.BREAK_MARGIN)
+            breakout = current_high > upper * (1 + self.BREAK_MARGIN)
             signal = 'BULLISH_BREAKOUT' if breakout else 'PATTERN_FORMING'
         else:
-            breakout = current_price < lower * (1 - self.BREAK_MARGIN)
+            breakout = current_low < lower * (1 - self.BREAK_MARGIN)
             signal = 'BEARISH_BREAKOUT' if breakout else 'PATTERN_FORMING'
         
         # BREAKOUT gets additional confidence boost

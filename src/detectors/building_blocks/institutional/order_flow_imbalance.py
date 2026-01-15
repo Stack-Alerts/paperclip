@@ -81,15 +81,19 @@ from src.utils.advanced_data_loader import advanced_data
         'NEUTRAL': {
             'base_points': 8,
             'formula': 'scaled',
+            'ui_visible': False,  # Filter from Strategy Builder UI
+
             'description': 'Balanced institutional flow - No clear pressure. Sideways action expected. Reduce exposure until bias emerges.'
         },
         
         'ERROR': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Analysis error - Cannot calculate order flow. Check volume data quality and bar completeness.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
+            'ui_visible': False,  # Filter from Strategy Builder UI
             'description': 'Insufficient data - Need at least 10 candles for order flow analysis. Wait for more volume history.'
         }
     },
