@@ -44,56 +44,69 @@ import numpy as np
         # Volatility level signals (absolute)
         'EXTREME': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Extreme volatility - Market moving >2000 USD per 15min. Use very wide stops (3x+ ATR).'
         },
         'VERY_HIGH': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Very high volatility - Large price swings. Use wider stops (2.5x ATR). Favorable for breakouts.'
         },
         'HIGH': {
                 'base_points': 9,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'High volatility - Active market. Use standard-to-wide stops (2x-2.5x ATR). Good for trend trading.'
         },
         'NORMAL': {
                 'base_points': 7,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Normal volatility - Regular market activity. Use standard stops (2x ATR). Suitable for all strategies.'
         },
         'CALM': {
                 'base_points': 6,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Low volatility - Tight consolidation. Use conservative stops (1.5x ATR). Range trading favorable.'
         },
         
         # Volatility level signals (percentile)
         'EXTREME_HIGH': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Volatility at 95th+ percentile - Historically extreme. Major event or trend. Widen all stops significantly.'
         },
         'EXTREME_LOW': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Volatility at <5th percentile - Historically low. Consolidation before breakout. Tighten stops, prepare for expansion.'
         },
         'VERY_LOW': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Volatility at 5th-30th percentile - Below average. Tight ranges. Breakout setup developing.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Volatility expanding - Energy building in market. Favorable for breakout entries and trend continuation.'
         },
         'BEARISH': {
                 'base_points': 10,
-                'formula': 'scaled'
+                'formula': 'scaled',
+                'description': 'Volatility contracting - Market consolidating. Reduce position sizes. Favor range-bound strategies.'
         },
         'NEUTRAL': {
-                'points': 0
+                'points': 0,
+                'description': 'Volatility stable - No directional bias. Market in equilibrium. Monitor for regime change.'
         },
         'ERROR': {
-                'points': 0
+                'points': 0,
+                'description': 'Data validation error - Cannot calculate ATR. Check data quality and completeness.'
         },
         'INSUFFICIENT_DATA': {
-                'points': 0
+                'points': 0,
+                'description': 'Insufficient data - Need 14+ candles to calculate ATR. Wait for more data.'
         }
 }
 )
