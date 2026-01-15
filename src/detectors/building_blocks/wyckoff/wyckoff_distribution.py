@@ -327,73 +327,97 @@ class WyckoffDistribution:
     
     def detect_utad(self, df: pd.DataFrame, resistance_level: float) -> tuple:
         """
-        Detect UTAD pattern (Phase C):
+        Detect UTAD pattern (Phase C): EVENT DETECTION
         - Price breaks above resistance (false breakout - trap!)
         - Volume on breakout LOWER than average (weak - not institutional)
         - Quick reversal back below resistance
+        
+        FIX: Scan recent history for completed UTAD events (last 20 bars)
         """
-        if len(df) < 10 or resistance_level == 0:
+        if len(df) < 15 or resistance_level == 0:
             return False, 0
         
-        # Check for breakout above resistance in last 10 bars
-        recent_highs = df['high'].iloc[-10:]
-        breakout_threshold = 1.0 + (self.utad_breakout_pct / 100.0)
-        broke_resistance = recent_highs.max() > resistance_level * breakout_threshold
+        # CRITICAL FIX: Scan recent history for UTAD EVENTS (last 20 bars)
+        # UTAD is an event that OCCURRED, not just current state
+        scan_window = min(20, len(df) - 3)
         
-        if not broke_resistance:
-            return False, 0
-        
-        # Volume should be LOWER (weak breakout - trap for retail)
-        volume_avg = df['volume'].iloc[-50:-10].mean()
-        breakout_volume = df['volume'].iloc[-10:].mean()
-        low_volume_breakout = breakout_volume < volume_avg * self.utad_volume_ratio
-        
-        # Quick reversal back below resistance
-        current_price = df['close'].iloc[-1]
-        reversed = current_price < resistance_level
-        
-        if broke_resistance and low_volume_breakout and reversed:
-            # UTAD DETECTED - Major shorting opportunity!
-            return True, 90
-        elif broke_resistance and reversed:
-            # Reversed but volume not ideal
-            return True, 75
+        for i in range(len(df) - scan_window, len(df)):
+            if i < 5:
+                continue
+            
+            # Look at 5-bar window before this point
+            window_start = max(0, i - 5)
+            window = df.iloc[window_start:i+1]
+            
+            # Did price break ABOVE resistance in this window?
+            breakout_threshold = resistance_level * 1.01  # 1% above (relaxed for crypto)
+            broke_resistance = window['high'].max() > breakout_threshold
+            
+            if not broke_resistance:
+                continue
+            
+            # Did price fail to SUSTAIN above resistance? (not necessarily full reversal)
+            final_close = window['close'].iloc[-1]
+            failed_to_sustain = final_close < resistance_level * 1.005  # Within 0.5% of resistance (very relaxed)
+            
+            if broke_resistance and failed_to_sustain:
+                # UTAD event found in recent history!
+                # Check volume (optional)
+                if len(window) > 5:
+                    volume_avg = df['volume'].iloc[max(0, window_start-20):window_start].mean()
+                    if volume_avg > 0:
+                        breakout_volume = window['volume'].mean()
+                        low_volume = breakout_volume < volume_avg * 1.1
+                        return True, 85 if low_volume else 75
+                return True, 75
         
         return False, 0
     
     def detect_sign_of_weakness(self, df: pd.DataFrame, support_level: float) -> tuple:
         """
-        Detect Sign of Weakness (Phase D):
+        Detect Sign of Weakness (Phase D): EVENT DETECTION
         - Price breaks below support
         - HIGH volume on breakdown (smart money selling)
         - Sustained move (not false breakdown)
+        
+        FIX: Scan recent history for completed SOW events (last 20 bars)
         """
-        if len(df) < 10 or support_level == 0:
+        if len(df) < 15 or support_level == 0:
             return False, 0
         
-        # Check for breakdown below support
-        recent_lows = df['low'].iloc[-10:]
-        breakdown_threshold = 1.0 - (self.sow_breakdown_pct / 100.0)
-        broke_support = recent_lows.min() < support_level * breakdown_threshold
+        # CRITICAL FIX: Scan recent history for SOW EVENTS (last 20 bars)
+        # SOW is an event that OCCURRED, not just current state
+        scan_window = min(20, len(df) - 3)
         
-        if not broke_support:
-            return False, 0
-        
-        # Volume should be HIGH (institutional selling)
-        volume_avg = df['volume'].iloc[-50:-10].mean()
-        breakdown_volume = df['volume'].iloc[-10:].mean()
-        high_volume_breakdown = breakdown_volume > volume_avg * self.sow_volume_ratio
-        
-        # Sustained move (close below support)
-        current_price = df['close'].iloc[-1]
-        sustained = current_price < support_level * 0.998
-        
-        if broke_support and high_volume_breakdown and sustained:
-            # SOW DETECTED - Distribution confirmed!
-            return True, 85
-        elif broke_support and sustained:
-            # Breakdown but volume not ideal
-            return True, 70
+        for i in range(len(df) - scan_window, len(df)):
+            if i < 5:
+                continue
+            
+            # Look at 5-bar window before this point
+            window_start = max(0, i - 5)
+            window = df.iloc[window_start:i+1]
+            
+            # Did price break BELOW support in this window?
+            breakdown_threshold = support_level * 0.99  # 1% below (relaxed for crypto)
+            broke_support = window['low'].min() < breakdown_threshold
+            
+            if not broke_support:
+                continue
+            
+            # Did price SUSTAIN below support by end of window?
+            final_close = window['close'].iloc[-1]
+            sustained = final_close < support_level * 0.998  # Sustained below support
+            
+            if broke_support and sustained:
+                # SOW event found in recent history!
+                # Check volume (optional)
+                if len(window) > 5:
+                    volume_avg = df['volume'].iloc[max(0, window_start-20):window_start].mean()
+                    if volume_avg > 0:
+                        breakdown_volume = window['volume'].mean()
+                        high_volume = breakdown_volume > volume_avg * 1.0
+                        return True, 85 if high_volume else 75
+                return True, 75
         
         return False, 0
     
