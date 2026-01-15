@@ -54,43 +54,43 @@ from src.utils.advanced_data_loader import advanced_data
         'BUY_IMBALANCE': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Strong buy pressure - volume weighted to upside (>65%)'
+            'description': 'Buy imbalance - 65%+ volume to upside. Strong institutional buying. Enter longs aggressively. Trail stops below recent lows.'
         },
         'SELL_IMBALANCE': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Strong sell pressure - volume weighted to downside (>65%)'
+            'description': 'Sell imbalance - 65%+ volume to downside. Strong institutional selling. Enter shorts or exit longs. Trail stops above recent highs.'
         },
         'BALANCED': {
             'base_points': 8,
             'formula': 'scaled',
-            'description': 'Balanced order flow - no clear directional pressure'
+            'description': 'Balanced order flow - Equal buy/sell pressure. No clear institutional bias. Reduce positions. Wait for imbalance signal.'
         },
         
         # Simple directional signals - SIMPLE for basic users
         'BULLISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Buy pressure detected - bullish (simple)'
+            'description': 'Buy pressure detected - Institutions accumulating. Long positions favorable. Use volume-weighted stops.'
         },
         'BEARISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Sell pressure detected - bearish (simple)'
+            'description': 'Sell pressure detected - Institutions distributing. Short positions favorable or exit longs. Use volume-weighted stops.'
         },
         'NEUTRAL': {
             'base_points': 8,
             'formula': 'scaled',
-            'description': 'Balanced flow - neutral (simple)'
+            'description': 'Balanced institutional flow - No clear pressure. Sideways action expected. Reduce exposure until bias emerges.'
         },
         
         'ERROR': {
             'points': 0,
-            'description': 'Analysis error occurred'
+            'description': 'Analysis error - Cannot calculate order flow. Check volume data quality and bar completeness.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
-            'description': 'Not enough data for analysis'
+            'description': 'Insufficient data - Need at least 10 candles for order flow analysis. Wait for more volume history.'
         }
     },
     description='Order Flow Imbalance - Buy/sell pressure detection from volume-weighted bar analysis',

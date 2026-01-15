@@ -61,32 +61,32 @@ class VolatilityRegime(Enum):
     ],
     signal_tiers={
         # Uptrend signals (bullish bias)
-        'UPTREND_LOW': {'base_points': 20, 'formula': 'scaled', 'description': 'Uptrend with low volatility - stable bullish'},
-        'UPTREND_MODERATE': {'base_points': 18, 'formula': 'scaled', 'description': 'Uptrend with moderate volatility'},
-        'UPTREND_HIGH': {'base_points': 15, 'formula': 'scaled', 'description': 'Uptrend with high volatility'},
-        'UPTREND_EXTREME': {'base_points': 12, 'formula': 'scaled', 'description': 'Uptrend with extreme volatility - risky'},
+        'UPTREND_LOW': {'base_points': 20, 'formula': 'scaled', 'description': 'Uptrend low volatility - Stable bullish trend. High confidence longs. Use trendline as support. Trail stops below channel.'},
+        'UPTREND_MODERATE': {'base_points': 18, 'formula': 'scaled', 'description': 'Uptrend moderate volatility - Normal bullish trend. Long positions favorable. Standard stops. Watch channel bounds.'},
+        'UPTREND_HIGH': {'base_points': 15, 'formula': 'scaled', 'description': 'Uptrend high volatility - Volatile bullish trend. Longs acceptable but risky. Wide stops. Reduce position size.'},
+        'UPTREND_EXTREME': {'base_points': 12, 'formula': 'scaled', 'description': 'Uptrend extreme volatility - Unstable bullish. High risk. Small positions only. Very wide stops. Consider waiting.'},
         
         # Downtrend signals (bearish bias)
-        'DOWNTREND_LOW': {'base_points': 20, 'formula': 'scaled', 'description': 'Downtrend with low volatility - stable bearish'},
-        'DOWNTREND_MODERATE': {'base_points': 18, 'formula': 'scaled', 'description': 'Downtrend with moderate volatility'},
-        'DOWNTREND_HIGH': {'base_points': 15, 'formula': 'scaled', 'description': 'Downtrend with high volatility'},
-        'DOWNTREND_EXTREME': {'base_points': 12, 'formula': 'scaled', 'description': 'Downtrend with extreme volatility - risky'},
+        'DOWNTREND_LOW': {'base_points': 20, 'formula': 'scaled', 'description': 'Downtrend low volatility - Stable bearish trend. High confidence shorts. Use trendline as resistance. Trail stops above channel.'},
+        'DOWNTREND_MODERATE': {'base_points': 18, 'formula': 'scaled', 'description': 'Downtrend moderate volatility - Normal bearish trend. Short positions favorable. Standard stops. Watch channel bounds.'},
+        'DOWNTREND_HIGH': {'base_points': 15, 'formula': 'scaled', 'description': 'Downtrend high volatility - Volatile bearish trend. Shorts acceptable but risky. Wide stops. Reduce position size.'},
+        'DOWNTREND_EXTREME': {'base_points': 12, 'formula': 'scaled', 'description': 'Downtrend extreme volatility - Unstable bearish. High risk. Small positions only. Very wide stops. Consider waiting.'},
         
         # Ranging signals (neutral)
-        'RANGING_LOW': {'base_points': 10, 'formula': 'scaled', 'description': 'Ranging with low volatility - consolidation'},
-        'RANGING_MODERATE': {'base_points': 8, 'formula': 'scaled', 'description': 'Ranging with moderate volatility'},
-        'RANGING_HIGH': {'base_points': 6, 'formula': 'scaled', 'description': 'Ranging with high volatility - choppy'},
-        'RANGING_EXTREME': {'base_points': 4, 'formula': 'scaled', 'description': 'Ranging with extreme volatility - avoid'},
+        'RANGING_LOW': {'base_points': 10, 'formula': 'scaled', 'description': 'Range low volatility - Tight consolidation. Trade channel bounds. Buy support sell resistance. Quick exits. Small positions.'},
+        'RANGING_MODERATE': {'base_points': 8, 'formula': 'scaled', 'description': 'Range moderate volatility - Normal consolidation. Range trade acceptable. Watch for breakout. Neutral bias.'},
+        'RANGING_HIGH': {'base_points': 6, 'formula': 'scaled', 'description': 'Range high volatility - Choppy sideways. Difficult to trade. False breakouts likely. Reduce exposure. Wait for clarity.'},
+        'RANGING_EXTREME': {'base_points': 4, 'formula': 'scaled', 'description': 'Range extreme volatility - Whipsaw action. Avoid trading. High slippage risk. Stand aside. Wait for trend or calm.'},
         
         # Simple directional signals - SIMPLE for basic users
-        'BULLISH': {'base_points': 18, 'formula': 'scaled', 'description': 'Uptrend - bullish (simple)'},
-        'BEARISH': {'base_points': 18, 'formula': 'scaled', 'description': 'Downtrend - bearish (simple)'},
-        'NEUTRAL': {'base_points': 8, 'formula': 'scaled', 'description': 'Ranging - neutral (simple)'},
+        'BULLISH': {'base_points': 18, 'formula': 'scaled', 'description': 'Power hour uptrend - Institutional buying during peak hours. Long positions favorable. Use power hour trendline as support.'},
+        'BEARISH': {'base_points': 18, 'formula': 'scaled', 'description': 'Power hour downtrend - Institutional selling during peak hours. Short positions favorable. Use power hour trendline as resistance.'},
+        'NEUTRAL': {'base_points': 8, 'formula': 'scaled', 'description': 'Power hour ranging - No clear institutional direction. Sideways action. Trade channel or wait for breakout.'},
         
         # Status signals
-        'INSUFFICIENT_POWER_HOURS': {'points': 0, 'description': 'Not enough power hour data'},
-        'ERROR': {'points': 0, 'description': 'Analysis error occurred'},
-        'INSUFFICIENT_DATA': {'points': 0, 'description': 'Not enough data for analysis'}
+        'INSUFFICIENT_POWER_HOURS': {'points': 0, 'description': 'Insufficient power hours - Need at least 20 power hour sessions for trendline analysis. Wait for more institutional hour data.'},
+        'ERROR': {'points': 0, 'description': 'Analysis error - Cannot build power hour trendlines. Check timestamp format and hour filtering.'},
+        'INSUFFICIENT_DATA': {'points': 0, 'description': 'Insufficient data - Need minimum 80 bars for power hour analysis. Wait for more historical data.'}
     },
     description='Power Hour Trends - Institutional trading hour trendline analysis with volatility regimes',
     tags=['market_structure', 'power_hour', 'trendline', 'volatility', 'luxalgo', 'context_block']

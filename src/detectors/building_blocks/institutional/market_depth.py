@@ -62,43 +62,43 @@ from src.utils.advanced_data_loader import advanced_data
         'HIGH_LIQUIDITY': {
             'base_points': 18,
             'formula': 'scaled',
-            'description': 'High volume/liquidity - excellent execution conditions'
+            'description': 'High liquidity - Volume 1.5x+ above average. Excellent execution. Tight spreads. Increase position sizes up to 20%. Minimal slippage expected.'
         },
         'NORMAL_LIQUIDITY': {
             'base_points': 12,
             'formula': 'scaled',
-            'description': 'Normal liquidity conditions - standard execution'
+            'description': 'Normal liquidity - Average volume conditions. Standard execution quality. Use normal position sizes. Expect standard slippage.'
         },
         'LOW_LIQUIDITY': {
             'base_points': 8,
             'formula': 'scaled',
-            'description': 'Low liquidity warning - poor execution risk'
+            'description': 'Low liquidity - Volume below 50% of average. Poor execution risk. Reduce positions 40-60%. Wide spreads. Expect significant slippage.'
         },
         
         # Simple directional signals - SIMPLE for basic users
         'BULLISH': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Good liquidity conditions - bullish (simple)'
+            'description': 'Good liquidity context - Execution quality favorable for long entries. Normal to high volume. Proceed with standard risk.'
         },
         'BEARISH': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Good liquidity conditions - bearish (simple)'
+            'description': 'Good liquidity context - Execution quality favorable for short entries. Normal to high volume. Proceed with standard risk.'
         },
         'NEUTRAL': {
             'base_points': 10,
             'formula': 'scaled',
-            'description': 'Normal liquidity - neutral (simple)'
+            'description': 'Normal liquidity - Standard market conditions. Neither advantage nor disadvantage. Use baseline position sizing.'
         },
         
         'ERROR': {
             'points': 0,
-            'description': 'Analysis error occurred'
+            'description': 'Analysis error - Cannot calculate market depth. Check volume data quality and completeness.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
-            'description': 'Not enough data for analysis'
+            'description': 'Insufficient data - Need at least 10 candles for liquidity analysis. Wait for more volume history.'
         }
     },
     description='Market Depth - Volume-based liquidity analysis with spread estimation',

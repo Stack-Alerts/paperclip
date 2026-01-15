@@ -58,43 +58,43 @@ import numpy as np
         'PRICE_IN_PREMIUM': {
             'base_points': 14,
             'formula': 'scaled',
-            'description': 'Price in premium zone - expensive, potential reversal down'
+            'description': 'Premium zone - Price above fair value. Expensive. Institutions distributing. Expect pullback to equilibrium. Take profits on longs. Consider shorts. Stop above recent high.'
         },
         'PRICE_IN_DISCOUNT': {
             'base_points': 14,
             'formula': 'scaled',
-            'description': 'Price in discount zone - cheap, potential reversal up'
+            'description': 'Discount zone - Price below fair value. Cheap. Institutions accumulating. Prime buying opportunity. Enter longs. Target equilibrium. Stop below recent low.'
         },
         'PRICE_AT_EQUILIBRIUM': {
             'base_points': 10,
             'formula': 'scaled',
-            'description': 'Price at equilibrium - fair value zone'
+            'description': 'Equilibrium zone - Fair value. Balanced. No edge. Wait for move into premium or discount. Range-bound. Use tight stops or stand aside.'
         },
         
         # Simple directional signals - SIMPLE
         'BULLISH': {
             'base_points': 14,
             'formula': 'scaled',
-            'description': 'In discount - bullish (simple)'
+            'description': 'In discount - Price at bargain levels. Institutional buying zone. Long positions highly favorable. Use discount as support.'
         },
         'BEARISH': {
             'base_points': 14,
             'formula': 'scaled',
-            'description': 'In premium - bearish (simple)'
+            'description': 'In premium - Price overextended. Institutional selling zone. Short positions favorable or take profits on longs. Mean reversion expected.'
         },
         'NEUTRAL': {
             'base_points': 10,
             'formula': 'scaled',
-            'description': 'At equilibrium - neutral (simple)'
+            'description': 'At equilibrium - Fair value. No clear edge. Wait for discount to buy or premium to sell. Patient positioning required.'
         },
         
         'ERROR': {
             'points': 0,
-            'description': 'Analysis error occurred'
+            'description': 'Analysis error - Cannot calculate premium/discount zones. Check range calculation and data quality.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
-            'description': 'Not enough data for analysis'
+            'description': 'Insufficient data - Need at least 20 candles for premium/discount analysis. Wait for wider price range to develop.'
         }
     },
     description='Premium/Discount Zones - ICT premium/discount analysis with multi-timeframe alignment',

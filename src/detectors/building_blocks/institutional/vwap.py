@@ -43,43 +43,43 @@ import numpy as np
         'ABOVE_VWAP': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Price above VWAP - premium zone'
+            'description': 'Price above VWAP - Premium zone. Institutions selling. Expect mean reversion. Consider shorts or take profits on longs. Stop above recent high.'
         },
         'BELOW_VWAP': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Price below VWAP - discount zone'
+            'description': 'Price below VWAP - Discount zone. Institutions buying. Favorable for longs. Mean reversion expected upward. Stop below recent low.'
         },
         'AT_VWAP': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Price at VWAP - high probability reversal zone'
+            'description': 'Price at VWAP - Fair value equilibrium. High probability reversal zone. Prime entry point. Watch for acceptance or rejection. Use VWAP as stop.'
         },
         
         # Simple directional signals - SIMPLE for basic users
         'BULLISH': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Above VWAP - bullish (simple)'
+            'description': 'Above VWAP - Price in premium. Bullish bias but expect pullback to VWAP. Trail stops. Consider profit taking.'
         },
         'BEARISH': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Below VWAP - bearish (simple)'
+            'description': 'Below VWAP - Price in discount. Bearish bias but expect rally to VWAP. Long entries favorable on dips. Use VWAP target.'
         },
         'NEUTRAL': {
             'base_points': 7,
             'formula': 'scaled',
-            'description': 'At VWAP - neutral (simple)'
+            'description': 'At VWAP - Fair value zone. No bias. Wait for breakout above or breakdown below before entering. High probability pivot.'
         },
         
         'ERROR': {
             'points': 0,
-            'description': 'Analysis error occurred'
+            'description': 'Analysis error - Cannot calculate VWAP. Check volume data quality and price completeness.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
-            'description': 'Not enough data for analysis'
+            'description': 'Insufficient data - Need at least 10 candles for VWAP calculation. Wait for more price and volume history.'
         }
     },
     description='VWAP - Volume-weighted average price, institutional benchmark for premium/discount zones',
