@@ -386,10 +386,14 @@ class ThreeBarReversal:
     
     def _neutral_response(self, timestamp: datetime, price: float, trend: str, reason: str = None) -> Dict[str, Any]:
         """Generate neutral response."""
+        granular_signal, simple_signal = self._determine_dual_signals('NEUTRAL')
         return {
-            'signal': 'NEUTRAL',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 50,
             'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
                 'current_price': round(price, 2),
                 'trend': trend,
                 'reason': reason or 'No 3-bar pattern detected',
@@ -402,10 +406,16 @@ class ThreeBarReversal:
     
     def _error_response(self, error: str) -> Dict[str, Any]:
         """Generate error response."""
+        granular_signal, simple_signal = self._determine_dual_signals('ERROR')
         return {
-            'signal': 'ERROR',
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': 0,
-            'metadata': {'error': error},
+            'metadata': {
+                'signal_simple': simple_signal,
+                'signal_granular': granular_signal,
+                'error': error
+            },
             'timestamp': datetime.now(),
             'timeframe': '15min',
             'confluence_factors': []
