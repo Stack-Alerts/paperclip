@@ -342,77 +342,97 @@ class WyckoffAccumulation:
     
     def detect_spring(self, df: pd.DataFrame, support_level: float) -> tuple:
         """
-        Detect spring pattern (Phase C):
+        Detect spring pattern (Phase C): EVENT DETECTION
         - Price breaks below support (false breakdown)
         - Volume on breakdown LOWER than average (weak hands)
         - Quick recovery back above support
+        
+        FIX: Scan recent history for completed spring events (last 20 bars)
         """
-        if len(df) < 10 or support_level == 0:
+        if len(df) < 15 or support_level == 0:
             return False, 0
         
-        # Check for breakdown in recent range period (not just last 20)
-        # Use last 50 bars to match range detection
-        lookback_bars = min(50, len(df))
-        recent_lows = df['low'].iloc[-lookback_bars:]
-        breakdown_threshold = 1.0 - (self.spring_breakdown_pct / 100.0)
-        broke_support = recent_lows.min() < support_level * breakdown_threshold
+        # CRITICAL FIX: Scan recent history for spring EVENTS (last 15 bars)
+        # A spring is an event that OCCURRED, not just current state
+        scan_window = min(15, len(df) - 3)
         
-        if not broke_support:
-            return False, 0
-        
-        # RELAXED: Volume check is optional (many springs don't have low volume)  
-        volume_avg = df['volume'].iloc[-lookback_bars-10:-10].mean() if len(df) > lookback_bars+10 else df['volume'].mean()
-        breakdown_volume = df['volume'].iloc[-lookback_bars:].mean()
-        low_volume_breakdown = breakdown_volume < volume_avg * 1.1  # Very relaxed (110%)
-        
-        # Quick recovery back above support
-        current_price = df['close'].iloc[-1]
-        recovered = current_price > support_level * 0.998  # Allow slight below (0.2%)
-        
-        if broke_support and recovered:
-            # Spring detected! Confidence based on volume
-            if low_volume_breakdown:
-                return True, 85  # Perfect spring
-            else:
-                return True, 70  # Spring with higher volume (still valid)
+        for i in range(len(df) - scan_window, len(df)):
+            if i < 5:
+                continue
+            
+            # Look at 5-bar window before this point (10 hours on 2HR = more realistic)
+            window_start = max(0, i - 5)
+            window = df.iloc[window_start:i+1]
+            
+            # Did price break BELOW support in this window?
+            breakdown_threshold = support_level * 0.98  # 2% below
+            broke_support = window['low'].min() < breakdown_threshold
+            
+            if not broke_support:
+                continue
+            
+            # Did price RECOVER above support by end of window?
+            final_close = window['close'].iloc[-1]
+            recovered = final_close > support_level * 0.998  # Back above support
+            
+            if broke_support and recovered:
+                # Spring event found in recent history!
+                # Check volume (optional)
+                if len(window) > 5:
+                    volume_avg = df['volume'].iloc[max(0, window_start-20):window_start].mean()
+                    if volume_avg > 0:
+                        breakdown_volume = window['volume'].mean()
+                        low_volume = breakdown_volume < volume_avg * 1.1
+                        return True, 85 if low_volume else 75
+                return True, 75
         
         return False, 0
     
     def detect_sign_of_strength(self, df: pd.DataFrame, resistance_level: float) -> tuple:
         """
-        Detect Sign of Strength (Phase D):
+        Detect Sign of Strength (Phase D): EVENT DETECTION
         - Price breaks above resistance
         - HIGH volume on breakout (smart money)
         - Sustained move (not false breakout)
+        
+        FIX: Scan recent history for completed SOS events (last 20 bars)
         """
-        if len(df) < 10 or resistance_level == 0:
+        if len(df) < 15 or resistance_level == 0:
             return False, 0
         
-        # Check for breakout in recent range period (not just last 20)
-        # Use last 50 bars to match range detection
-        lookback_bars = min(50, len(df))
-        recent_highs = df['high'].iloc[-lookback_bars:]
-        breakout_threshold = 1.0 + (self.sos_breakout_pct / 100.0)
-        broke_resistance = recent_highs.max() > resistance_level * breakout_threshold
+        # CRITICAL FIX: Scan recent history for SOS EVENTS (last 15 bars)
+        # An SOS is an event that OCCURRED, not just current state
+        scan_window = min(15, len(df) - 3)
         
-        if not broke_resistance:
-            return False, 0
-        
-        # RELAXED: Volume check is optional (many breakouts occur without high volume initially)
-        volume_avg = df['volume'].iloc[-lookback_bars-10:-10].mean() if len(df) > lookback_bars+10 else df['volume'].mean()
-        breakout_volume = df['volume'].iloc[-lookback_bars:].mean()
-        high_volume_breakout = breakout_volume > volume_avg * 1.0  # Relaxed to equal (100%)
-        
-        # Sustained move (close above resistance)
-        current_price = df['close'].iloc[-1]
-        sustained = current_price > resistance_level * 0.998  # Allow slight below (0.2%)
-        
-        if broke_resistance and sustained:
-            # SOS detected! Confidence based on volume
-            if high_volume_breakout:
-                return True, 85  # Perfect SOS with volume
-            else:
-                return True, 70  # SOS without volume confirmation (still valid)
+        for i in range(len(df) - scan_window, len(df)):
+            if i < 5:
+                continue
+            
+            # Look at 5-bar window before this point (10 hours on 2HR = more realistic)
+            window_start = max(0, i - 5)
+            window = df.iloc[window_start:i+1]
+            
+            # Did price break ABOVE resistance in this window?
+            breakout_threshold = resistance_level * 1.02  # 2% above
+            broke_resistance = window['high'].max() > breakout_threshold
+            
+            if not broke_resistance:
+                continue
+            
+            # Did price SUSTAIN above resistance by end of window?
+            final_close = window['close'].iloc[-1]
+            sustained = final_close > resistance_level * 1.002  # Sustained above resistance
+            
+            if broke_resistance and sustained:
+                # SOS event found in recent history!
+                # Check volume (optional)
+                if len(window) > 5:
+                    volume_avg = df['volume'].iloc[max(0, window_start-20):window_start].mean()
+                    if volume_avg > 0:
+                        breakout_volume = window['volume'].mean()
+                        high_volume = breakout_volume > volume_avg * 1.0
+                        return True, 85 if high_volume else 75
+                return True, 75
         
         return False, 0
     
