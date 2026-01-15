@@ -81,72 +81,72 @@ class LiquidityZone:
         'BUYSIDE_ZONE_TOUCH': {
             'base_points': 25,
             'formula': 'scaled',
-            'description': 'Price touching buyside liquidity - potential bounce/reversal up'
+            'description': 'Buyside liquidity touch - Price at short stop clusters. Institutional accumulation zone. Prime long entry. Expect bounce. Stop below zone.'
         },
         'SELLSIDE_ZONE_TOUCH': {
             'base_points': 25,
             'formula': 'scaled',
-            'description': 'Price touching sellside liquidity - potential reversal down'
+            'description': 'Sellside liquidity touch - Price at long stop clusters. Institutional distribution zone. Prime short entry. Expect reversal down. Stop above zone.'
         },
         
         # Breaches - Momentum continuation
         'BUYSIDE_BREACH': {
             'base_points': 22,
             'formula': 'scaled',
-            'description': 'Bearish breach below buyside - stop hunt complete'
+            'description': 'Buyside breach - Stop hunt complete below buyside. Shorts absorbed. Bearish momentum confirmed. Continue shorts or exit longs. Trail stops.'
         },
         'SELLSIDE_BREACH': {
             'base_points': 22,
             'formula': 'scaled',
-            'description': 'Bullish breach above sellside - stop hunt complete'
+            'description': 'Sellside breach - Stop hunt complete above sellside. Longs absorbed. Bullish momentum confirmed. Continue longs or exit shorts. Trail stops.'
         },
         
         # Void - Aggressive institutional move
         'VOID_DETECTED': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Liquidity void detected - rapid price movement'
+            'description': 'Liquidity void detected - Rapid institutional move. Low volume gap. Expect void fill pullback. Fade extreme moves. Target void center.'
         },
         
         # Proximity - Approaching zones
         'NEAR_BUYSIDE': {
             'base_points': 12,
             'formula': 'scaled',
-            'description': 'Approaching buyside liquidity zone'
+            'description': 'Near buyside liquidity - Approaching short stop zone. Prepare for potential bounce. Reduce short exposure. Watch for reversal signals.'
         },
         'NEAR_SELLSIDE': {
             'base_points': 12,
             'formula': 'scaled',
-            'description': 'Approaching sellside liquidity zone'
+            'description': 'Near sellside liquidity - Approaching long stop zone. Prepare for potential reversal. Reduce long exposure. Watch for rejection signals.'
         },
         
         # Neutral - Between zones
         'NEUTRAL': {
             'base_points': 5,
             'formula': 'scaled',
-            'description': 'Between liquidity zones - no clear setup'
+            'description': 'Between liquidity zones - No clear institutional zones nearby. Range-bound. Wait for zone interaction before entering positions.'
         },
         
         # Simple directional signals - SIMPLE for basic users
         'BULLISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Bullish liquidity setup - any event (simple)'
+            'description': 'Bullish liquidity - At buyside zone or sellside breach. Institutions buying. Long positions favorable. Use zone as support.'
         },
         'BEARISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Bearish liquidity setup - any event (simple)'
+            'description': 'Bearish liquidity - At sellside zone or buyside breach. Institutions selling. Short positions favorable. Use zone as resistance.'
         },
         
         # Status
         'ERROR': {
             'points': 0,
-            'description': 'Analysis error occurred'
+            'description': 'Analysis error - Cannot detect liquidity zones. Check swing point calculation and data quality.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
-            'description': 'Not enough data for analysis'
+            'description': 'Insufficient data - Need at least 40 candles for liquidity zone detection. Wait for more price history.'
         }
     },
     description='Liquidity - ICT/LuxAlgo institutional liquidity zones (buyside/sellside stops, voids, breaches)',

@@ -44,51 +44,51 @@ import pandas as pd
         'GOLDEN_CROSS': {
             'base_points': 35,
             'formula': 'scaled',
-            'description': 'EMA 50/200 golden cross - rare bullish reversal signal'
+            'description': 'Golden Cross - Fast EMA crossed above slow EMA. Major bullish reversal. Enter longs aggressively. Trail stops below fast EMA.'
         },
         'DEATH_CROSS': {
             'base_points': 35,
             'formula': 'scaled',
-            'description': 'EMA 50/200 death cross - rare bearish reversal signal'
+            'description': 'Death Cross - Fast EMA crossed below slow EMA. Major bearish reversal. Enter shorts aggressively. Trail stops above fast EMA.'
         },
         
         # Alignment states - Continuous trend confirmation (99.4% occurrence)
         'BULLISH_ALIGNMENT': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Fast EMA above slow EMA - bullish trend alignment'
+            'description': 'Bullish alignment - Fast EMA above slow EMA. Uptrend confirmed. Hold longs. Buy dips to fast EMA. Avoid shorts.'
         },
         'BEARISH_ALIGNMENT': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Fast EMA below slow EMA - bearish trend alignment'
+            'description': 'Bearish alignment - Fast EMA below slow EMA. Downtrend confirmed. Hold shorts. Sell rallies to fast EMA. Avoid longs.'
         },
         
         # Simple directional signals - SIMPLE for basic users
         'BULLISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Bullish EMA setup - any alignment (simple)'
+            'description': 'Bullish EMA trend - Fast above slow or golden cross. Long positions favorable. Stops below slow EMA.'
         },
         'BEARISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Bearish EMA setup - any alignment (simple)'
+            'description': 'Bearish EMA trend - Fast below slow or death cross. Short positions favorable. Stops above slow EMA.'
         },
         'NEUTRAL': {
             'base_points': 10,
             'formula': 'scaled',
-            'description': 'EMAs converging - neutral (simple)'
+            'description': 'EMAs converging - Trend weakening or reversal imminent. Reduce positions. Wait for clear cross before re-entering.'
         },
         
         # Status signals
         'ERROR': {
             'points': 0,
-            'description': 'Analysis error occurred'
+            'description': 'Analysis error - Cannot calculate EMAs. Check data quality and EMA periods configuration.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
-            'description': 'Not enough data for analysis'
+            'description': 'Insufficient data - Need at least 200 candles for EMA calculation. Wait for more price history.'
         }
     },
     description='EMA Crossover - Fast/slow EMA crosses (rare events) and trend alignment (continuous state)',

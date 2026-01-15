@@ -49,38 +49,38 @@ from src.utils.advanced_data_loader import advanced_data
         'NEAR_BUY_SIDE_LIQUIDITY': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Approaching buy-side liquidity (range high) - potential reversal down'
+            'description': 'Near buy-side liquidity - Approaching range high. Long stop clusters above. Expect rejection or sweep. Consider shorts. Take profits on longs. Stop above range high.'
         },
         'NEAR_SELL_SIDE_LIQUIDITY': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Approaching sell-side liquidity (range low) - potential reversal up'
+            'description': 'Near sell-side liquidity - Approaching range low. Short stop clusters below. Expect bounce or sweep. Consider longs. Take profits on shorts. Stop below range low.'
         },
         
         # Simple directional - SIMPLE
         'BULLISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Near sell-side liquidity - bullish (simple)'
+            'description': 'Near sell-side liquidity - Price at range support. Long stop clusters provide magnet. Enter longs. Target range high. Stop below range low.'
         },
         'BEARISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Near buy-side liquidity - bearish (simple)'
+            'description': 'Near buy-side liquidity - Price at range resistance. Short stop clusters provide magnet. Enter shorts. Target range low. Stop above range high.'
         },
         'NEUTRAL': {
             'base_points': 10,
             'formula': 'scaled',
-            'description': 'Mid-range - neutral (simple)'
+            'description': 'Mid-range - Between liquidity zones. No clear magnet. Range-bound. Wait for approach to buy or sell-side before entering.'
         },
         
         'ERROR': {
             'points': 0,
-            'description': 'Analysis error occurred'
+            'description': 'Analysis error - Cannot calculate range liquidity. Check range calculation and data quality.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
-            'description': 'Not enough data for analysis'
+            'description': 'Insufficient data - Need at least 20 candles for range liquidity analysis. Wait for wider price range to develop.'
         }
     },
     description='Range Liquidity - Detects proximity to buy/sell-side liquidity with optional orderbook depth analysis',

@@ -56,51 +56,51 @@ import numpy as np
         'AT_VWAP': {
             'base_points': 28,
             'formula': 'scaled',
-            'description': 'Price touching anchored VWAP - high probability reversal zone'
+            'description': 'Price at anchored VWAP - Institutional reversal zone. Prime entry level. Expect bounce or rejection. Use VWAP as stop reference.'
         },
         'NEAR_VWAP': {
             'base_points': 22,
             'formula': 'scaled',
-            'description': 'Price within 1% of anchored VWAP - approaching key level'
+            'description': 'Price within 1% of anchored VWAP - Approaching key level. Prepare for reaction. Tighten stops. Watch for acceptance or rejection.'
         },
         
         # Position signals - Standard institutional levels
         'ABOVE_ANCHORED_VWAP': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Price above anchored VWAP - bullish positioning'
+            'description': 'Price above anchored VWAP - Bullish control. VWAP acts as support. Long bias. Stop below VWAP plus buffer.'
         },
         'BELOW_ANCHORED_VWAP': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Price below anchored VWAP - bearish positioning'
+            'description': 'Price below anchored VWAP - Bearish control. VWAP acts as resistance. Short bias. Stop above VWAP plus buffer.'
         },
         
         # Simple directional signals - SIMPLE for basic users
         'BULLISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Above or at VWAP - bullish (simple)'
+            'description': 'Above anchored VWAP - Institutions buying. Long positions favorable. VWAP support below. Trail stops under VWAP.'
         },
         'BEARISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Below or at VWAP - bearish (simple)'
+            'description': 'Below anchored VWAP - Institutions selling. Short positions favorable. VWAP resistance above. Trail stops above VWAP.'
         },
         'NEUTRAL': {
             'base_points': 10,
             'formula': 'scaled',
-            'description': 'Near VWAP - neutral zone (simple)'
+            'description': 'At anchored VWAP - Institutional equilibrium. No clear bias. Wait for acceptance above or rejection below before entering.'
         },
         
         # Status signals
         'ERROR': {
             'points': 0,
-            'description': 'Analysis error occurred'
+            'description': 'Analysis error - Cannot calculate anchored VWAP. Check anchor point selection and volume data quality.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
-            'description': 'Not enough data for analysis'
+            'description': 'Insufficient data - Need at least 20 candles for anchored VWAP calculation. Wait for more price history from anchor.'
         }
     },
     description='Anchored VWAP - Volume-weighted average price from smart anchor points (swing highs/lows)',
