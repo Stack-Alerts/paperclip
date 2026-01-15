@@ -252,10 +252,16 @@ class OrderBlock:
                 signal = 'BEARISH'
         
         if not active_ob:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_ORDER_BLOCK')
             return {
-                'signal': 'NO_ORDER_BLOCK',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'No order block detected'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': 'No order block detected'
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
