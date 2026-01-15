@@ -165,7 +165,7 @@ class WyckoffDistribution:
     def __init__(self, timeframe: str = '15min', 
                  range_lookback: int = 50,           # Optimized for 2HR/4HR
                  volume_lookback: int = 50,
-                 range_threshold_pct: float = 10.0,  # RELAXED: 5% → 10% (match accumulation)
+                 range_threshold_pct: float = 5.0,   # Optimized for 2HR (30% Phase B, not 73%!)
                  utad_breakout_pct: float = 1.0,     # RELAXED: 2% → 1% for crypto
                  utad_volume_ratio: float = 0.90,    # Lower volume on UTAD (weak)
                  sow_breakdown_pct: float = 1.0,     # RELAXED: 2% → 1% for crypto
