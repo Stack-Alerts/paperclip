@@ -173,10 +173,16 @@ class PennantPattern:
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """INSTITUTIONAL GRADE: Pennant Pattern with multi-block validation"""
         if len(df) < 50:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'Need at least 50 bars'},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal,
+                    'error': 'Need at least 50 bars'
+                },
                 'timestamp': df['timestamp'].iloc[-1] if len(df) > 0 else datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -191,10 +197,15 @@ class PennantPattern:
         
         # Require minimum pole strength
         if abs(pole_move_pct) < self.MIN_POLE_STRENGTH:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN', 'NEUTRAL')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -214,10 +225,15 @@ class PennantPattern:
         is_converging = last_range < first_range * (1 - self.MIN_CONVERGENCE)
         
         if not is_converging:
+            granular_signal, simple_signal = self._determine_dual_signals('NO_PATTERN', 'NEUTRAL')
             return {
-                'signal': 'NO_PATTERN',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {},
+                'metadata': {
+                    'signal_simple': simple_signal,
+                    'signal_granular': granular_signal
+                },
                 'timestamp': df['timestamp'].iloc[-1],
                 'timeframe': self.timeframe,
                 'confluence_factors': []
