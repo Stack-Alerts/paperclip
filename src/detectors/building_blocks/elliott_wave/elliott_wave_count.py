@@ -62,99 +62,99 @@ import numpy as np
         'WAVE_5_BULLISH': {
             'base_points': 50,
             'formula': 'scaled',
-            'description': 'Wave 5 complete - bearish reversal expected'
+            'description': 'Wave 5 complete (bullish) - Bearish reversal imminent. Take profit on longs. Consider short entry. Stop above Wave 5 high.'
         },
         'WAVE_5_BEARISH': {
             'base_points': 50,
             'formula': 'scaled',
-            'description': 'Wave 5 complete - bullish reversal expected'
+            'description': 'Wave 5 complete (bearish) - Bullish reversal imminent. Take profit on shorts. Consider long entry. Stop below Wave 5 low.'
         },
         
         # Wave 3 signals - Strong trend continuation
         'WAVE_3_BULLISH': {
             'base_points': 40,
             'formula': 'scaled',
-            'description': 'Wave 3 in progress - strongest bullish wave'
+            'description': 'Wave 3 bullish - Strongest wave of impulse. Add to longs. Trail stops. Expect extended move. Never fade Wave 3.'
         },
         'WAVE_3_BEARISH': {
             'base_points': 40,
             'formula': 'scaled',
-            'description': 'Wave 3 in progress - strongest bearish wave'
+            'description': 'Wave 3 bearish - Strongest wave of impulse. Add to shorts. Trail stops. Expect extended move. Never fade Wave 3.'
         },
         
         # Wave 4 signals - Correction before Wave 5
         'WAVE_4_BULLISH': {
             'base_points': 25,
             'formula': 'scaled',
-            'description': 'Wave 4 correction - Wave 5 next (bullish)'
+            'description': 'Wave 4 correction (bullish) - Shallow pullback. Hold longs, add on dip. Wave 5 final push coming. Stop below Wave 4 low.'
         },
         'WAVE_4_BEARISH': {
             'base_points': 25,
             'formula': 'scaled',
-            'description': 'Wave 4 correction - Wave 5 next (bearish)'
+            'description': 'Wave 4 correction (bearish) - Shallow bounce. Hold shorts, add on rally. Wave 5 final push coming. Stop above Wave 4 high.'
         },
         
         # Wave 2 signals - Early correction
         'WAVE_2_BULLISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Wave 2 correction - Wave 3 coming (bullish)'
+            'description': 'Wave 2 correction (bullish) - Deep retracement after Wave 1. Prime long entry. Wave 3 (strongest) next. Stop below Wave 2 low.'
         },
         'WAVE_2_BEARISH': {
             'base_points': 20,
             'formula': 'scaled',
-            'description': 'Wave 2 correction - Wave 3 coming (bearish)'
+            'description': 'Wave 2 correction (bearish) - Deep retracement after Wave 1. Prime short entry. Wave 3 (strongest) next. Stop above Wave 2 high.'
         },
         
         # Wave 1 signals - Trend initiation
         'WAVE_1_BULLISH': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Wave 1 forming - new bullish impulse starting'
+            'description': 'Wave 1 bullish - New impulse starting. Early long entry favorable. Confirm with volume. Stop below Wave 1 start.'
         },
         'WAVE_1_BEARISH': {
             'base_points': 15,
             'formula': 'scaled',
-            'description': 'Wave 1 forming - new bearish impulse starting'
+            'description': 'Wave 1 bearish - New impulse starting. Early short entry favorable. Confirm with volume. Stop above Wave 1 start.'
         },
         
         # Simple directional signals - SIMPLE for basic users
         'BULLISH': {
             'base_points': 30,
             'formula': 'scaled',
-            'description': 'Bullish wave structure - any wave (simple)'
+            'description': 'Bullish wave detected - Elliott Wave impulse in progress. Long positions favorable. Use wave-based stops.'
         },
         'BEARISH': {
             'base_points': 30,
             'formula': 'scaled',
-            'description': 'Bearish wave structure - any wave (simple)'
+            'description': 'Bearish wave detected - Elliott Wave impulse in progress. Short positions favorable. Use wave-based stops.'
         },
         'NEUTRAL': {
             'base_points': 5,
             'formula': 'scaled',
-            'description': 'No clear wave direction (simple)'
+            'description': 'No clear wave structure - Market in transition or corrective phase. Wait for impulse wave to form before entering.'
         },
         
         # Status signals (no points)
         'WAVE_UNCERTAIN': {
             'points': 0,
-            'description': 'Not enough data for wave count'
+            'description': 'Wave count uncertain - Insufficient pivots or ambiguous structure. Wait for clearer wave pattern before trading.'
         },
         'INSUFFICIENT_PIVOTS': {
             'points': 0,
-            'description': 'Too few pivots for pattern detection'
+            'description': 'Insufficient pivots - Need more price swings to identify wave structure. Monitor for swing points developing.'
         },
         'NO_PATTERN': {
             'points': 0,
-            'description': 'No Elliott Wave pattern detected'
+            'description': 'No Elliott Wave pattern - Market not in clear impulse or corrective wave. Wait for structure to develop.'
         },
         'ERROR': {
             'points': 0,
-            'description': 'Analysis error occurred'
+            'description': 'Analysis error - Cannot calculate Elliott Wave count. Check data quality and timeframe completeness.'
         },
         'INSUFFICIENT_DATA': {
             'points': 0,
-            'description': 'Not enough data for analysis'
+            'description': 'Insufficient data - Need at least 50 candles for Elliott Wave analysis. Wait for more price history.'
         }
     },
     description='Elliott Wave Count - Identifies 5-wave impulse patterns with MTF context',
