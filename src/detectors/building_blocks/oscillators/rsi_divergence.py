@@ -183,6 +183,9 @@ class RSIDivergence:
         
         Bullish: Price lower low, RSI higher low
         Bearish: Price higher high, RSI lower high
+        
+        FIXED: nsmallest/nlargest return sorted by VALUE not TIME!
+        Solution: Get indices, sort chronologically, then compare
         """
         if len(price) < lookback:
             return {'bullish_divergence': False, 'bearish_divergence': False, 'hidden_bullish': False, 'hidden_bearish': False}
@@ -190,37 +193,77 @@ class RSIDivergence:
         recent_price = price.iloc[-lookback:]
         recent_rsi = rsi.iloc[-lookback:]
         
-        # Find extremes
-        price_lows = recent_price.nsmallest(2)
-        price_highs = recent_price.nlargest(2)
-        rsi_lows = recent_rsi.nsmallest(2)
-        rsi_highs = recent_rsi.nlargest(2)
+        # Find extremes WITH indices, then sort by TIME (index)
+        price_lows_idx = recent_price.nsmallest(2).index
+        price_highs_idx = recent_price.nlargest(2).index
+        rsi_lows_idx = recent_rsi.nsmallest(2).index
+        rsi_highs_idx = recent_rsi.nlargest(2).index
         
         # Regular bullish divergence
         bullish_div = False
-        if len(price_lows) == 2 and len(rsi_lows) == 2:
-            price_lower_low = price_lows.iloc[1] < price_lows.iloc[0]
-            rsi_higher_low = rsi_lows.iloc[1] > rsi_lows.iloc[0]
+        if len(price_lows_idx) == 2 and len(rsi_lows_idx) == 2:
+            # Sort by time (chronological order)
+            price_lows_sorted = price_lows_idx.sort_values()
+            rsi_lows_sorted = rsi_lows_idx.sort_values()
+            
+            # Get values in chronological order (older, newer)
+            price_older = price.loc[price_lows_sorted[0]]
+            price_newer = price.loc[price_lows_sorted[1]]
+            rsi_older = rsi.loc[rsi_lows_sorted[0]]
+            rsi_newer = rsi.loc[rsi_lows_sorted[1]]
+            
+            # Bullish divergence: price makes LOWER low, RSI makes HIGHER low
+            price_lower_low = price_newer < price_older
+            rsi_higher_low = rsi_newer > rsi_older
             bullish_div = price_lower_low and rsi_higher_low
         
         # Regular bearish divergence  
         bearish_div = False
-        if len(price_highs) == 2 and len(rsi_highs) == 2:
-            price_higher_high = price_highs.iloc[1] > price_highs.iloc[0]
-            rsi_lower_high = rsi_highs.iloc[1] < rsi_highs.iloc[0]
+        if len(price_highs_idx) == 2 and len(rsi_highs_idx) == 2:
+            # Sort by time (chronological order)
+            price_highs_sorted = price_highs_idx.sort_values()
+            rsi_highs_sorted = rsi_highs_idx.sort_values()
+            
+            # Get values in chronological order (older, newer)
+            price_older = price.loc[price_highs_sorted[0]]
+            price_newer = price.loc[price_highs_sorted[1]]
+            rsi_older = rsi.loc[rsi_highs_sorted[0]]
+            rsi_newer = rsi.loc[rsi_highs_sorted[1]]
+            
+            # Bearish divergence: price makes HIGHER high, RSI makes LOWER high
+            price_higher_high = price_newer > price_older
+            rsi_lower_high = rsi_newer < rsi_older
             bearish_div = price_higher_high and rsi_lower_high
         
         # Hidden divergences (trend continuation)
         hidden_bullish = False
-        if len(price_lows) == 2 and len(rsi_lows) == 2:
-            price_higher_low = price_lows.iloc[1] > price_lows.iloc[0]
-            rsi_lower_low = rsi_lows.iloc[1] < rsi_lows.iloc[0]
+        if len(price_lows_idx) == 2 and len(rsi_lows_idx) == 2:
+            price_lows_sorted = price_lows_idx.sort_values()
+            rsi_lows_sorted = rsi_lows_idx.sort_values()
+            
+            price_older = price.loc[price_lows_sorted[0]]
+            price_newer = price.loc[price_lows_sorted[1]]
+            rsi_older = rsi.loc[rsi_lows_sorted[0]]
+            rsi_newer = rsi.loc[rsi_lows_sorted[1]]
+            
+            # Hidden bullish: price makes HIGHER low, RSI makes LOWER low
+            price_higher_low = price_newer > price_older
+            rsi_lower_low = rsi_newer < rsi_older
             hidden_bullish = price_higher_low and rsi_lower_low
         
         hidden_bearish = False
-        if len(price_highs) == 2 and len(rsi_highs) == 2:
-            price_lower_high = price_highs.iloc[1] < price_highs.iloc[0]
-            rsi_higher_high = rsi_highs.iloc[1] > rsi_highs.iloc[0]
+        if len(price_highs_idx) == 2 and len(rsi_highs_idx) == 2:
+            price_highs_sorted = price_highs_idx.sort_values()
+            rsi_highs_sorted = rsi_highs_idx.sort_values()
+            
+            price_older = price.loc[price_highs_sorted[0]]
+            price_newer = price.loc[price_highs_sorted[1]]
+            rsi_older = rsi.loc[rsi_highs_sorted[0]]
+            rsi_newer = rsi.loc[rsi_highs_sorted[1]]
+            
+            # Hidden bearish: price makes LOWER high, RSI makes HIGHER high
+            price_lower_high = price_newer < price_older
+            rsi_higher_high = rsi_newer > rsi_older
             hidden_bearish = price_lower_high and rsi_higher_high
         
         return {
