@@ -1,0 +1,434 @@
+"""
+Strategy Blocks Configuration Panel - UI Component for Strategy Builder
+
+This panel displays the added building blocks and allows configuration:
+- Display blocks in order with signals
+- Reorder blocks (up/down)
+- Remove blocks
+- Show AND/OR logic
+- Visual feedback
+- Integration with orchestrator
+
+Author: Strategy Builder Team
+Date: 2026-01-16
+"""
+
+from typing import Optional, List
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QGroupBox, QScrollArea, QFrame
+)
+from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtGui import QFont
+
+from src.strategy_builder.integration.strategy_builder_orchestrator import (
+    StrategyBuilderOrchestrator
+)
+
+
+class BlockConfigItem(QWidget):
+    """
+    Custom widget for displaying a configured block with controls.
+    """
+    
+    move_up_clicked = pyqtSignal(str)  # block_name
+    move_down_clicked = pyqtSignal(str)  # block_name
+    remove_clicked = pyqtSignal(str)  # block_name
+    
+    def __init__(self, block_name: str, block_info: dict, position: int, total: int, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.block_name = block_name
+        self.block_info = block_info
+        self.position = position
+        self.total = total
+        
+        self._init_ui()
+    
+    def _init_ui(self):
+        """Initialize the UI for this block item."""
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+        
+        # Main header layout
+        header_layout = QHBoxLayout()
+        
+        # Position indicator
+        position_label = QLabel(f"#{self.position}")
+        position_font = QFont()
+        position_font.setBold(True)
+        position_font.setPointSize(12)
+        position_label.setFont(position_font)
+        position_label.setStyleSheet("color: #2070FF; min-width: 40px;")
+        header_layout.addWidget(position_label)
+        
+        # Block info layout
+        info_layout = QVBoxLayout()
+        
+        # Block name with AND/OR badge
+        name_layout = QHBoxLayout()
+        name_layout.setSpacing(10)
+        
+        name_label = QLabel(f"📊 {self.block_name}")
+        name_font = QFont()
+        name_font.setBold(True)
+        name_font.setPointSize(10)
+        name_label.setFont(name_font)
+        name_label.setStyleSheet("color: #E8EAED;")
+        name_layout.addWidget(name_label)
+        
+        # NEW: AND/OR Badge - prominent display
+        logic_type = self.block_info.get('logic', 'AND')
+        if logic_type == 'AND':
+            badge_text = "REQUIRED"
+            badge_bg = "#2070FF"  # Blue for required
+            badge_tooltip = "This block is REQUIRED - all signals must trigger"
+        else:
+            badge_text = "OPTIONAL"
+            badge_bg = "#28A745"  # Green for optional
+            badge_tooltip = "This block is OPTIONAL - boosts strategy when triggered"
+        
+        logic_badge = QLabel(badge_text)
+        logic_badge.setStyleSheet(f"""
+            QLabel {{
+                background-color: {badge_bg};
+                color: white;
+                font-weight: bold;
+                font-size: 9pt;
+                padding: 4px 12px;
+                border-radius: 4px;
+            }}
+        """)
+        logic_badge.setToolTip(badge_tooltip)
+        logic_badge.setMaximumHeight(24)
+        name_layout.addWidget(logic_badge)
+        name_layout.addStretch()
+        
+        info_layout.addLayout(name_layout)
+        
+        # Signals count
+        signals_count = len(self.block_info.get('signals', []))
+        signals_label = QLabel(f"Signals: {signals_count}")
+        signals_label.setStyleSheet("color: #9AA0A6; font-size: 9pt;")
+        info_layout.addWidget(signals_label)
+        
+        header_layout.addLayout(info_layout, stretch=1)
+        
+        # Control buttons layout
+        controls_layout = QVBoxLayout()
+        controls_layout.setSpacing(5)
+        
+        # Move buttons
+        move_layout = QHBoxLayout()
+        
+        self.up_button = QPushButton("▲")
+        self.up_button.setMaximumWidth(40)
+        self.up_button.setToolTip("Move block up")
+        self.up_button.clicked.connect(lambda: self.move_up_clicked.emit(self.block_name))
+        self.up_button.setEnabled(self.position > 1)  # Disable if first
+        move_layout.addWidget(self.up_button)
+        
+        self.down_button = QPushButton("▼")
+        self.down_button.setMaximumWidth(40)
+        self.down_button.setToolTip("Move block down")
+        self.down_button.clicked.connect(lambda: self.move_down_clicked.emit(self.block_name))
+        self.down_button.setEnabled(self.position < self.total)  # Disable if last
+        move_layout.addWidget(self.down_button)
+        
+        controls_layout.addLayout(move_layout)
+        
+        # Remove button
+        self.remove_button = QPushButton("✕ Remove")
+        self.remove_button.setMaximumWidth(90)
+        self.remove_button.setStyleSheet(
+            "QPushButton { background-color: #ff4444; color: white; font-weight: bold; padding: 5px; }"
+            "QPushButton:hover { background-color: #cc0000; }"
+        )
+        self.remove_button.clicked.connect(lambda: self.remove_clicked.emit(self.block_name))
+        controls_layout.addWidget(self.remove_button)
+        
+        header_layout.addLayout(controls_layout)
+        
+        layout.addLayout(header_layout)
+        
+        # Signals section - dark theme
+        if self.block_info.get('signals'):
+            signals_widget = QFrame()
+            signals_widget.setFrameShape(QFrame.StyledPanel)
+            signals_widget.setStyleSheet("background-color: #2A2F3A; border: 1px solid #3C4149; border-radius: 6px; padding: 5px;")
+            
+            signals_layout = QVBoxLayout()
+            signals_layout.setContentsMargins(10, 5, 10, 5)
+            
+            signals_header = QLabel("Signals:")
+            signals_header.setStyleSheet("font-weight: bold; color: #2070FF;")
+            signals_layout.addWidget(signals_header)
+            
+            for idx, signal in enumerate(self.block_info['signals'], 1):
+                signal_name = signal.get('name', 'Unknown')
+                signal_logic = signal.get('logic', 'AND')
+                
+                # Logic indicator color - brighter for dark theme
+                logic_color = "#4ADE80" if signal_logic == "AND" else "#60A5FA"
+                
+                signal_text = f"  {idx}. {signal_name} [{signal_logic}]"
+                signal_label = QLabel(signal_text)
+                signal_label.setStyleSheet(f"color: {logic_color}; font-size: 9pt;")
+                signals_layout.addWidget(signal_label)
+            
+            signals_widget.setLayout(signals_layout)
+            layout.addWidget(signals_widget)
+        
+        # Styling - dark theme
+        self.setStyleSheet("""
+            BlockConfigItem {
+                border: 2px solid #2070FF;
+                border-radius: 8px;
+                background-color: #1E2128;
+            }
+        """)
+        
+        self.setLayout(layout)
+    
+    def update_position(self, position: int, total: int):
+        """Update the position indicators and button states."""
+        self.position = position
+        self.total = total
+        
+        # Update button states
+        self.up_button.setEnabled(position > 1)
+        self.down_button.setEnabled(position < total)
+
+
+class StrategyBlocksPanel(QWidget):
+    """
+    Panel for configuring strategy building blocks.
+    
+    Displays added blocks with reordering and removal capabilities.
+    
+    Signals:
+        blocks_changed: Emitted when blocks are reordered or removed
+    """
+    
+    blocks_changed = pyqtSignal()
+    
+    def __init__(self, orchestrator: StrategyBuilderOrchestrator, parent: Optional[QWidget] = None):
+        """
+        Initialize the Strategy Blocks Panel.
+        
+        Args:
+            orchestrator: StrategyBuilderOrchestrator instance
+            parent: Parent widget (optional)
+        """
+        super().__init__(parent)
+        self.orchestrator = orchestrator
+        
+        # UI Components
+        self.blocks_scroll_area: Optional[QScrollArea] = None
+        self.blocks_container: Optional[QWidget] = None
+        self.blocks_layout: Optional[QVBoxLayout] = None
+        self.empty_label: Optional[QLabel] = None
+        
+        # Block items cache
+        self.block_items: List[BlockConfigItem] = []
+        
+        self._init_ui()
+        self._refresh_blocks()
+    
+    def _init_ui(self):
+        """Initialize the user interface components."""
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Group box
+        group_box = QGroupBox("Strategy Building Blocks")
+        group_box.setStyleSheet("QGroupBox::title { color: #00A3BF; }")  # Muted Cyan for title (25% darker)
+        group_box_font = QFont()
+        group_box_font.setBold(True)
+        group_box_font.setPointSize(10)
+        group_box.setFont(group_box_font)
+        
+        group_layout = QVBoxLayout()
+        group_layout.setSpacing(10)
+        
+        # Info header
+        info_layout = QHBoxLayout()
+        info_label = QLabel("ℹ️ Blocks are executed in order from top to bottom")
+        info_label.setStyleSheet("color: #0066cc; font-size: 9pt; font-style: italic; padding: 5px;")
+        info_layout.addWidget(info_label)
+        info_layout.addStretch()
+        group_layout.addLayout(info_layout)
+        
+        # Scroll area for blocks
+        self.blocks_scroll_area = QScrollArea()
+        self.blocks_scroll_area.setWidgetResizable(True)
+        self.blocks_scroll_area.setMinimumHeight(300)
+        
+        # Container widget for blocks
+        self.blocks_container = QWidget()
+        self.blocks_layout = QVBoxLayout()
+        self.blocks_layout.setSpacing(10)
+        self.blocks_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # Empty state label - dark theme
+        self.empty_label = QLabel("No blocks added yet.\n\nSearch and add blocks from the panel above.")
+        self.empty_label.setAlignment(Qt.AlignCenter)
+        self.empty_label.setStyleSheet(
+            "color: #9AA0A6; font-size: 12pt; padding: 50px; "
+            "background-color: #1E2128; border: 1px solid #3C4149; border-radius: 8px;"
+        )
+        self.blocks_layout.addWidget(self.empty_label)
+        
+        self.blocks_layout.addStretch()
+        self.blocks_container.setLayout(self.blocks_layout)
+        
+        self.blocks_scroll_area.setWidget(self.blocks_container)
+        group_layout.addWidget(self.blocks_scroll_area)
+        
+        group_box.setLayout(group_layout)
+        layout.addWidget(group_box)
+        
+        self.setLayout(layout)
+    
+    def _refresh_blocks(self):
+        """Refresh the display from orchestrator's current configuration."""
+        # Clear existing items
+        self._clear_blocks()
+        
+        # Get current config
+        config = self.orchestrator.get_current_config()
+        
+        if not config or not config.blocks:
+            # Show empty state
+            self.empty_label.setVisible(True)
+            return
+        
+        # Hide empty state
+        self.empty_label.setVisible(False)
+        
+        # Create block items
+        total_blocks = len(config.blocks)
+        for idx, block_config in enumerate(config.blocks, 1):
+            block_info = {
+                'name': block_config.name,
+                'logic': block_config.logic,
+                'signals': []
+            }
+            
+            # Add signal info
+            for signal_config in block_config.signals:
+                block_info['signals'].append({
+                    'name': signal_config.name,
+                    'logic': signal_config.logic
+                })
+            
+            # Create block item widget
+            block_item = BlockConfigItem(
+                block_config.name,
+                block_info,
+                idx,
+                total_blocks
+            )
+            
+            # Connect signals
+            block_item.move_up_clicked.connect(self._on_move_up)
+            block_item.move_down_clicked.connect(self._on_move_down)
+            block_item.remove_clicked.connect(self._on_remove)
+            
+            # Add to layout (insert before stretch)
+            self.blocks_layout.insertWidget(self.blocks_layout.count() - 1, block_item)
+            self.block_items.append(block_item)
+    
+    def _clear_blocks(self):
+        """Clear all block items from the display."""
+        # Remove all block items
+        for block_item in self.block_items:
+            self.blocks_layout.removeWidget(block_item)
+            block_item.deleteLater()
+        
+        self.block_items.clear()
+    
+    def _on_move_up(self, block_name: str):
+        """Handle move up button click."""
+        try:
+            # Call orchestrator to move block up
+            result = self.orchestrator.reorder_block(block_name, "up")
+            
+            if result.success:
+                # Refresh display
+                self._refresh_blocks()
+                # Emit changed signal
+                self.blocks_changed.emit()
+            else:
+                print(f"Failed to move block up: {result.message}")
+        except Exception as e:
+            print(f"Error moving block up: {e}")
+    
+    def _on_move_down(self, block_name: str):
+        """Handle move down button click."""
+        try:
+            # Call orchestrator to move block down
+            result = self.orchestrator.reorder_block(block_name, "down")
+            
+            if result.success:
+                # Refresh display
+                self._refresh_blocks()
+                # Emit changed signal
+                self.blocks_changed.emit()
+            else:
+                print(f"Failed to move block down: {result.message}")
+        except Exception as e:
+            print(f"Error moving block down: {e}")
+    
+    def _on_remove(self, block_name: str):
+        """Handle remove button click."""
+        try:
+            # Call orchestrator to remove block
+            result = self.orchestrator.remove_block(block_name)
+            
+            if result.success:
+                # Refresh display
+                self._refresh_blocks()
+                # Emit changed signal
+                self.blocks_changed.emit()
+            else:
+                print(f"Failed to remove block: {result.message}")
+        except Exception as e:
+            print(f"Error removing block: {e}")
+    
+    def refresh_from_orchestrator(self):
+        """Public method to refresh display from orchestrator."""
+        self._refresh_blocks()
+    
+    def add_block(self, block_name: str):
+        """
+        Add a block to the strategy.
+        
+        Args:
+            block_name: Name of the block to add
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            result = self.orchestrator.add_block(block_name)
+            
+            if result.success:
+                self._refresh_blocks()
+                self.blocks_changed.emit()
+                return True
+            else:
+                print(f"Failed to add block: {result.message}")
+                return False
+        except Exception as e:
+            print(f"Error adding block: {e}")
+            return False
+    
+    def get_block_count(self) -> int:
+        """Get the number of blocks currently configured."""
+        return len(self.block_items)
+    
+    def get_block_names(self) -> List[str]:
+        """Get list of configured block names in order."""
+        return [item.block_name for item in self.block_items]
