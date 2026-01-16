@@ -103,13 +103,13 @@ class IHOD:
         self.prev_ihod = None
         self.proximity_threshold = 0.15  # 0.15% = ~$67 on $45k BTC
     
-    def _determine_dual_signals(self, distance_pct: float, is_new_ihod: bool, prev_high: float, current_high: float, ihod: float) -> tuple:
+    def _determine_dual_signals(self, distance_pct: float, is_new_ihod: bool, prev_high: float, current_high: float, current_close: float, current_low: float, ihod: float) -> tuple:
         """
         DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)
         
-        FIXED: AT_IHOD logic was broken. Now checks for:
-        - AT_IHOD: Price near IHOD (within 0.15%)
-        - BEARISH_REJECTION: Price WAS at/above IHOD but rejected (wick pattern)
+        FIXED: Simplified rejection detection:
+        - AT_IHOD: Price testing IHOD (close near high)
+        - BEARISH_REJECTION: High touched IHOD but closed in lower half of bar
         """
         
         if is_new_ihod:
@@ -117,9 +117,21 @@ class IHOD:
             granular = 'BULLISH_BREAK'
             simple = 'BULLISH'
         elif abs(distance_pct) < self.proximity_threshold:
-            # AT IHOD: Price near the intraday high
-            # Check for rejection: if previous bar touched IHOD but current is lower
-            has_rejection = prev_high >= ihod * 0.998 and current_high < ihod * 0.998
+            # NEAR IHOD: Price close to intraday high
+            
+            # Simple rejection check: high touched IHOD, close in lower 60% of bar
+            touched_ihod = current_high >= ihod * 0.998  # Within 0.2% of IHOD
+            bar_range = current_high - current_low
+            
+            if bar_range > 0:
+                # Calculate where close is in the bar (0 = low, 1 = high)
+                close_position = (current_close - current_low) / bar_range
+                closed_weak = close_position < 0.6  # Closed in lower 60% of bar
+            else:
+                closed_weak = False
+            
+            # Rejection = touched IHOD but closed weak
+            has_rejection = touched_ihod and closed_weak
             
             if has_rejection:
                 # Rejected at IHOD
@@ -199,6 +211,7 @@ class IHOD:
         
         current_price = float(df['close'].iloc[-1])
         current_high = float(df['high'].iloc[-1])
+        current_low = float(df['low'].iloc[-1])
         prev_high = float(df['high'].iloc[-2]) if len(df) >= 2 else current_high
         distance_pct = ((current_price - ihod) / ihod) * 100
         
@@ -207,7 +220,7 @@ class IHOD:
         
         # DUAL SIGNAL ARCHITECTURE
         granular_signal, simple_signal = self._determine_dual_signals(
-            distance_pct, is_new_ihod, prev_high, current_high, ihod
+            distance_pct, is_new_ihod, prev_high, current_high, current_price, current_low, ihod
         )
         signal = granular_signal
         
