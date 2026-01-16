@@ -268,6 +268,99 @@ class StrategyBuilderOrchestrator:
                 message=f"Failed to add signal '{signal_name}'",
                 errors=[str(e)]
             )
+    
+    def add_block_with_signals(
+        self,
+        block_name: str,
+        signal_names: List[str],
+        block_logic: str = "AND",
+        signal_logic: str = "AND"
+    ) -> WorkflowResult:
+        """
+        NEW: Add block with signals - handles both new blocks and adding signals to existing blocks
+        
+        This is the institutional-grade method that intelligently:
+        1. Creates block if it doesn't exist
+        2. Adds all specified signals to the block
+        3. Handles both initial addition and subsequent signal additions
+        
+        Args:
+            block_name: Name of the building block
+            signal_names: List of signal names to add
+            block_logic: Logic for the block itself ("AND" or "OR")
+            signal_logic: Logic for the signals ("AND" or "OR")
+            
+        Returns:
+            WorkflowResult
+        """
+        try:
+            # Check if strategy exists
+            if not self.config_engine.config.name:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_BLOCK,
+                    message="No strategy created. Create a strategy first.",
+                    errors=["Strategy not initialized"]
+                )
+            
+            # Check if block already exists in config
+            block_exists = any(
+                block.name == block_name 
+                for block in self.config_engine.config.blocks
+            )
+            
+            # If block doesn't exist, add it first
+            if not block_exists:
+                add_block_result = self.add_block(block_name, block_logic)
+                if not add_block_result.success:
+                    return add_block_result
+            
+            # Add all signals to the block
+            signals_added = []
+            errors = []
+            
+            for signal_name in signal_names:
+                result = self.add_signal(
+                    block_name=block_name,
+                    signal_name=signal_name,
+                    logic=signal_logic
+                )
+                
+                if result.success:
+                    signals_added.append(signal_name)
+                else:
+                    errors.extend(result.errors)
+            
+            # Determine overall success
+            success = len(signals_added) > 0
+            
+            if success:
+                message = f"Added {len(signals_added)} signal(s) to block '{block_name}'"
+                if errors:
+                    message += f" (with {len(errors)} error(s))"
+            else:
+                message = f"Failed to add signals to block '{block_name}'"
+            
+            return WorkflowResult(
+                success=success,
+                step=WorkflowStep.ADD_SIGNAL,
+                message=message,
+                errors=errors,
+                strategy_config=self.config_engine.config,
+                data={
+                    'block_name': block_name,
+                    'signals_added': signals_added,
+                    'block_existed': block_exists
+                }
+            )
+            
+        except Exception as e:
+            return WorkflowResult(
+                success=False,
+                step=WorkflowStep.ADD_BLOCK,
+                message=f"Failed to add block with signals '{block_name}'",
+                errors=[str(e)]
+            )
             
     def validate_strategy(self) -> WorkflowResult:
         """

@@ -15,6 +15,7 @@ class SignalInfo:
     count: int
     percentage: float
     description: str = ""
+    ui_visible: bool = True  # Default to visible unless explicitly hidden
 
 
 @dataclass
@@ -85,7 +86,8 @@ class RegistryInterface:
                     name=raw_signal['name'],
                     count=raw_signal.get('count', 0),
                     percentage=raw_signal.get('percentage', 0.0),
-                    description=raw_signal.get('description', '')
+                    description=raw_signal.get('description', ''),
+                    ui_visible=raw_signal.get('ui_visible', True)  # Extract from registry
                 )
                 signals.append(signal)
             
@@ -125,7 +127,8 @@ class RegistryInterface:
                 name=raw_signal['name'],
                 count=raw_signal.get('count', 0),
                 percentage=raw_signal.get('percentage', 0.0),
-                description=raw_signal.get('description', '')
+                description=raw_signal.get('description', ''),
+                ui_visible=raw_signal.get('ui_visible', True)  # Extract from registry
             )
             signals.append(signal)
         
