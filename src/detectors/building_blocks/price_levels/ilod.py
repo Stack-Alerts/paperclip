@@ -103,21 +103,44 @@ class ILOD:
         self.prev_ilod = None
         self.proximity_threshold = 0.15  # 0.15% = ~$67 on $45k BTC
     
-    def _determine_dual_signals(self, distance_pct: float, is_new_ilod: bool) -> tuple:
-        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+    def _determine_dual_signals(self, distance_pct: float, is_new_ilod: bool, prev_low: float, current_low: float, current_close: float, current_high: float, ilod: float) -> tuple:
+        """
+        DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)
+        
+        MIRROR OF IHOD FIX:
+        - AT_ILOD: Price testing ILOD (close near low)
+        - BULLISH_BOUNCE: Low touched ILOD but closed in upper 60% of bar (bounce)
+        """
         
         if is_new_ilod:
-            # Breaking to new ILOD
+            # Breaking to new ILOD (breakdown)
             granular = 'BEARISH_BREAK'
             simple = 'BEARISH'
-        elif abs(distance_pct) < self.proximity_threshold and distance_pct > 0:
-            # At ILOD with bounce
-            granular = 'BULLISH_BOUNCE'
-            simple = 'BULLISH'
         elif abs(distance_pct) < self.proximity_threshold:
-            # At ILOD (testing)
-            granular = 'AT_ILOD'
-            simple = 'NEUTRAL'
+            # NEAR ILOD: Price close to intraday low
+            
+            # Simple bounce check: low touched ILOD, close in upper 60% of bar
+            touched_ilod = current_low <= ilod * 1.002  # Within 0.2% of ILOD
+            bar_range = current_high - current_low
+            
+            if bar_range > 0:
+                # Calculate where close is in the bar (0 = low, 1 = high)
+                close_position = (current_close - current_low) / bar_range
+                closed_strong = close_position > 0.4  # Closed in upper 60% of bar
+            else:
+                closed_strong = False
+            
+            # Bounce = touched ILOD but closed strong
+            has_bounce = touched_ilod and closed_strong
+            
+            if has_bounce:
+                # Bounced at ILOD
+                granular = 'BULLISH_BOUNCE'
+                simple = 'BULLISH'
+            else:
+                # Testing ILOD
+                granular = 'AT_ILOD'
+                simple = 'NEUTRAL'
         elif distance_pct > 0.5:
             # Above ILOD (normal state)
             granular = 'ABOVE_ILOD'
@@ -188,13 +211,17 @@ class ILOD:
         
         current_price = float(df['close'].iloc[-1])
         current_low = float(df['low'].iloc[-1])
+        current_high = float(df['high'].iloc[-1])
+        prev_low = float(df['low'].iloc[-2]) if len(df) >= 2 else current_low
         distance_pct = ((current_price - ilod) / ilod) * 100
         
         # Detect events: new ILOD if current bar's low breaks previous ILOD
         is_new_ilod = current_low < ilod
         
         # DUAL SIGNAL ARCHITECTURE
-        granular_signal, simple_signal = self._determine_dual_signals(distance_pct, is_new_ilod)
+        granular_signal, simple_signal = self._determine_dual_signals(
+            distance_pct, is_new_ilod, prev_low, current_low, current_price, current_high, ilod
+        )
         signal = granular_signal
         
         # Determine confidence
