@@ -659,6 +659,60 @@ CRITICAL REQUIREMENTS FOR EXPERT MODE:
 ✅ Use professional reports - Formatted, complete, detailed
 ✅ No shortcuts - Complete analysis every time
 """
+============================================================================
+COMBINED MODE ACTIVATION
+============================================================================
+COMBINED_MODE = """
+
+WHEN USER SPECIFIES MULTIPLE MODES:
+
+Example: "EXPERT MODE & RESEARCH PROTOCOL: Discover M patterns and provide 
+          institutional assessment"
+
+CLINE MUST:
+
+1️⃣ PHASE 1: RESEARCH & DISCOVERY
+   ├─ Activate NAUTILUS EXPERT REQUIREMENTS (baseline knowledge)
+   ├─ Follow RESEARCH_PROTOCOL
+   ├─ Run discovery strategy
+   ├─ Collect data and findings
+   └─ Generate research report
+
+2️⃣ PHASE 2: EXPERT MODE ANALYSIS
+   ├─ Take research findings
+   ├─ Apply EXPERT MODE protocols
+   ├─ Generate all 5 institutional reports:
+   │   • Trade Verification (if applicable)
+   │   • Backtest Analysis
+   │   • Expert Trader Assessment
+   │   • Improvement Recommendations
+   │   • Final Expert Recommendation
+   └─ Deliver complete expert-grade evaluation
+
+3️⃣ COMBINED DELIVERABLE
+   ├─ Research findings (patterns, statistics, data)
+   ├─ Expert analysis (institutional assessment)
+   ├─ Actionable recommendations
+   └─ Go/No-Go decision (if strategy related)
+
+ACTIVATION PATTERNS:
+
+Pattern 1: "EXPERT MODE & RESEARCH PROTOCOL: [task]"
+└─ Run research first, then expert analysis
+
+Pattern 2: "RESEARCH & EXPERT MODE: [task]"
+└─ Same as Pattern 1 (research → expert)
+
+Pattern 3: "EXPERT MODE & NAUTILUS EXPERT: [task]"
+└─ Expert analysis with deep NautilusTrader knowledge
+
+Pattern 4: "FULL ANALYSIS: [task]"
+└─ Shorthand for Research + Expert Mode + Nautilus Expert
+
+EXAMPLE USAGE:
+
+User: "EXPERT MODE & RESEARCH PROTOCOL: Find M patterns on BTC 15min for 
+       90 days and assess if tradeable
 
 ============================================================================
 CORE TYPES (MUST KNOW THESE)

@@ -108,14 +108,15 @@ class TripleBottomPattern:
         self.breakout_start_idx = None  # When breakout began
         
         # Pattern duration requirements for 15min timeframe
-        self.MIN_BARS_BETWEEN_TROUGHS = 12   # 3 hours minimum (same as triple_top)
-        self.MAX_BARS_BETWEEN_TROUGHS = 100  # 25 hours maximum
+        # EXPERT MODE FIX: Tightened for rare pattern (was triggering 44%)
+        self.MIN_BARS_BETWEEN_TROUGHS = 20   # 5 hours minimum (was 12 = 3hrs)
+        self.MAX_BARS_BETWEEN_TROUGHS = 80   # 20 hours maximum (was 100)
         self.PATTERN_MAX_DURATION = 150      # Pattern expires after 150 bars
         self.BREAKOUT_MAX_DURATION = 20      # Breakout confirmed for 20 bars
         
         # Validation requirements (STRICTER for better selectivity)
-        self.MIN_CONFLUENCES = 4  # Increased from 2 for institutional grade
-        self.MIN_TROUGH_SPACING = 7  # 7 bars minimum between troughs
+        self.MIN_CONFLUENCES = 5  # Increased to 5 for rare pattern (was 4)
+        self.MIN_TROUGH_SPACING = 12  # 12 bars minimum between troughs (3 hours)
         
         # Breakout requirements (stricter)
         self.BREAK_MARGIN = 0.005  # Must break 0.5% above neckline
@@ -163,13 +164,13 @@ class TripleBottomPattern:
         1. Lowest in 5-hour window (20 bars @ 15min) - ALWAYS REQUIRED
         2. At least 0.8% below recent average (prominence)
         3. Volume spike (1.15x average - relaxed for triple)
-        4. Proper spacing from other troughs (6+ bars)
+        4. Proper spacing from other troughs (12+ bars - EXPERT MODE tightened)
         
         Need 3 of 4 (REQ 1 always required, plus 2 of the other 3)
         """
         troughs = []
         lookback = 20  # 5 hours @ 15min bars
-        MIN_TROUGH_SPACING = 6  # Minimum spacing
+        # EXPERT MODE FIX: Use class variable instead of hardcoded 6
         
         for i in range(lookback, len(df) - lookback):
             low = df['low'].iloc[i]
@@ -193,11 +194,11 @@ class TripleBottomPattern:
             if avg_vol > 0 and vol >= avg_vol * 1.15:
                 requirements_met += 1
             
-            # REQ 4: Proper spacing from previous troughs
+            # REQ 4: Proper spacing from previous troughs (use class variable)
             spacing_ok = True
             if len(troughs) > 0:
                 last_trough_idx = troughs[-1]['idx']
-                if i - last_trough_idx >= MIN_TROUGH_SPACING:
+                if i - last_trough_idx >= self.MIN_TROUGH_SPACING:
                     requirements_met += 1
                 else:
                     spacing_ok = False
