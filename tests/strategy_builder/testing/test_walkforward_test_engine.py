@@ -8,9 +8,9 @@ import pytest
 from datetime import datetime, timedelta
 from src.strategy_builder.testing.walkforward_test_engine import (
     WalkforwardTestEngine,
-    TestMode,
-    TestConfig,
-    TestResult,
+    WalkforwardMode,
+    WalkforwardConfig,
+    WalkforwardResult,
     PositionAdjustment
 )
 from src.strategy_builder.core.strategy_config_engine import StrategyConfig
@@ -26,29 +26,29 @@ class TestWalkforwardTestEngine:
         
     def test_mode1_initialization(self):
         """Test Mode 1 (historical only) initialization"""
-        config = TestConfig(
-            mode=TestMode.MODE_1,
+        config = WalkforwardConfig(
+            mode=WalkforwardMode.MODE_1,
             lookback_days=180,
             start_date=datetime(2024, 1, 1)
         )
         engine = WalkforwardTestEngine(config)
-        assert engine.config.mode == TestMode.MODE_1
+        assert engine.config.mode == WalkforwardMode.MODE_1
         assert engine.config.lookback_days == 180
         
     def test_mode2_initialization(self):
         """Test Mode 2 (historical + live) initialization"""
-        config = TestConfig(
-            mode=TestMode.MODE_2,
+        config = WalkforwardConfig(
+            mode=WalkforwardMode.MODE_2,
             lookback_days=180,
             start_date=datetime(2024, 1, 1)
         )
         engine = WalkforwardTestEngine(config)
-        assert engine.config.mode == TestMode.MODE_2
+        assert engine.config.mode == WalkforwardMode.MODE_2
         
     def test_run_mode1_returns_result(self):
         """Test Mode 1 returns test result"""
-        config = TestConfig(
-            mode=TestMode.MODE_1,
+        config = WalkforwardConfig(
+            mode=WalkforwardMode.MODE_1,
             lookback_days=30,
             training_window_days=0
         )
@@ -58,12 +58,12 @@ class TestWalkforwardTestEngine:
         result = engine.run(strategy_config)
         
         assert result is not None
-        assert isinstance(result, TestResult)
+        assert isinstance(result, WalkforwardResult)
         
     def test_expanding_window_processing(self):
         """Test candle-by-candle expanding window"""
-        config = TestConfig(
-            mode=TestMode.MODE_1,
+        config = WalkforwardConfig(
+            mode=WalkforwardMode.MODE_1,
             lookback_days=10
         )
         engine = WalkforwardTestEngine(config)
@@ -74,8 +74,8 @@ class TestWalkforwardTestEngine:
         
     def test_training_window_offset(self):
         """Test training window offset calculation"""
-        config = TestConfig(
-            mode=TestMode.MODE_1,
+        config = WalkforwardConfig(
+            mode=WalkforwardMode.MODE_1,
             lookback_days=180,
             training_window_days=30
         )
@@ -87,7 +87,7 @@ class TestWalkforwardTestEngine:
         
     def test_track_position_adjustments(self):
         """Test tracking TP/SL adjustments"""
-        config = TestConfig(mode=TestMode.MODE_1, lookback_days=30)
+        config = WalkforwardConfig(mode=WalkforwardMode.MODE_1, lookback_days=30)
         engine = WalkforwardTestEngine(config)
         
         # Track an adjustment
@@ -103,29 +103,29 @@ class TestWalkforwardTestEngine:
         
     def test_mode1_completes_at_end_date(self):
         """Test Mode 1 stops at current date"""
-        config = TestConfig(
-            mode=TestMode.MODE_1,
+        config = WalkforwardConfig(
+            mode=WalkforwardMode.MODE_1,
             lookback_days=30
         )
         engine = WalkforwardTestEngine(config)
         
         # Mode 1 should complete and return
-        assert config.mode == TestMode.MODE_1
+        assert config.mode == WalkforwardMode.MODE_1
         
     def test_mode2_continues_waiting(self):
         """Test Mode 2 waits for new candles"""
-        config = TestConfig(
-            mode=TestMode.MODE_2,
+        config = WalkforwardConfig(
+            mode=WalkforwardMode.MODE_2,
             lookback_days=30
         )
         engine = WalkforwardTestEngine(config)
         
         # Mode 2 should wait for new data
-        assert config.mode == TestMode.MODE_2
+        assert config.mode == WalkforwardMode.MODE_2
         
     def test_result_includes_adjustment_count(self):
         """Test result includes TP/SL adjustment counts"""
-        config = TestConfig(mode=TestMode.MODE_1, lookback_days=10)
+        config = WalkforwardConfig(mode=WalkforwardMode.MODE_1, lookback_days=10)
         strategy_config = self._create_test_strategy()
         
         engine = WalkforwardTestEngine(config)
@@ -138,7 +138,7 @@ class TestWalkforwardTestEngine:
         
     def test_result_includes_position_count(self):
         """Test result includes position statistics"""
-        config = TestConfig(mode=TestMode.MODE_1, lookback_days=10)
+        config = WalkforwardConfig(mode=WalkforwardMode.MODE_1, lookback_days=10)
         strategy_config = self._create_test_strategy()
         
         engine = WalkforwardTestEngine(config)
@@ -166,27 +166,27 @@ class TestWalkforwardTestEngine:
         return config
 
 
-class TestTestConfig:
-    """Test TestConfig data class"""
+class TestWalkforwardConfig:
+    """Test WalkforwardConfig data class"""
     
     def test_config_creation(self):
         """Test creating test configuration"""
-        config = TestConfig(
-            mode=TestMode.MODE_1,
+        config = WalkforwardConfig(
+            mode=WalkforwardMode.MODE_1,
             lookback_days=180,
             training_window_days=30
         )
-        assert config.mode == TestMode.MODE_1
+        assert config.mode == WalkforwardMode.MODE_1
         assert config.lookback_days == 180
         assert config.training_window_days == 30
 
 
-class TestTestResult:
-    """Test TestResult data class"""
+class TestWalkforwardResult:
+    """Test WalkforwardResult data class"""
     
     def test_result_creation(self):
         """Test creating test result"""
-        result = TestResult(
+        result = WalkforwardResult(
             total_positions=10,
             winning_positions=6,
             losing_positions=4,
@@ -216,13 +216,13 @@ class TestPositionAdjustment:
         assert adj.new_value == 51000
 
 
-class TestTestMode:
-    """Test TestMode enum"""
+class TestWalkforwardMode:
+    """Test WalkforwardMode enum"""
     
     def test_mode_values(self):
         """Test mode enum values"""
-        assert TestMode.MODE_1 is not None
-        assert TestMode.MODE_2 is not None
+        assert WalkforwardMode.MODE_1 is not None
+        assert WalkforwardMode.MODE_2 is not None
 
 
 class TestWalkforwardTestEngineIntegration:
@@ -231,8 +231,8 @@ class TestWalkforwardTestEngineIntegration:
     def test_complete_mode1_workflow(self):
         """Test complete Mode 1 testing workflow"""
         # Create config
-        config = TestConfig(
-            mode=TestMode.MODE_1,
+        config = WalkforwardConfig(
+            mode=WalkforwardMode.MODE_1,
             lookback_days=30,
             training_window_days=0
         )
