@@ -183,6 +183,22 @@ class SupplyDemandZones:
         if not 10 <= threshold_percent <= 50:
             raise ValueError(f"Threshold must be 10-50%, got {threshold_percent}")
     
+    def _determine_dual_signals(self, granular_signal: str) -> tuple:
+        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+        granular = granular_signal
+        
+        # Map granular to simple directional
+        if granular in ['DEMAND_ZONE', 'NEAR_DEMAND']:
+            simple = 'BULLISH'
+        elif granular in ['SUPPLY_ZONE', 'NEAR_SUPPLY']:
+            simple = 'BEARISH'
+        elif granular in ['ERROR', 'INSUFFICIENT_DATA']:
+            simple = granular  # Keep as-is for error states
+        else:
+            simple = 'NEUTRAL'  # NO_ZONE
+        
+        return granular, simple
+    
     def analyze(self, df: pd.DataFrame, **kwargs) -> Dict[str, Any]:
         """
         Analyze dataframe for supply/demand zones.
@@ -193,20 +209,24 @@ class SupplyDemandZones:
         # Validation
         required_cols = {'open', 'high', 'low', 'close', 'volume', 'timestamp'}
         if not required_cols.issubset(df.columns):
+            granular_signal, simple_signal = self._determine_dual_signals('ERROR')
             return {
-                'signal': 'ERROR',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'Missing required columns'},
+                'metadata': {'error': 'Missing required columns', 'signal_simple': simple_signal, 'signal_granular': granular_signal},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
             }
         
         if len(df) < 50:
+            granular_signal, simple_signal = self._determine_dual_signals('INSUFFICIENT_DATA')
             return {
-                'signal': 'INSUFFICIENT_DATA',
+                'signal': granular_signal,
+                'signal_simple': simple_signal,
                 'confidence': 0,
-                'metadata': {'error': 'Need at least 50 bars'},
+                'metadata': {'error': 'Need at least 50 bars', 'signal_simple': simple_signal, 'signal_granular': granular_signal},
                 'timestamp': datetime.now(),
                 'timeframe': self.timeframe,
                 'confluence_factors': []
@@ -292,8 +312,13 @@ class SupplyDemandZones:
                     confidence = 55
                     confluence_factors = ['Far from zones']
         
+        # DUAL SIGNAL ARCHITECTURE
+        granular_signal, simple_signal = self._determine_dual_signals(signal)
+        
         # Metadata
         metadata = {
+            'signal_simple': simple_signal,
+            'signal_granular': granular_signal,
             'zone_type': zone_type,
             'supply_zones_count': len(self.supply_zones),
             'demand_zones_count': len(self.demand_zones),
@@ -315,7 +340,8 @@ class SupplyDemandZones:
             })
         
         return {
-            'signal': signal,
+            'signal': granular_signal,
+            'signal_simple': simple_signal,
             'confidence': confidence,
             'metadata': metadata,
             'timestamp': current_time,
