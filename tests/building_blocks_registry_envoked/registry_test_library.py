@@ -249,17 +249,19 @@ def test_building_block_registry(block_name: str, days: int = 180, use_multicore
         return None
     
     # Extract signal statistics from BOTH signal and signal_simple fields
-    signals = [r.get('signal', 'UNKNOWN') for r in all_results]
-    signals_simple = [r.get('signal_simple', 'UNKNOWN') for r in all_results]
-    
+    # FIXED: Don't double-count when signal == signal_simple
     signal_counts = {}
-    for sig in signals:
-        signal_counts[sig] = signal_counts.get(sig, 0) + 1
     
-    # Add signal_simple counts (count ALL occurrences, not just unique)
-    for sig in signals_simple:
-        # Count all signal_simple occurrences separately
-        signal_counts[sig] = signal_counts.get(sig, 0) + 1
+    for r in all_results:
+        sig_granular = r.get('signal', 'UNKNOWN')
+        sig_simple = r.get('signal_simple', 'UNKNOWN')
+        
+        # Count granular signal
+        signal_counts[sig_granular] = signal_counts.get(sig_granular, 0) + 1
+        
+        # Count simple signal ONLY if different from granular (avoid double-counting)
+        if sig_simple != sig_granular:
+            signal_counts[sig_simple] = signal_counts.get(sig_simple, 0) + 1
     
     # Check which valid_signals were found
     found_signals = set(signal_counts.keys())
