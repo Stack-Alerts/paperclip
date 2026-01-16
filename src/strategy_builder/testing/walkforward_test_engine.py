@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from src.strategy_builder.core.strategy_config_engine import StrategyConfig
 
 
-class TestMode(Enum):
+class WalkforwardMode(Enum):
     """Test execution modes"""
     MODE_1 = "historical_only"  # Run historical data and stop
     MODE_2 = "historical_plus_live"  # Run historical then wait for new candles
@@ -29,9 +29,9 @@ class PositionAdjustment:
 
 
 @dataclass
-class TestConfig:
+class WalkforwardConfig:
     """Configuration for walkforward testing"""
-    mode: TestMode = TestMode.MODE_1
+    mode: WalkforwardMode = WalkforwardMode.MODE_1
     lookback_days: int = 180
     training_window_days: int = 0
     start_date: Optional[datetime] = None
@@ -39,7 +39,7 @@ class TestConfig:
     
 
 @dataclass
-class TestResult:
+class WalkforwardResult:
     """Results from walkforward test"""
     total_positions: int = 0
     winning_positions: int = 0
@@ -65,19 +65,19 @@ class WalkforwardTestEngine:
     Mode 2: Historical + Live - processes past data then waits for new candles
     """
     
-    def __init__(self, config: Optional[TestConfig] = None):
+    def __init__(self, config: Optional[WalkforwardConfig] = None):
         """
         Initialize walkforward test engine
         
         Args:
             config: Test configuration (defaults to Mode 1, 180 days)
         """
-        self.config = config or TestConfig()
+        self.config = config or WalkforwardConfig()
         self.adjustments: List[PositionAdjustment] = []
         self.positions: List[Dict[str, Any]] = []
         self.current_candle_index = 0
         
-    def run(self, strategy_config: StrategyConfig) -> TestResult:
+    def run(self, strategy_config: StrategyConfig) -> WalkforwardResult:
         """
         Run walkforward test on strategy
         
@@ -85,7 +85,7 @@ class WalkforwardTestEngine:
             strategy_config: Strategy configuration to test
             
         Returns:
-            TestResult with comprehensive statistics
+            WalkforwardResult with comprehensive statistics
         """
         # Calculate date range
         total_lookback = self._calculate_total_lookback()
@@ -93,7 +93,7 @@ class WalkforwardTestEngine:
         end_date = datetime.now()
         
         # Initialize result
-        result = TestResult()
+        result = WalkforwardResult()
         result.test_duration_days = (end_date - start_date).days
         
         # Simulate candle-by-candle processing
@@ -107,7 +107,7 @@ class WalkforwardTestEngine:
         result = self._calculate_statistics(result)
         
         # Mode 2: Would continue waiting for new candles
-        if self.config.mode == TestMode.MODE_2:
+        if self.config.mode == WalkforwardMode.MODE_2:
             result.metadata['mode'] = 'live_continuation'
             result.metadata['waiting_for_new_candles'] = True
         else:
@@ -196,7 +196,7 @@ class WalkforwardTestEngine:
         """
         self.adjustments.append(adjustment)
         
-    def _calculate_statistics(self, result: TestResult) -> TestResult:
+    def _calculate_statistics(self, result: WalkforwardResult) -> WalkforwardResult:
         """
         Calculate final statistics from tracked data
         
