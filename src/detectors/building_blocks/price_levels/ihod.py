@@ -103,21 +103,32 @@ class IHOD:
         self.prev_ihod = None
         self.proximity_threshold = 0.15  # 0.15% = ~$67 on $45k BTC
     
-    def _determine_dual_signals(self, distance_pct: float, is_new_ihod: bool) -> tuple:
-        """DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)"""
+    def _determine_dual_signals(self, distance_pct: float, is_new_ihod: bool, prev_high: float, current_high: float, ihod: float) -> tuple:
+        """
+        DUAL SIGNAL ARCHITECTURE - Returns (granular_signal, simple_signal)
+        
+        FIXED: AT_IHOD logic was broken. Now checks for:
+        - AT_IHOD: Price near IHOD (within 0.15%)
+        - BEARISH_REJECTION: Price WAS at/above IHOD but rejected (wick pattern)
+        """
         
         if is_new_ihod:
             # Breaking to new IHOD
             granular = 'BULLISH_BREAK'
             simple = 'BULLISH'
-        elif abs(distance_pct) < self.proximity_threshold and distance_pct < 0:
-            # At IHOD with rejection
-            granular = 'BEARISH_REJECTION'
-            simple = 'BEARISH'
         elif abs(distance_pct) < self.proximity_threshold:
-            # At IHOD (testing)
-            granular = 'AT_IHOD'
-            simple = 'NEUTRAL'
+            # AT IHOD: Price near the intraday high
+            # Check for rejection: if previous bar touched IHOD but current is lower
+            has_rejection = prev_high >= ihod * 0.998 and current_high < ihod * 0.998
+            
+            if has_rejection:
+                # Rejected at IHOD
+                granular = 'BEARISH_REJECTION'
+                simple = 'BEARISH'
+            else:
+                # Testing IHOD
+                granular = 'AT_IHOD'
+                simple = 'NEUTRAL'
         elif distance_pct < -0.5:
             # Below IHOD (normal state)
             granular = 'BELOW_IHOD'
@@ -188,13 +199,16 @@ class IHOD:
         
         current_price = float(df['close'].iloc[-1])
         current_high = float(df['high'].iloc[-1])
+        prev_high = float(df['high'].iloc[-2]) if len(df) >= 2 else current_high
         distance_pct = ((current_price - ihod) / ihod) * 100
         
         # Detect events: new IHOD if current bar's high breaks previous IHOD
         is_new_ihod = current_high > ihod
         
         # DUAL SIGNAL ARCHITECTURE
-        granular_signal, simple_signal = self._determine_dual_signals(distance_pct, is_new_ihod)
+        granular_signal, simple_signal = self._determine_dual_signals(
+            distance_pct, is_new_ihod, prev_high, current_high, ihod
+        )
         signal = granular_signal
         
         # Determine confidence
