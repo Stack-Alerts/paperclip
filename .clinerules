@@ -715,6 +715,311 @@ User: "EXPERT MODE & RESEARCH PROTOCOL: Find M patterns on BTC 15min for
        90 days and assess if tradeable
 
 ============================================================================
+DESIGN MODE & UI/UX PROTOCOL
+============================================================================
+DESIGN_MODE = """
+
+ACTIVATION: "DESIGN MODE: [task]"
+
+USE WHEN: UI/UX design, interface redesign, workflow optimization, architecture design
+
+CLINE MUST:
+
+1️⃣ UNDERSTAND REQUIREMENTS
+   - Target users
+   - Current pain points
+   - Desired workflows
+   - Technical constraints
+   - Integration requirements
+
+2️⃣ RESEARCH BEST PRACTICES
+   - Similar applications (TradingView, ThinkOrSwim, etc.)
+   - UI/UX patterns for trading/technical tools
+   - Accessibility standards
+   - Performance considerations
+
+3️⃣ DESIGN DELIVERABLES
+   - Wireframes/mockups (ASCII or visual description)
+   - User flow diagrams
+   - Component specifications
+   - Responsive design approach
+   - State management patterns
+
+4️⃣ PROVIDE IMPLEMENTATION ROADMAP
+   - Priority components
+   - Development effort estimates
+   - Technology recommendations
+   - Dependencies and integration points
+
+EXAMPLE: "DESIGN MODE: Redesign the strategy builder UI for easier onboarding"
+
+OUTPUT:
+- Design overview document
+- Component library specifications
+- User flows and interactions
+- Implementation roadmap
+- Code structure recommendations
+"""
+
+============================================================================
+DESIGN MODE & EXPERT MODE INTEGRATION
+============================================================================
+DESIGN_EXPERT_INTEGRATION = """
+
+ACTIVATION: "DESIGN MODE & EXPERT MODE: [task]"
+
+USE WHEN: Need design + institutional-grade assessment of design quality
+
+CLINE EXECUTES:
+
+Phase 1 - DESIGN:
+✓ Create UI/UX designs
+✓ Design user flows
+✓ Specify components
+✓ Plan responsive approach
+✓ Generate implementation roadmap
+
+Phase 2 - EXPERT ANALYSIS:
+✓ Assess design quality (UX principles)
+✓ Reality check (is this buildable?)
+✓ Performance considerations
+✓ User testing recommendations
+✓ Improvement suggestions
+✓ Final assessment: READY / NEEDS REFINEMENT / MAJOR ISSUES
+
+COMBINED OUTPUT:
+- Design specifications + expert assessment
+- Quality metrics and readiness evaluation
+- Prioritized improvements
+- Go/No-Go for implementation
+
+EXAMPLE:
+"DESIGN MODE & EXPERT MODE: Design strategy builder UI and assess if 
+it's production-ready"
+"""
+
+============================================================================
+DESIGN MODE & NAUTILUS EXPERT INTEGRATION
+============================================================================
+DESIGN_NAUTILUS_INTEGRATION = """
+
+ACTIVATION: "DESIGN MODE & NAUTILUS EXPERT: [task]"
+
+USE WHEN: Design must integrate with NautilusTrader framework specifics
+
+CLINE EXECUTES:
+
+Phase 1 - NAUTILUS EXPERT REQUIREMENTS ACTIVE:
+✓ Know NautilusTrader architecture (Clock, DataEngine, ExecutionEngine, Portfolio, MessageBus)
+✓ Understand Strategy base class and all methods
+✓ Know exact data structures (Bar, QuoteTick, TradeTick)
+✓ Know order management and lifecycle
+✓ Understand backtesting engine requirements
+✓ Know type system (Quantity, Price, Money)
+✓ Know enum usage throughout
+
+Phase 2 - DESIGN WITH NAUTILUS CONTEXT:
+✓ Design UI that maps to NautilusTrader concepts
+✓ Component interactions match framework architecture
+✓ Data flow aligns with MessageBus patterns
+✓ Strategy builder creates syntactically correct code
+✓ Parameter UI matches Quantity/Price/Money types
+✓ Real-time updates respect Clock nanosecond timing
+✓ Backtest UI reflects actual backtesting engine flow
+
+DELIVERABLES:
+- Design specifications informed by framework
+- Component mappings to NautilusTrader classes
+- Code generation templates for strategy creation
+- Data flow diagrams aligned with framework
+- Integration points documented
+
+EXAMPLE:
+"DESIGN MODE & NAUTILUS EXPERT: Design UI for strategy builder that 
+creates production-grade NautilusTrader code"
+
+OUTPUT:
+- Design with Nautilus-aware specifications
+- Component-to-framework mappings
+- Strategy template generation approach
+- Data flow aligned with MessageBus
+- Code quality guidelines for generated strategies
+"""
+
+============================================================================
+DESIGN MODE & EXPERT MODE & NAUTILUS EXPERT (TRIPLE MODE)
+============================================================================
+DESIGN_EXPERT_NAUTILUS_TRIPLE = """
+
+ACTIVATION: 
+"DESIGN MODE & EXPERT MODE & NAUTILUS EXPERT: [task]"
+OR
+"FULL DESIGN ANALYSIS: [task]"
+
+USE WHEN: Complex design requiring all three:
+- Professional UI/UX (DESIGN MODE)
+- Institutional-grade assessment (EXPERT MODE)
+- Framework integration (NAUTILUS EXPERT)
+
+CLINE EXECUTES (3 PHASES):
+
+Phase 1 - DESIGN (with NAUTILUS context):
+✓ Design strategy builder UI
+✓ Integrate with NautilusTrader concepts
+✓ Map components to framework classes
+✓ Plan data flow with MessageBus patterns
+✓ Design parameter handling (Quantity, Price, Money)
+✓ Plan strategy code generation
+✓ Design backtest result visualization
+✓ Create responsive design approach
+
+Phase 2 - EXPERT ANALYSIS:
+✓ Assess design quality and usability
+✓ Reality check: Is this buildable?
+✓ Performance analysis
+✓ Framework integration assessment
+✓ Code generation quality assurance
+✓ User testing recommendations
+✓ Improvement suggestions (prioritized)
+✓ Final readiness assessment
+
+Phase 3 - NAUTILUS EXPERT VERIFICATION:
+✓ Verify generated strategies are production-grade
+✓ Check type system compliance (Quantity, Price, Money)
+✓ Verify enum usage patterns
+✓ Validate order management flow
+✓ Check portfolio tracking integration
+✓ Verify data structure compatibility
+✓ Assess backtesting integration
+
+COMBINED DELIVERABLES:
+
+1️⃣ DESIGN SPECIFICATION DOCUMENT
+   - UI/UX design with wireframes
+   - User flows and interactions
+   - Component specifications
+   - Responsive design approach
+   - Integration points with NautilusTrader
+
+2️⃣ EXPERT ASSESSMENT REPORT
+   - Design quality metrics
+   - Usability assessment
+   - Buildability evaluation
+   - Performance considerations
+   - Improvement recommendations
+   - Priority roadmap
+
+3️⃣ NAUTILUS INTEGRATION REPORT
+   - Framework compatibility assessment
+   - Code generation quality standards
+   - Type system compliance verification
+   - Data structure mapping validation
+   - Backtesting integration specifications
+   - Production-grade requirements
+
+4️⃣ IMPLEMENTATION ROADMAP
+   - Phase 1: Core components
+   - Phase 2: Data integration
+   - Phase 3: Strategy generation
+   - Phase 4: Backtest visualization
+   - Phase 5: Polish and optimization
+   - Effort estimates per phase
+
+5️⃣ FINAL RECOMMENDATION
+   - Ready for implementation: YES/NO/CONDITIONAL
+   - Confidence level
+   - Top 3 critical items
+   - Deployment readiness assessment
+
+EXAMPLE USAGE:
+
+"DESIGN MODE & EXPERT MODE & NAUTILUS EXPERT: Design a new UI for 
+the strategy builder that:
+
+Requirements:
+- Drag-and-drop block builder
+- Real-time backtest preview
+- Parameter tuning with live updates
+- Strategy optimization panel
+- Walk-forward analysis visualization
+- Order management monitor
+- Portfolio tracking display
+
+Must integrate with:
+- NautilusTrader Strategy base class
+- Real-time DataEngine
+- ExecutionEngine order lifecycle
+- Portfolio position tracking
+- MessageBus event system
+
+Target users: Intermediate to advanced quantitative traders
+
+Constraints: Real money at risk, must be institutional grade"
+
+CLINE DELIVERS:
+
+Phase 1 Output: 30-page design spec with NautilusTrader integration
+Phase 2 Output: Expert assessment (5 reports)
+Phase 3 Output: Nautilus compatibility verification
+Phase 4 Output: 6-month implementation roadmap
+Phase 5 Output: GO/NO-GO with confidence level
+
+VALUE:
+- Per project: ~$15,000+ design consulting fee equivalent
+- Integrates all three expertise areas
+- Production-grade quality
+- Framework-aware design
+- Expert-verified implementation path
+"""
+
+============================================================================
+DESIGN MODE QUICK REFERENCE
+============================================================================
+DESIGN_MODE_QUICK_REFERENCE = """
+
+DESIGN MODE ONLY:
+"DESIGN MODE: [task]"
+Example: "DESIGN MODE: Redesign parameter tuning panel"
+Output: Design specs + implementation roadmap
+
+DESIGN + EXPERT:
+"DESIGN MODE & EXPERT MODE: [task]"
+Example: "DESIGN MODE & EXPERT MODE: Design builder UI and assess quality"
+Output: Design specs + expert assessment + improvements
+
+DESIGN + NAUTILUS:
+"DESIGN MODE & NAUTILUS EXPERT: [task]"
+Example: "DESIGN MODE & NAUTILUS EXPERT: Design strategy builder for NautilusTrader"
+Output: Design specs + framework integration + code generation templates
+
+DESIGN + EXPERT + NAUTILUS (FULL):
+"DESIGN MODE & EXPERT MODE & NAUTILUS EXPERT: [task]"
+OR Shorthand: "FULL DESIGN ANALYSIS: [task]"
+Example: "FULL DESIGN ANALYSIS: Design complete strategy builder from scratch"
+Output: All three phases + 5 reports + implementation roadmap
+
+ACTIVATION KEYWORDS:
+
+Single Mode:
+- "DESIGN MODE: [task]"
+
+Dual Mode:
+- "DESIGN MODE & EXPERT MODE: [task]"
+- "DESIGN MODE & NAUTILUS EXPERT: [task]"
+
+Triple Mode:
+- "DESIGN MODE & EXPERT MODE & NAUTILUS EXPERT: [task]"
+- "FULL DESIGN ANALYSIS: [task]"
+- "COMPLETE DESIGN ASSESSMENT: [task]"
+
+FOR YOUR USE CASE (Strategy Builder):
+→ Use TRIPLE MODE: "FULL DESIGN ANALYSIS: [task]"
+→ Gets design + expert assessment + nautilus integration
+→ Perfect for complex systems requiring framework compatibility
+"""
+
+
+============================================================================
 CORE TYPES (MUST KNOW THESE)
 ============================================================================
 TYPES = """
