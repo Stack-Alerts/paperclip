@@ -1,4 +1,4 @@
-s"""
+"""
 Strategy Builder Main Window - Complete UI Application
 
 This is the main window that integrates all Strategy Builder UI components:
