@@ -234,7 +234,7 @@ class BlockListItem(QWidget):
         self.or_button.setStyleSheet("""
             QPushButton {
                 background-color: #10B981;
-                color: #A0AEC0;
+                color: white;
                 font-weight: bold;
                 border: none;
                 border-radius: 6px;
