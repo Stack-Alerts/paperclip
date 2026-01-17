@@ -95,9 +95,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Restore window geometry from settings
         self._restore_settings()
         
-        # Show data update modal on startup (after window is shown)
-        from PyQt5.QtCore import QTimer
-        QTimer.singleShot(500, self._show_data_update_modal)
+        # NOTE: Data update modal disabled - needs integration with working UnifiedDataManager
+        # Modal code is complete and ready in data_update_modal.py
+        # TODO: Enable when ready to integrate with data system
+        # from PyQt5.QtCore import QTimer
+        # QTimer.singleShot(500, self._show_data_update_modal)
     
     def _init_ui(self):
         """Initialize the user interface layout."""

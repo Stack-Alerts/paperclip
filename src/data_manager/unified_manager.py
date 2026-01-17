@@ -65,25 +65,19 @@ class UnifiedDataManager:
     
     def __init__(self):
         """Initialize unified manager"""
-        # FIXED: Use actual data location (data/raw/ not data/lakeapi/)
-        self.data_dir = RAW_DATA_DIR  # From config.py - points to data/raw/
+        self.lakeapi_dir = PROJECT_ROOT / "data" / "lakeapi"
         self.binance_dir = PROJECT_ROOT / "data" / "binance"
         
         # Components
+        self.bar_aggregator = BarAggregator()
         self.binance_client = None  # Lazy initialization
-        
-        # CSV file cutoff date (last date in CSV files)
-        # TODO: Auto-detect from CSV, for now hardcode known cutoff
-        from datetime import datetime
-        self.csv_cutoff_date = datetime(2025, 12, 16, 7, 45)
         
         # Thresholds
         self.binance_threshold_days = 30  # Use Binance for last 30 days
         
         print("✅ Unified Data Manager initialized")
-        print(f"   Historical Data (CSV): {self.data_dir}")
-        print(f"   CSV Cutoff: {self.csv_cutoff_date}")
-        print(f"   Binance (Recent): {self.binance_dir}")
+        print(f"   LakeAPI: {self.lakeapi_dir}")
+        print(f"   Binance: {self.binance_dir}")
         print(f"   Auto-routing threshold: {self.binance_threshold_days} days")
     
     def _get_binance_client(self) -> BinanceRestClient:
@@ -276,12 +270,12 @@ class UnifiedDataManager:
         end_date: datetime
     ) -> pd.DataFrame:
         """
-        Get bars from historical CSV files (data/raw/)
+        Get bars from LakeAPI (historical data)
         
         Process:
-        1. Load pre-aggregated CSV file for timeframe
-        2. Filter to date range
-        3. Return bars
+        1. Load trades from parquet files
+        2. Aggregate to requested timeframe
+        3. Filter to date range
         
         Args:
             timeframe: Bar timeframe
@@ -291,47 +285,24 @@ class UnifiedDataManager:
         Returns:
             DataFrame with bars
         """
-        print("   📂 Loading from CSV files...")
+        print("   📂 Loading from LakeAPI...")
         
         try:
-            # Map timeframe to CSV filename
-            csv_filename = f"BTC_USDT_PERP_{timeframe}.csv"
-            csv_path = self.data_dir / csv_filename
+            # Use bar aggregator to process LakeAPI trades
+            bars = self.bar_aggregator.aggregate_date_range(
+                'trades',
+                start_date,
+                end_date,
+                timeframe
+            )
             
-            if not csv_path.exists():
-                raise FileNotFoundError(f"CSV file not found: {csv_path}")
-            
-            # Load CSV
-            df = pd.read_csv(csv_path)
-            
-            # Standardize column names (CSV may have capitalized names)
-            if 'Timestamp' in df.columns:
-                df.rename(columns={
-                    'Timestamp': 'timestamp',
-                    'Open': 'open',
-                    'High': 'high',
-                    'Low': 'low',
-                    'Close': 'close',
-                    'Volume': 'volume'
-                }, inplace=True)
-            
-            # Convert timestamp and sort
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            df = df.sort_values('timestamp').reset_index(drop=True)
-            
-            # Filter to date range
-            df = df[
-                (df['timestamp'] >= start_date) &
-                (df['timestamp'] <= end_date)
-            ].copy()
-            
-            print(f"   ✅ CSV: {len(df)} bars loaded from {csv_filename}")
-            return df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
+            print(f"   ✅ LakeAPI: {len(bars)} bars loaded")
+            return bars
             
         except Exception as e:
-            print(f"   ❌ CSV loading error: {e}")
+            print(f"   ❌ LakeAPI error: {e}")
             
-            # Fallback to Binance if CSV fails
+            # Fallback to Binance if LakeAPI fails
             print("   🔄 Falling back to Binance...")
             return self._get_bars_binance(timeframe, start_date, end_date)
     
@@ -471,39 +442,30 @@ class UnifiedDataManager:
         Returns:
             Dict with earliest and latest available dates
         """
-        # Check CSV files
-        csv_start = None
-        csv_end = None
+        # Check LakeAPI
+        lakeapi_start = None
+        lakeapi_end = None
         
-        csv_filename = f"BTC_USDT_PERP_{timeframe}.csv"
-        csv_path = self.data_dir / csv_filename
-        
-        if csv_path.exists():
-            try:
-                # Read just first and last lines for speed
-                df = pd.read_csv(csv_path)
-                
-                # Handle capitalized columns
-                timestamp_col = 'Timestamp' if 'Timestamp' in df.columns else 'timestamp'
-                
-                df[timestamp_col] = pd.to_datetime(df[timestamp_col])
-                csv_start = df[timestamp_col].min()
-                csv_end = df[timestamp_col].max()
-            except Exception as e:
-                print(f"Warning: Could not read date range from {csv_filename}: {e}")
+        if self.lakeapi_dir.exists():
+            # Find earliest month
+            month_dirs = sorted([d for d in (self.lakeapi_dir / 'trades').glob('*') if d.is_dir()])
+            if month_dirs:
+                # Rough estimate from directory names
+                lakeapi_start = datetime.strptime(month_dirs[0].name, '%Y-%m')
+                lakeapi_end = datetime.strptime(month_dirs[-1].name, '%Y-%m')
         
         # Check Binance (assumed to be current)
         binance_end = datetime.now()
-        binance_start = csv_end if csv_end else (binance_end - timedelta(days=30))
+        binance_start = binance_end - timedelta(days=30)  # Typical availability
         
         # Combine
-        earliest = csv_start if csv_start else binance_start
+        earliest = lakeapi_start if lakeapi_start else binance_start
         latest = binance_end
         
         return {
             'earliest': earliest,
             'latest': latest,
-            'lakeapi_range': (csv_start, csv_end) if csv_start else None,
+            'lakeapi_range': (lakeapi_start, lakeapi_end) if lakeapi_start else None,
             'binance_range': (binance_start, binance_end)
         }
 
