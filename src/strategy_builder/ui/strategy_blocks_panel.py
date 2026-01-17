@@ -140,6 +140,19 @@ class BlockConfigItem(QWidget):
         
         controls_layout.addLayout(move_layout)
         
+        # Configure button for blocks #2+ (need reference to previous block)
+        if self.position > 1:
+            self.configure_block_button = QPushButton("⚙️ Config")
+            self.configure_block_button.setMinimumWidth(100)
+            self.configure_block_button.setStyleSheet(
+                "QPushButton { background-color: #2070FF; color: white; font-weight: bold; padding: 5px; }"
+                "QPushButton:hover { background-color: #1860EF; }"
+            )
+            self.configure_block_button.setToolTip("Configure timing constraint for this block")
+            # Emit with empty string as signal_name to indicate block-level config
+            self.configure_block_button.clicked.connect(lambda: self.configure_timing_clicked.emit(self.block_name, ""))
+            controls_layout.addWidget(self.configure_block_button)
+        
         # Remove button
         self.remove_button = QPushButton("✕ Remove")
         self.remove_button.setMinimumWidth(100)  # Changed from setMaximumWidth(90)
@@ -425,6 +438,43 @@ class StrategyBlocksPanel(QWidget):
         
         self.block_items.clear()
     
+    def _get_block_level_references(self, block_name: str) -> List[Tuple[str, str]]:
+        """
+        Get list of available reference signals for block-level timing constraints
+.
+        
+        Args:
+            block_name: Current block name
+            
+        Returns:
+            List of (display_name, reference_id) tuples from all previous blocks
+        """
+        references = []
+        config = self.orchestrator.get_current_config()
+        
+        if not config:
+            return references
+        
+        # Find current block index
+        current_block_idx = None
+        for block_idx, block in enumerate(config.blocks):
+            if block.name == block_name:
+                current_block_idx = block_idx
+                break
+        
+        if current_block_idx is None:
+            return references
+        
+        # Add all signals from all previous blocks
+        for block_idx in range(current_block_idx):
+            block = config.blocks[block_idx]
+            for signal in block.signals:
+                display_name = f"{block.name} → {signal.name}"
+                reference_id = f"{block.name}::{signal.name}"
+                references.append((display_name, reference_id))
+        
+        return references
+    
     def _get_available_references(self, block_name: str, signal_name: str) -> List[Tuple[str, str]]:
         """
         Get list of available reference signals for timing constraints.
@@ -513,23 +563,37 @@ class StrategyBlocksPanel(QWidget):
         
         Args:
             block_name: Block name
-            signal_name: Signal name
+            signal_name: Signal name (empty string for block-level timing)
         """
         try:
-            # Get available reference signals
-            available_references = self._get_available_references(block_name, signal_name)
+            # Determine if this is block-level or signal-level timing
+            is_block_level = (signal_name == "")
+            
+            if is_block_level:
+                # Block-level timing constraint
+                display_name = f"Block: {block_name}"
+                # Get references: all signals from all previous blocks
+                available_references = self._get_block_level_references(block_name)
+            else:
+                # Signal-level timing constraint
+                display_name = f"Signal: {block_name} → {signal_name}"
+                # Get references: previous signals
+                available_references = self._get_available_references(block_name, signal_name)
             
             if not available_references:
-                print(f"No reference signals available for {block_name}::{signal_name}")
+                print(f"No reference signals available for {display_name}")
                 return
             
             # Get current constraint
             current_constraint = self._get_current_constraint(block_name, signal_name)
             
+            # Use appropriate display name for dialog
+            title_name = "Block Timing" if is_block_level else signal_name
+            
             # Create and show dialog
             dialog = TimingConstraintDialog(
                 block_name=block_name,
-                signal_name=signal_name,
+                signal_name=title_name,
                 available_references=available_references,
                 current_constraint=current_constraint,
                 parent=self
