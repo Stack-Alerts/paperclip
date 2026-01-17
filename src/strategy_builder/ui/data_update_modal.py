@@ -109,12 +109,16 @@ class DataUpdateModal(QDialog):
     def _init_ui(self):
         """Initialize the user interface"""
         self.setWindowTitle("Data Update Check")
-        self.setModal(True)
         
         # Make dialog moveable and independent (30% bigger)
-        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+        # Use Window flag instead of Dialog to allow dragging
+        self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowStaysOnTopHint)
+        self.setModal(True)  # Keep modal behavior but allow dragging
+        
+        # 30% bigger than original 600x400
         self.setMinimumWidth(780)   # 600 * 1.3
         self.setMinimumHeight(520)  # 400 * 1.3
+        self.resize(780, 520)       # Set initial size
         
         # Dark theme
         self.setStyleSheet("""
