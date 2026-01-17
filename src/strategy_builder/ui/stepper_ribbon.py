@@ -16,7 +16,7 @@ from typing import Optional, Set
 from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QLabel, QPushButton
 )
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, QTimer
 from PyQt5.QtGui import QFont
 
 
@@ -60,10 +60,9 @@ class StepperRibbon(QWidget):
     def _init_ui(self):
         """Initialize the user interface."""
         layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(0, 0, 0, 0)  # No fixed margin - will be calculated dynamically
         layout.setSpacing(5)
         
-        # NO internal stretching - stepper has fixed width, positioned by toolbar
         # Create step buttons with arrows
         for idx, step in enumerate(self.STEPS):
             # Step button
@@ -89,10 +88,80 @@ class StepperRibbon(QWidget):
                 self.arrow_labels.append(arrow)
                 layout.addWidget(arrow)
         
+        # Add stretch at the END to absorb remaining space (prevents gaps between buttons)
+        layout.addStretch()
+        
         self.setLayout(layout)
         
         # Initial state
         self._update_display()
+    
+    def showEvent(self, event):
+        """Called when widget is shown - recalculate centering."""
+        super().showEvent(event)
+        # Delay calculation slightly to ensure all widgets are sized
+        QTimer.singleShot(100, self._recalculate_centering)
+    
+    def resizeEvent(self, event):
+        """Called when widget or window is resized - recalculate centering."""
+        super().resizeEvent(event)
+        self._recalculate_centering()
+    
+    def _recalculate_centering(self):
+        """Dynamically calculate left margin to center stepper in window."""
+        # Get parent (toolbar) and main window
+        toolbar = self.parent()
+        if not toolbar:
+            return
+            
+        main_window = toolbar.parent()
+        if not main_window:
+            return
+        
+        # Get widths
+        window_width = main_window.width()
+        
+        # Calculate natural stepper width (sum of buttons + arrows + spacing)
+        # Don't use sizeHint() as it returns expanded width if widget is expanding
+        stepper_width = 0
+        for btn in self.step_buttons:
+            stepper_width += btn.minimumWidth()  # 140px each
+        for arrow in self.arrow_labels:
+            stepper_width += arrow.sizeHint().width()  # Arrow width
+        # Add spacing between widgets (5px × number of gaps)
+        num_widgets = len(self.step_buttons) + len(self.arrow_labels)
+        stepper_width += 5 * (num_widgets - 1)  # spacing
+        # Add layout margins
+        stepper_width += 10  # Small buffer for margins/padding
+        
+        # Calculate actual toolbar button width (before stepper)
+        # Toolbar has New/Open/Save actions + separator before stepper
+        toolbar_buttons_width = 0
+        for action in toolbar.actions():
+            widget = toolbar.widgetForAction(action)
+            if widget == self:
+                break  # Stop when we reach the stepper
+            if widget:
+                toolbar_buttons_width += widget.width()
+            else:
+                # Action button (not widget)
+                toolbar_buttons_width += 80  # Approximate action button width
+        
+        # Calculate left margin to center stepper relative to full window
+        # Window center: window_width / 2
+        # Stepper center should also be at: window_width / 2
+        # Stepper left edge in window = toolbar_buttons_width + left_margin
+        # We want: toolbar_buttons_width + left_margin + (stepper_width / 2) = window_width / 2
+        # So: left_margin = (window_width / 2) - (stepper_width / 2) - toolbar_buttons_width
+        center_pos = (window_width - stepper_width) // 2
+        # Adjust toolbar button width for accurate centering (empirically determined)
+        adjusted_toolbar_width = int(toolbar_buttons_width * 1.3)
+        left_margin = max(0, center_pos - adjusted_toolbar_width)
+        
+        # Update margin
+        layout = self.layout()
+        if layout:
+            layout.setContentsMargins(left_margin, 0, 0, 0)
     
     def _on_step_clicked(self, step: int):
         """Handle step button click."""

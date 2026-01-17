@@ -384,20 +384,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         toolbar.addSeparator()
         
-        # Add expanding spacer BEFORE stepper
-        spacer_left = QWidget()
-        spacer_left.setSizePolicy(QWidget().sizePolicy().Expanding, QWidget().sizePolicy().Preferred)
-        toolbar.addWidget(spacer_left)
-        
-        # Add stepper (fixed width, no expansion)
+        # Add stepper - make it expand to fill toolbar so internal margin works
         self.stepper = StepperRibbon(self)
         self.stepper.step_clicked.connect(self._on_step_clicked)
+        self.stepper.setSizePolicy(QWidget().sizePolicy().Expanding, QWidget().sizePolicy().Preferred)
         toolbar.addWidget(self.stepper)
-        
-        # Add expanding spacer AFTER stepper (balances left spacer)
-        spacer_right = QWidget()
-        spacer_right.setSizePolicy(QWidget().sizePolicy().Expanding, QWidget().sizePolicy().Preferred)
-        toolbar.addWidget(spacer_right)
     
     def _create_status_bar(self):
         """Create the status bar."""
