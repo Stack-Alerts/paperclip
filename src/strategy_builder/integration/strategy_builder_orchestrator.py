@@ -546,6 +546,440 @@ class StrategyBuilderOrchestrator:
         except Exception:
             return []
             
+    def set_signal_timing_constraint(
+        self,
+        block_name: str,
+        signal_name: str,
+        constraint: Dict[str, Any]
+    ) -> WorkflowResult:
+        """
+        Set timing constraint for a signal
+        
+        Args:
+            block_name: Block name
+            signal_name: Signal name
+            constraint: Constraint dict with 'candles', 'reference', 'reference_name'
+            
+        Returns:
+            WorkflowResult
+        """
+        try:
+            # Find block and signal
+            block_found = False
+            signal_found = False
+            
+            for block in self.config_engine.config.blocks:
+                if block.name == block_name:
+                    block_found = True
+                    for signal in block.signals:
+                        if signal.name == signal_name:
+                            signal_found = True
+                            # Create timing constraint
+                            signal.timing_constraint = TimingConstraint(
+                                max_candles=constraint['candles'],
+                                reference=constraint['reference']
+                            )
+                            break
+                    break
+            
+            if not block_found:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_SIGNAL,
+                    message=f"Block '{block_name}' not found",
+                    errors=[f"Block '{block_name}' does not exist"]
+                )
+            
+            if not signal_found:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_SIGNAL,
+                    message=f"Signal '{signal_name}' not found in block '{block_name}'",
+                    errors=[f"Signal '{signal_name}' does not exist in block '{block_name}'"]
+                )
+            
+            return WorkflowResult(
+                success=True,
+                step=WorkflowStep.ADD_SIGNAL,
+                message=f"Timing constraint set for {block_name}::{signal_name}",
+                strategy_config=self.config_engine.config
+            )
+            
+        except Exception as e:
+            return WorkflowResult(
+                success=False,
+                step=WorkflowStep.ADD_SIGNAL,
+                message="Failed to set timing constraint",
+                errors=[str(e)]
+            )
+    
+    def remove_signal_timing_constraint(
+        self,
+        block_name: str,
+        signal_name: str
+    ) -> WorkflowResult:
+        """
+        Remove timing constraint from a signal
+        
+        Args:
+            block_name: Block name
+            signal_name: Signal name
+            
+        Returns:
+            WorkflowResult
+        """
+        try:
+            # Find block and signal
+            block_found = False
+            signal_found = False
+            
+            for block in self.config_engine.config.blocks:
+                if block.name == block_name:
+                    block_found = True
+                    for signal in block.signals:
+                        if signal.name == signal_name:
+                            signal_found = True
+                            # Remove timing constraint
+                            signal.timing_constraint = None
+                            break
+                    break
+            
+            if not block_found:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_SIGNAL,
+                    message=f"Block '{block_name}' not found",
+                    errors=[f"Block '{block_name}' does not exist"]
+                )
+            
+            if not signal_found:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_SIGNAL,
+                    message=f"Signal '{signal_name}' not found in block '{block_name}'",
+                    errors=[f"Signal '{signal_name}' does not exist in block '{block_name}'"]
+                )
+            
+            return WorkflowResult(
+                success=True,
+                step=WorkflowStep.ADD_SIGNAL,
+                message=f"Timing constraint removed from {block_name}::{signal_name}",
+                strategy_config=self.config_engine.config
+            )
+            
+        except Exception as e:
+            return WorkflowResult(
+                success=False,
+                step=WorkflowStep.ADD_SIGNAL,
+                message="Failed to remove timing constraint",
+                errors=[str(e)]
+            )
+    
+    def reorder_block(
+        self,
+        block_name: str,
+        direction: str
+    ) -> WorkflowResult:
+        """
+        Reorder a block in the strategy
+        
+        Args:
+            block_name: Block name
+            direction: 'up' or 'down'
+            
+        Returns:
+            WorkflowResult
+        """
+        try:
+            blocks = self.config_engine.config.blocks
+            
+            # Find block index
+            block_idx = None
+            for idx, block in enumerate(blocks):
+                if block.name == block_name:
+                    block_idx = idx
+                    break
+            
+            if block_idx is None:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_BLOCK,
+                    message=f"Block '{block_name}' not found",
+                    errors=[f"Block '{block_name}' does not exist"]
+                )
+            
+            # Move block
+            if direction == "up":
+                if block_idx == 0:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_BLOCK,
+                        message="Block is already first",
+                        errors=["Cannot move first block up"]
+                    )
+                # Swap with previous
+                blocks[block_idx], blocks[block_idx - 1] = blocks[block_idx - 1], blocks[block_idx]
+            elif direction == "down":
+                if block_idx == len(blocks) - 1:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_BLOCK,
+                        message="Block is already last",
+                        errors=["Cannot move last block down"]
+                    )
+                # Swap with next
+                blocks[block_idx], blocks[block_idx + 1] = blocks[block_idx + 1], blocks[block_idx]
+            else:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_BLOCK,
+                    message=f"Invalid direction: {direction}",
+                    errors=[f"Direction must be 'up' or 'down', got '{direction}'"]
+                )
+            
+            return WorkflowResult(
+                success=True,
+                step=WorkflowStep.ADD_BLOCK,
+                message=f"Block '{block_name}' moved {direction}",
+                strategy_config=self.config_engine.config
+            )
+            
+        except Exception as e:
+            return WorkflowResult(
+                success=False,
+                step=WorkflowStep.ADD_BLOCK,
+                message="Failed to reorder block",
+                errors=[str(e)]
+            )
+    
+    def remove_block(
+        self,
+        block_name: str
+    ) -> WorkflowResult:
+        """
+        Remove a block from the strategy
+        
+        Args:
+            block_name: Block name
+            
+        Returns:
+            WorkflowResult
+        """
+        try:
+            blocks = self.config_engine.config.blocks
+            
+            # Find and remove block
+            initial_count = len(blocks)
+            self.config_engine.config.blocks = [
+                block for block in blocks if block.name != block_name
+            ]
+            
+            if len(self.config_engine.config.blocks) == initial_count:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_BLOCK,
+                    message=f"Block '{block_name}' not found",
+                    errors=[f"Block '{block_name}' does not exist"]
+                )
+            
+            return WorkflowResult(
+                success=True,
+                step=WorkflowStep.ADD_BLOCK,
+                message=f"Block '{block_name}' removed",
+                strategy_config=self.config_engine.config
+            )
+            
+        except Exception as e:
+            return WorkflowResult(
+                success=False,
+                step=WorkflowStep.ADD_BLOCK,
+                message="Failed to remove block",
+                errors=[str(e)]
+            )
+    
+    def save_strategy(
+        self,
+        filepath: str
+    ) -> WorkflowResult:
+        """
+        Save strategy to file
+        
+        Args:
+            filepath: Path to save file
+            
+        Returns:
+            WorkflowResult
+        """
+        try:
+            import json
+            from pathlib import Path
+            
+            # Convert config to dict
+            config_dict = {
+                'name': self.config_engine.config.name,
+                'description': self.config_engine.config.description,
+                'blocks': []
+            }
+            
+            for block in self.config_engine.config.blocks:
+                block_dict = {
+                    'name': block.name,
+                    'logic': block.logic,
+                    'signals': []
+                }
+                
+                for signal in block.signals:
+                    signal_dict = {
+                        'name': signal.name,
+                        'logic': signal.logic,
+                        'timing_constraint': None
+                    }
+                    
+                    if signal.timing_constraint:
+                        signal_dict['timing_constraint'] = {
+                            'max_candles': signal.timing_constraint.max_candles,
+                            'reference': signal.timing_constraint.reference
+                        }
+                    
+                    block_dict['signals'].append(signal_dict)
+                
+                config_dict['blocks'].append(block_dict)
+            
+            # Save to file
+            Path(filepath).parent.mkdir(parents=True, exist_ok=True)
+            with open(filepath, 'w') as f:
+                json.dump(config_dict, f, indent=2)
+            
+            return WorkflowResult(
+                success=True,
+                step=WorkflowStep.CREATE_STRATEGY,
+                message=f"Strategy saved to {filepath}",
+                data={'file_path': filepath}
+            )
+            
+        except Exception as e:
+            return WorkflowResult(
+                success=False,
+                step=WorkflowStep.CREATE_STRATEGY,
+                message="Failed to save strategy",
+                errors=[str(e)]
+            )
+    
+    def load_strategy(
+        self,
+        filepath: str
+    ) -> WorkflowResult:
+        """
+        Load strategy from file
+        
+        Args:
+            filepath: Path to load file
+            
+        Returns:
+            WorkflowResult
+        """
+        try:
+            import json
+            
+            # Load from file
+            with open(filepath, 'r') as f:
+                config_dict = json.load(f)
+            
+            # Create new config
+            self.config_engine = StrategyConfigEngine(self.registry)
+            self.config_engine.config.name = config_dict.get('name', 'Untitled')
+            self.config_engine.config.description = config_dict.get('description', '')
+            
+            # Load blocks and signals
+            for block_dict in config_dict.get('blocks', []):
+                # Add block
+                self.config_engine.add_block(
+                    block_dict['name'],
+                    block_dict.get('logic', 'AND')
+                )
+                
+                # Add signals
+                for signal_dict in block_dict.get('signals', []):
+                    timing_constraint = None
+                    if signal_dict.get('timing_constraint'):
+                        tc = signal_dict['timing_constraint']
+                        timing_constraint = TimingConstraint(
+                            max_candles=tc['max_candles'],
+                            reference=tc['reference']
+                        )
+                    
+                    self.config_engine.add_signal(
+                        block_name=block_dict['name'],
+                        signal_name=signal_dict['name'],
+                        logic=signal_dict.get('logic', 'AND'),
+                        constraint=timing_constraint
+                    )
+            
+            return WorkflowResult(
+                success=True,
+                step=WorkflowStep.CREATE_STRATEGY,
+                message=f"Strategy loaded from {filepath}",
+                strategy_config=self.config_engine.config
+            )
+            
+        except Exception as e:
+            return WorkflowResult(
+                success=False,
+                step=WorkflowStep.CREATE_STRATEGY,
+                message="Failed to load strategy",
+                errors=[str(e)]
+            )
+    
+    def generate_description(self) -> str:
+        """
+        Generate auto-description for current strategy
+        
+        Returns:
+            Generated description string
+        """
+        try:
+            config = self.config_engine.config
+            
+            if not config.blocks:
+                return "No blocks configured yet."
+            
+            # Count blocks and signals
+            num_blocks = len(config.blocks)
+            num_signals = sum(len(block.signals) for block in config.blocks)
+            num_required = sum(1 for block in config.blocks if block.logic == "AND")
+            num_optional = num_blocks - num_required
+            
+            # Count timing constraints
+            num_timing = sum(
+                1 for block in config.blocks
+                for signal in block.signals
+                if signal.timing_constraint is not None
+            )
+            
+            # Build description
+            parts = []
+            parts.append(f"Strategy with {num_blocks} building block(s) and {num_signals} signal(s).")
+            
+            if num_required > 0:
+                parts.append(f"{num_required} required block(s).")
+            if num_optional > 0:
+                parts.append(f"{num_optional} optional block(s).")
+            
+            if num_timing > 0:
+                parts.append(f"{num_timing} timing constraint(s) configured.")
+            
+            # List blocks
+            block_names = [block.name for block in config.blocks]
+            if len(block_names) <= 3:
+                parts.append(f"Blocks: {', '.join(block_names)}.")
+            else:
+                parts.append(f"Blocks: {', '.join(block_names[:3])}, and {len(block_names) - 3} more.")
+            
+            return " ".join(parts)
+            
+        except Exception as e:
+            return f"Error generating description: {str(e)}"
+    
     def get_current_config(self) -> StrategyConfig:
         """
         Get current strategy configuration

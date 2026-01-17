@@ -6,6 +6,7 @@ This panel displays the added building blocks and allows configuration:
 - Reorder blocks (up/down)
 - Remove blocks
 - Show AND/OR logic
+- Configure timing constraints
 - Visual feedback
 - Integration with orchestrator
 
@@ -13,10 +14,10 @@ Author: Strategy Builder Team
 Date: 2026-01-16
 """
 
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGroupBox, QScrollArea, QFrame
+    QGroupBox, QScrollArea, QFrame, QDialog
 )
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QFont
@@ -24,6 +25,7 @@ from PyQt5.QtGui import QFont
 from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
 )
+from src.strategy_builder.ui.timing_constraint_dialog import TimingConstraintDialog
 
 
 class BlockConfigItem(QWidget):
@@ -34,6 +36,7 @@ class BlockConfigItem(QWidget):
     move_up_clicked = pyqtSignal(str)  # block_name
     move_down_clicked = pyqtSignal(str)  # block_name
     remove_clicked = pyqtSignal(str)  # block_name
+    configure_timing_clicked = pyqtSignal(str, str)  # block_name, signal_name
     
     def __init__(self, block_name: str, block_info: dict, position: int, total: int, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -151,7 +154,7 @@ class BlockConfigItem(QWidget):
         
         layout.addLayout(header_layout)
         
-        # Signals section - dark theme
+        # Signals section - dark theme with timing constraints and dependencies
         if self.block_info.get('signals'):
             signals_widget = QFrame()
             signals_widget.setFrameShape(QFrame.StyledPanel)
@@ -167,14 +170,76 @@ class BlockConfigItem(QWidget):
             for idx, signal in enumerate(self.block_info['signals'], 1):
                 signal_name = signal.get('name', 'Unknown')
                 signal_logic = signal.get('logic', 'AND')
+                timing_constraint = signal.get('timing_constraint')
+                
+                # Create horizontal layout for signal and configure button
+                signal_row_layout = QHBoxLayout()
+                signal_row_layout.setSpacing(8)
                 
                 # Logic indicator color - brighter for dark theme
                 logic_color = "#4ADE80" if signal_logic == "AND" else "#60A5FA"
                 
-                signal_text = f"  {idx}. {signal_name} [{signal_logic}]"
+                # Check if this signal has dependencies (references previous signals)
+                has_dependency = timing_constraint is not None
+                
+                # Build signal text with dependency arrow if needed
+                if has_dependency and idx > 1:
+                    # Show dependency arrow for non-first signals
+                    signal_text = f"  {idx}. {signal_name} [{signal_logic}] ← depends on previous"
+                else:
+                    signal_text = f"  {idx}. {signal_name} [{signal_logic}]"
+                
                 signal_label = QLabel(signal_text)
                 signal_label.setStyleSheet(f"color: {logic_color}; font-size: 9pt;")
-                signals_layout.addWidget(signal_label)
+                
+                # Add tooltip with full signal info
+                tooltip_parts = [f"Signal: {signal_name}", f"Logic: {signal_logic}"]
+                if timing_constraint:
+                    ref_signal = timing_constraint.get('reference_signal', 'previous signal')
+                    max_candles = timing_constraint.get('max_candles', 'N/A')
+                    tooltip_parts.append(f"Timing: Within {max_candles} candles of {ref_signal}")
+                signal_label.setToolTip("\n".join(tooltip_parts))
+                
+                signal_row_layout.addWidget(signal_label, stretch=1)
+                
+                # Add configure button for signals after the first (need reference signal)
+                if idx > 1:
+                    configure_btn = QPushButton("⚙️ Configure")
+                    configure_btn.setMaximumWidth(90)
+                    configure_btn.setStyleSheet("""
+                        QPushButton {
+                            background-color: #2070FF;
+                            color: white;
+                            font-weight: bold;
+                            font-size: 8pt;
+                            padding: 4px 8px;
+                            border-radius: 4px;
+                        }
+                        QPushButton:hover {
+                            background-color: #1860EF;
+                        }
+                        QPushButton:pressed {
+                            background-color: #1550DF;
+                        }
+                    """)
+                    configure_btn.setToolTip("Configure timing constraint for this signal")
+                    configure_btn.clicked.connect(
+                        lambda checked, sname=signal_name: self.configure_timing_clicked.emit(self.block_name, sname)
+                    )
+                    signal_row_layout.addWidget(configure_btn)
+                
+                signals_layout.addLayout(signal_row_layout)
+                
+                # Display timing constraint as indented sub-item
+                if timing_constraint:
+                    ref_signal = timing_constraint.get('reference_signal', 'previous signal')
+                    max_candles = timing_constraint.get('max_candles', 'N/A')
+                    
+                    timing_text = f"     └─ within {max_candles} candles of {ref_signal}"
+                    timing_label = QLabel(timing_text)
+                    timing_label.setStyleSheet("color: #FFA500; font-size: 8pt; font-style: italic;")  # Orange for timing
+                    timing_label.setToolTip(f"This signal must occur within {max_candles} candles after {ref_signal}")
+                    signals_layout.addWidget(timing_label)
             
             signals_widget.setLayout(signals_layout)
             layout.addWidget(signals_widget)
@@ -316,12 +381,22 @@ class StrategyBlocksPanel(QWidget):
                 'signals': []
             }
             
-            # Add signal info
+            # Add signal info with timing constraints
             for signal_config in block_config.signals:
-                block_info['signals'].append({
+                signal_dict = {
                     'name': signal_config.name,
-                    'logic': signal_config.logic
-                })
+                    'logic': signal_config.logic,
+                    'timing_constraint': None
+                }
+                
+                # Add timing constraint data if present
+                if signal_config.timing_constraint:
+                    signal_dict['timing_constraint'] = {
+                        'reference_signal': signal_config.timing_constraint.reference,
+                        'max_candles': signal_config.timing_constraint.max_candles
+                    }
+                
+                block_info['signals'].append(signal_dict)
             
             # Create block item widget
             block_item = BlockConfigItem(
@@ -335,6 +410,7 @@ class StrategyBlocksPanel(QWidget):
             block_item.move_up_clicked.connect(self._on_move_up)
             block_item.move_down_clicked.connect(self._on_move_down)
             block_item.remove_clicked.connect(self._on_remove)
+            block_item.configure_timing_clicked.connect(self._on_configure_timing)
             
             # Add to layout (insert before stretch)
             self.blocks_layout.insertWidget(self.blocks_layout.count() - 1, block_item)
@@ -348,6 +424,157 @@ class StrategyBlocksPanel(QWidget):
             block_item.deleteLater()
         
         self.block_items.clear()
+    
+    def _get_available_references(self, block_name: str, signal_name: str) -> List[Tuple[str, str]]:
+        """
+        Get list of available reference signals for timing constraints.
+        
+        Args:
+            block_name: Current block name
+            signal_name: Current signal name
+            
+        Returns:
+            List of (display_name, reference_id) tuples
+        """
+        references = []
+        config = self.orchestrator.get_current_config()
+        
+        if not config:
+            return references
+        
+        # Find current block and signal
+        current_block_idx = None
+        current_signal_idx = None
+        
+        for block_idx, block in enumerate(config.blocks):
+            if block.name == block_name:
+                current_block_idx = block_idx
+                for signal_idx, signal in enumerate(block.signals):
+                    if signal.name == signal_name:
+                        current_signal_idx = signal_idx
+                        break
+                break
+        
+        if current_block_idx is None or current_signal_idx is None:
+            return references
+        
+        # Add all signals from previous blocks
+        for block_idx in range(current_block_idx):
+            block = config.blocks[block_idx]
+            for signal in block.signals:
+                display_name = f"{block.name} → {signal.name}"
+                reference_id = f"{block.name}::{signal.name}"
+                references.append((display_name, reference_id))
+        
+        # Add previous signals from current block
+        current_block = config.blocks[current_block_idx]
+        for signal_idx in range(current_signal_idx):
+            signal = current_block.signals[signal_idx]
+            display_name = f"{block_name} → {signal.name}"
+            reference_id = f"{block_name}::{signal.name}"
+            references.append((display_name, reference_id))
+        
+        return references
+    
+    def _get_current_constraint(self, block_name: str, signal_name: str) -> Optional[dict]:
+        """
+        Get current timing constraint for a signal.
+        
+        Args:
+            block_name: Block name
+            signal_name: Signal name
+            
+        Returns:
+            Constraint dict or None
+        """
+        config = self.orchestrator.get_current_config()
+        
+        if not config:
+            return None
+        
+        # Find signal
+        for block in config.blocks:
+            if block.name == block_name:
+                for signal in block.signals:
+                    if signal.name == signal_name:
+                        if signal.timing_constraint:
+                            return {
+                                'candles': signal.timing_constraint.max_candles,
+                                'reference': signal.timing_constraint.reference,
+                                'reference_name': signal.timing_constraint.reference  # TODO: Get display name
+                            }
+                        return None
+        
+        return None
+    
+    def _on_configure_timing(self, block_name: str, signal_name: str):
+        """
+        Handle configure timing button click.
+        
+        Args:
+            block_name: Block name
+            signal_name: Signal name
+        """
+        try:
+            # Get available reference signals
+            available_references = self._get_available_references(block_name, signal_name)
+            
+            if not available_references:
+                print(f"No reference signals available for {block_name}::{signal_name}")
+                return
+            
+            # Get current constraint
+            current_constraint = self._get_current_constraint(block_name, signal_name)
+            
+            # Create and show dialog
+            dialog = TimingConstraintDialog(
+                block_name=block_name,
+                signal_name=signal_name,
+                available_references=available_references,
+                current_constraint=current_constraint,
+                parent=self
+            )
+            
+            if dialog.exec_() == QDialog.Accepted:
+                # Get constraint from dialog
+                constraint = dialog.get_constraint()
+                
+                # Save to orchestrator
+                if constraint:
+                    result = self.orchestrator.set_signal_timing_constraint(
+                        block_name=block_name,
+                        signal_name=signal_name,
+                        constraint=constraint
+                    )
+                    
+                    if result.success:
+                        # Refresh display
+                        self._refresh_blocks()
+                        # Emit changed signal
+                        self.blocks_changed.emit()
+                        print(f"Timing constraint configured for {block_name}::{signal_name}")
+                    else:
+                        print(f"Failed to set timing constraint: {result.message}")
+                else:
+                    # Remove constraint
+                    result = self.orchestrator.remove_signal_timing_constraint(
+                        block_name=block_name,
+                        signal_name=signal_name
+                    )
+                    
+                    if result.success:
+                        # Refresh display
+                        self._refresh_blocks()
+                        # Emit changed signal
+                        self.blocks_changed.emit()
+                        print(f"Timing constraint removed for {block_name}::{signal_name}")
+                    else:
+                        print(f"Failed to remove timing constraint: {result.message}")
+        
+        except Exception as e:
+            print(f"Error configuring timing constraint: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _on_move_up(self, block_name: str):
         """Handle move up button click."""
