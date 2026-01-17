@@ -71,11 +71,11 @@ class TimingConstraintDialog(QDialog):
     def _init_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle(f"Configure Timing Constraint - {self.signal_name}")
-        # Increased size to prevent text compression
-        self.setMinimumWidth(700)
-        self.setMinimumHeight(450)
-        # Set initial size for better appearance
-        self.resize(750, 500)
+        # Increased size by 25% to prevent text compression
+        self.setMinimumWidth(875)
+        self.setMinimumHeight(563)
+        # Set initial size for better appearance (25% larger)
+        self.resize(940, 625)
         
         # Apply dark theme
         self.setStyleSheet("""
