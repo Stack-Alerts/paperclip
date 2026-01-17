@@ -90,6 +90,9 @@ class BinanceRestClient:
         """
         Make API request with rate limiting
         
+        INSTITUTIONAL: Force fresh connection every time!
+        No session reuse, no connection pooling, no caching
+        
         Args:
             endpoint: API endpoint
             params: Query parameters
@@ -104,9 +107,26 @@ class BinanceRestClient:
         url = f"{base_url}{endpoint}"
         
         try:
-            response = requests.get(url, params=params, timeout=10)
+            # CRITICAL: Force fresh connection every time
+            # Create new session, make request, immediately close
+            session = requests.Session()
+            
+            # Disable any caching headers
+            headers = {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+            
+            response = session.get(url, params=params, headers=headers, timeout=10)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            
+            # CRITICAL: Close session immediately to prevent connection reuse
+            session.close()
+            
+            return data
+            
         except requests.exceptions.RequestException as e:
             print(f"❌ Binance API error: {e}")
             raise
@@ -296,6 +316,7 @@ class BinanceRestClient:
         source = 'Binance Futures' if futures else 'Binance Spot'
         
         print(f"📊 Fetching {interval} candles from {source}...")
+        print(f"   📍 DEBUG: params = {params}")
         
         response = self._request(endpoint, params, futures=futures)
         
