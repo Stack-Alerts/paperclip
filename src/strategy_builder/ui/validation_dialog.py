@@ -43,8 +43,13 @@ class ValidationDialog(QDialog):
     def _init_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle("Strategy Validation")
-        self.setMinimumSize(700, 600)
-        self.resize(800, 700)
+        
+        # Make dialog independent and draggable
+        self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint)
+        
+        # Larger size for better visibility
+        self.setMinimumSize(900, 700)
+        self.resize(1100, 850)
         
         # Apply dark theme stylesheet
         self.setStyleSheet("""
