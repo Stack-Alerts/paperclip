@@ -50,6 +50,7 @@ class StrategyInfoPanel(QWidget):
         
         # UI Components
         self.name_input: Optional[QLineEdit] = None
+        self.desc_label: Optional[QLabel] = None
         self.description_text: Optional[QTextEdit] = None
         self.bullish_radio: Optional[QRadioButton] = None
         self.bearish_radio: Optional[QRadioButton] = None
@@ -94,9 +95,9 @@ class StrategyInfoPanel(QWidget):
         # Description (Auto-generated) - Now scrollable with word wrap!
         desc_layout = QVBoxLayout()
         desc_layout.setSpacing(8)
-        desc_label = QLabel("Description:")
-        desc_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
-        desc_label.setToolTip("Strategy description (auto-generated from blocks)")
+        self.desc_label = QLabel("Description:")
+        self.desc_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
+        self.desc_label.setToolTip("Strategy description (auto-generated from blocks)")
         self.description_text = QTextEdit()
         self.description_text.setPlaceholderText(
             "Description will be auto-generated when you add building blocks...\n\n"
@@ -109,7 +110,7 @@ class StrategyInfoPanel(QWidget):
         self.description_text.setWordWrapMode(1)  # Enable word wrap (WordWrap mode)
         self.description_text.setLineWrapMode(1)  # Wrap at widget width
         self.description_text.setReadOnly(True)  # Auto-generated, not editable
-        desc_layout.addWidget(desc_label)
+        desc_layout.addWidget(self.desc_label)
         desc_layout.addWidget(self.description_text)
         group_layout.addLayout(desc_layout)
         
@@ -296,17 +297,18 @@ class StrategyInfoPanel(QWidget):
                 for block in required_blocks:
                     total_required_signals += sum(1 for s in block.signals if s.logic == 'AND')
                 
-                # Build enhanced description - Put actual description FIRST, then stats
-                description_lines = []
-                
-                # Start with the actual strategy description
-                description_lines.append(generated_desc)
-                
-                # Add stats/metadata AFTER the description
-                description_lines.append(f"\nStrategy has {len(config.blocks)} block(s) ({len(required_blocks)} required, {len(optional_blocks)} optional).")
-                
+                # Build stats string for label
+                stats_parts = []
+                stats_parts.append(f"Strategy has {len(config.blocks)} block(s) ({len(required_blocks)} required, {len(optional_blocks)} optional).")
                 if total_required_signals > 0:
-                    description_lines.append(f"Total required signals: {total_required_signals}.")
+                    stats_parts.append(f"Total required signals: {total_required_signals}.")
+                
+                # Update label with stats
+                self.desc_label.setText(f"Description: {' '.join(stats_parts)}")
+                
+                # Set only the actual description in text area
+                description_lines = []
+                description_lines.append(generated_desc)
                 
                 # Add timing constraint info if any
                 has_timing = False
@@ -319,7 +321,7 @@ class StrategyInfoPanel(QWidget):
                         break
                 
                 if has_timing:
-                    description_lines.append("Includes timing constraints between signals.")
+                    description_lines.append("\nIncludes timing constraints between signals.")
                 
                 self.set_description("\n".join(description_lines))
             else:
