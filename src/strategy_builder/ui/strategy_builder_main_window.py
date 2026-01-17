@@ -937,6 +937,15 @@ class StrategyBuilderMainWindow(QMainWindow):
                 # Update BOTH UI and config immediately to ensure sync
                 self.info_panel.set_strategy_type(suggested_type)
                 
+                # CRITICAL: Force Qt to process the radio button change NOW
+                QApplication.processEvents()
+                QApplication.processEvents()  # Process twice to ensure state propagates
+                
+                # Verify the UI actually changed
+                actual_type = self.info_panel.get_strategy_type()
+                if actual_type != suggested_type:
+                    print(f"WARNING: UI didn't update! Expected {suggested_type}, got {actual_type}")
+                
                 # Also update config directly right now (don't wait for later)
                 if hasattr(self.orchestrator.config_engine.config, 'strategy_type'):
                     self.orchestrator.config_engine.config.strategy_type = suggested_type
@@ -944,8 +953,6 @@ class StrategyBuilderMainWindow(QMainWindow):
                     setattr(self.orchestrator.config_engine.config, 'strategy_type', suggested_type)
                 
                 self._update_status(f"Strategy type changed to {suggested_type}")
-                # Force UI update
-                QApplication.processEvents()
                 return True  # Proceed with save
             elif clicked == proceed_btn:
                 # User wants to save anyway
