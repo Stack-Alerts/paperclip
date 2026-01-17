@@ -109,7 +109,6 @@ class StrategyBuilderMainWindow(QMainWindow):
         self._restore_settings()
         
         # Show data update modal on startup (after window is shown)
-        from PyQt5.QtCore import QTimer
         QTimer.singleShot(500, self._show_data_update_modal)
         
         # Start automatic data update system (after modal shown)
