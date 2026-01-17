@@ -38,6 +38,7 @@ from src.strategy_builder.ui.strategy_blocks_panel import StrategyBlocksPanel
 from src.strategy_builder.ui.validation_dialog import ValidationDialog
 from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
 from src.strategy_builder.ui.data_update_modal import DataUpdateModal
+from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
 
 # Import real block registry adapter
 try:
@@ -747,13 +748,13 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_run_backtest(self):
         """Run backtest for the current strategy."""
-        QMessageBox.information(
-            self,
-            "Backtest",
-            "Backtest functionality will be available in the Backtest Configuration Panel.\n\n"
-            "Coming soon in Phase 2!"
-        )
-        self._update_status("Backtest panel coming soon")
+        try:
+            dialog = BacktestConfigDialog(self.orchestrator, self)
+            dialog.show()  # Non-modal so user can see strategy
+            self._update_status("Backtest configuration opened")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error opening backtest dialog: {str(e)}")
+            self._update_status("Backtest configuration failed to open")
     
     def _on_generate_code(self):
         """Generate NautilusTrader code from strategy."""
