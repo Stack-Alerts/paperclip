@@ -27,6 +27,7 @@ from PyQt5.QtCore import Qt, QSize, QSettings, QTimer
 from PyQt5.QtGui import QIcon, QKeySequence, QFont
 from PyQt5.QtWidgets import QApplication, QStyle
 from datetime import datetime, timedelta
+import pandas as pd
 
 from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
@@ -1061,45 +1062,70 @@ class StrategyBuilderMainWindow(QMainWindow):
         Retries every 2s until data is fresh.
         """
         try:
-            self.retry_count = 0
             self._update_status("Checking for data updates...")
             
-            # Import unified manager
+            # Import unified manager and Binance client
             from src.data_manager.unified_manager import UnifiedDataManager
+            from src.data_manager.binance.rest_client import BinanceRestClient
             
-            # Check if we need updates (silent check)
+            # Check data status
             manager = UnifiedDataManager()
-            gaps = manager.detect_gaps('15m', silent=True)
+            status = manager.get_all_data_types_status()
             
-            if gaps and len(gaps) > 0:
+            # Check for gaps in trades (15min data)
+            trades_status = status.get('trades', {})
+            gap_minutes = trades_status.get('gap_minutes', 999)
+            
+            # If gap > 20 minutes (more than 1 candle + buffer), download
+            if gap_minutes > 20:
                 # Data needs updating
-                self._update_status(f"Updating data: {len(gaps)} gap(s) detected...")
+                self._update_status(f"Downloading fresh data (gap: {gap_minutes} min)...")
                 
-                # Download missing data
-                manager.download_missing_data('15m', gaps)
-                
-                self.last_update_time = datetime.now()
-                self._update_status(f"Data updated at {self.last_update_time.strftime('%H:%M:%S')}")
+                try:
+                    # Use Binance client to download and save
+                    client = BinanceRestClient()
+                    bars = client.get_klines('15m', limit=100, futures=True)
+                    
+                    if len(bars) > 0:
+                        # Save to Binance directory
+                        now = datetime.now()
+                        month_dir = manager.binance_dir / f"{now.year}-{now.month:02d}"
+                        month_dir.mkdir(parents=True, exist_ok=True)
+                        
+                        # Save with month-level filename
+                        output_file = month_dir / f"BTCUSDT_PERP_15m_{now.year}-{now.month:02d}.parquet"
+                        
+                        # If file exists, merge with existing data
+                        if output_file.exists():
+                            existing = pd.read_parquet(output_file)
+                            bars = pd.concat([existing, bars], ignore_index=True)
+                            bars = bars.drop_duplicates(subset=['timestamp'], keep='last')
+                            bars = bars.sort_values('timestamp')
+                        
+                        # Save merged data
+                        bars.to_parquet(output_file, index=False)
+                        
+                        self.last_update_time = datetime.now()
+                        self._update_status(f"Data updated at {self.last_update_time.strftime('%H:%M:%S')}")
+                    else:
+                        self._update_status("No data received from Binance")
+                        
+                except Exception as e:
+                    print(f"Error downloading data: {e}")
+                    self._update_status(f"Download error: {str(e)}")
                 
                 # Schedule next check (in 15 minutes)
                 QTimer.singleShot(15 * 60 * 1000, self._schedule_next_check)
                 
             else:
-                # No gaps, but check if data is actually fresh
-                # Retry every 2s for up to 10 retries (20 seconds total)
-                if self.retry_count < 10:
-                    self.retry_count += 1
-                    self._update_status(f"Waiting for fresh data... (retry {self.retry_count}/10)")
-                   
-                    # Retry in 2 seconds
-                    QTimer.singleShot(2000, self._check_and_update_data)
-                else:
-                    # Max retries reached, schedule next check
-                    self._update_status("Data check complete - Next check in 15 min")
-                    QTimer.singleShot(15 * 60 * 1000, self._schedule_next_check)
+                # Data is fresh, schedule next check
+                self._update_status(f"Data is fresh (gap: {gap_minutes} min)")
+                QTimer.singleShot(15 * 60 * 1000, self._schedule_next_check)
             
         except Exception as e:
             print(f"Error checking/updating data: {e}")
+            import traceback
+            traceback.print_exc()
             self._update_status(f"Data update error: {str(e)}")
             # Schedule next check anyway
             QTimer.singleShot(15 * 60 * 1000, self._schedule_next_check)
