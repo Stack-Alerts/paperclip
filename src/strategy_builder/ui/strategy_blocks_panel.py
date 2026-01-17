@@ -603,11 +603,24 @@ class StrategyBlocksPanel(QWidget):
                 # Get constraint from dialog
                 constraint = dialog.get_constraint()
                 
+                # For block-level timing, apply constraint to first signal in block
+                target_signal_name = signal_name
+                if is_block_level:
+                    # Get first signal in this block
+                    config = self.orchestrator.get_current_config()
+                    if config:
+                        for block in config.blocks:
+                            if block.name == block_name:
+                                if block.signals:
+                                    target_signal_name = block.signals[0].name
+                                    print(f"Block-level timing: Applying to first signal '{target_signal_name}'")
+                                break
+                
                 # Save to orchestrator
                 if constraint:
                     result = self.orchestrator.set_signal_timing_constraint(
                         block_name=block_name,
-                        signal_name=signal_name,
+                        signal_name=target_signal_name,
                         constraint=constraint
                     )
                     
