@@ -621,10 +621,20 @@ class StrategyBuilderMainWindow(QMainWindow):
             if not self._check_strategy_type_match():
                 return False  # User cancelled save
             
-            # Update config name from UI before saving
+            # Update config from UI before saving
             strategy_name = self.info_panel.get_strategy_name()
             if strategy_name:
                 self.orchestrator.config_engine.config.name = strategy_name
+            
+            # Also update strategy type from UI
+            strategy_type = self.info_panel.get_strategy_type()
+            if strategy_type:
+                # Ensure config has strategy_type attribute
+                if hasattr(self.orchestrator.config_engine.config, 'strategy_type'):
+                    self.orchestrator.config_engine.config.strategy_type = strategy_type
+                else:
+                    # Add attribute if it doesn't exist
+                    setattr(self.orchestrator.config_engine.config, 'strategy_type', strategy_type)
             
             # Save using orchestrator
             result = self.orchestrator.save_strategy(filename)
