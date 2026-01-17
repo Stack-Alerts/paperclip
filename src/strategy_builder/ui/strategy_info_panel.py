@@ -56,6 +56,8 @@ class StrategyInfoPanel(QWidget):
         self.bearish_radio: Optional[QRadioButton] = None
         self.type_button_group: Optional[QButtonGroup] = None
         self.required_signals_label: Optional[QLabel] = None
+        self.optional_signals_label: Optional[QLabel] = None
+        self.time_constraint_label: Optional[QLabel] = None
         
         self._init_ui()
         self._connect_signals()
@@ -114,48 +116,91 @@ class StrategyInfoPanel(QWidget):
         desc_layout.addWidget(self.description_text)
         group_layout.addLayout(desc_layout)
         
+        # Compact metadata row: Strategy Type | Required Signals | Optional Signals | Time Constraint
+        meta_layout = QHBoxLayout()
+        meta_layout.setSpacing(15)
+        
         # Strategy Type
-        type_layout = QHBoxLayout()
         type_label = QLabel("Strategy Type:")
-        type_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
+        type_label.setStyleSheet("color: #A0AEC0;")
         type_label.setToolTip("Select whether this is a bullish or bearish strategy")
+        meta_layout.addWidget(type_label)
         
         self.bullish_radio = QRadioButton("Bullish")
-        self.bullish_radio.setStyleSheet("QRadioButton { color: #10B981; background: transparent; }")  # Success green, no background
+        self.bullish_radio.setStyleSheet("QRadioButton { color: #10B981; background: transparent; }")
         self.bullish_radio.setToolTip("Strategy designed for uptrending markets")
-        self.bullish_radio.setChecked(True)  # Default to Bullish
+        self.bullish_radio.setChecked(True)
+        meta_layout.addWidget(self.bullish_radio)
         
         self.bearish_radio = QRadioButton("Bearish")
-        self.bearish_radio.setStyleSheet("QRadioButton { color: #EF4444; background: transparent; }")  # Error red, no background
+        self.bearish_radio.setStyleSheet("QRadioButton { color: #EF4444; background: transparent; }")
         self.bearish_radio.setToolTip("Strategy designed for downtrending markets")
+        meta_layout.addWidget(self.bearish_radio)
         
-        # Button group to ensure only one can be selected
+        # Button group
         self.type_button_group = QButtonGroup()
         self.type_button_group.addButton(self.bullish_radio)
         self.type_button_group.addButton(self.bearish_radio)
         
-        type_layout.addWidget(type_label)
-        type_layout.addWidget(self.bullish_radio)
-        type_layout.addWidget(self.bearish_radio)
-        type_layout.addStretch()
-        group_layout.addLayout(type_layout)
+        # Separator
+        sep1 = QLabel("|")
+        sep1.setStyleSheet("color: #4A5568; font-weight: bold;")
+        meta_layout.addWidget(sep1)
         
-        # Required Signals (Auto-calculated)
-        signals_layout = QHBoxLayout()
-        signals_label = QLabel("Required Signals:")
-        signals_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
-        signals_label.setToolTip("Number of signals required for strategy entry (auto-calculated)")
+        # Required Signals
+        req_sig_label = QLabel("Required Signals:")
+        req_sig_label.setStyleSheet("color: #A0AEC0;")
+        req_sig_label.setToolTip("Number of signals required for strategy entry")
+        meta_layout.addWidget(req_sig_label)
+        
         self.required_signals_label = QLabel("0")
         required_signals_font = QFont()
         required_signals_font.setBold(True)
-        required_signals_font.setPointSize(11)
+        required_signals_font.setPointSize(10)
         self.required_signals_label.setFont(required_signals_font)
         self.required_signals_label.setStyleSheet("color: #0066cc;")
+        meta_layout.addWidget(self.required_signals_label)
         
-        signals_layout.addWidget(signals_label)
-        signals_layout.addWidget(self.required_signals_label)
-        signals_layout.addStretch()
-        group_layout.addLayout(signals_layout)
+        # Separator
+        sep2 = QLabel("|")
+        sep2.setStyleSheet("color: #4A5568; font-weight: bold;")
+        meta_layout.addWidget(sep2)
+        
+        # Optional Signals
+        opt_sig_label = QLabel("Optional Signals:")
+        opt_sig_label.setStyleSheet("color: #A0AEC0;")
+        opt_sig_label.setToolTip("Number of optional signals (boosters)")
+        meta_layout.addWidget(opt_sig_label)
+        
+        self.optional_signals_label = QLabel("0")
+        optional_signals_font = QFont()
+        optional_signals_font.setBold(True)
+        optional_signals_font.setPointSize(10)
+        self.optional_signals_label.setFont(optional_signals_font)
+        self.optional_signals_label.setStyleSheet("color: #10B981;")
+        meta_layout.addWidget(self.optional_signals_label)
+        
+        # Separator
+        sep3 = QLabel("|")
+        sep3.setStyleSheet("color: #4A5568; font-weight: bold;")
+        meta_layout.addWidget(sep3)
+        
+        # Time Constraint
+        time_const_label = QLabel("Time Constraint:")
+        time_const_label.setStyleSheet("color: #A0AEC0;")
+        time_const_label.setToolTip("Whether timing constraints are configured")
+        meta_layout.addWidget(time_const_label)
+        
+        self.time_constraint_label = QLabel("No")
+        time_constraint_font = QFont()
+        time_constraint_font.setBold(True)
+        time_constraint_font.setPointSize(10)
+        self.time_constraint_label.setFont(time_constraint_font)
+        self.time_constraint_label.setStyleSheet("color: #888888;")
+        meta_layout.addWidget(self.time_constraint_label)
+        
+        meta_layout.addStretch()
+        group_layout.addLayout(meta_layout)
         
         # Add horizontal line separator
         line = QFrame()
@@ -413,7 +458,60 @@ class StrategyInfoPanel(QWidget):
         """
         self.update_description_from_config()
         self.update_required_signals_from_config()
+        self._update_metadata_row()
         self._update_status()
+    
+    def _update_metadata_row(self):
+        """Update the metadata row (optional signals and time constraint)."""
+        try:
+            config = self.orchestrator.get_current_config()
+            
+            if not config or not config.blocks:
+                self.optional_signals_label.setText("0")
+                self.optional_signals_label.setStyleSheet("color: #888888;")
+                self.time_constraint_label.setText("No")
+                self.time_constraint_label.setStyleSheet("color: #888888;")
+                return
+            
+            # Count optional signals (OR blocks/signals)
+            optional_count = 0
+            for block in config.blocks:
+                if block.logic == "OR":
+                    # Count all signals in OR block
+                    optional_count += len(block.signals) if hasattr(block, 'signals') else 0
+                elif block.logic == "AND":
+                    # Count OR signals within AND blocks
+                    if hasattr(block, 'signals'):
+                        optional_count += sum(1 for s in block.signals if s.logic == "OR")
+            
+            self.optional_signals_label.setText(str(optional_count))
+            if optional_count > 0:
+                self.optional_signals_label.setStyleSheet("color: #10B981; font-weight: bold;")
+            else:
+                self.optional_signals_label.setStyleSheet("color: #888888;")
+            
+            # Check for time constraints
+            has_timing = False
+            for block in config.blocks:
+                if hasattr(block, 'signals'):
+                    for signal in block.signals:
+                        if hasattr(signal, 'timing_constraint') and signal.timing_constraint:
+                            has_timing = True
+                            break
+                if has_timing:
+                    break
+            
+            if has_timing:
+                self.time_constraint_label.setText("Yes")
+                self.time_constraint_label.setStyleSheet("color: #FFA500; font-weight: bold;")  # Orange
+            else:
+                self.time_constraint_label.setText("No")
+                self.time_constraint_label.setStyleSheet("color: #888888;")
+                
+        except Exception as e:
+            # Gracefully handle errors
+            self.optional_signals_label.setText("0")
+            self.time_constraint_label.setText("No")
     
     def create_strategy_in_orchestrator(self) -> bool:
         """
