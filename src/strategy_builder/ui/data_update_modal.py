@@ -288,8 +288,18 @@ class DataUpdateModal(QDialog):
                     self.gap_days = info['gap_days']
                     report_lines.append(f"  ❌ {data_type.upper()}: GAP DETECTED")
                     if info['start'] and info['end']:
-                        report_lines.append(f"     Range: {info['start'].strftime('%Y-%m-%d')} → {info['end'].strftime('%Y-%m-%d')}")
-                    report_lines.append(f"     Missing: {info['gap_days']} days\n")
+                        report_lines.append(f"     Range: {info['start'].strftime('%Y-%m-%d')} → {info['end'].strftime('%Y-%m-%d %H:%M')}")
+                    
+                    # Show precise gap for futures trading
+                    gap_minutes = info.get('gap_minutes', info['gap_days'] * 1440)
+                    if gap_minutes < 60:
+                        report_lines.append(f"     Missing: {gap_minutes} minutes ({int(gap_minutes/15)} candles @ 15min)\n")
+                    elif gap_minutes < 1440:
+                        hours = int(gap_minutes / 60)
+                        mins = int(gap_minutes % 60)
+                        report_lines.append(f"     Missing: {hours}h {mins}m ({int(gap_minutes/15)} candles @ 15min)\n")
+                    else:
+                        report_lines.append(f"     Missing: {info['gap_days']} days ({int(gap_minutes/15)} candles @ 15min)\n")
                 elif info['status'] == 'missing':
                     any_gaps = True
                     max_gap = 999
