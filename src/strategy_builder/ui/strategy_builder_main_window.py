@@ -848,17 +848,38 @@ class StrategyBuilderMainWindow(QMainWindow):
             if not config or not config.blocks:
                 return True  # No blocks, nothing to check
             
-            # Count bullish vs bearish signals
+            # Count bullish vs bearish signals (comprehensive keyword detection)
             bullish_count = 0
             bearish_count = 0
+            
+            # Define directional keywords
+            bullish_keywords = [
+                'BULLISH', 'LONG', 'BUY', 'ABOVE', 'OVER', 'UP', 'HIGHER',
+                'BREAKOUT', 'SUPPORT', 'BOUNCE', 'REVERSAL_UP', 'UPTREND',
+                'ACCUMULATION', 'REACCUMULATION', 'SPRING', 'SOS', 'LPS'
+            ]
+            
+            bearish_keywords = [
+                'BEARISH', 'SHORT', 'SELL', 'BELOW', 'UNDER', 'DOWN', 'LOWER',
+                'BREAKDOWN', 'RESISTANCE', 'REJECTION', 'REVERSAL_DOWN', 'DOWNTREND',
+                'DISTRIBUTION', 'REDISTRIBUTION', 'UPTHRUST', 'SOW', 'LPSY'
+            ]
             
             for block in config.blocks:
                 for signal in block.signals:
                     signal_name_upper = signal.name.upper()
-                    if 'BULLISH' in signal_name_upper or 'LONG' in signal_name_upper:
+                    
+                    # Check for bullish keywords
+                    is_bullish = any(keyword in signal_name_upper for keyword in bullish_keywords)
+                    # Check for bearish keywords
+                    is_bearish = any(keyword in signal_name_upper for keyword in bearish_keywords)
+                    
+                    if is_bullish:
                         bullish_count += 1
-                    elif 'BEARISH' in signal_name_upper or 'SHORT' in signal_name_upper:
+                    if is_bearish:
                         bearish_count += 1
+                    
+                    # Note: A signal can have both (e.g., "BULLISH_REJECTION") - count both
             
             # Get current strategy type from UI
             current_type = self.info_panel.get_strategy_type()
