@@ -21,7 +21,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont
 
 # Import UnifiedDataManager - THE ONLY DATA SOURCE!
-from src.data_manager.unified_manager import UnifiedDataManager
+from src.data_manager.unified_manager import UnifiedDataManager, DataSource
 
 
 class DataUpdateThread(QThread):
@@ -53,7 +53,7 @@ class DataUpdateThread(QThread):
                 timeframe='15m',
                 start_date=self.start_date,
                 end_date=self.end_date,
-                source='binance'  # Force Binance only!
+                source=DataSource.BINANCE  # Force Binance only!
             )
             
             self.progress.emit(60, 100, f"Downloaded {len(bars_15m)} bars (15min)")
@@ -64,7 +64,7 @@ class DataUpdateThread(QThread):
                 timeframe='1h',
                 start_date=self.start_date,
                 end_date=self.end_date,
-                source='binance'
+                source=DataSource.BINANCE
             )
             
             self.progress.emit(90, 100, f"Downloaded {len(bars_1h)} bars (1h)")
@@ -219,8 +219,8 @@ class DataUpdateModal(QDialog):
         details_layout = QVBoxLayout()
         
         self.details_text = QTextEdit()
-        self.details_text.setReadOnly(True)
-        self.details_text.setMinimumHeight(600)  # Super tall - absolutely NO scrolling
+        self.details_text.setReadOnly(True)  
+        self.details_text.setMinimumHeight(700)  # EXTRA tall - ZERO scrolling
         details_layout.addWidget(self.details_text)
         
         details_group.setLayout(details_layout)
