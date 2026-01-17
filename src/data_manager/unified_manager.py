@@ -526,24 +526,35 @@ class UnifiedDataManager:
                         files = list(binance_dir.glob(pattern))
                         all_binance_files.extend(files)
                     
-                    # Remove duplicates and sort
-                    binance_files = sorted(set(all_binance_files))
+                    # Remove duplicates
+                    binance_files = list(set(all_binance_files))
                     
                     if binance_files:
                         try:
-                            # Read last Binance file
-                            last_binance = binance_files[-1]
-                            df_binance = pd.read_parquet(last_binance, columns=['timestamp'])
-                            if len(df_binance) > 0:
-                                binance_end = pd.to_datetime(df_binance['timestamp'].iloc[-1])
-                                # Update end date if Binance has more recent data
-                                if binance_end > end_date:
-                                    end_date = binance_end
-                                    # Recalculate gap with new end date
-                                    gap_days = (datetime.now() - end_date).days
-                                    print(f"   ✅ Binance data found: {binance_end} (gap now: {gap_days} days)")
+                            # CRITICAL: Check ACTUAL timestamps in ALL files to find true latest
+                            # Don't trust filename sorting - check file contents!
+                            latest_timestamp = None
+                            latest_file = None
+                            
+                            for file in binance_files:
+                                try:
+                                    df_temp = pd.read_parquet(file, columns=['timestamp'])
+                                    if len(df_temp) > 0:
+                                        file_end = pd.to_datetime(df_temp['timestamp'].iloc[-1])
+                                        if latest_timestamp is None or file_end > latest_timestamp:
+                                            latest_timestamp = file_end
+                                            latest_file = file
+                                except:
+                                    continue
+                            
+                            if latest_timestamp and latest_timestamp > end_date:
+                                end_date = latest_timestamp
+                                # Recalculate gap with new end date
+                                gap_days = (datetime.now() - end_date).days
+                                print(f"   ✅ Binance: {latest_file.name} → {latest_timestamp} (gap: {gap_days}d)")
+                            
                         except Exception as e:
-                            print(f"   ⚠️  Error reading Binance file: {e}")
+                            print(f"   ⚠️  Error reading Binance files: {e}")
                 
                 # For 15min futures, we need precision down to minutes
                 # Calculate gap in minutes for more accurate detection
