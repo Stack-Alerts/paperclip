@@ -43,8 +43,10 @@ class DataUpdateThread(QThread):
         self.manager = UnifiedDataManager()
     
     def run(self):
-        """Download missing data from Binance"""
+        """Download missing data from Binance AND SAVE TO DISK"""
         try:
+            from pathlib import Path
+            
             self.progress.emit(0, 100, "Initializing Binance connection...")
             
             # Download 15min bars (primary timeframe)
@@ -56,10 +58,14 @@ class DataUpdateThread(QThread):
                 source=DataSource.BINANCE  # Force Binance only!
             )
             
-            self.progress.emit(60, 100, f"Downloaded {len(bars_15m)} bars (15min)")
+            self.progress.emit(40, 100, f"Downloaded {len(bars_15m)} bars (15min)")
+            
+            # INSTITUTIONAL: SAVE TO DISK!
+            self.progress.emit(45, 100, "Saving 15min bars to disk...")
+            saved_files_15m = self._save_bars_to_disk(bars_15m, '15m')
             
             # Download 1h bars (secondary timeframe)
-            self.progress.emit(70, 100, "Downloading 1h bars from Binance...")
+            self.progress.emit(60, 100, "Downloading 1h bars from Binance...")
             bars_1h = self.manager.get_bars(
                 timeframe='1h',
                 start_date=self.start_date,
@@ -67,16 +73,21 @@ class DataUpdateThread(QThread):
                 source=DataSource.BINANCE
             )
             
-            self.progress.emit(90, 100, f"Downloaded {len(bars_1h)} bars (1h)")
+            self.progress.emit(80, 100, f"Downloaded {len(bars_1h)} bars (1h)")
+            
+            # INSTITUTIONAL: SAVE TO DISK!
+            self.progress.emit(85, 100, "Saving 1h bars to disk...")
+            saved_files_1h = self._save_bars_to_disk(bars_1h, '1h')
             
             # Success!
             self.progress.emit(100, 100, "Download complete!")
             self.finished.emit(
                 True,
                 f"✅ Successfully updated!\n\n"
-                f"15min bars: {len(bars_15m)}\n"
-                f"1h bars: {len(bars_1h)}\n\n"
-                f"Data saved to: data/binance/"
+                f"15min bars: {len(bars_15m)} ({len(saved_files_15m)} files saved)\n"
+                f"1h bars: {len(bars_1h)} ({len(saved_files_1h)} files saved)\n\n"
+                f"Files saved to: data/binance/\n"
+                f"Latest timestamp: {bars_15m['timestamp'].iloc[-1]}"
             )
             
         except Exception as e:
@@ -85,6 +96,41 @@ class DataUpdateThread(QThread):
                 f"❌ Download failed:\n\n{str(e)}\n\n"
                 f"You can try again later or continue without update."
             )
+    
+    def _save_bars_to_disk(self, bars, timeframe: str) -> list:
+        """Save downloaded bars to parquet files by month"""
+        from pathlib import Path
+        import pandas as pd
+        
+        if len(bars) == 0:
+            return []
+        
+        saved_files = []
+        base_dir = Path("data/binance")
+        base_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Group bars by month
+        bars['month'] = pd.to_datetime(bars['timestamp']).dt.to_period('M')
+        
+        for month, month_data in bars.groupby('month'):
+            # Create month directory (e.g., 2026-01)
+            month_dir = base_dir / str(month)
+            month_dir.mkdir(exist_ok=True)
+            
+            # Filename format: BTCUSDT_PERP_15m_2026-01-17.parquet
+            # Use last day of data in this month as date
+            last_date = month_data['timestamp'].max().strftime('%Y-%m-%d')
+            filename = f"BTCUSDT_PERP_{timeframe}_{last_date}.parquet"
+            filepath = month_dir / filename
+            
+            # Save (overwrite if exists - latest data wins)
+            month_data_clean = month_data.drop(columns=['month'])
+            month_data_clean.to_parquet(filepath, index=False)
+            saved_files.append(str(filepath))
+            
+            print(f"   💾 Saved: {filepath} ({len(month_data)} bars)")
+        
+        return saved_files
 
 
 class DataUpdateModal(QDialog):
