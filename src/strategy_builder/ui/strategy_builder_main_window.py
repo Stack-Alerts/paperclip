@@ -249,17 +249,6 @@ class StrategyBuilderMainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         central_widget.setLayout(main_layout)
         
-        # Add stepper ribbon as dedicated row (perfectly centered to window)
-        self.stepper = StepperRibbon(self)
-        self.stepper.step_clicked.connect(self._on_step_clicked)
-        self.stepper.setStyleSheet("""
-            QWidget {
-                background-color: #1E2128;
-                border-bottom: 1px solid #3C4149;
-            }
-        """)
-        main_layout.addWidget(self.stepper)
-        
         # Create main splitter (horizontal split)
         main_splitter = QSplitter(Qt.Horizontal)
         
@@ -393,6 +382,20 @@ class StrategyBuilderMainWindow(QMainWindow):
         save_action.triggered.connect(self._on_save_strategy)
         toolbar.addAction(save_action)
         
+        toolbar.addSeparator()
+        
+        # Add fixed spacer to offset stepper for window centering
+        # Stepper is ~800px wide, window is ~1400px
+        # To center: need (1400 - 800) / 2 = 300px from left
+        # Toolbar buttons take ~200px, so add ~100px spacer
+        spacer = QWidget()
+        spacer.setFixedWidth(180)  # Fixed offset for window centering
+        toolbar.addWidget(spacer)
+        
+        # Add stepper (no internal centering, positioned by spacer)
+        self.stepper = StepperRibbon(self)
+        self.stepper.step_clicked.connect(self._on_step_clicked)
+        toolbar.addWidget(self.stepper)
     
     def _create_status_bar(self):
         """Create the status bar."""
