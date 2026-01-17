@@ -529,11 +529,18 @@ class UnifiedDataManager:
                         except:
                             pass
                 
+                # For 15min futures, we need precision down to minutes
+                # Calculate gap in minutes for more accurate detection
+                gap_minutes = (datetime.now() - end_date).total_seconds() / 60
+                
+                # If gap > 15 minutes (one candle), mark as gap
+                # This ensures we detect missing even a single 15-minute candle
                 status[data_type] = {
                     'start': start_date,
                     'end': end_date,
                     'gap_days': gap_days,
-                    'status': 'complete' if gap_days <= 0 else 'gap'
+                    'gap_minutes': int(gap_minutes),
+                    'status': 'complete' if gap_minutes <= 15 else 'gap'
                 }
                 
             except Exception as e:
