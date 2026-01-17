@@ -494,6 +494,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         # CRITICAL: Use Qt's dialog instead of native dialog (native doesn't respect sizing)
         dialog.setOptions(QFileDialog.DontUseNativeDialog)
         
+        # Apply dark theme stylesheet (since parent is None, it doesn't inherit)
+        dialog.setStyleSheet(self.styleSheet())
+        
         # Set larger default size (800x600)
         dialog.resize(800, 600)
         
@@ -558,6 +561,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         # CRITICAL: Use Qt's dialog instead of native dialog (native doesn't respect sizing)
         dialog.setOptions(QFileDialog.DontUseNativeDialog)
+        
+        # Apply dark theme stylesheet (since parent is None, it doesn't inherit)
+        dialog.setStyleSheet(self.styleSheet())
         
         # Set larger default size (800x600)
         dialog.resize(800, 600)
