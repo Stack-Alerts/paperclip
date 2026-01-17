@@ -510,51 +510,26 @@ class UnifiedDataManager:
                 # Calculate gap FIRST
                 gap_days = (datetime.now() - end_date).days
                 
-                # Check if gap is filled by Binance data
-                binance_dir = self.binance_dir
-                if binance_dir.exists() and gap_days > 0:
-                    # Check for recent Binance files (15m timeframe for all data types)
-                    # Try multiple patterns to find Binance data
-                    binance_patterns = [
-                        f'BTCUSDT_PERP_15m_*.parquet',  # Direct files
-                        f'**/BTCUSDT_PERP_15m_*.parquet',  # Subdirectories
-                        f'15m/BTCUSDT_PERP_15m_*.parquet',  # Common structure
-                    ]
-                    
-                    all_binance_files = []
-                    for pattern in binance_patterns:
-                        files = list(binance_dir.glob(pattern))
-                        all_binance_files.extend(files)
-                    
-                    # Remove duplicates
-                    binance_files = list(set(all_binance_files))
-                    
-                    if binance_files:
-                        try:
-                            # CRITICAL: Check ACTUAL timestamps in ALL files to find true latest
-                            # Don't trust filename sorting - check file contents!
-                            latest_timestamp = None
-                            latest_file = None
+                # INSTITUTIONAL: Use manager's get_bars to get actual Binance data
+                # This properly uses the download infrastructure instead of manual file globbing
+                if gap_days > 0:
+                    try:
+                        # Try to get recent bars from Binance (last 2 days to be safe)
+                        recent_start = datetime.now() - timedelta(days=2)
+                        binance_bars = self._get_bars_binance('15m', recent_start, datetime.now())
+                        
+                        if len(binance_bars) > 0:
+                            # Get last candle timestamp from actual bars
+                            binance_end = pd.to_datetime(binance_bars['timestamp'].iloc[-1])
                             
-                            for file in binance_files:
-                                try:
-                                    df_temp = pd.read_parquet(file, columns=['timestamp'])
-                                    if len(df_temp) > 0:
-                                        file_end = pd.to_datetime(df_temp['timestamp'].iloc[-1])
-                                        if latest_timestamp is None or file_end > latest_timestamp:
-                                            latest_timestamp = file_end
-                                            latest_file = file
-                                except:
-                                    continue
-                            
-                            if latest_timestamp and latest_timestamp > end_date:
-                                end_date = latest_timestamp
+                            if binance_end > end_date:
+                                end_date = binance_end
                                 # Recalculate gap with new end date
                                 gap_days = (datetime.now() - end_date).days
-                                print(f"   ✅ Binance: {latest_file.name} → {latest_timestamp} (gap: {gap_days}d)")
-                            
-                        except Exception as e:
-                            print(f"   ⚠️  Error reading Binance files: {e}")
+                                print(f"   ✅ Binance bars: last candle at {binance_end} (gap: {gap_days}d)")
+                    except Exception as e:
+                        # If Binance fails, just use LakeAPI data
+                        pass
                 
                 # For 15min futures, we need precision down to minutes
                 # Calculate gap in minutes for more accurate detection
