@@ -312,8 +312,8 @@ class BinanceRestClient:
             'taker_buy_quote', 'ignore'
         ])
         
-        # Convert types
-        df['timestamp'] = pd.to_datetime(df['open_time'], unit='ms')
+        # Convert types - INSTITUTIONAL: Use exact same method as direct test!
+        df['timestamp'] = df['open_time'].apply(lambda x: datetime.fromtimestamp(x / 1000))
         df['open'] = df['open'].astype(float)
         df['high'] = df['high'].astype(float)
         df['low'] = df['low'].astype(float)
