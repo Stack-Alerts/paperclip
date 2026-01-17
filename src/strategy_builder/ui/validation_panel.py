@@ -15,7 +15,7 @@ Date: 2026-01-16
 from typing import Optional
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGroupBox, QScrollArea, QFrame
+    QGroupBox, QScrollArea, QFrame, QApplication
 )
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QFont
@@ -103,6 +103,11 @@ class ValidationPanel(QWidget):
         self.status_label.setStyleSheet("color: #888888;")
         header_layout.addWidget(self.status_label)
         
+        # Last validated timestamp
+        self.last_validated_label = QLabel("")
+        self.last_validated_label.setStyleSheet("color: #9AA0A6; font-size: 9pt;")
+        header_layout.addWidget(self.last_validated_label)
+        
         header_layout.addStretch()
         
         # Validate Now button
@@ -121,6 +126,10 @@ class ValidationPanel(QWidget):
             }
             QPushButton:pressed {
                 background-color: #1550DF;
+            }
+            QPushButton:disabled {
+                background-color: #555555;
+                color: #888888;
             }
         """)
         header_layout.addWidget(self.validate_button)
@@ -342,6 +351,14 @@ class ValidationPanel(QWidget):
     def validate_strategy(self):
         """Run validation and update display."""
         try:
+            # Show "validating..." feedback
+            self.validate_button.setEnabled(False)
+            self.validate_button.setText("⏳ Validating...")
+            self.last_validated_label.setText("Running validation...")
+            
+            # Force UI update
+            QApplication.processEvents()
+            
             # Get validation result from orchestrator
             result = self.orchestrator.validate_strategy()
             self.last_validation_result = result
@@ -349,8 +366,19 @@ class ValidationPanel(QWidget):
             # Update display
             self._update_validation_display(result)
             
+            # Update timestamp
+            from datetime import datetime
+            now = datetime.now().strftime("%H:%M:%S")
+            self.last_validated_label.setText(f"Last validated: {now}")
+            
+            # Re-enable button
+            self.validate_button.setEnabled(True)
+            self.validate_button.setText("🔍 Validate Now")
+            
         except Exception as e:
             self._show_validation_error(str(e))
+            self.validate_button.setEnabled(True)
+            self.validate_button.setText("🔍 Validate Now")
     
     def _update_validation_display(self, result):
         """
