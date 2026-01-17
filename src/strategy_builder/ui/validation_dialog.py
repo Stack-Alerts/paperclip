@@ -47,9 +47,9 @@ class ValidationDialog(QDialog):
         # Make dialog independent and draggable
         self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint)
         
-        # Larger size to fit all content without scrolling
-        self.setMinimumSize(1100, 850)
-        self.resize(1200, 950)
+        # Larger size to fit all content without scrolling (increased to eliminate scrollbar)
+        self.setMinimumSize(1100, 950)
+        self.resize(1200, 1050)
         
         # Apply dark theme stylesheet
         self.setStyleSheet("""
