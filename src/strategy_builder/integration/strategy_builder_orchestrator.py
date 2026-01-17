@@ -818,6 +818,7 @@ class StrategyBuilderOrchestrator:
             config_dict = {
                 'name': self.config_engine.config.name,
                 'description': self.config_engine.config.description,
+                'strategy_type': getattr(self.config_engine.config, 'strategy_type', 'Bullish'),
                 'blocks': []
             }
             
@@ -889,6 +890,10 @@ class StrategyBuilderOrchestrator:
             self.config_engine = StrategyConfigEngine(self.registry)
             self.config_engine.config.name = config_dict.get('name', 'Untitled')
             self.config_engine.config.description = config_dict.get('description', '')
+            
+            # Load strategy type
+            strategy_type = config_dict.get('strategy_type', 'Bullish')
+            setattr(self.config_engine.config, 'strategy_type', strategy_type)
             
             # Load blocks and signals
             for block_dict in config_dict.get('blocks', []):
