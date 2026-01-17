@@ -513,8 +513,22 @@ class UnifiedDataManager:
                 # Check if gap is filled by Binance data
                 binance_dir = self.binance_dir
                 if binance_dir.exists() and gap_days > 0:
-                    # Check for recent Binance files (15m timeframe as indicator)
-                    binance_files = sorted(binance_dir.glob('**/BTCUSDT_PERP_15m_*.parquet'))
+                    # Check for recent Binance files (15m timeframe for all data types)
+                    # Try multiple patterns to find Binance data
+                    binance_patterns = [
+                        f'BTCUSDT_PERP_15m_*.parquet',  # Direct files
+                        f'**/BTCUSDT_PERP_15m_*.parquet',  # Subdirectories
+                        f'15m/BTCUSDT_PERP_15m_*.parquet',  # Common structure
+                    ]
+                    
+                    all_binance_files = []
+                    for pattern in binance_patterns:
+                        files = list(binance_dir.glob(pattern))
+                        all_binance_files.extend(files)
+                    
+                    # Remove duplicates and sort
+                    binance_files = sorted(set(all_binance_files))
+                    
                     if binance_files:
                         try:
                             # Read last Binance file
@@ -525,9 +539,11 @@ class UnifiedDataManager:
                                 # Update end date if Binance has more recent data
                                 if binance_end > end_date:
                                     end_date = binance_end
+                                    # Recalculate gap with new end date
                                     gap_days = (datetime.now() - end_date).days
-                        except:
-                            pass
+                                    print(f"   ✅ Binance data found: {binance_end} (gap now: {gap_days} days)")
+                        except Exception as e:
+                            print(f"   ⚠️  Error reading Binance file: {e}")
                 
                 # For 15min futures, we need precision down to minutes
                 # Calculate gap in minutes for more accurate detection
