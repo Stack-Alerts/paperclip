@@ -65,7 +65,7 @@ class UnifiedDataManager:
     
     def __init__(self):
         """Initialize unified manager"""
-        self.lakeapi_dir = PROJECT_ROOT / "data" / "lakeapi"
+        self.lakeapi_dir = RAW_DATA_DIR  # Historical data (LakeAPI decommissioned, data remains)
         self.binance_dir = PROJECT_ROOT / "data" / "binance"
         
         # Components
