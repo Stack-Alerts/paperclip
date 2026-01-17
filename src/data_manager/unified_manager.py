@@ -442,17 +442,26 @@ class UnifiedDataManager:
         Returns:
             Dict with earliest and latest available dates
         """
-        # Check LakeAPI
+        # Check LakeAPI (historical data in parquet files)
         lakeapi_start = None
         lakeapi_end = None
         
-        if self.lakeapi_dir.exists():
-            # Find earliest month
-            month_dirs = sorted([d for d in (self.lakeapi_dir / 'trades').glob('*') if d.is_dir()])
-            if month_dirs:
-                # Rough estimate from directory names
-                lakeapi_start = datetime.strptime(month_dirs[0].name, '%Y-%m')
-                lakeapi_end = datetime.strptime(month_dirs[-1].name, '%Y-%m')
+        trades_dir = self.lakeapi_dir / 'trades'
+        if trades_dir.exists():
+            # Find earliest and latest parquet files
+            parquet_files = sorted(trades_dir.glob('BTC-USDT_trades_*.parquet'))
+            if parquet_files:
+                # Extract dates from filenames: BTC-USDT_trades_2024-01.parquet
+                first_file = parquet_files[0].stem.split('_')[-1]  # '2024-01'
+                last_file = parquet_files[-1].stem.split('_')[-1]   # '2026-01'
+                
+                lakeapi_start = datetime.strptime(first_file, '%Y-%m')
+                
+                # For end date, use end of month
+                year, month = map(int, last_file.split('-'))
+                from calendar import monthrange
+                last_day = monthrange(year, month)[1]
+                lakeapi_end = datetime(year, month, last_day, 23, 59, 59)
         
         # Check Binance (assumed to be current)
         binance_end = datetime.now()
