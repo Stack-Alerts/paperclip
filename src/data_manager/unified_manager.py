@@ -451,17 +451,38 @@ class UnifiedDataManager:
             # Find earliest and latest parquet files
             parquet_files = sorted(trades_dir.glob('BTC-USDT_trades_*.parquet'))
             if parquet_files:
-                # Extract dates from filenames: BTC-USDT_trades_2024-01.parquet
+                # Extract start date from first filename
                 first_file = parquet_files[0].stem.split('_')[-1]  # '2024-01'
-                last_file = parquet_files[-1].stem.split('_')[-1]   # '2026-01'
-                
                 lakeapi_start = datetime.strptime(first_file, '%Y-%m')
                 
-                # For end date, use end of month
-                year, month = map(int, last_file.split('-'))
-                from calendar import monthrange
-                last_day = monthrange(year, month)[1]
-                lakeapi_end = datetime(year, month, last_day, 23, 59, 59)
+                # CRITICAL: Read ACTUAL last timestamp from the parquet file, not filename!
+                import pandas as pd
+                try:
+                    last_parquet = parquet_files[-1]
+                    # Try possible timestamp column names
+                    timestamp_cols = ['timestamp', 'origin_time', 'received_time']
+                    df = None
+                    
+                    for col in timestamp_cols:
+                        try:
+                            df = pd.read_parquet(last_parquet, columns=[col])
+                            if len(df) > 0:
+                                lakeapi_end = pd.to_datetime(df[col].iloc[-1])
+                                break
+                        except:
+                            continue
+                    
+                    if df is None or len(df) == 0:
+                        raise Exception("Could not read timestamp from any column")
+                        
+                except Exception as e:
+                    print(f"Warning: Could not read last timestamp from {last_parquet}: {e}")
+                    # Fallback to filename
+                    last_file = parquet_files[-1].stem.split('_')[-1]
+                    year, month = map(int, last_file.split('-'))
+                    from calendar import monthrange
+                    last_day = monthrange(year, month)[1]
+                    lakeapi_end = datetime(year, month, last_day, 23, 59, 59)
         
         # Check Binance (assumed to be current)
         binance_end = datetime.now()
