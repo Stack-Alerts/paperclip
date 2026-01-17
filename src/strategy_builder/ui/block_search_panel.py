@@ -35,6 +35,14 @@ except ImportError:
     logger = None
     LogComponent = None
 
+# Import signal statistics loader
+from src.strategy_builder.utils.signal_statistics_loader import (
+    SignalStatisticsLoader,
+    load_statistics,
+    get_signal_display,
+    is_statistics_loaded
+)
+
 
 class BlockListItem(QWidget):
     """
@@ -403,6 +411,15 @@ class BlockSearchPanel(QWidget):
         # Block items cache
         self.block_items: Dict[str, BlockListItem] = {}
         
+        # Load signal statistics
+        self.stats_loader = SignalStatisticsLoader()
+        self.stats_loaded = self.stats_loader.load()
+        
+        if self.stats_loaded:
+            print("✅ Signal statistics loaded successfully")
+        else:
+            print("⚠️  Signal statistics not available - run: python scripts/analyze_signal_occurrences.py")
+        
         self._init_ui()
         self._load_blocks()
     
@@ -520,6 +537,32 @@ class BlockSearchPanel(QWidget):
         # Pass other events to base class
         return super().eventFilter(obj, event)
     
+    def _enrich_signals_with_stats(self, block_info: BlockInfo, block_name: str):
+        """
+        Enrich signal objects with occurrence statistics from loader.
+        
+        Args:
+            block_info: Block information object with signals
+            block_name: Name of the block
+        """
+        # Get all signal statistics for this block
+        all_stats = self.stats_loader.get_all_signals_for_block(block_name)
+        
+        if not all_stats:
+            return
+        
+        # Enrich each signal with its statistics
+        for signal in block_info.signals:
+            signal_name = signal.name
+            
+            if signal_name in all_stats:
+                stats = all_stats[signal_name]
+                
+                # Add occurrence data directly to signal object
+                signal.occurrences = stats.get('count', 0)
+                signal.occurrence_percentage = stats.get('percentage', 0.0)
+                signal.total_candles = stats.get('total_candles', 0)
+    
     def _load_blocks(self):
         """Load all blocks from the registry and populate the UI."""
         if LOGGER_AVAILABLE and logger:
@@ -567,6 +610,10 @@ class BlockSearchPanel(QWidget):
                             categories.add(block_info.category)
                         if hasattr(block_info, 'block_type'):
                             types.add(block_info.block_type)
+                        
+                        # Enrich signals with occurrence statistics
+                        if self.stats_loaded:
+                            self._enrich_signals_with_stats(block_info, block_name)
                         
                         # Create block item widget
                         block_item = BlockListItem(block_info)
