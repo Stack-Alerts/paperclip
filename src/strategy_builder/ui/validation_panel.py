@@ -136,11 +136,11 @@ class ValidationPanel(QWidget):
         
         group_layout.addLayout(header_layout)
         
-        # Scroll area for validation results
+        # Scroll area for validation results (no max height - let it expand)
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setMinimumHeight(300)
-        scroll_area.setMaximumHeight(400)
+        scroll_area.setMinimumHeight(400)
+        # No maximum height - allow it to expand to fit all content
         
         # Container for validation sections
         results_container = QWidget()
