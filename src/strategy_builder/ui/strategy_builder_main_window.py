@@ -882,6 +882,8 @@ class StrategyBuilderMainWindow(QMainWindow):
                 # User wants to change strategy type
                 self.info_panel.set_strategy_type(suggested_type)
                 self._update_status(f"Strategy type changed to {suggested_type}")
+                # Force UI update
+                QApplication.processEvents()
                 return True  # Proceed with save
             elif clicked == proceed_btn:
                 # User wants to save anyway
