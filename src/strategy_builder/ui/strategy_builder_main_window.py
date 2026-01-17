@@ -486,7 +486,8 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _on_open_strategy(self):
         """Open an existing strategy."""
         # Create custom dialog with larger size and persistence
-        dialog = QFileDialog(self, "Open Strategy", "", "Strategy Files (*.json);;All Files (*)")
+        # Pass None as parent so dialog is independent and can be moved freely
+        dialog = QFileDialog(None, "Open Strategy", "", "Strategy Files (*.json);;All Files (*)")
         dialog.setFileMode(QFileDialog.ExistingFile)
         dialog.setAcceptMode(QFileDialog.AcceptOpen)
         
@@ -549,7 +550,8 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _on_save_strategy_as(self) -> bool:
         """Save the strategy with a new filename."""
         # Create custom dialog with larger size and persistence
-        dialog = QFileDialog(self, "Save Strategy As", "", "Strategy Files (*.json);;All Files (*)")
+        # Pass None as parent so dialog is independent and can be moved freely
+        dialog = QFileDialog(None, "Save Strategy As", "", "Strategy Files (*.json);;All Files (*)")
         dialog.setFileMode(QFileDialog.AnyFile)
         dialog.setAcceptMode(QFileDialog.AcceptSave)
         dialog.setDefaultSuffix("json")
