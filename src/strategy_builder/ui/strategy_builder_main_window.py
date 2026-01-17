@@ -33,7 +33,7 @@ from src.strategy_builder.integration.strategy_builder_orchestrator import (
 from src.strategy_builder.ui.strategy_info_panel import StrategyInfoPanel
 from src.strategy_builder.ui.block_search_panel import BlockSearchPanel
 from src.strategy_builder.ui.strategy_blocks_panel import StrategyBlocksPanel
-from src.strategy_builder.ui.validation_panel import ValidationPanel
+from src.strategy_builder.ui.validation_dialog import ValidationDialog
 from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
 
 # Import real block registry adapter
@@ -72,7 +72,6 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.info_panel: Optional[StrategyInfoPanel] = None
         self.search_panel: Optional[BlockSearchPanel] = None
         self.blocks_panel: Optional[StrategyBlocksPanel] = None
-        self.validation_panel: Optional[ValidationPanel] = None
         
         # Track current file
         self.current_file: Optional[str] = None
@@ -261,12 +260,10 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Create panels
         self.info_panel = StrategyInfoPanel(self.orchestrator)
         self.blocks_panel = StrategyBlocksPanel(self.orchestrator)
-        self.validation_panel = ValidationPanel(self.orchestrator)
         
-        # Add to left layout
+        # Add to left layout (validation panel removed - now shown as modal)
         left_layout.addWidget(self.info_panel)
-        left_layout.addWidget(self.blocks_panel, stretch=2)
-        left_layout.addWidget(self.validation_panel, stretch=1)
+        left_layout.addWidget(self.blocks_panel, stretch=1)
         left_widget.setLayout(left_layout)
         
         # Right side: Search panel
@@ -399,17 +396,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Block selection: Add to blocks panel
         self.search_panel.block_selected.connect(self._on_block_selected)
         
-        # Blocks changed: Refresh other panels and auto-validate
+        # Blocks changed: Refresh other panels
         self.blocks_panel.blocks_changed.connect(self._on_blocks_changed)
-        self.blocks_panel.blocks_changed.connect(lambda: self.validation_panel.auto_validate(True))
         
         # Strategy name changed: Update window title
         self.info_panel.strategy_name_changed.connect(self._on_strategy_name_changed)
-        
-        # Validation panel action buttons
-        self.validation_panel.save_requested.connect(self._on_save_strategy)
-        self.validation_panel.run_test_requested.connect(self._on_run_backtest)
-        self.validation_panel.generate_requested.connect(self._on_generate_code)
     
     def _on_block_selected(self, block_name: str):
         """Handle block selection from search panel."""
@@ -728,15 +719,28 @@ class StrategyBuilderMainWindow(QMainWindow):
             self._update_status("Design your strategy by adding blocks")
         
         elif step == 1:
-            # Validate step - run validation
+            # Validate step - show validation dialog
             self.stepper.set_current_step(1)
-            self._on_validate()
-            # If validation successful, mark as complete
+            
+            # Create and show validation dialog
+            dialog = ValidationDialog(self.orchestrator, self)
+            
+            # Connect dialog signals to main window actions
+            dialog.validation_panel.save_requested.connect(self._on_save_strategy)
+            dialog.validation_panel.generate_requested.connect(self._on_generate_code)
+            dialog.validation_panel.run_test_requested.connect(self._on_run_backtest)
+            
+            # Show modal dialog
+            dialog.exec_()
+            
+            # Update stepper state based on validation result
             result = self.orchestrator.validate_strategy()
             if result.success:
                 self.stepper.mark_step_complete(1)
+                self._update_status("Strategy validated successfully")
             else:
                 self.stepper.mark_step_error(1)
+                self._update_status("Strategy validation has errors")
         
         elif step == 2:
             # Generate step - generate code
