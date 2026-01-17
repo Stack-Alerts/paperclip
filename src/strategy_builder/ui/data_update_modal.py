@@ -98,7 +98,7 @@ class DataUpdateThread(QThread):
             )
     
     def _save_bars_to_disk(self, bars, timeframe: str) -> list:
-        """Save downloaded bars to parquet files by month"""
+        """INSTITUTIONAL: Merge new bars with existing data"""
         from pathlib import Path
         import pandas as pd
         
@@ -117,18 +117,37 @@ class DataUpdateThread(QThread):
             month_dir = base_dir / str(month)
             month_dir.mkdir(exist_ok=True)
             
-            # Filename format: BTCUSDT_PERP_15m_2026-01-17.parquet
-            # Use last day of data in this month as date
-            last_date = month_data['timestamp'].max().strftime('%Y-%m-%d')
-            filename = f"BTCUSDT_PERP_{timeframe}_{last_date}.parquet"
+            # Filename format: BTCUSDT_PERP_15m_2026-01.parquet (month level, not day!)
+            filename = f"BTCUSDT_PERP_{timeframe}_{month}.parquet"
             filepath = month_dir / filename
             
-            # Save (overwrite if exists - latest data wins)
             month_data_clean = month_data.drop(columns=['month'])
-            month_data_clean.to_parquet(filepath, index=False)
-            saved_files.append(str(filepath))
             
-            print(f"   💾 Saved: {filepath} ({len(month_data)} bars)")
+            # INSTITUTIONAL: Merge with existing data if file exists
+            if filepath.exists():
+                try:
+                    # Read existing data
+                    existing_data = pd.read_parquet(filepath)
+                    
+                    # Combine old + new
+                    combined = pd.concat([existing_data, month_data_clean], ignore_index=True)
+                    
+                    # Remove duplicates (keep latest)
+                    combined = combined.sort_values('timestamp').drop_duplicates(subset=['timestamp'], keep='last')
+                    
+                    # Save merged data
+                    combined.to_parquet(filepath, index=False)
+                    print(f"   💾 Updated: {filepath} ({len(existing_data)} → {len(combined)} bars, +{len(combined)-len(existing_data)} new)")
+                except Exception as e:
+                    print(f"   ⚠️  Could not merge, overwriting: {e}")
+                    month_data_clean.to_parquet(filepath, index=False)
+                    print(f"   💾 Saved: {filepath} ({len(month_data_clean)} bars)")
+            else:
+                # New file - just save
+                month_data_clean.to_parquet(filepath, index=False)
+                print(f"   💾 Created: {filepath} ({len(month_data_clean)} bars)")
+            
+            saved_files.append(str(filepath))
         
         return saved_files
 
