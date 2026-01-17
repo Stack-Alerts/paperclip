@@ -384,17 +384,12 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         toolbar.addSeparator()
         
-        # Add fixed spacer to offset stepper for window centering
-        # Stepper is ~800px wide, window is ~1400px
-        # To center: need (1400 - 800) / 2 = 300px from left
-        # Toolbar buttons take ~200px, so add ~100px spacer
-        spacer = QWidget()
-        spacer.setFixedWidth(180)  # Fixed offset for window centering
-        toolbar.addWidget(spacer)
-        
-        # Add stepper (no internal centering, positioned by spacer)
+        # Add stepper to fill remaining width and center internally
+        # This way it centers relative to FULL toolbar width (= window width)
         self.stepper = StepperRibbon(self)
         self.stepper.step_clicked.connect(self._on_step_clicked)
+        # Make stepper expand to fill all remaining toolbar space
+        self.stepper.setSizePolicy(QWidget().sizePolicy().Expanding, QWidget().sizePolicy().Preferred)
         toolbar.addWidget(self.stepper)
     
     def _create_status_bar(self):
