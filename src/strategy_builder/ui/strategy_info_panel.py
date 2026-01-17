@@ -452,7 +452,7 @@ class StrategyInfoPanel(QWidget):
     def refresh_from_orchestrator(self):
         """
         Refresh all fields from the orchestrator's current configuration.
-        
+
         This is called when the strategy configuration changes elsewhere
         in the application.
         """
@@ -461,9 +461,13 @@ class StrategyInfoPanel(QWidget):
             config = self.orchestrator.get_current_config()
             if config and hasattr(config, 'name') and config.name:
                 self.set_strategy_name(config.name)
+            
+            # CRITICAL: Also load strategy_type from config
+            if config and hasattr(config, 'strategy_type'):
+                self.set_strategy_type(config.strategy_type)
         except Exception:
             pass  # Gracefully handle if config not available
-        
+
         self.update_description_from_config()
         self.update_required_signals_from_config()
         self._update_metadata_row()
