@@ -507,8 +507,27 @@ class UnifiedDataManager:
                     last_day = monthrange(year, month)[1]
                     end_date = datetime(year, month, last_day, 23, 59, 59)
                 
-                # Calculate gap
+                # Calculate gap FIRST
                 gap_days = (datetime.now() - end_date).days
+                
+                # Check if gap is filled by Binance data
+                binance_dir = self.binance_dir
+                if binance_dir.exists() and gap_days > 0:
+                    # Check for recent Binance files (15m timeframe as indicator)
+                    binance_files = sorted(binance_dir.glob('**/BTCUSDT_PERP_15m_*.parquet'))
+                    if binance_files:
+                        try:
+                            # Read last Binance file
+                            last_binance = binance_files[-1]
+                            df_binance = pd.read_parquet(last_binance, columns=['timestamp'])
+                            if len(df_binance) > 0:
+                                binance_end = pd.to_datetime(df_binance['timestamp'].iloc[-1])
+                                # Update end date if Binance has more recent data
+                                if binance_end > end_date:
+                                    end_date = binance_end
+                                    gap_days = (datetime.now() - end_date).days
+                        except:
+                            pass
                 
                 status[data_type] = {
                     'start': start_date,
