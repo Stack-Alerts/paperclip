@@ -63,10 +63,7 @@ class StepperRibbon(QWidget):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(5)
         
-        # Center the stepper ribbon
-        layout.addStretch()
-        
-        # Create step buttons with arrows
+        # Create step buttons with arrows (no internal centering - let toolbar center us)
         for idx, step in enumerate(self.STEPS):
             # Step button
             btn = QPushButton(f"{step['icon']} {step['name']}")
@@ -90,9 +87,6 @@ class StepperRibbon(QWidget):
                 arrow.setStyleSheet("color: #4A5568; background: transparent;")
                 self.arrow_labels.append(arrow)
                 layout.addWidget(arrow)
-        
-        # Add stretch after steps to center them
-        layout.addStretch()
         
         self.setLayout(layout)
         
