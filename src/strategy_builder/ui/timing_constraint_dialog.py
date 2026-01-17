@@ -45,8 +45,16 @@ class TimingConstraintDialog(QDialog):
         """
         super().__init__(parent)
         
-        # Make dialog movable (not locked to parent window)
-        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+        # Make dialog TRULY movable - use Tool window instead of Dialog
+        # This prevents modal locking to parent window
+        self.setWindowFlags(
+            Qt.Window | 
+            Qt.WindowTitleHint | 
+            Qt.WindowCloseButtonHint |
+            Qt.WindowStaysOnTopHint
+        )
+        # Still modal for keyboard focus, but not locked visually
+        self.setModal(True)
         
         self.block_name = block_name
         self.signal_name = signal_name
@@ -63,8 +71,11 @@ class TimingConstraintDialog(QDialog):
     def _init_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle(f"Configure Timing Constraint - {self.signal_name}")
-        self.setMinimumWidth(500)
-        self.setMinimumHeight(300)
+        # Increased size to prevent text compression
+        self.setMinimumWidth(700)
+        self.setMinimumHeight(450)
+        # Set initial size for better appearance
+        self.resize(750, 500)
         
         # Apply dark theme
         self.setStyleSheet("""
