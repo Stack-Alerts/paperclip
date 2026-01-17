@@ -485,9 +485,13 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_open_strategy(self):
         """Open an existing strategy."""
+        # Get last used directory
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        last_dir = settings.value("lastDirectory", "")
+        
         # Create custom dialog with larger size and persistence
         # Pass None as parent so dialog is independent and can be moved freely
-        dialog = QFileDialog(None, "Open Strategy", "", "Strategy Files (*.json);;All Files (*)")
+        dialog = QFileDialog(None, "Open Strategy", last_dir, "Strategy Files (*.json);;All Files (*)")
         dialog.setFileMode(QFileDialog.ExistingFile)
         dialog.setAcceptMode(QFileDialog.AcceptOpen)
         
@@ -501,7 +505,6 @@ class StrategyBuilderMainWindow(QMainWindow):
         dialog.resize(800, 600)
         
         # Restore saved size if available
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
         dialog_geometry = settings.value("openDialog/geometry")
         if dialog_geometry:
             dialog.restoreGeometry(dialog_geometry)
@@ -528,6 +531,10 @@ class StrategyBuilderMainWindow(QMainWindow):
                     self.current_file = filename
                     self.is_modified = False
                     
+                    # Save directory for next time
+                    import os
+                    settings.setValue("lastDirectory", os.path.dirname(filename))
+                    
                     # Refresh all panels
                     self.info_panel.refresh_from_orchestrator()
                     self.blocks_panel.refresh_from_orchestrator()
@@ -537,7 +544,7 @@ class StrategyBuilderMainWindow(QMainWindow):
                         self.search_panel.mark_block_as_added(block_name)
                     
                     self._update_window_title()
-                    self._update_status(f"Loaded strategy from: {filename}")
+                    self._update_status(f"Loaded strategy from:{filename}")
                 else:
                     QMessageBox.warning(self, "Load Failed", f"Failed to load strategy: {result.message}")
             except Exception as e:
@@ -552,9 +559,13 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_save_strategy_as(self) -> bool:
         """Save the strategy with a new filename."""
+        # Get last used directory
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        last_dir = settings.value("lastDirectory", "")
+        
         # Create custom dialog with larger size and persistence
         # Pass None as parent so dialog is independent and can be moved freely
-        dialog = QFileDialog(None, "Save Strategy As", "", "Strategy Files (*.json);;All Files (*)")
+        dialog = QFileDialog(None, "Save Strategy As", last_dir, "Strategy Files (*.json);;All Files (*)")
         dialog.setFileMode(QFileDialog.AnyFile)
         dialog.setAcceptMode(QFileDialog.AcceptSave)
         dialog.setDefaultSuffix("json")
@@ -600,6 +611,12 @@ class StrategyBuilderMainWindow(QMainWindow):
             if result.success:
                 self.current_file = filename
                 self.is_modified = False
+                
+                # Save directory for next time
+                import os
+                settings = QSettings("BTC_Engine", "StrategyBuilder")
+                settings.setValue("lastDirectory", os.path.dirname(filename))
+                
                 self._update_window_title()
                 self._update_status(f"Saved strategy to: {filename}")
                 return True
