@@ -1,4 +1,4 @@
-"""
+s"""
 Strategy Builder Main Window - Complete UI Application
 
 This is the main window that integrates all Strategy Builder UI components:
@@ -95,11 +95,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Restore window geometry from settings
         self._restore_settings()
         
-        # NOTE: Data update modal temporarily disabled until UnifiedDataManager
-        # is configured to work with actual data structure (data/raw/ not data/lakeapi/)
-        # TODO: Re-enable once UnifiedDataManager loads from data/raw/*.csv files
-        # from PyQt5.QtCore import QTimer
-        # QTimer.singleShot(500, self._show_data_update_modal)
+        # Show data update modal on startup (after window is shown)
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(500, self._show_data_update_modal)
     
     def _init_ui(self):
         """Initialize the user interface layout."""
