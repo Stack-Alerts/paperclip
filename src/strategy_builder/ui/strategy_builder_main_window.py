@@ -636,6 +636,19 @@ class StrategyBuilderMainWindow(QMainWindow):
                     # Add attribute if it doesn't exist
                     setattr(self.orchestrator.config_engine.config, 'strategy_type', strategy_type)
             
+            # CRITICAL RECHECK: Verify config matches UI before saving
+            ui_type = self.info_panel.get_strategy_type()
+            config_type = getattr(self.orchestrator.config_engine.config, 'strategy_type', None)
+            if config_type != ui_type:
+                print(f"WARNING: Config mismatch before save! UI={ui_type}, Config={config_type}")
+                print(f"Forcing config to match UI: {ui_type}")
+                # Force config to match UI
+                if hasattr(self.orchestrator.config_engine.config, 'strategy_type'):
+                    self.orchestrator.config_engine.config.strategy_type = ui_type
+                else:
+                    setattr(self.orchestrator.config_engine.config, 'strategy_type', ui_type)
+                print(f"Config now: {self.orchestrator.config_engine.config.strategy_type}")
+            
             # Save using orchestrator
             result = self.orchestrator.save_strategy(filename)
             
