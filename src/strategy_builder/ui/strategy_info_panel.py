@@ -456,6 +456,14 @@ class StrategyInfoPanel(QWidget):
         This is called when the strategy configuration changes elsewhere
         in the application.
         """
+        # Update strategy name from config
+        try:
+            config = self.orchestrator.get_current_config()
+            if config and hasattr(config, 'name') and config.name:
+                self.set_strategy_name(config.name)
+        except Exception:
+            pass  # Gracefully handle if config not available
+        
         self.update_description_from_config()
         self.update_required_signals_from_config()
         self._update_metadata_row()

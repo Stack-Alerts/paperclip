@@ -605,6 +605,11 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _save_to_file(self, filename: str) -> bool:
         """Save strategy to file."""
         try:
+            # Update config name from UI before saving
+            strategy_name = self.info_panel.get_strategy_name()
+            if strategy_name:
+                self.orchestrator.config_engine.config.name = strategy_name
+            
             # Save using orchestrator
             result = self.orchestrator.save_strategy(filename)
             
