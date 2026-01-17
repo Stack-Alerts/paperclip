@@ -110,8 +110,11 @@ class DataUpdateModal(QDialog):
         """Initialize the user interface"""
         self.setWindowTitle("Data Update Check")
         self.setModal(True)
-        self.setMinimumWidth(600)
-        self.setMinimumHeight(400)
+        
+        # Make dialog moveable and independent (30% bigger)
+        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+        self.setMinimumWidth(780)   # 600 * 1.3
+        self.setMinimumHeight(520)  # 400 * 1.3
         
         # Dark theme
         self.setStyleSheet("""
