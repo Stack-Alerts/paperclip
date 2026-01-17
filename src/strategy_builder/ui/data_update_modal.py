@@ -115,10 +115,10 @@ class DataUpdateModal(QDialog):
         self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowStaysOnTopHint)
         self.setModal(True)  # Keep modal behavior but allow dragging
         
-        # Much bigger to avoid scrolling
-        self.setMinimumWidth(900)
-        self.setMinimumHeight(650)
-        self.resize(900, 650)
+        # Much bigger to avoid any scrolling
+        self.setMinimumWidth(1100)
+        self.setMinimumHeight(750)
+        self.resize(1100, 750)
         
         # Dark theme
         self.setStyleSheet("""
@@ -220,7 +220,7 @@ class DataUpdateModal(QDialog):
         
         self.details_text = QTextEdit()
         self.details_text.setReadOnly(True)
-        self.details_text.setMinimumHeight(350)  # Much taller - no scrolling
+        self.details_text.setMinimumHeight(450)  # Extra tall - definitely no scrolling
         details_layout.addWidget(self.details_text)
         
         details_group.setLayout(details_layout)
