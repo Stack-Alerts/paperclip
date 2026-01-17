@@ -63,9 +63,7 @@ class StepperRibbon(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(5)
         
-        # Center buttons within expanded widget width
-        layout.addStretch()
-        
+        # NO internal stretching - stepper has fixed width, positioned by toolbar
         # Create step buttons with arrows
         for idx, step in enumerate(self.STEPS):
             # Step button
@@ -90,9 +88,6 @@ class StepperRibbon(QWidget):
                 arrow.setStyleSheet("color: #4A5568; background: transparent;")
                 self.arrow_labels.append(arrow)
                 layout.addWidget(arrow)
-        
-        # Add stretch after to keep buttons centered
-        layout.addStretch()
         
         self.setLayout(layout)
         
