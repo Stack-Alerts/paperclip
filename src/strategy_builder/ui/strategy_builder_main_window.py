@@ -576,6 +576,18 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Apply dark theme stylesheet (since parent is None, it doesn't inherit)
         dialog.setStyleSheet(self.styleSheet())
         
+        # Auto-generate filename from strategy name
+        strategy_name = self.info_panel.get_strategy_name()
+        if strategy_name:
+            # Convert to valid filename: lowercase, spaces to underscores
+            filename_base = strategy_name.lower().replace(' ', '_')
+            # Remove any invalid characters
+            import re
+            filename_base = re.sub(r'[^\w\-_]', '', filename_base)
+            suggested_filename = f"{filename_base}.json"
+            # Set as default filename
+            dialog.selectFile(suggested_filename)
+        
         # Set larger default size (800x600)
         dialog.resize(800, 600)
         
