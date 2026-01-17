@@ -543,6 +543,14 @@ class StrategyBuilderMainWindow(QMainWindow):
         else:
             return self._on_save_strategy_as()
     
+    def _on_save_strategy_with_feedback(self) -> bool:
+        """Save the current strategy with success dialog (for validation dialog)."""
+        if self.current_file:
+            return self._save_to_file(self.current_file, show_success=True)
+        else:
+            # Save As always shows its own dialog, so no need for extra feedback
+            return self._on_save_strategy_as()
+    
     def _on_save_strategy_as(self) -> bool:
         """Save the strategy with a new filename."""
         # Get last used directory
@@ -600,8 +608,14 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         return self._save_to_file(filename)
     
-    def _save_to_file(self, filename: str) -> bool:
-        """Save strategy to file."""
+    def _save_to_file(self, filename: str, show_success: bool = False) -> bool:
+        """
+        Save strategy to file.
+        
+        Args:
+            filename: Path to save file
+            show_success: Whether to show success message dialog
+        """
         try:
             # Check for strategy type mismatch before saving
             if not self._check_strategy_type_match():
@@ -626,6 +640,15 @@ class StrategyBuilderMainWindow(QMainWindow):
                 
                 self._update_window_title()
                 self._update_status(f"Saved strategy to: {filename}")
+                
+                # Show success message if requested (e.g., when called from validation dialog)
+                if show_success:
+                    QMessageBox.information(
+                        self,
+                        "Strategy Saved",
+                        f"Strategy saved successfully!\n\nFile: {filename}"
+                    )
+                
                 return True
             else:
                 QMessageBox.warning(self, "Save Failed", f"Failed to save strategy: {result.message}")
@@ -725,8 +748,8 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Create and show validation dialog
             dialog = ValidationDialog(self.orchestrator, self)
             
-            # Connect dialog signals to main window actions
-            dialog.validation_panel.save_requested.connect(self._on_save_strategy)
+            # Connect dialog signals to main window actions (with visual feedback)
+            dialog.validation_panel.save_requested.connect(lambda: self._on_save_strategy_with_feedback())
             dialog.validation_panel.generate_requested.connect(self._on_generate_code)
             dialog.validation_panel.run_test_requested.connect(self._on_run_backtest)
             
