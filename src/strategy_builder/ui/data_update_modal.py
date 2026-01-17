@@ -115,10 +115,10 @@ class DataUpdateModal(QDialog):
         self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowStaysOnTopHint)
         self.setModal(True)  # Keep modal behavior but allow dragging
         
-        # Extra large to avoid ANY scrolling - institutional grade
-        self.setMinimumWidth(1300)
-        self.setMinimumHeight(900)
-        self.resize(1300, 900)
+        # MASSIVE to avoid scrolling - institutional grade
+        self.setMinimumWidth(1400)
+        self.setMinimumHeight(1000)
+        self.resize(1400, 1000)
         
         # Dark theme
         self.setStyleSheet("""
@@ -279,14 +279,16 @@ class DataUpdateModal(QDialog):
             for data_type, info in all_status.items():
                 if info['status'] == 'complete':
                     report_lines.append(f"  ✅ {data_type.upper()}: Complete")
-                    report_lines.append(f"     Through: {info['end'].strftime('%Y-%m-%d')}\n")
+                    if info['start'] and info['end']:
+                        report_lines.append(f"     Range: {info['start'].strftime('%Y-%m-%d')} → {info['end'].strftime('%Y-%m-%d')}\n")
                 elif info['status'] == 'gap':
                     any_gaps = True
                     max_gap = max(max_gap, info['gap_days'])
                     self.lakeapi_end = info['end']  # Store for download
                     self.gap_days = info['gap_days']
                     report_lines.append(f"  ❌ {data_type.upper()}: GAP DETECTED")
-                    report_lines.append(f"     Through: {info['end'].strftime('%Y-%m-%d')}")
+                    if info['start'] and info['end']:
+                        report_lines.append(f"     Range: {info['start'].strftime('%Y-%m-%d')} → {info['end'].strftime('%Y-%m-%d')}")
                     report_lines.append(f"     Missing: {info['gap_days']} days\n")
                 elif info['status'] == 'missing':
                     any_gaps = True
