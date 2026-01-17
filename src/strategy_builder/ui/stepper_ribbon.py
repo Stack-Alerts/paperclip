@@ -60,10 +60,10 @@ class StepperRibbon(QWidget):
     def _init_ui(self):
         """Initialize the user interface."""
         layout = QHBoxLayout()
-        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(5)
         
-        # Add stretch before steps (right-align in toolbar)
+        # Center the stepper ribbon
         layout.addStretch()
         
         # Create step buttons with arrows
@@ -71,9 +71,8 @@ class StepperRibbon(QWidget):
             # Step button
             btn = QPushButton(f"{step['icon']} {step['name']}")
             btn.setToolTip(step['tooltip'])
-            btn.setMinimumWidth(125)
-            btn.setMaximumWidth(125)
-            btn.setMinimumHeight(32)
+            btn.setMinimumWidth(140)
+            btn.setMinimumHeight(36)
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(lambda checked, i=idx: self._on_step_clicked(i))
             
@@ -91,6 +90,9 @@ class StepperRibbon(QWidget):
                 arrow.setStyleSheet("color: #4A5568; background: transparent;")
                 self.arrow_labels.append(arrow)
                 layout.addWidget(arrow)
+        
+        # Add stretch after steps to center them
+        layout.addStretch()
         
         self.setLayout(layout)
         
