@@ -934,7 +934,15 @@ class StrategyBuilderMainWindow(QMainWindow):
             
             if clicked == change_btn:
                 # User wants to change strategy type
+                # Update BOTH UI and config immediately to ensure sync
                 self.info_panel.set_strategy_type(suggested_type)
+                
+                # Also update config directly right now (don't wait for later)
+                if hasattr(self.orchestrator.config_engine.config, 'strategy_type'):
+                    self.orchestrator.config_engine.config.strategy_type = suggested_type
+                else:
+                    setattr(self.orchestrator.config_engine.config, 'strategy_type', suggested_type)
+                
                 self._update_status(f"Strategy type changed to {suggested_type}")
                 # Force UI update
                 QApplication.processEvents()
