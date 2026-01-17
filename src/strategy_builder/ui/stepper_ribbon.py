@@ -71,8 +71,8 @@ class StepperRibbon(QWidget):
             # Step button
             btn = QPushButton(f"{step['icon']} {step['name']}")
             btn.setToolTip(step['tooltip'])
-            btn.setMinimumWidth(110)
-            btn.setMaximumWidth(110)
+            btn.setMinimumWidth(125)
+            btn.setMaximumWidth(125)
             btn.setMinimumHeight(32)
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(lambda checked, i=idx: self._on_step_clicked(i))
