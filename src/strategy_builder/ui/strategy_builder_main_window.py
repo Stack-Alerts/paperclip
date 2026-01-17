@@ -84,6 +84,12 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.retry_timer: Optional[QTimer] = None
         self.last_update_time: Optional[datetime] = None
         self.retry_count = 0
+        self.next_check_time: Optional[datetime] = None
+        
+        # Countdown timer for status bar
+        self.countdown_timer = QTimer()
+        self.countdown_timer.timeout.connect(self._update_countdown_status)
+        self.countdown_timer.start(1000)  # Update every second
         
         # Setup UI
         self._init_ui()
@@ -1113,12 +1119,48 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Schedule check
             QTimer.singleShot(ms_until_check, self._check_and_update_data)
             
-            # Update status with countdown
-            next_check = now + timedelta(seconds=seconds_to_next)
-            self._update_status(f"Next data check at {next_check.strftime('%H:%M:%S')}")
+            # Save next check time for countdown
+            self.next_check_time = now + timedelta(seconds=seconds_to_next)
             
         except Exception as e:
             print(f"Error scheduling next check: {e}")
+    
+    def _update_countdown_status(self):
+        """Update status bar with live countdown to next data check."""
+        try:
+            # Only show countdown when nothing else is being displayed
+            current_status = self.statusBar().currentMessage()
+            
+            # Check if we should show countdown (not during active operations)
+            if current_status and any(keyword in current_status for keyword in [
+                'Added block', 'Strategy updated', 'Saved', 'Loaded', 'Checking',
+                'Updating', 'Validat', 'Generated', 'cleared', 'created'
+            ]):
+                # Don't override active status messages
+                return
+            
+            # Show countdown if next check is scheduled
+            if self.next_check_time:
+                now = datetime.now()
+                seconds_until = (self.next_check_time - now).total_seconds()
+                
+                if seconds_until > 0:
+                    minutes = int(seconds_until // 60)
+                    seconds = int(seconds_until % 60)
+                    
+                    if minutes > 0:
+                        self._update_status(f"Next data check in {minutes}m {seconds}s")
+                    else:
+                        self._update_status(f"Next data check in {seconds}s")
+                else:
+                    self._update_status("Checking for data updates...")
+            else:
+                # No check scheduled yet
+                self._update_status("Ready")
+                
+        except Exception as e:
+            # Silently fail to avoid disrupting UI
+            pass
     
     def _save_settings(self):
         """Save window geometry and state to settings."""
