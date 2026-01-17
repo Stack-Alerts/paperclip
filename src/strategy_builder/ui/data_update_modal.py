@@ -263,83 +263,67 @@ class DataUpdateModal(QDialog):
         self.setLayout(layout)
     
     def _check_data_gap(self):
-        """Check for gaps between LakeAPI and current time"""
+        """Check for gaps across ALL data types"""
         try:
-            # Get available ranges
-            ranges = self.manager.get_available_date_range('15m')
+            # Get status for ALL data types
+            all_status = self.manager.get_all_data_types_status()
             
-            lakeapi_range = ranges.get('lakeapi_range')
+            # Build comprehensive report
+            any_gaps = False
+            max_gap = 0
+            report_lines = []
             
-            if lakeapi_range and lakeapi_range[0]:
-                # LakeAPI data exists
-                self.lakeapi_end = lakeapi_range[1]
-                self.current_time = datetime.now()
-                
-                # Calculate gap (negative = historical data extends beyond today = GOOD!)
-                self.gap_days = (self.current_time - self.lakeapi_end).days
-                
-                if self.gap_days > 0:
-                    # REAL GAP: Historical data is BEHIND current time
-                    self.status_label.setText(
-                        f"⚠️ DATA GAP DETECTED: {self.gap_days} days MISSING"
-                    )
-                    self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
-                    
-                    self.details_text.setText(
-                        f"❌ CRITICAL: Data gap detected!\n\n"
-                        f"Historical Data (LakeAPI):\n"
-                        f"  Available through: {self.lakeapi_end.strftime('%Y-%m-%d')}\n\n"
-                        f"Current Time:\n"
-                        f"  {self.current_time.strftime('%Y-%m-%d %H:%M')}\n\n"
-                        f"Missing Gap:\n"
-                        f"  {self.gap_days} days ({self.gap_days * 96} bars @ 15min)\n\n"
-                        f"⚠️  This WILL cause problems with building block analysis!\n"
-                        f"     Building blocks need continuous, gap-free data.\n\n"
-                        f"Recommendation:\n"
-                        f"  Click 'Update Data' to download missing data from Binance.\n"
-                        f"  This will fill the gap and ensure 100% accurate analysis.\n\n"
-                        f"Note: Download will be saved to data/binance/ directory."
-                    )
-                    
-                    self.update_button.setEnabled(True)
+            self.current_time = datetime.now()
+            report_lines.append("📊 DATA TYPE STATUS:\n")
+            
+            for data_type, info in all_status.items():
+                if info['status'] == 'complete':
+                    report_lines.append(f"  ✅ {data_type.upper()}: Complete")
+                    report_lines.append(f"     Through: {info['end'].strftime('%Y-%m-%d')}\n")
+                elif info['status'] == 'gap':
+                    any_gaps = True
+                    max_gap = max(max_gap, info['gap_days'])
+                    self.lakeapi_end = info['end']  # Store for download
+                    self.gap_days = info['gap_days']
+                    report_lines.append(f"  ❌ {data_type.upper()}: GAP DETECTED")
+                    report_lines.append(f"     Through: {info['end'].strftime('%Y-%m-%d')}")
+                    report_lines.append(f"     Missing: {info['gap_days']} days\n")
+                elif info['status'] == 'missing':
+                    any_gaps = True
+                    max_gap = 999
+                    report_lines.append(f"  ❌ {data_type.upper()}: MISSING")
+                    report_lines.append(f"     No data found in data/raw/{data_type}/\n")
                 else:
-                    # NO GAP: Historical data is current or extends beyond today
-                    days_ahead = abs(self.gap_days)
-                    self.status_label.setText("✅ DATA IS COMPLETE - 100% ACCURATE")
-                    self.status_label.setStyleSheet("color: #4ADE80; font-weight: bold;")
-                    
-                    self.details_text.setText(
-                        f"✅ PERFECT: No data gaps detected!\n\n"
-                        f"Historical Data (LakeAPI):\n"
-                        f"  Available through: {self.lakeapi_end.strftime('%Y-%m-%d')}\n"
-                        f"  ({days_ahead} days ahead of current time)\n\n"
-                        f"Current Time:\n"
-                        f"  {self.current_time.strftime('%Y-%m-%d %H:%M')}\n\n"
-                        f"Gap Analysis:\n"
-                        f"  ✅ NO GAPS - Data is continuous and complete\n"
-                        f"  ✅ Building blocks will have 100% accurate data\n"
-                        f"  ✅ All analysis will be institutional grade\n\n"
-                        f"Status:\n"
-                        f"  Your data is complete. No updates needed.\n"
-                        f"  Click 'Continue' to proceed with strategy building."
-                    )
-                    
-                    self.skip_button.setText("Continue")
-            else:
-                # No LakeAPI data found
-                self.status_label.setText("⚠️ No historical data found")
+                    report_lines.append(f"  ⚠️  {data_type.upper()}: ERROR")
+                    if 'error' in info:
+                        report_lines.append(f"     {info['error']}\n")
+            
+            report_lines.append(f"Current Time: {self.current_time.strftime('%Y-%m-%d %H:%M')}\n")
+            
+            if any_gaps:
+                self.status_label.setText(
+                    f"⚠️ DATA GAPS DETECTED: Up to {max_gap} days MISSING"
+                )
                 self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
                 
-                self.details_text.setText(
-                    f"No LakeAPI data detected in: data/lakeapi/\n\n"
-                    f"You can either:\n"
-                    f"1. Continue without historical data (limited functionality)\n"
-                    f"2. Import LakeAPI data first\n\n"
-                    f"Note: Recent data can be downloaded from Binance,\n"
-                    f"but for full historical analysis, LakeAPI data is recommended."
-                )
+                report_lines.append("❌ CRITICAL: Building blocks need ALL data types!")
+                report_lines.append("   - Trade management needs funding rates")
+                report_lines.append("   - Building blocks need liquidations")
+                report_lines.append("   - Advanced blocks need orderbook\n")
+                report_lines.append("Click 'Update Data' to fill ALL gaps.")
                 
-                self.skip_button.setText("Continue Anyway")
+                self.details_text.setText("\n".join(report_lines))
+                self.update_button.setEnabled(True)
+            else:
+                self.status_label.setText("✅ ALL DATA COMPLETE - 100% ACCURATE")
+                self.status_label.setStyleSheet("color: #4ADE80; font-weight: bold;")
+                
+                report_lines.append("✅ PERFECT: All data types complete!")
+                report_lines.append("   Building blocks have full data access")
+                report_lines.append("   Trade Manager ready for deployment")
+                
+                self.details_text.setText("\n".join(report_lines))
+                self.skip_button.setText("Continue")
         
         except Exception as e:
             self.status_label.setText("❌ Error checking data")

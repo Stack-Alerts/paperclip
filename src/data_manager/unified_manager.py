@@ -432,6 +432,103 @@ class UnifiedDataManager:
         print(f"   ✅ Hybrid: {len(combined)} total bars")
         return combined
     
+    def get_all_data_types_status(self) -> Dict[str, Dict]:
+        """
+        Check status of ALL data types
+        
+        Returns:
+            Dict with status for each data type:
+            {
+                'trades': {
+                    'start': datetime,
+                    'end': datetime,
+                    'gap_days': int,
+                    'status': 'complete' | 'gap' | 'missing'
+                },
+                'funding': {...},
+                'liquidations': {...},
+                'open_interest': {...},
+                'orderbook': {...}
+            }
+        """
+        data_types = ['trades', 'funding', 'liquidations', 'open_interest', 'orderbook']
+        status = {}
+        
+        for data_type in data_types:
+            data_dir = self.lakeapi_dir / data_type
+            if not data_dir.exists():
+                status[data_type] = {
+                    'status': 'missing',
+                    'gap_days': 999,
+                    'start': None,
+                    'end': None
+                }
+                continue
+            
+            # Find last parquet file
+            parquet_files = sorted(data_dir.glob(f'BTC-USDT_{data_type}_*.parquet'))
+            if not parquet_files:
+                status[data_type] = {
+                    'status': 'missing',
+                    'gap_days': 999,
+                    'start': None,
+                    'end': None
+                }
+                continue
+            
+            # Read actual last timestamp (same logic as trades)
+            try:
+                last_file = parquet_files[-1]
+                first_file = parquet_files[0]
+                
+                # Get start date from first file
+                first_date_str = first_file.stem.split('_')[-1]  # '2022-03'
+                start_date = datetime.strptime(first_date_str, '%Y-%m')
+                
+                # Try possible timestamp column names for end date
+                timestamp_cols = ['timestamp', 'origin_time', 'received_time', 'time']
+                df = None
+                end_date = None
+                
+                for col in timestamp_cols:
+                    try:
+                        df = pd.read_parquet(last_file, columns=[col])
+                        if len(df) > 0:
+                            end_date = pd.to_datetime(df[col].iloc[-1])
+                            break
+                    except:
+                        continue
+                
+                if end_date is None:
+                    # Fallback to filename
+                    last_date_str = last_file.stem.split('_')[-1]
+                    year, month = map(int, last_date_str.split('-'))
+                    from calendar import monthrange
+                    last_day = monthrange(year, month)[1]
+                    end_date = datetime(year, month, last_day, 23, 59, 59)
+                
+                # Calculate gap
+                gap_days = (datetime.now() - end_date).days
+                
+                status[data_type] = {
+                    'start': start_date,
+                    'end': end_date,
+                    'gap_days': gap_days,
+                    'status': 'complete' if gap_days <= 0 else 'gap'
+                }
+                
+            except Exception as e:
+                print(f"Error checking {data_type}: {e}")
+                status[data_type] = {
+                    'status': 'error',
+                    'gap_days': 999,
+                    'start': None,
+                    'end': None,
+                    'error': str(e)
+                }
+        
+        return status
+    
     def get_available_date_range(self, timeframe: str = '15m') -> Dict[str, datetime]:
         """
         Get available date range across all sources
