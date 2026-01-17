@@ -617,6 +617,10 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _save_to_file(self, filename: str) -> bool:
         """Save strategy to file."""
         try:
+            # Check for strategy type mismatch before saving
+            if not self._check_strategy_type_match():
+                return False  # User cancelled save
+            
             # Update config name from UI before saving
             strategy_name = self.info_panel.get_strategy_name()
             if strategy_name:
@@ -755,6 +759,88 @@ class StrategyBuilderMainWindow(QMainWindow):
         window_state = settings.value("windowState")
         if window_state:
             self.restoreState(window_state)
+    
+    def _check_strategy_type_match(self) -> bool:
+        """
+        Check if strategy type matches signal direction.
+        
+        Returns:
+            True if user wants to proceed with save, False if cancelled
+        """
+        try:
+            config = self.orchestrator.get_current_config()
+            if not config or not config.blocks:
+                return True  # No blocks, nothing to check
+            
+            # Count bullish vs bearish signals
+            bullish_count = 0
+            bearish_count = 0
+            
+            for block in config.blocks:
+                for signal in block.signals:
+                    signal_name_upper = signal.name.upper()
+                    if 'BULLISH' in signal_name_upper or 'LONG' in signal_name_upper:
+                        bullish_count += 1
+                    elif 'BEARISH' in signal_name_upper or 'SHORT' in signal_name_upper:
+                        bearish_count += 1
+            
+            # Get current strategy type from UI
+            current_type = self.info_panel.get_strategy_type()
+            
+            # Check for mismatch
+            mismatch = False
+            suggested_type = None
+            
+            if current_type == "Bullish" and bearish_count > bullish_count:
+                mismatch = True
+                suggested_type = "Bearish"
+            elif current_type == "Bearish" and bullish_count > bearish_count:
+                mismatch = True
+                suggested_type = "Bullish"
+            
+            if not mismatch:
+                return True  # All good, proceed with save
+            
+            # Show warning dialog with fix option
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Warning)
+            msg.setWindowTitle("Strategy Type Mismatch")
+            msg.setText(
+                f"<b>Strategy Type Mismatch Detected</b><br><br>"
+                f"Current Strategy Type: <b>{current_type}</b><br>"
+                f"Signal Direction: <b>{suggested_type}</b> "
+                f"({bullish_count} bullish, {bearish_count} bearish)<br><br>"
+                f"Your strategy contains mostly {suggested_type.lower()} signals, "
+                f"but is configured as {current_type}."
+            )
+            msg.setInformativeText("Would you like to change the strategy type before saving?")
+            
+            # Add custom buttons
+            change_btn = msg.addButton(f"Change to {suggested_type}", QMessageBox.AcceptRole)
+            proceed_btn = msg.addButton("Save Anyway", QMessageBox.DestructiveRole)
+            cancel_btn = msg.addButton("Cancel", QMessageBox.RejectRole)
+            
+            msg.setDefaultButton(change_btn)
+            msg.exec_()
+            
+            clicked = msg.clickedButton()
+            
+            if clicked == change_btn:
+                # User wants to change strategy type
+                self.info_panel.set_strategy_type(suggested_type)
+                self._update_status(f"Strategy type changed to {suggested_type}")
+                return True  # Proceed with save
+            elif clicked == proceed_btn:
+                # User wants to save anyway
+                return True  # Proceed with save
+            else:
+                # User cancelled
+                return False  # Don't save
+            
+        except Exception as e:
+            # Don't block save on error, just log and proceed
+            print(f"Error checking strategy type match: {e}")
+            return True
     
     def _save_settings(self):
         """Save window geometry and state to settings."""
