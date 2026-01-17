@@ -91,6 +91,8 @@ class ValidationPanel(QWidget):
         
         # Header with Validate Now button
         header_layout = QHBoxLayout()
+        # Add right margin to align with scroll area content (account for scrollbar)
+        header_layout.setContentsMargins(0, 0, 20, 0)
         
         # Status label
         self.status_label = QLabel("Status: Not Validated")
