@@ -45,6 +45,9 @@ class TimingConstraintDialog(QDialog):
         """
         super().__init__(parent)
         
+        # Make dialog movable (not locked to parent window)
+        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+        
         self.block_name = block_name
         self.signal_name = signal_name
         self.available_references = available_references
@@ -130,20 +133,21 @@ class TimingConstraintDialog(QDialog):
             QCheckBox {
                 color: #E8EAED;
                 spacing: 8px;
+                background: transparent;
             }
             QCheckBox::indicator {
                 width: 18px;
                 height: 18px;
                 border: 2px solid #3C4149;
                 border-radius: 4px;
-                background-color: #2A2F3A;
+                background: transparent;
             }
             QCheckBox::indicator:checked {
-                background-color: #2070FF;
-                border-color: #2070FF;
+                background-color: #4ADE80;
+                border-color: #4ADE80;
             }
             QCheckBox::indicator:hover {
-                border-color: #4A5058;
+                border-color: #4ADE80;
             }
             QPushButton {
                 background-color: #2070FF;
