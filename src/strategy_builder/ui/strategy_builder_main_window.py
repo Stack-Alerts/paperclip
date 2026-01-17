@@ -347,6 +347,13 @@ class StrategyBuilderMainWindow(QMainWindow):
         generate_action.triggered.connect(self._on_generate_code)
         tools_menu.addAction(generate_action)
         
+        tools_menu.addSeparator()
+        
+        update_data_action = QAction(style.standardIcon(QStyle.SP_BrowserReload), "&Update Data...", self)
+        update_data_action.setStatusTip("Check for data gaps and update from Binance")
+        update_data_action.triggered.connect(self._on_update_data)
+        tools_menu.addAction(update_data_action)
+        
         # Help Menu
         help_menu = menu_bar.addMenu("&Help")
         
@@ -820,6 +827,16 @@ class StrategyBuilderMainWindow(QMainWindow):
                 "Options: Draft, Unpublished, Published"
             )
             self._update_status("Publish status management coming soon")
+    
+    def _on_update_data(self):
+        """Open the data update modal."""
+        try:
+            modal = DataUpdateModal(self)
+            modal.exec_()  # Show modal (blocks until closed)
+            self._update_status("Data update check complete")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error opening data update dialog: {str(e)}")
+            self._update_status("Data update check failed")
     
     def _on_about(self):
         """Show about dialog."""
