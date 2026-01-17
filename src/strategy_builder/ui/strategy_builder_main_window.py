@@ -485,12 +485,32 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_open_strategy(self):
         """Open an existing strategy."""
-        filename, _ = QFileDialog.getOpenFileName(
-            self,
-            "Open Strategy",
-            "",
-            "Strategy Files (*.json);;All Files (*)"
-        )
+        # Create custom dialog with larger size and persistence
+        dialog = QFileDialog(self, "Open Strategy", "", "Strategy Files (*.json);;All Files (*)")
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setAcceptMode(QFileDialog.AcceptOpen)
+        
+        # Set larger default size (800x600)
+        dialog.resize(800, 600)
+        
+        # Restore saved size if available
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        dialog_geometry = settings.value("openDialog/geometry")
+        if dialog_geometry:
+            dialog.restoreGeometry(dialog_geometry)
+        
+        # Execute dialog
+        if dialog.exec_() != QFileDialog.Accepted:
+            return
+        
+        # Save dialog geometry for next time
+        settings.setValue("openDialog/geometry", dialog.saveGeometry())
+        
+        files = dialog.selectedFiles()
+        if not files:
+            return
+        
+        filename = files[0]
         
         if filename:
             try:
@@ -525,19 +545,37 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_save_strategy_as(self) -> bool:
         """Save the strategy with a new filename."""
-        filename, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Strategy As",
-            "",
-            "Strategy Files (*.json);;All Files (*)"
-        )
+        # Create custom dialog with larger size and persistence
+        dialog = QFileDialog(self, "Save Strategy As", "", "Strategy Files (*.json);;All Files (*)")
+        dialog.setFileMode(QFileDialog.AnyFile)
+        dialog.setAcceptMode(QFileDialog.AcceptSave)
+        dialog.setDefaultSuffix("json")
         
-        if filename:
-            if not filename.endswith('.json'):
-                filename += '.json'
-            return self._save_to_file(filename)
+        # Set larger default size (800x600)
+        dialog.resize(800, 600)
         
-        return False
+        # Restore saved size if available
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        dialog_geometry = settings.value("saveDialog/geometry")
+        if dialog_geometry:
+            dialog.restoreGeometry(dialog_geometry)
+        
+        # Execute dialog
+        if dialog.exec_() != QFileDialog.Accepted:
+            return False
+        
+        # Save dialog geometry for next time
+        settings.setValue("saveDialog/geometry", dialog.saveGeometry())
+        
+        files = dialog.selectedFiles()
+        if not files:
+            return False
+        
+        filename = files[0]
+        if not filename.endswith('.json'):
+            filename += '.json'
+        
+        return self._save_to_file(filename)
     
     def _save_to_file(self, filename: str) -> bool:
         """Save strategy to file."""
