@@ -279,10 +279,48 @@ class StrategyInfoPanel(QWidget):
         try:
             config = self.orchestrator.get_current_config()
             
-            if config and hasattr(config, 'description') and config.description:
-                self.set_description(config.description)
-            elif config and hasattr(config, 'blocks') and config.blocks:
-                # Generate description from blocks
+            if not config or not config.blocks:
+                self.set_description("No blocks added yet...")
+                return
+            
+            # Use the backend's generate_description() method for intelligent description
+            if hasattr(self.orchestrator, 'config_engine') and hasattr(self.orchestrator.config_engine, 'generate_description'):
+                generated_desc = self.orchestrator.config_engine.generate_description()
+                
+                # Enhance with additional information
+                required_blocks = [b for b in config.blocks if b.logic == 'AND']
+                optional_blocks = [b for b in config.blocks if b.logic == 'OR']
+                
+                # Count total required signals
+                total_required_signals = 0
+                for block in required_blocks:
+                    total_required_signals += sum(1 for s in block.signals if s.logic == 'AND')
+                
+                # Build enhanced description
+                description_lines = []
+                description_lines.append(f"Strategy has {len(config.blocks)} block(s) ({len(required_blocks)} required, {len(optional_blocks)} optional).")
+                
+                if total_required_signals > 0:
+                    description_lines.append(f"Total required signals: {total_required_signals}.")
+                
+                description_lines.append("\n" + generated_desc)
+                
+                # Add timing constraint info if any
+                has_timing = False
+                for block in config.blocks:
+                    for signal in block.signals:
+                        if signal.timing_constraint:
+                            has_timing = True
+                            break
+                    if has_timing:
+                        break
+                
+                if has_timing:
+                    description_lines.append("\nIncludes timing constraints between signals.")
+                
+                self.set_description("\n".join(description_lines))
+            else:
+                # Fallback to simple description if backend method not available
                 description_parts = []
                 for block in config.blocks:
                     block_desc = f"- {block.name}"
@@ -296,8 +334,6 @@ class StrategyInfoPanel(QWidget):
                 if description_parts:
                     generated = "Strategy with:\n" + "\n".join(description_parts)
                     self.set_description(generated)
-            else:
-                self.set_description("No blocks added yet...")
         except Exception as e:
             # Gracefully handle any errors
             self.set_description(f"Error generating description: {str(e)}")

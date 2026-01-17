@@ -33,6 +33,7 @@ from src.strategy_builder.integration.strategy_builder_orchestrator import (
 from src.strategy_builder.ui.strategy_info_panel import StrategyInfoPanel
 from src.strategy_builder.ui.block_search_panel import BlockSearchPanel
 from src.strategy_builder.ui.strategy_blocks_panel import StrategyBlocksPanel
+from src.strategy_builder.ui.validation_panel import ValidationPanel
 
 # Import real block registry adapter
 try:
@@ -70,6 +71,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.info_panel: Optional[StrategyInfoPanel] = None
         self.search_panel: Optional[BlockSearchPanel] = None
         self.blocks_panel: Optional[StrategyBlocksPanel] = None
+        self.validation_panel: Optional[ValidationPanel] = None
         
         # Track current file
         self.current_file: Optional[str] = None
@@ -258,10 +260,12 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Create panels
         self.info_panel = StrategyInfoPanel(self.orchestrator)
         self.blocks_panel = StrategyBlocksPanel(self.orchestrator)
+        self.validation_panel = ValidationPanel(self.orchestrator)
         
         # Add to left layout
         left_layout.addWidget(self.info_panel)
-        left_layout.addWidget(self.blocks_panel, stretch=1)
+        left_layout.addWidget(self.blocks_panel, stretch=2)
+        left_layout.addWidget(self.validation_panel, stretch=1)
         left_widget.setLayout(left_layout)
         
         # Right side: Search panel
@@ -400,11 +404,17 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Block selection: Add to blocks panel
         self.search_panel.block_selected.connect(self._on_block_selected)
         
-        # Blocks changed: Refresh other panels
+        # Blocks changed: Refresh other panels and auto-validate
         self.blocks_panel.blocks_changed.connect(self._on_blocks_changed)
+        self.blocks_panel.blocks_changed.connect(lambda: self.validation_panel.auto_validate(True))
         
         # Strategy name changed: Update window title
         self.info_panel.strategy_name_changed.connect(self._on_strategy_name_changed)
+        
+        # Validation panel action buttons
+        self.validation_panel.save_requested.connect(self._on_save_strategy)
+        self.validation_panel.run_test_requested.connect(self._on_run_backtest)
+        self.validation_panel.generate_requested.connect(self._on_generate_code)
     
     def _on_block_selected(self, block_name: str):
         """Handle block selection from search panel."""
@@ -413,6 +423,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         # Refresh blocks panel to show newly added block
         self.blocks_panel.refresh_from_orchestrator()
+        
+        # Refresh info panel to update description and required signals
+        self.info_panel.refresh_from_orchestrator()
         
         # Mark as added in search panel
         self.search_panel.mark_block_as_added(block_name)
@@ -581,6 +594,16 @@ class StrategyBuilderMainWindow(QMainWindow):
                 self._update_status("Strategy validation failed")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error validating strategy: {str(e)}")
+    
+    def _on_run_backtest(self):
+        """Run backtest for the current strategy."""
+        QMessageBox.information(
+            self,
+            "Backtest",
+            "Backtest functionality will be available in the Backtest Configuration Panel.\n\n"
+            "Coming soon in Phase 2!"
+        )
+        self._update_status("Backtest panel coming soon")
     
     def _on_generate_code(self):
         """Generate NautilusTrader code from strategy."""

@@ -62,17 +62,42 @@ class ConfigValidators:
     """Validation utilities for strategy configuration"""
     
     @staticmethod
-    def validate_timing(signal: SignalConfig, block: BlockConfig) -> bool:
-        """Validate timing constraint references exist"""
+    def validate_timing(signal: SignalConfig, block: BlockConfig, config: StrategyConfig) -> bool:
+        """
+        Validate timing constraint references exist.
+        
+        Args:
+            signal: Signal with timing constraint
+            block: Block containing the signal
+            config: Full strategy configuration to check references
+            
+        Returns:
+            True if reference is valid
+        """
         if not signal.timing_constraint:
             return True
             
-        # Check if reference signal exists in block
         reference = signal.timing_constraint.reference
+        
+        # Special case: "any previous signal"
         if reference == "any previous signal":
             return True
+        
+        # Check for cross-block reference format: "block_name::signal_name"
+        if '::' in reference:
+            block_name, signal_name = reference.split('::', 1)
             
-        # Check if referenced signal exists
+            # Find referenced block
+            for ref_block in config.blocks:
+                if ref_block.name == block_name:
+                    # Find referenced signal in that block
+                    for ref_signal in ref_block.signals:
+                        if ref_signal.name == signal_name:
+                            return True
+            
+            return False
+        
+        # Check within same block (backward compatibility)
         for sig in block.signals:
             if sig.name in reference or reference in sig.name:
                 return True
@@ -319,7 +344,7 @@ class StrategyConfigEngine:
         for block in self.config.blocks:
             for signal in block.signals:
                 if signal.timing_constraint:
-                    if not self.validators.validate_timing(signal, block):
+                    if not self.validators.validate_timing(signal, block, self.config):
                         errors.append(
                             f"Invalid timing constraint on {block.name}.{signal.name}: "
                             f"reference '{signal.timing_constraint.reference}' not found"
