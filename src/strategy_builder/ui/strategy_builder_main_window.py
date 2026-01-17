@@ -490,6 +490,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         dialog.setFileMode(QFileDialog.ExistingFile)
         dialog.setAcceptMode(QFileDialog.AcceptOpen)
         
+        # CRITICAL: Use Qt's dialog instead of native dialog (native doesn't respect sizing)
+        dialog.setOptions(QFileDialog.DontUseNativeDialog)
+        
         # Set larger default size (800x600)
         dialog.resize(800, 600)
         
@@ -550,6 +553,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         dialog.setFileMode(QFileDialog.AnyFile)
         dialog.setAcceptMode(QFileDialog.AcceptSave)
         dialog.setDefaultSuffix("json")
+        
+        # CRITICAL: Use Qt's dialog instead of native dialog (native doesn't respect sizing)
+        dialog.setOptions(QFileDialog.DontUseNativeDialog)
         
         # Set larger default size (800x600)
         dialog.resize(800, 600)
