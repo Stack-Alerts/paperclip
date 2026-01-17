@@ -35,6 +35,7 @@ from src.strategy_builder.ui.block_search_panel import BlockSearchPanel
 from src.strategy_builder.ui.strategy_blocks_panel import StrategyBlocksPanel
 from src.strategy_builder.ui.validation_dialog import ValidationDialog
 from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
+from src.strategy_builder.ui.data_update_modal import DataUpdateModal
 
 # Import real block registry adapter
 try:
@@ -93,6 +94,10 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         # Restore window geometry from settings
         self._restore_settings()
+        
+        # Show data update modal on startup (after window is shown)
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(500, self._show_data_update_modal)
     
     def _init_ui(self):
         """Initialize the user interface layout."""
@@ -978,6 +983,16 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Don't block save on error, just log and proceed
             print(f"Error checking strategy type match: {e}")
             return True
+    
+    def _show_data_update_modal(self):
+        """Show the data update modal on startup."""
+        try:
+            modal = DataUpdateModal(self)
+            modal.exec_()  # Show modal (blocks until closed)
+        except Exception as e:
+            # Don't block app startup if modal fails
+            print(f"Warning: Data update modal failed: {e}")
+            self._update_status("Data update check skipped (error occurred)")
     
     def _save_settings(self):
         """Save window geometry and state to settings."""
