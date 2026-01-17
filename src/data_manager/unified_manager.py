@@ -330,19 +330,15 @@ class UnifiedDataManager:
         try:
             client = self._get_binance_client()
             
-            # Calculate hours to request
-            hours = int((end_date - start_date).total_seconds() / 3600)
-            
-            if hours > 720:  # More than 30 days
-                print(f"   ⚠️  Large range ({hours}h), using pagination...")
-                # Request in chunks (will be implemented in client)
-                hours = 720  # Limit to 30 days
+            # INSTITUTIONAL: DON'T use hours parameter!
+            # Just request maximum recent candles (limit=1500)
+            # Let Binance give us everything available, then we filter
             
             # Get klines from Binance Futures
             bars = client.get_klines(
                 interval=timeframe,
                 symbol='BTCUSDT',
-                hours=hours,
+                limit=1500,  # Maximum allowed by Binance
                 futures=True  # CRITICAL: Perpetual futures!
             )
             
