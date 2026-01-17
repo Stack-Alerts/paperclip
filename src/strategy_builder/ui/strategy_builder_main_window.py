@@ -23,9 +23,10 @@ from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QAction, QToolBar, QStatusBar, QFileDialog, QMessageBox
 )
-from PyQt5.QtCore import Qt, QSize, QSettings
+from PyQt5.QtCore import Qt, QSize, QSettings, QTimer
 from PyQt5.QtGui import QIcon, QKeySequence, QFont
 from PyQt5.QtWidgets import QApplication, QStyle
+from datetime import datetime, timedelta
 
 from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
@@ -78,6 +79,12 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.current_file: Optional[str] = None
         self.is_modified = False
         
+        # Auto-update timers
+        self.candle_check_timer: Optional[QTimer] = None
+        self.retry_timer: Optional[QTimer] = None
+        self.last_update_time: Optional[datetime] = None
+        self.retry_count = 0
+        
         # Setup UI
         self._init_ui()
         self._create_menu_bar()
@@ -98,6 +105,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Show data update modal on startup (after window is shown)
         from PyQt5.QtCore import QTimer
         QTimer.singleShot(500, self._show_data_update_modal)
+        
+        # Start automatic data update system (after modal shown)
+        QTimer.singleShot(1500, self._start_auto_update_system)
     
     def _init_ui(self):
         """Initialize the user interface layout."""
@@ -1010,6 +1020,105 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Don't block app startup if modal fails
             print(f"Warning: Data update modal failed: {e}")
             self._update_status("Data update check skipped (error occurred)")
+    
+    def _start_auto_update_system(self):
+        """
+        Start automatic data update system.
+        
+        Updates every 15 minutes:
+        - Checks 0.2s after candle close
+        - Retries every 2s until data is fresh
+        """
+        try:
+            # Calculate time until next candle close (15-min candles)
+            now = datetime.now()
+            
+            # Next 15-min boundary
+            minutes_to_next = 15 - (now.minute % 15)
+            seconds_to_next = (minutes_to_next * 60) - now.second
+            
+            # Add 0.2s delay after candle close
+            ms_until_check = (seconds_to_next * 1000) + 200
+            
+            # Schedule first check
+            QTimer.singleShot(ms_until_check, self._check_and_update_data)
+            
+            self._update_status(f"Auto-update system started - Next check in {seconds_to_next}s")
+            
+        except Exception as e:
+            print(f"Error starting auto-update system: {e}")
+    
+    def _check_and_update_data(self):
+        """
+        Check if data needs updating and update if necessary.
+        
+        Called 0.2s after each 15-min candle close.
+        Retries every 2s until data is fresh.
+        """
+        try:
+            self.retry_count = 0
+            self._update_status("Checking for data updates...")
+            
+            # Import unified manager
+            from src.data_manager.unified_manager import UnifiedDataManager
+            
+            # Check if we need updates (silent check)
+            manager = UnifiedDataManager()
+            gaps = manager.detect_gaps('15m', silent=True)
+            
+            if gaps and len(gaps) > 0:
+                # Data needs updating
+                self._update_status(f"Updating data: {len(gaps)} gap(s) detected...")
+                
+                # Download missing data
+                manager.download_missing_data('15m', gaps)
+                
+                self.last_update_time = datetime.now()
+                self._update_status(f"Data updated at {self.last_update_time.strftime('%H:%M:%S')}")
+                
+                # Schedule next check (in 15 minutes)
+                QTimer.singleShot(15 * 60 * 1000, self._schedule_next_check)
+                
+            else:
+                # No gaps, but check if data is actually fresh
+                # Retry every 2s for up to 10 retries (20 seconds total)
+                if self.retry_count < 10:
+                    self.retry_count += 1
+                    self._update_status(f"Waiting for fresh data... (retry {self.retry_count}/10)")
+                   
+                    # Retry in 2 seconds
+                    QTimer.singleShot(2000, self._check_and_update_data)
+                else:
+                    # Max retries reached, schedule next check
+                    self._update_status("Data check complete - Next check in 15 min")
+                    QTimer.singleShot(15 * 60 * 1000, self._schedule_next_check)
+            
+        except Exception as e:
+            print(f"Error checking/updating data: {e}")
+            self._update_status(f"Data update error: {str(e)}")
+            # Schedule next check anyway
+            QTimer.singleShot(15 * 60 * 1000, self._schedule_next_check)
+    
+    def _schedule_next_check(self):
+        """Schedule the next data check at 0.2s after next candle close."""
+        try:
+            # Calculate time until next 15-min candle close
+            now = datetime.now()
+            minutes_to_next = 15 - (now.minute % 15)
+            seconds_to_next = (minutes_to_next * 60) - now.second
+            
+            # Add 0.2s delay after candle close
+            ms_until_check = (seconds_to_next * 1000) + 200
+            
+            # Schedule check
+            QTimer.singleShot(ms_until_check, self._check_and_update_data)
+            
+            # Update status with countdown
+            next_check = now + timedelta(seconds=seconds_to_next)
+            self._update_status(f"Next data check at {next_check.strftime('%H:%M:%S')}")
+            
+        except Exception as e:
+            print(f"Error scheduling next check: {e}")
     
     def _save_settings(self):
         """Save window geometry and state to settings."""
