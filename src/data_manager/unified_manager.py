@@ -348,10 +348,11 @@ class UnifiedDataManager:
             
             # Filter to exact range
             bars['timestamp'] = pd.to_datetime(bars['timestamp'])
-            bars = bars[
-                (bars['timestamp'] >= start_date) &
-                (bars['timestamp'] <= end_date)
-            ].copy()
+            
+            # INSTITUTIONAL: Don't filter by end_date too strictly!
+            # Binance returns ALL available candles including current forming one
+            # We want everything >= start_date (don't cut off recent data)
+            bars = bars[bars['timestamp'] >= start_date].copy()
             
             print(f"   ✅ Binance: {len(bars)} bars loaded")
             return bars
