@@ -98,25 +98,14 @@ class ValidationDialog(QDialog):
         self.setLayout(layout)
     
     def _connect_signals(self):
-        """Connect signals from validation panel to dialog."""
-        # When save/generate/test buttons clicked, keep dialog open but signal parent
-        self.validation_panel.save_requested.connect(self._on_save_requested)
-        self.validation_panel.generate_requested.connect(self._on_generate_requested)
-        self.validation_panel.run_test_requested.connect(self._on_run_test_requested)
-    
-    def _on_save_requested(self):
-        """Handle save request - close dialog and let parent handle it."""
-        # Don't close dialog - user might want to see validation results
-        pass
-    
-    def _on_generate_requested(self):
-        """Handle generate request - close dialog and let parent handle it."""
-        # Don't close dialog - user might want to see validation results
-        pass
-    
-    def _on_run_test_requested(self):
-        """Handle test request - close dialog and let parent handle it."""
-        # Don't close dialog - user might want to see validation results
+        """
+        Connect signals from validation panel to dialog.
+        
+        Note: The actual action button signals (save/generate/test) are connected
+        directly in the main window when the dialog is created, so we don't 
+        handle them here.
+        """
+        # No internal signal handling needed - parent handles all actions
         pass
     
     def showEvent(self, event):
