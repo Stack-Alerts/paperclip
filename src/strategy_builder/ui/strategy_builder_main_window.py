@@ -34,6 +34,7 @@ from src.strategy_builder.ui.strategy_info_panel import StrategyInfoPanel
 from src.strategy_builder.ui.block_search_panel import BlockSearchPanel
 from src.strategy_builder.ui.strategy_blocks_panel import StrategyBlocksPanel
 from src.strategy_builder.ui.validation_panel import ValidationPanel
+from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
 
 # Import real block registry adapter
 try:
@@ -383,17 +384,10 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         toolbar.addSeparator()
         
-        # Validate
-        validate_action = QAction(style.standardIcon(QStyle.SP_DialogApplyButton), "Validate", self)
-        validate_action.setStatusTip("Validate strategy")
-        validate_action.triggered.connect(self._on_validate)
-        toolbar.addAction(validate_action)
-        
-        # Generate Code
-        generate_action = QAction(style.standardIcon(QStyle.SP_FileDialogDetailedView), "Generate", self)
-        generate_action.setStatusTip("Generate code")
-        generate_action.triggered.connect(self._on_generate_code)
-        toolbar.addAction(generate_action)
+        # Create and add stepper ribbon widget to toolbar
+        self.stepper = StepperRibbon(self)
+        self.stepper.step_clicked.connect(self._on_step_clicked)
+        toolbar.addWidget(self.stepper)
     
     def _create_status_bar(self):
         """Create the status bar."""
@@ -716,6 +710,60 @@ class StrategyBuilderMainWindow(QMainWindow):
                 )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error generating code: {str(e)}")
+    
+    def _on_step_clicked(self, step: int):
+        """
+        Handle stepper ribbon step click.
+        
+        Step 0: Design - Always active
+        Step 1: Validate - Opens validation dialog
+        Step 2: Generate - Generates code
+        Step 3: Test - Opens backtest
+        Step 4: Publish - Sets status
+        """
+        if step == 0:
+            # Design step - just highlight it
+            self.stepper.set_current_step(0)
+            self._update_status("Design your strategy by adding blocks")
+        
+        elif step == 1:
+            # Validate step - run validation
+            self.stepper.set_current_step(1)
+            self._on_validate()
+            # If validation successful, mark as complete
+            result = self.orchestrator.validate_strategy()
+            if result.success:
+                self.stepper.mark_step_complete(1)
+            else:
+                self.stepper.mark_step_error(1)
+        
+        elif step == 2:
+            # Generate step - generate code
+            self.stepper.set_current_step(2)
+            self._on_generate_code()
+            # Mark as complete after generation
+            result = self.orchestrator.generate_code()
+            if result.success:
+                self.stepper.mark_step_complete(2)
+            else:
+                self.stepper.mark_step_error(2)
+        
+        elif step == 3:
+            # Test step - run backtest
+            self.stepper.set_current_step(3)
+            self._on_run_backtest()
+            # TODO: Mark complete when backtest runs successfully
+        
+        elif step == 4:
+            # Publish step - set status
+            self.stepper.set_current_step(4)
+            QMessageBox.information(
+                self,
+                "Publish Status",
+                "Publish status management coming soon!\n\n"
+                "Options: Draft, Unpublished, Published"
+            )
+            self._update_status("Publish status management coming soon")
     
     def _on_about(self):
         """Show about dialog."""
