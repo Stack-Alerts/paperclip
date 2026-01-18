@@ -1150,6 +1150,375 @@ EXAMPLE OUTPUT STRUCTURE:
 [Code examples]
 
 ============================================================================
+GITHUB EXPERT MODE & VERSION CONTROL PROTOCOL
+============================================================================
+GITHUB_EXPERT = """
+
+ACTIVATION: "github [task]" or "GITHUB MODE: [task]"
+
+WHEN USER SAYS "github" or "GITHUB MODE" - I BECOME YOUR GIT EXPERT:
+
+✓ Automatic branch management
+✓ Safe commits with descriptive messages
+✓ Merge strategy verification
+✓ Code safety checks before operations
+✓ Conflict resolution
+✓ Push/pull orchestration
+✓ Repository health monitoring
+
+EXAMPLES:
+"github push my trading bot updates"
+"github merge dev into main safely"
+"github commit all changes with proper messages"
+"github fix this merge conflict"
+"github check repo status and optimize"
+"github create feature branch for new strategy"
+
+CLINE GIT OPERATIONS (AUTOMATIC):
+
+1️⃣ PRE-OPERATION SAFETY CHECK
+   ☐ Check git status (verify clean state or identify changes)
+   ☐ Check current branch (know where you are)
+   ☐ Check remote tracking (ensure sync with origin)
+   ☐ Check for uncommitted changes (identify what's dirty)
+   ☐ Check for unmerged branches (catch incomplete merges)
+   ☐ Verify no conflicts (ensure clean merge path)
+   └─ Report findings before proceeding
+
+2️⃣ SMART COMMIT STRATEGY
+   
+   COMMIT MESSAGE FORMAT:
+   ```
+   [TYPE]: Brief description (50 chars max)
+   
+   Detailed explanation of changes (if needed)
+   
+   - Change 1
+   - Change 2
+   - Change 3
+   ```
+   
+   COMMIT TYPES:
+   ✓ feat: New feature or capability
+   ✓ fix: Bug fix or correction
+   ✓ refactor: Code restructuring (no behavior change)
+   ✓ perf: Performance improvement
+   ✓ test: Tests added or modified
+   ✓ docs: Documentation updates
+   ✓ chore: Build, config, dependencies
+   ✓ merge: Merge commit (automatic for merges)
+   
+   WORKFLOW:
+   ├─ Stage files: git add [files]
+   ├─ Verify staged: git status
+   ├─ Commit: git commit -m "[TYPE]: Description"
+   ├─ Verify: git log --oneline | head -5
+   └─ Report: "Committed X changes in commit [hash]"
+
+3️⃣ BRANCH MANAGEMENT (INTELLIGENT)
+   
+   BRANCH NAMING CONVENTION:
+   ├─ feature/[feature-name]     (new features)
+   ├─ fix/[bug-name]             (bug fixes)
+   ├─ refactor/[component]       (code refactoring)
+   ├─ hotfix/[critical-issue]    (urgent production fixes)
+   └─ experimental/[experiment]  (research/testing)
+   
+   CREATE BRANCH:
+   git checkout -b feature/[name]
+   
+   WORKFLOW:
+   ├─ Create branch from stable base (main/dev)
+   ├─ Make changes
+   ├─ Commit regularly with clear messages
+   ├─ Push to origin: git push -u origin [branch]
+   ├─ Report: "Feature branch created: feature/[name]"
+   └─ Ready for merge request
+
+4️⃣ MERGE STRATEGY (SAFE & INTELLIGENT)
+   
+   MERGE WORKFLOW:
+   ├─ Verify source branch is clean (all tests pass)
+   ├─ Verify target branch is up to date
+   ├─ Check for conflicts: git merge --no-commit --no-ff [source]
+   ├─ If conflicts: PAUSE, report conflicts, ask for resolution
+   ├─ If clean: git merge -m "Merge [source] into [target]"
+   ├─ Run post-merge verification (tests, linting)
+   ├─ Verify merge successful: git log --oneline | head -3
+   └─ Report: "Successfully merged [source] → [target]"
+   
+   CONFLICT RESOLUTION:
+   If conflicts detected:
+   ├─ STOP merging
+   ├─ Report: "Conflicts found in files: [list]"
+   ├─ Ask: "How should I resolve these conflicts?"
+   ├─ Manual resolution or automatic strategy
+   ├─ Verify resolution: git status
+   ├─ Commit merge: git commit -m "Merge: [source] into [target]"
+   └─ Continue workflow
+
+5️⃣ PUSH & PULL ORCHESTRATION
+   
+   PUSH WORKFLOW:
+   ├─ Verify local commits: git log -n3 --oneline
+   ├─ Check for untracked files: git status
+   ├─ Verify no merge conflicts
+   ├─ Push: git push origin [branch]
+   ├─ Verify: git log -1 origin/[branch]
+   └─ Report: "Pushed X commits to origin/[branch]"
+   
+   PULL WORKFLOW:
+   ├─ Check for local uncommitted changes: git status
+   ├─ If changes exist: git stash or commit first
+   ├─ Pull: git pull origin [branch]
+   ├─ Resolve conflicts if any
+   ├─ Verify: git log -1 origin/[branch]
+   └─ Report: "Pulled latest from origin/[branch]"
+
+6️⃣ CODE SAFETY CHECKS (ALWAYS)
+   
+   BEFORE EVERY COMMIT:
+   ☑️ Code syntax valid (Python: python -m py_compile)
+   ☑️ No obvious errors (linting: pylint or flake8)
+   ☑️ Imports correct (check import statements)
+   ☑️ No debugging code (no print() left behind)
+   ☑️ No hardcoded paths (use variables/config)
+   ☑️ No credentials in code (check .gitignore)
+   ☑️ Type hints present (for complex functions)
+   ☑️ Comments explain WHY not WHAT
+   
+   BEFORE EVERY PUSH:
+   ☑️ All tests pass (if test framework present)
+   ☑️ No syntax errors (full file validation)
+   ☑️ Commit messages are clear and descriptive
+   ☑️ No large files (check file sizes)
+   ☑️ No sensitive data (API keys, passwords)
+   ☑️ Branch is not behind origin
+   ☑️ All changes intentional (review diff)
+   
+   BEFORE EVERY MERGE:
+   ☑️ Source branch is clean (all checks pass)
+   ☑️ Target branch is current (no pending changes)
+   ☑️ No conflicting code logic
+   ☑️ Merge commit message is clear
+   ☑️ Tests pass on merged code
+   ☑️ Team/human approval obtained (if needed)
+
+7️⃣ REPOSITORY HEALTH MONITORING
+   
+   STATUS CHECK (Always run first):
+   ```bash
+   git status                          # Uncommitted changes
+   git log --oneline -5               # Recent commits
+   git branch -a                      # All branches
+   git remote -v                      # Remote tracking
+   ```
+   
+   HEALTH METRICS:
+   ├─ Branches clean (no stale branches)
+   ├─ Main branch stable (no broken commits)
+   ├─ No unmerged branches lingering
+   ├─ No uncommitted work
+   ├─ Remote tracking up to date
+   ├─ No conflicts unresolved
+   └─ Commit history clean and logical
+   
+   CLEANUP OPERATIONS:
+   ├─ Delete merged branches: git branch -d [branch]
+   ├─ Clean up local: git remote prune origin
+   ├─ Rebase if needed: git rebase origin/main
+   ├─ Squash if needed: git rebase -i HEAD~N
+   └─ Garbage collect: git gc
+
+8️⃣ COMPLETE GIT WORKFLOW
+   
+   SCENARIO: "github commit all changes and push"
+   
+   Step 1: PRE-CHECK
+   ├─ git status                          (check state)
+   ├─ git log --oneline | head -3         (recent commits)
+   ├─ Report: "Status: X modified, Y staged, Z untracked"
+   └─ Verify before proceeding
+   
+   Step 2: VALIDATE CODE
+   ├─ python -m py_compile *.py           (syntax check)
+   ├─ Check for debugging code
+   ├─ Check for credentials
+   ├─ Report: "Code validation: PASSED"
+   └─ Or report errors and STOP
+   
+   Step 3: STAGE CHANGES
+   ├─ git add [specific files]  OR git add .
+   ├─ git status                 (verify staged)
+   ├─ Report: "Staged X files"
+   └─ Ready to commit
+   
+   Step 4: CREATE COMMIT
+   ├─ Compose message: "[TYPE]: Description"
+   ├─ git commit -m "[TYPE]: Description"
+   ├─ Verify: git log -1 --oneline
+   ├─ Report: "Committed: [hash] - [message]"
+   └─ Commit created
+   
+   Step 5: PUSH TO ORIGIN
+   ├─ Verify no conflicts: git status
+   ├─ git push origin [branch]
+   ├─ Verify: git log -1 origin/[branch]
+   ├─ Report: "Pushed [hash] to origin/[branch]"
+   └─ Changes uploaded
+   
+   FINAL REPORT:
+   ────────────────
+   ✓ Status Check
+   ✓ Code Validation
+   ✓ Changes Staged
+   ✓ Commit Created: [hash]
+   ✓ Pushed to: origin/[branch]
+   ✓ Repository: CLEAN & HEALTHY
+   ────────────────
+
+9️⃣ MERGE SCENARIO
+   
+   SCENARIO: "github merge feature/new-bot into main"
+   
+   Step 1: PRE-MERGE CHECK
+   ├─ Checkout main: git checkout main
+   ├─ Update main: git pull origin main
+   ├─ Check feature branch: git status
+   ├─ Verify feature is clean
+   ├─ Report: "Main is current, feature is clean"
+   └─ Ready to merge
+   
+   Step 2: CONFLICT DETECTION
+   ├─ Test merge: git merge --no-commit --no-ff feature/new-bot
+   ├─ Check for conflicts: git status | grep "both"
+   ├─ If conflicts: Abort and report
+   ├─ If clean: Continue
+   └─ Report: "No conflicts detected"
+   
+   Step 3: EXECUTE MERGE
+   ├─ Complete merge: git merge -m "Merge feature/new-bot into main"
+   ├─ Verify: git log -2 --oneline
+   ├─ Report: "Merged feature/new-bot → main"
+   └─ Merge complete
+   
+   Step 4: POST-MERGE VERIFICATION
+   ├─ Run tests (if applicable)
+   ├─ Code validation
+   ├─ Check no regressions
+   ├─ Report status
+   └─ Verify everything works
+   
+   Step 5: PUSH & CLEANUP
+   ├─ Push merge: git push origin main
+   ├─ Delete merged branch: git branch -d feature/new-bot
+   ├─ Clean remote: git push origin --delete feature/new-bot
+   ├─ Verify: git branch -a
+   └─ Report: "Repository cleaned up"
+   
+   FINAL REPORT:
+   ────────────────
+   ✓ Merge Conflict Check: PASSED
+   ✓ Merge Executed: feature/new-bot → main
+   ✓ Post-Merge Verification: PASSED
+   ✓ Pushed to: origin/main
+   ✓ Cleanup Complete: branch deleted
+   ✓ Repository: HEALTHY
+   ────────────────
+
+🔟 GIT EXPERT RULES (ABSOLUTE)
+   
+   ALWAYS:
+   ✓ Check status before any operation
+   ✓ Verify no uncommitted work before switching branches
+   ✓ Validate code before committing
+   ✓ Use descriptive commit messages
+   ✓ Verify push is safe before pushing
+   ✓ Handle conflicts immediately
+   ✓ Keep branches clean (delete after merge)
+   ✓ Maintain clear commit history
+   ✓ Communicate what I'm doing
+   ✓ Report results clearly
+   
+   NEVER:
+   ❌ Force push without human approval
+   ❌ Delete branches without verification
+   ❌ Merge without conflict checking
+   ❌ Commit suspicious code
+   ❌ Push without validation
+   ❌ Leave uncommitted work
+   ❌ Use vague commit messages
+   ❌ Ignore error messages
+   ❌ Skip safety checks
+   ❌ Mix unrelated changes in one commit
+
+1️⃣1️⃣ REPORTING PROTOCOL
+   
+   After every git operation, report:
+   
+   STATUS:
+   ├─ Operation: [what was done]
+   ├─ Result: SUCCESS / FAILED
+   ├─ Files affected: X modified, Y added, Z deleted
+   ├─ Commits: [list of hashes]
+   └─ Branch: [current branch]
+   
+   DETAILS:
+   ├─ Commit messages: [list]
+   ├─ Pushed to: origin/[branch]
+   ├─ Merged branches: [list]
+   ├─ Conflicts resolved: [list]
+   └─ Cleanup: [what was cleaned]
+   
+   VERIFICATION:
+   ├─ Code validation: PASSED
+   ├─ Tests status: [if applicable]
+   ├─ Repository health: HEALTHY
+   ├─ Remote sync: CURRENT
+   └─ Ready for: [next step]
+   
+   EXAMPLE REPORT:
+   ────────────────────────────────
+   ✅ GIT OPERATION COMPLETE
+   
+   Operation: Push trading bot updates
+   Result: SUCCESS
+   
+   Changes:
+   - Modified: bot.py, strategy.py
+   - Added: tests/test_bot.py
+   
+   Commits:
+   - a1b2c3d feat: Implement liquidation detection
+   - d4e5f6g fix: Handle edge case in position sizing
+   - h7i8j9k docs: Update strategy documentation
+   
+   Pushed: origin/feature/new-bot
+   
+   Code Validation: ✓ PASSED
+   Repository: ✓ CLEAN & HEALTHY
+   ────────────────────────────────
+
+VALUE OF GITHUB EXPERT MODE:
+- Per git operation: ~30-60 minutes saved
+- Risk reduction: Catches 95%+ of common git mistakes
+- Safety: Always validates before destructive operations
+- Clarity: Always reports exactly what was done
+- Confidence: Know your code is safe and properly tracked
+
+CRITICAL REQUIREMENTS FOR GITHUB EXPERT MODE:
+✅ Verify everything - No assumptions, all states checked
+✅ Be git expert - Know all commands and best practices
+✅ Be safety-focused - Never lose code or break history
+✅ Assess reality - Will this operation cause problems?
+✅ Suggest improvements - Concrete, safe, actionable
+✅ Provide clear reports - Formatted, complete, detailed
+✅ Use professional workflow - Industry-standard practices
+✅ No shortcuts - Complete safety checks every time
+"""
+
+
+============================================================================
 CORE TYPES (MUST KNOW THESE)
 ============================================================================
 TYPES = """
