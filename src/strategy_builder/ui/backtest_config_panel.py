@@ -213,22 +213,7 @@ class BacktestConfigPanel(QWidget):
     def _create_config_group(self) -> QGroupBox:
         """Create configuration controls group - 3-column layout with proper proportions"""
         group = QGroupBox("Configuration")
-        group.setStyleSheet("""
-            QGroupBox {
-                color: #9AA0A6;
-                font-weight: bold;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                color: #9AA0A6;
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
+        group.setStyleSheet(get_groupbox_header_stylesheet())
         main_layout = QHBoxLayout()
         main_layout.setSpacing(20)
         
@@ -259,22 +244,7 @@ class BacktestConfigPanel(QWidget):
     def _create_basic_settings_column(self) -> QGroupBox:
         """Create Basic Settings column"""
         group = QGroupBox("Basic Settings")
-        group.setStyleSheet("""
-            QGroupBox {
-                color: #9AA0A6;
-                font-weight: bold;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                color: #9AA0A6;
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
+        group.setStyleSheet(get_groupbox_header_stylesheet())
         layout = QVBoxLayout()
         layout.setSpacing(12)
         
@@ -533,22 +503,7 @@ class BacktestConfigPanel(QWidget):
     def _create_adaptive_sl_column(self) -> QGroupBox:
         """Create Adaptive SL v2.0 column"""
         group = QGroupBox("Adaptive SL v2.0")
-        group.setStyleSheet("""
-            QGroupBox {
-                color: #9AA0A6;
-                font-weight: bold;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                color: #9AA0A6;
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
+        group.setStyleSheet(get_groupbox_header_stylesheet())
         layout = QVBoxLayout()
         layout.setSpacing(12)
         
@@ -849,22 +804,7 @@ class BacktestConfigPanel(QWidget):
     def _create_risk_reward_column(self) -> QGroupBox:
         """Create Risk/Reward column"""
         group = QGroupBox("Risk/Reward")
-        group.setStyleSheet("""
-            QGroupBox {
-                color: #9AA0A6;
-                font-weight: bold;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                color: #9AA0A6;
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
+        group.setStyleSheet(get_groupbox_header_stylesheet())
         layout = QVBoxLayout()
         layout.setSpacing(12)
         
@@ -1024,22 +964,7 @@ class BacktestConfigPanel(QWidget):
     def _create_progress_group(self) -> QGroupBox:
         """Create progress monitoring group - COMPACT INLINE DESIGN"""
         group = QGroupBox("Progress")
-        group.setStyleSheet("""
-            QGroupBox {
-                color: #9AA0A6;
-                font-weight: bold;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                color: #9AA0A6;
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
+        group.setStyleSheet(get_groupbox_header_stylesheet())
         layout = QVBoxLayout()
         layout.setSpacing(8)
         
