@@ -1107,29 +1107,30 @@ class BacktestConfigPanel(QWidget):
         
         # Candles (inline)
         candles_widget = QLabel("Candles: <b>0 / 0</b>")
-        candles_widget.setStyleSheet("color: #E8EAED;")
+        from src.strategy_builder.ui.styles import get_color
+        candles_widget.setStyleSheet(f"color: {get_color('text_primary')};")
         self.candles_label = candles_widget  # Store reference
         stats_line.addWidget(candles_widget)
         
         # Separator
         sep1 = QLabel("|")
-        sep1.setStyleSheet("color: #3C4149;")
+        sep1.setStyleSheet(f"color: {get_color('border')};")
         stats_line.addWidget(sep1)
         
         # Trades (inline)
         trades_widget = QLabel("Trades: <b>0</b>")
-        trades_widget.setStyleSheet("color: #E8EAED;")
+        trades_widget.setStyleSheet(f"color: {get_color('text_primary')};")
         self.trades_label = trades_widget  # Store reference
         stats_line.addWidget(trades_widget)
         
         # Separator
         sep2 = QLabel("|")
-        sep2.setStyleSheet("color: #3C4149;")
+        sep2.setStyleSheet(f"color: {get_color('border')};")
         stats_line.addWidget(sep2)
         
         # TP/SL Adjustments (inline with breakdown)
         adj_widget = QLabel("TP/SL Adjustments: <b>0</b> <span style='color: #9AA0A6;'>(TP1: 0, TP2: 0, TP3: 0, SL: 0)</span>")
-        adj_widget.setStyleSheet("color: #E8EAED;")
+        adj_widget.setStyleSheet(f"color: {get_color('text_primary')};")
         self.adjustments_label = adj_widget  # Store reference
         self.breakdown_label = adj_widget  # Same widget contains breakdown
         stats_line.addWidget(adj_widget)
