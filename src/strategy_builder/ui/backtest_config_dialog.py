@@ -28,8 +28,10 @@ class BacktestConfigDialog(QDialog):
     def _init_ui(self):
         """Initialize the dialog UI"""
         self.setWindowTitle("Backtest Configuration")
-        self.setModal(False)  # Non-modal so user can see strategy while configuring
-        self.setMinimumSize(700, 600)
+        self.setModal(False)  # Non-modal so user can see strategy
+        
+        # Start fullscreen (like old Universal Optimizer)
+        self.showMaximized()
         
         # Layout
         layout = QVBoxLayout()
