@@ -35,7 +35,7 @@ MAIN_STYLESHEET = """
         left: 12px;
         padding: 0 5px;
         color: #095983;
-        font-size: 14pt;
+        font-size: 12pt !important;
         font-weight: bold;
     }
     QLineEdit {
@@ -576,7 +576,7 @@ def get_panel_title_stylesheet() -> str:
     """Get stylesheet for panel titles (matches main window 'Strategy Information' style)."""
     return f"""
         color: #095983;
-        font-size: 14pt;
+        font-size: 12pt;
         font-weight: bold;
     """
 
