@@ -26,6 +26,12 @@ from src.strategy_builder.integration.strategy_builder_orchestrator import (
 )
 from src.strategy_builder.core.registry_interface import BlockInfo, SearchFilters
 
+# Import centralized styles
+from src.strategy_builder.ui.styles import (
+    get_label_style, get_expand_button_style, get_add_button_style,
+    get_checkbox_style, get_success_button_stylesheet
+)
+
 # Import institutional logger
 try:
     from src.strategy_builder.utils import logger, LogComponent
@@ -90,7 +96,7 @@ class BlockListItem(QWidget):
         name_font.setBold(True)
         name_font.setPointSize(12)
         name_label.setFont(name_font)
-        name_label.setStyleSheet("color: #A0AEC0;")  # Text Primary (muted, matches dark UI)
+        name_label.setStyleSheet(get_label_style('default'))
         info_layout.addWidget(name_label)
         
         # Category and Type
