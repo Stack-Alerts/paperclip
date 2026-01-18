@@ -663,7 +663,7 @@ class BlockSearchPanel(QWidget):
             
             # Show error state
             error_label = QLabel(f"Error loading blocks: {str(e)}")
-            error_label.setStyleSheet("color: #ff0000; font-size: 11pt; padding: 20px;")
+            error_label.setStyleSheet(get_label_style('error') + " font-size: 11pt; padding: 20px;")
             error_label.setWordWrap(True)
             self.blocks_layout.addWidget(error_label)
     
