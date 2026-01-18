@@ -138,12 +138,14 @@ class StrategyInfoPanel(QWidget):
         meta_layout.addWidget(type_label)
         
         self.bullish_radio = QRadioButton("Bullish")
+        self.bullish_radio.setFont(content_font)
         self.bullish_radio.setStyleSheet(get_radio_button_style('bullish'))
         self.bullish_radio.setToolTip("Strategy designed for uptrending markets")
         self.bullish_radio.setChecked(True)
         meta_layout.addWidget(self.bullish_radio)
         
         self.bearish_radio = QRadioButton("Bearish")
+        self.bearish_radio.setFont(content_font)
         self.bearish_radio.setStyleSheet(get_radio_button_style('bearish'))
         self.bearish_radio.setToolTip("Strategy designed for downtrending markets")
         meta_layout.addWidget(self.bearish_radio)
