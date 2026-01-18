@@ -116,7 +116,7 @@ class BacktestConfigPanel(QWidget):
             }
             QTabBar::tab {
                 background: #374151;
-                color: #9CA3AF;
+                color: #E8EAED;
                 padding: 15px 30px;
                 margin-right: 4px;
                 margin-top: 8px;
@@ -132,7 +132,7 @@ class BacktestConfigPanel(QWidget):
             }
             QTabBar::tab:hover:!selected {
                 background: #4B5563;
-                color: #D1D5DB;
+                color: #FFFFFF;
             }
         """)
         
