@@ -30,6 +30,14 @@ class BacktestConfigDialog(QDialog):
         self.setWindowTitle("Backtest Configuration")
         self.setModal(False)  # Non-modal so user can see strategy
         
+        # Set window flags to enable maximize/minimize/close buttons
+        self.setWindowFlags(
+            Qt.Window |
+            Qt.WindowMaximizeButtonHint |
+            Qt.WindowMinimizeButtonHint |
+            Qt.WindowCloseButtonHint
+        )
+        
         # Start fullscreen (like old Universal Optimizer)
         self.showMaximized()
         
