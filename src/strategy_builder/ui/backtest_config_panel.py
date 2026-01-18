@@ -446,7 +446,7 @@ class BacktestConfigPanel(QWidget):
         
         # Separator above Mode
         sep_top = QLabel()
-        sep_top.setStyleSheet("background-color: #3C4149; max-height: 1px; margin: 10px 0;")
+        sep_top.setStyleSheet(get_separator_stylesheet())
         sep_top.setFixedHeight(1)
         layout.addWidget(sep_top)
         
@@ -500,7 +500,7 @@ class BacktestConfigPanel(QWidget):
         
         # Separator below Mode
         sep_bottom = QLabel()
-        sep_bottom.setStyleSheet("background-color: #3C4149; max-height: 1px; margin: 10px 0;")
+        sep_bottom.setStyleSheet(get_separator_stylesheet())
         sep_bottom.setFixedHeight(1)
         layout.addWidget(sep_bottom)
         
@@ -680,7 +680,7 @@ class BacktestConfigPanel(QWidget):
         
         # Separator above checkboxes
         sep_top = QLabel()
-        sep_top.setStyleSheet("background-color: #3C4149; max-height: 1px; margin: 10px 0;")
+        sep_top.setStyleSheet(get_separator_stylesheet())
         sep_top.setFixedHeight(1)
         layout.addWidget(sep_top)
         
@@ -731,7 +731,7 @@ class BacktestConfigPanel(QWidget):
         
         # Separator below checkboxes
         sep_bottom = QLabel()
-        sep_bottom.setStyleSheet("background-color: #3C4149; max-height: 1px; margin: 10px 0;")
+        sep_bottom.setStyleSheet(get_separator_stylesheet())
         sep_bottom.setFixedHeight(1)
         layout.addWidget(sep_bottom)
         

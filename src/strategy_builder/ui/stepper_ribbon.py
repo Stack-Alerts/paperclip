@@ -87,7 +87,8 @@ class StepperRibbon(QWidget):
                 arrow_font.setPointSize(12)
                 arrow_font.setBold(True)
                 arrow.setFont(arrow_font)
-                arrow.setStyleSheet("color: #4A5568; background: transparent;")
+                from src.strategy_builder.ui.styles import get_color
+                arrow.setStyleSheet(f"color: {get_color('text_muted')}; background: transparent;")
                 self.arrow_labels.append(arrow)
                 layout.addWidget(arrow)
         
