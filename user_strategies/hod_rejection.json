@@ -2,6 +2,8 @@
   "name": "HOD Rejection",
   "description": "Strategy: New_Strategy",
   "strategy_type": "Bearish",
+  "validation_status": "passed",
+  "generation_status": "success",
   "blocks": [
     {
       "name": "hod",

@@ -738,6 +738,11 @@ class StrategyBuilderMainWindow(QMainWindow):
                 self.orchestrator.config_engine.config.validation_status = 'passed'
                 self.stepper.mark_step_complete(1)
                 self._update_status("Strategy validated successfully")
+                
+                # AUTO-SAVE after validation (if file exists)
+                if self.current_file:
+                    self._save_to_file(self.current_file)
+                    print("DEBUG: Auto-saved after validation")
             else:
                 self.validation_passed = False
                 # Clear validation status on error
@@ -760,6 +765,11 @@ class StrategyBuilderMainWindow(QMainWindow):
                 # IMMEDIATELY set status on config so it persists on save
                 self.orchestrator.config_engine.config.generation_status = 'success'
                 self.stepper.mark_step_complete(2)
+                
+                # AUTO-SAVE after generation (if file exists)
+                if self.current_file:
+                    self._save_to_file(self.current_file)
+                    print("DEBUG: Auto-saved after generation")
             else:
                 self.code_generated = False
                 # Clear generation status on error
