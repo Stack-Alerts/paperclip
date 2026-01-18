@@ -73,6 +73,12 @@ class StrategyInfoPanel(QWidget):
         # Group box for all strategy info
         group_box = QGroupBox("📋 Strategy Information")
         
+        # Set title font programmatically (CSS doesn't work for QGroupBox::title)
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        group_box.setFont(title_font)
+        
         group_layout = QVBoxLayout()
         group_layout.setSpacing(20)  # Match backtest panel spacing
         group_layout.setContentsMargins(15, 20, 15, 15)  # Add internal padding

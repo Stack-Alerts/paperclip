@@ -440,6 +440,12 @@ class BlockSearchPanel(QWidget):
         # Group box
         group_box = QGroupBox("📦 Available Building Blocks")
         
+        # Set title font programmatically (CSS doesn't work for QGroupBox::title)
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        group_box.setFont(title_font)
+        
         group_layout = QVBoxLayout()
         group_layout.setSpacing(15)
         group_layout.setContentsMargins(15, 20, 15, 15)  # Match backtest panel padding
