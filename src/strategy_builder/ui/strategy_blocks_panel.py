@@ -209,22 +209,7 @@ class BlockConfigItem(QWidget):
                 if idx > 1:
                     configure_btn = QPushButton("⚙️ Configure")
                     configure_btn.setMaximumWidth(90)
-                    configure_btn.setStyleSheet("""
-                        QPushButton {
-                            background-color: #204486;
-                            color: white;
-                            font-weight: bold;
-                            font-size: 8pt;
-                            padding: 4px 8px;
-                            border-radius: 4px;
-                        }
-                        QPushButton:hover {
-                            background-color: #1A3A70;
-                        }
-                        QPushButton:pressed {
-                            background-color: #1550DF;
-                        }
-                    """)
+                    configure_btn.setStyleSheet(get_icon_button_style())
                     configure_btn.setToolTip("Configure timing constraint for this signal")
                     configure_btn.clicked.connect(
                         lambda checked, sname=signal_name: self.configure_timing_clicked.emit(self.block_name, sname)
