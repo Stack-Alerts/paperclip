@@ -650,7 +650,7 @@ class BacktestConfigPanel(QWidget):
         # Quick preset buttons
         for val in [1, 2, 3, 4, 5, 6, 7]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(50, 50)
+            btn.setFixedSize(65, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.delay_spin.setValue(v))
             delay_layout.addWidget(btn)
@@ -687,7 +687,7 @@ class BacktestConfigPanel(QWidget):
         # Quick preset buttons (values need multiplying by 100 for spinbox that uses integers)
         for val_display, val_actual in [(1, 100), (1.25, 125), (1.5, 150), (1.75, 175), (2, 200), (2.15, 215), (2.25, 225)]:
             btn = QPushButton(str(val_display))
-            btn.setFixedSize(50, 50)
+            btn.setFixedSize(65, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val_actual: self.emergency_spin.setValue(int(v / 100)))
             emergency_layout.addWidget(btn)
@@ -726,7 +726,7 @@ class BacktestConfigPanel(QWidget):
         # Quick preset buttons
         for val in [5, 10, 15, 20, 25, 30, 35]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(50, 50)
+            btn.setFixedSize(65, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.vol_lookback_spin.setValue(v))
             vol_lookback_layout.addWidget(btn)
@@ -764,7 +764,7 @@ class BacktestConfigPanel(QWidget):
         # Quick preset buttons
         for val in [12, 13, 14, 15, 16, 17, 18]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(50, 50)
+            btn.setFixedSize(65, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.vol_multi_spin.setValue(v))
             vol_multi_layout.addWidget(btn)
@@ -802,7 +802,7 @@ class BacktestConfigPanel(QWidget):
         # Quick preset buttons
         for val in [5, 6, 7, 8, 9, 10, 11, 12]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(50, 50)
+            btn.setFixedSize(65, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.min_sl_spin.setValue(v))
             min_sl_layout.addWidget(btn)
@@ -841,7 +841,7 @@ class BacktestConfigPanel(QWidget):
         # Quick preset buttons
         for val in [10, 11, 12, 13, 14, 15, 16]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(50, 50)
+            btn.setFixedSize(65, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.max_sl_spin.setValue(v))
             max_sl_layout.addWidget(btn)
@@ -891,7 +891,7 @@ class BacktestConfigPanel(QWidget):
         # Quick preset buttons
         for val in [12, 15, 20, 22, 25, 27, 30]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(50, 50)
+            btn.setFixedSize(65, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.rr_spin.setValue(v))
             rr_layout.addWidget(btn)
@@ -931,7 +931,7 @@ class BacktestConfigPanel(QWidget):
         # Quick preset buttons
         for val in [1, 2, 5, 7, 10, 12, 15]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(50, 50)
+            btn.setFixedSize(65, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.risk_spin.setValue(v))
             risk_layout.addWidget(btn)
@@ -969,7 +969,7 @@ class BacktestConfigPanel(QWidget):
         # Quick preset buttons
         for val in [3, 5, 10, 15, 20, 25, 30]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(50, 50)
+            btn.setFixedSize(65, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.leverage_spin.setValue(v))
             leverage_layout.addWidget(btn)
@@ -1077,7 +1077,7 @@ class BacktestConfigPanel(QWidget):
         # Quick preset buttons
         for val in [15, 20, 25, 30, 40, 50, 75]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(50, 50)
+            btn.setFixedSize(65, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.max_bars_spin.setValue(v))
             bars_layout.addWidget(btn)
