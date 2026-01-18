@@ -18,6 +18,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
+# Import universal combo box fix
+from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
+
 
 class TimingConstraintDialog(QDialog):
     """
@@ -161,7 +164,7 @@ class TimingConstraintDialog(QDialog):
                 border-color: #4ADE80;
             }
             QPushButton {
-                background-color: #2070FF;
+                background-color: #204486;
                 color: white;
                 font-weight: bold;
                 padding: 8px 20px;
@@ -170,7 +173,7 @@ class TimingConstraintDialog(QDialog):
                 min-width: 100px;
             }
             QPushButton:hover {
-                background-color: #1860EF;
+                background-color: #1A3A70;
             }
             QPushButton:pressed {
                 background-color: #1550DF;
@@ -193,7 +196,7 @@ class TimingConstraintDialog(QDialog):
         header_font.setBold(True)
         header_font.setPointSize(10)
         header.setFont(header_font)
-        header.setStyleSheet("color: #00A3BF; padding: 10px;")
+        header.setStyleSheet("color: #095983; padding: 10px;")
         layout.addWidget(header)
         
         # Constraint configuration group
@@ -235,6 +238,9 @@ class TimingConstraintDialog(QDialog):
             # No references available yet
             self.reference_combo.addItem("(No previous signals)", None)
             self.reference_combo.setEnabled(False)
+        
+        # Apply comprehensive fix for white bars
+        fix_combobox_white_bars(self.reference_combo)
         
         reference_layout.addWidget(self.reference_combo)
         reference_layout.addStretch()

@@ -228,7 +228,7 @@ class DataUpdateModal(QDialog):
                 border-radius: 3px;
             }
             QPushButton {
-                background-color: #2070FF;
+                background-color: #204486;
                 color: white;
                 font-weight: bold;
                 padding: 10px 20px;
@@ -237,7 +237,7 @@ class DataUpdateModal(QDialog):
                 min-width: 120px;
             }
             QPushButton:hover {
-                background-color: #1860EF;
+                background-color: #1A3A70;
             }
             QPushButton:pressed {
                 background-color: #1550DF;
@@ -262,9 +262,9 @@ class DataUpdateModal(QDialog):
         header = QLabel("📊 Historical Data Update Check")
         header_font = QFont()
         header_font.setBold(True)
-        header_font.setPointSize(12)
+        header_font.setPointSize(14)
         header.setFont(header_font)
-        header.setStyleSheet("color: #00A3BF; padding: 10px;")
+        header.setStyleSheet("color: #095983; padding: 10px;")
         layout.addWidget(header)
         
         # Status group
@@ -299,7 +299,7 @@ class DataUpdateModal(QDialog):
         # Progress message
         self.progress_label = QLabel("")
         self.progress_label.setVisible(False)
-        self.progress_label.setStyleSheet("color: #00A3BF; font-style: italic;")
+        self.progress_label.setStyleSheet("color: #095983; font-style: italic;")
         layout.addWidget(self.progress_label)
         
         layout.addStretch()

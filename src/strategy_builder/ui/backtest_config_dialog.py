@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout
 from PyQt5.QtCore import Qt
 
 from .backtest_config_panel import BacktestConfigPanel
+from .styles import get_main_stylesheet
 
 
 class BacktestConfigDialog(QDialog):
@@ -51,9 +52,5 @@ class BacktestConfigDialog(QDialog):
         
         self.setLayout(layout)
         
-        # Apply dark theme
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #15191E;
-            }
-        """)
+        # Apply centralized dark theme
+        self.setStyleSheet(get_main_stylesheet())
