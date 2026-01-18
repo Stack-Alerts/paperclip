@@ -108,7 +108,7 @@ class BlockConfigItem(QWidget):
         # Signals count
         signals_count = len(self.block_info.get('signals', []))
         signals_label = QLabel(f"Signals: {signals_count}")
-        signals_label.setStyleSheet("color: #9AA0A6; font-size: 9pt;")
+        signals_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt;")
         info_layout.addWidget(signals_label)
         
         header_layout.addLayout(info_layout, stretch=1)
