@@ -311,9 +311,14 @@ class StrategyBlocksPanel(QWidget):
         group_layout.setSpacing(15)
         group_layout.setContentsMargins(15, 20, 15, 15)  # Match backtest panel padding
         
+        # Reset font for content (only title should be 12pt)
+        content_font = QFont()
+        content_font.setPointSize(10)
+        
         # Info header
         info_layout = QHBoxLayout()
         info_label = QLabel("ℹ️ Blocks are executed in order from top to bottom")
+        info_label.setFont(content_font)
         info_label.setStyleSheet(get_label_style('info') + " font-size: 9pt; font-style: italic; padding: 5px;")
         info_layout.addWidget(info_label)
         info_layout.addStretch()
