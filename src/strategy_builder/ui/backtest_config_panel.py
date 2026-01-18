@@ -647,10 +647,10 @@ class BacktestConfigPanel(QWidget):
         delay_label.setStyleSheet(get_label_style('muted'))
         delay_layout.addWidget(delay_label)
         
-        # Quick preset buttons
+        # Quick preset buttons - UNIFORM GRID
         for val in [1, 2, 3, 4, 5, 6, 7]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(65, 50)
+            btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.delay_spin.setValue(v))
             delay_layout.addWidget(btn)
@@ -659,7 +659,7 @@ class BacktestConfigPanel(QWidget):
         self.delay_spin.setRange(0, 20)
         self.delay_spin.setValue(2)
         self.delay_spin.setSuffix(" bars")
-        self.delay_spin.setMaximumWidth(130)
+        self.delay_spin.setFixedWidth(150)
         self.delay_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.delay_spin.setToolTip(
             "Stop Loss Delay Period\n\n"
@@ -684,10 +684,10 @@ class BacktestConfigPanel(QWidget):
         emergency_label.setStyleSheet(get_label_style('muted'))
         emergency_layout.addWidget(emergency_label)
         
-        # Quick preset buttons (values need multiplying by 100 for spinbox that uses integers)
+        # Quick preset buttons - UNIFORM GRID
         for val_display, val_actual in [(1, 100), (1.25, 125), (1.5, 150), (1.75, 175), (2, 200), (2.15, 215), (2.25, 225)]:
             btn = QPushButton(str(val_display))
-            btn.setFixedSize(65, 50)
+            btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val_actual: self.emergency_spin.setValue(int(v / 100)))
             emergency_layout.addWidget(btn)
@@ -697,7 +697,7 @@ class BacktestConfigPanel(QWidget):
         self.emergency_spin.setValue(2)
         self.emergency_spin.setSuffix("%")
         self.emergency_spin.setSingleStep(1)
-        self.emergency_spin.setMaximumWidth(100)
+        self.emergency_spin.setFixedWidth(150)
         self.emergency_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.emergency_spin.setToolTip(
             "Emergency Stop Loss\n\n"
@@ -723,10 +723,10 @@ class BacktestConfigPanel(QWidget):
         vol_lookback_label.setStyleSheet(get_label_style('muted'))
         vol_lookback_layout.addWidget(vol_lookback_label)
         
-        # Quick preset buttons
+        # Quick preset buttons - UNIFORM GRID
         for val in [5, 10, 15, 20, 25, 30, 35]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(65, 50)
+            btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.vol_lookback_spin.setValue(v))
             vol_lookback_layout.addWidget(btn)
@@ -735,7 +735,7 @@ class BacktestConfigPanel(QWidget):
         self.vol_lookback_spin.setRange(5, 100)
         self.vol_lookback_spin.setValue(20)
         self.vol_lookback_spin.setSuffix(" bars")
-        self.vol_lookback_spin.setMaximumWidth(130)
+        self.vol_lookback_spin.setFixedWidth(150)
         self.vol_lookback_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.vol_lookback_spin.setToolTip(
             "Volatility Lookback Period\n\n"
@@ -761,10 +761,10 @@ class BacktestConfigPanel(QWidget):
         vol_multi_label.setStyleSheet(get_label_style('muted'))
         vol_multi_layout.addWidget(vol_multi_label)
         
-        # Quick preset buttons
+        # Quick preset buttons - UNIFORM GRID
         for val in [12, 13, 14, 15, 16, 17, 18]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(65, 50)
+            btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.vol_multi_spin.setValue(v))
             vol_multi_layout.addWidget(btn)
@@ -774,7 +774,7 @@ class BacktestConfigPanel(QWidget):
         self.vol_multi_spin.setValue(12)
         self.vol_multi_spin.setSuffix("x")
         self.vol_multi_spin.setSingleStep(1)
-        self.vol_multi_spin.setMaximumWidth(100)
+        self.vol_multi_spin.setFixedWidth(150)
         self.vol_multi_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.vol_multi_spin.setToolTip(
             "Volatility Multiplier\n\n"
@@ -799,10 +799,10 @@ class BacktestConfigPanel(QWidget):
         min_sl_label.setStyleSheet(get_label_style('muted'))
         min_sl_layout.addWidget(min_sl_label)
         
-        # Quick preset buttons
-        for val in [5, 6, 7, 8, 9, 10, 11, 12]:
+        # Quick preset buttons - UNIFORM GRID (removed 5, starts from 6)
+        for val in [6, 7, 8, 9, 10, 11, 12]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(65, 50)
+            btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.min_sl_spin.setValue(v))
             min_sl_layout.addWidget(btn)
@@ -812,7 +812,7 @@ class BacktestConfigPanel(QWidget):
         self.min_sl_spin.setValue(7)
         self.min_sl_spin.setSuffix("%")
         self.min_sl_spin.setSingleStep(1)
-        self.min_sl_spin.setMaximumWidth(100)
+        self.min_sl_spin.setFixedWidth(150)
         self.min_sl_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.min_sl_spin.setToolTip(
             "Minimum Stop Loss Distance\n\n"
@@ -838,10 +838,10 @@ class BacktestConfigPanel(QWidget):
         max_sl_label.setStyleSheet(get_label_style('muted'))
         max_sl_layout.addWidget(max_sl_label)
         
-        # Quick preset buttons
+        # Quick preset buttons - UNIFORM GRID
         for val in [10, 11, 12, 13, 14, 15, 16]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(65, 50)
+            btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.max_sl_spin.setValue(v))
             max_sl_layout.addWidget(btn)
@@ -851,7 +851,7 @@ class BacktestConfigPanel(QWidget):
         self.max_sl_spin.setValue(20)
         self.max_sl_spin.setSuffix("%")
         self.max_sl_spin.setSingleStep(1)
-        self.max_sl_spin.setMaximumWidth(100)
+        self.max_sl_spin.setFixedWidth(150)
         self.max_sl_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.max_sl_spin.setToolTip(
             "Maximum Stop Loss Distance\n\n"
@@ -888,10 +888,10 @@ class BacktestConfigPanel(QWidget):
         rr_label.setStyleSheet(get_label_style('muted'))
         rr_layout.addWidget(rr_label)
         
-        # Quick preset buttons
+        # Quick preset buttons - UNIFORM GRID
         for val in [12, 15, 20, 22, 25, 27, 30]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(65, 50)
+            btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.rr_spin.setValue(v))
             rr_layout.addWidget(btn)
@@ -901,7 +901,7 @@ class BacktestConfigPanel(QWidget):
         self.rr_spin.setValue(12)
         self.rr_spin.setSuffix("")
         self.rr_spin.setSingleStep(1)
-        self.rr_spin.setMaximumWidth(100)
+        self.rr_spin.setFixedWidth(150)
         self.rr_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.rr_spin.setToolTip(
             "Minimum Risk to Reward Ratio\n\n"
@@ -928,10 +928,10 @@ class BacktestConfigPanel(QWidget):
         risk_label.setStyleSheet(get_label_style('muted'))
         risk_layout.addWidget(risk_label)
         
-        # Quick preset buttons
+        # Quick preset buttons - UNIFORM GRID
         for val in [1, 2, 5, 7, 10, 12, 15]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(65, 50)
+            btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.risk_spin.setValue(v))
             risk_layout.addWidget(btn)
@@ -940,7 +940,7 @@ class BacktestConfigPanel(QWidget):
         self.risk_spin.setRange(1, 100)
         self.risk_spin.setValue(10)
         self.risk_spin.setSuffix("%")
-        self.risk_spin.setMaximumWidth(100)
+        self.risk_spin.setFixedWidth(150)
         self.risk_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.risk_spin.setToolTip(
             "Risk Per Trade (% of Capital)\n\n"
@@ -966,10 +966,10 @@ class BacktestConfigPanel(QWidget):
         leverage_label.setStyleSheet(get_label_style('muted'))
         leverage_layout.addWidget(leverage_label)
         
-        # Quick preset buttons
+        # Quick preset buttons - UNIFORM GRID
         for val in [3, 5, 10, 15, 20, 25, 30]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(65, 50)
+            btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.leverage_spin.setValue(v))
             leverage_layout.addWidget(btn)
@@ -978,7 +978,7 @@ class BacktestConfigPanel(QWidget):
         self.leverage_spin.setRange(1, 100)
         self.leverage_spin.setValue(10)
         self.leverage_spin.setSuffix("x")
-        self.leverage_spin.setMaximumWidth(100)
+        self.leverage_spin.setFixedWidth(150)
         self.leverage_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.leverage_spin.setToolTip(
             "Maximum Leverage Multiplier\n\n"
@@ -997,7 +997,7 @@ class BacktestConfigPanel(QWidget):
         leverage_layout.addWidget(self.leverage_spin)
         layout.addLayout(leverage_layout)
         
-        # Min Confluence WITH CALCULATE FROM STRATEGY BUTTON
+        # Min Confluence WITH RESET & INCREMENT/DECREMENT BUTTONS
         confluence_layout = QHBoxLayout()
         confluence_layout.setSpacing(8)
         
@@ -1005,12 +1005,12 @@ class BacktestConfigPanel(QWidget):
         confluence_label.setStyleSheet(get_label_style('muted'))
         confluence_layout.addWidget(confluence_label)
         
-        # Calculate from Strategy button
-        calc_btn = QPushButton("📊 Calculate")
-        calc_btn.setFixedSize(120, 50)
-        calc_btn.setStyleSheet(get_preset_day_button_stylesheet())
-        calc_btn.setToolTip(
-            "Calculate Optimal Confluence from Strategy\n\n"
+        # Reset From Strategy button
+        reset_btn = QPushButton("Reset From Strategy")
+        reset_btn.setFixedSize(241, 50)
+        reset_btn.setStyleSheet(get_preset_day_button_stylesheet())
+        reset_btn.setToolTip(
+            "Reset Confluence From Strategy\n\n"
             "Automatically analyzes your current strategy configuration:\n"
             "• Counts required blocks (AND logic)\n"
             "• Counts optional blocks (OR logic)\n"
@@ -1028,14 +1028,30 @@ class BacktestConfigPanel(QWidget):
             "✓ Most optional signals should trigger\n"
             "✓ Quality trades over quantity"
         )
-        calc_btn.clicked.connect(self._calculate_confluence_from_strategy)
-        confluence_layout.addWidget(calc_btn)
+        reset_btn.clicked.connect(self._calculate_confluence_from_strategy)
+        confluence_layout.addWidget(reset_btn)
+        
+        # Decrement buttons
+        for val in [-1, -2]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.confluence_spin.setValue(self.confluence_spin.value() + v))
+            confluence_layout.addWidget(btn)
+        
+        # Increment buttons
+        for val in [+1, +2]:
+            btn = QPushButton(f"+{val}")
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.confluence_spin.setValue(self.confluence_spin.value() + v))
+            confluence_layout.addWidget(btn)
         
         self.confluence_spin = QSpinBox()
         self.confluence_spin.setRange(0, 100)
         self.confluence_spin.setValue(40)
         self.confluence_spin.setSuffix(" pts")
-        self.confluence_spin.setMaximumWidth(130)
+        self.confluence_spin.setFixedWidth(150)
         self.confluence_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.confluence_spin.setToolTip(
             "Minimum Confluence Points (Strategy-Specific)\n\n"
@@ -1074,10 +1090,10 @@ class BacktestConfigPanel(QWidget):
         bars_label.setStyleSheet(get_label_style('muted'))
         bars_layout.addWidget(bars_label)
         
-        # Quick preset buttons
+        # Quick preset buttons - UNIFORM GRID
         for val in [15, 20, 25, 30, 40, 50, 75]:
             btn = QPushButton(str(val))
-            btn.setFixedSize(65, 50)
+            btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.max_bars_spin.setValue(v))
             bars_layout.addWidget(btn)
@@ -1086,7 +1102,7 @@ class BacktestConfigPanel(QWidget):
         self.max_bars_spin.setRange(1, 500)
         self.max_bars_spin.setValue(200)
         self.max_bars_spin.setSuffix(" bars")
-        self.max_bars_spin.setMaximumWidth(130)
+        self.max_bars_spin.setFixedWidth(150)
         self.max_bars_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.max_bars_spin.setToolTip(
             "Maximum Position Hold Time\n\n"
