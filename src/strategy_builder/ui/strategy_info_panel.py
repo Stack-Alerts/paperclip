@@ -70,15 +70,11 @@ class StrategyInfoPanel(QWidget):
         layout.setContentsMargins(15, 15, 15, 15)
         
         # Group box for all strategy info
-        group_box = QGroupBox("Strategy Information")
-        group_box_font = QFont()
-        group_box_font.setBold(True)
-        group_box_font.setPointSize(10)
-        group_box.setFont(group_box_font)
-        group_box.setStyleSheet("QGroupBox::title { color: #00A3BF; }")  # Muted Cyan for title (25% darker)
+        group_box = QGroupBox("📋 Strategy Information")
         
         group_layout = QVBoxLayout()
-        group_layout.setSpacing(18)  # Increased spacing between fields
+        group_layout.setSpacing(20)  # Match backtest panel spacing
+        group_layout.setContentsMargins(15, 20, 15, 15)  # Add internal padding
         
         # Strategy Name
         name_layout = QVBoxLayout()
@@ -158,7 +154,7 @@ class StrategyInfoPanel(QWidget):
         required_signals_font.setBold(True)
         required_signals_font.setPointSize(10)
         self.required_signals_label.setFont(required_signals_font)
-        self.required_signals_label.setStyleSheet("color: #0066cc;")
+        self.required_signals_label.setStyleSheet("color: #10B981;")
         meta_layout.addWidget(self.required_signals_label)
         
         # Separator
@@ -177,7 +173,7 @@ class StrategyInfoPanel(QWidget):
         optional_signals_font.setBold(True)
         optional_signals_font.setPointSize(10)
         self.optional_signals_label.setFont(optional_signals_font)
-        self.optional_signals_label.setStyleSheet("color: #10B981;")
+        self.optional_signals_label.setStyleSheet("color: #214fa2;")
         meta_layout.addWidget(self.optional_signals_label)
         
         # Separator
@@ -406,15 +402,11 @@ class StrategyInfoPanel(QWidget):
         """
         self.required_signals_label.setText(str(count))
         
-        # Color code based on count
+        # Always use consistent green (#10B981) for any count > 0
         if count == 0:
             self.required_signals_label.setStyleSheet("color: #888888;")
-        elif count <= 5:
-            self.required_signals_label.setStyleSheet("color: #00aa00;")
-        elif count <= 10:
-            self.required_signals_label.setStyleSheet("color: #0066cc;")
         else:
-            self.required_signals_label.setStyleSheet("color: #ff6600;")
+            self.required_signals_label.setStyleSheet("color: #10B981; font-weight: bold;")
     
     def update_required_signals_from_config(self):
         """
@@ -498,7 +490,7 @@ class StrategyInfoPanel(QWidget):
             
             self.optional_signals_label.setText(str(optional_count))
             if optional_count > 0:
-                self.optional_signals_label.setStyleSheet("color: #10B981; font-weight: bold;")
+                self.optional_signals_label.setStyleSheet("color: #214fa2; font-weight: bold;")
             else:
                 self.optional_signals_label.setStyleSheet("color: #888888;")
             
@@ -515,7 +507,7 @@ class StrategyInfoPanel(QWidget):
             
             if has_timing:
                 self.time_constraint_label.setText("Yes")
-                self.time_constraint_label.setStyleSheet("color: #FFA500; font-weight: bold;")  # Orange
+                self.time_constraint_label.setStyleSheet("color: #10B981; font-weight: bold;")  # Green
             else:
                 self.time_constraint_label.setText("No")
                 self.time_constraint_label.setStyleSheet("color: #888888;")

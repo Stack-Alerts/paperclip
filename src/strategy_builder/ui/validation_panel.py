@@ -84,7 +84,7 @@ class ValidationPanel(QWidget):
         group_box_font.setBold(True)
         group_box_font.setPointSize(10)
         group_box.setFont(group_box_font)
-        group_box.setStyleSheet("QGroupBox::title { color: #00A3BF; }")
+        group_box.setStyleSheet("QGroupBox::title { color: #095983; }")
         
         group_layout = QVBoxLayout()
         group_layout.setSpacing(12)
@@ -114,7 +114,7 @@ class ValidationPanel(QWidget):
         self.validate_button = QPushButton("🔍 Validate Now")
         self.validate_button.setStyleSheet("""
             QPushButton {
-                background-color: #2070FF;
+                background-color: #204486;
                 color: white;
                 font-weight: bold;
                 padding: 8px 16px;
@@ -122,7 +122,7 @@ class ValidationPanel(QWidget):
                 min-width: 120px;
             }
             QPushButton:hover {
-                background-color: #1860EF;
+                background-color: #1A3A70;
             }
             QPushButton:pressed {
                 background-color: #1550DF;
@@ -226,14 +226,14 @@ class ValidationPanel(QWidget):
         self.run_test_button.setEnabled(False)
         self.run_test_button.setStyleSheet("""
             QPushButton {
-                background-color: #2070FF;
+                background-color: #204486;
                 color: white;
                 font-weight: bold;
                 padding: 8px 16px;
                 border-radius: 4px;
             }
             QPushButton:hover {
-                background-color: #1860EF;
+                background-color: #1A3A70;
             }
             QPushButton:disabled {
                 background-color: #555555;

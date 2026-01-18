@@ -39,6 +39,7 @@ from src.strategy_builder.ui.validation_dialog import ValidationDialog
 from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
 from src.strategy_builder.ui.data_update_modal import DataUpdateModal
 from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
+from src.strategy_builder.ui.styles import get_main_stylesheet
 
 # Import real block registry adapter
 try:
@@ -124,142 +125,8 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         # Use OS title bar (change via GNOME theme - see TITLE_BAR_COLOR_FIX.md)
         
-        # Apply dark theme stylesheet
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #15191E;
-            }
-            QWidget {
-                background-color: #15191E;
-                color: #E8EAED;
-            }
-            QGroupBox {
-                background-color: #1E2128;
-                border: 1px solid #3C4149;
-                border-radius: 8px;
-                margin-top: 12px;
-                padding-top: 12px;
-                color: #E8EAED;
-                font-weight: bold;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 5px;
-                color: #E8EAED;
-            }
-            QLineEdit {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 6px;
-                padding: 8px;
-                color: #E8EAED;
-            }
-            QLineEdit:focus {
-                border-color: #2070FF;
-            }
-            QComboBox {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 6px;
-                padding: 6px 10px;
-                color: #E8EAED;
-            }
-            QComboBox:hover {
-                border-color: #2070FF;
-            }
-            QComboBox::drop-down {
-                border: none;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                selection-background-color: #2070FF;
-                color: #E8EAED;
-            }
-            QTextEdit {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 6px;
-                padding: 8px;
-                color: #BDC1C6;
-            }
-            QLabel {
-                color: #E8EAED;
-                background: transparent;
-            }
-            QScrollArea {
-                background-color: #15191E;
-                border: none;
-            }
-            QScrollBar:vertical {
-                background-color: #1E2128;
-                width: 12px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #3C4149;
-                border-radius: 6px;
-                min-height: 20px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: #4A5058;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-            QSplitter::handle {
-                background-color: #3C4149;
-            }
-            QSplitter::handle:horizontal {
-                width: 2px;
-            }
-            QSplitter::handle:vertical {
-                height: 2px;
-            }
-            QMenuBar {
-                background-color: #1E2128;
-                color: #E8EAED;
-                border-bottom: 1px solid #3C4149;
-            }
-            QMenuBar::item:selected {
-                background-color: #2A2F3A;
-            }
-            QMenu {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                color: #E8EAED;
-            }
-            QMenu::item:selected {
-                background-color: #2070FF;
-            }
-            QToolBar {
-                background-color: #1E2128;
-                border-bottom: 1px solid #3C4149;
-                border-top: 1px solid #3C4149;
-                spacing: 8px;
-                padding: 8px 4px;
-                margin-top: 4px;
-            }
-            QToolButton {
-                background: transparent;
-                border: none;
-                color: #A0AEC0;
-                padding: 6px;
-            }
-            QToolButton:hover {
-                background-color: #2A2F3A;
-                border-radius: 4px;
-            }
-            QToolButton:pressed {
-                background-color: #374151;
-            }
-            QStatusBar {
-                background-color: #1E2128;
-                color: #9AA0A6;
-                border-top: 1px solid #3C4149;
-            }
-        """)
+        # Apply centralized dark theme stylesheet
+        self.setStyleSheet(get_main_stylesheet())
         
         # Central widget container
         central_widget = QWidget()

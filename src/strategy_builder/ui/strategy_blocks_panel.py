@@ -62,7 +62,7 @@ class BlockConfigItem(QWidget):
         position_font.setBold(True)
         position_font.setPointSize(12)
         position_label.setFont(position_font)
-        position_label.setStyleSheet("color: #2070FF; min-width: 40px;")
+        position_label.setStyleSheet("color: #204486; min-width: 40px;")
         header_layout.addWidget(position_label)
         
         # Block info layout
@@ -84,7 +84,7 @@ class BlockConfigItem(QWidget):
         logic_type = self.block_info.get('logic', 'AND')
         if logic_type == 'AND':
             badge_text = "REQUIRED"
-            badge_bg = "#2070FF"  # Blue for required
+            badge_bg = "#204486"  # Blue for required
             badge_tooltip = "This block is REQUIRED - all signals must trigger"
         else:
             badge_text = "OPTIONAL"
@@ -145,8 +145,8 @@ class BlockConfigItem(QWidget):
             self.configure_block_button = QPushButton("⚙️ Config")
             self.configure_block_button.setMinimumWidth(100)
             self.configure_block_button.setStyleSheet(
-                "QPushButton { background-color: #2070FF; color: white; font-weight: bold; padding: 5px; }"
-                "QPushButton:hover { background-color: #1860EF; }"
+                "QPushButton { background-color: #204486; color: white; font-weight: bold; padding: 5px; }"
+                "QPushButton:hover { background-color: #1A3A70; }"
             )
             self.configure_block_button.setToolTip("Configure timing constraint for this block")
             # Emit with empty string as signal_name to indicate block-level config
@@ -177,7 +177,7 @@ class BlockConfigItem(QWidget):
             signals_layout.setContentsMargins(10, 5, 10, 5)
             
             signals_header = QLabel("Signals:")
-            signals_header.setStyleSheet("font-weight: bold; color: #2070FF;")
+            signals_header.setStyleSheet("font-weight: bold; color: #204486;")
             signals_layout.addWidget(signals_header)
             
             for idx, signal in enumerate(self.block_info['signals'], 1):
@@ -221,7 +221,7 @@ class BlockConfigItem(QWidget):
                     configure_btn.setMaximumWidth(90)
                     configure_btn.setStyleSheet("""
                         QPushButton {
-                            background-color: #2070FF;
+                            background-color: #204486;
                             color: white;
                             font-weight: bold;
                             font-size: 8pt;
@@ -229,7 +229,7 @@ class BlockConfigItem(QWidget):
                             border-radius: 4px;
                         }
                         QPushButton:hover {
-                            background-color: #1860EF;
+                            background-color: #1A3A70;
                         }
                         QPushButton:pressed {
                             background-color: #1550DF;
@@ -260,7 +260,7 @@ class BlockConfigItem(QWidget):
         # Styling - dark theme
         self.setStyleSheet("""
             BlockConfigItem {
-                border: 2px solid #2070FF;
+                border: 2px solid #204486;
                 border-radius: 8px;
                 background-color: #1E2128;
             }
@@ -320,15 +320,11 @@ class StrategyBlocksPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         
         # Group box
-        group_box = QGroupBox("Strategy Building Blocks")
-        group_box.setStyleSheet("QGroupBox::title { color: #00A3BF; }")  # Muted Cyan for title (25% darker)
-        group_box_font = QFont()
-        group_box_font.setBold(True)
-        group_box_font.setPointSize(10)
-        group_box.setFont(group_box_font)
+        group_box = QGroupBox("🧩 Strategy Building Blocks")
         
         group_layout = QVBoxLayout()
-        group_layout.setSpacing(10)
+        group_layout.setSpacing(15)
+        group_layout.setContentsMargins(15, 20, 15, 15)  # Match backtest panel padding
         
         # Info header
         info_layout = QHBoxLayout()

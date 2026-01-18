@@ -247,16 +247,16 @@ class StepperRibbon(QWidget):
                 # Error state - red
                 btn.setStyleSheet("""
                     QPushButton {
-                        background-color: #DC2626;
+                        background-color: #C35252;
                         color: white;
                         font-weight: bold;
-                        border: 2px solid #991B1B;
+                        border: 2px solid #A63F3F;
                         border-radius: 6px;
                         padding: 6px 12px;
                         font-size: 10pt;
                     }
                     QPushButton:hover {
-                        background-color: #B91C1C;
+                        background-color: #A63F3F;
                     }
                 """)
             elif is_completed:
@@ -279,7 +279,7 @@ class StepperRibbon(QWidget):
                 # Active/current state - blue
                 btn.setStyleSheet("""
                     QPushButton {
-                        background-color: #2070FF;
+                        background-color: #204486;
                         color: white;
                         font-weight: bold;
                         border: 2px solid #1E40AF;

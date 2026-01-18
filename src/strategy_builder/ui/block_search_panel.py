@@ -42,6 +42,8 @@ from src.strategy_builder.utils.signal_statistics_loader import (
     get_signal_display,
     is_statistics_loaded
 )
+# Import universal combo box fix
+from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
 
 
 class BlockListItem(QWidget):
@@ -430,15 +432,11 @@ class BlockSearchPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         
         # Group box
-        group_box = QGroupBox("Available Building Blocks")
-        group_box_font = QFont()
-        group_box_font.setBold(True)
-        group_box_font.setPointSize(10)
-        group_box.setFont(group_box_font)
-        group_box.setStyleSheet("QGroupBox::title { color: #00A3BF; }")  # Muted Cyan for title (25% darker)
+        group_box = QGroupBox("📦 Available Building Blocks")
         
         group_layout = QVBoxLayout()
-        group_layout.setSpacing(10)
+        group_layout.setSpacing(15)
+        group_layout.setContentsMargins(15, 20, 15, 15)  # Match backtest panel padding
         
         # Search and filter controls - increased spacing
         controls_layout = QVBoxLayout()
@@ -468,6 +466,7 @@ class BlockSearchPanel(QWidget):
         filters_layout.addWidget(category_label)
         self.category_filter = QComboBox()
         self.category_filter.addItem("All Categories")
+        fix_combobox_white_bars(self.category_filter)  # Comprehensive fix
         self.category_filter.currentTextChanged.connect(self._on_filter_changed)
         filters_layout.addWidget(self.category_filter)
         
@@ -477,6 +476,7 @@ class BlockSearchPanel(QWidget):
         filters_layout.addWidget(type_label)
         self.type_filter = QComboBox()
         self.type_filter.addItem("All Types")
+        fix_combobox_white_bars(self.type_filter)  # Comprehensive fix
         self.type_filter.currentTextChanged.connect(self._on_filter_changed)
         filters_layout.addWidget(self.type_filter)
         
