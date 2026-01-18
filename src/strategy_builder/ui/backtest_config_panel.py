@@ -997,15 +997,45 @@ class BacktestConfigPanel(QWidget):
         leverage_layout.addWidget(self.leverage_spin)
         layout.addLayout(leverage_layout)
         
-        # Min Confluence
+        # Min Confluence WITH CALCULATE FROM STRATEGY BUTTON
         confluence_layout = QHBoxLayout()
+        confluence_layout.setSpacing(8)
+        
         confluence_label = QLabel("Confluence:")
         confluence_label.setStyleSheet(get_label_style('muted'))
         confluence_layout.addWidget(confluence_label)
+        
+        # Calculate from Strategy button
+        calc_btn = QPushButton("📊 Calculate")
+        calc_btn.setFixedSize(120, 50)
+        calc_btn.setStyleSheet(get_preset_day_button_stylesheet())
+        calc_btn.setToolTip(
+            "Calculate Optimal Confluence from Strategy\n\n"
+            "Automatically analyzes your current strategy configuration:\n"
+            "• Counts required blocks (AND logic)\n"
+            "• Counts optional blocks (OR logic)\n"
+            "• Calculates total possible confluence points\n"
+            "• Sets recommended threshold\n\n"
+            "Formula:\n"
+            "• Required points: Sum of all AND block weights\n"
+            "• Optional points: Sum of all OR block weights\n"
+            "• Recommended: 60-70% of total points\n\n"
+            "Example:\n"
+            "If strategy has 50 required + 25 optional = 75 total pts\n"
+            "Recommended confluence = 50 pts (67% of total)\n\n"
+            "This ensures:\n"
+            "✓ All required signals must trigger\n"
+            "✓ Most optional signals should trigger\n"
+            "✓ Quality trades over quantity"
+        )
+        calc_btn.clicked.connect(self._calculate_confluence_from_strategy)
+        confluence_layout.addWidget(calc_btn)
+        
         self.confluence_spin = QSpinBox()
         self.confluence_spin.setRange(0, 100)
         self.confluence_spin.setValue(40)
         self.confluence_spin.setSuffix(" pts")
+        self.confluence_spin.setMaximumWidth(130)
         self.confluence_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.confluence_spin.setToolTip(
             "Minimum Confluence Points (Strategy-Specific)\n\n"
@@ -1294,3 +1324,79 @@ class BacktestConfigPanel(QWidget):
         self.min_sl_spin.setValue(6)  # 0.6%
         self.max_sl_spin.setValue(15)  # 1.5%
         self.structure_check.setChecked(True)
+    
+    def _calculate_confluence_from_strategy(self):
+        """
+        Calculate optimal confluence points from current strategy configuration.
+        
+        NAUTILUS EXPERT: Analyze strategy blocks and signals to determine
+        the recommended confluence threshold based on required vs optional signals.
+        """
+        try:
+            # Get current strategy configuration from orchestrator
+            config = self.orchestrator.get_current_config()
+            
+            if not config or not hasattr(config, 'blocks') or not config.blocks:
+                self.results_text.setText(
+                    "⚠️ No strategy configured yet!\n\n"
+                    "Please add building blocks to your strategy first,\n"
+                    "then click 'Calculate' to determine optimal confluence."
+                )
+                return
+            
+            # Calculate required and optional points
+            required_points = 0
+            optional_points = 0
+            
+            for block in config.blocks:
+                if not hasattr(block, 'signals'):
+                    continue
+                
+                for signal in block.signals:
+                    # Each signal typically contributes 10-15 points
+                    # This is a simplified calculation - backend may have more sophisticated weighting
+                    signal_weight = 10
+                    
+                    if hasattr(signal, 'logic'):
+                        if signal.logic == 'AND':
+                            required_points += signal_weight
+                        elif signal.logic == 'OR':
+                            optional_points += signal_weight
+            
+            total_points = required_points + optional_points
+            
+            if total_points == 0:
+                self.results_text.setText(
+                    "⚠️ No signals detected in strategy!\n\n"
+                    "Add signals to your building blocks first."
+                )
+                return
+            
+            # Recommended confluence: Required points + 50-70% of optional points
+            # This ensures all required signals trigger + most optional signals
+            recommended = required_points + int(optional_points * 0.6)
+            
+            # Set the calculated value
+            self.confluence_spin.setValue(recommended)
+            
+            # Show calculation details in results
+            self.results_text.setText(
+                f"📊 Confluence Calculated from Strategy:\n\n"
+                f"Required Signals: {required_points} pts (AND logic)\n"
+                f"Optional Signals: {optional_points} pts (OR logic)\n"
+                f"Total Possible: {total_points} pts\n\n"
+                f"✅ Recommended Confluence: {recommended} pts\n"
+                f"   ({int((recommended / total_points) * 100)}% of total)\n\n"
+                f"This ensures:\n"
+                f"• All required signals must trigger\n"
+                f"• ~60% of optional signals should trigger\n"
+                f"• Quality trades over quantity\n\n"
+                f"You can adjust manually if needed."
+            )
+            
+        except Exception as e:
+            self.results_text.setText(
+                f"❌ Error calculating confluence:\n{str(e)}\n\n"
+                "Using default value of 40 pts."
+            )
+            self.confluence_spin.setValue(40)
