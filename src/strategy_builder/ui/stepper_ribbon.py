@@ -227,6 +227,14 @@ class StepperRibbon(QWidget):
         self.error_steps.clear()
         self._update_display()
     
+    def reset_all_steps(self):
+        """
+        Reset all steps to initial state (alias for reset()).
+        
+        Clears all completion and error states.
+        """
+        self.reset()
+    
     def _update_display(self):
         """Update the visual display of all steps."""
         for idx, btn in enumerate(self.step_buttons):
