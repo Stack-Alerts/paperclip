@@ -458,7 +458,7 @@ class BacktestConfigPanel(QWidget):
         
         # Stop Loss Adjustment Mode
         sl_layout = QVBoxLayout()
-        sl_label = QLabel("SL Adjustment:")
+        sl_label = QLabel("Stop Loss Adjustment:")
         sl_label.setStyleSheet(get_label_style('muted'))
         sl_layout.addWidget(sl_label)
         self.sl_combo = QComboBox()
@@ -643,7 +643,7 @@ class BacktestConfigPanel(QWidget):
         delay_layout = QHBoxLayout()
         delay_layout.setSpacing(8)
         
-        delay_label = QLabel("Delay:")
+        delay_label = QLabel("Stop Loss Delay:")
         delay_label.setStyleSheet(get_label_style('muted'))
         delay_layout.addWidget(delay_label)
         
@@ -719,7 +719,7 @@ class BacktestConfigPanel(QWidget):
         vol_lookback_layout = QHBoxLayout()
         vol_lookback_layout.setSpacing(8)
         
-        vol_lookback_label = QLabel("Vol Lookback:")
+        vol_lookback_label = QLabel("Volatility Lookback:")
         vol_lookback_label.setStyleSheet(get_label_style('muted'))
         vol_lookback_layout.addWidget(vol_lookback_label)
         
@@ -757,7 +757,7 @@ class BacktestConfigPanel(QWidget):
         vol_multi_layout = QHBoxLayout()
         vol_multi_layout.setSpacing(8)
         
-        vol_multi_label = QLabel("Vol Multi:")
+        vol_multi_label = QLabel("Volatility Multiplier:")
         vol_multi_label.setStyleSheet(get_label_style('muted'))
         vol_multi_layout.addWidget(vol_multi_label)
         
@@ -795,7 +795,7 @@ class BacktestConfigPanel(QWidget):
         min_sl_layout = QHBoxLayout()
         min_sl_layout.setSpacing(8)
         
-        min_sl_label = QLabel("Min SL:")
+        min_sl_label = QLabel("Min Stop Loss:")
         min_sl_label.setStyleSheet(get_label_style('muted'))
         min_sl_layout.addWidget(min_sl_label)
         
@@ -834,7 +834,7 @@ class BacktestConfigPanel(QWidget):
         max_sl_layout = QHBoxLayout()
         max_sl_layout.setSpacing(8)
         
-        max_sl_label = QLabel("Max SL:")
+        max_sl_label = QLabel("Max Stop Loss:")
         max_sl_label.setStyleSheet(get_label_style('muted'))
         max_sl_layout.addWidget(max_sl_label)
         
@@ -924,7 +924,7 @@ class BacktestConfigPanel(QWidget):
         risk_layout = QHBoxLayout()
         risk_layout.setSpacing(8)
         
-        risk_label = QLabel("Risk%:")
+        risk_label = QLabel("Risk %:")
         risk_label.setStyleSheet(get_label_style('muted'))
         risk_layout.addWidget(risk_label)
         
