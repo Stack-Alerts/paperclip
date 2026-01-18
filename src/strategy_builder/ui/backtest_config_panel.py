@@ -19,7 +19,7 @@ from typing import Optional
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
     QRadioButton, QButtonGroup, QComboBox, QProgressBar,
-    QPushButton, QGroupBox, QTextEdit
+    QPushButton, QGroupBox, QTextEdit, QTabWidget
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont
@@ -102,6 +102,62 @@ class BacktestConfigPanel(QWidget):
     
     def _init_ui(self):
         """Initialize the user interface"""
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        # Create tab widget
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #3C4149;
+                background: #15191E;
+            }
+            QTabBar::tab {
+                background: #1E2227;
+                color: #9AA0A6;
+                padding: 10px 20px;
+                margin-right: 2px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }
+            QTabBar::tab:selected {
+                background: #15191E;
+                color: #FFFFFF;
+                border-bottom: 2px solid #2070FF;
+            }
+            QTabBar::tab:hover {
+                background: #2A2F36;
+                color: #FFFFFF;
+            }
+        """)
+        
+        # Tab 1: Configuration (existing content)
+        config_tab = self._create_config_tab()
+        self.tab_widget.addTab(config_tab, "⚙️ Config")
+        
+        # Tab 2: Live Output (placeholder)
+        output_tab = self._create_placeholder_tab("📊 Live Output", "Real-time backtest output will appear here")
+        self.tab_widget.addTab(output_tab, "📊 Live Output")
+        
+        # Tab 3: Trades (placeholder)
+        trades_tab = self._create_placeholder_tab("📋 Trades", "Trade history table will appear here")
+        self.tab_widget.addTab(trades_tab, "📋 Trades")
+        
+        # Tab 4: Metrics (placeholder)
+        metrics_tab = self._create_placeholder_tab("📈 Metrics", "Key metrics comparison will appear here")
+        self.tab_widget.addTab(metrics_tab, "📈 Metrics")
+        
+        # Tab 5: Compare (placeholder)
+        compare_tab = self._create_placeholder_tab("🔄 Compare", "Configuration comparison will appear here")
+        self.tab_widget.addTab(compare_tab, "🔄 Compare")
+        
+        main_layout.addWidget(self.tab_widget)
+        self.setLayout(main_layout)
+    
+    def _create_config_tab(self) -> QWidget:
+        """Create configuration tab (original content)"""
+        widget = QWidget()
         layout = QVBoxLayout()
         layout.setSpacing(15)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -118,7 +174,6 @@ class BacktestConfigPanel(QWidget):
         config_group = self._create_config_group()
         layout.addWidget(config_group)
         
-       
         # Progress Group
         progress_group = self._create_progress_group()
         layout.addWidget(progress_group)
@@ -136,7 +191,33 @@ class BacktestConfigPanel(QWidget):
         layout.addWidget(self.results_text)
         
         layout.addStretch()
-        self.setLayout(layout)
+        widget.setLayout(layout)
+        return widget
+    
+    def _create_placeholder_tab(self, title: str, message: str) -> QWidget:
+        """Create a placeholder tab for future implementation"""
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Title
+        title_label = QLabel(title)
+        title_font = QFont()
+        title_font.setPointSize(16)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        title_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title_label)
+        
+        # Coming soon message
+        msg_label = QLabel(f"{message}\n\n🚧 Coming Soon 🚧")
+        msg_label.setAlignment(Qt.AlignCenter)
+        msg_label.setStyleSheet("color: #9AA0A6; font-size: 14px; padding: 20px;")
+        layout.addWidget(msg_label)
+        
+        layout.addStretch()
+        widget.setLayout(layout)
+        return widget
     
     def _create_config_group(self) -> QGroupBox:
         """Create configuration controls group"""
