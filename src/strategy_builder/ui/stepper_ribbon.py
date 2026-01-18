@@ -19,6 +19,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import pyqtSignal, Qt, QTimer
 from PyQt5.QtGui import QFont
 
+# Import centralized styles
+from src.strategy_builder.ui.styles import get_color
+
 
 class StepperRibbon(QWidget):
     """
