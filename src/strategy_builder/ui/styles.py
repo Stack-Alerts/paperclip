@@ -464,22 +464,36 @@ def get_color(color_name: str) -> str:
     return COLORS.get(color_name, COLORS['text_primary'])
 
 
-def get_primary_button_stylesheet() -> str:
-    """Get stylesheet for primary action buttons."""
+def get_primary_button_stylesheet(compact=False) -> str:
+    """
+    Get stylesheet for primary action buttons.
+    
+    Args:
+        compact: If True, uses smaller padding (8px 16px vs 10px 20px)
+    
+    Returns:
+        Button stylesheet string
+    """
+    padding = "8px 16px" if compact else "10px 20px"
+    radius = "4px" if compact else "6px"
     return f"""
         QPushButton {{
             background-color: {COLORS['button_primary']};
             color: white;
             font-weight: bold;
-            padding: 10px 20px;
-            border-radius: 6px;
+            padding: {padding};
+            border-radius: {radius};
+            min-width: 120px;
         }}
         QPushButton:hover {{
             background-color: {COLORS['button_primary_hover']};
         }}
+        QPushButton:pressed {{
+            background-color: #1550DF;
+        }}
         QPushButton:disabled {{
-            background-color: {COLORS['button_secondary']};
-            color: {COLORS['text_muted']};
+            background-color: #555555;
+            color: #888888;
         }}
     """
 
