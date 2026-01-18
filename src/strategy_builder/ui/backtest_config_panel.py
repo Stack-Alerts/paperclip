@@ -1022,22 +1022,7 @@ class BacktestConfigPanel(QWidget):
         # Run Button
         self.run_btn = QPushButton("▶️ Run Test")
         self.run_btn.clicked.connect(self._on_run_clicked)
-        self.run_btn.setStyleSheet("""
-                    QPushButton {
-                background-color: #204486;
-                color: white;
-                font-weight: bold;
-                padding: 10px 20px;
-                border-radius: 6px;
-            }
-            QPushButton:hover {
-                background-color: #1557CC;
-            }
-            QPushButton:disabled {
-                background-color: #3C4149;
-                color: #6B7280;
-            }
-        """)
+        self.run_btn.setStyleSheet(get_primary_button_stylesheet())
         layout.addWidget(self.run_btn)
         
         # Pause Button
