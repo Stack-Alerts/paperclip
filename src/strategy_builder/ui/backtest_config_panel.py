@@ -122,7 +122,7 @@ class BacktestConfigPanel(QWidget):
                 margin-top: 8px;
                 border-top-left-radius: 8px;
                 border-top-right-radius: 8px;
-                font-size: 14px;
+                font-size: 16px;
                 font-weight: bold;
                 min-width: 120px;
             }
@@ -231,9 +231,9 @@ class BacktestConfigPanel(QWidget):
         group.setStyleSheet("""
             QRadioButton {
                 background: transparent;
-                color: #9CA3AF;
+                color: #E8EAED;
                 padding: 5px;
-                font-size: 13px;
+                font-size: 15px;
             }
             QRadioButton:checked {
                 color: #2070FF;
