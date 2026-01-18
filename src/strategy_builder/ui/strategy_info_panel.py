@@ -83,13 +83,19 @@ class StrategyInfoPanel(QWidget):
         group_layout.setSpacing(20)  # Match backtest panel spacing
         group_layout.setContentsMargins(15, 20, 15, 15)  # Add internal padding
         
+        # Reset font for content (only title should be 12pt, not content)
+        content_font = QFont()
+        content_font.setPointSize(10)  # Normal size for content
+        
         # Strategy Name
         name_layout = QVBoxLayout()
         name_layout.setSpacing(8)
         name_label = QLabel("Strategy Name:")
+        name_label.setFont(content_font)
         name_label.setStyleSheet(get_label_style('muted'))
         name_label.setToolTip("Enter a unique name for your strategy")
         self.name_input = QLineEdit()
+        self.name_input.setFont(content_font)
         self.name_input.setPlaceholderText("e.g., Example_MA_Crossover")
         self.name_input.setMaxLength(100)
         self.name_input.setMinimumHeight(36)  # Bigger input
@@ -101,9 +107,11 @@ class StrategyInfoPanel(QWidget):
         desc_layout = QVBoxLayout()
         desc_layout.setSpacing(8)
         self.desc_label = QLabel("Description:")
+        self.desc_label.setFont(content_font)
         self.desc_label.setStyleSheet(get_label_style('muted'))
         self.desc_label.setToolTip("Strategy description (auto-generated from blocks)")
         self.description_text = QTextEdit()
+        self.description_text.setFont(content_font)
         self.description_text.setPlaceholderText(
             "Description will be auto-generated when you add building blocks...\n\n"
             "Example:\n"
