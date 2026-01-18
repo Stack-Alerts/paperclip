@@ -161,7 +161,8 @@ class BlockConfigItem(QWidget):
         if self.block_info.get('signals'):
             signals_widget = QFrame()
             signals_widget.setFrameShape(QFrame.StyledPanel)
-            signals_widget.setStyleSheet("background-color: #2A2F3A; border: 1px solid #3C4149; border-radius: 6px; padding: 5px;")
+            from src.strategy_builder.ui.styles import get_color
+            signals_widget.setStyleSheet(f"background-color: {get_color('bg_light')}; border: 1px solid {get_color('border')}; border-radius: 6px; padding: 5px;")
             
             signals_layout = QVBoxLayout()
             signals_layout.setContentsMargins(10, 5, 10, 5)
@@ -233,12 +234,13 @@ class BlockConfigItem(QWidget):
             layout.addWidget(signals_widget)
         
         # Styling - dark theme
-        self.setStyleSheet("""
-            BlockConfigItem {
-                border: 2px solid #204486;
+        from src.strategy_builder.ui.styles import get_color
+        self.setStyleSheet(f"""
+            BlockConfigItem {{
+                border: 2px solid {get_color('button_primary')};
                 border-radius: 8px;
-                background-color: #1E2128;
-            }
+                background-color: {get_color('bg_medium')};
+            }}
         """)
         
         self.setLayout(layout)
