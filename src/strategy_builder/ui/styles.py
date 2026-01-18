@@ -588,24 +588,31 @@ def get_groupbox_header_stylesheet() -> str:
 
 
 def get_preset_day_button_stylesheet() -> str:
-    """Get stylesheet for day preset buttons (30 | 60 | 90 etc)."""
-    return f"""
-        QPushButton {{
+    """
+    Get stylesheet for preset day selection buttons (30, 60, 90, etc).
+    
+    Optimized for compact inline display with hover/pressed states.
+    
+    Returns:
+        Button stylesheet string
+    """
+    return """
+        QPushButton {
             background-color: #1E293B;
             color: #CBD5E1;
-            border: 1px solid {COLORS['border']};
+            border: 1px solid #334155;
             border-radius: 4px;
             font-size: 8pt;
             font-weight: normal;
-        }}
-        QPushButton:hover {{
-            background-color: {COLORS['button_primary']};
+        }
+        QPushButton:hover {
+            background-color: #2563EB;
             color: white;
             border-color: #3B82F6;
-        }}
-        QPushButton:pressed {{
-            background-color: {COLORS['button_primary_hover']};
-        }}
+        }
+        QPushButton:pressed {
+            background-color: #1D4ED8;
+        }
     """
 
 
