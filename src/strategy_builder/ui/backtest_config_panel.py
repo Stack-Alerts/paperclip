@@ -106,29 +106,33 @@ class BacktestConfigPanel(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # Create tab widget
+        # Create tab widget with stepper-like styling
         self.tab_widget = QTabWidget()
         self.tab_widget.setStyleSheet("""
             QTabWidget::pane {
                 border: 1px solid #3C4149;
                 background: #15191E;
+                margin-top: 10px;
             }
             QTabBar::tab {
-                background: #1E2227;
-                color: #9AA0A6;
-                padding: 10px 20px;
-                margin-right: 2px;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
+                background: #374151;
+                color: #9CA3AF;
+                padding: 15px 30px;
+                margin-right: 4px;
+                margin-top: 8px;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                font-size: 14px;
+                font-weight: bold;
+                min-width: 120px;
             }
             QTabBar::tab:selected {
-                background: #15191E;
+                background: #2070FF;
                 color: #FFFFFF;
-                border-bottom: 2px solid #2070FF;
             }
-            QTabBar::tab:hover {
-                background: #2A2F36;
-                color: #FFFFFF;
+            QTabBar::tab:hover:!selected {
+                background: #4B5563;
+                color: #D1D5DB;
             }
         """)
         
@@ -222,6 +226,39 @@ class BacktestConfigPanel(QWidget):
     def _create_config_group(self) -> QGroupBox:
         """Create configuration controls group"""
         group = QGroupBox("Configuration")
+        
+        # Style group and radio buttons
+        group.setStyleSheet("""
+            QRadioButton {
+                background: transparent;
+                color: #9CA3AF;
+                padding: 5px;
+                font-size: 13px;
+            }
+            QRadioButton:checked {
+                color: #2070FF;
+                font-weight: bold;
+            }
+            QRadioButton::indicator {
+                width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                border: 2px solid #6B7280;
+                background: transparent;
+            }
+            QRadioButton::indicator:checked {
+                border-color: #2070FF;
+                background: #2070FF;
+            }
+            QRadioButton::indicator:checked:after {
+                content: '';
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: white;
+            }
+        """)
+        
         layout = QVBoxLayout()
         
         # Lookback Days
