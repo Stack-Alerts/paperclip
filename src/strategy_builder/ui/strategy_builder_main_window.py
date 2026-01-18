@@ -450,19 +450,15 @@ class StrategyBuilderMainWindow(QMainWindow):
                     if config:
                         # Check validation status from JSON
                         validation_status = getattr(config, 'validation_status', None)
-                        print(f"DEBUG: Loaded validation_status = {validation_status}")
                         if validation_status == 'passed':
                             self.validation_passed = True
                             self.stepper.mark_step_complete(1)
-                            print("DEBUG: Marked validation step complete")
                         
                         # Check generation status from JSON
                         generation_status = getattr(config, 'generation_status', None)
-                        print(f"DEBUG: Loaded generation_status = {generation_status}")
                         if generation_status == 'success':
                             self.code_generated = True
                             self.stepper.mark_step_complete(2)
-                            print("DEBUG: Marked generation step complete")
                     
                     self._update_window_title()
                     self._update_status(f"Loaded strategy from:{filename}")
@@ -742,7 +738,6 @@ class StrategyBuilderMainWindow(QMainWindow):
                 # AUTO-SAVE after validation (if file exists)
                 if self.current_file:
                     self._save_to_file(self.current_file)
-                    print("DEBUG: Auto-saved after validation")
             else:
                 self.validation_passed = False
                 # Clear validation status on error
@@ -769,7 +764,6 @@ class StrategyBuilderMainWindow(QMainWindow):
                 # AUTO-SAVE after generation (if file exists)
                 if self.current_file:
                     self._save_to_file(self.current_file)
-                    print("DEBUG: Auto-saved after generation")
             else:
                 self.code_generated = False
                 # Clear generation status on error
