@@ -203,7 +203,7 @@ class BacktestConfigPanel(QWidget):
         # Coming soon message
         msg_label = QLabel(f"{message}\n\n🚧 Coming Soon 🚧")
         msg_label.setAlignment(Qt.AlignCenter)
-        msg_label.setStyleSheet("color: #9AA0A6; font-size: 14px; padding: 20px;")
+        msg_label.setStyleSheet(get_label_style('muted') + " font-size: 14px; padding: 20px;")
         layout.addWidget(msg_label)
         
         layout.addStretch()
