@@ -319,7 +319,7 @@ class StrategyBlocksPanel(QWidget):
         # Info header
         info_layout = QHBoxLayout()
         info_label = QLabel("ℹ️ Blocks are executed in order from top to bottom")
-        info_label.setStyleSheet("color: #0066cc; font-size: 9pt; font-style: italic; padding: 5px;")
+        info_label.setStyleSheet(get_label_style('info') + " font-size: 9pt; font-style: italic; padding: 5px;")
         info_layout.addWidget(info_label)
         info_layout.addStretch()
         group_layout.addLayout(info_layout)
@@ -339,7 +339,7 @@ class StrategyBlocksPanel(QWidget):
         self.empty_label = QLabel("No blocks added yet.\n\nSearch and add blocks from the panel above.")
         self.empty_label.setAlignment(Qt.AlignCenter)
         self.empty_label.setStyleSheet(
-            "color: #9AA0A6; font-size: 12pt; padding: 50px; "
+            get_label_style('muted') + " font-size: 12pt; padding: 50px; "
             "background-color: #1E2128; border: 1px solid #3C4149; border-radius: 8px;"
         )
         self.blocks_layout.addWidget(self.empty_label)
