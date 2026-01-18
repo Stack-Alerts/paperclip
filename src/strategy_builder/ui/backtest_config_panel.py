@@ -293,24 +293,7 @@ class BacktestConfigPanel(QWidget):
             # 2-digit: 65px, 3-digit: 67px
             width = 67 if days >= 100 else 65
             btn.setFixedSize(width, 50)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #1E293B;
-                    color: #CBD5E1;
-                    border: 1px solid #334155;
-                    border-radius: 4px;
-                    font-size: 8pt;
-                    font-weight: normal;
-                }
-                QPushButton:hover {
-                    background-color: #2563EB;
-                    color: white;
-                    border-color: #3B82F6;
-                }
-                QPushButton:pressed {
-                    background-color: #1D4ED8;
-                }
-            """)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, d=days: self.lookback_spin.setValue(d))
             lookback_layout.addWidget(btn)
         
@@ -347,24 +330,7 @@ class BacktestConfigPanel(QWidget):
             # 2-digit: 65px, 3-digit: 67px
             width = 67 if days >= 100 else 65
             btn.setFixedSize(width, 50)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #1E293B;
-                    color: #CBD5E1;
-                    border: 1px solid #334155;
-                    border-radius: 4px;
-                    font-size: 8pt;
-                    font-weight: normal;
-                }
-                QPushButton:hover {
-                    background-color: #2563EB;
-                    color: white;
-                    border-color: #3B82F6;
-                }
-                QPushButton:pressed {
-                    background-color: #1D4ED8;
-                }
-            """)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, d=days: self.training_spin.setValue(d))
             training_layout.addWidget(btn)
         
@@ -403,24 +369,7 @@ class BacktestConfigPanel(QWidget):
             # 2-digit: 65px, 3-digit: 67px
             width = 67 if days >= 100 else 65
             btn.setFixedSize(width, 50)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #1E293B;
-                    color: #CBD5E1;
-                    border: 1px solid #334155;
-                    border-radius: 4px;
-                    font-size: 8pt;
-                    font-weight: normal;
-                }
-                QPushButton:hover {
-                    background-color: #2563EB;
-                    color: white;
-                    border-color: #3B82F6;
-                }
-                QPushButton:pressed {
-                    background-color: #1D4ED8;
-                }
-            """)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, d=days: self.testing_spin.setValue(d))
             testing_layout.addWidget(btn)
         
