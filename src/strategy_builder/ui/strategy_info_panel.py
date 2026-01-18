@@ -23,7 +23,7 @@ from PyQt5.QtGui import QFont
 from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
 )
-from src.strategy_builder.ui.styles import get_label_style, get_color
+from src.strategy_builder.ui.styles import get_label_style, get_color, get_radio_button_style
 
 
 class StrategyInfoPanel(QWidget):
@@ -124,13 +124,13 @@ class StrategyInfoPanel(QWidget):
         meta_layout.addWidget(type_label)
         
         self.bullish_radio = QRadioButton("Bullish")
-        self.bullish_radio.setStyleSheet("QRadioButton { color: #10B981; background: transparent; }")
+        self.bullish_radio.setStyleSheet(get_radio_button_style('bullish'))
         self.bullish_radio.setToolTip("Strategy designed for uptrending markets")
         self.bullish_radio.setChecked(True)
         meta_layout.addWidget(self.bullish_radio)
         
         self.bearish_radio = QRadioButton("Bearish")
-        self.bearish_radio.setStyleSheet("QRadioButton { color: #EF4444; background: transparent; }")
+        self.bearish_radio.setStyleSheet(get_radio_button_style('bearish'))
         self.bearish_radio.setToolTip("Strategy designed for downtrending markets")
         meta_layout.addWidget(self.bearish_radio)
         
