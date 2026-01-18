@@ -43,7 +43,7 @@ class ValidationDialog(QDialog):
     
     def _init_ui(self):
         """Initialize the user interface."""
-        self.setWindowTitle("Strategy Validation")
+        self.setWindowTitle("BTC Engine v3 - Strategy Validation")
         
         # Make dialog independent and draggable
         self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint)

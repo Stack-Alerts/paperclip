@@ -223,6 +223,7 @@ class BacktestConfigPanel(QWidget):
         """Create configuration controls group - 3-column layout with proper proportions"""
         group = QGroupBox("Configuration")
         group.setStyleSheet(get_groupbox_header_stylesheet())
+        group.setMaximumHeight(600)  # Compact config panel - extra space goes to Results
         main_layout = QHBoxLayout()
         main_layout.setSpacing(20)
         
@@ -258,6 +259,7 @@ class BacktestConfigPanel(QWidget):
         """Create Basic Settings column"""
         group = QGroupBox("Basic Settings")
         group.setStyleSheet(get_groupbox_header_stylesheet())
+        # No height constraint - let layout manage naturally
         layout = QVBoxLayout()
         layout.setSpacing(12)
         
@@ -517,6 +519,7 @@ class BacktestConfigPanel(QWidget):
         """Create Adaptive SL v2.0 column"""
         group = QGroupBox("Adaptive SL v2.0")
         group.setStyleSheet(get_groupbox_header_stylesheet())
+        # No height constraint - let layout manage naturally
         layout = QVBoxLayout()
         layout.setSpacing(12)
         
@@ -914,6 +917,7 @@ class BacktestConfigPanel(QWidget):
         """Create Risk/Reward column"""
         group = QGroupBox("Risk/Reward")
         group.setStyleSheet(get_groupbox_header_stylesheet())
+        # No height constraint - let layout manage naturally
         layout = QVBoxLayout()
         layout.setSpacing(12)
         

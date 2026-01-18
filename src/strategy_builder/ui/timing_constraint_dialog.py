@@ -75,7 +75,7 @@ class TimingConstraintDialog(QDialog):
     
     def _init_ui(self):
         """Initialize the user interface."""
-        self.setWindowTitle(f"Configure Timing Constraint - {self.signal_name}")
+        self.setWindowTitle(f"BTC Engine v3 - Configure Timing Constraint - {self.signal_name}")
         # Increased size by 25% to prevent text compression
         self.setMinimumWidth(875)
         self.setMinimumHeight(563)
