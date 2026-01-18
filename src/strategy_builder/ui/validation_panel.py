@@ -23,6 +23,7 @@ from PyQt5.QtGui import QFont
 from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
 )
+from src.strategy_builder.ui.styles import get_label_style, get_color
 
 
 class ValidationPanel(QWidget):
@@ -100,12 +101,12 @@ class ValidationPanel(QWidget):
         status_font.setBold(True)
         status_font.setPointSize(11)
         self.status_label.setFont(status_font)
-        self.status_label.setStyleSheet("color: #888888;")
+        self.status_label.setStyleSheet(f"color: {get_color('text_disabled')};")
         header_layout.addWidget(self.status_label)
         
         # Last validated timestamp
         self.last_validated_label = QLabel("")
-        self.last_validated_label.setStyleSheet("color: #9AA0A6; font-size: 9pt;")
+        self.last_validated_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt;")
         header_layout.addWidget(self.last_validated_label)
         
         header_layout.addStretch()
@@ -194,7 +195,7 @@ class ValidationPanel(QWidget):
         nautilus_font = QFont()
         nautilus_font.setBold(True)
         self.nautilus_label.setFont(nautilus_font)
-        self.nautilus_label.setStyleSheet("color: #4ADE80;")
+        self.nautilus_label.setStyleSheet(f"color: {get_color('success')};")
         nautilus_layout.addWidget(self.nautilus_label)
         nautilus_layout.addStretch()
         group_layout.addLayout(nautilus_layout)
@@ -315,7 +316,7 @@ class ValidationPanel(QWidget):
         
         for item in items:
             item_label = QLabel(f"├─ {item}")
-            item_label.setStyleSheet("color: #E8EAED; font-size: 9pt;")
+            item_label.setStyleSheet(f"color: {get_color('text_primary')}; font-size: 9pt;")
             items_layout.addWidget(item_label)
         
         items_container.setLayout(items_layout)
@@ -390,7 +391,7 @@ class ValidationPanel(QWidget):
         if result.success:
             # Strategy is valid
             self.status_label.setText("Status: ✅ VALID (Strict Mode)")
-            self.status_label.setStyleSheet("color: #4ADE80; font-weight: bold;")
+            self.status_label.setStyleSheet(f"color: {get_color('success')}; font-weight: bold;")
             
             # Enable action buttons
             self.save_button.setEnabled(True)
@@ -425,7 +426,7 @@ class ValidationPanel(QWidget):
         else:
             # Strategy has errors
             self.status_label.setText("Status: ❌ INVALID")
-            self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
+            self.status_label.setStyleSheet(f"color: {get_color('error')}; font-weight: bold;")
             
             # Disable action buttons
             self.save_button.setEnabled(False)
