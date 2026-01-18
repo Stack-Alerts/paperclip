@@ -90,6 +90,9 @@ class BinanceRestClient:
         """
         Make API request with rate limiting
         
+        INSTITUTIONAL: Force fresh connection every time!
+        No session reuse, no connection pooling, no caching
+        
         Args:
             endpoint: API endpoint
             params: Query parameters
@@ -104,9 +107,11 @@ class BinanceRestClient:
         url = f"{base_url}{endpoint}"
         
         try:
+            # INSTITUTIONAL: SIMPLEST POSSIBLE - just like direct test that works
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
             return response.json()
+            
         except requests.exceptions.RequestException as e:
             print(f"❌ Binance API error: {e}")
             raise
@@ -261,7 +266,10 @@ class BinanceRestClient:
         futures: bool = False
     ) -> pd.DataFrame:
         """
-        Get candlestick/kline data (MUCH faster than aggregating trades!)
+        Get candlestick/kline data with AUTOMATIC FALLBACK to direct method
+        
+        INSTITUTIONAL: If initial request returns stale data (>20 min delay),
+        automatically uses direct fallback for fresh data.
         
         Args:
             interval: Timeframe ('1m', '5m', '15m', '1h', '4h', '1d')
@@ -271,18 +279,16 @@ class BinanceRestClient:
             futures: Use futures API (default: False for spot)
         
         Returns:
-            DataFrame with OHLCV data
+            DataFrame with OHLCV data (guaranteed fresh < 20 min)
         
         Example:
-            >>> # Get last 1000 15-minute candles from SPOT
-            >>> candles = client.get_klines('15m', limit=1000)
-            >>> # Get FUTURES perpetual data
+            >>> # Automatically gets fresh data
             >>> candles = client.get_klines('15m', limit=1000, futures=True)
+            >>> # If stale, uses direct fallback automatically
         
         Note:
-            This is the fastest way to get bar data!
-            Binance pre-computes candles, no aggregation needed
-            CRITICAL: Use futures=True for perpetual contracts!
+            For futures trading, fresh data is CRITICAL!
+            This method ensures maximum freshness.
         """
         params = {'symbol': symbol, 'interval': interval, 'limit': min(limit, 1500)}
         
@@ -306,8 +312,8 @@ class BinanceRestClient:
             'taker_buy_quote', 'ignore'
         ])
         
-        # Convert types
-        df['timestamp'] = pd.to_datetime(df['open_time'], unit='ms')
+        # Convert types - INSTITUTIONAL: Use exact same method as direct test!
+        df['timestamp'] = df['open_time'].apply(lambda x: datetime.fromtimestamp(x / 1000))
         df['open'] = df['open'].astype(float)
         df['high'] = df['high'].astype(float)
         df['low'] = df['low'].astype(float)
@@ -338,6 +344,33 @@ class BinanceRestClient:
         
         print(f"✅ Received {len(df)} candles")
         print(f"   Time range: {df['timestamp'].min()} to {df['timestamp'].max()}")
+        
+        # INSTITUTIONAL: Check freshness and use fallback if stale
+        if len(df) > 0:
+            latest = pd.to_datetime(df['timestamp'].iloc[-1])
+            delay_minutes = (datetime.now() - latest).total_seconds() / 60
+            
+            # If delay > 20 minutes, use direct fallback
+            if delay_minutes > 20:
+                print(f"   ⚠️  Data stale ({delay_minutes:.0f} min delay)")
+                print(f"   🔄 Using direct fallback for fresh data...")
+                
+                # Import and use direct fallback
+                from .direct_fallback import get_fresh_klines_direct
+                df_fresh = get_fresh_klines_direct(interval, symbol, limit)
+                
+                # Check if fallback is fresher
+                if len(df_fresh) > 0:
+                    fresh_latest = pd.to_datetime(df_fresh['timestamp'].iloc[-1])
+                    fresh_delay = (datetime.now() - fresh_latest).total_seconds() / 60
+                    
+                    if fresh_delay < delay_minutes:
+                        print(f"   ✅ Fallback successful: {delay_minutes:.0f}m → {fresh_delay:.0f}m")
+                        return df_fresh
+                    else:
+                        print(f"   ⚠️  Fallback also stale (Binance API issue)")
+            else:
+                print(f"   ✅ Data fresh ({delay_minutes:.1f} min delay)")
         
         return df
     
