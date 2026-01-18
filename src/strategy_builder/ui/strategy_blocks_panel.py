@@ -167,7 +167,7 @@ class BlockConfigItem(QWidget):
             signals_layout.setContentsMargins(10, 5, 10, 5)
             
             signals_header = QLabel("Signals:")
-            signals_header.setStyleSheet("font-weight: bold; color: #204486;")
+            signals_header.setStyleSheet(get_label_style('info') + " font-weight: bold;")
             signals_layout.addWidget(signals_header)
             
             for idx, signal in enumerate(self.block_info['signals'], 1):
@@ -240,7 +240,7 @@ class BlockConfigItem(QWidget):
                     
                     timing_text = f"     └─ within {max_candles} candles of {ref_signal}"
                     timing_label = QLabel(timing_text)
-                    timing_label.setStyleSheet("color: #FFA500; font-size: 8pt; font-style: italic;")  # Orange for timing
+                    timing_label.setStyleSheet(get_label_style('warning') + " font-size: 8pt; font-style: italic;")
                     timing_label.setToolTip(f"This signal must occur within {max_candles} candles after {ref_signal}")
                     signals_layout.addWidget(timing_label)
             
