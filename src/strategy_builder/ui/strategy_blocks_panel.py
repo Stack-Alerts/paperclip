@@ -26,6 +26,11 @@ from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
 )
 from src.strategy_builder.ui.timing_constraint_dialog import TimingConstraintDialog
+# Import centralized styles
+from src.strategy_builder.ui.styles import (
+    get_label_style, get_logic_badge_style, get_primary_button_stylesheet,
+    get_danger_button_stylesheet, get_icon_button_style, get_block_label_style
+)
 
 
 class BlockConfigItem(QWidget):
@@ -62,7 +67,7 @@ class BlockConfigItem(QWidget):
         position_font.setBold(True)
         position_font.setPointSize(12)
         position_label.setFont(position_font)
-        position_label.setStyleSheet("color: #204486; min-width: 40px;")
+        position_label.setStyleSheet(get_label_style('info') + " min-width: 40px;")
         header_layout.addWidget(position_label)
         
         # Block info layout
