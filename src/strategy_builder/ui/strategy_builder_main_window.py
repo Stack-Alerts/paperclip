@@ -431,6 +431,12 @@ class StrategyBuilderMainWindow(QMainWindow):
                     import os
                     settings.setValue("lastDirectory", os.path.dirname(filename))
                     
+                    # RESET WORKFLOW STATE FIRST (clear previous strategy state)
+                    self.validation_passed = False
+                    self.code_generated = False
+                    self.test_completed = False
+                    self.stepper.reset_all_steps()  # Clear all step states
+                    
                     # Refresh all panels
                     self.info_panel.refresh_from_orchestrator()
                     self.blocks_panel.refresh_from_orchestrator()
@@ -439,20 +445,24 @@ class StrategyBuilderMainWindow(QMainWindow):
                     for block_name in self.blocks_panel.get_block_names():
                         self.search_panel.mark_block_as_added(block_name)
                     
-                    # RESTORE WORKFLOW STATE from loaded strategy
+                    # RESTORE WORKFLOW STATE from loaded strategy JSON
                     config = self.orchestrator.get_current_config()
                     if config:
-                        # Check validation status
+                        # Check validation status from JSON
                         validation_status = getattr(config, 'validation_status', None)
+                        print(f"DEBUG: Loaded validation_status = {validation_status}")
                         if validation_status == 'passed':
                             self.validation_passed = True
                             self.stepper.mark_step_complete(1)
+                            print("DEBUG: Marked validation step complete")
                         
-                        # Check generation status
+                        # Check generation status from JSON
                         generation_status = getattr(config, 'generation_status', None)
+                        print(f"DEBUG: Loaded generation_status = {generation_status}")
                         if generation_status == 'success':
                             self.code_generated = True
                             self.stepper.mark_step_complete(2)
+                            print("DEBUG: Marked generation step complete")
                     
                     self._update_window_title()
                     self._update_status(f"Loaded strategy from:{filename}")
