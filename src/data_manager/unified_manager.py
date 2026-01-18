@@ -65,7 +65,7 @@ class UnifiedDataManager:
     
     def __init__(self):
         """Initialize unified manager"""
-        self.lakeapi_dir = PROJECT_ROOT / "data" / "lakeapi"
+        self.lakeapi_dir = RAW_DATA_DIR  # Historical data (LakeAPI decommissioned, data remains)
         self.binance_dir = PROJECT_ROOT / "data" / "binance"
         
         # Components
@@ -330,28 +330,25 @@ class UnifiedDataManager:
         try:
             client = self._get_binance_client()
             
-            # Calculate hours to request
-            hours = int((end_date - start_date).total_seconds() / 3600)
-            
-            if hours > 720:  # More than 30 days
-                print(f"   ⚠️  Large range ({hours}h), using pagination...")
-                # Request in chunks (will be implemented in client)
-                hours = 720  # Limit to 30 days
+            # INSTITUTIONAL: DON'T use hours parameter!
+            # Just request maximum recent candles (limit=1500)
+            # Let Binance give us everything available, then we filter
             
             # Get klines from Binance Futures
             bars = client.get_klines(
                 interval=timeframe,
                 symbol='BTCUSDT',
-                hours=hours,
+                limit=1500,  # Maximum allowed by Binance
                 futures=True  # CRITICAL: Perpetual futures!
             )
             
             # Filter to exact range
             bars['timestamp'] = pd.to_datetime(bars['timestamp'])
-            bars = bars[
-                (bars['timestamp'] >= start_date) &
-                (bars['timestamp'] <= end_date)
-            ].copy()
+            
+            # INSTITUTIONAL: Don't filter by end_date too strictly!
+            # Binance returns ALL available candles including current forming one
+            # We want everything >= start_date (don't cut off recent data)
+            bars = bars[bars['timestamp'] >= start_date].copy()
             
             print(f"   ✅ Binance: {len(bars)} bars loaded")
             return bars
@@ -432,6 +429,138 @@ class UnifiedDataManager:
         print(f"   ✅ Hybrid: {len(combined)} total bars")
         return combined
     
+    def get_all_data_types_status(self) -> Dict[str, Dict]:
+        """
+        Check status of ALL data types
+        
+        Returns:
+            Dict with status for each data type:
+            {
+                'trades': {
+                    'start': datetime,
+                    'end': datetime,
+                    'gap_days': int,
+                    'status': 'complete' | 'gap' | 'missing'
+                },
+                'funding': {...},
+                'liquidations': {...},
+                'open_interest': {...},
+                'orderbook': {...}
+            }
+        """
+        data_types = ['trades', 'funding', 'liquidations', 'open_interest', 'orderbook']
+        status = {}
+        
+        for data_type in data_types:
+            data_dir = self.lakeapi_dir / data_type
+            if not data_dir.exists():
+                status[data_type] = {
+                    'status': 'missing',
+                    'gap_days': 999,
+                    'start': None,
+                    'end': None
+                }
+                continue
+            
+            # Find last parquet file
+            parquet_files = sorted(data_dir.glob(f'BTC-USDT_{data_type}_*.parquet'))
+            if not parquet_files:
+                status[data_type] = {
+                    'status': 'missing',
+                    'gap_days': 999,
+                    'start': None,
+                    'end': None
+                }
+                continue
+            
+            # Read actual last timestamp (same logic as trades)
+            try:
+                last_file = parquet_files[-1]
+                first_file = parquet_files[0]
+                
+                # Get start date from first file
+                first_date_str = first_file.stem.split('_')[-1]  # '2022-03'
+                start_date = datetime.strptime(first_date_str, '%Y-%m')
+                
+                # Try possible timestamp column names for end date
+                timestamp_cols = ['timestamp', 'origin_time', 'received_time', 'time']
+                df = None
+                end_date = None
+                
+                for col in timestamp_cols:
+                    try:
+                        df = pd.read_parquet(last_file, columns=[col])
+                        if len(df) > 0:
+                            end_date = pd.to_datetime(df[col].iloc[-1])
+                            break
+                    except:
+                        continue
+                
+                if end_date is None:
+                    # Fallback to filename
+                    last_date_str = last_file.stem.split('_')[-1]
+                    year, month = map(int, last_date_str.split('-'))
+                    from calendar import monthrange
+                    last_day = monthrange(year, month)[1]
+                    end_date = datetime(year, month, last_day, 23, 59, 59)
+                
+                # Calculate gap FIRST
+                gap_days = (datetime.now() - end_date).days
+                
+                # INSTITUTIONAL: Check DOWNLOADED Binance files (not API!)
+                # Read actual parquet files in data/binance/ directory
+                if gap_days > 0 and self.binance_dir.exists():
+                    try:
+                        # Find all 15m parquet files in Binance directory
+                        binance_files = list(self.binance_dir.glob('**/BTCUSDT_PERP_15m_*.parquet'))
+                        
+                        if binance_files:
+                            # Read ALL files and find absolute latest timestamp
+                            latest_timestamp = None
+                            
+                            for file in binance_files:
+                                try:
+                                    df_temp = pd.read_parquet(file, columns=['timestamp'])
+                                    if len(df_temp) > 0:
+                                        file_end = pd.to_datetime(df_temp['timestamp'].iloc[-1])
+                                        if latest_timestamp is None or file_end > latest_timestamp:
+                                            latest_timestamp = file_end
+                                except:
+                                    continue
+                            
+                            if latest_timestamp and latest_timestamp > end_date:
+                                end_date = latest_timestamp
+                                gap_days = (datetime.now() - end_date).days
+                                print(f"   ✅ Downloaded Binance: last candle at {latest_timestamp} (gap: {gap_days}d)")
+                    except Exception as e:
+                        pass
+                
+                # For 15min futures, we need precision down to minutes
+                # Calculate gap in minutes for more accurate detection
+                gap_minutes = (datetime.now() - end_date).total_seconds() / 60
+                
+                # If gap > 15 minutes (one candle), mark as gap
+                # This ensures we detect missing even a single 15-minute candle
+                status[data_type] = {
+                    'start': start_date,
+                    'end': end_date,
+                    'gap_days': gap_days,
+                    'gap_minutes': int(gap_minutes),
+                    'status': 'complete' if gap_minutes <= 15 else 'gap'
+                }
+                
+            except Exception as e:
+                print(f"Error checking {data_type}: {e}")
+                status[data_type] = {
+                    'status': 'error',
+                    'gap_days': 999,
+                    'start': None,
+                    'end': None,
+                    'error': str(e)
+                }
+        
+        return status
+    
     def get_available_date_range(self, timeframe: str = '15m') -> Dict[str, datetime]:
         """
         Get available date range across all sources
@@ -442,17 +571,47 @@ class UnifiedDataManager:
         Returns:
             Dict with earliest and latest available dates
         """
-        # Check LakeAPI
+        # Check LakeAPI (historical data in parquet files)
         lakeapi_start = None
         lakeapi_end = None
         
-        if self.lakeapi_dir.exists():
-            # Find earliest month
-            month_dirs = sorted([d for d in (self.lakeapi_dir / 'trades').glob('*') if d.is_dir()])
-            if month_dirs:
-                # Rough estimate from directory names
-                lakeapi_start = datetime.strptime(month_dirs[0].name, '%Y-%m')
-                lakeapi_end = datetime.strptime(month_dirs[-1].name, '%Y-%m')
+        trades_dir = self.lakeapi_dir / 'trades'
+        if trades_dir.exists():
+            # Find earliest and latest parquet files
+            parquet_files = sorted(trades_dir.glob('BTC-USDT_trades_*.parquet'))
+            if parquet_files:
+                # Extract start date from first filename
+                first_file = parquet_files[0].stem.split('_')[-1]  # '2024-01'
+                lakeapi_start = datetime.strptime(first_file, '%Y-%m')
+                
+                # CRITICAL: Read ACTUAL last timestamp from the parquet file, not filename!
+                import pandas as pd
+                try:
+                    last_parquet = parquet_files[-1]
+                    # Try possible timestamp column names
+                    timestamp_cols = ['timestamp', 'origin_time', 'received_time']
+                    df = None
+                    
+                    for col in timestamp_cols:
+                        try:
+                            df = pd.read_parquet(last_parquet, columns=[col])
+                            if len(df) > 0:
+                                lakeapi_end = pd.to_datetime(df[col].iloc[-1])
+                                break
+                        except:
+                            continue
+                    
+                    if df is None or len(df) == 0:
+                        raise Exception("Could not read timestamp from any column")
+                        
+                except Exception as e:
+                    print(f"Warning: Could not read last timestamp from {last_parquet}: {e}")
+                    # Fallback to filename
+                    last_file = parquet_files[-1].stem.split('_')[-1]
+                    year, month = map(int, last_file.split('-'))
+                    from calendar import monthrange
+                    last_day = monthrange(year, month)[1]
+                    lakeapi_end = datetime(year, month, last_day, 23, 59, 59)
         
         # Check Binance (assumed to be current)
         binance_end = datetime.now()

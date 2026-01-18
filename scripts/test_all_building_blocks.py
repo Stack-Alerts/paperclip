@@ -252,6 +252,66 @@ def generate_markdown_report(results, output_file, test_days, start_time, end_ti
     print(f"\n✅ Markdown report saved: {output_file}")
 
 
+def generate_signal_occurrence_json(results, test_days):
+    """
+    Generate signal occurrence statistics JSON for Strategy Builder UI.
+    
+    Args:
+        results: Test results dictionary
+        test_days: Number of days tested
+    """
+    import json
+    
+    # Build statistics for each block
+    blocks_stats = {}
+    
+    for block_name, result in results.items():
+        if not result or result.get('test_status') != 'SUCCESS':
+            # Skip failed blocks
+            continue
+        
+        # Extract signal counts
+        signal_counts = result['results']['signal_counts']
+        total_results = result['results']['total_results']
+        
+        # Calculate percentages and format
+        signal_stats = {}
+        for signal, count in signal_counts.items():
+            percentage = (count / total_results * 100) if total_results > 0 else 0
+            signal_stats[signal] = {
+                'count': count,
+                'percentage': round(percentage, 2),
+                'total_candles': total_results
+            }
+        
+        blocks_stats[block_name] = {
+            'block_name': block_name,
+            'total_candles': total_results,
+            'errors': result['results']['total_errors'],
+            'signals': signal_stats
+        }
+    
+    # Create output
+    output_data = {
+        'analysis_date': datetime.now().isoformat(),
+        'data_timeframe': '15min',
+        'data_days': test_days,
+        'total_blocks': len(blocks_stats),
+        'blocks': blocks_stats
+    }
+    
+    # Save to catalog directory (used by Strategy Builder)
+    output_path = Path('data/catalog/signal_occurrence_statistics.json')
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(output_path, 'w') as f:
+        json.dump(output_data, f, indent=2)
+    
+    print(f"✅ Signal occurrence statistics saved: {output_path}")
+    print(f"   Blocks with data: {len(blocks_stats)}")
+    print(f"   Total signals tracked: {sum(len(b['signals']) for b in blocks_stats.values())}")
+
+
 def main():
     """Test all building blocks and generate report."""
     parser = argparse.ArgumentParser(description='Test All Building Blocks')
@@ -348,6 +408,13 @@ def main():
     output_file = output_dir / 'ALL_BUILDING_BLOCKS_TEST_REPORT.md'
     
     generate_markdown_report(results, output_file, args.days, start_time, end_time)
+    
+    # Also generate signal occurrence statistics JSON for Strategy Builder UI
+    print("\n" + "="*80)
+    print("GENERATING SIGNAL OCCURRENCE STATISTICS")
+    print("="*80)
+    
+    generate_signal_occurrence_json(results, args.days)
     
     # Summary
     successful = len([r for r in results.values() if r is not None])

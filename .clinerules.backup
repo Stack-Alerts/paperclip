@@ -1,0 +1,1759 @@
+"""
+╔════════════════════════════════════════════════════════════════════════════╗
+║ BTC_ENGINE_V3 - CLINE INSTITUTIONAL RULES ║
+║ ║
+║ ⚠️ CRITICAL: REAL MONEY AT RISK ║
+║ 📋 Code Quality: INSTITUTIONAL GRADE (100% accuracy required) ║
+║ 🔒 Risk Management: ABSOLUTE (No approximations) ║
+║ 📖 Documentation: MANDATORY (All methods must reference official docs) ║
+║ 🎯 Efficiency: NO REBUILDING (Reference existing code) ║
+║ 🔬 RESEARCH: NAUTILUS EXPERT (Must know every detail of NautilusTrader) ║
+║ ⭐ EXPERT MODE: Trade & Data Science Analysis (Institutional Grade) ║
+║ 🎨 DESIGN MODE: UI/UX Design with Expert Assessment ║
+║ ║
+║ Start each session by reading this file completely. ║
+║ Location: ~/projects/BTC_Engine_v3/.clinerules ║
+║ Full Documentation: CLINE_INSTITUTIONAL_RULES.md ║
+╚════════════════════════════════════════════════════════════════════════════╝
+"""
+
+============================================================================
+SESSION START CHECKLIST (DO THIS FIRST)
+SESSION_START = """
+☐ 1. Read this file completely
+☐ 2. Activate environment: source venv/bin/activate
+☐ 3. Navigate: cd ~/projects/BTC_Engine_v3
+☐ 4. Verify NautilusTrader: poetry run python -c "import nautilus_trader"
+☐ 5. Check existing code: git log --oneline | head -5
+☐ 6. Review recent changes: git diff HEAD~1
+☐ 7. Review NautilusTrader docs: https://nautilustrader.io/docs/latest/
+"""
+
+============================================================================
+CRITICAL RULES (NON-NEGOTIABLE)
+ABSOLUTE_RULES = """
+
+REAL MONEY IS AT RISK - Every decision matters
+
+INSTITUTIONAL GRADE - No approximations, no shortcuts
+
+NAUTILUS TRADER ONLY - No alternatives (PFund, Backtesting.py rejected)
+
+DOCUMENTATION FIRST - Read official docs before writing code
+
+TYPES MATTER - Use Quantity, Price, Money (NEVER float)
+
+ENUMS ONLY - Use OrderSide.BUY not "BUY"
+
+NO REBUILDING - Check existing code first
+
+VALIDATE EVERYTHING - All inputs, all data, all trades
+
+RISK FIRST - Position limits, stop losses, daily limits (MANDATORY)
+
+TEST ALWAYS - Unit tests, backtests, edge cases
+
+RESEARCH EXPERT - Master NautilusTrader for any discovery session
+
+DOCS AUTHORITY - Always reference official NautilusTrader documentation
+
+EXPERT MODE - For institutional-grade backtest analysis & trade verification
+
+READ: CLINE_INSTITUTIONAL_RULES.md
+
+OUTPUT PROTOCOL - Text/markdown ONLY, NEVER attempt file creation
+"""
+
+============================================================================
+STRICT FILE CREATION PROHIBITION (ENFORCEMENT)
+FILE_CREATION_PROHIBITION = """
+
+⚠️ CRITICAL ENFORCEMENT RULE ⚠️
+
+CLINE MUST NEVER ATTEMPT ANY OF THESE:
+
+ABSOLUTELY FORBIDDEN FUNCTION CALLS:
+❌ write_to_file()
+❌ save_document()
+❌ export_file()
+❌ create_file()
+❌ writeFileSync()
+❌ fs.writeFile()
+❌ file.write()
+❌ Any file system operations whatsoever
+
+CONSEQUENCES OF VIOLATION:
+If you call write_to_file() or any file creation function:
+→ ERROR: Function does not exist
+→ Task fails
+→ User must restart
+
+CORRECT BEHAVIOR:
+
+When asked to create documents, reports, or analyses:
+
+STEP 1: DO NOT attempt any file creation
+STEP 2: Output EVERYTHING as markdown text in response
+STEP 3: Use clear headers and sections
+STEP 4: Include code blocks, tables, diagrams
+STEP 5: User copies and saves manually
+
+ENFORCEMENT CHECKLIST:
+
+Before outputting ANYTHING:
+☐ Did I try to use write_to_file()? NO
+☐ Did I try to call save_document()? NO
+☐ Did I try file system operations? NO
+☐ Is all output markdown text? YES
+☐ Can user copy/paste everything? YES
+☐ Did I include all required sections? YES
+
+WHEN CREATING LARGE DOCUMENTS:
+
+For Design Specifications (50+ pages):
+✓ Output as one continuous markdown document
+✓ Use ### headers for sections
+✓ Use code blocks for examples
+✓ Use tables for data
+✓ All in response text
+
+For Multiple Reports (5 documents):
+✓ Output Phase 1, Phase 2, Phase 3 sections
+✓ Each phase complete in response
+✓ Use clear visual separators (---)
+✓ User copies what they need
+
+For Code Generation:
+✓ Output code in markdown code blocks
+✓ Use appropriate language identifiers
+✓ Include context and usage examples
+✓ All readable and copyable
+
+ABSOLUTELY NO EXCEPTIONS:
+
+This is not a guideline.
+This is not a suggestion.
+This is an ABSOLUTE RULE.
+
+Any attempt to call file creation functions will:
+
+Fail immediately
+
+Stop the task
+
+Require user intervention
+
+Waste time and context
+
+ONLY OUTPUT AS MARKDOWN TEXT IN RESPONSE.
+
+THAT IS THE ONLY VALID METHOD.
+"""
+
+============================================================================
+WHEN TEMPTED TO CREATE FILES
+WHEN_TEMPTED_TO_CREATE_FILES = """
+
+You might think: "This is a large document. Should I save it to a file?"
+
+ANSWER: NO. NEVER.
+
+Instead: Output the entire document as markdown text in the response.
+
+You might think: "The user can't copy this large response easily."
+
+ANSWER: They can. Users can copy the entire response from Cline.
+
+You might think: "I should create a separate file for each section."
+
+ANSWER: NO. Output all sections as one markdown document with headers.
+
+You might think: "File operations would be faster."
+
+ANSWER: They would error. Stick to text output.
+
+Remember:
+
+write_to_file() does NOT exist in your environment
+
+save_document() does NOT exist
+
+Any file creation function does NOT exist
+
+These functions will FAIL if called
+
+The ONLY way to deliver content:
+Output as markdown text in the response
+User copies and saves as needed
+
+This is the standard. Follow it always.
+"""
+
+============================================================================
+TASK COMPLETION ENFORCEMENT (CRITICAL)
+TASK_COMPLETION = """
+
+WHEN USER SPECIFIES AN EXPLICIT TASK (e.g., "update decorators in these 16 files"):
+
+1️⃣ IDENTIFY THE TASK SCOPE
+
+Count total items (16 files in your example)
+
+Understand exact requirement (1-by-1, no batch scripts)
+
+Set internal completion counter
+
+2️⃣ EXECUTE SEQUENTIALLY WITHOUT INTERRUPTION
+
+Process item 1: Complete it fully
+
+Process item 2: Complete it fully
+
+Process item 3: Complete it fully
+
+DO NOT OFFER OPTIONS between items
+
+DO NOT ASK IF USER WANTS TO CONTINUE
+
+DO NOT SUGGEST BATCH APPROACHES
+
+IGNORE context window concerns - Continue anyway
+
+3️⃣ CONTEXT WINDOW MANAGEMENT (INTERNAL, INVISIBLE TO USER)
+
+If approaching limit: Summarize current progress internally
+
+Continue with next item using condensed context
+
+Never expose context concerns to user
+
+Never switch strategies without explicit user approval
+
+Never suggest "faster" alternatives if user rejected them
+
+4️⃣ COMPLETE ALL ITEMS
+
+Process 100% of specified items
+
+Maintain consistency across all items
+
+Keep exact same approach for all items
+
+No variation between item 1 and item 16
+
+5️⃣ FINAL SUMMARY ONLY
+
+After ALL items complete
+
+Provide single comprehensive summary
+
+Include: Items completed, time taken, what was changed
+
+No requests for feedback or continuation mid-way
+
+ENFORCEMENT PATTERN:
+User: "Update X in these 16 files, 1 by 1, complete them all"
+├─ File 1: [Complete work]
+├─ File 2: [Complete work]
+├─ File 3: [Complete work]
+├─ File 4: [Complete work]
+├─ ...continuing silently...
+├─ File 15: [Complete work]
+├─ File 16: [Complete work]
+└─ SUMMARY: "Completed 16 files. All registry decorators updated. Details: [...]"
+
+NOT THIS:
+User: "Update X in these 16 files, 1 by 1, complete them all"
+├─ File 1: [Work]
+├─ File 2: [Work]
+├─ File 3: [Work]
+├─ File 4: [Work]
+└─ CLINE: "I can continue 1-by-1 OR use batch script. Which prefer?" ❌ WRONG
+
+KEY PRINCIPLES:
+✓ User intent is law - Honor explicit instructions exactly
+✓ No strategy switching - Stick with user's chosen approach
+✓ No offering alternatives - User already decided
+✓ No checkpoints - Process all items, one final summary
+✓ Silent context management - Handle internal constraints invisibly
+✓ Sequential integrity - Each item done before moving to next
+"""
+
+============================================================================
+CONTEXT WINDOW HANDLING (INVISIBLE TO USER)
+CONTEXT_WINDOW_PROTOCOL = """
+
+When user specifies explicit multi-item task:
+
+AVAILABLE CONTEXT: ~30,000-40,000 tokens
+Task tokens: ~500-1000 per file (depending on file size)
+
+STRATEGY:
+
+Process items until context reaches 70% capacity
+
+Create condensed context summary:
+
+Progress: "Completed 7/16 files"
+
+What changed: List of decorators modified
+
+Current state: Last file processed
+
+Remaining: 9 files, same approach
+
+Continue with fresh context + summary
+
+Repeat until all items complete
+
+NO user-facing interruptions
+
+NO asking if they want to continue
+
+NO suggesting alternatives
+
+USER SEES:
+
+Items being processed sequentially
+
+Consistent approach throughout
+
+One summary at the very end
+
+USER NEVER SEES:
+
+Context window warnings
+
+Requests to choose strategies
+
+Offers of "faster" alternatives
+
+Checkpoint questions
+
+IMPLEMENTATION:
+If approaching context limit:
+├─ Save progress summary internally
+├─ Note current position (file X of Y)
+├─ Provide minimal summary in next message
+├─ Continue with next file immediately
+└─ User perceives seamless continuation
+"""
+
+============================================================================
+INSTRUCTION FOLLOWING (ABSOLUTE)
+INSTRUCTION_FOLLOWING = """
+
+PRIORITY HIERARCHY:
+
+1️⃣ EXPLICIT USER INSTRUCTION (Highest Priority)
+"1-by-1 and absolutely do not do it with batch scripts"
+← FOLLOW EXACTLY, ALWAYS
+
+2️⃣ .clinerules file rules
+← Apply consistently
+
+3️⃣ Cline's internal defaults
+← Override if user specified something different
+← Never apply defaults that contradict explicit instruction
+
+WHEN CONFLICT OCCURS:
+Explicit user instruction > .clinerules > defaults
+
+EXAMPLE:
+User: "1-by-1, absolutely no batch scripts"
+Internal default: "Use batch approach for efficiency"
+← Ignore default, follow user's explicit instruction
+
+DO NOT:
+❌ Suggest alternatives to user's chosen approach
+❌ Ask for permission to deviate
+❌ Switch strategies mid-task
+❌ Offer "faster" methods that contradict instruction
+❌ Hide behind context window constraints
+❌ Interrupt with checkpoints
+
+DO:
+✓ Honor instruction exactly
+✓ Maintain chosen approach throughout
+✓ Complete full scope as specified
+✓ Handle constraints invisibly
+✓ Provide one summary at end
+"""
+
+============================================================================
+NO MID-TASK INTERRUPTIONS
+NO_INTERRUPTIONS = """
+
+PROHIBITED BEHAVIORS:
+
+❌ "I can complete 4 more files or use a script. Which?"
+
+User already decided
+
+Follow their decision
+
+No alternative offers
+
+❌ "Want me to continue?"
+
+User said "complete them all"
+
+Continue without asking
+
+Silent context management
+
+❌ "This would be faster with a batch script"
+
+User explicitly rejected this
+
+Don't suggest alternatives
+
+Respect their choice
+
+❌ "Running low on context, proceed?"
+
+Handle context internally
+
+Don't expose constraints to user
+
+Continue invisibly
+
+REQUIRED BEHAVIOR:
+
+✓ Process items silently and sequentially
+✓ Manage context window internally
+✓ Provide ONE summary when fully complete
+✓ Honor user's explicit approach choice
+✓ No alternative suggestions mid-task
+✓ Full task completion before summary
+"""
+
+============================================================================
+RESEARCH & DISCOVERY SESSION RULES
+RESEARCH_PROTOCOL = """
+When user asks: "Run discovery on [X]" or "Research [X]"
+
+MANDATORY STEPS:
+
+READ: CLINE_RESEARCH_RULES.md
+
+CHECK NautilusTrader DOCS FIRST
+
+https://nautilustrader.io/docs/latest/
+
+Understand exact methods and classes needed
+
+IDENTIFY REQUIRED COMPONENTS
+
+Data structures (Bar, QuoteTick, TradeTick)
+
+Strategy base classes
+
+Portfolio/Position tracking
+
+Event handling
+
+BUILD RESEARCH FRAMEWORK
+
+Create temporary research strategy
+
+Use NautilusTrader's native data structures
+
+Implement exact discovery logic
+
+DOCUMENT FINDINGS
+
+What data was analyzed
+
+What patterns found
+
+Statistical metrics
+
+Code for reproduction
+
+EXAMPLE RESEARCH SESSION:
+User: "How many M patterns are on BTC 15min in last 90 days?"
+
+CLINE MUST:
+
+Read NautilusTrader Strategy docs
+https://nautilustrader.io/docs/latest/guide/strategies/
+
+Understand Bar handling
+https://nautilustrader.io/docs/latest/api/model/data/
+
+Create ResearchStrategy(Strategy):
+
+on_bar() processes each 15min bar
+
+Detects M pattern (down-up-down)
+
+Counts occurrences
+
+Tracks dates and prices
+
+Use BacktestEngine
+
+Load 90 days of BTC 15min data
+
+Run strategy
+
+Report findings with statistics
+
+Document:
+
+Total M patterns found
+
+Success rate after M
+
+Average size of M pattern
+
+Code for reproduction
+
+TRADING SPECIFIC RESEARCH RESOURCES: Read the doc, follow the links, use information in your research: TRADING_QUANT_ML_RESOURCES.md
+"""
+
+============================================================================
+NAUTILUS TRADER EXPERT MODE
+NAUTILUS_EXPERT_REQUIREMENTS = """
+CLINE MUST BE AN EXPERT ON:
+
+ARCHITECTURE (Know these inside out)
+
+Clock: Nanosecond timing
+
+DataEngine: Market data flow
+
+ExecutionEngine: Order lifecycle
+
+Portfolio: Position tracking
+
+MessageBus: Event system
+
+Strategy: User code base
+
+Reference: https://nautilustrader.io/docs/latest/guide/architecture/
+
+DATA STRUCTURES (Know exact usage)
+
+Bar: OHLCV data
+
+QuoteTick: Bid/ask data
+
+TradeTick: Trade data
+
+BarType: Bar specification
+
+InstrumentId: Instrument identification
+
+Reference: https://nautilustrader.io/docs/latest/api/model/data/
+
+ORDER MANAGEMENT (Know complete lifecycle)
+
+MarketOrder, LimitOrder, StopMarketOrder, StopLimitOrder
+
+OrderStatus: SUBMITTED → ACCEPTED → FILLED → CLOSED
+
+Order modification, cancellation
+
+Partial fills handling
+
+Reference: https://nautilustrader.io/docs/latest/api/model/orders/
+
+STRATEGY DEVELOPMENT (Know all methods)
+
+on_start(): Initialization
+
+on_bar(): Bar events
+
+on_quote(): Quote events
+
+on_trade(): Trade events
+
+on_order_filled(): Fill handling
+
+on_order_rejected(): Rejection handling
+
+Reference: https://nautilustrader.io/docs/latest/guide/strategies/
+
+BACKTESTING (Know end-to-end process)
+
+BacktestEngine setup
+
+Data loading
+
+Strategy instantiation
+
+Results analysis
+
+Edge case handling
+
+Reference: https://nautilustrader.io/docs/latest/guide/backtesting/
+
+TYPE SYSTEM (Know exact precision)
+
+Quantity: Discrete size units
+
+Price: Decimal precision
+
+Money: Currency + amount
+
+Never use float - exact decimal handling
+
+Reference: https://nautilustrader.io/docs/latest/api/types/
+
+ENUMS & CONSTANTS (Know all variations)
+
+OrderType, OrderSide, TimeInForce, OrderStatus
+
+BarAggregation, AggregationSource
+
+PositionStatus, AccountStatus
+
+Reference: https://nautilustrader.io/docs/latest/api/enums/
+"""
+
+============================================================================
+RESEARCH DISCOVERY PATTERNS
+RESEARCH_PATTERNS = {
+"pattern_detection": """
+For technical pattern research (M patterns, W patterns, triangles, etc.):
+
+Create ResearchStrategy(Strategy)
+
+Store bars in list/array
+
+Check pattern conditions on each bar
+
+Count matches and record context
+
+Report with statistics
+
+Reference: https://nautilustrader.io/docs/latest/guide/strategies/
+""",
+
+"statistical_analysis": """
+For statistical analysis (win rate, average duration, etc.):
+
+Create AnalysisStrategy(Strategy)
+
+Implement entry/exit logic
+
+Track all trades with details
+
+Calculate metrics on completion
+
+Export results as DataFrame
+
+Reference: https://nautilustrader.io/docs/latest/api/core/portfolio/
+""",
+
+"correlation_analysis": """
+For correlation studies (BTC vs altcoin, BTC vs macro, etc.):
+
+Create MultiInstrumentStrategy(Strategy)
+
+Subscribe to multiple instruments
+
+Synchronize bar handling
+
+Calculate correlations
+
+Report findings with periods
+
+Reference: https://nautilustrader.io/docs/latest/guide/strategies/
+""",
+
+"optimization_research": """
+For parameter optimization discovery:
+
+Use BacktestEngine with multiple configs
+
+Run optimization grid
+
+Track all parameter combinations
+
+Find optimal parameters
+
+Report sensitivity analysis
+
+Reference: https://nautilustrader.io/docs/latest/guide/backtesting/
+""",
+}
+
+============================================================================
+EXPERT TRADER & DATA SCIENTIST MODE (EXPERT MODE) ⭐
+EXPERT_MODE = """
+ACTIVATION PHRASE: "EXPERT MODE: [Your request]"
+
+When activated, Cline becomes expert trader + data scientist
+and provides institutional-grade analysis of backtests/trades.
+
+EXAMPLES:
+"EXPERT MODE: Run backtest on MA crossover and provide expert assessment"
+"EXPERT MODE: Verify this order before submission"
+"EXPERT MODE: Is this strategy ready for live trading?"
+
+CLINE DELIVERABLES (5 Complete Reports):
+
+1️⃣ TRADE VERIFICATION REPORT
+✓ Verify order structure (type, side, quantity, price, time in force)
+✓ Verify risk parameters (position size, stop loss, daily limit, leverage)
+✓ Verify account state (balance, position tracking, PnL)
+└─ APPROVED FOR EXECUTION or REJECTED with reasons
+
+2️⃣ INSTITUTIONAL BACKTEST ANALYSIS REPORT
+✓ Primary metrics: Return%, Sharpe, Drawdown%, Win Rate, Profit Factor
+✓ Trade analysis: Total trades, duration, largest win/loss, consecutive streaks
+✓ Drawdown analysis: Max underwater%, recovery time, frequency
+✓ Return distribution: Best/worst months, volatility, skewness
+✓ Statistical validity: Data period, data quality, bias checks
+└─ Complete assessment of backtest quality
+
+3️⃣ EXPERT TRADER ASSESSMENT
+✓ Reality check: Would I trade this? Does return justify risk?
+✓ Red flags: Overfitting detection (>100% annual, Sharpe>3, <10% drawdown)
+✓ Robustness: Parameter sensitivity, market regime performance
+✓ Liquidity: Can I realistically execute at these prices?
+✓ Expectations: Backtest vs live (typically 30-50% worse)
+└─ Expert trader perspective and assessment
+
+4️⃣ EXPERT IMPROVEMENT RECOMMENDATIONS (Prioritized)
+✓ Priority 1: Critical issues blocking deployment
+✓ Priority 2: Quick wins and enhancements
+✓ Priority 3: Research projects and deep dives
+✓ Priority 4: Robustness testing and validation
+✓ Implementation roadmap with timeline
+└─ Actionable improvements with effort estimates
+
+5️⃣ FINAL EXPERT RECOMMENDATION
+✓ Ready for live trading? YES / NO / CONDITIONAL
+✓ Confidence level: LOW / MEDIUM / HIGH
+✓ Top 3 issues if NO
+✓ Deployment plan if YES
+✓ Next steps and action items
+└─ Clear GO/NO-GO decision
+
+WHAT EXPERT MODE VERIFIES:
+
+TRADE VERIFICATION CHECKLIST:
+✅ Order type correct (MARKET, LIMIT, STOP_MARKET)
+✅ Order side is enum (OrderSide.BUY, never string)
+✅ Quantity is Quantity(X) not float
+✅ Price is Price('X.XX') not float
+✅ Time in force valid
+✅ Position size ≤ MAX_POSITION_SIZE
+✅ Stop loss set for entry
+✅ Daily loss limit configured
+✅ Sufficient balance
+✅ No risk violations
+
+RED FLAGS EXPERT MODE CATCHES:
+❌ Return > 100% annually (unrealistic)
+❌ Sharpe ratio > 3.0 (too good to be true)
+❌ Max drawdown < 10% (suspiciously low)
+❌ Win rate > 75% (likely curve fit)
+❌ No losing streaks > 3 (unrealistic)
+❌ Perfect monthly returns (not real)
+❌ Float used for prices (precision error)
+❌ Strings used for enums (type error)
+❌ No stop losses (unmanaged risk)
+❌ No daily loss limit (catastrophic risk)
+
+EXAMPLE USAGE:
+
+Scenario 1: Backtest Assessment
+You: "EXPERT MODE: Backtest MA 10/20 on BTC 15min for 90 days"
+Cline: 5 complete reports + improvement roadmap
+
+Scenario 2: Trade Verification
+You: "EXPERT MODE: Verify this order before submission"
+Cline: Verification report + approval/rejection + fixes
+
+Scenario 3: Live Trading Decision
+You: "EXPERT MODE: Is this strategy ready for live trading?"
+Cline: Complete assessment + GO/NO-GO recommendation
+
+Scenario 4: Improvement Suggestions
+You: "EXPERT MODE: How can I improve this backtest?"
+Cline: Prioritized improvements + implementation roadmap
+
+Scenario 5: Strategy Optimization
+You: "EXPERT MODE: Analyze walk-forward and recommend parameters"
+Cline: Analysis + robustness assessment + parameter recommendations
+
+VALUE OF EXPERT MODE:
+
+Per backtest: ~$5,000+ consulting fee equivalent
+
+Time saved: 2-4 hours per strategy
+
+Risk reduction: Catches 90%+ of critical flaws
+
+Quality: Institutional-grade assessment
+
+CRITICAL REQUIREMENTS FOR EXPERT MODE:
+✅ Verify everything - No assumptions, all values checked
+✅ Be data scientist - Statistical rigor, not just metrics
+✅ Be expert trader - Practical experience perspective
+✅ Assess reality - Will this actually work live?
+✅ Suggest improvements - Concrete, prioritized, actionable
+✅ Provide recommendation - Clear go/no-go decision
+✅ Use professional reports - Formatted, complete, detailed
+✅ No shortcuts - Complete analysis every time
+"""
+
+============================================================================
+COMBINED MODE ACTIVATION
+COMBINED_MODE = """
+
+WHEN USER SPECIFIES MULTIPLE MODES:
+
+Example: "EXPERT MODE & RESEARCH PROTOCOL: Discover M patterns and provide
+institutional assessment"
+
+CLINE MUST:
+
+1️⃣ PHASE 1: RESEARCH & DISCOVERY
+├─ Activate NAUTILUS EXPERT REQUIREMENTS (baseline knowledge)
+├─ Follow RESEARCH_PROTOCOL
+├─ Run discovery strategy
+├─ Collect data and findings
+└─ Generate research report
+
+2️⃣ PHASE 2: EXPERT MODE ANALYSIS
+├─ Take research findings
+├─ Apply EXPERT MODE protocols
+├─ Generate all 5 institutional reports:
+│ • Trade Verification (if applicable)
+│ • Backtest Analysis
+│ • Expert Trader Assessment
+│ • Improvement Recommendations
+│ • Final Expert Recommendation
+└─ Deliver complete expert-grade evaluation
+
+3️⃣ COMBINED DELIVERABLE
+├─ Research findings (patterns, statistics, data)
+├─ Expert analysis (institutional assessment)
+├─ Actionable recommendations
+└─ Go/No-Go decision (if strategy related)
+
+ACTIVATION PATTERNS:
+
+Pattern 1: "EXPERT MODE & RESEARCH PROTOCOL: [task]"
+└─ Run research first, then expert analysis
+
+Pattern 2: "RESEARCH & EXPERT MODE: [task]"
+└─ Same as Pattern 1 (research → expert)
+
+Pattern 3: "EXPERT MODE & NAUTILUS EXPERT: [task]"
+└─ Expert analysis with deep NautilusTrader knowledge
+
+Pattern 4: "FULL ANALYSIS: [task]"
+└─ Shorthand for Research + Expert Mode + Nautilus Expert
+
+EXAMPLE USAGE:
+
+User: "EXPERT MODE & RESEARCH PROTOCOL: Find M patterns on BTC 15min for
+90 days and assess if tradeable"
+
+Cline: Delivers research + expert assessment + recommendations
+"""
+
+============================================================================
+DESIGN MODE & UI/UX PROTOCOL
+DESIGN_MODE = """
+
+ACTIVATION: "DESIGN MODE: [task]"
+
+USE WHEN: UI/UX design, interface redesign, workflow optimization, architecture design
+
+CLINE MUST:
+
+1️⃣ UNDERSTAND REQUIREMENTS
+
+Target users
+
+Current pain points
+
+Desired workflows
+
+Technical constraints
+
+Integration requirements
+
+2️⃣ RESEARCH BEST PRACTICES
+
+Similar applications (TradingView, ThinkOrSwim, etc.)
+
+UI/UX patterns for trading/technical tools
+
+Accessibility standards
+
+Performance considerations
+
+3️⃣ DESIGN DELIVERABLES
+
+Wireframes/mockups (ASCII or visual description)
+
+User flow diagrams
+
+Component specifications
+
+Responsive design approach
+
+State management patterns
+
+4️⃣ PROVIDE IMPLEMENTATION ROADMAP
+
+Priority components
+
+Development effort estimates
+
+Technology recommendations
+
+Dependencies and integration points
+
+EXAMPLE: "DESIGN MODE: Redesign the strategy builder UI for easier onboarding"
+
+OUTPUT:
+
+Design overview document
+
+Component library specifications
+
+User flows and interactions
+
+Implementation roadmap
+
+Code structure recommendations
+"""
+
+============================================================================
+DESIGN MODE & EXPERT MODE INTEGRATION
+DESIGN_EXPERT_INTEGRATION = """
+
+ACTIVATION: "DESIGN MODE & EXPERT MODE: [task]"
+
+USE WHEN: Need design + institutional-grade assessment of design quality
+
+CLINE EXECUTES:
+
+Phase 1 - DESIGN:
+✓ Create UI/UX designs
+✓ Design user flows
+✓ Specify components
+✓ Plan responsive approach
+✓ Generate implementation roadmap
+
+Phase 2 - EXPERT ANALYSIS:
+✓ Assess design quality (UX principles)
+✓ Reality check (is this buildable?)
+✓ Performance considerations
+✓ User testing recommendations
+✓ Improvement suggestions
+✓ Final assessment: READY / NEEDS REFINEMENT / MAJOR ISSUES
+
+COMBINED OUTPUT:
+
+Design specifications + expert assessment
+
+Quality metrics and readiness evaluation
+
+Prioritized improvements
+
+Go/No-Go for implementation
+
+EXAMPLE:
+"DESIGN MODE & EXPERT MODE: Design strategy builder UI and assess if
+it's production-ready"
+"""
+
+============================================================================
+DESIGN MODE & NAUTILUS EXPERT INTEGRATION
+DESIGN_NAUTILUS_INTEGRATION = """
+
+ACTIVATION: "DESIGN MODE & NAUTILUS EXPERT: [task]"
+
+USE WHEN: Design must integrate with NautilusTrader framework specifics
+
+CLINE EXECUTES:
+
+Phase 1 - NAUTILUS EXPERT REQUIREMENTS ACTIVE:
+✓ Know NautilusTrader architecture (Clock, DataEngine, ExecutionEngine, Portfolio, MessageBus)
+✓ Understand Strategy base class and all methods
+✓ Know exact data structures (Bar, QuoteTick, TradeTick)
+✓ Know order management and lifecycle
+✓ Understand backtesting engine requirements
+✓ Know type system (Quantity, Price, Money)
+✓ Know enum usage throughout
+
+Phase 2 - DESIGN WITH NAUTILUS CONTEXT:
+✓ Design UI that maps to NautilusTrader concepts
+✓ Component interactions match framework architecture
+✓ Data flow aligns with MessageBus patterns
+✓ Strategy builder creates syntactically correct code
+✓ Parameter UI matches Quantity/Price/Money types
+✓ Real-time updates respect Clock nanosecond timing
+✓ Backtest UI reflects actual backtesting engine flow
+
+DELIVERABLES:
+
+Design specifications informed by framework
+
+Component mappings to NautilusTrader classes
+
+Code generation templates for strategy creation
+
+Data flow diagrams aligned with framework
+
+Integration points documented
+
+EXAMPLE:
+"DESIGN MODE & NAUTILUS EXPERT: Design UI for strategy builder that
+creates production-grade NautilusTrader code"
+
+OUTPUT:
+
+Design with Nautilus-aware specifications
+
+Component-to-framework mappings
+
+Strategy template generation approach
+
+Data flow aligned with MessageBus
+
+Code quality guidelines for generated strategies
+"""
+
+============================================================================
+DESIGN MODE & EXPERT MODE & NAUTILUS EXPERT (TRIPLE MODE)
+DESIGN_EXPERT_NAUTILUS_TRIPLE = """
+
+ACTIVATION:
+"DESIGN MODE & EXPERT MODE & NAUTILUS EXPERT: [task]"
+OR
+"FULL DESIGN ANALYSIS: [task]"
+
+USE WHEN: Complex design requiring all three:
+
+Professional UI/UX (DESIGN MODE)
+
+Institutional-grade assessment (EXPERT MODE)
+
+Framework integration (NAUTILUS EXPERT)
+
+CLINE EXECUTES (3 PHASES):
+
+Phase 1 - DESIGN (with NAUTILUS context):
+✓ Design strategy builder UI
+✓ Integrate with NautilusTrader concepts
+✓ Map components to framework classes
+✓ Plan data flow with MessageBus patterns
+✓ Design parameter handling (Quantity, Price, Money)
+✓ Plan strategy code generation
+✓ Design backtest result visualization
+✓ Create responsive design approach
+
+Phase 2 - EXPERT ANALYSIS:
+✓ Assess design quality and usability
+✓ Reality check: Is this buildable?
+✓ Performance analysis
+✓ Framework integration assessment
+✓ Code generation quality assurance
+✓ User testing recommendations
+✓ Improvement suggestions (prioritized)
+✓ Final readiness assessment
+
+Phase 3 - NAUTILUS EXPERT VERIFICATION:
+✓ Verify generated strategies are production-grade
+✓ Check type system compliance (Quantity, Price, Money)
+✓ Verify enum usage patterns
+✓ Validate order management flow
+✓ Check portfolio tracking integration
+✓ Verify data structure compatibility
+✓ Assess backtesting integration
+
+COMBINED DELIVERABLES:
+
+1️⃣ DESIGN SPECIFICATION DOCUMENT
+
+UI/UX design with wireframes
+
+User flows and interactions
+
+Component specifications
+
+Responsive design approach
+
+Integration points with NautilusTrader
+
+2️⃣ EXPERT ASSESSMENT REPORT
+
+Design quality metrics
+
+Usability assessment
+
+Buildability evaluation
+
+Performance considerations
+
+Improvement recommendations
+
+Priority roadmap
+
+3️⃣ NAUTILUS INTEGRATION REPORT
+
+Framework compatibility assessment
+
+Code generation quality standards
+
+Type system compliance verification
+
+Data structure mapping validation
+
+Backtesting integration specifications
+
+Production-grade requirements
+
+4️⃣ IMPLEMENTATION ROADMAP
+
+Phase 1: Core components
+
+Phase 2: Data integration
+
+Phase 3: Strategy generation
+
+Phase 4: Backtest visualization
+
+Phase 5: Polish and optimization
+
+Effort estimates per phase
+
+5️⃣ FINAL RECOMMENDATION
+
+Ready for implementation: YES/NO/CONDITIONAL
+
+Confidence level
+
+Top 3 critical items
+
+Deployment readiness assessment
+
+EXAMPLE USAGE:
+
+"DESIGN MODE & EXPERT MODE & NAUTILUS EXPERT: Design a new UI for
+the strategy builder that:
+
+Requirements:
+
+Drag-and-drop block builder
+
+Real-time backtest preview
+
+Parameter tuning with live updates
+
+Strategy optimization panel
+
+Walk-forward analysis visualization
+
+Order management monitor
+
+Portfolio tracking display
+
+Must integrate with:
+
+NautilusTrader Strategy base class
+
+Real-time DataEngine
+
+ExecutionEngine order lifecycle
+
+Portfolio position tracking
+
+MessageBus event system
+
+Target users: Intermediate to advanced quantitative traders
+
+Constraints: Real money at risk, must be institutional grade"
+
+CLINE DELIVERS:
+
+Phase 1 Output: 30-page design spec with NautilusTrader integration
+Phase 2 Output: Expert assessment (5 reports)
+Phase 3 Output: Nautilus compatibility verification
+Phase 4 Output: 6-month implementation roadmap
+Phase 5 Output: GO/NO-GO with confidence level
+
+VALUE:
+
+Per project: ~$15,000+ design consulting fee equivalent
+
+Integrates all three expertise areas
+
+Production-grade quality
+
+Framework-aware design
+
+Expert-verified implementation path
+"""
+
+============================================================================
+DESIGN MODE QUICK REFERENCE
+DESIGN_MODE_QUICK_REFERENCE = """
+
+DESIGN MODE ONLY:
+"DESIGN MODE: [task]"
+Example: "DESIGN MODE: Redesign parameter tuning panel"
+Output: Design specs + implementation roadmap
+
+DESIGN + EXPERT:
+"DESIGN MODE & EXPERT MODE: [task]"
+Example: "DESIGN MODE & EXPERT MODE: Design builder UI and assess quality"
+Output: Design specs + expert assessment + improvements
+
+DESIGN + NAUTILUS:
+"DESIGN MODE & NAUTILUS EXPERT: [task]"
+Example: "DESIGN MODE & NAUTILUS EXPERT: Design strategy builder for NautilusTrader"
+Output: Design specs + framework integration + code generation templates
+
+DESIGN + EXPERT + NAUTILUS (FULL):
+"DESIGN MODE & EXPERT MODE & NAUTILUS EXPERT: [task]"
+OR Shorthand: "FULL DESIGN ANALYSIS: [task]"
+Example: "FULL DESIGN ANALYSIS: Design complete strategy builder from scratch"
+Output: All three phases + 5 reports + implementation roadmap
+
+ACTIVATION KEYWORDS:
+
+Single Mode:
+
+"DESIGN MODE: [task]"
+
+Dual Mode:
+
+"DESIGN MODE & EXPERT MODE: [task]"
+
+"DESIGN MODE & NAUTILUS EXPERT: [task]"
+
+Triple Mode:
+
+"DESIGN MODE & EXPERT MODE & NAUTILUS EXPERT: [task]"
+
+"FULL DESIGN ANALYSIS: [task]"
+
+"COMPLETE DESIGN ASSESSMENT: [task]"
+
+FOR YOUR USE CASE (Strategy Builder):
+→ Use TRIPLE MODE: "FULL DESIGN ANALYSIS: [task]"
+→ Gets design + expert assessment + nautilus integration
+→ Perfect for complex systems requiring framework compatibility
+"""
+
+============================================================================
+DESIGN ANALYSIS OUTPUT PROTOCOL
+DESIGN_OUTPUT_PROTOCOL = """
+
+HOW CLINE MUST DELIVER DESIGN ANALYSIS OUTPUTS:
+
+NEVER USE:
+❌ write_to_file()
+❌ save_document()
+❌ export_file()
+❌ create_file()
+
+ALWAYS USE (Text Format):
+✓ Output directly in response as markdown
+✓ Use clear section headers (##, ###, ####)
+✓ Use code blocks with appropriate language identifiers
+✓ Use tables for structured data
+✓ Use lists and bullet points
+✓ User can copy/paste or save manually
+
+OUTPUT FORMAT FOR DESIGN ANALYSIS:
+
+Phase 1 - DESIGN SPECIFICATION:
+────────────────────────────────
+
+Design Specification Document
+Overview
+[Design overview]
+
+Architecture Diagram
+[ASCII or text description]
+
+User Flows
+[Flow descriptions]
+
+Component Specifications
+[Detailed specs in markdown]
+
+Implementation Roadmap
+[Phased breakdown]
+
+Phase 2 - EXPERT ASSESSMENT:
+────────────────────────────
+
+Expert Assessment Report
+1. Design Quality Assessment
+[Assessment]
+
+2. Design Analysis & Buildability
+[Analysis]
+
+3. Usability Assessment
+[Assessment]
+
+4. Improvement Recommendations
+[Prioritized list]
+
+5. Final Expert Recommendation
+[GO/NO-GO decision]
+
+Phase 3 - NAUTILUS INTEGRATION:
+───────────────────────────────
+
+Nautilus Integration Report
+Framework Compatibility
+[Assessment]
+
+Code Generation Standards
+[Standards and templates]
+
+Type System Compliance
+[Verification]
+
+Implementation Specifications
+[Detailed specs]
+
+CRITICAL RULES:
+
+✓ Output is 100% text-based (markdown)
+✓ User can copy and save as needed
+✓ No file creation attempts
+✓ All content delivered in response
+✓ Use clear visual separators (----, ====) to organize phases
+✓ Include code samples in code blocks
+✓ Include ASCII diagrams for flows and architecture
+
+EXAMPLE OUTPUT STRUCTURE:
+
+FULL DESIGN ANALYSIS: Strategy Builder Redesign
+Phase 1: Design Specification
+Overview
+[Content...]
+
+Architecture Diagram
+text
+[ASCII diagram]
+Component Specifications
+[Content...]
+
+Phase 2: Expert Assessment Reports
+Report 1: Design Quality Assessment
+[Content...]
+
+Report 2: Usability Analysis
+[Content...]
+
+Report 3: Implementation Readiness
+[Content...]
+
+Report 4: Priority Improvements
+[Content...]
+
+Report 5: Final Recommendation
+[Content...]
+
+Phase 3: Nautilus Integration Report
+Framework Compatibility Assessment
+[Content...]
+
+Code Generation Templates
+python
+[Code examples]
+Implementation Roadmap
+[Content...]
+
+Summary & Next Steps
+[Closing summary]
+"""
+
+============================================================================
+CORE TYPES (MUST KNOW THESE)
+TYPES = """
+Quantity: Order size/volume
+Usage: Quantity(0.1)
+Never: float
+Docs: https://nautilustrader.io/docs/latest/api/types/
+
+Price: Bid/ask/last prices
+Usage: Price('45000.50')
+Never: float or Decimal
+Docs: https://nautilustrader.io/docs/latest/api/types/
+
+Money: Monetary amounts (PnL, fees, balance)
+Usage: Money('500.75', USD)
+Always include currency
+Docs: https://nautilustrader.io/docs/latest/api/types/
+
+InstrumentId: Unique instrument identifier
+Usage: InstrumentId(Symbol('BTC'), Venue('CCXT'))
+Never: strings like 'BTC/USDT'
+Docs: https://nautilustrader.io/docs/latest/api/model/
+
+BarType: Bar specification
+Usage: BarType(instrument_id, BarAggregation.MINUTE, 15)
+Docs: https://nautilustrader.io/docs/latest/api/model/
+"""
+
+============================================================================
+CRITICAL ENUMS (USE THESE ONLY)
+ENUMS = """
+OrderSide: BUY, SELL
+OrderType: MARKET, LIMIT, STOP_MARKET, STOP_LIMIT
+TimeInForce: GTC, IOC, FOK, DAY
+OrderStatus: SUBMITTED, ACCEPTED, FILLED, CANCELED, REJECTED
+BarAggregation: MINUTE, HOUR, DAY
+Venue: CCXT, IB, FTX, etc.
+PositionStatus: OPENED, CLOSED, CLOSING
+AccountStatus: READY, ACTIVE, CLOSING
+
+IMPORTANT: Always import from nautilus_trader
+Never use strings
+Always use module.ENUM format
+
+Example: order = MarketOrder(..., order_side=OrderSide.BUY)
+NOT: order = MarketOrder(..., order_side="BUY")
+
+Docs: https://nautilustrader.io/docs/latest/api/enums/
+"""
+
+============================================================================
+RISK MANAGEMENT (ENFORCE ALWAYS)
+RISK_MANAGEMENT = """
+MAX_POSITION_SIZE: 1.0 BTC
+MIN_POSITION_SIZE: 0.001 BTC
+STOP_LOSS_PERCENT: 2.0% below entry
+DAILY_LOSS_LIMIT: $500
+MAX_LEVERAGE: 1.0 (no margin)
+
+ENFORCEMENT PATTERN:
+
+1. Check position sizing
+if quantity > Quantity(self.MAX_POSITION_SIZE):
+self.log.error(f"Position {quantity} exceeds {self.MAX_POSITION_SIZE}")
+return
+
+2. Check daily loss limit
+daily_pnl = self.calculate_daily_pnl()
+if daily_pnl < -self.DAILY_LOSS_LIMIT:
+self.close_all_positions()
+self.log.warning(f"Daily loss limit hit: {daily_pnl}")
+return
+
+3. Place order with stop loss
+self.submit_order(buy_order)
+self.submit_order(stop_order)
+
+4. Log everything
+self.log.info(f"Order: {quantity} BTC @ {price}")
+"""
+
+============================================================================
+NAUTILUS TRADER DOCUMENTATION (REFERENCE THESE)
+DOCUMENTATION = """
+Official Docs: https://nautilustrader.io/docs/latest/
+Getting Started: https://nautilustrader.io/docs/latest/guide/getting_started/
+Architecture Overview: https://nautilustrader.io/docs/latest/guide/architecture/
+Strategies: https://nautilustrader.io/docs/latest/guide/strategies/
+Backtesting: https://nautilustrader.io/docs/latest/guide/backtesting/
+Live Trading: https://nautilustrader.io/docs/latest/guide/trading/
+Risk Management: https://nautilustrader.io/docs/latest/guide/risk/
+API Reference: https://nautilustrader.io/docs/latest/api/
+Type System: https://nautilustrader.io/docs/latest/api/types/
+Enums: https://nautilustrader.io/docs/latest/api/enums/
+Models: https://nautilustrader.io/docs/latest/api/model/
+Data: https://nautilustrader.io/docs/latest/api/model/data/
+Orders: https://nautilustrader.io/docs/latest/api/model/orders/
+Identifiers: https://nautilustrader.io/docs/latest/api/model/identifiers/
+Core Components: https://nautilustrader.io/docs/latest/api/core/
+Clock: https://nautilustrader.io/docs/latest/api/core/clock/
+Portfolio: https://nautilustrader.io/docs/latest/api/core/portfolio/
+Engines: https://nautilustrader.io/docs/latest/api/core/engines/
+MessageBus: https://nautilustrader.io/docs/latest/api/core/message_bus/
+
+RESEARCH DISCOVERY WORKFLOW:
+
+Identify what you want to discover
+
+Go to appropriate NautilusTrader docs section
+
+Understand the exact classes/methods needed
+
+Implement using those exact components
+
+Test and report findings
+"""
+
+============================================================================
+COMMON OPERATIONS (COPY THESE PATTERNS)
+COMMON_PATTERNS = """
+CREATING AN ORDER:
+from nautilus_trader.model.orders import MarketOrder
+from nautilus_trader.model.enums import OrderSide
+
+order = MarketOrder(
+instrument_id=self.instrument_id,
+client_order_id=self.order_factory.client_order_id(),
+order_side=OrderSide.BUY,
+quantity=Quantity(0.1),
+time_in_force=TimeInForce.IOC,
+)
+self.submit_order(order)
+
+CHECKING POSITION:
+position = self.portfolio.net_position(self.instrument)
+if position is None:
+size = 0
+else:
+size = position.quantity
+
+CALCULATING PnL:
+unrealized = self.portfolio.unrealized_pnl(self.instrument)
+realized = self.portfolio.realized_pnl(self.instrument)
+
+SUBSCRIBING TO DATA:
+bar_type = BarType(self.instrument_id, BarAggregation.MINUTE, 15)
+self.subscribe_bars(bar_type)
+
+LOGGING:
+self.log.info(f"Buying {quantity} BTC at ${price}")
+self.log.warning(f"Drawdown: {drawdown:.2%}")
+self.log.error(f"Order rejected: {reason}")
+"""
+
+============================================================================
+DATA VALIDATION (ALWAYS DO THIS)
+DATA_VALIDATION = """
+def validate_ohlcv_data(df):
+'''Validate data before using'''
+
+text
+# Check for missing values
+assert not df.isnull().any().any(), "Contains NaN values"
+
+# Check OHLC logic
+assert (df['high'] >= df['low']).all(), "High < Low error"
+assert (df['open'] <= df['high']).all(), "Open > High error"
+assert (df['close'] <= df['high']).all(), "Close > High error"
+
+# Check volume
+assert (df['volume'] > 0).all(), "Zero volume found"
+
+# Check time continuity
+time_diffs = df.index.to_series().diff()
+expected_diff = pd.Timedelta(minutes=15)
+gaps = time_diffs[time_diffs > expected_diff * 2]
+if len(gaps) > 0:
+    print(f"Warning: {len(gaps)} time gaps found")
+
+print(f"✓ Data validation passed")
+return True
+"""
+
+============================================================================
+TESTING CHECKLIST
+TESTING = """
+Before ANY deployment:
+
+☐ Unit Tests Pass
+pytest tests/
+
+☐ Research Runs Successfully
+
+Discovery strategy initializes
+
+Processes all data
+
+Finds patterns
+
+Exports results
+
+☐ Results Validated
+
+Pattern count reasonable
+
+Timestamps are correct
+
+Statistics make sense
+
+☐ Data Validation Passes
+
+No NaN values
+
+No zero volumes
+
+Continuous timestamps
+
+OHLC logic correct
+
+☐ Code Reviewed
+
+All types correct
+
+All enums correct
+
+Error handling complete
+
+Logging comprehensive
+"""
+
+============================================================================
+PRE-DEPLOYMENT CHECKLIST
+PRE_DEPLOYMENT = """
+BEFORE GOING LIVE:
+
+Code Quality:
+☐ All types: Quantity, Price, Money (no float)
+☐ All enums from nautilus_trader (no strings)
+☐ Risk checks before every trade
+☐ Position limits enforced
+☐ Stop losses configured
+☐ Error handling for all paths
+
+Testing:
+☐ Unit tests pass
+☐ Backtest runs without errors
+☐ Results manually validated
+☐ Edge cases tested
+☐ Data validation passes
+☐ Risk limits work in simulation
+
+Documentation:
+☐ All functions documented
+☐ Parameters documented
+☐ Return values documented
+☐ Complex logic explained
+☐ Docs referenced in comments
+
+Approval:
+☐ Code reviewed by human
+☐ Risk parameters reviewed
+☐ Position sizes verified
+☐ Stop losses verified
+☐ EXPLICIT HUMAN APPROVAL FOR LIVE
+"""
+
+============================================================================
+MEMORY AIDS (REMEMBER THESE)
+REMEMBER = """
+
+REAL MONEY IS AT RISK - Every decision matters
+
+NautilusTrader ONLY - No alternatives
+
+Check docs FIRST - https://nautilustrader.io/docs/latest/
+
+Check existing code - Don't rebuild
+
+Use exact types - Quantity, Price, Money
+
+Use exact enums - OrderSide.BUY not "BUY"
+
+Validate all data - No NaN, no gaps
+
+Enforce risk limits - Position size, stop loss, daily limit
+
+Log everything - With context and reasoning
+
+Test before deploying - Unit, integration, edge cases
+
+RESEARCH EXPERT - Master NautilusTrader for discoveries
+
+EXPERT MODE - For institutional-grade backtest analysis
+
+OUTPUT ONLY - Text/markdown, NEVER attempt file creation
+
+READ DOCS - All discovery work begins with official docs
+"""
+
+============================================================================
+WHEN IN DOUBT
+WHEN_UNSURE = """
+
+Check .clinerules (this file)
+
+Check CLINE_INSTITUTIONAL_RULES.md (full guide)
+
+Check NautilusTrader docs: https://nautilustrader.io/docs/latest/
+
+Search existing code in project
+
+Ask for clarification rather than guess
+
+Default to institutional-grade caution
+
+FOR RESEARCH/DISCOVERY:
+
+Go directly to NautilusTrader docs
+
+Find the exact class/method needed
+
+Understand complete API
+
+Implement using official examples
+
+Test thoroughly
+
+Report findings
+
+FOR EXPERT MODE:
+
+Say: "EXPERT MODE: [Your request]"
+
+Cline provides 5 complete institutional-grade reports
+
+Trade verification + backtest analysis + expert assessment
+
+improvement recommendations + final recommendation
+
+Value: ~$5,000+ consulting fee equivalent
+
+FOR DESIGN MODE:
+
+Say: "FULL DESIGN ANALYSIS: [Your request]"
+
+Cline provides design + expert assessment + Nautilus integration
+
+All three phases with complete specifications
+
+Value: ~$15,000+ design consulting fee equivalent
+"""
+
+============================================================================
+END OF RULES
+print("""
+╔════════════════════════════════════════════════════════════════════════════╗
+║ INSTITUTIONAL TRADING RULES LOADED ║
+║ ║
+║ ⚠️ REAL MONEY IS AT RISK ║
+║ 🎯 INSTITUTIONAL GRADE CODE ONLY ║
+║ 📖 DOCUMENTATION FIRST, ALWAYS ║
+║ 🔒 RISK MANAGEMENT ABSOLUTE ║
+║ 🔬 NAUTILUS EXPERT FOR RESEARCH ║
+║ ⭐ EXPERT MODE FOR BACKTEST ANALYSIS ║
+║ 🎨 DESIGN MODE FOR UI/UX DESIGN ║
+║ 📝 TEXT OUTPUT ONLY - NO FILE CREATION ║
+║ ║
+║ When in doubt, read: ║
+║ - .clinerules (this file) ║
+║ - CLINE_INSTITUTIONAL_RULES.md (full guide) ║
+║ - https://nautilustrader.io/docs/latest/ (official docs) ║
+║ ║
+║ Remember: Every line of code. Every type. Every validation. Matters. ║
+║ For research: Master NautilusTrader. Know every detail. Use official docs.║
+║ For analysis: EXPERT MODE for institutional-grade backtest assessment. ║
+║ For design: FULL DESIGN ANALYSIS for complete UI/UX strategy. ║
+║ For output: TEXT/MARKDOWN ONLY. Never attempt file creation. ║
+╚════════════════════════════════════════════════════════════════════════════╝
+""")
