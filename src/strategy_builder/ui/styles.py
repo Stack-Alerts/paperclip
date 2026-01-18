@@ -612,3 +612,32 @@ def get_preset_day_button_stylesheet() -> str:
 def get_separator_stylesheet() -> str:
     """Get stylesheet for horizontal separator lines."""
     return f"background-color: {COLORS['border']}; max-height: 1px; margin: 10px 0;"
+
+
+def get_secondary_button_stylesheet() -> str:
+    """Get stylesheet for secondary/cancel buttons."""
+    return f"""
+        QPushButton {{
+            background-color: {COLORS['button_secondary']};
+            color: white;
+            font-weight: bold;
+            padding: 10px 24px;
+            border-radius: 4px;
+            min-width: 100px;
+        }}
+        QPushButton:hover {{
+            background-color: {COLORS['button_secondary_hover']};
+        }}
+    """
+
+
+def get_status_label_style(status='default') -> str:
+    """Get styled status label for success/error/warning states."""
+    colors = {
+        'success': COLORS['success'],  # #10B981
+        'error': COLORS['error'],      # #C35252
+        'warning': COLORS['warning'],  # #FFA500
+        'info': COLORS['info'],        # #2070FF
+        'default': COLORS['text_muted']
+    }
+    return f"color: {colors.get(status, colors['default'])}; font-weight: bold;"

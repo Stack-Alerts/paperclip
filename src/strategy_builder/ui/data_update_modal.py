@@ -22,6 +22,11 @@ from PyQt5.QtGui import QFont
 
 # Import UnifiedDataManager - THE ONLY DATA SOURCE!
 from src.data_manager.unified_manager import UnifiedDataManager, DataSource
+# Import centralized styles
+from src.strategy_builder.ui.styles import (
+    get_main_stylesheet, get_panel_title_stylesheet, 
+    get_label_style, get_status_label_style
+)
 
 
 class DataUpdateThread(QThread):
@@ -185,86 +190,20 @@ class DataUpdateModal(QDialog):
         self.setMinimumHeight(1000)
         self.resize(1400, 1000)
         
-        # Dark theme
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #1E2128;
-                color: #E8EAED;
-            }
-            QLabel {
-                color: #E8EAED;
-                background: transparent;
-            }
-            QGroupBox {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 6px;
-                margin-top: 12px;
-                padding-top: 12px;
-                color: #E8EAED;
-                font-weight: bold;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-            }
-            QTextEdit {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                padding: 8px;
-                color: #BDC1C6;
-            }
-            QProgressBar {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                text-align: center;
-                color: #E8EAED;
-            }
-            QProgressBar::chunk {
-                background-color: #2070FF;
-                border-radius: 3px;
-            }
-            QPushButton {
-                background-color: #204486;
-                color: white;
-                font-weight: bold;
-                padding: 10px 20px;
-                border-radius: 4px;
-                border: none;
-                min-width: 120px;
-            }
-            QPushButton:hover {
-                background-color: #1A3A70;
-            }
-            QPushButton:pressed {
-                background-color: #1550DF;
-            }
-            QPushButton:disabled {
-                background-color: #555555;
-                color: #888888;
-            }
-            QPushButton#skipButton {
-                background-color: #555555;
-            }
-            QPushButton#skipButton:hover {
-                background-color: #666666;
-            }
-        """)
+        # Apply centralized dark theme stylesheet
+        self.setStyleSheet(get_main_stylesheet())
         
         layout = QVBoxLayout()
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # Header
+        # Header with centralized styling
         header = QLabel("📊 Historical Data Update Check")
         header_font = QFont()
         header_font.setBold(True)
         header_font.setPointSize(14)
         header.setFont(header_font)
-        header.setStyleSheet("color: #095983; padding: 10px;")
+        header.setStyleSheet(get_panel_title_stylesheet())
         layout.addWidget(header)
         
         # Status group
@@ -296,10 +235,10 @@ class DataUpdateModal(QDialog):
         self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
         
-        # Progress message
+        # Progress message with centralized styling
         self.progress_label = QLabel("")
         self.progress_label.setVisible(False)
-        self.progress_label.setStyleSheet("color: #095983; font-style: italic;")
+        self.progress_label.setStyleSheet(get_label_style('info') + " font-style: italic;")
         layout.addWidget(self.progress_label)
         
         layout.addStretch()
@@ -381,7 +320,7 @@ class DataUpdateModal(QDialog):
                 self.status_label.setText(
                     f"⚠️ DATA GAPS DETECTED: Up to {max_gap} days MISSING"
                 )
-                self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
+                self.status_label.setStyleSheet(get_status_label_style('error'))
                 
                 report_lines.append("❌ CRITICAL: Building blocks need ALL data types!")
                 report_lines.append("   - Trade management needs funding rates")
@@ -393,7 +332,7 @@ class DataUpdateModal(QDialog):
                 self.update_button.setEnabled(True)
             else:
                 self.status_label.setText("✅ ALL DATA COMPLETE - 100% ACCURATE")
-                self.status_label.setStyleSheet("color: #4ADE80; font-weight: bold;")
+                self.status_label.setStyleSheet(get_status_label_style('success'))
                 
                 report_lines.append("✅ PERFECT: All data types complete!")
                 report_lines.append("   Building blocks have full data access")
@@ -404,7 +343,7 @@ class DataUpdateModal(QDialog):
         
         except Exception as e:
             self.status_label.setText("❌ Error checking data")
-            self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
+            self.status_label.setStyleSheet(get_status_label_style('error'))
             
             self.details_text.setText(
                 f"Error occurred while checking data:\n\n"
@@ -452,10 +391,10 @@ class DataUpdateModal(QDialog):
         
         if success:
             self.status_label.setText("✅ Update Complete!")
-            self.status_label.setStyleSheet("color: #4ADE80; font-weight: bold;")
+            self.status_label.setStyleSheet(get_status_label_style('success'))
         else:
             self.status_label.setText("❌ Update Failed")
-            self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
+            self.status_label.setStyleSheet(get_status_label_style('error'))
         
         self.details_text.setText(message)
         
