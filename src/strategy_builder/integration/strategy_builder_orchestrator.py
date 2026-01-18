@@ -819,6 +819,8 @@ class StrategyBuilderOrchestrator:
                 'name': self.config_engine.config.name,
                 'description': self.config_engine.config.description,
                 'strategy_type': getattr(self.config_engine.config, 'strategy_type', 'Bullish'),
+                'validation_status': getattr(self.config_engine.config, 'validation_status', None),
+                'generation_status': getattr(self.config_engine.config, 'generation_status', None),
                 'blocks': []
             }
             
@@ -894,6 +896,15 @@ class StrategyBuilderOrchestrator:
             # Load strategy type
             strategy_type = config_dict.get('strategy_type', 'Bullish')
             setattr(self.config_engine.config, 'strategy_type', strategy_type)
+            
+            # Load workflow state (validation/generation status)
+            validation_status = config_dict.get('validation_status', None)
+            if validation_status:
+                setattr(self.config_engine.config, 'validation_status', validation_status)
+            
+            generation_status = config_dict.get('generation_status', None)
+            if generation_status:
+                setattr(self.config_engine.config, 'generation_status', generation_status)
             
             # Load blocks and signals
             for block_dict in config_dict.get('blocks', []):
