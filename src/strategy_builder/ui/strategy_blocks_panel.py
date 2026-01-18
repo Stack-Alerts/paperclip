@@ -140,10 +140,7 @@ class BlockConfigItem(QWidget):
         if self.position > 1:
             self.configure_block_button = QPushButton("⚙️ Config")
             self.configure_block_button.setMinimumWidth(100)
-            self.configure_block_button.setStyleSheet(
-                "QPushButton { background-color: #204486; color: white; font-weight: bold; padding: 5px; }"
-                "QPushButton:hover { background-color: #1A3A70; }"
-            )
+            self.configure_block_button.setStyleSheet(get_primary_button_stylesheet())
             self.configure_block_button.setToolTip("Configure timing constraint for this block")
             # Emit with empty string as signal_name to indicate block-level config
             self.configure_block_button.clicked.connect(lambda: self.configure_timing_clicked.emit(self.block_name, ""))
@@ -152,10 +149,7 @@ class BlockConfigItem(QWidget):
         # Remove button
         self.remove_button = QPushButton("✕ Remove")
         self.remove_button.setMinimumWidth(100)  # Changed from setMaximumWidth(90)
-        self.remove_button.setStyleSheet(
-            "QPushButton { background-color: #ff4444; color: white; font-weight: bold; padding: 5px; }"
-            "QPushButton:hover { background-color: #cc0000; }"
-        )
+        self.remove_button.setStyleSheet(get_danger_button_stylesheet())
         self.remove_button.clicked.connect(lambda: self.remove_clicked.emit(self.block_name))
         controls_layout.addWidget(self.remove_button)
         
