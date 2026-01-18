@@ -263,6 +263,216 @@ RESEARCH DISCOVERY WORKFLOW:
 4. Implement using those exact components
 5. Test and report findings
 """
+============================================================================
+UI STYLING & STYLESHEET PROTOCOL (CRITICAL FOR STRATEGY BUILDER)
+============================================================================
+UI_STYLING_RULES = """
+CENTRAL STYLESHEET ENFORCEMENT - ALL UI COMPONENTS
+
+CRITICAL RULE: NO HARDCODED STYLES ANYWHERE IN DEVELOPMENT CODE
+
+AUTHORITY: src/strategy_builder/ui/styles.py is the ONLY source of truth
+for all UI styling, colors, spacing, typography, and visual design.
+
+MANDATORY PROTOCOL:
+
+1️⃣ STYLESHEET IMPORTS (REQUIRED IN EVERY UI FILE)
+   ✓ from src.strategy_builder.ui.styles import [class/constant]
+   ✓ Never import inline styles
+   ✓ Never use style dictionaries in component files
+   ✓ Never hardcode colors, fonts, sizes, spacing
+   
+   EXAMPLE (CORRECT):
+   from src.strategy_builder.ui.styles import (
+       PRIMARY_COLOR, SPACING_UNIT, BUTTON_STYLE, CARD_STYLE
+   )
+
+2️⃣ STYLE APPLICATION (MANDATORY PATTERN)
+   ✓ All components use styles.py definitions
+   ✓ Dynamic styling: reference style constants
+   ✓ Conditional styling: use style helper functions from styles.py
+   ✓ Custom styling: ONLY add to styles.py, NEVER in component
+   
+   EXAMPLE (CORRECT):
+   class StrategyCard(QWidget):
+       def __init__(self):
+           self.setStyleSheet(CARD_STYLE)
+           self.main_layout.setSpacing(SPACING_UNIT * 2)
+           self.button.setStyleSheet(BUTTON_STYLE)
+   
+   EXAMPLE (WRONG):
+   class StrategyCard(QWidget):
+       def __init__(self):
+           self.setStyleSheet("background: white; padding: 10px;")
+           self.button.setStyleSheet("color: #007ACC; font-size: 14px;")
+
+3️⃣ COLOR USAGE (CENTRALIZED ONLY)
+   ✓ Define all colors in src/strategy_builder/ui/styles.py
+   ✓ Reference via COLOR_NAME constant
+   ✓ NEVER hardcode hex colors, RGB, or color names in components
+   ✓ NEVER use inline color definitions
+   
+   EXAMPLE (CORRECT - in styles.py):
+   PRIMARY_COLOR = "#007ACC"
+   SECONDARY_COLOR = "#F3F3F3"
+   SUCCESS_COLOR = "#28A745"
+   ERROR_COLOR = "#DC3545"
+   
+   EXAMPLE (CORRECT - in component):
+   button.setStyleSheet(f"background-color: {PRIMARY_COLOR};")
+   
+   EXAMPLE (WRONG - hardcoded):
+   button.setStyleSheet("background-color: #007ACC;")
+
+4️⃣ SPACING & SIZING (CENTRALIZED ONLY)
+   ✓ Define all spacing/sizing in styles.py
+   ✓ Use SPACING_UNIT as base unit
+   ✓ Use SIZE_* constants for dimensions
+   ✓ NEVER hardcode pixel values in components
+   
+   EXAMPLE (CORRECT - in styles.py):
+   SPACING_UNIT = 8
+   BUTTON_HEIGHT = SPACING_UNIT * 5  # 40px
+   CARD_PADDING = SPACING_UNIT * 2    # 16px
+   FONT_SIZE_BASE = 14
+   FONT_SIZE_LARGE = 16
+   FONT_SIZE_SMALL = 12
+   
+   EXAMPLE (CORRECT - in component):
+   layout.setSpacing(SPACING_UNIT)
+   layout.setContentsMargins(CARD_PADDING, CARD_PADDING, CARD_PADDING, CARD_PADDING)
+   button.setMinimumHeight(BUTTON_HEIGHT)
+   
+   EXAMPLE (WRONG - hardcoded):
+   layout.setSpacing(8)
+   layout.setContentsMargins(16, 16, 16, 16)
+   button.setMinimumHeight(40)
+
+5️⃣ TYPOGRAPHY (CENTRALIZED ONLY)
+   ✓ Define all fonts in styles.py
+   ✓ Use FONT_* constants for family, size, weight
+   ✓ NEVER hardcode font definitions in components
+   ✓ NEVER inline QFont() creation
+   
+   EXAMPLE (CORRECT - in styles.py):
+   FONT_FAMILY = "Segoe UI"
+   FONT_SIZE_BASE = 14
+   FONT_SIZE_HEADING = 18
+   FONT_WEIGHT_NORMAL = 400
+   FONT_WEIGHT_BOLD = 600
+   
+   def create_font(size=FONT_SIZE_BASE, bold=False):
+       font = QFont(FONT_FAMILY, size)
+       if bold:
+           font.setWeight(FONT_WEIGHT_BOLD)
+       return font
+   
+   EXAMPLE (CORRECT - in component):
+   from src.strategy_builder.ui.styles import create_font, FONT_SIZE_HEADING
+   label.setFont(create_font(FONT_SIZE_HEADING, bold=True))
+   
+   EXAMPLE (WRONG - hardcoded):
+   font = QFont("Segoe UI", 18)
+   font.setBold(True)
+   label.setFont(font)
+
+6️⃣ THEME CONSISTENCY (MANDATORY)
+   ✓ All components must use styles.py for visual consistency
+   ✓ Theme changes only in styles.py
+   ✓ No per-component styling overrides
+   ✓ Global theme changes automatically affect all components
+   
+   WORKFLOW:
+   1. User requests color change
+   2. Update ONLY in src/strategy_builder/ui/styles.py
+   3. All components using that style automatically update
+   4. No component files modified
+   5. ZERO hardcoded styles anywhere
+
+7️⃣ ENFORCEMENT CHECKLIST (BEFORE EVERY COMMIT)
+   ☐ No hardcoded color hex values in any component file
+   ☐ No inline setStyleSheet() with style definitions
+   ☐ No hardcoded pixel values for spacing/sizing
+   ☐ No inline QFont() creation (use styles.py helper)
+   ☐ No style dictionaries in component code
+   ☐ All color refs use COLOR_* constants from styles.py
+   ☐ All spacing refs use SPACING_* constants from styles.py
+   ☐ All font refs use create_font() from styles.py
+   ☐ styles.py is ONLY file with hardcoded style values
+   ☐ All UI files import from styles.py
+   
+   COMMAND TO CHECK:
+   grep -r "setStyleSheet\|QFont\|#[0-9A-Fa-f]\|padding:\|margin:\|color:" \
+       src/strategy_builder/ui/*.py \
+       --include="*.py" --exclude="styles.py" | wc -l
+   
+   Result should be: 0 (no matches except in styles.py)
+
+8️⃣ EXCEPTION HANDLING
+   ✓ ONLY exception: styles.py can have hardcoded values
+   ✓ NEVER: Any other file has hardcoded styles
+   ✓ If component needs new style:
+     1. Add to styles.py first
+     2. Then use in component
+     3. NEVER add directly to component
+   
+   EXAMPLE (CORRECT WORKFLOW):
+   Requirement: "Make button text bold and blue"
+   
+   Step 1 - Add to styles.py:
+   BOLD_BUTTON_STYLE = "font-weight: 600; color: #007ACC;"
+   
+   Step 2 - Use in component:
+   from src.strategy_builder.ui.styles import BOLD_BUTTON_STYLE
+   self.button.setStyleSheet(BOLD_BUTTON_STYLE)
+   
+   EXAMPLE (WRONG WORKFLOW):
+   Requirement: "Make button text bold and blue"
+   
+   ❌ WRONG - add directly to component:
+   self.button.setStyleSheet("font-weight: 600; color: #007ACC;")
+
+9️⃣ SCALABILITY & MAINTAINABILITY
+   ✓ Single source of truth: styles.py
+   ✓ Global theme changes: Edit styles.py only
+   ✓ No style duplication across components
+   ✓ Easy to implement dark mode (swap COLORS dict)
+   ✓ Easy to implement responsive design (adjust SPACING_UNIT)
+   ✓ Easy to audit styles (all in one file)
+   ✓ Easy to maintain consistency (automatic across all components)
+
+🔟 VIOLATIONS & CORRECTIONS
+   
+   VIOLATION DETECTION:
+   - Hardcoded color in component → RED FLAG
+   - Inline style dictionary → RED FLAG
+   - Direct pixel value in component → RED FLAG
+   - New QFont() in component → RED FLAG
+   - setStyleSheet() with definitions in component → RED FLAG
+   
+   CORRECTION PATTERN:
+   1. Identify violation (grep search above)
+   2. Extract style to styles.py
+   3. Replace with constant reference
+   4. Test visual consistency
+   5. Commit only styles.py changes for that fix
+
+FULL DETAILS: CLINE_INSTITUTIONAL_RULES.md → UI_STYLING_PROTOCOL
+
+COMMAND TO VERIFY COMPLIANCE:
+# All style definitions should be in styles.py only
+grep -r "background-color:\|color:\|padding:\|margin:\|font-weight:" \
+    src/strategy_builder/ui/ --include="*.py" | grep -v "styles.py" | wc -l
+# Result must be: 0
+
+STYLE EXTENSIONS WORKFLOW:
+1. User requests new styling
+2. Add to src/strategy_builder/ui/styles.py
+3. Export constant or helper function
+4. Import in component
+5. Use exported style
+6. Zero changes to component files
+"""
 
 ============================================================================
 WHEN IN DOUBT
