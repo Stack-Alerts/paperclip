@@ -125,7 +125,7 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _init_ui(self):
         """Initialize the user interface layout."""
         # Window properties
-        self.setWindowTitle("Strategy Builder")
+        self.setWindowTitle("BTC Engine v3 - Strategy Builder")
         self.setGeometry(100, 100, 1400, 900)
         
         # Use OS title bar (change via GNOME theme - see TITLE_BAR_COLOR_FIX.md)
@@ -439,6 +439,21 @@ class StrategyBuilderMainWindow(QMainWindow):
                     for block_name in self.blocks_panel.get_block_names():
                         self.search_panel.mark_block_as_added(block_name)
                     
+                    # RESTORE WORKFLOW STATE from loaded strategy
+                    config = self.orchestrator.get_current_config()
+                    if config:
+                        # Check validation status
+                        validation_status = getattr(config, 'validation_status', None)
+                        if validation_status == 'passed':
+                            self.validation_passed = True
+                            self.stepper.mark_step_complete(1)
+                        
+                        # Check generation status
+                        generation_status = getattr(config, 'generation_status', None)
+                        if generation_status == 'success':
+                            self.code_generated = True
+                            self.stepper.mark_step_complete(2)
+                    
                     self._update_window_title()
                     self._update_status(f"Loaded strategy from:{filename}")
                 else:
@@ -558,6 +573,19 @@ class StrategyBuilderMainWindow(QMainWindow):
                 else:
                     setattr(self.orchestrator.config_engine.config, 'strategy_type', ui_type)
                 print(f"Config now: {self.orchestrator.config_engine.config.strategy_type}")
+            
+            # PERSIST WORKFLOW STATE: Save validation and generation status
+            if self.validation_passed:
+                if not hasattr(self.orchestrator.config_engine.config, 'validation_status'):
+                    setattr(self.orchestrator.config_engine.config, 'validation_status', 'passed')
+                else:
+                    self.orchestrator.config_engine.config.validation_status = 'passed'
+            
+            if self.code_generated:
+                if not hasattr(self.orchestrator.config_engine.config, 'generation_status'):
+                    setattr(self.orchestrator.config_engine.config, 'generation_status', 'success')
+                else:
+                    self.orchestrator.config_engine.config.generation_status = 'success'
             
             # Save using orchestrator
             result = self.orchestrator.save_strategy(filename)

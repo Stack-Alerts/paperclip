@@ -178,7 +178,7 @@ class DataUpdateModal(QDialog):
     
     def _init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("Data Update Check")
+        self.setWindowTitle("BTC Engine v3 - Data Update Check")
         
         # Make dialog moveable and independent (30% bigger)
         # Use Window flag instead of Dialog to allow dragging
