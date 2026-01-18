@@ -641,3 +641,135 @@ def get_status_label_style(status='default') -> str:
         'default': COLORS['text_muted']
     }
     return f"color: {colors.get(status, colors['default'])}; font-weight: bold;"
+
+
+def get_logic_badge_style(badge_type='required') -> str:
+    """
+    Get logic badge styling for Required/Optional/AND/OR indicators.
+    
+    Args:
+        badge_type: Type of badge ('required', 'optional', 'and', 'or')
+    
+    Returns:
+        CSS style string for logic badges
+    """
+    colors = {
+        'required': COLORS['button_primary'],    # Blue
+        'optional': COLORS['button_success'],    # Green
+        'and': COLORS['info'],                   # Blue
+        'or': COLORS['warning']                  # Orange
+    }
+    return f"""
+        QLabel {{
+            background-color: {colors.get(badge_type, colors['required'])};
+            color: white;
+            font-weight: bold;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 9pt;
+        }}
+    """
+
+
+def get_block_label_style(signal_direction='neutral') -> str:
+    """
+    Get block signal label styling for Bullish/Bearish/Neutral labels.
+    
+    Args:
+        signal_direction: Direction ('bullish', 'bearish', 'neutral')
+    
+    Returns:
+        CSS style string for block labels
+    """
+    colors = {
+        'bullish': COLORS['success'],      # Green
+        'bearish': COLORS['error'],        # Red
+        'neutral': COLORS['text_muted']    # Gray
+    }
+    return f"color: {colors.get(signal_direction, colors['neutral'])}; font-weight: bold;"
+
+
+def get_position_label_style(position='entry') -> str:
+    """
+    Get position label styling for Entry/Exit/Both indicators.
+    
+    Args:
+        position: Position type ('entry', 'exit', 'both')
+    
+    Returns:
+        CSS style string for position labels
+    """
+    colors = {
+        'entry': COLORS['success'],     # Green
+        'exit': COLORS['error'],        # Red
+        'both': COLORS['info']          # Blue
+    }
+    return f"color: {colors.get(position, colors['entry'])}; font-weight: bold;"
+
+
+def get_expand_button_style() -> str:
+    """Get expand/collapse button styling for block panels."""
+    return f"""
+        QPushButton {{
+            background: transparent;
+            border: none;
+            color: {COLORS['text_muted']};
+            font-weight: bold;
+            text-align: left;
+            padding: 2px;
+        }}
+        QPushButton:hover {{
+            color: {COLORS['info']};
+        }}
+    """
+
+
+def get_remove_button_style() -> str:
+    """Get remove/delete button styling (small red cross buttons)."""
+    return f"""
+        QPushButton {{
+            background-color: {COLORS['button_danger']};
+            color: white;
+            border-radius: 3px;
+            font-weight: bold;
+            padding: 2px 6px;
+            max-width: 20px;
+            max-height: 20px;
+        }}
+        QPushButton:hover {{
+            background-color: {COLORS['button_danger_hover']};
+        }}
+    """
+
+
+def get_add_button_style() -> str:
+    """Get add button styling for adding blocks/signals."""
+    return f"""
+        QPushButton {{
+            background-color: {COLORS['button_success']};
+            color: white;
+            font-weight: bold;
+            padding: 6px 16px;
+            border-radius: 6px;
+        }}
+        QPushButton:hover {{
+            background-color: {COLORS['button_success_hover']};
+        }}
+    """
+
+
+def get_icon_button_style() -> str:
+    """Get styling for small icon buttons (config, settings, etc.)."""
+    return f"""
+        QPushButton {{
+            background: transparent;
+            border: none;
+            color: {COLORS['text_muted']};
+            padding: 4px;
+        }}
+        QPushButton:hover {{
+            background-color: {COLORS['bg_light']};
+            border-radius: 4px;
+            color: {COLORS['text_primary']};
+        }}
+    """
