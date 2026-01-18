@@ -227,22 +227,25 @@ class BacktestConfigPanel(QWidget):
         """Create configuration controls group"""
         group = QGroupBox("Configuration")
         
-        # Style group and radio buttons
+        # Style group and radio buttons (match main window sizing)
         group.setStyleSheet("""
+            QLabel {
+                font-size: 14pt;
+            }
             QRadioButton {
                 background: transparent;
                 color: #E8EAED;
                 padding: 5px;
-                font-size: 15px;
+                font-size: 14pt;
             }
             QRadioButton:checked {
                 color: #2070FF;
                 font-weight: bold;
             }
             QRadioButton::indicator {
-                width: 18px;
-                height: 18px;
-                border-radius: 9px;
+                width: 20px;
+                height: 20px;
+                border-radius: 10px;
                 border: 2px solid #6B7280;
                 background: transparent;
             }
@@ -252,9 +255,9 @@ class BacktestConfigPanel(QWidget):
             }
             QRadioButton::indicator:checked:after {
                 content: '';
-                width: 8px;
-                height: 8px;
-                border-radius: 4px;
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
                 background: white;
             }
         """)
