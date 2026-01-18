@@ -29,7 +29,7 @@ from src.strategy_builder.core.registry_interface import BlockInfo, SearchFilter
 # Import centralized styles
 from src.strategy_builder.ui.styles import (
     get_label_style, get_expand_button_style, get_add_button_style,
-    get_checkbox_style, get_success_button_stylesheet
+    get_checkbox_style, get_success_button_stylesheet, get_color
 )
 
 # Import institutional logger
@@ -146,7 +146,7 @@ class BlockListItem(QWidget):
         
         # Header with instruction
         signals_header = QLabel("Select signals to add:")
-        signals_header.setStyleSheet("font-weight: bold; color: #00D9FF; font-size: 10pt;")  # Primary Cyan
+        signals_header.setStyleSheet(f"font-weight: bold; color: {get_color('primary')}; font-size: 10pt;")
         signals_layout.addWidget(signals_header)
         
         # Display signals with checkboxes (filter out hidden signals)
@@ -452,7 +452,7 @@ class BlockSearchPanel(QWidget):
         search_layout = QHBoxLayout()
         search_layout.setSpacing(10)
         search_label = QLabel("🔍 Search:")
-        search_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
+        search_label.setStyleSheet(get_label_style('muted'))
         search_label.setMinimumWidth(70)
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search by block name, description, or signal...")
@@ -468,7 +468,7 @@ class BlockSearchPanel(QWidget):
         
         # Category filter
         category_label = QLabel("Category:")
-        category_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
+        category_label.setStyleSheet(get_label_style('muted'))
         filters_layout.addWidget(category_label)
         self.category_filter = QComboBox()
         self.category_filter.addItem("All Categories")
@@ -478,7 +478,7 @@ class BlockSearchPanel(QWidget):
         
         # Type filter
         type_label = QLabel("Type:")
-        type_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
+        type_label.setStyleSheet(get_label_style('muted'))
         filters_layout.addWidget(type_label)
         self.type_filter = QComboBox()
         self.type_filter.addItem("All Types")
