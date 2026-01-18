@@ -120,15 +120,17 @@ class BlockConfigItem(QWidget):
         # Move buttons
         move_layout = QHBoxLayout()
         
-        self.up_button = QPushButton("▲")
+        self.up_button = QPushButton("▴")  # Sharp small triangle up
         self.up_button.setMaximumWidth(40)
+        self.up_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
         self.up_button.setToolTip("Move block up")
         self.up_button.clicked.connect(lambda: self.move_up_clicked.emit(self.block_name))
         self.up_button.setEnabled(self.position > 1)  # Disable if first
         move_layout.addWidget(self.up_button)
         
-        self.down_button = QPushButton("▼")
+        self.down_button = QPushButton("▾")  # Sharp small triangle down
         self.down_button.setMaximumWidth(40)
+        self.down_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
         self.down_button.setToolTip("Move block down")
         self.down_button.clicked.connect(lambda: self.move_down_clicked.emit(self.block_name))
         self.down_button.setEnabled(self.position < self.total)  # Disable if last

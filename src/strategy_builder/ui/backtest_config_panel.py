@@ -114,6 +114,11 @@ class BacktestConfigPanel(QWidget):
         super().__init__(parent)
         self.orchestrator = orchestrator
         self.worker: Optional[BacktestWorker] = None
+        
+        # Storage for custom preset values
+        self.custom_values = {}
+        self._loading_preset = False  # Flag to prevent auto-switch to Custom during preset load
+        
         self._init_ui()
     
     def _init_ui(self):
@@ -157,9 +162,16 @@ class BacktestConfigPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         
         # Title (using centralized panel title style - matches main window "Strategy Information")
-        title = QLabel("⚙️ Backtest Configuration")
-        title.setStyleSheet(get_panel_title_stylesheet())
-        layout.addWidget(title)
+        # Dynamic title with strategy name
+        strategy_name = self._get_strategy_name()
+        if strategy_name:
+            title_text = f"⚙️ Backtest Configuration - {strategy_name} Strategy"
+        else:
+            title_text = "⚙️ Backtest Configuration"
+        
+        self.title_label = QLabel(title_text)
+        self.title_label.setStyleSheet(get_panel_title_stylesheet())
+        layout.addWidget(self.title_label)
         
         # Configuration Group
         config_group = self._create_config_group()
@@ -176,12 +188,9 @@ class BacktestConfigPanel(QWidget):
         # Results Display
         self.results_text = QTextEdit()
         self.results_text.setReadOnly(True)
-        self.results_text.setMaximumHeight(150)
         self.results_text.setPlaceholderText("Backtest results will appear here...")
         layout.addWidget(QLabel("📊 Results:"))
-        layout.addWidget(self.results_text)
-        
-        layout.addStretch()
+        layout.addWidget(self.results_text)  # Will expand to fill remaining space
         widget.setLayout(layout)
         return widget
     
@@ -235,6 +244,10 @@ class BacktestConfigPanel(QWidget):
         self.conservative_radio.toggled.connect(lambda checked: self._apply_conservative_preset() if checked else None)
         self.balanced_radio.toggled.connect(lambda checked: self._apply_balanced_preset() if checked else None)
         self.aggressive_radio.toggled.connect(lambda checked: self._apply_aggressive_preset() if checked else None)
+        self.custom_radio.toggled.connect(lambda checked: self._apply_custom_preset() if checked else None)
+        
+        # Connect all spinboxes to detect manual changes and auto-switch to Custom
+        self._connect_value_change_detection()
         
         # Set default preset (this will trigger the signal and load values)
         self.balanced_radio.setChecked(True)
@@ -522,6 +535,28 @@ class BacktestConfigPanel(QWidget):
         self.balanced_radio.setStyleSheet(get_radio_button_style())
         self.aggressive_radio = QRadioButton("🚀 Aggressive")
         self.aggressive_radio.setStyleSheet(get_radio_button_style())
+        self.custom_radio = QRadioButton("⚙️ Custom")
+        self.custom_radio.setStyleSheet(get_radio_button_style())
+        self.custom_radio.setToolTip(
+            "⚙️ Custom Preset\n\n"
+            "Your manually configured settings.\n\n"
+            "How it works:\n"
+            "• When you select a preset (Conservative/Balanced/Aggressive)\n"
+            "• Then manually adjust any value\n"
+            "• Custom preset automatically activates\n"
+            "• Your manual settings are saved\n\n"
+            "Benefits:\n"
+            "• Experiment with preset starting points\n"
+            "• Fine-tune to your exact needs\n"
+            "• Always return to your custom configuration\n"
+            "• Never lose your manual adjustments\n\n"
+            "Example workflow:\n"
+            "1. Start with 'Balanced' preset\n"
+            "2. Change Emergency SL from 2% to 2.5%\n"
+            "3. Custom automatically selected\n"
+            "4. Try 'Aggressive' preset (Custom values saved)\n"
+            "5. Click 'Custom' to restore your 2.5% setting"
+        )
         
         self.conservative_radio.setToolTip(
             "🐢 Conservative Preset\n\n"
@@ -572,11 +607,13 @@ class BacktestConfigPanel(QWidget):
         self.preset_group.addButton(self.conservative_radio, 1)
         self.preset_group.addButton(self.balanced_radio, 2)
         self.preset_group.addButton(self.aggressive_radio, 3)
+        self.preset_group.addButton(self.custom_radio, 4)
         
         # Add radio buttons to horizontal layout
         presets_layout.addWidget(self.conservative_radio)
         presets_layout.addWidget(self.balanced_radio)
         presets_layout.addWidget(self.aggressive_radio)
+        presets_layout.addWidget(self.custom_radio)
         presets_layout.addStretch()
         
         # Add horizontal layout to main column layout
@@ -1308,8 +1345,27 @@ class BacktestConfigPanel(QWidget):
             'sl_mode': self.sl_combo.currentText()
         }
     
+    def _get_strategy_name(self) -> str:
+        """Get current strategy name from orchestrator"""
+        try:
+            config = self.orchestrator.get_current_config()
+            if config and hasattr(config, 'name') and config.name:
+                return config.name
+            return ""
+        except:
+            return ""
+    
+    def update_strategy_title(self):
+        """Update title when strategy changes"""
+        strategy_name = self._get_strategy_name()
+        if strategy_name:
+            self.title_label.setText(f"⚙️ Backtest Configuration - {strategy_name} Strategy")
+        else:
+            self.title_label.setText("⚙️ Backtest Configuration")
+    
     def _apply_conservative_preset(self):
         """Apply conservative SL preset (wider SLs, higher win rate, fewer trades)"""
+        self._loading_preset = True
         self.delayed_sl_check.setChecked(True)
         self.delay_spin.setValue(3)
         self.emergency_spin.setValue(3)
@@ -1318,9 +1374,11 @@ class BacktestConfigPanel(QWidget):
         self.min_sl_spin.setValue(10)  # 1.0%
         self.max_sl_spin.setValue(25)  # 2.5%
         self.structure_check.setChecked(True)
+        self._loading_preset = False
     
     def _apply_balanced_preset(self):
         """Apply balanced SL preset (default settings)"""
+        self._loading_preset = True
         self.delayed_sl_check.setChecked(True)
         self.delay_spin.setValue(2)
         self.emergency_spin.setValue(2)
@@ -1329,9 +1387,11 @@ class BacktestConfigPanel(QWidget):
         self.min_sl_spin.setValue(7)  # 0.7%
         self.max_sl_spin.setValue(20)  # 2.0%
         self.structure_check.setChecked(True)
+        self._loading_preset = False
     
     def _apply_aggressive_preset(self):
         """Apply aggressive SL preset (tighter SLs, more trades, lower win rate)"""
+        self._loading_preset = True
         self.delayed_sl_check.setChecked(True)
         self.delay_spin.setValue(1)
         self.emergency_spin.setValue(2)
@@ -1340,6 +1400,71 @@ class BacktestConfigPanel(QWidget):
         self.min_sl_spin.setValue(6)  # 0.6%
         self.max_sl_spin.setValue(15)  # 1.5%
         self.structure_check.setChecked(True)
+        self._loading_preset = False
+    
+    def _apply_custom_preset(self):
+        """Load saved custom values when Custom preset is selected"""
+        if not self.custom_values:
+            # No custom values saved yet, use current Balanced defaults
+            return
+        
+        self._loading_preset = True
+        self.delayed_sl_check.setChecked(self.custom_values.get('delayed_sl', True))
+        self.delay_spin.setValue(self.custom_values.get('delay', 2))
+        self.emergency_spin.setValue(self.custom_values.get('emergency', 2))
+        self.vol_lookback_spin.setValue(self.custom_values.get('vol_lookback', 20))
+        self.vol_multi_spin.setValue(self.custom_values.get('vol_multi', 12))
+        self.min_sl_spin.setValue(self.custom_values.get('min_sl', 7))
+        self.max_sl_spin.setValue(self.custom_values.get('max_sl', 20))
+        self.structure_check.setChecked(self.custom_values.get('structure', True))
+        self._loading_preset = False
+    
+    def _save_custom_values(self):
+        """Save current values to custom preset storage"""
+        self.custom_values = {
+            'delayed_sl': self.delayed_sl_check.isChecked(),
+            'delay': self.delay_spin.value(),
+            'emergency': self.emergency_spin.value(),
+            'vol_lookback': self.vol_lookback_spin.value(),
+            'vol_multi': self.vol_multi_spin.value(),
+            'min_sl': self.min_sl_spin.value(),
+            'max_sl': self.max_sl_spin.value(),
+            'structure': self.structure_check.isChecked()
+        }
+    
+    def _on_manual_value_change(self):
+        """Detect manual value changes and auto-activate Custom preset"""
+        # Skip if we're currently loading a preset
+        if self._loading_preset:
+            return
+        
+        # Skip if Custom is already selected
+        if self.custom_radio.isChecked():
+            # Still save the new custom value
+            self._save_custom_values()
+            return
+        
+        # Save current values to custom storage
+        self._save_custom_values()
+        
+        # Auto-activate Custom preset
+        self._loading_preset = True  # Prevent recursion
+        self.custom_radio.setChecked(True)
+        self._loading_preset = False
+    
+    def _connect_value_change_detection(self):
+        """Connect all value-changing widgets to detect manual changes"""
+        # Connect spinboxes
+        self.delay_spin.valueChanged.connect(self._on_manual_value_change)
+        self.emergency_spin.valueChanged.connect(self._on_manual_value_change)
+        self.vol_lookback_spin.valueChanged.connect(self._on_manual_value_change)
+        self.vol_multi_spin.valueChanged.connect(self._on_manual_value_change)
+        self.min_sl_spin.valueChanged.connect(self._on_manual_value_change)
+        self.max_sl_spin.valueChanged.connect(self._on_manual_value_change)
+        
+        # Connect checkboxes
+        self.delayed_sl_check.stateChanged.connect(self._on_manual_value_change)
+        self.structure_check.stateChanged.connect(self._on_manual_value_change)
     
     def _calculate_confluence_from_strategy(self):
         """

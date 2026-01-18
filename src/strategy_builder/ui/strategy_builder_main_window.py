@@ -82,6 +82,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.current_file: Optional[str] = None
         self.is_modified = False
         
+        # Track workflow state (step completion flags)
+        self.validation_passed = False
+        self.code_generated = False
+        self.test_completed = False
+        
         # Auto-update timers
         self.candle_check_timer: Optional[QTimer] = None
         self.retry_timer: Optional[QTimer] = None
@@ -350,16 +355,25 @@ class StrategyBuilderMainWindow(QMainWindow):
             if reply == QMessageBox.Yes:
                 if not self._on_save_strategy():
                     return  # Save was cancelled
-            elif reply == QMessageBox.Cancel:
+        elif reply == QMessageBox.Cancel:
                 return
         
-        # Create new strategy
+        # Reset strategy name in UI
         self.info_panel.set_strategy_name("")
+        
+        # CRITICAL: Create new empty strategy in orchestrator (clears all blocks)
+        self.orchestrator.create_strategy("New_Strategy")
+        
+        # Clear current file tracking
         self.current_file = None
         self.is_modified = False
         
-        # Clear blocks panel
+        # Clear visual markers in search panel
         self.search_panel.clear_added_blocks()
+        
+        # Refresh all panels to show empty state
+        self.blocks_panel.refresh_from_orchestrator()
+        self.info_panel.refresh_from_orchestrator()
         
         # Update UI
         self._update_window_title()
@@ -647,13 +661,13 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_step_clicked(self, step: int):
         """
-        Handle stepper ribbon step click.
+        Handle stepper ribbon step click with workflow enforcement.
         
         Step 0: Design - Always active
-        Step 1: Validate - Opens validation dialog
-        Step 2: Generate - Generates code
-        Step 3: Test - Opens backtest
-        Step 4: Publish - Sets status
+        Step 1: Validate - Requires strategy name + blocks
+        Step 2: Generate - Requires successful validation
+        Step 3: Test - Requires code generated
+        Step 4: Publish - Requires test completed
         """
         if step == 0:
             # Design step - just highlight it
@@ -661,7 +675,10 @@ class StrategyBuilderMainWindow(QMainWindow):
             self._update_status("Design your strategy by adding blocks")
         
         elif step == 1:
-            # Validate step - show validation dialog
+            # Validate step - CHECK PREREQUISITES
+            if not self._check_validation_prerequisites():
+                return  # Prerequisites not met, error shown
+            
             self.stepper.set_current_step(1)
             
             # Create and show validation dialog
@@ -678,31 +695,45 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Update stepper state based on validation result
             result = self.orchestrator.validate_strategy()
             if result.success:
+                self.validation_passed = True  # Track completion
                 self.stepper.mark_step_complete(1)
                 self._update_status("Strategy validated successfully")
             else:
+                self.validation_passed = False
                 self.stepper.mark_step_error(1)
                 self._update_status("Strategy validation has errors")
         
         elif step == 2:
-            # Generate step - generate code
+            # Generate step - CHECK PREREQUISITES
+            if not self._check_generation_prerequisites():
+                return  # Prerequisites not met, error shown
+            
             self.stepper.set_current_step(2)
             self._on_generate_code()
             # Mark as complete after generation
             result = self.orchestrator.generate_code()
             if result.success:
+                self.code_generated = True  # Track completion
                 self.stepper.mark_step_complete(2)
             else:
+                self.code_generated = False
                 self.stepper.mark_step_error(2)
         
         elif step == 3:
-            # Test step - run backtest
+            # Test step - CHECK PREREQUISITES  
+            if not self._check_test_prerequisites():
+                return  # Prerequisites not met, error shown
+            
             self.stepper.set_current_step(3)
             self._on_run_backtest()
-            # TODO: Mark complete when backtest runs successfully
+            # Mark complete when backtest dialog opens successfully
+            self.test_completed = True
         
         elif step == 4:
-            # Publish step - set status
+            # Publish step - CHECK PREREQUISITES
+            if not self._check_publish_prerequisites():
+                return  # Prerequisites not met, error shown
+            
             self.stepper.set_current_step(4)
             QMessageBox.information(
                 self,
@@ -1054,6 +1085,77 @@ class StrategyBuilderMainWindow(QMainWindow):
         except Exception as e:
             # Silently fail to avoid disrupting UI
             pass
+    
+    def _check_validation_prerequisites(self) -> bool:
+        """Check if validation prerequisites are met (strategy name + blocks)."""
+        strategy_name = self.info_panel.get_strategy_name()
+        block_count = self.blocks_panel.get_block_count()
+        
+        errors = []
+        if not strategy_name or strategy_name.strip() == "":
+            errors.append("• Strategy must have a name")
+        if block_count == 0:
+            errors.append("• Strategy must have at least one building block")
+        
+        if errors:
+            QMessageBox.warning(
+                self,
+                "Cannot Validate Strategy",
+                "<b>Validation Prerequisites Not Met</b><br><br>" +
+                "Please complete the following before validating:<br><br>" +
+                "<br>".join(errors)
+            )
+            return False
+        return True
+    
+    def _check_generation_prerequisites(self) -> bool:
+        """Check if code generation prerequisites are met (valid strategy)."""
+        if not self.validation_passed:
+            QMessageBox.warning(
+                self,
+                "Cannot Generate Code",
+                "<b>Validation Required</b><br><br>"
+                "You must successfully validate your strategy before generating code.<br><br>"
+                "Steps:<br>"
+                "1. Click the <b>Validate</b> step<br>"
+                "2. Fix any validation errors<br>"
+                "3. Return here to generate code"
+            )
+            return False
+        return True
+    
+    def _check_test_prerequisites(self) -> bool:
+        """Check if testing prerequisites are met (code generated)."""
+        if not self.code_generated:
+            QMessageBox.warning(
+                self,
+                "Cannot Run Test",
+                "<b>Code Generation Required</b><br><br>"
+                "You must generate code before running tests.<br><br>"
+                "Steps:<br>"
+                "1. Click the <b>Validate</b> step (if not done)<br>"
+                "2. Click the <b>Generate</b> step to create code<br>"
+                "3. Return here to run tests"
+            )
+            return False
+        return True
+    
+    def _check_publish_prerequisites(self) -> bool:
+        """Check if publish prerequisites are met (tests completed)."""
+        if not self.test_completed:
+            QMessageBox.warning(
+                self,
+                "Cannot Publish Strategy",
+                "<b>Testing Required</b><br><br>"
+                "You must complete testing before publishing.<br><br>"
+                "Steps:<br>"
+                "1. Complete validation and code generation<br>"
+                "2. Click the <b>Test</b> step to run backtests<br>"
+                "3. Review results<br>"
+                "4. Return here to publish"
+            )
+            return False
+        return True
     
     def _save_settings(self):
         """Save window geometry and state to settings."""
