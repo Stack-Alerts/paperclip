@@ -450,6 +450,10 @@ class BlockSearchPanel(QWidget):
         group_layout.setSpacing(15)
         group_layout.setContentsMargins(15, 20, 15, 15)  # Match backtest panel padding
         
+        # Reset font for content (only title should be 12pt)
+        content_font = QFont()
+        content_font.setPointSize(10)
+        
         # Search and filter controls - increased spacing
         controls_layout = QVBoxLayout()
         controls_layout.setSpacing(20)  # More space between search and filters
