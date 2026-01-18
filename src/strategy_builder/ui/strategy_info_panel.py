@@ -155,7 +155,7 @@ class StrategyInfoPanel(QWidget):
         required_signals_font.setBold(True)
         required_signals_font.setPointSize(10)
         self.required_signals_label.setFont(required_signals_font)
-        self.required_signals_label.setStyleSheet("color: #10B981;")
+        self.required_signals_label.setStyleSheet(f"color: {get_color('success')};")
         meta_layout.addWidget(self.required_signals_label)
         
         # Separator
@@ -174,7 +174,7 @@ class StrategyInfoPanel(QWidget):
         optional_signals_font.setBold(True)
         optional_signals_font.setPointSize(10)
         self.optional_signals_label.setFont(optional_signals_font)
-        self.optional_signals_label.setStyleSheet("color: #214fa2;")
+        self.optional_signals_label.setStyleSheet(f"color: {get_color('info')};")
         meta_layout.addWidget(self.optional_signals_label)
         
         # Separator
@@ -475,7 +475,7 @@ class StrategyInfoPanel(QWidget):
                 self.optional_signals_label.setText("0")
                 self.optional_signals_label.setStyleSheet(f"color: {get_color('text_disabled')};")
                 self.time_constraint_label.setText("No")
-                self.time_constraint_label.setStyleSheet("color: #888888;")
+                self.time_constraint_label.setStyleSheet(f"color: {get_color('text_disabled')};")
                 return
             
             # Count optional signals (OR blocks/signals)

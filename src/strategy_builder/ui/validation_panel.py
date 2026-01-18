@@ -85,7 +85,7 @@ class ValidationPanel(QWidget):
         group_box_font.setBold(True)
         group_box_font.setPointSize(10)
         group_box.setFont(group_box_font)
-        group_box.setStyleSheet("QGroupBox::title { color: #095983; }")
+        group_box.setStyleSheet(f"QGroupBox::title {{ color: {get_color('info')}; }}")
         
         group_layout = QVBoxLayout()
         group_layout.setSpacing(12)
@@ -520,7 +520,7 @@ class ValidationPanel(QWidget):
         # Add new items
         for item in items:
             item_label = QLabel(f"├─ {item}")
-            item_label.setStyleSheet("color: #E8EAED; font-size: 9pt;")
+            item_label.setStyleSheet(f"color: {get_color('text_primary')}; font-size: 9pt;")
             item_label.setWordWrap(True)
             items_layout.addWidget(item_label)
     
@@ -532,7 +532,7 @@ class ValidationPanel(QWidget):
             error_message: Error message to display
         """
         self.status_label.setText("Status: ❌ ERROR")
-        self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
+        self.status_label.setStyleSheet(f"color: {get_color('error')}; font-weight: bold;")
         
         self._update_section(self.basic_section, "❌ Validation Error", "#EF4444", [
             f"Error: {error_message}"
