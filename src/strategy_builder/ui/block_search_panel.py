@@ -104,7 +104,7 @@ class BlockListItem(QWidget):
         if hasattr(self.block_info, 'default_weight') and self.block_info.default_weight:
             meta_text += f" | Weight: {self.block_info.default_weight} points"
         meta_label = QLabel(meta_text)
-        meta_label.setStyleSheet("color: #718096; font-size: 9pt;")  # Text Secondary (darker)
+        meta_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt;")
         info_layout.addWidget(meta_label)
         
         layout.addLayout(info_layout)
@@ -201,7 +201,7 @@ class BlockListItem(QWidget):
             if hasattr(signal_info, 'description') and signal_info.description:
                 desc_label = QLabel(f"   {signal_info.description}")
                 desc_label.setWordWrap(True)
-                desc_label.setStyleSheet("color: #9AA0A6; font-size: 9pt; padding: 2px 0 4px 28px; font-style: italic;")
+                desc_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt; padding: 2px 0 4px 28px; font-style: italic;")
                 checkbox_layout.addWidget(desc_label)
             
             signals_layout.addLayout(checkbox_layout)
@@ -265,7 +265,7 @@ class BlockListItem(QWidget):
         
         # Note about data source
         note_label = QLabel("Note: Signal counts based on last 180 days of BTC data")
-        note_label.setStyleSheet("color: #9AA0A6; font-size: 9pt; font-style: italic; padding-top: 8px;")
+        note_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt; font-style: italic; padding-top: 8px;")
         signals_layout.addWidget(note_label)
         
         self.signals_widget.setLayout(signals_layout)
@@ -591,7 +591,7 @@ class BlockSearchPanel(QWidget):
                 
                 empty_label = QLabel("No blocks found in registry.")
                 empty_label.setAlignment(Qt.AlignCenter)
-                empty_label.setStyleSheet("color: #888888; font-size: 12pt; padding: 50px;")
+                empty_label.setStyleSheet(get_label_style('muted') + " font-size: 12pt; padding: 50px;")
                 self.blocks_layout.addWidget(empty_label)
                 return
             
