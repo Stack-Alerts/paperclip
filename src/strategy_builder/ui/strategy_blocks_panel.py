@@ -82,31 +82,22 @@ class BlockConfigItem(QWidget):
         name_font.setBold(True)
         name_font.setPointSize(10)
         name_label.setFont(name_font)
-        name_label.setStyleSheet("color: #E8EAED;")
+        name_label.setStyleSheet(get_label_style('default'))
         name_layout.addWidget(name_label)
         
-        # NEW: AND/OR Badge - prominent display
+        # NEW: AND/OR Badge - prominent display with centralized styling
         logic_type = self.block_info.get('logic', 'AND')
         if logic_type == 'AND':
             badge_text = "REQUIRED"
-            badge_bg = "#204486"  # Blue for required
+            badge_type_style = 'required'
             badge_tooltip = "This block is REQUIRED - all signals must trigger"
         else:
             badge_text = "OPTIONAL"
-            badge_bg = "#28A745"  # Green for optional
+            badge_type_style = 'optional'
             badge_tooltip = "This block is OPTIONAL - boosts strategy when triggered"
         
         logic_badge = QLabel(badge_text)
-        logic_badge.setStyleSheet(f"""
-            QLabel {{
-                background-color: {badge_bg};
-                color: white;
-                font-weight: bold;
-                font-size: 9pt;
-                padding: 4px 12px;
-                border-radius: 4px;
-            }}
-        """)
+        logic_badge.setStyleSheet(get_logic_badge_style(badge_type_style))
         logic_badge.setToolTip(badge_tooltip)
         logic_badge.setMaximumHeight(24)
         name_layout.addWidget(logic_badge)
