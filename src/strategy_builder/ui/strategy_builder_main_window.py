@@ -734,10 +734,15 @@ class StrategyBuilderMainWindow(QMainWindow):
             result = self.orchestrator.validate_strategy()
             if result.success:
                 self.validation_passed = True  # Track completion
+                # IMMEDIATELY set status on config so it persists on save
+                self.orchestrator.config_engine.config.validation_status = 'passed'
                 self.stepper.mark_step_complete(1)
                 self._update_status("Strategy validated successfully")
             else:
                 self.validation_passed = False
+                # Clear validation status on error
+                if hasattr(self.orchestrator.config_engine.config, 'validation_status'):
+                    delattr(self.orchestrator.config_engine.config, 'validation_status')
                 self.stepper.mark_step_error(1)
                 self._update_status("Strategy validation has errors")
         
@@ -752,9 +757,14 @@ class StrategyBuilderMainWindow(QMainWindow):
             result = self.orchestrator.generate_code()
             if result.success:
                 self.code_generated = True  # Track completion
+                # IMMEDIATELY set status on config so it persists on save
+                self.orchestrator.config_engine.config.generation_status = 'success'
                 self.stepper.mark_step_complete(2)
             else:
                 self.code_generated = False
+                # Clear generation status on error
+                if hasattr(self.orchestrator.config_engine.config, 'generation_status'):
+                    delattr(self.orchestrator.config_engine.config, 'generation_status')
                 self.stepper.mark_step_error(2)
         
         elif step == 3:
