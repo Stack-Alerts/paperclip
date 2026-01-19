@@ -251,18 +251,18 @@ class StrategyPersistence:
             )
             
             for signal_data in block_data.get('signals', []):
-                # Create timing constraint if present
+                # Create timing constraint if present (check for both key existence and non-None value)
                 timing_constraint = None
-                if 'timing_constraint' in signal_data:
+                if signal_data.get('timing_constraint'):  # This checks both existence and non-None
                     tc_data = signal_data['timing_constraint']
                     timing_constraint = TimingConstraint(
                         max_candles=tc_data['max_candles'],
                         reference=tc_data['reference']
                     )
                 
-                # Create recheck config if present
+                # Create recheck config if present (check for both key existence and non-None value)
                 recheck_config = None
-                if 'recheck_config' in signal_data:
+                if signal_data.get('recheck_config'):  # This checks both existence and non-None
                     rc_data = signal_data['recheck_config']
                     recheck_config = RecheckConfig(
                         enabled=rc_data.get('enabled', False),
