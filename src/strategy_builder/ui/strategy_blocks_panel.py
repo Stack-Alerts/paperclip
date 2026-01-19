@@ -61,13 +61,13 @@ class BlockConfigItem(QWidget):
         # Main header layout
         header_layout = QHBoxLayout()
         
-        # Position indicator
+        # Position indicator - BRIGHT BLUE like original design
         position_label = QLabel(f"#{self.position}")
         position_font = QFont()
         position_font.setBold(True)
         position_font.setPointSize(12)
         position_label.setFont(position_font)
-        position_label.setStyleSheet(get_label_style('info') + " min-width: 40px;")
+        position_label.setStyleSheet("color: #00D9FF; font-weight: bold; min-width: 40px;")  # Match original bright blue
         header_layout.addWidget(position_label)
         
         # Block info layout
@@ -211,7 +211,8 @@ class BlockConfigItem(QWidget):
                 # Add configure button for signals after the first (need reference signal)
                 if idx > 1:
                     configure_btn = QPushButton("⚙️ Configure")
-                    configure_btn.setMaximumWidth(90)
+                    configure_btn.setMinimumWidth(90)  # Changed from setMaximumWidth
+                    configure_btn.setMinimumHeight(28)  # ADD proper height like original
                     configure_btn.setStyleSheet(get_icon_button_style())
                     configure_btn.setToolTip("Configure timing constraint for this signal")
                     configure_btn.clicked.connect(
