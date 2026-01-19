@@ -321,7 +321,7 @@ COLORS = {
     'info': '#2070FF',
     
     # Button colors
-    'button_primary': '#204486',
+    'button_primary': '#2a5eb8',  # User specified blue for position numbers and REQUIRED badge
     'button_primary_hover': '#1A3A70',
     'button_success': '#10B981',
     'button_success_hover': '#059669',
