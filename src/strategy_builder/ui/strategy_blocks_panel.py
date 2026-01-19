@@ -227,7 +227,7 @@ class BlockConfigItem(QWidget):
                 
                 # Add configure button for signals after the first (need reference signal)
                 if idx > 1:
-                    configure_btn = QPushButton("⚙️ Configure")
+                    configure_btn = QPushButton("⚙️ Config")
                     configure_btn.setMinimumWidth(90)
                     configure_btn.setMinimumHeight(28)
                     configure_btn.setStyleSheet(get_primary_button_stylesheet())
