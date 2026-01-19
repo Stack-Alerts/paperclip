@@ -56,9 +56,9 @@ class AlertDialog(QDialog):
         )
         self.setModal(True)
         
-        # Large size matching Data Update Modal style (but not as massive)
-        self.setMinimumSize(600, 400)
-        self.resize(600, 450)
+        # Large size matching Data Update Modal style (25% taller, 50% wider per user request)
+        self.setMinimumSize(900, 500)
+        self.resize(900, 550)
         
         # Apply centralized dark theme
         self.setStyleSheet(get_main_stylesheet())
