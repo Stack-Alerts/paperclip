@@ -16,7 +16,7 @@ from typing import Optional, List, Dict
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QGroupBox, QSizePolicy, QSpacerItem,
-    QComboBox, QTextEdit, QScrollArea, QFrame, QCheckBox, QAbstractItemView
+    QComboBox, QTextEdit, QScrollArea, QFrame, QCheckBox
 )
 from PyQt5.QtCore import pyqtSignal, Qt, QEvent
 from PyQt5.QtGui import QFont, QWheelEvent
@@ -513,10 +513,6 @@ class BlockSearchPanel(QWidget):
         self.blocks_scroll_area = QScrollArea()
         self.blocks_scroll_area.setWidgetResizable(True)
         self.blocks_scroll_area.setMinimumHeight(400)
-        
-        # Enable smooth pixel-based scrolling (fixes jerky scrolling)
-        self.blocks_scroll_area.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
-        self.blocks_scroll_area.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         
         # Container widget for blocks
         self.blocks_container = QWidget()
