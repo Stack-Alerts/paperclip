@@ -71,7 +71,7 @@ class StrategyInfoPanel(QWidget):
         layout.setContentsMargins(15, 15, 15, 15)
         
         # Group box for all strategy info
-        group_box = QGroupBox("� Strategy Information")
+        group_box = QGroupBox("💡 Strategy Information")
         
         # Set title font programmatically (CSS doesn't work for QGroupBox::title)
         title_font = QFont()
