@@ -39,7 +39,7 @@ from src.strategy_builder.ui.validation_dialog import ValidationDialog
 from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
 from src.strategy_builder.ui.data_update_modal import DataUpdateModal
 from src.strategy_builder.ui.alert_dialog import show_warning
-from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
+from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
 from src.strategy_builder.ui.styles import get_main_stylesheet
 
 # Import real block registry adapter
