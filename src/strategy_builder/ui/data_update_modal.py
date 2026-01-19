@@ -186,10 +186,10 @@ class DataUpdateModal(QDialog):
         self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowStaysOnTopHint)
         self.setModal(True)  # Keep modal behavior but allow dragging
         
-        # MASSIVE to avoid scrolling - institutional grade
+        # MASSIVE to avoid scrolling - institutional grade (75px taller)
         self.setMinimumWidth(1400)
-        self.setMinimumHeight(1000)
-        self.resize(1400, 1000)
+        self.setMinimumHeight(1075)
+        self.resize(1400, 1075)
         
         # Apply centralized dark theme stylesheet
         self.setStyleSheet(get_main_stylesheet())
@@ -214,6 +214,8 @@ class DataUpdateModal(QDialog):
         
         self.status_label = QLabel("Checking data availability...")
         self.status_label.setWordWrap(True)
+        self.status_label.setAlignment(Qt.AlignCenter)  # Center text vertically and horizontally
+        self.status_label.setMinimumHeight(60)  # Give it some height for vertical centering
         status_layout.addWidget(self.status_label)
         
         status_group.setLayout(status_layout)
