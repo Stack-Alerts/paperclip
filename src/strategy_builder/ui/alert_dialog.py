@@ -101,7 +101,7 @@ class AlertDialog(QDialog):
         message_font = QFont()
         message_font.setPointSize(11)
         message_label.setFont(message_font)
-        message_label.setStyleSheet("color: #E8EAED; line-height: 1.6;")
+        message_label.setStyleSheet("color: #d4d7d3; line-height: 1.6;")
         layout.addWidget(message_label)
         
         layout.addStretch()
