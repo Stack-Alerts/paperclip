@@ -451,8 +451,10 @@ class BlockSearchPanel(QWidget):
         group_layout.setContentsMargins(15, 20, 15, 15)  # Match backtest panel padding
         
         # Reset font for content (only title should be 12pt)
-        content_font = QFont()
-        content_font.setPointSize(10)
+        # CRITICAL: Make it instance variable so it persists!
+        self.content_font = QFont()
+        self.content_font.setPointSize(10)
+        self.content_font.setBold(False)  # Explicitly not bold
         
         # Search and filter controls - increased spacing
         controls_layout = QVBoxLayout()
@@ -462,11 +464,11 @@ class BlockSearchPanel(QWidget):
         search_layout = QHBoxLayout()
         search_layout.setSpacing(10)
         search_label = QLabel("🔍 Search:")
-        search_label.setFont(content_font)
+        search_label.setFont(self.content_font)
         search_label.setStyleSheet(get_label_style('muted'))
         search_label.setMinimumWidth(70)
         self.search_input = QLineEdit()
-        self.search_input.setFont(content_font)
+        self.search_input.setFont(self.content_font)
         self.search_input.setPlaceholderText("Search by block name, description, or signal...")
         self.search_input.setMinimumHeight(36)  # Bigger input
         self.search_input.textChanged.connect(self._on_search_changed)
@@ -480,11 +482,11 @@ class BlockSearchPanel(QWidget):
         
         # Category filter
         category_label = QLabel("Category:")
-        category_label.setFont(content_font)
+        category_label.setFont(self.content_font)
         category_label.setStyleSheet(get_label_style('muted'))
         filters_layout.addWidget(category_label)
         self.category_filter = QComboBox()
-        self.category_filter.setFont(content_font)
+        self.category_filter.setFont(self.content_font)
         self.category_filter.addItem("All Categories")
         fix_combobox_white_bars(self.category_filter)  # Comprehensive fix
         self.category_filter.currentTextChanged.connect(self._on_filter_changed)
@@ -492,11 +494,11 @@ class BlockSearchPanel(QWidget):
         
         # Type filter
         type_label = QLabel("Type:")
-        type_label.setFont(content_font)
+        type_label.setFont(self.content_font)
         type_label.setStyleSheet(get_label_style('muted'))
         filters_layout.addWidget(type_label)
         self.type_filter = QComboBox()
-        self.type_filter.setFont(content_font)
+        self.type_filter.setFont(self.content_font)
         self.type_filter.addItem("All Types")
         fix_combobox_white_bars(self.type_filter)  # Comprehensive fix
         self.type_filter.currentTextChanged.connect(self._on_filter_changed)
