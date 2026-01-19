@@ -674,17 +674,28 @@ def get_logic_badge_style(badge_type='required') -> str:
     Returns:
         CSS style string for logic badges
     """
-    colors = {
-        'required': COLORS['button_primary'],    # Blue
-        'optional': COLORS['button_success'],    # Green
-        'and': COLORS['info'],                   # Blue
-        'or': COLORS['warning']                  # Orange
+    bg_colors = {
+        'required': COLORS['button_primary'],    # Blue background
+        'optional': COLORS['button_success'],    # Green background
+        'and': COLORS['info'],                   # Blue background
+        'or': COLORS['warning']                  # Orange background
     }
+    
+    text_colors = {
+        'required': '#ffed00',                   # Yellow text for REQUIRED
+        'optional': 'white',                     # White text for OPTIONAL
+        'and': 'white',
+        'or': 'white'
+    }
+    
+    bg_color = bg_colors.get(badge_type, bg_colors['required'])
+    text_color = text_colors.get(badge_type, text_colors['required'])
+    
     return f"""
         QLabel {{
-            background-color: {colors.get(badge_type, colors['required'])};
-            color: white;
-            font-weight: bold;
+            background-color: {bg_color};
+            color: {text_color};
+            font-weight: normal;
             padding: 4px 12px;
             border-radius: 4px;
             font-size: 9pt;
