@@ -137,11 +137,11 @@ class BacktestConfigPanel(QWidget):
         
         # Tab 2: Live Output (placeholder)
         output_tab = self._create_placeholder_tab("📊 Live Output", "Real-time backtest output will appear here")
-        self.tab_widget.addTab(output_tab, "📊 Live Output")
+        self.tab_widget.addTab(output_tab, "💚 Live Output")
         
         # Tab 3: Trades (placeholder)
         trades_tab = self._create_placeholder_tab("📋 Trades", "Trade history table will appear here")
-        self.tab_widget.addTab(trades_tab, "📋 Trades")
+        self.tab_widget.addTab(trades_tab, "💰 Trades")
         
         # Tab 4: Metrics (placeholder)
         metrics_tab = self._create_placeholder_tab("💠 Metrics", "Key metrics comparison will appear here")
@@ -149,7 +149,7 @@ class BacktestConfigPanel(QWidget):
         
         # Tab 5: Compare (placeholder)
         compare_tab = self._create_placeholder_tab("🔄 Compare", "Configuration comparison will appear here")
-        self.tab_widget.addTab(compare_tab, "🔄 Compare")
+        self.tab_widget.addTab(compare_tab, "🔁 Compare")
         
         main_layout.addWidget(self.tab_widget)
         self.setLayout(main_layout)
