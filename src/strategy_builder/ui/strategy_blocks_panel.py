@@ -307,16 +307,26 @@ class BlockConfigItem(QWidget):
         )
         
         if ok and bar_delay > 0:
-            # Emit signal to parent panel to handle configuration
-            # We'll use a custom signal for this
-            if hasattr(self.parent(), '_on_signal_recheck_configured'):
-                self.parent()._on_signal_recheck_configured(self.block_name, signal_name, bar_delay)
+            # Find the StrategyBlocksPanel (traverse up the widget tree)
+            panel = self._find_strategy_blocks_panel()
+            if panel and hasattr(panel, '_on_signal_recheck_configured'):
+                panel._on_signal_recheck_configured(self.block_name, signal_name, bar_delay)
     
     def _on_remove_recheck(self, signal_name: str):
         """Handle remove recheck button click."""
-        # Emit signal to parent panel to handle removal
-        if hasattr(self.parent(), '_on_signal_recheck_removed'):
-            self.parent()._on_signal_recheck_removed(self.block_name, signal_name)
+        # Find the StrategyBlocksPanel (traverse up the widget tree)
+        panel = self._find_strategy_blocks_panel()
+        if panel and hasattr(panel, '_on_signal_recheck_removed'):
+            panel._on_signal_recheck_removed(self.block_name, signal_name)
+    
+    def _find_strategy_blocks_panel(self):
+        """Find the StrategyBlocksPanel by traversing up the widget tree."""
+        widget = self.parent()
+        while widget is not None:
+            if isinstance(widget, StrategyBlocksPanel):
+                return widget
+            widget = widget.parent()
+        return None
     
     def update_position(self, position: int, total: int):
         """Update the position indicators and button states."""
@@ -476,12 +486,13 @@ class StrategyBlocksPanel(QWidget):
                 
                 block_info['signals'].append(signal_dict)
             
-            # Create block item widget
+            # Create block item widget with parent set to this panel
             block_item = BlockConfigItem(
                 block_config.name,
                 block_info,
                 idx,
-                total_blocks
+                total_blocks,
+                parent=self.blocks_container  # Set parent to ensure proper signal routing
             )
             
             # Connect signals
