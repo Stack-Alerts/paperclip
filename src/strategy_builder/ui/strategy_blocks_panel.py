@@ -119,10 +119,11 @@ class BlockConfigItem(QWidget):
         # Control buttons layout
         controls_layout = QVBoxLayout()
         controls_layout.setSpacing(5)
-        
-        # Move buttons
+
+        # Move buttons - aligned to the right
         move_layout = QHBoxLayout()
-        
+        move_layout.addStretch()  # Push buttons to the right
+
         self.up_button = QPushButton("▴")  # Sharp small triangle up
         self.up_button.setMaximumWidth(40)
         self.up_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
@@ -130,7 +131,7 @@ class BlockConfigItem(QWidget):
         self.up_button.clicked.connect(lambda: self.move_up_clicked.emit(self.block_name))
         self.up_button.setEnabled(self.position > 1)  # Disable if first
         move_layout.addWidget(self.up_button)
-        
+
         self.down_button = QPushButton("▾")  # Sharp small triangle down
         self.down_button.setMaximumWidth(40)
         self.down_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
@@ -138,7 +139,7 @@ class BlockConfigItem(QWidget):
         self.down_button.clicked.connect(lambda: self.move_down_clicked.emit(self.block_name))
         self.down_button.setEnabled(self.position < self.total)  # Disable if last
         move_layout.addWidget(self.down_button)
-        
+
         controls_layout.addLayout(move_layout)
         
         # Configure button for blocks #2+ (need reference to previous block)
