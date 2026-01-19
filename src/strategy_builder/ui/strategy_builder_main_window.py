@@ -38,7 +38,7 @@ from src.strategy_builder.ui.strategy_blocks_panel import StrategyBlocksPanel
 from src.strategy_builder.ui.validation_dialog import ValidationDialog
 from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
 from src.strategy_builder.ui.data_update_modal import DataUpdateModal
-from src.strategy_builder.ui.alert_dialog import show_warning
+from src.strategy_builder.ui.alert_dialog import show_warning, ask_question
 from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
 from src.strategy_builder.ui.styles import get_main_stylesheet
 
@@ -346,17 +346,17 @@ class StrategyBuilderMainWindow(QMainWindow):
         """Create a new strategy."""
         # Check if current strategy should be saved
         if self.is_modified:
-            reply = QMessageBox.question(
+            reply = ask_question(
                 self,
                 "Unsaved Changes",
-                " You have unsaved changes. Do you want to save before creating a new strategy?",
-                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before creating a new strategy?"
             )
             
-            if reply == QMessageBox.Yes:
+            if reply == 'yes':
                 if not self._on_save_strategy():
                     return  # Save was cancelled
-            elif reply == QMessageBox.Cancel:
+            elif reply == 'cancel':
                 return
         
         # Reset strategy name in UI
@@ -627,14 +627,14 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_clear_blocks(self):
         """Clear all blocks from strategy."""
-        reply = QMessageBox.question(
+        reply = ask_question(
             self,
             "Clear Blocks",
-            "Are you sure you want to remove all blocks from the strategy?",
-            QMessageBox.Yes | QMessageBox.No
+            "Clear All Blocks",
+            "Are you sure you want to remove all blocks from the strategy?"
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == 'yes':
             # Clear blocks
             self.search_panel.clear_added_blocks()
             # Refresh will happen via blocks_changed signal
@@ -1219,20 +1219,20 @@ class StrategyBuilderMainWindow(QMainWindow):
     def closeEvent(self, event):
         """Handle window close event."""
         if self.is_modified:
-            reply = QMessageBox.question(
+            reply = ask_question(
                 self,
                 "Unsaved Changes",
-                "You have unsaved changes. Do you want to save before exiting?",
-                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before exiting?"
             )
             
-            if reply == QMessageBox.Yes:
+            if reply == 'yes':
                 if self._on_save_strategy():
                     self._save_settings()
                     event.accept()
                 else:
                     event.ignore()
-            elif reply == QMessageBox.No:
+            elif reply == 'no':
                 self._save_settings()
                 event.accept()
             else:
