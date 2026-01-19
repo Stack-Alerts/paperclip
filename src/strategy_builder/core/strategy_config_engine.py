@@ -16,11 +16,19 @@ class TimingConstraint:
 
 
 @dataclass
+class RecheckConfig:
+    """Recheck validation configuration - requires signal to reoccur within bars"""
+    enabled: bool = False
+    bar_delay: int = 0  # Number of bars within which signal must reoccur
+
+
+@dataclass
 class SignalConfig:
     """Configuration for a single signal within a block"""
     name: str
     logic: str  # "AND" or "OR"
     timing_constraint: Optional[TimingConstraint] = None
+    recheck_config: Optional[RecheckConfig] = None
 
 
 @dataclass

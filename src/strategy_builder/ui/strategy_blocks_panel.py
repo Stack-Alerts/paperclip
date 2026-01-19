@@ -211,6 +211,17 @@ class BlockConfigItem(QWidget):
                 
                 signal_row_layout.addWidget(signal_label, stretch=1)
                 
+                # Add "Recheck On Delayed Candles" button for all signals
+                recheck_btn = QPushButton("Recheck On Delayed Candles")
+                recheck_btn.setMinimumWidth(180)
+                recheck_btn.setMinimumHeight(28)
+                recheck_btn.setStyleSheet(get_icon_button_style())
+                recheck_btn.setToolTip("Require this signal to reoccur within specified bars for validation")
+                recheck_btn.clicked.connect(
+                    lambda checked, sname=signal_name: self._on_recheck_clicked(sname)
+                )
+                signal_row_layout.addWidget(recheck_btn)
+                
                 # Add configure button for signals after the first (need reference signal)
                 if idx > 1:
                     configure_btn = QPushButton("⚙️ Configure")
@@ -224,6 +235,35 @@ class BlockConfigItem(QWidget):
                     signal_row_layout.addWidget(configure_btn)
                 
                 signals_layout.addLayout(signal_row_layout)
+                
+                # Display recheck configuration as indented sub-item
+                if signal.get('recheck_config'):
+                    recheck_cfg = signal['recheck_config']
+                    if recheck_cfg.get('enabled'):
+                        bar_delay = recheck_cfg.get('bar_delay', 0)
+                        
+                        # Create recheck row with input and remove button
+                        recheck_row_layout = QHBoxLayout()
+                        recheck_row_layout.setSpacing(8)
+                        
+                        recheck_text = f"     -----> {signal_name} [RECHECK] in {bar_delay} Bars"
+                        recheck_label = QLabel(recheck_text)
+                        recheck_label.setStyleSheet(get_label_style('success') + " font-size: 8pt; font-style: italic;")
+                        recheck_label.setToolTip(f"This signal must reoccur within {bar_delay} bars for validation")
+                        recheck_row_layout.addWidget(recheck_label, stretch=1)
+                        
+                        # Remove recheck button
+                        remove_recheck_btn = QPushButton("✕ Remove")
+                        remove_recheck_btn.setMinimumWidth(90)
+                        remove_recheck_btn.setMinimumHeight(28)
+                        remove_recheck_btn.setStyleSheet(get_danger_button_stylesheet())
+                        remove_recheck_btn.setToolTip("Remove recheck validation")
+                        remove_recheck_btn.clicked.connect(
+                            lambda checked, sname=signal_name: self._on_remove_recheck(sname)
+                        )
+                        recheck_row_layout.addWidget(remove_recheck_btn)
+                        
+                        signals_layout.addLayout(recheck_row_layout)
                 
                 # Display timing constraint as indented sub-item
                 if timing_constraint:
@@ -250,6 +290,33 @@ class BlockConfigItem(QWidget):
         """)
         
         self.setLayout(layout)
+    
+    def _on_recheck_clicked(self, signal_name: str):
+        """Handle recheck button click - show dialog to configure bar delay."""
+        from PyQt5.QtWidgets import QInputDialog
+        
+        # Show input dialog for bar delay
+        bar_delay, ok = QInputDialog.getInt(
+            self,
+            "Configure Recheck Validation",
+            f"Signal: {signal_name}\n\nEnter number of bars within which signal must reoccur for validation:",
+            value=25,  # Default value
+            min=1,
+            max=500,
+            step=1
+        )
+        
+        if ok and bar_delay > 0:
+            # Emit signal to parent panel to handle configuration
+            # We'll use a custom signal for this
+            if hasattr(self.parent(), '_on_signal_recheck_configured'):
+                self.parent()._on_signal_recheck_configured(self.block_name, signal_name, bar_delay)
+    
+    def _on_remove_recheck(self, signal_name: str):
+        """Handle remove recheck button click."""
+        # Emit signal to parent panel to handle removal
+        if hasattr(self.parent(), '_on_signal_recheck_removed'):
+            self.parent()._on_signal_recheck_removed(self.block_name, signal_name)
     
     def update_position(self, position: int, total: int):
         """Update the position indicators and button states."""
@@ -384,12 +451,13 @@ class StrategyBlocksPanel(QWidget):
                 'signals': []
             }
             
-            # Add signal info with timing constraints
+            # Add signal info with timing constraints and recheck config
             for signal_config in block_config.signals:
                 signal_dict = {
                     'name': signal_config.name,
                     'logic': signal_config.logic,
-                    'timing_constraint': None
+                    'timing_constraint': None,
+                    'recheck_config': None
                 }
                 
                 # Add timing constraint data if present
@@ -397,6 +465,13 @@ class StrategyBlocksPanel(QWidget):
                     signal_dict['timing_constraint'] = {
                         'reference_signal': signal_config.timing_constraint.reference,
                         'max_candles': signal_config.timing_constraint.max_candles
+                    }
+                
+                # Add recheck config data if present
+                if signal_config.recheck_config:
+                    signal_dict['recheck_config'] = {
+                        'enabled': signal_config.recheck_config.enabled,
+                        'bar_delay': signal_config.recheck_config.bar_delay
                     }
                 
                 block_info['signals'].append(signal_dict)
@@ -690,6 +765,81 @@ class StrategyBlocksPanel(QWidget):
                 print(f"Failed to remove block: {result.message}")
         except Exception as e:
             print(f"Error removing block: {e}")
+    
+    def _on_signal_recheck_configured(self, block_name: str, signal_name: str, bar_delay: int):
+        """
+        Handle recheck configuration for a signal.
+        
+        Args:
+            block_name: Block name
+            signal_name: Signal name
+            bar_delay: Number of bars for recheck validation
+        """
+        try:
+            # Get current config
+            config = self.orchestrator.get_current_config()
+            if not config:
+                print("No configuration available")
+                return
+            
+            # Find and update signal
+            from src.strategy_builder.core.strategy_config_engine import RecheckConfig
+            
+            for block in config.blocks:
+                if block.name == block_name:
+                    for signal in block.signals:
+                        if signal.name == signal_name:
+                            # Set recheck config
+                            signal.recheck_config = RecheckConfig(enabled=True, bar_delay=bar_delay)
+                            print(f"Recheck configured for {block_name}::{signal_name} - {bar_delay} bars")
+                            
+                            # Refresh display
+                            self._refresh_blocks()
+                            # Emit changed signal
+                            self.blocks_changed.emit()
+                            return
+            
+            print(f"Signal {block_name}::{signal_name} not found")
+        except Exception as e:
+            print(f"Error configuring recheck: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_signal_recheck_removed(self, block_name: str, signal_name: str):
+        """
+        Handle removal of recheck configuration for a signal.
+        
+        Args:
+            block_name: Block name
+            signal_name: Signal name
+        """
+        try:
+            # Get current config
+            config = self.orchestrator.get_current_config()
+            if not config:
+                print("No configuration available")
+                return
+            
+            # Find and update signal
+            for block in config.blocks:
+                if block.name == block_name:
+                    for signal in block.signals:
+                        if signal.name == signal_name:
+                            # Remove recheck config
+                            signal.recheck_config = None
+                            print(f"Recheck removed for {block_name}::{signal_name}")
+                            
+                            # Refresh display
+                            self._refresh_blocks()
+                            # Emit changed signal
+                            self.blocks_changed.emit()
+                            return
+            
+            print(f"Signal {block_name}::{signal_name} not found")
+        except Exception as e:
+            print(f"Error removing recheck: {e}")
+            import traceback
+            traceback.print_exc()
     
     def refresh_from_orchestrator(self):
         """Public method to refresh display from orchestrator."""
