@@ -410,11 +410,15 @@ class StrategyInfoPanel(QWidget):
                     if has_timing and has_recheck:
                         break
                 
+                # Combine timing and recheck info on one line if both exist
+                features = []
                 if has_timing:
-                    description_lines.append("\nIncludes timing constraints between signals.")
-                
+                    features.append("timing constraints between signals")
                 if has_recheck:
-                    description_lines.append("Includes signal recheck validations.")
+                    features.append("signal recheck validations")
+                
+                if features:
+                    description_lines.append(f"\nIncludes {' and '.join(features)}.")
                 
                 self.set_description("\n".join(description_lines))
             else:
