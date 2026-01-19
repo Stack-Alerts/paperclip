@@ -79,8 +79,8 @@ class TimingConstraintDialog(QDialog):
         # Increased size by 25% to prevent text compression
         self.setMinimumWidth(875)
         self.setMinimumHeight(563)
-        # Set initial size for better appearance (25% larger)
-        self.resize(940, 625)
+        # Set initial size for better appearance (50% larger for readability)
+        self.resize(1200, 700)
         
         # Apply centralized dark theme stylesheet
         self.setStyleSheet(get_main_stylesheet())
