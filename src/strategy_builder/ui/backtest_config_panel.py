@@ -145,7 +145,7 @@ class BacktestConfigPanel(QWidget):
         
         # Tab 4: Metrics (placeholder)
         metrics_tab = self._create_placeholder_tab("💠 Metrics", "Key metrics comparison will appear here")
-        self.tab_widget.addTab(metrics_tab, "💠 Metrics")
+        self.tab_widget.addTab(metrics_tab, "💹 Metrics")
         
         # Tab 5: Compare (placeholder)
         compare_tab = self._create_placeholder_tab("🔄 Compare", "Configuration comparison will appear here")
