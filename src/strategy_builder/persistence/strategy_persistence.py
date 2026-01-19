@@ -16,7 +16,8 @@ from src.strategy_builder.core.strategy_config_engine import (
     StrategyConfig,
     BlockConfig,
     SignalConfig,
-    TimingConstraint
+    TimingConstraint,
+    RecheckConfig
 )
 
 
@@ -215,6 +216,13 @@ class StrategyPersistence:
                         'max_candles': signal.timing_constraint.max_candles,
                         'reference': signal.timing_constraint.reference
                     }
+                
+                # Add recheck config if present
+                if signal.recheck_config:
+                    signal_data['recheck_config'] = {
+                        'enabled': signal.recheck_config.enabled,
+                        'bar_delay': signal.recheck_config.bar_delay
+                    }
                     
                 block_data['signals'].append(signal_data)
                 
@@ -252,11 +260,21 @@ class StrategyPersistence:
                         max_candles=tc_data['max_candles'],
                         reference=tc_data['reference']
                     )
+                
+                # Create recheck config if present
+                recheck_config = None
+                if 'recheck_config' in signal_data:
+                    rc_data = signal_data['recheck_config']
+                    recheck_config = RecheckConfig(
+                        enabled=rc_data.get('enabled', False),
+                        bar_delay=rc_data.get('bar_delay', 0)
+                    )
                     
                 signal = SignalConfig(
                     name=signal_data['name'],
                     logic=signal_data['logic'],
-                    timing_constraint=timing_constraint
+                    timing_constraint=timing_constraint,
+                    recheck_config=recheck_config
                 )
                 
                 block.signals.append(signal)
