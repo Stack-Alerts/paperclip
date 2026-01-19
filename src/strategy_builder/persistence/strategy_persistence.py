@@ -130,12 +130,11 @@ class StrategyPersistence:
                     errors=[f"Unsupported format: {format}"]
                 )
                 
-            # Check version compatibility
+            # Check version compatibility (optional for backward compatibility)
+            # Old files may not have version field
             if 'version' not in data:
-                return PersistenceResult(
-                    success=False,
-                    errors=["Missing version information"]
-                )
+                # Assume version 1.0.0 for backward compatibility
+                data['version'] = '1.0.0'
                 
             # Convert dict to config
             config = self._dict_to_config(data)
