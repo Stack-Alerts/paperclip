@@ -100,7 +100,9 @@ class BlockConfigItem(QWidget):
         logic_badge = QLabel(badge_text)
         logic_badge.setStyleSheet(get_logic_badge_style(badge_type_style))
         logic_badge.setToolTip(badge_tooltip)
-        # Removed setMaximumHeight - let padding control the height
+        # Set size policy to prevent expansion
+        from PyQt5.QtWidgets import QSizePolicy
+        logic_badge.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         name_layout.addWidget(logic_badge)
         name_layout.addStretch()
         
