@@ -190,9 +190,9 @@ class QuestionDialog(QDialog):
         )
         self.setModal(True)
         
-        # Large size (150% increase - 2250x1375)
-        self.setMinimumSize(2250, 1300)
-        self.resize(2250, 1375)
+        # Standard size (same as AlertDialog)
+        self.setMinimumSize(900, 500)
+        self.resize(900, 550)
         
         # Apply centralized dark theme
         self.setStyleSheet(get_main_stylesheet())
