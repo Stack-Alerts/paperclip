@@ -438,7 +438,7 @@ class BlockSearchPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         
         # Group box
-        group_box = QGroupBox("📦 Available Building Blocks")
+        group_box = QGroupBox("🔧 Available Building Blocks")
         
         # Set title font programmatically (CSS doesn't work for QGroupBox::title)
         title_font = QFont()
