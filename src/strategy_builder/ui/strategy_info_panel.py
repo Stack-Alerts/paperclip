@@ -502,16 +502,13 @@ class StrategyInfoPanel(QWidget):
                 self.time_constraint_label.setStyleSheet(f"color: {get_color('text_disabled')};")
                 return
             
-            # Count optional signals (OR blocks/signals)
+            # Count optional signals - ONLY from OR (OPTIONAL) blocks
+            # Signal logic within blocks doesn't matter - block logic determines requirement
             optional_count = 0
             for block in config.blocks:
                 if block.logic == "OR":
-                    # Count all signals in OR block
+                    # Count all signals in OPTIONAL blocks
                     optional_count += len(block.signals) if hasattr(block, 'signals') else 0
-                elif block.logic == "AND":
-                    # Count OR signals within AND blocks
-                    if hasattr(block, 'signals'):
-                        optional_count += sum(1 for s in block.signals if s.logic == "OR")
             
             self.optional_signals_label.setText(str(optional_count))
             if optional_count > 0:
