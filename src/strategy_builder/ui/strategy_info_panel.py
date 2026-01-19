@@ -84,18 +84,20 @@ class StrategyInfoPanel(QWidget):
         group_layout.setContentsMargins(15, 20, 15, 15)  # Add internal padding
         
         # Reset font for content (only title should be 12pt, not content)
-        content_font = QFont()
-        content_font.setPointSize(10)  # Normal size for content
+        # CRITICAL: Make it instance variable so it persists!
+        self.content_font = QFont()
+        self.content_font.setPointSize(10)  # Normal size for content
+        self.content_font.setBold(False)  # Explicitly not bold
         
         # Strategy Name
         name_layout = QVBoxLayout()
         name_layout.setSpacing(8)
         name_label = QLabel("Strategy Name:")
-        name_label.setFont(content_font)
+        name_label.setFont(self.content_font)
         name_label.setStyleSheet(get_label_style('muted'))
         name_label.setToolTip("Enter a unique name for your strategy")
         self.name_input = QLineEdit()
-        self.name_input.setFont(content_font)
+        self.name_input.setFont(self.content_font)
         self.name_input.setPlaceholderText("e.g., Example_MA_Crossover")
         self.name_input.setMaxLength(100)
         self.name_input.setMinimumHeight(36)  # Bigger input
@@ -107,11 +109,11 @@ class StrategyInfoPanel(QWidget):
         desc_layout = QVBoxLayout()
         desc_layout.setSpacing(8)
         self.desc_label = QLabel("Description:")
-        self.desc_label.setFont(content_font)
+        self.desc_label.setFont(self.content_font)
         self.desc_label.setStyleSheet(get_label_style('muted'))
         self.desc_label.setToolTip("Strategy description (auto-generated from blocks)")
         self.description_text = QTextEdit()
-        self.description_text.setFont(content_font)
+        self.description_text.setFont(self.content_font)
         self.description_text.setPlaceholderText(
             "Description will be auto-generated when you add building blocks...\n\n"
             "Example:\n"
@@ -138,14 +140,14 @@ class StrategyInfoPanel(QWidget):
         meta_layout.addWidget(type_label)
         
         self.bullish_radio = QRadioButton("Bullish")
-        self.bullish_radio.setFont(content_font)
+        self.bullish_radio.setFont(self.content_font)
         self.bullish_radio.setStyleSheet(get_radio_button_style('bullish'))
         self.bullish_radio.setToolTip("Strategy designed for uptrending markets")
         self.bullish_radio.setChecked(True)
         meta_layout.addWidget(self.bullish_radio)
         
         self.bearish_radio = QRadioButton("Bearish")
-        self.bearish_radio.setFont(content_font)
+        self.bearish_radio.setFont(self.content_font)
         self.bearish_radio.setStyleSheet(get_radio_button_style('bearish'))
         self.bearish_radio.setToolTip("Strategy designed for downtrending markets")
         meta_layout.addWidget(self.bearish_radio)
