@@ -123,8 +123,8 @@ class StrategyInfoPanel(QWidget):
             "Moving Average crossover with momentum confirmation. "
             "Entry on golden cross with volume confirmation within 5 candles..."
         )
-        self.description_text.setMinimumHeight(120)  # Allow scrolling instead of max
-        self.description_text.setMaximumHeight(180)  # Cap the max height
+        self.description_text.setMinimumHeight(130)  # Allow scrolling instead of max
+        self.description_text.setMaximumHeight(190)  # Cap the max height
         self.description_text.setWordWrapMode(1)  # Enable word wrap (WordWrap mode)
         self.description_text.setLineWrapMode(1)  # Wrap at widget width
         self.description_text.setReadOnly(True)  # Auto-generated, not editable
