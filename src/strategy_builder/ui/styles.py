@@ -166,7 +166,7 @@ MAIN_STYLESHEET = """
     }
     QToolButton:hover {
         background-color: #2A2F3A;
-        border-radius: 4px;
+        border-radius: 2px;
     }
     QToolButton:pressed {
         background-color: #374151;
@@ -588,7 +588,7 @@ def get_groupbox_header_stylesheet() -> str:
             color: {COLORS['text_muted']};
             font-weight: bold;
             border: 1px solid {COLORS['border']};
-            border-radius: 4px;
+            border-radius: 2px;
             margin-top: 8px;
             padding-top: 10px;
         }}
@@ -615,7 +615,7 @@ def get_preset_day_button_stylesheet() -> str:
             background-color: #1E293B;
             color: #CBD5E1;
             border: 1px solid #334155;
-            border-radius: 4px;
+            border-radius: 2px;
             font-size: 8pt;
             font-weight: normal;
         }
@@ -643,7 +643,7 @@ def get_secondary_button_stylesheet() -> str:
             color: white;
             font-weight: bold;
             padding: 10px 24px;
-            border-radius: 4px;
+            border-radius: 2px;
             min-width: 100px;
         }}
         QPushButton:hover {{
@@ -696,9 +696,9 @@ def get_logic_badge_style(badge_type='required') -> str:
             background-color: {bg_color};
             color: {text_color};
             font-weight: bold;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 10pt;
+            padding: 2px 8px;
+            border-radius: 2px;
+            font-size: 8pt;
         }}
     """
 
@@ -801,7 +801,7 @@ def get_icon_button_style() -> str:
         }}
         QPushButton:hover {{
             background-color: {COLORS['bg_light']};
-            border-radius: 4px;
+            border-radius: 2px;
             color: {COLORS['text_primary']};
         }}
     """
