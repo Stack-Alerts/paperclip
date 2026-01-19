@@ -359,11 +359,15 @@ class StrategyInfoPanel(QWidget):
                 for block in required_blocks:
                     total_required_signals += len(block.signals)
                 
-                # Build stats string for label
+                # Count optional signals too for complete picture
+                total_optional_signals = 0
+                for block in optional_blocks:
+                    total_optional_signals += len(block.signals)
+                
+                # Build stats string for label - clearer wording
                 stats_parts = []
                 stats_parts.append(f"Strategy has {len(config.blocks)} block(s) ({len(required_blocks)} required, {len(optional_blocks)} optional).")
-                if total_required_signals > 0:
-                    stats_parts.append(f"Total required signals: {total_required_signals}.")
+                stats_parts.append(f"Signals: {total_required_signals} required, {total_optional_signals} optional.")
                 
                 # Update label with stats
                 self.desc_label.setText(f"Description: {' '.join(stats_parts)}")
