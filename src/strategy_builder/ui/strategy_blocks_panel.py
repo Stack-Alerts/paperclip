@@ -17,7 +17,7 @@ Date: 2026-01-16
 from typing import Optional, List, Tuple
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGroupBox, QScrollArea, QFrame, QDialog
+    QGroupBox, QScrollArea, QFrame, QDialog, QAbstractItemView
 )
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QFont
@@ -412,6 +412,10 @@ class StrategyBlocksPanel(QWidget):
         self.blocks_scroll_area = QScrollArea()
         self.blocks_scroll_area.setWidgetResizable(True)
         self.blocks_scroll_area.setMinimumHeight(300)
+        
+        # Enable smooth pixel-based scrolling (fixes jerky scrolling)
+        self.blocks_scroll_area.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.blocks_scroll_area.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         
         # Container widget for blocks
         self.blocks_container = QWidget()
