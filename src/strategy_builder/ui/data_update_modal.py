@@ -186,10 +186,10 @@ class DataUpdateModal(QDialog):
         self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowStaysOnTopHint)
         self.setModal(True)  # Keep modal behavior but allow dragging
         
-        # MASSIVE to avoid scrolling - institutional grade (75px taller)
+        # MASSIVE to avoid scrolling - institutional grade (90px taller total)
         self.setMinimumWidth(1400)
-        self.setMinimumHeight(1075)
-        self.resize(1400, 1075)
+        self.setMinimumHeight(1090)
+        self.resize(1400, 1090)
         
         # Apply centralized dark theme stylesheet
         self.setStyleSheet(get_main_stylesheet())
