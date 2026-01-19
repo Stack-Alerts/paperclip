@@ -821,7 +821,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         """Update the window title with strategy name and modified status."""
         title = "BTC Engine v3 - Strategy Builder"
 
-        # Show strategy name (from orchestrator config)
+        # Show strategy name only (from orchestrator config)
         strategy_name = None
         if self.orchestrator and self.orchestrator.config_engine.config.name:
             strategy_name = self.orchestrator.config_engine.config.name
@@ -830,11 +830,6 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         if strategy_name and strategy_name != "New_Strategy":
             title += f" - {strategy_name}"
-            # Optionally show filename (basename only, not full path)
-            if self.current_file:
-                from pathlib import Path
-                filename = Path(self.current_file).name
-                title += f" ({filename})"
         elif strategy_name == "New_Strategy":
             title += " - Untitled"
 
