@@ -25,7 +25,8 @@ from src.data_manager.unified_manager import UnifiedDataManager, DataSource
 # Import centralized styles
 from src.strategy_builder.ui.styles import (
     get_main_stylesheet, get_panel_title_stylesheet, 
-    get_label_style, get_status_label_style
+    get_label_style, get_status_label_style,
+    get_primary_button_stylesheet, get_secondary_button_stylesheet
 )
 
 
@@ -247,17 +248,25 @@ class DataUpdateModal(QDialog):
         buttons_layout = QHBoxLayout()
         buttons_layout.addStretch()
         
-        self.skip_button = QPushButton("Skip for Now")
-        self.skip_button.setObjectName("skipButton")
+        self.skip_button = QPushButton("⏭️ Skip for Now")
+        self.skip_button.setMinimumWidth(150)
+        self.skip_button.setMinimumHeight(40)
+        self.skip_button.setStyleSheet(get_secondary_button_stylesheet())
         self.skip_button.clicked.connect(self.reject)
         buttons_layout.addWidget(self.skip_button)
         
-        self.update_button = QPushButton("Update Data")
+        self.update_button = QPushButton("📥 Update Data")
+        self.update_button.setMinimumWidth(150)
+        self.update_button.setMinimumHeight(40)
+        self.update_button.setStyleSheet(get_primary_button_stylesheet())
         self.update_button.clicked.connect(self._start_update)
         self.update_button.setEnabled(False)
         buttons_layout.addWidget(self.update_button)
         
-        self.close_button = QPushButton("Continue")
+        self.close_button = QPushButton("✅ Continue")
+        self.close_button.setMinimumWidth(150)
+        self.close_button.setMinimumHeight(40)
+        self.close_button.setStyleSheet(get_primary_button_stylesheet())
         self.close_button.clicked.connect(self.accept)
         self.close_button.setVisible(False)
         buttons_layout.addWidget(self.close_button)
