@@ -114,6 +114,8 @@ class StrategyInfoPanel(QWidget):
         self.desc_label.setToolTip("Strategy description (auto-generated from blocks)")
         self.description_text = QTextEdit()
         self.description_text.setFont(self.content_font)
+        # Apply muted text styling for better readability
+        self.description_text.setStyleSheet(f"color: {get_color('text_muted')}; background-color: {get_color('bg_input')};")
         self.description_text.setPlaceholderText(
             "Description will be auto-generated when you add building blocks...\n\n"
             "Example:\n"
@@ -439,21 +441,14 @@ class StrategyInfoPanel(QWidget):
             if config and hasattr(config, 'required_signals'):
                 self.set_required_signals(config.required_signals)
             else:
-                # Calculate manually from blocks
+                # Calculate manually from blocks - count ALL signals from REQUIRED blocks
                 total_required = 0
                 if config and hasattr(config, 'blocks'):
                     for block in config.blocks:
                         if hasattr(block, 'logic') and block.logic == "AND":
-                            # For AND blocks, count all AND signals
+                            # For REQUIRED (AND) blocks: count ALL signals (both AND and OR within block)
                             if hasattr(block, 'signals'):
-                                total_required += sum(
-                                    1 for s in block.signals 
-                                    if hasattr(s, 'logic') and s.logic == "AND"
-                                )
-                        elif hasattr(block, 'logic') and block.logic == "OR":
-                            # For OR blocks, count at least 1
-                            if hasattr(block, 'signals') and block.signals:
-                                total_required += 1
+                                total_required += len(block.signals)
                 
                 self.set_required_signals(total_required)
         except Exception as e:
