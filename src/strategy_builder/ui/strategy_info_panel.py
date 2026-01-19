@@ -374,16 +374,23 @@ class StrategyInfoPanel(QWidget):
                 
                 # Add timing constraint info if any
                 has_timing = False
+                has_recheck = False
                 for block in config.blocks:
                     for signal in block.signals:
                         if signal.timing_constraint:
                             has_timing = True
+                        if hasattr(signal, 'recheck_config') and signal.recheck_config and signal.recheck_config.enabled:
+                            has_recheck = True
+                        if has_timing and has_recheck:
                             break
-                    if has_timing:
+                    if has_timing and has_recheck:
                         break
                 
                 if has_timing:
                     description_lines.append("\nIncludes timing constraints between signals.")
+                
+                if has_recheck:
+                    description_lines.append("Includes signal recheck validations.")
                 
                 self.set_description("\n".join(description_lines))
             else:
