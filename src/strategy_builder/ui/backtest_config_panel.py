@@ -133,7 +133,7 @@ class BacktestConfigPanel(QWidget):
         
         # Tab 1: Configuration (existing content)
         config_tab = self._create_config_tab()
-        self.tab_widget.addTab(config_tab, "⚙️ Config")
+        self.tab_widget.addTab(config_tab, "💠 Config")
         
         # Tab 2: Live Output (placeholder)
         output_tab = self._create_placeholder_tab("📊 Live Output", "Real-time backtest output will appear here")
@@ -144,8 +144,8 @@ class BacktestConfigPanel(QWidget):
         self.tab_widget.addTab(trades_tab, "📋 Trades")
         
         # Tab 4: Metrics (placeholder)
-        metrics_tab = self._create_placeholder_tab("⚙️ Metrics", "Key metrics comparison will appear here")
-        self.tab_widget.addTab(metrics_tab, "⚙️ Metrics")
+        metrics_tab = self._create_placeholder_tab("💠 Metrics", "Key metrics comparison will appear here")
+        self.tab_widget.addTab(metrics_tab, "💠 Metrics")
         
         # Tab 5: Compare (placeholder)
         compare_tab = self._create_placeholder_tab("🔄 Compare", "Configuration comparison will appear here")
@@ -165,9 +165,9 @@ class BacktestConfigPanel(QWidget):
         # Dynamic title with strategy name
         strategy_name = self._get_strategy_name()
         if strategy_name:
-            title_text = f"⚙️ Backtest Configuration - {strategy_name} Strategy"
+            title_text = f"💠 Backtest Configuration - {strategy_name} Strategy"
         else:
-            title_text = "⚙️ Backtest Configuration"
+            title_text = "💠 Backtest Configuration"
         
         self.title_label = QLabel(title_text)
         self.title_label.setStyleSheet(get_panel_title_stylesheet())
@@ -448,7 +448,7 @@ class BacktestConfigPanel(QWidget):
         fix_combobox_white_bars(self.tpsl_combo)  # Comprehensive fix
         self.tpsl_combo.setToolTip(
             "TP/SL Initial Calculation Method\n\n"
-            "⚙️ This controls HOW initial TP/SL levels are calculated at entry.\n\n"
+            "💠 This controls HOW initial TP/SL levels are calculated at entry.\n\n"
             "Fibonacci:\n"
             "• TP levels at Fibonacci retracements (0.382, 0.618, 1.0)\n"
             "• SL at key Fibonacci support/resistance\n"
@@ -538,10 +538,10 @@ class BacktestConfigPanel(QWidget):
         self.balanced_radio.setStyleSheet(get_radio_button_style())
         self.aggressive_radio = QRadioButton("🚀 Aggressive")
         self.aggressive_radio.setStyleSheet(get_radio_button_style())
-        self.custom_radio = QRadioButton("⚙️ Custom")
+        self.custom_radio = QRadioButton("💠 Custom")
         self.custom_radio.setStyleSheet(get_radio_button_style())
         self.custom_radio.setToolTip(
-            "⚙️ Custom Preset\n\n"
+            "💠 Custom Preset\n\n"
             "Your manually configured settings.\n\n"
             "How it works:\n"
             "• When you select a preset (Conservative/Balanced/Aggressive)\n"
@@ -1247,7 +1247,7 @@ class BacktestConfigPanel(QWidget):
         layout.addStretch()
         
         # View Results Button
-        self.results_btn = QPushButton("⚙️ View Live Results")
+        self.results_btn = QPushButton("💠 View Live Results")
         self.results_btn.setEnabled(False)
         layout.addWidget(self.results_btn)
         
@@ -1363,9 +1363,9 @@ class BacktestConfigPanel(QWidget):
         """Update title when strategy changes"""
         strategy_name = self._get_strategy_name()
         if strategy_name:
-            self.title_label.setText(f"⚙️ Backtest Configuration - {strategy_name} Strategy")
+            self.title_label.setText(f"💠 Backtest Configuration - {strategy_name} Strategy")
         else:
-            self.title_label.setText("⚙️ Backtest Configuration")
+            self.title_label.setText("💠 Backtest Configuration")
     
     def _apply_conservative_preset(self):
         """Apply conservative SL preset (wider SLs, higher win rate, fewer trades)"""
