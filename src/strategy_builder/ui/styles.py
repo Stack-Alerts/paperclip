@@ -675,15 +675,15 @@ def get_logic_badge_style(badge_type='required') -> str:
         CSS style string for logic badges
     """
     bg_colors = {
-        'required': COLORS['button_primary'],    # Blue background
-        'optional': COLORS['button_success'],    # Green background
+        'required': COLORS['button_primary'],    # Blue background #2a5eb8
+        'optional': '#007a51',                   # Dark green background (user specified)
         'and': COLORS['info'],                   # Blue background
         'or': COLORS['warning']                  # Orange background
     }
     
     text_colors = {
-        'required': '#ffed00',                   # Yellow text for REQUIRED
-        'optional': 'white',                     # White text for OPTIONAL
+        'required': '#e8eaed',                   # Light gray text (user specified)
+        'optional': '#e8eaed',                   # Light gray text (user specified)
         'and': 'white',
         'or': 'white'
     }
@@ -696,7 +696,7 @@ def get_logic_badge_style(badge_type='required') -> str:
             background-color: {bg_color};
             color: {text_color};
             font-weight: normal;
-            padding: 4px 12px;
+            padding: 4px 16px;
             border-radius: 4px;
             font-size: 9pt;
         }}
