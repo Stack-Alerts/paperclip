@@ -682,8 +682,8 @@ def get_logic_badge_style(badge_type='required') -> str:
     }
     
     text_colors = {
-        'required': '#e8eaed',                   # Light gray text (user specified)
-        'optional': '#e8eaed',                   # Light gray text (user specified)
+        'required': '#FFFFFF',                   # White text for maximum contrast
+        'optional': '#FFFFFF',                   # White text for maximum contrast
         'and': 'white',
         'or': 'white'
     }
