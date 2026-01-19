@@ -444,24 +444,23 @@ class StrategyInfoPanel(QWidget):
         """
         Update required signals count based on current strategy configuration.
         
-        Retrieves the count from the orchestrator's current config.
+        ALWAYS calculates from blocks - never trusts stored required_signals value
+        because it may be stale/incorrect when loading from JSON.
         """
         try:
             config = self.orchestrator.get_current_config()
             
-            if config and hasattr(config, 'required_signals'):
-                self.set_required_signals(config.required_signals)
-            else:
-                # Calculate manually from blocks - count ALL signals from REQUIRED blocks
-                total_required = 0
-                if config and hasattr(config, 'blocks'):
-                    for block in config.blocks:
-                        if hasattr(block, 'logic') and block.logic == "AND":
-                            # For REQUIRED (AND) blocks: count ALL signals (both AND and OR within block)
-                            if hasattr(block, 'signals'):
-                                total_required += len(block.signals)
-                
-                self.set_required_signals(total_required)
+            # ALWAYS calculate from blocks - count ALL signals from REQUIRED blocks
+            # Don't use config.required_signals as it may be stale
+            total_required = 0
+            if config and hasattr(config, 'blocks'):
+                for block in config.blocks:
+                    if hasattr(block, 'logic') and block.logic == "AND":
+                        # For REQUIRED (AND) blocks: count ALL signals
+                        if hasattr(block, 'signals'):
+                            total_required += len(block.signals)
+            
+            self.set_required_signals(total_required)
         except Exception as e:
             # Gracefully handle errors
             self.set_required_signals(0)
