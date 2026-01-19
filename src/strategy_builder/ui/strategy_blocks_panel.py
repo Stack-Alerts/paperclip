@@ -213,16 +213,17 @@ class BlockConfigItem(QWidget):
                 
                 signal_row_layout.addWidget(signal_label, stretch=1)
                 
-                # Add "Recheck On Delayed Candles" button for all signals
-                recheck_btn = QPushButton("Recheck On Delayed Candles")
-                recheck_btn.setMinimumWidth(180)
-                recheck_btn.setMinimumHeight(28)
-                recheck_btn.setStyleSheet(get_recheck_button_stylesheet())
-                recheck_btn.setToolTip("Require this signal to reoccur within specified bars for validation")
-                recheck_btn.clicked.connect(
-                    lambda checked, sname=signal_name: self._on_recheck_clicked(sname)
-                )
-                signal_row_layout.addWidget(recheck_btn)
+                # Add "Recheck On Delayed Candles" button - hide if recheck already configured
+                if not signal.get('recheck_config') or not signal['recheck_config'].get('enabled'):
+                    recheck_btn = QPushButton("Recheck On Delayed Candles")
+                    recheck_btn.setMinimumWidth(180)
+                    recheck_btn.setMinimumHeight(28)
+                    recheck_btn.setStyleSheet(get_recheck_button_stylesheet())
+                    recheck_btn.setToolTip("Require this signal to reoccur within specified bars for validation")
+                    recheck_btn.clicked.connect(
+                        lambda checked, sname=signal_name: self._on_recheck_clicked(sname)
+                    )
+                    signal_row_layout.addWidget(recheck_btn)
                 
                 # Add configure button for signals after the first (need reference signal)
                 if idx > 1:
@@ -255,8 +256,8 @@ class BlockConfigItem(QWidget):
                         recheck_row_layout.addWidget(recheck_label, stretch=1)
                         
                         # Remove recheck button
-                        remove_recheck_btn = QPushButton("✕ Remove")
-                        remove_recheck_btn.setMinimumWidth(90)
+                        remove_recheck_btn = QPushButton("✕")
+                        remove_recheck_btn.setMinimumWidth(40)
                         remove_recheck_btn.setMinimumHeight(28)
                         remove_recheck_btn.setStyleSheet(get_danger_button_stylesheet())
                         remove_recheck_btn.setToolTip("Remove recheck validation")
