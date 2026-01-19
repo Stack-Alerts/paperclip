@@ -36,8 +36,9 @@ from src.strategy_builder.ui.strategy_info_panel import StrategyInfoPanel
 from src.strategy_builder.ui.block_search_panel import BlockSearchPanel
 from src.strategy_builder.ui.strategy_blocks_panel import StrategyBlocksPanel
 from src.strategy_builder.ui.validation_dialog import ValidationDialog
-from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
+from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
 from src.strategy_builder.ui.data_update_modal import DataUpdateModal
+from src.strategy_builder.ui.alert_dialog import show_warning
 from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
 from src.strategy_builder.ui.styles import get_main_stylesheet
 
@@ -397,8 +398,8 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Apply dark theme stylesheet (since parent is None, it doesn't inherit)
         dialog.setStyleSheet(self.styleSheet())
         
-        # Set larger default size (800x600)
-        dialog.resize(800, 600)
+        # Set larger default size (1600x1200 - 100% bigger per user request)
+        dialog.resize(1600, 1200)
         
         # Restore saved size if available
         dialog_geometry = settings.value("openDialog/geometry")
@@ -513,8 +514,8 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Set as default filename
             dialog.selectFile(suggested_filename)
         
-        # Set larger default size (800x600)
-        dialog.resize(800, 600)
+        # Set larger default size (1600x1200 - 100% bigger per user request)
+        dialog.resize(1600, 1200)
         
         # Restore saved size if available
         settings = QSettings("BTC_Engine", "StrategyBuilder")
@@ -1150,12 +1151,12 @@ class StrategyBuilderMainWindow(QMainWindow):
             errors.append("• Strategy must have at least one building block")
         
         if errors:
-            QMessageBox.warning(
+            show_warning(
                 self,
                 "Cannot Validate Strategy",
-                "<b>Validation Prerequisites Not Met</b><br><br>" +
-                "Please complete the following before validating:<br><br>" +
-                "<br>".join(errors)
+                "Validation Prerequisites Not Met",
+                "Please complete the following before validating:\n\n" +
+                "\n".join(errors)
             )
             return False
         return True
@@ -1163,14 +1164,14 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _check_generation_prerequisites(self) -> bool:
         """Check if code generation prerequisites are met (valid strategy)."""
         if not self.validation_passed:
-            QMessageBox.warning(
+            show_warning(
                 self,
                 "Cannot Generate Code",
-                "<b>Validation Required</b><br><br>"
-                "You must successfully validate your strategy before generating code.<br><br>"
-                "Steps:<br>"
-                "1. Click the <b>Validate</b> step<br>"
-                "2. Fix any validation errors<br>"
+                "Validation Required",
+                "You must successfully validate your strategy before generating code.\n\n"
+                "Steps:\n"
+                "1. Click the Validate step\n"
+                "2. Fix any validation errors\n"
                 "3. Return here to generate code"
             )
             return False
@@ -1179,14 +1180,14 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _check_test_prerequisites(self) -> bool:
         """Check if testing prerequisites are met (code generated)."""
         if not self.code_generated:
-            QMessageBox.warning(
+            show_warning(
                 self,
                 "Cannot Run Test",
-                "<b>Code Generation Required</b><br><br>"
-                "You must generate code before running tests.<br><br>"
-                "Steps:<br>"
-                "1. Click the <b>Validate</b> step (if not done)<br>"
-                "2. Click the <b>Generate</b> step to create code<br>"
+                "Code Generation Required",
+                "You must generate code before running tests.\n\n"
+                "Steps:\n"
+                "1. Click the Validate step (if not done)\n"
+                "2. Click the Generate step to create code\n"
                 "3. Return here to run tests"
             )
             return False
@@ -1195,15 +1196,15 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _check_publish_prerequisites(self) -> bool:
         """Check if publish prerequisites are met (tests completed)."""
         if not self.test_completed:
-            QMessageBox.warning(
+            show_warning(
                 self,
                 "Cannot Publish Strategy",
-                "<b>Testing Required</b><br><br>"
-                "You must complete testing before publishing.<br><br>"
-                "Steps:<br>"
-                "1. Complete validation and code generation<br>"
-                "2. Click the <b>Test</b> step to run backtests<br>"
-                "3. Review results<br>"
+                "Testing Required",
+                "You must complete testing before publishing.\n\n"
+                "Steps:\n"
+                "1. Complete validation and code generation\n"
+                "2. Click the Test step to run backtests\n"
+                "3. Review results\n"
                 "4. Return here to publish"
             )
             return False
