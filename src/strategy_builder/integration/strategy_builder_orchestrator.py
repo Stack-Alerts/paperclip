@@ -835,15 +835,22 @@ class StrategyBuilderOrchestrator:
                     signal_dict = {
                         'name': signal.name,
                         'logic': signal.logic,
-                        'timing_constraint': None
+                        'timing_constraint': None,
+                        'recheck_config': None
                     }
-                    
+
                     if signal.timing_constraint:
                         signal_dict['timing_constraint'] = {
                             'max_candles': signal.timing_constraint.max_candles,
                             'reference': signal.timing_constraint.reference
                         }
                     
+                    if signal.recheck_config:
+                        signal_dict['recheck_config'] = {
+                            'enabled': signal.recheck_config.enabled,
+                            'bar_delay': signal.recheck_config.bar_delay
+                        }
+
                     block_dict['signals'].append(signal_dict)
                 
                 config_dict['blocks'].append(block_dict)
@@ -930,6 +937,22 @@ class StrategyBuilderOrchestrator:
                         logic=signal_dict.get('logic', 'AND'),
                         constraint=timing_constraint
                     )
+                    
+                    # Load recheck config if present
+                    if signal_dict.get('recheck_config'):
+                        from src.strategy_builder.core.strategy_config_engine import RecheckConfig
+                        rc = signal_dict['recheck_config']
+                        # Find the signal we just added and set its recheck_config
+                        for block in self.config_engine.config.blocks:
+                            if block.name == block_dict['name']:
+                                for signal in block.signals:
+                                    if signal.name == signal_dict['name']:
+                                        signal.recheck_config = RecheckConfig(
+                                            enabled=rc.get('enabled', False),
+                                            bar_delay=rc.get('bar_delay', 0)
+                                        )
+                                        break
+                                break
             
             return WorkflowResult(
                 success=True,
