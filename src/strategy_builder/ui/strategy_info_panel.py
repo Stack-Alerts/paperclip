@@ -58,6 +58,7 @@ class StrategyInfoPanel(QWidget):
         self.type_button_group: Optional[QButtonGroup] = None
         self.required_signals_label: Optional[QLabel] = None
         self.optional_signals_label: Optional[QLabel] = None
+        self.rechecked_signals_label: Optional[QLabel] = None
         self.time_constraint_label: Optional[QLabel] = None
         
         self._init_ui()
@@ -201,6 +202,25 @@ class StrategyInfoPanel(QWidget):
         sep3 = QLabel("|")
         sep3.setStyleSheet(f"color: {get_color('text_muted')}; font-weight: bold;")
         meta_layout.addWidget(sep3)
+        
+        # Rechecked Signals
+        recheck_sig_label = QLabel("Rechecked Signals:")
+        recheck_sig_label.setStyleSheet(get_label_style('muted'))
+        recheck_sig_label.setToolTip("Number of signals with recheck validation configured")
+        meta_layout.addWidget(recheck_sig_label)
+        
+        self.rechecked_signals_label = QLabel("0")
+        rechecked_signals_font = QFont()
+        rechecked_signals_font.setBold(True)
+        rechecked_signals_font.setPointSize(10)
+        self.rechecked_signals_label.setFont(rechecked_signals_font)
+        self.rechecked_signals_label.setStyleSheet(f"color: {get_color('warning')};")
+        meta_layout.addWidget(self.rechecked_signals_label)
+        
+        # Separator
+        sep4 = QLabel("|")
+        sep4.setStyleSheet(f"color: {get_color('text_muted')}; font-weight: bold;")
+        meta_layout.addWidget(sep4)
         
         # Time Constraint
         time_const_label = QLabel("Time Constraint:")
@@ -514,6 +534,20 @@ class StrategyInfoPanel(QWidget):
                 self.optional_signals_label.setStyleSheet(f"color: {get_color('info')}; font-weight: bold;")
             else:
                 self.optional_signals_label.setStyleSheet(f"color: {get_color('text_disabled')};")
+            
+            # Count rechecked signals - signals with recheck validation configured
+            recheck_count = 0
+            for block in config.blocks:
+                if hasattr(block, 'signals'):
+                    for signal in block.signals:
+                        if hasattr(signal, 'recheck_config') and signal.recheck_config and signal.recheck_config.enabled:
+                            recheck_count += 1
+            
+            self.rechecked_signals_label.setText(str(recheck_count))
+            if recheck_count > 0:
+                self.rechecked_signals_label.setStyleSheet(f"color: {get_color('warning')}; font-weight: bold;")
+            else:
+                self.rechecked_signals_label.setStyleSheet(f"color: {get_color('text_disabled')};")
             
             # Check for time constraints
             has_timing = False
