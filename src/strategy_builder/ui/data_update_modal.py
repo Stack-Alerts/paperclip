@@ -212,7 +212,7 @@ class DataUpdateModal(QDialog):
         status_group.setMaximumHeight(100)  # Limit panel height for compact appearance
         status_layout = QVBoxLayout()
         status_layout.setSpacing(5)
-        status_layout.setContentsMargins(10, 10, 10, 10)
+        status_layout.setContentsMargins(10, 3, 10, 10)  # Reduced top margin (3px)
         
         self.status_label = QLabel("Checking data availability...")
         self.status_label.setWordWrap(True)
