@@ -61,13 +61,14 @@ class BlockConfigItem(QWidget):
         # Main header layout
         header_layout = QHBoxLayout()
         
-        # Position indicator - BRIGHT BLUE like original design
+        # Position indicator - Use centralized color from styles.py
+        from src.strategy_builder.ui.styles import get_color
         position_label = QLabel(f"#{self.position}")
         position_font = QFont()
         position_font.setBold(True)
         position_font.setPointSize(12)
         position_label.setFont(position_font)
-        position_label.setStyleSheet("color: #00D9FF; font-weight: bold; min-width: 40px;")  # Match original bright blue
+        position_label.setStyleSheet(f"color: {get_color('button_primary')}; font-weight: bold; min-width: 40px;")
         header_layout.addWidget(position_label)
         
         # Block info layout
