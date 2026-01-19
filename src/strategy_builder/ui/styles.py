@@ -695,10 +695,10 @@ def get_logic_badge_style(badge_type='required') -> str:
         QLabel {{
             background-color: {bg_color};
             color: {text_color};
-            font-weight: normal;
+            font-weight: bold;
             padding: 8px 12px;
             border-radius: 4px;
-            font-size: 9pt;
+            font-size: 10pt;
         }}
     """
 
