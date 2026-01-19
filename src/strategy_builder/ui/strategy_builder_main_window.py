@@ -356,7 +356,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             if reply == QMessageBox.Yes:
                 if not self._on_save_strategy():
                     return  # Save was cancelled
-        elif reply == QMessageBox.Cancel:
+            elif reply == QMessageBox.Cancel:
                 return
         
         # Reset strategy name in UI
