@@ -165,7 +165,7 @@ class BacktestConfigPanel(QWidget):
         # Dynamic title with strategy name
         strategy_name = self._get_strategy_name()
         if strategy_name:
-            title_text = f"🎯 Backtest Configuration - {strategy_name} Strategy"
+            title_text = f"📈 Backtest Configuration - {strategy_name} Strategy"
         else:
             title_text = "⚙️ Backtest Configuration"
         
@@ -1365,7 +1365,7 @@ class BacktestConfigPanel(QWidget):
         if strategy_name:
             self.title_label.setText(f"⚙️ Backtest Configuration - {strategy_name} Strategy")
         else:
-            self.title_label.setText("🎯 Backtest Configuration")
+            self.title_label.setText("📈 Backtest Configuration")
     
     def _apply_conservative_preset(self):
         """Apply conservative SL preset (wider SLs, higher win rate, fewer trades)"""
