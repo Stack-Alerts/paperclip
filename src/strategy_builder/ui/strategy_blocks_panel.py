@@ -228,9 +228,9 @@ class BlockConfigItem(QWidget):
                 # Add configure button for signals after the first (need reference signal)
                 if idx > 1:
                     configure_btn = QPushButton("⚙️ Configure")
-                    configure_btn.setMinimumWidth(90)  # Changed from setMaximumWidth
-                    configure_btn.setMinimumHeight(28)  # ADD proper height like original
-                    configure_btn.setStyleSheet(get_icon_button_style())
+                    configure_btn.setMinimumWidth(90)
+                    configure_btn.setMinimumHeight(28)
+                    configure_btn.setStyleSheet(get_primary_button_stylesheet())
                     configure_btn.setToolTip("Configure timing constraint for this signal")
                     configure_btn.clicked.connect(
                         lambda checked, sname=signal_name: self.configure_timing_clicked.emit(self.block_name, sname)
