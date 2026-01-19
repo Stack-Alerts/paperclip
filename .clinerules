@@ -475,6 +475,74 @@ STYLE EXTENSIONS WORKFLOW:
 """
 
 ============================================================================
+FILE EDITING PRIORITY (CRITICAL FIX FOR VSCODE)
+============================================================================
+FILE_EDITING = """
+WHEN MODIFYING EMPTY OR EXISTING FILES IN VSCODE:
+
+❌ NEVER attempt: write_to_file (BROKEN - don't use)
+✅ ALWAYS use: VSCode Edit Command
+
+VSCODE EDIT SYNTAX:
+1. Open the file in VSCode editor
+2. Use inline editing (select text, replace)
+3. Use "Find & Replace" for bulk changes
+4. Save with Ctrl+S
+
+FOR EMPTY FILES:
+1. File exists but is empty: docs/v3/UI-UX/RECHECK_DELAYED_BARS_DESIGN_SPEC.md
+2. Open in VSCode
+3. Place cursor at top
+4. Paste/type complete content
+5. Save
+"""
+
+
+============================================================================
+TOOL FAILURE & RECOVERY PROTOCOL (CRITICAL)
+============================================================================
+TOOL_FAILURE = """
+IF ENCOUNTERING TOOL ERRORS (write_to_file, etc.):
+
+DO NOT RETRY SAME TOOL - USE ALTERNATIVE IMMEDIATELY
+
+1️⃣ WRITE_TO_FILE ERROR:
+   ❌ Never: Retry write_to_file again
+   ✅ Always: Switch to create_text_file
+   
+   Command to use:
+   create_text_file(file_name="name.md", content="FULL CONTENT HERE")
+
+2️⃣ RETRY RULES:
+   - Max 1 retry per tool
+   - If 2nd attempt fails → Switch tools immediately
+   - Report error to user with clear explanation
+   - Provide manual workaround
+
+3️⃣ FILE CREATION PRIORITY:
+   Markdown files (.md):
+   1. create_text_file ← PRIMARY
+   2. Doc artifact (if document-like)
+   3. Manual: cat > file.md << 'EOF'
+   
+   DO NOT attempt write_to_file - it will fail.
+
+4️⃣ CONTENT PARAMETER (MANDATORY):
+   ✓ ALWAYS populate content parameter with full file text
+   ✓ NEVER use empty content=""
+   ✓ NEVER use placeholder content
+   ✓ Content must be complete before tool call
+
+5️⃣ WHEN STUCK IN RETRY LOOP:
+   ✓ Report: "Tool X failed with: [error]"
+   ✓ Explain: "Switching to tool Y instead"
+   ✓ Execute: Use different tool immediately
+   ✓ Provide: Manual workaround if both fail
+
+KEY: Better to fail once with clear reason than retry endlessly.
+"""
+
+============================================================================
 WHEN IN DOUBT
 ============================================================================
 HELP = """
