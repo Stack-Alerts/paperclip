@@ -365,12 +365,12 @@ class StrategyInfoPanel(QWidget):
                     total_optional_signals += len(block.signals)
                 
                 # Build stats string for label - clearer wording
-                stats_parts = []
-                stats_parts.append(f"Strategy has {len(config.blocks)} block(s) ({len(required_blocks)} required, {len(optional_blocks)} optional).")
-                stats_parts.append(f"Signals: {total_required_signals} required, {total_optional_signals} optional.")
+                # Format: "Description: X blocks, Y signals (breakdown)"
+                block_text = f"{len(config.blocks)} block(s) ({len(required_blocks)} required, {len(optional_blocks)} optional)"
+                signal_text = f"{total_required_signals + total_optional_signals} signal(s) ({total_required_signals} required, {total_optional_signals} optional)"
                 
                 # Update label with stats
-                self.desc_label.setText(f"Description: {' '.join(stats_parts)}")
+                self.desc_label.setText(f"Description: {block_text}, {signal_text}.")
                 
                 # Set only the actual description in text area
                 description_lines = []
