@@ -805,3 +805,31 @@ def get_icon_button_style() -> str:
             color: {COLORS['text_primary']};
         }}
     """
+
+
+def get_recheck_button_stylesheet() -> str:
+    """
+    Get stylesheet for Recheck On Delayed Candles button.
+    
+    Uses darker gray/blue styling to distinguish from primary Config button.
+    
+    Returns:
+        Button stylesheet string with darker gray/blue theme
+    """
+    return """
+        QPushButton {
+            background-color: #3C4756;
+            color: #B8C5D6;
+            border: 1px solid #4A5568;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-weight: 500;
+        }
+        QPushButton:hover {
+            background-color: #4A5568;
+            border-color: #5A6678;
+        }
+        QPushButton:pressed {
+            background-color: #2D3748;
+        }
+    """

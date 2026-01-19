@@ -29,7 +29,8 @@ from src.strategy_builder.ui.timing_constraint_dialog import TimingConstraintDia
 # Import centralized styles
 from src.strategy_builder.ui.styles import (
     get_label_style, get_logic_badge_style, get_primary_button_stylesheet,
-    get_danger_button_stylesheet, get_icon_button_style, get_block_label_style
+    get_danger_button_stylesheet, get_icon_button_style, get_block_label_style,
+    get_recheck_button_stylesheet
 )
 
 
@@ -216,24 +217,7 @@ class BlockConfigItem(QWidget):
                 recheck_btn = QPushButton("Recheck On Delayed Candles")
                 recheck_btn.setMinimumWidth(180)
                 recheck_btn.setMinimumHeight(28)
-                # Custom darker gray/blue styling (distinct from bright blue Config button)
-                recheck_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #3C4756;
-                        color: #B8C5D6;
-                        border: 1px solid #4A5568;
-                        border-radius: 4px;
-                        padding: 6px 12px;
-                        font-weight: 500;
-                    }
-                    QPushButton:hover {
-                        background-color: #4A5568;
-                        border-color: #5A6678;
-                    }
-                    QPushButton:pressed {
-                        background-color: #2D3748;
-                    }
-                """)
+                recheck_btn.setStyleSheet(get_recheck_button_stylesheet())
                 recheck_btn.setToolTip("Require this signal to reoccur within specified bars for validation")
                 recheck_btn.clicked.connect(
                     lambda checked, sname=signal_name: self._on_recheck_clicked(sname)
