@@ -354,10 +354,10 @@ class StrategyInfoPanel(QWidget):
                 required_blocks = [b for b in config.blocks if b.logic == 'AND']
                 optional_blocks = [b for b in config.blocks if b.logic == 'OR']
                 
-                # Count total required signals
+                # Count total required signals - ALL signals from REQUIRED blocks
                 total_required_signals = 0
                 for block in required_blocks:
-                    total_required_signals += sum(1 for s in block.signals if s.logic == 'AND')
+                    total_required_signals += len(block.signals)
                 
                 # Build stats string for label
                 stats_parts = []
