@@ -215,7 +215,7 @@ class DataUpdateModal(QDialog):
         self.status_label = QLabel("Checking data availability...")
         self.status_label.setWordWrap(True)
         self.status_label.setAlignment(Qt.AlignCenter)  # Center text vertically and horizontally
-        self.status_label.setMinimumHeight(60)  # Give it some height for vertical centering
+        self.status_label.setMinimumHeight(40)  # Compact height with centered text
         status_layout.addWidget(self.status_label)
         
         status_group.setLayout(status_layout)
