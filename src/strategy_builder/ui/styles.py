@@ -696,7 +696,7 @@ def get_logic_badge_style(badge_type='required') -> str:
             background-color: {bg_color};
             color: {text_color};
             font-weight: bold;
-            padding: 8px 12px;
+            padding: 12px 16px;
             border-radius: 4px;
             font-size: 10pt;
         }}
