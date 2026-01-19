@@ -56,9 +56,9 @@ class AlertDialog(QDialog):
         )
         self.setModal(True)
         
-        # Large size matching Data Update Modal style (increased 150% per user request)
-        self.setMinimumSize(2250, 1300)
-        self.resize(2250, 1375)
+        # Large size matching Data Update Modal style (25% taller, 50% wider per user request)
+        self.setMinimumSize(900, 500)
+        self.resize(900, 550)
         
         # Apply centralized dark theme
         self.setStyleSheet(get_main_stylesheet())
@@ -161,3 +161,153 @@ def show_info(parent, title: str, heading: str, message: str):
 def show_success(parent, title: str, heading: str, message: str):
     """Show a success alert (green checkmark icon)."""
     show_alert(parent, title, heading, message, "✅")
+
+
+class QuestionDialog(QDialog):
+    """
+    Custom question dialog with Yes/No/Cancel buttons.
+    
+    Size: 2250x1375 (matching AlertDialog)
+    Returns: 'yes', 'no', or 'cancel'
+    """
+    
+    def __init__(
+        self,
+        title: str,
+        heading: str,
+        message: str,
+        icon: str = "❓",
+        parent: Optional['QWidget'] = None
+    ):
+        """Initialize the question dialog."""
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.result = 'cancel'  # Default result
+        
+        # Make dialog independent and draggable
+        self.setWindowFlags(
+            Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowStaysOnTopHint
+        )
+        self.setModal(True)
+        
+        # Large size (150% increase - 2250x1375)
+        self.setMinimumSize(2250, 1300)
+        self.resize(2250, 1375)
+        
+        # Apply centralized dark theme
+        self.setStyleSheet(get_main_stylesheet())
+        
+        self._init_ui(heading, message, icon)
+    
+    def _init_ui(self, heading: str, message: str, icon: str):
+        """Initialize the user interface."""
+        layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(30, 30, 30, 30)
+        
+        # Header with icon and heading
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(15)
+        
+        # Icon
+        icon_label = QLabel(icon)
+        icon_font = QFont()
+        icon_font.setPointSize(32)
+        icon_label.setFont(icon_font)
+        header_layout.addWidget(icon_label)
+        
+        # Heading
+        heading_label = QLabel(heading)
+        heading_font = QFont()
+        heading_font.setBold(True)
+        heading_font.setPointSize(16)
+        heading_label.setFont(heading_font)
+        heading_label.setStyleSheet(get_panel_title_stylesheet())
+        heading_label.setWordWrap(True)
+        header_layout.addWidget(heading_label, stretch=1)
+        
+        layout.addLayout(header_layout)
+        
+        # Message content
+        message_label = QLabel(message)
+        message_label.setWordWrap(True)
+        message_label.setTextFormat(Qt.RichText)
+        message_font = QFont()
+        message_font.setPointSize(11)
+        message_label.setFont(message_font)
+        message_label.setStyleSheet("color: #d4d7d3; line-height: 1.6;")
+        layout.addWidget(message_label)
+        
+        layout.addStretch()
+        
+        # Buttons (Cancel, No, Yes)
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        # Cancel button
+        cancel_button = QPushButton("❌ Cancel")
+        cancel_button.setMinimumWidth(120)
+        cancel_button.setMinimumHeight(40)
+        cancel_button.setStyleSheet(get_secondary_button_stylesheet())
+        cancel_button.clicked.connect(self._on_cancel)
+        button_layout.addWidget(cancel_button)
+        
+        # No button
+        no_button = QPushButton("🔴 No")
+        no_button.setMinimumWidth(120)
+        no_button.setMinimumHeight(40)
+        no_button.setStyleSheet(get_secondary_button_stylesheet())
+        no_button.clicked.connect(self._on_no)
+        button_layout.addWidget(no_button)
+        
+        # Yes button
+        yes_button = QPushButton("✅ Yes")
+        yes_button.setMinimumWidth(120)
+        yes_button.setMinimumHeight(40)
+        yes_button.setStyleSheet(get_primary_button_stylesheet())
+        yes_button.clicked.connect(self._on_yes)
+        button_layout.addWidget(yes_button)
+        
+        layout.addLayout(button_layout)
+        
+        self.setLayout(layout)
+    
+    def _on_yes(self):
+        """Handle Yes button."""
+        self.result = 'yes'
+        self.accept()
+    
+    def _on_no(self):
+        """Handle No button."""
+        self.result = 'no'
+        self.accept()
+    
+    def _on_cancel(self):
+        """Handle Cancel button."""
+        self.result = 'cancel'
+        self.reject()
+
+
+def ask_question(
+    parent,
+    title: str,
+    heading: str,
+    message: str,
+    icon: str = "❓"
+) -> str:
+    """
+    Show a question dialog with Yes/No/Cancel buttons.
+    
+    Args:
+        parent: Parent widget
+        title: Window title
+        heading: Bold heading text
+        message: Main message text (supports HTML)
+        icon: Emoji icon (default: ❓)
+    
+    Returns:
+        'yes', 'no', or 'cancel'
+    """
+    dialog = QuestionDialog(title, heading, message, icon, parent)
+    dialog.exec_()
+    return dialog.result
