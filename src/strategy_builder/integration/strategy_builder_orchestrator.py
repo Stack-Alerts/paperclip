@@ -26,6 +26,7 @@ from src.strategy_builder.testing.walkforward_test_engine import (
     WalkforwardMode,
     WalkforwardResult
 )
+from src.strategy_builder.persistence.strategy_persistence import StrategyPersistence
 
 
 class MockRegistry:
@@ -130,6 +131,7 @@ class StrategyBuilderOrchestrator:
         self.dependency_resolver = SignalDependencyResolver()
         self.code_generator = NautilusCodeGenerator()
         self.test_engine = WalkforwardTestEngine()
+        self.persistence = StrategyPersistence()
         
     def create_strategy(
         self,
@@ -802,7 +804,7 @@ class StrategyBuilderOrchestrator:
         filepath: str
     ) -> WorkflowResult:
         """
-        Save strategy to file
+        Save strategy to file using centralized StrategyPersistence
         
         Args:
             filepath: Path to save file
@@ -811,53 +813,36 @@ class StrategyBuilderOrchestrator:
             WorkflowResult
         """
         try:
-            import json
             from pathlib import Path
+            import json
             
-            # Convert config to dict
-            config_dict = {
-                'name': self.config_engine.config.name,
-                'description': self.config_engine.config.description,
-                'strategy_type': getattr(self.config_engine.config, 'strategy_type', 'Bullish'),
-                'validation_status': getattr(self.config_engine.config, 'validation_status', None),
-                'generation_status': getattr(self.config_engine.config, 'generation_status', None),
-                'blocks': []
-            }
+            # Use centralized persistence layer for core save
+            result = self.persistence.save(
+                config=self.config_engine.config,
+                filepath=Path(filepath)
+            )
             
-            for block in self.config_engine.config.blocks:
-                block_dict = {
-                    'name': block.name,
-                    'logic': block.logic,
-                    'signals': []
-                }
-                
-                for signal in block.signals:
-                    signal_dict = {
-                        'name': signal.name,
-                        'logic': signal.logic,
-                        'timing_constraint': None,
-                        'recheck_config': None
-                    }
-
-                    if signal.timing_constraint:
-                        signal_dict['timing_constraint'] = {
-                            'max_candles': signal.timing_constraint.max_candles,
-                            'reference': signal.timing_constraint.reference
-                        }
-                    
-                    if signal.recheck_config:
-                        signal_dict['recheck_config'] = {
-                            'enabled': signal.recheck_config.enabled,
-                            'bar_delay': signal.recheck_config.bar_delay
-                        }
-
-                    block_dict['signals'].append(signal_dict)
-                
-                config_dict['blocks'].append(block_dict)
+            if not result.success:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.CREATE_STRATEGY,
+                    message="Failed to save strategy",
+                    errors=result.errors
+                )
             
-            # Save to file
-            Path(filepath).parent.mkdir(parents=True, exist_ok=True)
-            with open(filepath, 'w') as f:
+            # Add orchestrator-level workflow metadata (strategy_type, validation_status, etc.)
+            # This is a thin layer on top of the core persistence
+            filepath_obj = Path(filepath)
+            with open(filepath_obj, 'r') as f:
+                config_dict = json.load(f)
+            
+            # Add workflow metadata
+            config_dict['strategy_type'] = getattr(self.config_engine.config, 'strategy_type', 'Bullish')
+            config_dict['validation_status'] = getattr(self.config_engine.config, 'validation_status', None)
+            config_dict['generation_status'] = getattr(self.config_engine.config, 'generation_status', None)
+            
+            # Write back with metadata
+            with open(filepath_obj, 'w') as f:
                 json.dump(config_dict, f, indent=2)
             
             return WorkflowResult(
@@ -880,7 +865,7 @@ class StrategyBuilderOrchestrator:
         filepath: str
     ) -> WorkflowResult:
         """
-        Load strategy from file
+        Load strategy from file using centralized StrategyPersistence
         
         Args:
             filepath: Path to load file
@@ -889,70 +874,36 @@ class StrategyBuilderOrchestrator:
             WorkflowResult
         """
         try:
+            from pathlib import Path
             import json
             
-            # Load from file
+            # Use centralized persistence layer for core load
+            result = self.persistence.load(Path(filepath))
+            
+            if not result.success:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.CREATE_STRATEGY,
+                    message="Failed to load strategy",
+                    errors=result.errors
+                )
+            
+            # Set loaded config to engine
+            self.config_engine = StrategyConfigEngine(self.registry)
+            self.config_engine.config = result.config
+            
+            # Load orchestrator-level workflow metadata (strategy_type, validation_status, etc.)
+            # Read raw JSON to get workflow metadata
             with open(filepath, 'r') as f:
                 config_dict = json.load(f)
             
-            # Create new config
-            self.config_engine = StrategyConfigEngine(self.registry)
-            self.config_engine.config.name = config_dict.get('name', 'Untitled')
-            self.config_engine.config.description = config_dict.get('description', '')
-            
-            # Load strategy type
-            strategy_type = config_dict.get('strategy_type', 'Bullish')
-            setattr(self.config_engine.config, 'strategy_type', strategy_type)
-            
-            # Load workflow state (validation/generation status)
-            validation_status = config_dict.get('validation_status', None)
-            if validation_status:
-                setattr(self.config_engine.config, 'validation_status', validation_status)
-            
-            generation_status = config_dict.get('generation_status', None)
-            if generation_status:
-                setattr(self.config_engine.config, 'generation_status', generation_status)
-            
-            # Load blocks and signals
-            for block_dict in config_dict.get('blocks', []):
-                # Add block
-                self.config_engine.add_block(
-                    block_dict['name'],
-                    block_dict.get('logic', 'AND')
-                )
-                
-                # Add signals
-                for signal_dict in block_dict.get('signals', []):
-                    timing_constraint = None
-                    if signal_dict.get('timing_constraint'):
-                        tc = signal_dict['timing_constraint']
-                        timing_constraint = TimingConstraint(
-                            max_candles=tc['max_candles'],
-                            reference=tc['reference']
-                        )
-                    
-                    self.config_engine.add_signal(
-                        block_name=block_dict['name'],
-                        signal_name=signal_dict['name'],
-                        logic=signal_dict.get('logic', 'AND'),
-                        constraint=timing_constraint
-                    )
-                    
-                    # Load recheck config if present
-                    if signal_dict.get('recheck_config'):
-                        from src.strategy_builder.core.strategy_config_engine import RecheckConfig
-                        rc = signal_dict['recheck_config']
-                        # Find the signal we just added and set its recheck_config
-                        for block in self.config_engine.config.blocks:
-                            if block.name == block_dict['name']:
-                                for signal in block.signals:
-                                    if signal.name == signal_dict['name']:
-                                        signal.recheck_config = RecheckConfig(
-                                            enabled=rc.get('enabled', False),
-                                            bar_delay=rc.get('bar_delay', 0)
-                                        )
-                                        break
-                                break
+            # Load workflow metadata if present
+            if 'strategy_type' in config_dict:
+                setattr(self.config_engine.config, 'strategy_type', config_dict['strategy_type'])
+            if 'validation_status' in config_dict:
+                setattr(self.config_engine.config, 'validation_status', config_dict['validation_status'])
+            if 'generation_status' in config_dict:
+                setattr(self.config_engine.config, 'generation_status', config_dict['generation_status'])
             
             return WorkflowResult(
                 success=True,
