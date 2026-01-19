@@ -216,7 +216,7 @@ class BlockConfigItem(QWidget):
                 recheck_btn = QPushButton("Recheck On Delayed Candles")
                 recheck_btn.setMinimumWidth(180)
                 recheck_btn.setMinimumHeight(28)
-                recheck_btn.setStyleSheet(get_icon_button_style())
+                recheck_btn.setStyleSheet(get_primary_button_stylesheet())
                 recheck_btn.setToolTip("Require this signal to reoccur within specified bars for validation")
                 recheck_btn.clicked.connect(
                     lambda checked, sname=signal_name: self._on_recheck_clicked(sname)
