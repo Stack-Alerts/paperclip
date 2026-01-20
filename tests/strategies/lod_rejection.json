@@ -1,0 +1,66 @@
+{
+  "name": "LOD Rejection",
+  "description": "Bullish strategy targeting LOD rejection patterns",
+  "blocks": [
+    {
+      "name": "lod",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "LOD_REJECTION",
+          "logic": "AND",
+          "recheck_config": {
+            "enabled": true,
+            "bar_delay": 25
+          }
+        }
+      ]
+    },
+    {
+      "name": "stochastic_rsi",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "BULLISH_CROSS",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "rsi_divergence",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "BULLISH_DIVERGENCE",
+          "logic": "AND"
+        },
+        {
+          "name": "OVERSOLD",
+          "logic": "OR",
+          "timing_constraint": {
+            "max_candles": 20,
+            "reference": "lod::LOD_REJECTION"
+          },
+          "recheck_config": {
+            "enabled": true,
+            "bar_delay": 25
+          }
+        }
+      ]
+    },
+    {
+      "name": "order_block",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "BULLISH_OB",
+          "logic": "OR"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0",
+  "strategy_type": "Bullish",
+  "validation_status": "passed",
+  "generation_status": "success"
+}

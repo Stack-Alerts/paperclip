@@ -1,0 +1,57 @@
+{
+  "name": "RSI Vwap 50% Asia Rejection",
+  "description": "Strategy: New_Strategy",
+  "version": "1.0.0",
+  "strategy_type": "Bearish",
+  "validation_status": "passed",
+  "generation_status": "success",
+  "blocks": [
+    {
+      "name": "stochastic_rsi",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "BEARISH_CROSS",
+          "logic": "AND",
+          "timing_constraint": null
+        }
+      ]
+    },
+    {
+      "name": "asia_session_50_percent",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "BELOW_ASIA_50",
+          "logic": "AND",
+          "timing_constraint": {
+            "max_candles": 20,
+            "reference": "stochastic_rsi::BEARISH_CROSS"
+          }
+        }
+      ]
+    },
+    {
+      "name": "vwap",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "ABOVE_VWAP",
+          "logic": "OR",
+          "timing_constraint": {
+            "max_candles": 5,
+            "reference": "stochastic_rsi::BEARISH_CROSS"
+          }
+        },
+        {
+          "name": "AT_VWAP",
+          "logic": "OR",
+          "timing_constraint": {
+            "max_candles": 13,
+            "reference": "stochastic_rsi::BEARISH_CROSS"
+          }
+        }
+      ]
+    }
+  ]
+}

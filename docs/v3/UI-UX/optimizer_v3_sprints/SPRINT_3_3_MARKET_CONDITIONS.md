@@ -419,7 +419,7 @@ def test_nautilus_market_analyzer():
 - [ ] Volume analysis with Quantity type
 - [ ] Market regime classification
 - [ ] Comprehensive metrics with proper types
-- [ ] 95%+ test coverage
+- [ ] 100% test coverage
 - [ ] Zero floating point arithmetic
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ NautilusTrader Expert

@@ -474,7 +474,7 @@ def test_performance_metrics():
 - [ ] Type safety in all operations
 - [ ] Integration testing with all phases
 - [ ] Performance targets met
-- [ ] 95%+ test coverage
+- [ ] 100% test coverage
 - [ ] Zero floating point arithmetic
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ NautilusTrader Expert

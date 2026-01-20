@@ -417,7 +417,7 @@ def test_nautilus_signal_event():
 - [ ] Market context tracking
 - [ ] Signal relationship tracking
 - [ ] Serialization/deserialization
-- [ ] 95%+ test coverage
+- [ ] 100% test coverage
 - [ ] Zero floating point arithmetic
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ NautilusTrader Expert
@@ -642,7 +642,7 @@ def test_nautilus_weight_metrics():
 - [ ] Correlation analysis
 - [ ] Weight calculation (0-100)
 - [ ] Serialization/deserialization
-- [ ] 95%+ test coverage
+- [ ] 100% test coverage
 - [ ] Zero floating point arithmetic
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ NautilusTrader Expert
@@ -779,7 +779,7 @@ def test_nautilus_weight_integrator():
 - [ ] Handles visible signals only
 - [ ] Weight validation and clamping
 - [ ] Error handling and logging
-- [ ] 95%+ test coverage
+- [ ] 100% test coverage
 - [ ] Zero floating point arithmetic
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ NautilusTrader Expert
@@ -1450,7 +1450,7 @@ class AutomatedRecommendationsEngine:
 - [ ] All 32 tasks done
 - [ ] All signals tracked
 - [ ] Dashboard functional
-- [ ] 95%+ coverage
+- [ ] 100% coverage
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ Architect
 

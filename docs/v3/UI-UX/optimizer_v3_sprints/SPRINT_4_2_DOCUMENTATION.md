@@ -64,7 +64,7 @@ API_DOC_STYLE=google  # docstring style
 API_DOC_PRIVATE=false  # include private members
 API_DOC_INHERITED=true  # include inherited members
 API_DOC_UNDOC_MEMBERS=false  # include undocumented members
-API_DOC_COVERAGE_MIN=95  # minimum coverage percent
+API_DOC_COVERAGE_MIN=100  # minimum coverage percent
 
 # Code Examples
 EXAMPLE_MAX_LENGTH=50  # maximum lines per example
