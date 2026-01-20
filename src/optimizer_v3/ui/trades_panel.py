@@ -166,14 +166,20 @@ class TradesPanel(QWidget):
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSortingEnabled(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().setVisible(False)
         
-        # Set column widths - widened for readability
+        # Set column widths - significantly widened to use full window width
         # ID, Time, Symbol, Side, Size, Entry, Exit, Duration, P&L, P&L %, Status, Notes
-        column_widths = [60, 120, 100, 60, 80, 90, 90, 100, 120, 100, 100, 150]
+        column_widths = [80, 150, 120, 80, 100, 120, 120, 120, 150, 120, 120, 200]
         for i, width in enumerate(column_widths):
             self.table.setColumnWidth(i, width)
+        
+        # Make Time, Entry, Exit, P&L, and Notes columns stretch proportionally
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # Time
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)  # Entry
+        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)  # Exit
+        self.table.horizontalHeader().setSectionResizeMode(8, QHeaderView.ResizeMode.Stretch)  # P&L
+        self.table.horizontalHeader().setSectionResizeMode(11, QHeaderView.ResizeMode.Stretch)  # Notes
         
         # Connect signals
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
