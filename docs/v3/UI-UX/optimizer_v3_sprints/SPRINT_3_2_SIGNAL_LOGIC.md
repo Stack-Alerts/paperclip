@@ -414,7 +414,7 @@ def test_nautilus_logic_tester():
 - [ ] Impact analysis with NautilusTrader types
 - [ ] Results validation against criteria
 - [ ] Signal correlation analysis
-- [ ] 95%+ test coverage
+- [ ] 100% test coverage
 - [ ] Zero floating point arithmetic
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ NautilusTrader Expert
@@ -634,7 +634,7 @@ def test_nautilus_logic_analyzer():
 - [ ] UI controls with proper styling
 - [ ] Results display with type formatting
 - [ ] Integration tests with NautilusTrader
-- [ ] 95%+ test coverage
+- [ ] 100% test coverage
 - [ ] Zero floating point arithmetic
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ UI Designer ☐ NautilusTrader Expert

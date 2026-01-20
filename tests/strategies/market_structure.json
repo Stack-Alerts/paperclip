@@ -1,0 +1,40 @@
+{
+  "name": "Market Structure",
+  "description": "Market structure break strategy",
+  "blocks": [
+    {
+      "name": "market_structure",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "STRUCTURE_BREAK",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "liquidity",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "LIQUIDITY_GRAB",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "fair_value_gap",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "FVG_FILL",
+          "logic": "OR"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0",
+  "strategy_type": "Bullish",
+  "validation_status": "passed",
+  "generation_status": "success"
+}

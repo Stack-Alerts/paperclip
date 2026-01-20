@@ -486,7 +486,7 @@ def test_nautilus_training_system():
 - [ ] Volatility-based analysis
 - [ ] Type safety in all calculations
 - [ ] Comprehensive metrics with proper types
-- [ ] 95%+ test coverage
+- [ ] 100% test coverage
 - [ ] Zero floating point arithmetic
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ NautilusTrader Expert
@@ -553,7 +553,7 @@ See OPTIMIZER_V3_AUTOMATED_TRAINER.md for complete specifications
 - [ ] All 20 tasks done
 - [ ] Window 4 fully functional
 - [ ] Training database working
-- [ ] 95%+ test coverage
+- [ ] 100% test coverage
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ Architect
 

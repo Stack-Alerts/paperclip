@@ -1,0 +1,40 @@
+{
+  "name": "Divergence Strategy",
+  "description": "Multi-indicator divergence detection",
+  "blocks": [
+    {
+      "name": "rsi_divergence",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "BEARISH_DIVERGENCE",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "macd",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "BEARISH_CROSS",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "price_action",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "LOWER_HIGH",
+          "logic": "OR"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0",
+  "strategy_type": "Bearish",
+  "validation_status": "passed",
+  "generation_status": "success"
+}

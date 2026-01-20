@@ -1,0 +1,40 @@
+{
+  "name": "Liquidity Sweep",
+  "description": "Identify liquidity sweeps and reversals",
+  "blocks": [
+    {
+      "name": "liquidity",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "LIQUIDITY_SWEEP",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "order_block",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "BULLISH_OB",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "volume",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "VOLUME_EXPANSION",
+          "logic": "OR"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0",
+  "strategy_type": "Bullish",
+  "validation_status": "passed",
+  "generation_status": "success"
+}

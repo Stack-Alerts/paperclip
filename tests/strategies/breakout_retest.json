@@ -1,0 +1,50 @@
+{
+  "name": "Breakout Retest",
+  "description": "Breakout and retest confirmation strategy",
+  "blocks": [
+    {
+      "name": "breakout",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "RESISTANCE_BREAK",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "retest",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "PULLBACK_RETEST",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "volume",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "VOLUME_CONFIRMATION",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "order_block",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "BULLISH_OB",
+          "logic": "OR"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0",
+  "strategy_type": "Bullish",
+  "validation_status": "passed",
+  "generation_status": "success"
+}

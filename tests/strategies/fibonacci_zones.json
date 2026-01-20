@@ -1,0 +1,40 @@
+{
+  "name": "Fibonacci Zones",
+  "description": "Trade fibonacci retracement levels",
+  "blocks": [
+    {
+      "name": "fibonacci",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "FIB_618_REJECTION",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "price_action",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "REJECTION_CANDLE",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "volume",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "VOLUME_CONFIRMATION",
+          "logic": "OR"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0",
+  "strategy_type": "Bearish",
+  "validation_status": "passed",
+  "generation_status": "success"
+}

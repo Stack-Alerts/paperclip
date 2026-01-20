@@ -528,7 +528,7 @@ def test_nautilus_strategy_scorer():
 - [ ] Win rate and ratios with Decimal type
 - [ ] Component scores (0-100 scale)
 - [ ] Risk exposure analysis
-- [ ] 95%+ test coverage
+- [ ] 100% test coverage
 - [ ] Zero floating point arithmetic
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ NautilusTrader Expert
@@ -747,7 +747,7 @@ def test_nautilus_parameter_optimizer():
 - [ ] Parameter ranges with appropriate types
 - [ ] Risk metrics calculation
 - [ ] Bayesian optimization integration
-- [ ] 95%+ test coverage
+- [ ] 100% test coverage
 - [ ] Zero floating point arithmetic
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ NautilusTrader Expert
@@ -783,7 +783,7 @@ def test_nautilus_parameter_optimizer():
 - [ ] All 15 tasks done
 - [ ] ML pipeline working
 - [ ] Strategies generated
-- [ ] 95%+ coverage
+- [ ] 100% coverage
 
 **Sign-off**: ☐ Developer ☐ Lead ☐ Architect
 

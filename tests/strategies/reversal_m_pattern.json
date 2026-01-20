@@ -1,0 +1,50 @@
+{
+  "name": "Reversal M Pattern",
+  "description": "M-pattern reversal strategy with confirmation",
+  "blocks": [
+    {
+      "name": "pattern_recognition",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "M_PATTERN",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "hod",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "HOD_REJECTION",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "rsi_divergence",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "BEARISH_DIVERGENCE",
+          "logic": "OR"
+        }
+      ]
+    },
+    {
+      "name": "order_block",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "BEARISH_OB",
+          "logic": "OR"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0",
+  "strategy_type": "Bearish",
+  "validation_status": "passed",
+  "generation_status": "success"
+}

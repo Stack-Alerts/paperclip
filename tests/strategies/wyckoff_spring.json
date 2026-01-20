@@ -1,0 +1,40 @@
+{
+  "name": "Wyckoff Spring",
+  "description": "Wyckoff spring pattern for accumulation trades",
+  "blocks": [
+    {
+      "name": "wyckoff",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "SPRING",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "volume",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "VOLUME_SURGE",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "rsi_divergence",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "BULLISH_DIVERGENCE",
+          "logic": "OR"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0",
+  "strategy_type": "Bullish",
+  "validation_status": "passed",
+  "generation_status": "success"
+}
