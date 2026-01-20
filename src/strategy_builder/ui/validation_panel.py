@@ -23,6 +23,10 @@ from PyQt5.QtGui import QFont
 from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
 )
+from src.strategy_builder.ui.styles import (
+    get_label_style, get_color, get_primary_button_stylesheet, 
+    get_success_button_stylesheet
+)
 
 
 class ValidationPanel(QWidget):
@@ -84,7 +88,7 @@ class ValidationPanel(QWidget):
         group_box_font.setBold(True)
         group_box_font.setPointSize(10)
         group_box.setFont(group_box_font)
-        group_box.setStyleSheet("QGroupBox::title { color: #095983; }")
+        group_box.setStyleSheet(f"QGroupBox::title {{ color: {get_color('info')}; }}")
         
         group_layout = QVBoxLayout()
         group_layout.setSpacing(12)
@@ -100,38 +104,19 @@ class ValidationPanel(QWidget):
         status_font.setBold(True)
         status_font.setPointSize(11)
         self.status_label.setFont(status_font)
-        self.status_label.setStyleSheet("color: #888888;")
+        self.status_label.setStyleSheet(f"color: {get_color('text_disabled')};")
         header_layout.addWidget(self.status_label)
         
         # Last validated timestamp
         self.last_validated_label = QLabel("")
-        self.last_validated_label.setStyleSheet("color: #9AA0A6; font-size: 9pt;")
+        self.last_validated_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt;")
         header_layout.addWidget(self.last_validated_label)
         
         header_layout.addStretch()
         
         # Validate Now button
         self.validate_button = QPushButton("🔍 Validate Now")
-        self.validate_button.setStyleSheet("""
-            QPushButton {
-                background-color: #204486;
-                color: white;
-                font-weight: bold;
-                padding: 8px 16px;
-                border-radius: 4px;
-                min-width: 120px;
-            }
-            QPushButton:hover {
-                background-color: #1A3A70;
-            }
-            QPushButton:pressed {
-                background-color: #1550DF;
-            }
-            QPushButton:disabled {
-                background-color: #555555;
-                color: #888888;
-            }
-        """)
+        self.validate_button.setStyleSheet(get_primary_button_stylesheet(compact=True))
         header_layout.addWidget(self.validate_button)
         
         group_layout.addLayout(header_layout)
@@ -194,7 +179,7 @@ class ValidationPanel(QWidget):
         nautilus_font = QFont()
         nautilus_font.setBold(True)
         self.nautilus_label.setFont(nautilus_font)
-        self.nautilus_label.setStyleSheet("color: #4ADE80;")
+        self.nautilus_label.setStyleSheet(f"color: {get_color('success')};")
         nautilus_layout.addWidget(self.nautilus_label)
         nautilus_layout.addStretch()
         group_layout.addLayout(nautilus_layout)
@@ -204,62 +189,17 @@ class ValidationPanel(QWidget):
         
         self.save_button = QPushButton("💾 Save Strategy")
         self.save_button.setEnabled(False)
-        self.save_button.setStyleSheet("""
-            QPushButton {
-                background-color: #10B981;
-                color: white;
-                font-weight: bold;
-                padding: 8px 16px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #0EA972;
-            }
-            QPushButton:disabled {
-                background-color: #555555;
-                color: #888888;
-            }
-        """)
+        self.save_button.setStyleSheet(get_success_button_stylesheet())
         actions_layout.addWidget(self.save_button)
         
         self.run_test_button = QPushButton("▶️ Run Backtest")
         self.run_test_button.setEnabled(False)
-        self.run_test_button.setStyleSheet("""
-            QPushButton {
-                background-color: #204486;
-                color: white;
-                font-weight: bold;
-                padding: 8px 16px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #1A3A70;
-            }
-            QPushButton:disabled {
-                background-color: #555555;
-                color: #888888;
-            }
-        """)
+        self.run_test_button.setStyleSheet(get_primary_button_stylesheet(compact=True))
         actions_layout.addWidget(self.run_test_button)
         
         self.generate_button = QPushButton("📝 Generate Code")
         self.generate_button.setEnabled(False)
-        self.generate_button.setStyleSheet("""
-            QPushButton {
-                background-color: #8B5CF6;
-                color: white;
-                font-weight: bold;
-                padding: 8px 16px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #7C4CE6;
-            }
-            QPushButton:disabled {
-                background-color: #555555;
-                color: #888888;
-            }
-        """)
+        self.generate_button.setStyleSheet(get_primary_button_stylesheet(compact=True))
         actions_layout.addWidget(self.generate_button)
         
         actions_layout.addStretch()
@@ -315,7 +255,7 @@ class ValidationPanel(QWidget):
         
         for item in items:
             item_label = QLabel(f"├─ {item}")
-            item_label.setStyleSheet("color: #E8EAED; font-size: 9pt;")
+            item_label.setStyleSheet(f"color: {get_color('text_primary')}; font-size: 9pt;")
             items_layout.addWidget(item_label)
         
         items_container.setLayout(items_layout)
@@ -390,7 +330,7 @@ class ValidationPanel(QWidget):
         if result.success:
             # Strategy is valid
             self.status_label.setText("Status: ✅ VALID (Strict Mode)")
-            self.status_label.setStyleSheet("color: #4ADE80; font-weight: bold;")
+            self.status_label.setStyleSheet(f"color: {get_color('success')}; font-weight: bold;")
             
             # Enable action buttons
             self.save_button.setEnabled(True)
@@ -425,7 +365,7 @@ class ValidationPanel(QWidget):
         else:
             # Strategy has errors
             self.status_label.setText("Status: ❌ INVALID")
-            self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
+            self.status_label.setStyleSheet(f"color: {get_color('error')}; font-weight: bold;")
             
             # Disable action buttons
             self.save_button.setEnabled(False)
@@ -519,7 +459,7 @@ class ValidationPanel(QWidget):
         # Add new items
         for item in items:
             item_label = QLabel(f"├─ {item}")
-            item_label.setStyleSheet("color: #E8EAED; font-size: 9pt;")
+            item_label.setStyleSheet(f"color: {get_color('text_primary')}; font-size: 9pt;")
             item_label.setWordWrap(True)
             items_layout.addWidget(item_label)
     
@@ -531,7 +471,7 @@ class ValidationPanel(QWidget):
             error_message: Error message to display
         """
         self.status_label.setText("Status: ❌ ERROR")
-        self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
+        self.status_label.setStyleSheet(f"color: {get_color('error')}; font-weight: bold;")
         
         self._update_section(self.basic_section, "❌ Validation Error", "#EF4444", [
             f"Error: {error_message}"

@@ -1,7 +1,6 @@
 {
   "name": "HOD Rejection",
   "description": "Strategy: New_Strategy",
-  "strategy_type": "Bearish",
   "blocks": [
     {
       "name": "hod",
@@ -10,7 +9,10 @@
         {
           "name": "HOD_REJECTION",
           "logic": "AND",
-          "timing_constraint": null
+          "recheck_config": {
+            "enabled": true,
+            "bar_delay": 25
+          }
         }
       ]
     },
@@ -20,8 +22,7 @@
       "signals": [
         {
           "name": "BEARISH_CROSS",
-          "logic": "AND",
-          "timing_constraint": null
+          "logic": "AND"
         }
       ]
     },
@@ -31,8 +32,7 @@
       "signals": [
         {
           "name": "BEARISH_DIVERGENCE",
-          "logic": "AND",
-          "timing_constraint": null
+          "logic": "AND"
         },
         {
           "name": "OVERBOUGHT",
@@ -40,6 +40,10 @@
           "timing_constraint": {
             "max_candles": 20,
             "reference": "hod::HOD_REJECTION"
+          },
+          "recheck_config": {
+            "enabled": true,
+            "bar_delay": 25
           }
         }
       ]
@@ -50,10 +54,13 @@
       "signals": [
         {
           "name": "BEARISH_OB",
-          "logic": "OR",
-          "timing_constraint": null
+          "logic": "OR"
         }
       ]
     }
-  ]
+  ],
+  "version": "1.0.0",
+  "strategy_type": "Bearish",
+  "validation_status": "passed",
+  "generation_status": "success"
 }

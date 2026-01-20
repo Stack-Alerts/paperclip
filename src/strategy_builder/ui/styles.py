@@ -35,7 +35,7 @@ MAIN_STYLESHEET = """
         left: 12px;
         padding: 0 5px;
         color: #095983;
-        font-size: 14pt;
+        font-size: 12pt !important;
         font-weight: bold;
     }
     QLineEdit {
@@ -166,7 +166,7 @@ MAIN_STYLESHEET = """
     }
     QToolButton:hover {
         background-color: #2A2F3A;
-        border-radius: 4px;
+        border-radius: 2px;
     }
     QToolButton:pressed {
         background-color: #374151;
@@ -321,7 +321,7 @@ COLORS = {
     'info': '#2070FF',
     
     # Button colors
-    'button_primary': '#204486',
+    'button_primary': '#2a5eb8',  # User specified blue for position numbers and REQUIRED badge
     'button_primary_hover': '#1A3A70',
     'button_success': '#10B981',
     'button_success_hover': '#059669',
@@ -464,22 +464,36 @@ def get_color(color_name: str) -> str:
     return COLORS.get(color_name, COLORS['text_primary'])
 
 
-def get_primary_button_stylesheet() -> str:
-    """Get stylesheet for primary action buttons."""
+def get_primary_button_stylesheet(compact=False) -> str:
+    """
+    Get stylesheet for primary action buttons.
+    
+    Args:
+        compact: If True, uses smaller padding (8px 16px vs 10px 20px)
+    
+    Returns:
+        Button stylesheet string
+    """
+    padding = "8px 16px" if compact else "10px 20px"
+    radius = "4px" if compact else "6px"
     return f"""
         QPushButton {{
             background-color: {COLORS['button_primary']};
             color: white;
             font-weight: bold;
-            padding: 10px 20px;
-            border-radius: 6px;
+            padding: {padding};
+            border-radius: {radius};
+            min-width: 120px;
         }}
         QPushButton:hover {{
             background-color: {COLORS['button_primary_hover']};
         }}
+        QPushButton:pressed {{
+            background-color: #1550DF;
+        }}
         QPushButton:disabled {{
-            background-color: {COLORS['button_secondary']};
-            color: {COLORS['text_muted']};
+            background-color: #555555;
+            color: #888888;
         }}
     """
 
@@ -562,7 +576,7 @@ def get_panel_title_stylesheet() -> str:
     """Get stylesheet for panel titles (matches main window 'Strategy Information' style)."""
     return f"""
         color: #095983;
-        font-size: 14pt;
+        font-size: 12pt;
         font-weight: bold;
     """
 
@@ -574,7 +588,7 @@ def get_groupbox_header_stylesheet() -> str:
             color: {COLORS['text_muted']};
             font-weight: bold;
             border: 1px solid {COLORS['border']};
-            border-radius: 4px;
+            border-radius: 2px;
             margin-top: 8px;
             padding-top: 10px;
         }}
@@ -588,27 +602,234 @@ def get_groupbox_header_stylesheet() -> str:
 
 
 def get_preset_day_button_stylesheet() -> str:
-    """Get stylesheet for day preset buttons (30 | 60 | 90 etc)."""
-    return f"""
-        QPushButton {{
+    """
+    Get stylesheet for preset day selection buttons (30, 60, 90, etc).
+    
+    Optimized for compact inline display with hover/pressed states.
+    
+    Returns:
+        Button stylesheet string
+    """
+    return """
+        QPushButton {
             background-color: #1E293B;
             color: #CBD5E1;
-            border: 1px solid {COLORS['border']};
-            border-radius: 4px;
+            border: 1px solid #334155;
+            border-radius: 2px;
             font-size: 8pt;
             font-weight: normal;
-        }}
-        QPushButton:hover {{
-            background-color: {COLORS['button_primary']};
+        }
+        QPushButton:hover {
+            background-color: #2563EB;
             color: white;
             border-color: #3B82F6;
-        }}
-        QPushButton:pressed {{
-            background-color: {COLORS['button_primary_hover']};
-        }}
+        }
+        QPushButton:pressed {
+            background-color: #1D4ED8;
+        }
     """
 
 
 def get_separator_stylesheet() -> str:
     """Get stylesheet for horizontal separator lines."""
     return f"background-color: {COLORS['border']}; max-height: 1px; margin: 10px 0;"
+
+
+def get_secondary_button_stylesheet() -> str:
+    """Get stylesheet for secondary/cancel buttons."""
+    return f"""
+        QPushButton {{
+            background-color: {COLORS['button_secondary']};
+            color: white;
+            font-weight: bold;
+            padding: 10px 24px;
+            border-radius: 2px;
+            min-width: 100px;
+        }}
+        QPushButton:hover {{
+            background-color: {COLORS['button_secondary_hover']};
+        }}
+    """
+
+
+def get_status_label_style(status='default') -> str:
+    """Get styled status label for success/error/warning states."""
+    colors = {
+        'success': COLORS['success'],  # #10B981
+        'error': COLORS['error'],      # #C35252
+        'warning': COLORS['warning'],  # #FFA500
+        'info': COLORS['info'],        # #2070FF
+        'default': COLORS['text_muted']
+    }
+    return f"color: {colors.get(status, colors['default'])}; font-weight: bold;"
+
+
+def get_logic_badge_style(badge_type='required') -> str:
+    """
+    Get logic badge styling for Required/Optional/AND/OR indicators.
+    
+    Args:
+        badge_type: Type of badge ('required', 'optional', 'and', 'or')
+    
+    Returns:
+        CSS style string for logic badges
+    """
+    bg_colors = {
+        'required': COLORS['button_primary'],    # Blue background #2a5eb8
+        'optional': '#007a51',                   # Dark green background (user specified)
+        'and': COLORS['info'],                   # Blue background
+        'or': COLORS['warning']                  # Orange background
+    }
+    
+    text_colors = {
+        'required': '#FFFFFF',                   # White text for maximum contrast
+        'optional': '#FFFFFF',                   # White text for maximum contrast
+        'and': 'white',
+        'or': 'white'
+    }
+    
+    bg_color = bg_colors.get(badge_type, bg_colors['required'])
+    text_color = text_colors.get(badge_type, text_colors['required'])
+    
+    return f"""
+        QLabel {{
+            background-color: {bg_color};
+            color: {text_color};
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 2px;
+            font-size: 8pt;
+        }}
+    """
+
+
+def get_block_label_style(signal_direction='neutral') -> str:
+    """
+    Get block signal label styling for Bullish/Bearish/Neutral labels.
+    
+    Args:
+        signal_direction: Direction ('bullish', 'bearish', 'neutral')
+    
+    Returns:
+        CSS style string for block labels
+    """
+    colors = {
+        'bullish': COLORS['success'],      # Green
+        'bearish': COLORS['error'],        # Red
+        'neutral': COLORS['text_muted']    # Gray
+    }
+    return f"color: {colors.get(signal_direction, colors['neutral'])}; font-weight: bold;"
+
+
+def get_position_label_style(position='entry') -> str:
+    """
+    Get position label styling for Entry/Exit/Both indicators.
+    
+    Args:
+        position: Position type ('entry', 'exit', 'both')
+    
+    Returns:
+        CSS style string for position labels
+    """
+    colors = {
+        'entry': COLORS['success'],     # Green
+        'exit': COLORS['error'],        # Red
+        'both': COLORS['info']          # Blue
+    }
+    return f"color: {colors.get(position, colors['entry'])}; font-weight: bold;"
+
+
+def get_expand_button_style() -> str:
+    """Get expand/collapse button styling for block panels."""
+    return f"""
+        QPushButton {{
+            background: transparent;
+            border: none;
+            color: {COLORS['text_muted']};
+            font-weight: bold;
+            text-align: left;
+            padding: 2px;
+        }}
+        QPushButton:hover {{
+            color: {COLORS['info']};
+        }}
+    """
+
+
+def get_remove_button_style() -> str:
+    """Get remove/delete button styling (small red cross buttons)."""
+    return f"""
+        QPushButton {{
+            background-color: {COLORS['button_danger']};
+            color: white;
+            border-radius: 3px;
+            font-weight: bold;
+            padding: 2px 6px;
+            max-width: 20px;
+            max-height: 20px;
+        }}
+        QPushButton:hover {{
+            background-color: {COLORS['button_danger_hover']};
+        }}
+    """
+
+
+def get_add_button_style() -> str:
+    """Get add button styling for adding blocks/signals."""
+    return f"""
+        QPushButton {{
+            background-color: {COLORS['button_success']};
+            color: white;
+            font-weight: bold;
+            padding: 6px 16px;
+            border-radius: 6px;
+        }}
+        QPushButton:hover {{
+            background-color: {COLORS['button_success_hover']};
+        }}
+    """
+
+
+def get_icon_button_style() -> str:
+    """Get styling for small icon buttons (config, settings, etc.)."""
+    return f"""
+        QPushButton {{
+            background: transparent;
+            border: none;
+            color: {COLORS['text_muted']};
+            padding: 4px;
+        }}
+        QPushButton:hover {{
+            background-color: {COLORS['bg_light']};
+            border-radius: 2px;
+            color: {COLORS['text_primary']};
+        }}
+    """
+
+
+def get_recheck_button_stylesheet() -> str:
+    """
+    Get stylesheet for Recheck On Delayed Candles button.
+    
+    Uses darker gray/blue styling to distinguish from primary Config button.
+    
+    Returns:
+        Button stylesheet string with darker gray/blue theme
+    """
+    return """
+        QPushButton {
+            background-color: #3C4756;
+            color: #B8C5D6;
+            border: 1px solid #4A5568;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-weight: 500;
+        }
+        QPushButton:hover {
+            background-color: #4A5568;
+            border-color: #5A6678;
+        }
+        QPushButton:pressed {
+            background-color: #2D3748;
+        }
+    """

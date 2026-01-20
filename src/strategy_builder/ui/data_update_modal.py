@@ -22,6 +22,12 @@ from PyQt5.QtGui import QFont
 
 # Import UnifiedDataManager - THE ONLY DATA SOURCE!
 from src.data_manager.unified_manager import UnifiedDataManager, DataSource
+# Import centralized styles
+from src.strategy_builder.ui.styles import (
+    get_main_stylesheet, get_panel_title_stylesheet, 
+    get_label_style, get_status_label_style,
+    get_primary_button_stylesheet, get_secondary_button_stylesheet
+)
 
 
 class DataUpdateThread(QThread):
@@ -173,107 +179,44 @@ class DataUpdateModal(QDialog):
     
     def _init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("Data Update Check")
+        self.setWindowTitle("BTC Engine v3 - Data Update Check")
         
         # Make dialog moveable and independent (30% bigger)
         # Use Window flag instead of Dialog to allow dragging
         self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowStaysOnTopHint)
         self.setModal(True)  # Keep modal behavior but allow dragging
         
-        # MASSIVE to avoid scrolling - institutional grade
+        # MASSIVE to avoid scrolling - institutional grade (90px taller total)
         self.setMinimumWidth(1400)
-        self.setMinimumHeight(1000)
-        self.resize(1400, 1000)
+        self.setMinimumHeight(1090)
+        self.resize(1400, 1090)
         
-        # Dark theme
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #1E2128;
-                color: #E8EAED;
-            }
-            QLabel {
-                color: #E8EAED;
-                background: transparent;
-            }
-            QGroupBox {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 6px;
-                margin-top: 12px;
-                padding-top: 12px;
-                color: #E8EAED;
-                font-weight: bold;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-            }
-            QTextEdit {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                padding: 8px;
-                color: #BDC1C6;
-            }
-            QProgressBar {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                text-align: center;
-                color: #E8EAED;
-            }
-            QProgressBar::chunk {
-                background-color: #2070FF;
-                border-radius: 3px;
-            }
-            QPushButton {
-                background-color: #204486;
-                color: white;
-                font-weight: bold;
-                padding: 10px 20px;
-                border-radius: 4px;
-                border: none;
-                min-width: 120px;
-            }
-            QPushButton:hover {
-                background-color: #1A3A70;
-            }
-            QPushButton:pressed {
-                background-color: #1550DF;
-            }
-            QPushButton:disabled {
-                background-color: #555555;
-                color: #888888;
-            }
-            QPushButton#skipButton {
-                background-color: #555555;
-            }
-            QPushButton#skipButton:hover {
-                background-color: #666666;
-            }
-        """)
+        # Apply centralized dark theme stylesheet
+        self.setStyleSheet(get_main_stylesheet())
         
         layout = QVBoxLayout()
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # Header
+        # Header with centralized styling
         header = QLabel("📊 Historical Data Update Check")
         header_font = QFont()
         header_font.setBold(True)
         header_font.setPointSize(14)
         header.setFont(header_font)
-        header.setStyleSheet("color: #095983; padding: 10px;")
+        header.setStyleSheet(get_panel_title_stylesheet())
         layout.addWidget(header)
         
         # Status group
         status_group = QGroupBox("Data Status")
+        status_group.setMaximumHeight(100)  # Limit panel height for compact appearance
         status_layout = QVBoxLayout()
-        status_layout.setSpacing(10)
+        status_layout.setSpacing(0)  # No spacing between elements
+        status_layout.setContentsMargins(10, 0, 10, 10)  # Zero top margin for tight fit
         
         self.status_label = QLabel("Checking data availability...")
         self.status_label.setWordWrap(True)
+        self.status_label.setAlignment(Qt.AlignCenter)  # Center text vertically and horizontally
         status_layout.addWidget(self.status_label)
         
         status_group.setLayout(status_layout)
@@ -296,10 +239,10 @@ class DataUpdateModal(QDialog):
         self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
         
-        # Progress message
+        # Progress message with centralized styling
         self.progress_label = QLabel("")
         self.progress_label.setVisible(False)
-        self.progress_label.setStyleSheet("color: #095983; font-style: italic;")
+        self.progress_label.setStyleSheet(get_label_style('info') + " font-style: italic;")
         layout.addWidget(self.progress_label)
         
         layout.addStretch()
@@ -308,17 +251,25 @@ class DataUpdateModal(QDialog):
         buttons_layout = QHBoxLayout()
         buttons_layout.addStretch()
         
-        self.skip_button = QPushButton("Skip for Now")
-        self.skip_button.setObjectName("skipButton")
+        self.skip_button = QPushButton("⏭️ Skip for Now")
+        self.skip_button.setMinimumWidth(150)
+        self.skip_button.setMinimumHeight(40)
+        self.skip_button.setStyleSheet(get_secondary_button_stylesheet())
         self.skip_button.clicked.connect(self.reject)
         buttons_layout.addWidget(self.skip_button)
         
-        self.update_button = QPushButton("Update Data")
+        self.update_button = QPushButton("📥 Update Data")
+        self.update_button.setMinimumWidth(150)
+        self.update_button.setMinimumHeight(40)
+        self.update_button.setStyleSheet(get_primary_button_stylesheet())
         self.update_button.clicked.connect(self._start_update)
         self.update_button.setEnabled(False)
         buttons_layout.addWidget(self.update_button)
         
-        self.close_button = QPushButton("Continue")
+        self.close_button = QPushButton("✅ Continue")
+        self.close_button.setMinimumWidth(150)
+        self.close_button.setMinimumHeight(40)
+        self.close_button.setStyleSheet(get_primary_button_stylesheet())
         self.close_button.clicked.connect(self.accept)
         self.close_button.setVisible(False)
         buttons_layout.addWidget(self.close_button)
@@ -381,7 +332,7 @@ class DataUpdateModal(QDialog):
                 self.status_label.setText(
                     f"⚠️ DATA GAPS DETECTED: Up to {max_gap} days MISSING"
                 )
-                self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
+                self.status_label.setStyleSheet(get_status_label_style('error'))
                 
                 report_lines.append("❌ CRITICAL: Building blocks need ALL data types!")
                 report_lines.append("   - Trade management needs funding rates")
@@ -393,7 +344,7 @@ class DataUpdateModal(QDialog):
                 self.update_button.setEnabled(True)
             else:
                 self.status_label.setText("✅ ALL DATA COMPLETE - 100% ACCURATE")
-                self.status_label.setStyleSheet("color: #4ADE80; font-weight: bold;")
+                self.status_label.setStyleSheet(get_status_label_style('success'))
                 
                 report_lines.append("✅ PERFECT: All data types complete!")
                 report_lines.append("   Building blocks have full data access")
@@ -404,7 +355,7 @@ class DataUpdateModal(QDialog):
         
         except Exception as e:
             self.status_label.setText("❌ Error checking data")
-            self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
+            self.status_label.setStyleSheet(get_status_label_style('error'))
             
             self.details_text.setText(
                 f"Error occurred while checking data:\n\n"
@@ -452,10 +403,10 @@ class DataUpdateModal(QDialog):
         
         if success:
             self.status_label.setText("✅ Update Complete!")
-            self.status_label.setStyleSheet("color: #4ADE80; font-weight: bold;")
+            self.status_label.setStyleSheet(get_status_label_style('success'))
         else:
             self.status_label.setText("❌ Update Failed")
-            self.status_label.setStyleSheet("color: #EF4444; font-weight: bold;")
+            self.status_label.setStyleSheet(get_status_label_style('error'))
         
         self.details_text.setText(message)
         

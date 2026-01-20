@@ -17,7 +17,7 @@ Date: 2026-01-16
 from typing import Optional, List, Tuple
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGroupBox, QScrollArea, QFrame, QDialog
+    QGroupBox, QScrollArea, QFrame, QDialog, QScroller
 )
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QFont
@@ -26,6 +26,12 @@ from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
 )
 from src.strategy_builder.ui.timing_constraint_dialog import TimingConstraintDialog
+# Import centralized styles
+from src.strategy_builder.ui.styles import (
+    get_label_style, get_logic_badge_style, get_primary_button_stylesheet,
+    get_danger_button_stylesheet, get_icon_button_style, get_block_label_style,
+    get_recheck_button_stylesheet
+)
 
 
 class BlockConfigItem(QWidget):
@@ -56,13 +62,14 @@ class BlockConfigItem(QWidget):
         # Main header layout
         header_layout = QHBoxLayout()
         
-        # Position indicator
+        # Position indicator - Use centralized color from styles.py
+        from src.strategy_builder.ui.styles import get_color
         position_label = QLabel(f"#{self.position}")
         position_font = QFont()
         position_font.setBold(True)
         position_font.setPointSize(12)
         position_label.setFont(position_font)
-        position_label.setStyleSheet("color: #204486; min-width: 40px;")
+        position_label.setStyleSheet(f"color: {get_color('button_primary')}; font-weight: bold; min-width: 40px;")
         header_layout.addWidget(position_label)
         
         # Block info layout
@@ -77,33 +84,26 @@ class BlockConfigItem(QWidget):
         name_font.setBold(True)
         name_font.setPointSize(10)
         name_label.setFont(name_font)
-        name_label.setStyleSheet("color: #E8EAED;")
+        name_label.setStyleSheet(get_label_style('default'))
         name_layout.addWidget(name_label)
         
-        # NEW: AND/OR Badge - prominent display
+        # NEW: AND/OR Badge - prominent display with centralized styling
         logic_type = self.block_info.get('logic', 'AND')
         if logic_type == 'AND':
             badge_text = "REQUIRED"
-            badge_bg = "#204486"  # Blue for required
+            badge_type_style = 'required'
             badge_tooltip = "This block is REQUIRED - all signals must trigger"
         else:
             badge_text = "OPTIONAL"
-            badge_bg = "#28A745"  # Green for optional
+            badge_type_style = 'optional'
             badge_tooltip = "This block is OPTIONAL - boosts strategy when triggered"
         
         logic_badge = QLabel(badge_text)
-        logic_badge.setStyleSheet(f"""
-            QLabel {{
-                background-color: {badge_bg};
-                color: white;
-                font-weight: bold;
-                font-size: 9pt;
-                padding: 4px 12px;
-                border-radius: 4px;
-            }}
-        """)
+        logic_badge.setStyleSheet(get_logic_badge_style(badge_type_style))
         logic_badge.setToolTip(badge_tooltip)
-        logic_badge.setMaximumHeight(24)
+        # Set size policy to prevent expansion
+        from PyQt5.QtWidgets import QSizePolicy
+        logic_badge.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         name_layout.addWidget(logic_badge)
         name_layout.addStretch()
         
@@ -112,7 +112,7 @@ class BlockConfigItem(QWidget):
         # Signals count
         signals_count = len(self.block_info.get('signals', []))
         signals_label = QLabel(f"Signals: {signals_count}")
-        signals_label.setStyleSheet("color: #9AA0A6; font-size: 9pt;")
+        signals_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt;")
         info_layout.addWidget(signals_label)
         
         header_layout.addLayout(info_layout, stretch=1)
@@ -120,34 +120,34 @@ class BlockConfigItem(QWidget):
         # Control buttons layout
         controls_layout = QVBoxLayout()
         controls_layout.setSpacing(5)
-        
-        # Move buttons
+
+        # Move buttons - aligned to the right
         move_layout = QHBoxLayout()
-        
-        self.up_button = QPushButton("▲")
+        move_layout.addStretch()  # Push buttons to the right
+
+        self.up_button = QPushButton("▴")  # Sharp small triangle up
         self.up_button.setMaximumWidth(40)
+        self.up_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
         self.up_button.setToolTip("Move block up")
         self.up_button.clicked.connect(lambda: self.move_up_clicked.emit(self.block_name))
         self.up_button.setEnabled(self.position > 1)  # Disable if first
         move_layout.addWidget(self.up_button)
-        
-        self.down_button = QPushButton("▼")
+
+        self.down_button = QPushButton("▾")  # Sharp small triangle down
         self.down_button.setMaximumWidth(40)
+        self.down_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
         self.down_button.setToolTip("Move block down")
         self.down_button.clicked.connect(lambda: self.move_down_clicked.emit(self.block_name))
         self.down_button.setEnabled(self.position < self.total)  # Disable if last
         move_layout.addWidget(self.down_button)
-        
+
         controls_layout.addLayout(move_layout)
         
         # Configure button for blocks #2+ (need reference to previous block)
         if self.position > 1:
             self.configure_block_button = QPushButton("⚙️ Config")
             self.configure_block_button.setMinimumWidth(100)
-            self.configure_block_button.setStyleSheet(
-                "QPushButton { background-color: #204486; color: white; font-weight: bold; padding: 5px; }"
-                "QPushButton:hover { background-color: #1A3A70; }"
-            )
+            self.configure_block_button.setStyleSheet(get_primary_button_stylesheet())
             self.configure_block_button.setToolTip("Configure timing constraint for this block")
             # Emit with empty string as signal_name to indicate block-level config
             self.configure_block_button.clicked.connect(lambda: self.configure_timing_clicked.emit(self.block_name, ""))
@@ -156,10 +156,7 @@ class BlockConfigItem(QWidget):
         # Remove button
         self.remove_button = QPushButton("✕ Remove")
         self.remove_button.setMinimumWidth(100)  # Changed from setMaximumWidth(90)
-        self.remove_button.setStyleSheet(
-            "QPushButton { background-color: #ff4444; color: white; font-weight: bold; padding: 5px; }"
-            "QPushButton:hover { background-color: #cc0000; }"
-        )
+        self.remove_button.setStyleSheet(get_danger_button_stylesheet())
         self.remove_button.clicked.connect(lambda: self.remove_clicked.emit(self.block_name))
         controls_layout.addWidget(self.remove_button)
         
@@ -171,13 +168,14 @@ class BlockConfigItem(QWidget):
         if self.block_info.get('signals'):
             signals_widget = QFrame()
             signals_widget.setFrameShape(QFrame.StyledPanel)
-            signals_widget.setStyleSheet("background-color: #2A2F3A; border: 1px solid #3C4149; border-radius: 6px; padding: 5px;")
+            from src.strategy_builder.ui.styles import get_color
+            signals_widget.setStyleSheet(f"background-color: {get_color('bg_light')}; border: 1px solid {get_color('border')}; border-radius: 6px; padding: 5px;")
             
             signals_layout = QVBoxLayout()
             signals_layout.setContentsMargins(10, 5, 10, 5)
             
             signals_header = QLabel("Signals:")
-            signals_header.setStyleSheet("font-weight: bold; color: #204486;")
+            signals_header.setStyleSheet(get_label_style('info') + " font-weight: bold;")
             signals_layout.addWidget(signals_header)
             
             for idx, signal in enumerate(self.block_info['signals'], 1):
@@ -215,26 +213,24 @@ class BlockConfigItem(QWidget):
                 
                 signal_row_layout.addWidget(signal_label, stretch=1)
                 
+                # Add "Recheck On Delayed Candles" button - hide if recheck already configured
+                if not signal.get('recheck_config') or not signal['recheck_config'].get('enabled'):
+                    recheck_btn = QPushButton("Recheck On Delayed Candles")
+                    recheck_btn.setMinimumWidth(180)
+                    recheck_btn.setMinimumHeight(28)
+                    recheck_btn.setStyleSheet(get_recheck_button_stylesheet())
+                    recheck_btn.setToolTip("Require this signal to reoccur within specified bars for validation")
+                    recheck_btn.clicked.connect(
+                        lambda checked, sname=signal_name: self._on_recheck_clicked(sname)
+                    )
+                    signal_row_layout.addWidget(recheck_btn)
+                
                 # Add configure button for signals after the first (need reference signal)
                 if idx > 1:
-                    configure_btn = QPushButton("⚙️ Configure")
-                    configure_btn.setMaximumWidth(90)
-                    configure_btn.setStyleSheet("""
-                        QPushButton {
-                            background-color: #204486;
-                            color: white;
-                            font-weight: bold;
-                            font-size: 8pt;
-                            padding: 4px 8px;
-                            border-radius: 4px;
-                        }
-                        QPushButton:hover {
-                            background-color: #1A3A70;
-                        }
-                        QPushButton:pressed {
-                            background-color: #1550DF;
-                        }
-                    """)
+                    configure_btn = QPushButton("⚙️ Config")
+                    configure_btn.setMinimumWidth(90)
+                    configure_btn.setMinimumHeight(28)
+                    configure_btn.setStyleSheet(get_primary_button_stylesheet())
                     configure_btn.setToolTip("Configure timing constraint for this signal")
                     configure_btn.clicked.connect(
                         lambda checked, sname=signal_name: self.configure_timing_clicked.emit(self.block_name, sname)
@@ -243,6 +239,35 @@ class BlockConfigItem(QWidget):
                 
                 signals_layout.addLayout(signal_row_layout)
                 
+                # Display recheck configuration as indented sub-item
+                if signal.get('recheck_config'):
+                    recheck_cfg = signal['recheck_config']
+                    if recheck_cfg.get('enabled'):
+                        bar_delay = recheck_cfg.get('bar_delay', 0)
+                        
+                        # Create recheck row with input and remove button
+                        recheck_row_layout = QHBoxLayout()
+                        recheck_row_layout.setSpacing(8)
+                        
+                        recheck_text = f"     -----> {signal_name} [RECHECK] in {bar_delay} Bars"
+                        recheck_label = QLabel(recheck_text)
+                        recheck_label.setStyleSheet(get_label_style('success') + " font-size: 8pt; font-style: italic;")
+                        recheck_label.setToolTip(f"This signal must reoccur within {bar_delay} bars for validation")
+                        recheck_row_layout.addWidget(recheck_label, stretch=1)
+                        
+                        # Remove recheck button
+                        remove_recheck_btn = QPushButton("✕")
+                        remove_recheck_btn.setMinimumWidth(40)
+                        remove_recheck_btn.setMinimumHeight(28)
+                        remove_recheck_btn.setStyleSheet(get_danger_button_stylesheet())
+                        remove_recheck_btn.setToolTip("Remove recheck validation")
+                        remove_recheck_btn.clicked.connect(
+                            lambda checked, sname=signal_name: self._on_remove_recheck(sname)
+                        )
+                        recheck_row_layout.addWidget(remove_recheck_btn)
+                        
+                        signals_layout.addLayout(recheck_row_layout)
+                
                 # Display timing constraint as indented sub-item
                 if timing_constraint:
                     ref_signal = timing_constraint.get('reference_signal', 'previous signal')
@@ -250,7 +275,7 @@ class BlockConfigItem(QWidget):
                     
                     timing_text = f"     └─ within {max_candles} candles of {ref_signal}"
                     timing_label = QLabel(timing_text)
-                    timing_label.setStyleSheet("color: #FFA500; font-size: 8pt; font-style: italic;")  # Orange for timing
+                    timing_label.setStyleSheet(get_label_style('warning') + " font-size: 8pt; font-style: italic;")
                     timing_label.setToolTip(f"This signal must occur within {max_candles} candles after {ref_signal}")
                     signals_layout.addWidget(timing_label)
             
@@ -258,15 +283,53 @@ class BlockConfigItem(QWidget):
             layout.addWidget(signals_widget)
         
         # Styling - dark theme
-        self.setStyleSheet("""
-            BlockConfigItem {
-                border: 2px solid #204486;
+        from src.strategy_builder.ui.styles import get_color
+        self.setStyleSheet(f"""
+            BlockConfigItem {{
+                border: 2px solid {get_color('button_primary')};
                 border-radius: 8px;
-                background-color: #1E2128;
-            }
+                background-color: {get_color('bg_medium')};
+            }}
         """)
         
         self.setLayout(layout)
+    
+    def _on_recheck_clicked(self, signal_name: str):
+        """Handle recheck button click - show dialog to configure bar delay."""
+        from PyQt5.QtWidgets import QInputDialog
+        
+        # Show input dialog for bar delay
+        bar_delay, ok = QInputDialog.getInt(
+            self,
+            "Configure Recheck Validation",
+            f"Signal: {signal_name}\n\nEnter number of bars within which signal must reoccur for validation:",
+            value=25,  # Default value
+            min=1,
+            max=500,
+            step=1
+        )
+        
+        if ok and bar_delay > 0:
+            # Find the StrategyBlocksPanel (traverse up the widget tree)
+            panel = self._find_strategy_blocks_panel()
+            if panel and hasattr(panel, '_on_signal_recheck_configured'):
+                panel._on_signal_recheck_configured(self.block_name, signal_name, bar_delay)
+    
+    def _on_remove_recheck(self, signal_name: str):
+        """Handle remove recheck button click."""
+        # Find the StrategyBlocksPanel (traverse up the widget tree)
+        panel = self._find_strategy_blocks_panel()
+        if panel and hasattr(panel, '_on_signal_recheck_removed'):
+            panel._on_signal_recheck_removed(self.block_name, signal_name)
+    
+    def _find_strategy_blocks_panel(self):
+        """Find the StrategyBlocksPanel by traversing up the widget tree."""
+        widget = self.parent()
+        while widget is not None:
+            if isinstance(widget, StrategyBlocksPanel):
+                return widget
+            widget = widget.parent()
+        return None
     
     def update_position(self, position: int, total: int):
         """Update the position indicators and button states."""
@@ -322,14 +385,25 @@ class StrategyBlocksPanel(QWidget):
         # Group box
         group_box = QGroupBox("🧩 Strategy Building Blocks")
         
+        # Set title font programmatically (CSS doesn't work for QGroupBox::title)
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        group_box.setFont(title_font)
+        
         group_layout = QVBoxLayout()
         group_layout.setSpacing(15)
         group_layout.setContentsMargins(15, 20, 15, 15)  # Match backtest panel padding
         
+        # Reset font for content (only title should be 12pt)
+        content_font = QFont()
+        content_font.setPointSize(10)
+        
         # Info header
         info_layout = QHBoxLayout()
         info_label = QLabel("ℹ️ Blocks are executed in order from top to bottom")
-        info_label.setStyleSheet("color: #0066cc; font-size: 9pt; font-style: italic; padding: 5px;")
+        info_label.setFont(content_font)
+        info_label.setStyleSheet(get_label_style('info') + " font-size: 9pt; font-style: italic; padding: 5px;")
         info_layout.addWidget(info_label)
         info_layout.addStretch()
         group_layout.addLayout(info_layout)
@@ -349,7 +423,7 @@ class StrategyBlocksPanel(QWidget):
         self.empty_label = QLabel("No blocks added yet.\n\nSearch and add blocks from the panel above.")
         self.empty_label.setAlignment(Qt.AlignCenter)
         self.empty_label.setStyleSheet(
-            "color: #9AA0A6; font-size: 12pt; padding: 50px; "
+            get_label_style('muted') + " font-size: 12pt; padding: 50px; "
             "background-color: #1E2128; border: 1px solid #3C4149; border-radius: 8px;"
         )
         self.blocks_layout.addWidget(self.empty_label)
@@ -390,12 +464,13 @@ class StrategyBlocksPanel(QWidget):
                 'signals': []
             }
             
-            # Add signal info with timing constraints
+            # Add signal info with timing constraints and recheck config
             for signal_config in block_config.signals:
                 signal_dict = {
                     'name': signal_config.name,
                     'logic': signal_config.logic,
-                    'timing_constraint': None
+                    'timing_constraint': None,
+                    'recheck_config': None
                 }
                 
                 # Add timing constraint data if present
@@ -405,14 +480,22 @@ class StrategyBlocksPanel(QWidget):
                         'max_candles': signal_config.timing_constraint.max_candles
                     }
                 
+                # Add recheck config data if present
+                if signal_config.recheck_config:
+                    signal_dict['recheck_config'] = {
+                        'enabled': signal_config.recheck_config.enabled,
+                        'bar_delay': signal_config.recheck_config.bar_delay
+                    }
+                
                 block_info['signals'].append(signal_dict)
             
-            # Create block item widget
+            # Create block item widget with parent set to this panel
             block_item = BlockConfigItem(
                 block_config.name,
                 block_info,
                 idx,
-                total_blocks
+                total_blocks,
+                parent=self.blocks_container  # Set parent to ensure proper signal routing
             )
             
             # Connect signals
@@ -696,6 +779,81 @@ class StrategyBlocksPanel(QWidget):
                 print(f"Failed to remove block: {result.message}")
         except Exception as e:
             print(f"Error removing block: {e}")
+    
+    def _on_signal_recheck_configured(self, block_name: str, signal_name: str, bar_delay: int):
+        """
+        Handle recheck configuration for a signal.
+        
+        Args:
+            block_name: Block name
+            signal_name: Signal name
+            bar_delay: Number of bars for recheck validation
+        """
+        try:
+            # Get current config
+            config = self.orchestrator.get_current_config()
+            if not config:
+                print("No configuration available")
+                return
+            
+            # Find and update signal
+            from src.strategy_builder.core.strategy_config_engine import RecheckConfig
+            
+            for block in config.blocks:
+                if block.name == block_name:
+                    for signal in block.signals:
+                        if signal.name == signal_name:
+                            # Set recheck config
+                            signal.recheck_config = RecheckConfig(enabled=True, bar_delay=bar_delay)
+                            print(f"Recheck configured for {block_name}::{signal_name} - {bar_delay} bars")
+                            
+                            # Refresh display
+                            self._refresh_blocks()
+                            # Emit changed signal
+                            self.blocks_changed.emit()
+                            return
+            
+            print(f"Signal {block_name}::{signal_name} not found")
+        except Exception as e:
+            print(f"Error configuring recheck: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_signal_recheck_removed(self, block_name: str, signal_name: str):
+        """
+        Handle removal of recheck configuration for a signal.
+        
+        Args:
+            block_name: Block name
+            signal_name: Signal name
+        """
+        try:
+            # Get current config
+            config = self.orchestrator.get_current_config()
+            if not config:
+                print("No configuration available")
+                return
+            
+            # Find and update signal
+            for block in config.blocks:
+                if block.name == block_name:
+                    for signal in block.signals:
+                        if signal.name == signal_name:
+                            # Remove recheck config
+                            signal.recheck_config = None
+                            print(f"Recheck removed for {block_name}::{signal_name}")
+                            
+                            # Refresh display
+                            self._refresh_blocks()
+                            # Emit changed signal
+                            self.blocks_changed.emit()
+                            return
+            
+            print(f"Signal {block_name}::{signal_name} not found")
+        except Exception as e:
+            print(f"Error removing recheck: {e}")
+            import traceback
+            traceback.print_exc()
     
     def refresh_from_orchestrator(self):
         """Public method to refresh display from orchestrator."""

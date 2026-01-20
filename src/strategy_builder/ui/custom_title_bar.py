@@ -83,7 +83,8 @@ class CustomTitleBar(QWidget):
         title_font.setPointSize(10)
         title_font.setBold(False)
         self.title_label.setFont(title_font)
-        self.title_label.setStyleSheet("color: #E8EAED; background: transparent;")
+        from src.strategy_builder.ui.styles import get_color
+        self.title_label.setStyleSheet(f"color: {get_color('text_primary')}; background: transparent;")
         layout.addWidget(self.title_label)
         
         # Spacer

@@ -28,7 +28,7 @@ class BacktestConfigDialog(QDialog):
     
     def _init_ui(self):
         """Initialize the dialog UI"""
-        self.setWindowTitle("Backtest Configuration")
+        self.setWindowTitle("BTC Engine v3 - Backtest Configuration")
         self.setModal(False)  # Non-modal so user can see strategy
         
         # Set window flags to enable maximize/minimize/close buttons
