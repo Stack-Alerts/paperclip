@@ -167,11 +167,12 @@ class LiveOutputPanel(QWidget):
         """Create filter controls - INLINE with separator"""
         group = QGroupBox("Filters")
         group.setStyleSheet(get_groupbox_header_stylesheet())
-        group.setMaximumHeight(80)
+        group.setMaximumHeight(90)  # Increased from 80 to accommodate padding
         
         # Single horizontal layout for all filters
         layout = QHBoxLayout()
         layout.setSpacing(15)
+        layout.setContentsMargins(10, 15, 10, 10)  # Add padding: left, top, right, bottom
         
         # Level filters
         level_label = QLabel("Levels:")
