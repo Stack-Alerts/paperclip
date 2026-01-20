@@ -87,7 +87,7 @@ class MetricsDisplayPanel(QWidget):
         
         # Tab 3: Comparison
         comparison_tab = self._create_comparison_tab()
-        self.tab_widget.addTab(comparison_tab, "🔁 Compare")
+        self.tab_widget.addTab(comparison_tab, "📊 Compare")
         
         layout.addWidget(self.tab_widget)
         
