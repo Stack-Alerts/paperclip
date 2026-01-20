@@ -148,7 +148,7 @@ class LiveOutputPanel(QWidget):
         # Clear button
         clear_btn = QPushButton("🗑️ Clear")
         clear_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        clear_btn.setFixedSize(130, 42)  # Increased height to 42px to prevent text cutoff
+        clear_btn.setFixedSize(130, 52)  # Increased to 52px height for comfortable click target
         clear_btn.clicked.connect(self._clear_output)
         clear_btn.setToolTip("Clear all messages")
         layout.addWidget(clear_btn)
@@ -156,7 +156,7 @@ class LiveOutputPanel(QWidget):
         # Export button
         export_btn = QPushButton("💾 Export")
         export_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        export_btn.setFixedSize(130, 42)  # Increased height to 42px to prevent text cutoff
+        export_btn.setFixedSize(130, 52)  # Increased to 52px height for comfortable click target
         export_btn.clicked.connect(self._export_output)
         export_btn.setToolTip("Export output to file")
         layout.addWidget(export_btn)
