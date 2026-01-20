@@ -120,11 +120,7 @@ class LiveOutputPanel(QWidget):
         self.title_label.setStyleSheet(get_panel_title_stylesheet())
         layout.addWidget(self.title_label)
         
-        # Control bar
-        control_bar = self._create_control_bar()
-        layout.addLayout(control_bar)
-        
-        # Filters
+        # Filters (buttons moved to bottom)
         filters_group = self._create_filters()
         layout.addWidget(filters_group)
         
@@ -132,31 +128,48 @@ class LiveOutputPanel(QWidget):
         output_group = self._create_output_display()
         layout.addWidget(output_group)
         
-        # Stats bar
-        stats_bar = self._create_stats_bar()
-        layout.addLayout(stats_bar)
+        # Stats + Control bar combined at bottom
+        bottom_bar = self._create_bottom_bar()
+        layout.addLayout(bottom_bar)
         
         self.setLayout(layout)
     
-    def _create_control_bar(self) -> QHBoxLayout:
-        """Create control button bar"""
+    def _create_bottom_bar(self) -> QHBoxLayout:
+        """Create combined bottom bar: stats on left, buttons on right"""
         layout = QHBoxLayout()
-        layout.setSpacing(10)
+        layout.setSpacing(20)
         
+        # Stats on the left
+        self.msg_count_label = QLabel("Messages: <b>0</b>")
+        self.msg_count_label.setStyleSheet(get_label_style())
+        layout.addWidget(self.msg_count_label)
+        
+        self.filtered_count_label = QLabel("Displayed: <b>0</b>")
+        self.filtered_count_label.setStyleSheet(get_label_style())
+        layout.addWidget(self.filtered_count_label)
+        
+        self.error_count_label = QLabel("⛔ Errors: <b>0</b>")
+        self.error_count_label.setStyleSheet(f"color: {COLORS['error']};")
+        layout.addWidget(self.error_count_label)
+        
+        self.warning_count_label = QLabel("⚠️ Warnings: <b>0</b>")
+        self.warning_count_label.setStyleSheet(f"color: {COLORS['warning']};")
+        layout.addWidget(self.warning_count_label)
+        
+        # Stretch pushes buttons to the right
         layout.addStretch()
         
-        # Clear button
+        # Buttons on the right
         clear_btn = QPushButton("🗑️ Clear")
         clear_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        clear_btn.setFixedSize(130, 52)  # Increased to 52px height for comfortable click target
+        clear_btn.setFixedSize(130, 52)
         clear_btn.clicked.connect(self._clear_output)
         clear_btn.setToolTip("Clear all messages")
         layout.addWidget(clear_btn)
         
-        # Export button
         export_btn = QPushButton("💾 Export")
         export_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        export_btn.setFixedSize(130, 52)  # Increased to 52px height for comfortable click target
+        export_btn.setFixedSize(130, 52)
         export_btn.clicked.connect(self._export_output)
         export_btn.setToolTip("Export output to file")
         layout.addWidget(export_btn)
@@ -245,34 +258,6 @@ class LiveOutputPanel(QWidget):
         layout.addWidget(self.output_text)
         group.setLayout(layout)
         return group
-    
-    def _create_stats_bar(self) -> QHBoxLayout:
-        """Create statistics bar"""
-        layout = QHBoxLayout()
-        layout.setSpacing(20)
-        
-        # Message count
-        self.msg_count_label = QLabel("Messages: <b>0</b>")
-        self.msg_count_label.setStyleSheet(get_label_style())
-        layout.addWidget(self.msg_count_label)
-        
-        # Filtered count
-        self.filtered_count_label = QLabel("Displayed: <b>0</b>")
-        self.filtered_count_label.setStyleSheet(get_label_style())
-        layout.addWidget(self.filtered_count_label)
-        
-        # Error count
-        self.error_count_label = QLabel("⛔ Errors: <b>0</b>")
-        self.error_count_label.setStyleSheet(f"color: {COLORS['error']};")
-        layout.addWidget(self.error_count_label)
-        
-        # Warning count
-        self.warning_count_label = QLabel("⚠️ Warnings: <b>0</b>")
-        self.warning_count_label.setStyleSheet(f"color: {COLORS['warning']};")
-        layout.addWidget(self.warning_count_label)
-        
-        layout.addStretch()
-        return layout
     
     def add_message(self, message: str, level: str = "INFO", category: str = "SYSTEM") -> None:
         """
