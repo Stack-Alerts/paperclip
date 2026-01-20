@@ -143,13 +143,6 @@ class LiveOutputPanel(QWidget):
         layout = QHBoxLayout()
         layout.setSpacing(10)
         
-        # Auto-scroll checkbox
-        self.auto_scroll_check = QCheckBox("Auto-scroll")
-        self.auto_scroll_check.setChecked(True)
-        self.auto_scroll_check.setStyleSheet(get_checkbox_style())
-        self.auto_scroll_check.stateChanged.connect(self._toggle_auto_scroll)
-        layout.addWidget(self.auto_scroll_check)
-        
         layout.addStretch()
         
         # Clear button
@@ -214,6 +207,13 @@ class LiveOutputPanel(QWidget):
             self.category_checkboxes[category] = checkbox
         
         layout.addStretch()
+        
+        # Auto-scroll checkbox at the very right
+        self.auto_scroll_check = QCheckBox("Auto-scroll")
+        self.auto_scroll_check.setChecked(True)
+        self.auto_scroll_check.setStyleSheet(get_checkbox_style())
+        self.auto_scroll_check.stateChanged.connect(self._toggle_auto_scroll)
+        layout.addWidget(self.auto_scroll_check)
         
         group.setLayout(layout)
         return group
