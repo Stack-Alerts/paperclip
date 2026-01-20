@@ -62,7 +62,7 @@ This sprint integrates with the following detailed specifications:
 - [x] 1.2.5 Resource monitoring
 
 ### Execution Control
-- [ ] 1.2.6 Early stopping logic
+- [x] 1.2.6 Early stopping logic
 - [ ] 1.2.7 Orchestrator integration
 - [ ] 1.2.8 Unit tests
 - [ ] 1.2.9 Load testing
