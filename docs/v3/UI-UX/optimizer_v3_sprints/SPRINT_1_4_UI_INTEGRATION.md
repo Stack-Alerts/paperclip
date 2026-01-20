@@ -75,10 +75,10 @@ This sprint integrates with the following detailed specifications:
 - [x] 1.4.3 Config count estimator
 
 ### Window 2 Tab Integration
-- [ ] 1.4.4 Live Output (Tab 2)
-- [ ] 1.4.5 Trades Panel (Tab 3)
-- [ ] 1.4.6 Metrics Display (Tab 4)
-- [ ] 1.4.7 Compare View (Tab 5)
+- [x] 1.4.4 Live Output (Tab 2)
+- [x] 1.4.5 Trades Panel (Tab 3)
+- [x] 1.4.6 Metrics Display (Tab 4)
+- [x] 1.4.7 Compare View (Tab 5)
 - [ ] 1.4.8 Apply Optimal Config Button
 
 ### Testing & Validation
