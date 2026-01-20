@@ -835,3 +835,66 @@ def get_recheck_button_stylesheet() -> str:
             background-color: #2D3748;
         }
     """
+
+
+def get_table_stylesheet() -> str:
+    """
+    Get comprehensive table stylesheet for data tables.
+    
+    Returns:
+        Complete QTableWidget stylesheet with headers, rows, selection
+    """
+    return f"""
+        QTableWidget {{
+            background-color: {COLORS['bg_dark']};
+            color: {COLORS['text_primary']};
+            border: 1px solid {COLORS['border']};
+            gridline-color: {COLORS['border']};
+            selection-background-color: {COLORS['info']}40;
+            selection-color: {COLORS['text_primary']};
+        }}
+        QTableWidget::item {{
+            padding: 8px;
+        }}
+        QHeaderView::section {{
+            background-color: {COLORS['bg_secondary']};
+            color: {COLORS['text_primary']};
+            padding: 12px;
+            border: 1px solid {COLORS['border']};
+            font-weight: 600;
+        }}
+    """
+
+
+def get_text_edit_stylesheet() -> str:
+    """
+    Get stylesheet for QTextEdit output displays.
+    
+    Returns:
+        QTextEdit stylesheet with dark theme and monospace font
+    """
+    return f"""
+        QTextEdit {{
+            background-color: {COLORS['bg_dark']};
+            color: {COLORS['text_primary']};
+            border: 1px solid {COLORS['border']};
+            padding: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+        }}
+    """
+
+
+def get_scroll_area_stylesheet() -> str:
+    """
+    Get stylesheet for QScrollArea.
+    
+    Returns:
+        QScrollArea stylesheet with dark theme
+    """
+    return f"""
+        QScrollArea {{
+            background-color: {COLORS['bg_dark']};
+            border: 1px solid {COLORS['border']};
+        }}
+    """
