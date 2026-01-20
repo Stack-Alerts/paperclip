@@ -30,7 +30,7 @@
 - [x] 1.5.1 Test with 10+ strategies
 - [x] 1.5.2 Validate accuracy
 - [x] 1.5.2A NautilusTrader Integration Tests
-- [ ] 1.5.3 Performance profiling
+- [x] 1.5.3 Performance profiling
 - [ ] 1.5.4 Performance optimization
 - [ ] 1.5.5 User documentation
 - [ ] 1.5.6 Code review & refactoring
