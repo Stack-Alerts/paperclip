@@ -1,0 +1,68 @@
+Optimizer V3 Database Migrations
+================================
+
+This directory contains Alembic database migrations for Optimizer V3.
+
+## Usage
+
+### Create a new migration
+```bash
+alembic revision --autogenerate -m "Description of changes"
+```
+
+### Apply migrations
+```bash
+# Upgrade to latest version
+alembic upgrade head
+
+# Upgrade to specific version
+alembic upgrade <revision_id>
+```
+
+### Rollback migrations
+```bash
+# Downgrade one revision
+alembic downgrade -1
+
+# Downgrade to specific version
+alembic downgrade <revision_id>
+
+# Downgrade all
+alembic downgrade base
+```
+
+### View migration history
+```bash
+# Show current version
+alembic current
+
+# Show migration history
+alembic history
+
+# Show pending migrations
+alembic history -r current:head
+```
+
+## Migration Files
+
+Migration files are stored in the `versions/` directory with the format:
+`YYYYMMDD_HHMM_<revision_id>_<slug>.py`
+
+Each migration file contains:
+- `upgrade()`: SQL commands to apply the migration
+- `downgrade()`: SQL commands to rollback the migration
+
+## Configuration
+
+Database connection is configured in:
+- `.env` file for environment variables
+- `src/optimizer_v3/database/config.py` for connection settings
+- `alembic/env.py` loads the configuration
+
+## Best Practices
+
+1. Always review auto-generated migrations before applying
+2. Test migrations on development database first
+3. Create backups before applying migrations to production
+4. Keep migrations atomic and reversible
+5. Document complex migrations in the migration file
