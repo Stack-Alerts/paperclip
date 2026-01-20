@@ -85,7 +85,6 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         # Track workflow state (step completion flags)
         self.validation_passed = False
-        self.code_generated = False
         self.test_completed = False
         
         # Auto-update timers
@@ -434,7 +433,6 @@ class StrategyBuilderMainWindow(QMainWindow):
                     
                     # RESET WORKFLOW STATE FIRST (clear previous strategy state)
                     self.validation_passed = False
-                    self.code_generated = False
                     self.test_completed = False
                     self.stepper.reset_all_steps()  # Clear all step states
                     
@@ -454,12 +452,6 @@ class StrategyBuilderMainWindow(QMainWindow):
                         if validation_status == 'passed':
                             self.validation_passed = True
                             self.stepper.mark_step_complete(1)
-                        
-                        # Check generation status from JSON
-                        generation_status = getattr(config, 'generation_status', None)
-                        if generation_status == 'success':
-                            self.code_generated = True
-                            self.stepper.mark_step_complete(2)
                     
                     self._update_window_title()
                     self._update_status(f"Loaded strategy from:{filename}")
@@ -581,18 +573,12 @@ class StrategyBuilderMainWindow(QMainWindow):
                     setattr(self.orchestrator.config_engine.config, 'strategy_type', ui_type)
                 print(f"Config now: {self.orchestrator.config_engine.config.strategy_type}")
             
-            # PERSIST WORKFLOW STATE: Save validation and generation status
+            # PERSIST WORKFLOW STATE: Save validation status
             if self.validation_passed:
                 if not hasattr(self.orchestrator.config_engine.config, 'validation_status'):
                     setattr(self.orchestrator.config_engine.config, 'validation_status', 'passed')
                 else:
                     self.orchestrator.config_engine.config.validation_status = 'passed'
-            
-            if self.code_generated:
-                if not hasattr(self.orchestrator.config_engine.config, 'generation_status'):
-                    setattr(self.orchestrator.config_engine.config, 'generation_status', 'success')
-                else:
-                    self.orchestrator.config_engine.config.generation_status = 'success'
             
             # Save using orchestrator
             result = self.orchestrator.save_strategy(filename)
@@ -748,46 +734,21 @@ class StrategyBuilderMainWindow(QMainWindow):
                 self._update_status("Strategy validation has errors")
         
         elif step == 2:
-            # Generate step - CHECK PREREQUISITES
-            if not self._check_generation_prerequisites():
-                return  # Prerequisites not met, error shown
-            
-            self.stepper.set_current_step(2)
-            self._on_generate_code()
-            # Mark as complete after generation
-            result = self.orchestrator.generate_code()
-            if result.success:
-                self.code_generated = True  # Track completion
-                # IMMEDIATELY set status on config so it persists on save
-                self.orchestrator.config_engine.config.generation_status = 'success'
-                self.stepper.mark_step_complete(2)
-                
-                # AUTO-SAVE after generation (if file exists)
-                if self.current_file:
-                    self._save_to_file(self.current_file)
-            else:
-                self.code_generated = False
-                # Clear generation status on error
-                if hasattr(self.orchestrator.config_engine.config, 'generation_status'):
-                    delattr(self.orchestrator.config_engine.config, 'generation_status')
-                self.stepper.mark_step_error(2)
-        
-        elif step == 3:
-            # Test step - CHECK PREREQUISITES  
+            # Test / Optimize step - CHECK PREREQUISITES  
             if not self._check_test_prerequisites():
                 return  # Prerequisites not met, error shown
             
-            self.stepper.set_current_step(3)
+            self.stepper.set_current_step(2)
             self._on_run_backtest()
             # Mark complete when backtest dialog opens successfully
             self.test_completed = True
         
-        elif step == 4:
+        elif step == 3:
             # Publish step - CHECK PREREQUISITES
             if not self._check_publish_prerequisites():
                 return  # Prerequisites not met, error shown
             
-            self.stepper.set_current_step(4)
+            self.stepper.set_current_step(3)
             QMessageBox.information(
                 self,
                 "Publish Status",
@@ -1185,17 +1146,17 @@ class StrategyBuilderMainWindow(QMainWindow):
         return True
     
     def _check_test_prerequisites(self) -> bool:
-        """Check if testing prerequisites are met (code generated)."""
-        if not self.code_generated:
+        """Check if testing prerequisites are met (validated strategy)."""
+        if not self.validation_passed:
             show_warning(
                 self,
-                "Cannot Run Test",
-                "Code Generation Required",
-                "You must generate code before running tests.\n\n"
+                "Cannot Run Test / Optimize",
+                "Validation Required",
+                "You must validate your strategy before running tests.\n\n"
                 "Steps:\n"
-                "1. Click the Validate step (if not done)\n"
-                "2. Click the Generate step to create code\n"
-                "3. Return here to run tests"
+                "1. Click the Validate step\n"
+                "2. Fix any validation errors\n"
+                "3. Return here to run tests and optimize"
             )
             return False
         return True
@@ -1209,8 +1170,8 @@ class StrategyBuilderMainWindow(QMainWindow):
                 "Testing Required",
                 "You must complete testing before publishing.\n\n"
                 "Steps:\n"
-                "1. Complete validation and code generation\n"
-                "2. Click the Test step to run backtests\n"
+                "1. Complete validation\n"
+                "2. Click the Test / Optimize step to run backtests\n"
                 "3. Review results\n"
                 "4. Return here to publish"
             )

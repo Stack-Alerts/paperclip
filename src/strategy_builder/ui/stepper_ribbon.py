@@ -1,12 +1,11 @@
 """
 Stepper Ribbon - Workflow Progress Component
 
-Shows the 5-step workflow progression in the toolbar:
+Shows the 4-step workflow progression in the toolbar:
 1. Design Strategy
 2. Validate
-3. Generate Code  
-4. Test
-5. Publish
+3. Test / Optimize
+4. Publish
 
 Author: Strategy Builder Team
 Date: 2026-01-17
@@ -30,9 +29,8 @@ class StepperRibbon(QWidget):
     Steps:
     1. Design Strategy
     2. Validate
-    3. Generate Code
-    4. Test/Backtest
-    5. Publish Status
+    3. Test / Optimize
+    4. Publish Status
     
     Signals:
         step_clicked(int): Emitted when step is clicked
@@ -43,8 +41,7 @@ class StepperRibbon(QWidget):
     STEPS = [
         {"name": "Design", "icon": "📝", "tooltip": "Design your trading strategy"},
         {"name": "Validate", "icon": "✓", "tooltip": "Validate strategy configuration"},
-        {"name": "Generate", "icon": "⚙️", "tooltip": "Generate NautilusTrader code"},
-        {"name": "Test", "icon": "🧪", "tooltip": "Run backtest"},
+        {"name": "Test / Optimize", "icon": "🧪", "tooltip": "Run backtest and optimize parameters with Optimizer v3"},
         {"name": "Publish", "icon": "🚀", "tooltip": "Set publish status"}
     ]
     
@@ -177,7 +174,7 @@ class StepperRibbon(QWidget):
         Set the current active step.
         
         Args:
-            step: Step index (0-4)
+            step: Step index (0-3)
         """
         if 0 <= step < len(self.STEPS):
             self.current_step = step
@@ -188,7 +185,7 @@ class StepperRibbon(QWidget):
         Mark a step as complete with checkmark.
         
         Args:
-            step: Step index (0-4)
+            step: Step index (0-3)
         """
         if 0 <= step < len(self.STEPS):
             self.completed_steps.add(step)
@@ -201,7 +198,7 @@ class StepperRibbon(QWidget):
         Mark a step as having an error.
         
         Args:
-            step: Step index (0-4)
+            step: Step index (0-3)
         """
         if 0 <= step < len(self.STEPS):
             self.error_steps.add(step)
@@ -214,7 +211,7 @@ class StepperRibbon(QWidget):
         Clear error state from a step.
         
         Args:
-            step: Step index (0-4)
+            step: Step index (0-3)
         """
         if 0 <= step < len(self.STEPS):
             self.error_steps.discard(step)
