@@ -79,6 +79,7 @@ class LiveOutputPanel(QWidget):
         self.auto_scroll = True
         self.message_count = 0
         self.strategy_name = strategy_name  # Store strategy name
+        self.is_running = False  # Track if test is running
         
         # Filter states
         self.level_filters = {
@@ -426,3 +427,24 @@ class LiveOutputPanel(QWidget):
     def get_filtered_messages(self) -> List[Dict]:
         """Get currently displayed messages"""
         return self.filtered_messages.copy()
+    
+    def set_running(self, running: bool) -> None:
+        """
+        Set running state and update icon.
+        
+        Args:
+            running: True if test is running, False if idle
+        """
+        self.is_running = running
+        self._update_title_icon()
+    
+    def _update_title_icon(self) -> None:
+        """Update title icon based on running state"""
+        icon = "🟢" if self.is_running else "🔴"
+        
+        if self.strategy_name:
+            title_text = f"{icon} Live Output - {self.strategy_name}"
+        else:
+            title_text = f"{icon} Live Output"
+        
+        self.title_label.setText(title_text)

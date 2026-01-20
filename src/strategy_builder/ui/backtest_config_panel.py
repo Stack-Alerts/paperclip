@@ -1287,6 +1287,9 @@ class BacktestConfigPanel(QWidget):
         self.stop_btn.setEnabled(True)
         self.results_btn.setEnabled(True)
         
+        # Update Live Output icon to green (running)
+        self.output_panel.set_running(True)
+        
         self.results_text.setText("🔄 Backtest started...\n")
     
     def _on_pause_clicked(self):
@@ -1320,6 +1323,9 @@ class BacktestConfigPanel(QWidget):
         self.pause_btn.setEnabled(False)
         self.stop_btn.setEnabled(False)
         self.pause_btn.setText("⏸️ Pause")
+        
+        # Update Live Output icon to red (idle)
+        self.output_panel.set_running(False)
         
         if success:
             # Update displays - INLINE HTML FORMAT
@@ -1355,8 +1361,14 @@ class BacktestConfigPanel(QWidget):
         }
     
     def _get_strategy_name(self) -> str:
-        """Get current strategy name from orchestrator"""
+        """Get current strategy name from Strategy Info Panel (Name field in UI)"""
         try:
+            # Access the main window to get the strategy info panel
+            main_window = self.window()
+            if hasattr(main_window, 'strategy_info_panel'):
+                return main_window.strategy_info_panel.get_strategy_name()
+            
+            # Fallback to config if panel not accessible
             config = self.orchestrator.get_current_config()
             if config and hasattr(config, 'name') and config.name:
                 return config.name
