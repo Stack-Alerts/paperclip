@@ -82,7 +82,7 @@ class TradesPanel(QWidget):
         layout.setSpacing(15)
         
         # Title
-        title_label = QLabel("💰 Trades Panel")
+        title_label = QLabel("📊 Trades Panel")
         title_label.setStyleSheet(get_panel_title_stylesheet())
         layout.addWidget(title_label)
         

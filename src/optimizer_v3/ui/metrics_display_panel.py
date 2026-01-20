@@ -69,7 +69,7 @@ class MetricsDisplayPanel(QWidget):
         layout.setSpacing(15)
         
         # Title
-        title_label = QLabel("💹 Performance Metrics")
+        title_label = QLabel("📊 Performance Metrics")
         title_label.setStyleSheet(get_panel_title_stylesheet())
         layout.addWidget(title_label)
         
