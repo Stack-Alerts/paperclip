@@ -14,12 +14,12 @@ Sprint: 1.4 (UI Integration - Task 1.4.7)
 """
 
 from typing import List, Dict, Optional
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QScrollArea, QFrame
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QColor
 from decimal import Decimal
 from dataclasses import dataclass
 from datetime import datetime
@@ -502,7 +502,7 @@ class CompareViewPanel(QWidget):
     def _export_comparison(self) -> None:
         """Export comparison to file"""
         from datetime import datetime
-        from PyQt6.QtWidgets import QMessageBox
+        from PyQt5.QtWidgets import QMessageBox
         
         if not self.configs:
             QMessageBox.information(

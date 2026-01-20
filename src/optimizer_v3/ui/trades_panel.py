@@ -14,13 +14,13 @@ Sprint: 1.4 (UI Integration - Task 1.4.5)
 """
 
 from typing import List, Dict, Optional, Set
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QTableWidget, QTableWidgetItem, QHeaderView,
     QComboBox, QLineEdit, QMessageBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QColor
 from datetime import datetime, timedelta
 from decimal import Decimal
 from dataclasses import dataclass, field

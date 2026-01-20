@@ -135,21 +135,25 @@ class BacktestConfigPanel(QWidget):
         config_tab = self._create_config_tab()
         self.tab_widget.addTab(config_tab, "💠 Config")
         
-        # Tab 2: Live Output (placeholder)
-        output_tab = self._create_placeholder_tab("📊 Live Output", "Real-time backtest output will appear here")
-        self.tab_widget.addTab(output_tab, "💚 Live Output")
+        # Tab 2: Live Output (Optimizer v3 - INTEGRATED)
+        from src.optimizer_v3.ui.live_output_panel import LiveOutputPanel
+        self.output_panel = LiveOutputPanel()
+        self.tab_widget.addTab(self.output_panel, "💚 Live Output")
         
-        # Tab 3: Trades (placeholder)
-        trades_tab = self._create_placeholder_tab("📋 Trades", "Trade history table will appear here")
-        self.tab_widget.addTab(trades_tab, "💰 Trades")
+        # Tab 3: Trades (Optimizer v3 - INTEGRATED)
+        from src.optimizer_v3.ui.trades_panel import TradesPanel
+        self.trades_panel = TradesPanel()
+        self.tab_widget.addTab(self.trades_panel, "💰 Trades")
         
-        # Tab 4: Metrics (placeholder)
-        metrics_tab = self._create_placeholder_tab("💠 Metrics", "Key metrics comparison will appear here")
-        self.tab_widget.addTab(metrics_tab, "💹 Metrics")
+        # Tab 4: Metrics (Optimizer v3 - INTEGRATED)
+        from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
+        self.metrics_panel = MetricsDisplayPanel()
+        self.tab_widget.addTab(self.metrics_panel, "💹 Metrics")
         
-        # Tab 5: Compare (placeholder)
-        compare_tab = self._create_placeholder_tab("🔄 Compare", "Configuration comparison will appear here")
-        self.tab_widget.addTab(compare_tab, "🔁 Compare")
+        # Tab 5: Compare (Optimizer v3 - INTEGRATED)
+        from src.optimizer_v3.ui.compare_view_panel import CompareViewPanel
+        self.compare_panel = CompareViewPanel()
+        self.tab_widget.addTab(self.compare_panel, "🔁 Compare")
         
         main_layout.addWidget(self.tab_widget)
         self.setLayout(main_layout)

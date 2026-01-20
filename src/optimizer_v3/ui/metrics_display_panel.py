@@ -14,12 +14,12 @@ Sprint: 1.4 (UI Integration - Task 1.4.6)
 """
 
 from typing import List, Dict, Optional, Tuple
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QTableWidget, QTableWidgetItem, QHeaderView, QScrollArea
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QColor
 from decimal import Decimal
 from dataclasses import dataclass
 
@@ -490,7 +490,7 @@ class MetricsDisplayPanel(QWidget):
     
     def _get_bold_font(self):
         """Get bold font"""
-        from PyQt6.QtGui import QFont
+        from PyQt5.QtGui import QFont
         font = QFont()
         font.setBold(True)
         return font
@@ -498,7 +498,7 @@ class MetricsDisplayPanel(QWidget):
     def _export_metrics(self) -> None:
         """Export metrics comparison"""
         from datetime import datetime
-        from PyQt6.QtWidgets import QMessageBox
+        from PyQt5.QtWidgets import QMessageBox
         
         if not self.user_metrics or not self.optimized_metrics:
             QMessageBox.information(

@@ -13,11 +13,11 @@ Sprint: 1.4 (UI Integration)
 """
 
 from typing import List, Dict, Optional, Callable
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QCheckBox, QSpinBox, QGridLayout
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal
 from decimal import Decimal
 
 # Import centralized styles - ZERO hardcoded styles
