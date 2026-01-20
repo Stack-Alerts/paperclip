@@ -72,12 +72,13 @@ class LiveOutputPanel(QWidget):
     # Signals
     message_received = pyqtSignal(str, str, str)  # timestamp, level, message
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, strategy_name: Optional[str] = None):
         super().__init__(parent)
         self.messages: List[Dict] = []
         self.filtered_messages: List[Dict] = []
         self.auto_scroll = True
         self.message_count = 0
+        self.strategy_name = strategy_name  # Store strategy name
         
         # Filter states
         self.level_filters = {
@@ -109,10 +110,14 @@ class LiveOutputPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(15)
         
-        # Title
-        title_label = QLabel("💚 Live Output")
-        title_label.setStyleSheet(get_panel_title_stylesheet())
-        layout.addWidget(title_label)
+        # Title - Dynamic with strategy name
+        if self.strategy_name:
+            title_text = f"🔴 Live Output - {self.strategy_name}"
+        else:
+            title_text = "🔴 Live Output"
+        self.title_label = QLabel(title_text)
+        self.title_label.setStyleSheet(get_panel_title_stylesheet())
+        layout.addWidget(self.title_label)
         
         # Control bar
         control_bar = self._create_control_bar()

@@ -137,8 +137,9 @@ class BacktestConfigPanel(QWidget):
         
         # Tab 2: Live Output (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.live_output_panel import LiveOutputPanel
-        self.output_panel = LiveOutputPanel()
-        self.tab_widget.addTab(self.output_panel, "💚 Live Output")
+        strategy_name = self._get_strategy_name()
+        self.output_panel = LiveOutputPanel(strategy_name=strategy_name)
+        self.tab_widget.addTab(self.output_panel, "🔴 Live Output")
         
         # Tab 3: Trades (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.trades_panel import TradesPanel
