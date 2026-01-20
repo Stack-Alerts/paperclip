@@ -119,19 +119,19 @@ class MetricsDisplayPanel(QWidget):
         # Table styling
         self.perf_table.setStyleSheet(
             f"QTableWidget {{"
-            f"background-color: {COLORS['bg_dark']}; "
-            f"color: {COLORS['text_primary']}; "
-            f"border: 1px solid {COLORS['border']}; "
-            f"gridline-color: {COLORS['border']}; "
+            f"background-color: {get_color('bg_dark')}; "
+            f"color: {get_color('text_primary')}; "
+            f"border: 1px solid {get_color('border')}; "
+            f"gridline-color: {get_color('border')}; "
             f"}} "
             f"QTableWidget::item {{"
             f"padding: 10px; "
             f"}} "
             f"QHeaderView::section {{"
             f"background-color: {COLORS['bg_secondary']}; "
-            f"color: {COLORS['text_primary']}; "
+            f"color: {get_color('text_primary')}; "
             f"padding: 12px; "
-            f"border: 1px solid {COLORS['border']}; "
+            f"border: 1px solid {get_color('border')}; "
             f"font-weight: 600; "
             f"}}"
         )
@@ -199,19 +199,19 @@ class MetricsDisplayPanel(QWidget):
         # Table styling (same as performance)
         self.risk_table.setStyleSheet(
             f"QTableWidget {{"
-            f"background-color: {COLORS['bg_dark']}; "
-            f"color: {COLORS['text_primary']}; "
-            f"border: 1px solid {COLORS['border']}; "
-            f"gridline-color: {COLORS['border']}; "
+            f"background-color: {get_color('bg_dark')}; "
+            f"color: {get_color('text_primary')}; "
+            f"border: 1px solid {get_color('border')}; "
+            f"gridline-color: {get_color('border')}; "
             f"}} "
             f"QTableWidget::item {{"
             f"padding: 10px; "
             f"}} "
             f"QHeaderView::section {{"
             f"background-color: {COLORS['bg_secondary']}; "
-            f"color: {COLORS['text_primary']}; "
+            f"color: {get_color('text_primary')}; "
             f"padding: 12px; "
-            f"border: 1px solid {COLORS['border']}; "
+            f"border: 1px solid {get_color('border')}; "
             f"font-weight: 600; "
             f"}}"
         )
@@ -283,19 +283,19 @@ class MetricsDisplayPanel(QWidget):
         # Table styling
         self.comp_table.setStyleSheet(
             f"QTableWidget {{"
-            f"background-color: {COLORS['bg_dark']}; "
-            f"color: {COLORS['text_primary']}; "
-            f"border: 1px solid {COLORS['border']}; "
-            f"gridline-color: {COLORS['border']}; "
+            f"background-color: {get_color('bg_dark')}; "
+            f"color: {get_color('text_primary')}; "
+            f"border: 1px solid {get_color('border')}; "
+            f"gridline-color: {get_color('border')}; "
             f"}} "
             f"QTableWidget::item {{"
             f"padding: 10px; "
             f"}} "
             f"QHeaderView::section {{"
             f"background-color: {COLORS['bg_secondary']}; "
-            f"color: {COLORS['text_primary']}; "
+            f"color: {get_color('text_primary')}; "
             f"padding: 12px; "
-            f"border: 1px solid {COLORS['border']}; "
+            f"border: 1px solid {get_color('border')}; "
             f"font-weight: 600; "
             f"}}"
         )
@@ -404,9 +404,9 @@ class MetricsDisplayPanel(QWidget):
                 # Color code certain metrics
                 if key in ['total_pnl', 'avg_trade_pnl']:
                     if float(value) > 0:
-                        item.setForeground(QColor(COLORS['success']))
+                        item.setForeground(QColor(get_color('success')))
                     elif float(value) < 0:
-                        item.setForeground(QColor(COLORS['error']))
+                        item.setForeground(QColor(get_color('error')))
                 
                 self.perf_table.setItem(row, 1, item)
                 
@@ -414,11 +414,11 @@ class MetricsDisplayPanel(QWidget):
                 rating = self._get_rating(key, value)
                 rating_item = self._create_item(rating)
                 if rating == '✓ Good':
-                    rating_item.setForeground(QColor(COLORS['success']))
+                    rating_item.setForeground(QColor(get_color('success')))
                 elif rating == '⚠ Fair':
-                    rating_item.setForeground(QColor(COLORS['warning']))
+                    rating_item.setForeground(QColor(get_color('warning')))
                 elif rating == '✗ Poor':
-                    rating_item.setForeground(QColor(COLORS['error']))
+                    rating_item.setForeground(QColor(get_color('error')))
                 self.perf_table.setItem(row, 2, rating_item)
     
     def _update_risk_table(self) -> None:
