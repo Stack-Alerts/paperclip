@@ -31,8 +31,8 @@ from src.strategy_builder.ui.styles import (
     get_label_style,
     get_panel_title_stylesheet,
     get_primary_button_stylesheet,
-    get_color,
-    COLORS
+    get_scroll_area_stylesheet,
+    get_color
 )
 
 
@@ -48,13 +48,8 @@ class ConfigPanel(QScrollArea):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
-        # Styling
-        self.setStyleSheet(
-            f"QScrollArea {{"
-            f"background-color: {get_color('bg_dark')}; "
-            f"border: 1px solid {get_color('border')}; "
-            f"}}"
-        )
+        # Use centralized scroll area stylesheet
+        self.setStyleSheet(get_scroll_area_stylesheet())
         
         self._init_content()
     
@@ -72,7 +67,7 @@ class ConfigPanel(QScrollArea):
             f"font-size: 16px; "
             f"font-weight: 600; "
             f"padding: 10px; "
-            f"background-color: {COLORS['bg_secondary']}; "
+            f"background-color: {get_color('bg_secondary')}; "
             f"border-radius: 4px;"
         )
         header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
