@@ -70,9 +70,9 @@ This sprint integrates with the following detailed specifications:
 ## ✅ TASK CHECKLIST
 
 ### Window 2 Tab 1 Integration
-- [ ] 1.4.1 Add "Optimize" button (Tab 1)
-- [ ] 1.4.2 Parameter selection checkboxes
-- [ ] 1.4.3 Config count estimator
+- [x] 1.4.1 Add "Optimize" button (Tab 1)
+- [x] 1.4.2 Parameter selection checkboxes
+- [x] 1.4.3 Config count estimator
 
 ### Window 2 Tab Integration
 - [ ] 1.4.4 Live Output (Tab 2)
@@ -522,7 +522,7 @@ def test_trades_panel():
 - [ ] Bold highlighting for best config
 - [ ] Summary panel with proper type formatting
 - [ ] All styling from styles.py
-- [ ] 95%+ test coverage for type handling
+- [ ] 100% test coverage for type handling
 - [ ] All metrics properly formatted with correct precision
 - [ ] Side-by-side comparison view working
 - [ ] Statistical significance testing implemented
