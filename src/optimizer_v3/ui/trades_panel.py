@@ -163,7 +163,7 @@ class TradesPanel(QWidget):
             f"color: {COLORS['text_primary']}; "
             f"border: 1px solid {COLORS['border']}; "
             f"gridline-color: {COLORS['border']}; "
-            f"selection-background-color: {COLORS['primary']}40; "
+            f"selection-background-color: {COLORS['info']}40; "
             f"selection-color: {COLORS['text_primary']}; "
             f"}} "
             f"QTableWidget::item {{"
