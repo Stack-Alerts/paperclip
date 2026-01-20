@@ -307,7 +307,7 @@ class LiveOutputPanel(QWidget):
         color_map = {
             MessageLevel.INFO: COLORS['info'],
             MessageLevel.DECISION: COLORS['success'],
-            MessageLevel.ACTION: COLORS['primary'],
+            MessageLevel.ACTION: COLORS['info'],
             MessageLevel.WARNING: COLORS['warning'],
             MessageLevel.ERROR: COLORS['error']
         }
