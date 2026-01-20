@@ -148,7 +148,7 @@ class LiveOutputPanel(QWidget):
         # Clear button
         clear_btn = QPushButton("🗑️ Clear")
         clear_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        clear_btn.setFixedSize(130, 36)  # Fixed width AND height for exact consistency
+        clear_btn.setFixedSize(130, 42)  # Increased height to 42px to prevent text cutoff
         clear_btn.clicked.connect(self._clear_output)
         clear_btn.setToolTip("Clear all messages")
         layout.addWidget(clear_btn)
@@ -156,7 +156,7 @@ class LiveOutputPanel(QWidget):
         # Export button
         export_btn = QPushButton("💾 Export")
         export_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        export_btn.setFixedSize(130, 36)  # Fixed width AND height for exact consistency
+        export_btn.setFixedSize(130, 42)  # Increased height to 42px to prevent text cutoff
         export_btn.clicked.connect(self._export_output)
         export_btn.setToolTip("Export output to file")
         layout.addWidget(export_btn)
@@ -164,19 +164,20 @@ class LiveOutputPanel(QWidget):
         return layout
     
     def _create_filters(self) -> QGroupBox:
-        """Create filter controls - INLINE with separator"""
+        """Create filter controls - INLINE with separator - SPACIOUS READABLE LAYOUT"""
         group = QGroupBox("Filters")
         group.setStyleSheet(get_groupbox_header_stylesheet())
-        group.setMaximumHeight(90)  # Increased from 80 to accommodate padding
+        group.setMaximumHeight(110)  # Increased to 110px for breathing room
         
         # Single horizontal layout for all filters
         layout = QHBoxLayout()
-        layout.setSpacing(15)
-        layout.setContentsMargins(10, 15, 10, 10)  # Add padding: left, top, right, bottom
+        layout.setSpacing(25)  # Increased spacing between elements from 15 to 25
+        layout.setContentsMargins(15, 20, 15, 15)  # More padding: left, top, right, bottom
         
         # Level filters
         level_label = QLabel("Levels:")
         level_label.setStyleSheet(get_label_style('muted'))
+        level_label.setContentsMargins(0, 0, 10, 0)  # Add right margin before checkboxes
         layout.addWidget(level_label)
         
         self.level_checkboxes = {}
@@ -220,12 +221,12 @@ class LiveOutputPanel(QWidget):
         return group
     
     def _create_output_display(self) -> QGroupBox:
-        """Create output text display"""
+        """Create output text display - WITH PROPER PADDING FOR LABEL VISIBILITY"""
         group = QGroupBox("Output")
         group.setStyleSheet(get_groupbox_header_stylesheet())
         
         layout = QVBoxLayout()
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(10, 15, 10, 10)  # Increased top margin for label visibility
         
         # Text edit for output
         self.output_text = QTextEdit()
