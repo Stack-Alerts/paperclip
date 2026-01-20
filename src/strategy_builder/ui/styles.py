@@ -360,7 +360,7 @@ RADIO_BUTTON_STYLES = {
 
 # Standardized checkbox styling (transparent background)
 CHECKBOX_STYLES = {
-    'default': f"QCheckBox {{ color: {COLORS['text_primary']}; background: transparent; }}",
+    'default': f"QCheckBox {{ color: {COLORS['text_muted']}; background: transparent; }}",
     'success': f"QCheckBox {{ color: {COLORS['success']}; background: transparent; }}",
     'error': f"QCheckBox {{ color: {COLORS['error']}; background: transparent; }}",
 }
