@@ -55,24 +55,24 @@ This sprint integrates with the following detailed specifications:
 ## ✅ TASK CHECKLIST
 
 ### Performance Metrics
-- [ ] 1.3.1 Multi-objective scoring
-- [ ] 1.3.2 Sharpe ratio calculator
-- [ ] 1.3.3 Win rate calculator
-- [ ] 1.3.4 Drawdown calculator
-- [ ] 1.3.5 Profit factor calculator
+- [x] 1.3.1 Multi-objective scoring
+- [x] 1.3.2 Sharpe ratio calculator
+- [x] 1.3.3 Win rate calculator
+- [x] 1.3.4 Drawdown calculator
+- [x] 1.3.5 Profit factor calculator
 
 ### Analysis & Comparison
-- [ ] 1.3.6 Statistical comparison
-- [ ] 1.3.7 Config diff highlighter
-- [ ] 1.3.8 CSV export
+- [x] 1.3.6 Statistical comparison
+- [x] 1.3.7 Config diff highlighter
+- [x] 1.3.8 CSV export
 - [ ] 1.3.9 Unit tests
 - [ ] 1.3.10 Sprint sign-off
 
 ### State Management
-- [ ] 1.3.11 State manager
-- [ ] 1.3.12 Session history
-- [ ] 1.3.13 Resume from last session
-- [ ] 1.3.14 State migration tools
+- [x] 1.3.11 State manager
+- [x] 1.3.12 Session history
+- [x] 1.3.13 Resume from last session
+- [x] 1.3.14 State migration tools
 - [ ] 1.3.15 State validation tests
 
 ## 📝 TASK DETAILS
