@@ -342,7 +342,7 @@ COLORS = {
 
 # Standardized label styling (used throughout main window)
 LABEL_STYLES = {
-    'default': f"color: {COLORS['text_primary']};",
+    'default': f"color: {COLORS['text_muted']};",  # Changed to muted to match Config tab
     'muted': f"color: {COLORS['text_label']};",  # #A0AEC0
     'secondary': f"color: {COLORS['text_secondary']};",
     'error': f"color: {COLORS['error']};",
