@@ -4,12 +4,16 @@ Task 1.3.15: State validation tests with 100% coverage
 """
 
 import pytest
+import sys
 import tempfile
 import shutil
 from pathlib import Path
 from decimal import Decimal
 from datetime import datetime, timedelta
 from nautilus_trader.model.objects import Money, Quantity, Price
+
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from src.optimizer_v3.core.results.state_manager import StateManager
 
