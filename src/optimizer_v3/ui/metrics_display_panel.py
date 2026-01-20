@@ -34,8 +34,8 @@ from src.strategy_builder.ui.styles import (
     get_panel_title_stylesheet,
     get_primary_button_stylesheet,
     get_tab_widget_stylesheet,
-    get_color,
-    COLORS
+    get_table_stylesheet,
+    get_color
 )
 
 
@@ -117,24 +117,8 @@ class MetricsDisplayPanel(QWidget):
         self.perf_table.setHorizontalHeaderLabels(['Metric', 'Value', 'Rating'])
         
         # Table styling
-        self.perf_table.setStyleSheet(
-            f"QTableWidget {{"
-            f"background-color: {get_color('bg_dark')}; "
-            f"color: {get_color('text_primary')}; "
-            f"border: 1px solid {get_color('border')}; "
-            f"gridline-color: {get_color('border')}; "
-            f"}} "
-            f"QTableWidget::item {{"
-            f"padding: 10px; "
-            f"}} "
-            f"QHeaderView::section {{"
-            f"background-color: {COLORS['bg_secondary']}; "
-            f"color: {get_color('text_primary')}; "
-            f"padding: 12px; "
-            f"border: 1px solid {get_color('border')}; "
-            f"font-weight: 600; "
-            f"}}"
-        )
+        # Use centralized table stylesheet (ZERO hardcoded styles)
+        self.perf_table.setStyleSheet(get_table_stylesheet())
         
         self.perf_table.setAlternatingRowColors(True)
         self.perf_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -196,25 +180,8 @@ class MetricsDisplayPanel(QWidget):
         self.risk_table.setColumnCount(3)
         self.risk_table.setHorizontalHeaderLabels(['Metric', 'Value', 'Status'])
         
-        # Table styling (same as performance)
-        self.risk_table.setStyleSheet(
-            f"QTableWidget {{"
-            f"background-color: {get_color('bg_dark')}; "
-            f"color: {get_color('text_primary')}; "
-            f"border: 1px solid {get_color('border')}; "
-            f"gridline-color: {get_color('border')}; "
-            f"}} "
-            f"QTableWidget::item {{"
-            f"padding: 10px; "
-            f"}} "
-            f"QHeaderView::section {{"
-            f"background-color: {COLORS['bg_secondary']}; "
-            f"color: {get_color('text_primary')}; "
-            f"padding: 12px; "
-            f"border: 1px solid {get_color('border')}; "
-            f"font-weight: 600; "
-            f"}}"
-        )
+        # Use centralized table stylesheet (ZERO hardcoded styles)
+        self.risk_table.setStyleSheet(get_table_stylesheet())
         
         self.risk_table.setAlternatingRowColors(True)
         self.risk_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -280,25 +247,8 @@ class MetricsDisplayPanel(QWidget):
         self.comp_table.setColumnCount(4)
         self.comp_table.setHorizontalHeaderLabels(['Parameter', 'Original', 'Optimized', 'Change'])
         
-        # Table styling
-        self.comp_table.setStyleSheet(
-            f"QTableWidget {{"
-            f"background-color: {get_color('bg_dark')}; "
-            f"color: {get_color('text_primary')}; "
-            f"border: 1px solid {get_color('border')}; "
-            f"gridline-color: {get_color('border')}; "
-            f"}} "
-            f"QTableWidget::item {{"
-            f"padding: 10px; "
-            f"}} "
-            f"QHeaderView::section {{"
-            f"background-color: {COLORS['bg_secondary']}; "
-            f"color: {get_color('text_primary')}; "
-            f"padding: 12px; "
-            f"border: 1px solid {get_color('border')}; "
-            f"font-weight: 600; "
-            f"}}"
-        )
+        # Use centralized table stylesheet (ZERO hardcoded styles)
+        self.comp_table.setStyleSheet(get_table_stylesheet())
         
         self.comp_table.setAlternatingRowColors(True)
         self.comp_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
