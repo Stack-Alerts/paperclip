@@ -301,9 +301,10 @@ COLORS = {
     # Background colors
     'bg_dark': '#15191E',
     'bg_medium': '#1E2128',
+    'bg_secondary': '#1E2128',  # Alias for bg_medium (table headers, panels)
     'bg_light': '#2A2F3A',
     'bg_input': '#2A2F3A',
-    
+
     # Border colors
     'border': '#3C4149',
     'border_focus': '#2070FF',
@@ -311,6 +312,7 @@ COLORS = {
     # Text colors
     'text_primary': '#E8EAED',
     'text_secondary': '#BDC1C6',
+    'secondary': '#BDC1C6',  # Alias for text_secondary (message categories, labels)
     'text_muted': '#9AA0A6',
     'text_label': '#A0AEC0',
     
