@@ -343,16 +343,16 @@ class LiveOutputPanel(QWidget):
     
     def _toggle_auto_scroll(self, state: int) -> None:
         """Toggle auto-scroll"""
-        self.auto_scroll = (state == Qt.CheckState.Checked.value)
+        self.auto_scroll = (state == Qt.Checked)
     
     def _toggle_level_filter(self, level: MessageLevel, state: int) -> None:
         """Toggle level filter"""
-        self.level_filters[level] = (state == Qt.CheckState.Checked.value)
+        self.level_filters[level] = (state == Qt.Checked)
         self._reapply_filters()
     
     def _toggle_category_filter(self, category: MessageCategory, state: int) -> None:
         """Toggle category filter"""
-        self.category_filters[category] = (state == Qt.CheckState.Checked.value)
+        self.category_filters[category] = (state == Qt.Checked)
         self._reapply_filters()
     
     def _reapply_filters(self) -> None:
