@@ -47,13 +47,15 @@ class BacktestWorker(QThread):
     # Signals
     progress_updated = pyqtSignal(int, int, str)  # current, total, message
     backtest_finished = pyqtSignal(bool, dict)  # success, results
+    live_message = pyqtSignal(str, str, str)  # message, level, category - NEW for real-time messages
     
-    def __init__(self, orchestrator, config: dict):
+    def __init__(self, orchestrator, config: dict, output_panel=None):
         super().__init__()
         self.orchestrator = orchestrator
         self.config = config
         self.is_paused = False
         self.should_stop = False
+        self.output_panel = output_panel  # Store reference to output panel
     
     def run(self):
         """Run backtest in background thread"""
