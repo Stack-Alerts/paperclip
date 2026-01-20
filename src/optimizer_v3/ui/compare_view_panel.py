@@ -51,8 +51,8 @@ class ConfigPanel(QScrollArea):
         # Styling
         self.setStyleSheet(
             f"QScrollArea {{"
-            f"background-color: {COLORS['bg_dark']}; "
-            f"border: 1px solid {COLORS['border']}; "
+            f"background-color: {get_color('bg_dark')}; "
+            f"border: 1px solid {get_color('border')}; "
             f"}}"
         )
         
@@ -68,7 +68,7 @@ class ConfigPanel(QScrollArea):
         # Header
         header_label = QLabel(self._get_header_text())
         header_label.setStyleSheet(
-            f"color: {COLORS['text_primary']}; "
+            f"color: {get_color('text_primary')}; "
             f"font-size: 16px; "
             f"font-weight: 600; "
             f"padding: 10px; "
@@ -186,9 +186,9 @@ class ConfigPanel(QScrollArea):
                     # Color code P&L
                     if key == 'total_pnl':
                         if float(metrics[key]) > 0:
-                            metric_label.setStyleSheet(f"color: {COLORS['success']};")
+                            metric_label.setStyleSheet(f"color: {get_color('success')};")
                         elif float(metrics[key]) < 0:
-                            metric_label.setStyleSheet(f"color: {COLORS['error']};")
+                            metric_label.setStyleSheet(f"color: {get_color('error')};")
                         else:
                             metric_label.setStyleSheet(get_label_style())
                     else:
