@@ -14,12 +14,12 @@ Sprint: 1.4 (UI Integration - Task 1.4.4)
 """
 
 from typing import List, Dict, Optional, Set
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QCheckBox, QTextEdit, QComboBox, QScrollArea
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QTextCursor, QFont
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
+from PyQt5.QtGui import QTextCursor, QFont
 from datetime import datetime
 from enum import Enum
 
