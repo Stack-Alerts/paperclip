@@ -69,11 +69,11 @@ This sprint integrates with the following detailed specifications:
 - [ ] 1.2.10 Sprint sign-off
 
 ### Checkpoint System
-- [ ] 1.2.11 Checkpoint system
-- [ ] 1.2.12 Auto-save progress
-- [ ] 1.2.13 Resume from checkpoint
-- [ ] 1.2.14 Rollback on error
-- [ ] 1.2.15 Export partial results
+- [x] 1.2.11 Checkpoint system
+- [x] 1.2.12 Auto-save progress
+- [x] 1.2.13 Resume from checkpoint
+- [x] 1.2.14 Rollback on error
+- [x] 1.2.15 Export partial results
 
 ### Resource Management
 - [ ] 1.2.16 Worker cleanup (completion)
