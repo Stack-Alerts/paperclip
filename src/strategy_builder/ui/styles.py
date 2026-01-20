@@ -848,20 +848,20 @@ def get_table_stylesheet() -> str:
         QTableWidget {{
             background-color: {COLORS['bg_dark']};
             alternate-background-color: {COLORS['bg_medium']};
-            color: {COLORS['text_primary']};
+            color: {COLORS['text_muted']};
             border: 1px solid {COLORS['border']};
             gridline-color: {COLORS['border']};
             selection-background-color: {COLORS['info']}40;
-            selection-color: {COLORS['text_primary']};
+            selection-color: {COLORS['text_muted']};
         }}
         QTableWidget::item {{
-            padding: 8px;
+            padding: 12px 8px;
             background-color: transparent;
         }}
         QHeaderView::section {{
             background-color: {COLORS['bg_secondary']};
-            color: {COLORS['text_primary']};
-            padding: 12px;
+            color: {COLORS['text_muted']};
+            padding: 14px 12px;
             border: 1px solid {COLORS['border']};
             font-weight: 600;
         }}
