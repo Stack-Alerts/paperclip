@@ -31,10 +31,10 @@
 - [x] 1.5.2 Validate accuracy
 - [x] 1.5.2A NautilusTrader Integration Tests
 - [x] 1.5.3 Performance profiling
-- [ ] 1.5.4 Performance optimization
-- [ ] 1.5.5 User documentation
-- [ ] 1.5.6 Code review & refactoring
-- [ ] 1.5.7 Phase 1 complete sign-off
+- [x] 1.5.4 Performance optimization
+- [x] 1.5.5 User documentation
+- [x] 1.5.6 Code review & refactoring
+- [x] 1.5.7 Phase 1 complete sign-off
 
 ---
 
