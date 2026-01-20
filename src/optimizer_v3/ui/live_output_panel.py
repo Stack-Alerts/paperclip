@@ -163,19 +163,19 @@ class LiveOutputPanel(QWidget):
         return layout
     
     def _create_filters(self) -> QGroupBox:
-        """Create filter controls"""
+        """Create filter controls - INLINE with separator"""
         group = QGroupBox("Filters")
         group.setStyleSheet(get_groupbox_header_stylesheet())
-        group.setMaximumHeight(120)
+        group.setMaximumHeight(80)
         
-        layout = QVBoxLayout()
-        layout.setSpacing(10)
+        # Single horizontal layout for all filters
+        layout = QHBoxLayout()
+        layout.setSpacing(15)
         
         # Level filters
-        level_layout = QHBoxLayout()
         level_label = QLabel("Levels:")
         level_label.setStyleSheet(get_label_style('muted'))
-        level_layout.addWidget(level_label)
+        layout.addWidget(level_label)
         
         self.level_checkboxes = {}
         for level in MessageLevel:
@@ -183,17 +183,18 @@ class LiveOutputPanel(QWidget):
             checkbox.setChecked(True)
             checkbox.setStyleSheet(get_checkbox_style())
             checkbox.stateChanged.connect(lambda state, l=level: self._toggle_level_filter(l, state))
-            level_layout.addWidget(checkbox)
+            layout.addWidget(checkbox)
             self.level_checkboxes[level] = checkbox
         
-        level_layout.addStretch()
-        layout.addLayout(level_layout)
+        # Separator between Levels and Categories
+        separator = QLabel("|")
+        separator.setStyleSheet(f"color: {COLORS['border']}; font-size: 18px; padding: 0 10px;")
+        layout.addWidget(separator)
         
         # Category filters
-        category_layout = QHBoxLayout()
         category_label = QLabel("Categories:")
         category_label.setStyleSheet(get_label_style('muted'))
-        category_layout.addWidget(category_label)
+        layout.addWidget(category_label)
         
         self.category_checkboxes = {}
         for category in MessageCategory:
@@ -201,11 +202,10 @@ class LiveOutputPanel(QWidget):
             checkbox.setChecked(True)
             checkbox.setStyleSheet(get_checkbox_style())
             checkbox.stateChanged.connect(lambda state, c=category: self._toggle_category_filter(c, state))
-            category_layout.addWidget(checkbox)
+            layout.addWidget(checkbox)
             self.category_checkboxes[category] = checkbox
         
-        category_layout.addStretch()
-        layout.addLayout(category_layout)
+        layout.addStretch()
         
         group.setLayout(layout)
         return group
