@@ -1,6 +1,6 @@
 """
 Database Infrastructure for Optimizer V3
-Tasks 0.2-0.6: Database Configuration, Connection Pooling, Models, Validation & Manager
+Tasks 0.2-0.7: Database Configuration, Connection Pooling, Models, Validation, Manager & Backup
 """
 
 from .config import (
@@ -59,6 +59,11 @@ from .manager import (
     close_db_manager,
 )
 
+from .backup import (
+    DatabaseBackup,
+    get_backup_manager,
+)
+
 __all__ = [
     # Configuration
     "get_db_config",
@@ -102,4 +107,7 @@ __all__ = [
     "DatabaseManager",
     "get_db_manager",
     "close_db_manager",
+    # Backup & Restore
+    "DatabaseBackup",
+    "get_backup_manager",
 ]
