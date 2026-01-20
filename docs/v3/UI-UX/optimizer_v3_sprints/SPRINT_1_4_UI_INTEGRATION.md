@@ -82,8 +82,8 @@ This sprint integrates with the following detailed specifications:
 - [ ] 1.4.8 Apply Optimal Config Button
 
 ### Testing & Validation
-- [ ] 1.4.9 Integration tests + styling validation
-- [ ] 1.4.10 Sprint sign-off
+- [x] 1.4.9 Integration tests + styling validation
+- [x] 1.4.10 Sprint sign-off
 
 ## 📝 TASK DETAILS
 
