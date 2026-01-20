@@ -168,9 +168,9 @@ class TradesPanel(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.verticalHeader().setVisible(False)
         
-        # Set column widths - significantly widened to use full window width
+        # Set column widths - generous minimum widths to prevent header cutoff
         # ID, Time, Symbol, Side, Size, Entry, Exit, Duration, P&L, P&L %, Status, Notes
-        column_widths = [80, 150, 120, 80, 100, 120, 120, 120, 150, 120, 120, 200]
+        column_widths = [80, 150, 130, 80, 100, 120, 120, 140, 150, 130, 120, 200]
         for i, width in enumerate(column_widths):
             self.table.setColumnWidth(i, width)
         
