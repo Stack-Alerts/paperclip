@@ -239,7 +239,7 @@ class CompareViewPanel(QWidget):
         layout.setSpacing(15)
         
         # Title
-        title_label = QLabel("🔁 Configuration Comparison")
+        title_label = QLabel("📊 Configuration Comparison")
         title_label.setStyleSheet(get_panel_title_stylesheet())
         layout.addWidget(title_label)
         
