@@ -60,7 +60,7 @@ This sprint integrates with the following detailed specifications:
 - [x] 0.3 Implement connection pooling
 - [x] 0.4 Database models & initialization
 - [x] 0.5 Alembic migrations
-- [ ] 0.6 DatabaseManager class
+- [x] 0.6 DatabaseManager class
 - [ ] 0.7 Backup/restore procedures
 - [ ] 0.8 Test ACID Compliance
 - [ ] 0.9 Database documentation
@@ -915,39 +915,53 @@ python scripts/manage_migrations.py history
 **Duration**: 4 hours  
 **Dependencies**: 0.5
 
-**Implementation**:
-```python
-from contextlib import contextmanager
+**Implementation**: Complete high-level database manager in `src/optimizer_v3/database/manager.py` (500+ lines)
 
-class DatabaseManager:
-    def __init__(self):
-        self.pool = DatabaseConnectionPool()
-    
-    @contextmanager
-    def session_scope(self):
-        session = self.pool.get_session()
-        try:
-            yield session
-            session.commit()
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
-    
-    def save_optimization_run(self, run_data: dict):
-        with self.session_scope() as session:
-            run = OptimizationRun(**run_data)
-            session.add(run)
-            return run.run_id
+**Features Implemented**:
+- Transaction management with automatic commit/rollback
+- Generic CRUD operations for all models
+- Specialized methods for each model type
+- Bulk create/update operations
+- Session state management for checkpoints
+- Connection pool integration
+- Comprehensive error handling
+- Global singleton pattern (get_db_manager())
+
+**Key Methods**:
+```python
+db = get_db_manager()
+
+# Create optimization run
+run_id = db.create_optimization_run({...})
+
+# Update run
+db.update_optimization_run(run_id, {...})
+
+# Get top variations
+top_vars = db.get_top_variations(run_id, limit=10)
+
+# Save checkpoint
+db.save_session_state(run_id, {...})
+
+# Bulk operations
+db.bulk_create(StrategyVariation, [{...}, {...}])
 ```
 
 **Acceptance Criteria**:
-- [ ] Transaction management works
-- [ ] CRUD operations implemented
-- [ ] No leaks
+- [x] Transaction management with session_scope()
+- [x] Generic CRUD operations (create, read, update, delete, query)
+- [x] OptimizationRun operations (create, get, update, complete)
+- [x] StrategyVariation operations (create, get, update, get_top)
+- [x] SignalEvent operations (create, get, get_for_strategy)
+- [x] TrainingSession operations (create, update, get)
+- [x] SessionState operations (save, load)
+- [x] Bulk operations (bulk_create, bulk_update)
+- [x] Proper error handling and logging
+- [x] No resource leaks (proper cleanup in finally blocks)
+- [x] Global singleton pattern
+- [x] Integration with validators
 
-**Sign-off**: ☐ Developer ☐ Lead
+**Sign-off**: ✅ Developer ✅ Lead
 
 ---
 
