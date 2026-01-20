@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QHBoxLayout
 from PyQt5.QtCore import Qt
 
 from src.strategy_builder.ui.validation_panel import ValidationPanel
+from src.strategy_builder.ui.styles import get_main_stylesheet, get_secondary_button_stylesheet
 from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
 )
@@ -42,7 +43,7 @@ class ValidationDialog(QDialog):
     
     def _init_ui(self):
         """Initialize the user interface."""
-        self.setWindowTitle("Strategy Validation")
+        self.setWindowTitle("BTC Engine v3 - Strategy Validation")
         
         # Make dialog independent and draggable
         self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint)
@@ -51,16 +52,8 @@ class ValidationDialog(QDialog):
         self.setMinimumSize(1100, 950)
         self.resize(1200, 1050)
         
-        # Apply dark theme stylesheet
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #15191E;
-            }
-            QWidget {
-                background-color: #15191E;
-                color: #E8EAED;
-            }
-        """)
+        # Apply centralized dark theme stylesheet
+        self.setStyleSheet(get_main_stylesheet())
         
         # Main layout
         layout = QVBoxLayout()
@@ -75,21 +68,9 @@ class ValidationDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        # Close button
+        # Close button with centralized styling
         close_button = QPushButton("Close")
-        close_button.setStyleSheet("""
-            QPushButton {
-                background-color: #374151;
-                color: white;
-                font-weight: bold;
-                padding: 10px 24px;
-                border-radius: 4px;
-                min-width: 100px;
-            }
-            QPushButton:hover {
-                background-color: #4B5563;
-            }
-        """)
+        close_button.setStyleSheet(get_secondary_button_stylesheet())
         close_button.clicked.connect(self.accept)
         button_layout.addWidget(close_button)
         

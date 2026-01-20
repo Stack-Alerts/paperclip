@@ -20,6 +20,8 @@ from PyQt5.QtGui import QFont
 
 # Import universal combo box fix
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
+# Import centralized styles
+from src.strategy_builder.ui.styles import get_main_stylesheet, get_panel_title_stylesheet, get_label_style
 
 
 class TimingConstraintDialog(QDialog):
@@ -73,130 +75,27 @@ class TimingConstraintDialog(QDialog):
     
     def _init_ui(self):
         """Initialize the user interface."""
-        self.setWindowTitle(f"Configure Timing Constraint - {self.signal_name}")
+        self.setWindowTitle(f"BTC Engine v3 - Configure Timing Constraint - {self.signal_name}")
         # Increased size by 25% to prevent text compression
         self.setMinimumWidth(875)
         self.setMinimumHeight(563)
-        # Set initial size for better appearance (25% larger)
-        self.resize(940, 625)
+        # Set initial size for better appearance (50% larger for readability)
+        self.resize(1200, 700)
         
-        # Apply dark theme
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #1E2128;
-                color: #E8EAED;
-            }
-            QLabel {
-                color: #E8EAED;
-                background: transparent;
-            }
-            QGroupBox {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 6px;
-                margin-top: 12px;
-                padding-top: 12px;
-                color: #E8EAED;
-                font-weight: bold;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-            }
-            QSpinBox {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                padding: 6px;
-                color: #E8EAED;
-                min-width: 100px;
-            }
-            QSpinBox:focus {
-                border-color: #2070FF;
-            }
-            QSpinBox::up-button, QSpinBox::down-button {
-                background-color: #3C4149;
-                border: none;
-                width: 20px;
-            }
-            QSpinBox::up-button:hover, QSpinBox::down-button:hover {
-                background-color: #4A5058;
-            }
-            QComboBox {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                padding: 6px;
-                color: #E8EAED;
-                min-width: 200px;
-            }
-            QComboBox:hover {
-                border-color: #2070FF;
-            }
-            QComboBox::drop-down {
-                border: none;
-                width: 20px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #2A2F3A;
-                border: 1px solid #3C4149;
-                selection-background-color: #2070FF;
-                color: #E8EAED;
-            }
-            QCheckBox {
-                color: #E8EAED;
-                spacing: 8px;
-                background: transparent;
-            }
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-                border: 2px solid #3C4149;
-                border-radius: 4px;
-                background: transparent;
-            }
-            QCheckBox::indicator:checked {
-                background-color: #4ADE80;
-                border-color: #4ADE80;
-            }
-            QCheckBox::indicator:hover {
-                border-color: #4ADE80;
-            }
-            QPushButton {
-                background-color: #204486;
-                color: white;
-                font-weight: bold;
-                padding: 8px 20px;
-                border-radius: 4px;
-                border: none;
-                min-width: 100px;
-            }
-            QPushButton:hover {
-                background-color: #1A3A70;
-            }
-            QPushButton:pressed {
-                background-color: #1550DF;
-            }
-            QPushButton#cancelButton {
-                background-color: #555555;
-            }
-            QPushButton#cancelButton:hover {
-                background-color: #666666;
-            }
-        """)
+        # Apply centralized dark theme stylesheet
+        self.setStyleSheet(get_main_stylesheet())
         
         layout = QVBoxLayout()
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # Header
+        # Header with centralized styling
         header = QLabel(f"Configure timing constraint for signal:\n{self.block_name} → {self.signal_name}")
         header_font = QFont()
         header_font.setBold(True)
         header_font.setPointSize(10)
         header.setFont(header_font)
-        header.setStyleSheet("color: #095983; padding: 10px;")
+        header.setStyleSheet(get_panel_title_stylesheet())
         layout.addWidget(header)
         
         # Constraint configuration group
@@ -205,10 +104,15 @@ class TimingConstraintDialog(QDialog):
         config_layout.setSpacing(15)
         config_layout.setContentsMargins(15, 20, 15, 15)
         
-        # Enable checkbox
+        # Enable checkbox with centralized styling
         self.constraint_enabled = QCheckBox("Enable timing constraint")
-        self.constraint_enabled.setStyleSheet("font-weight: bold; font-size: 10pt;")
+        # Use default checkbox style (global stylesheet handles appearance)
         self.constraint_enabled.stateChanged.connect(self._on_enabled_changed)
+        # Apply font styling separately
+        checkbox_font = QFont()
+        checkbox_font.setBold(True)
+        checkbox_font.setPointSize(10)
+        self.constraint_enabled.setFont(checkbox_font)
         config_layout.addRow("", self.constraint_enabled)
         
         # Number of candles
@@ -259,7 +163,8 @@ class TimingConstraintDialog(QDialog):
         
         self.example_label = QLabel()
         self.example_label.setWordWrap(True)
-        self.example_label.setStyleSheet("color: #9AA0A6; font-style: italic; padding: 5px;")
+        # Use centralized muted text style with italic font
+        self.example_label.setStyleSheet(get_label_style('muted') + " font-style: italic; padding: 5px;")
         self._update_example_text()
         example_layout.addWidget(self.example_label)
         

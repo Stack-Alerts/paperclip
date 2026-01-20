@@ -23,6 +23,7 @@ from PyQt5.QtGui import QFont
 from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
 )
+from src.strategy_builder.ui.styles import get_label_style, get_color, get_radio_button_style
 
 
 class StrategyInfoPanel(QWidget):
@@ -57,6 +58,7 @@ class StrategyInfoPanel(QWidget):
         self.type_button_group: Optional[QButtonGroup] = None
         self.required_signals_label: Optional[QLabel] = None
         self.optional_signals_label: Optional[QLabel] = None
+        self.rechecked_signals_label: Optional[QLabel] = None
         self.time_constraint_label: Optional[QLabel] = None
         
         self._init_ui()
@@ -70,19 +72,33 @@ class StrategyInfoPanel(QWidget):
         layout.setContentsMargins(15, 15, 15, 15)
         
         # Group box for all strategy info
-        group_box = QGroupBox("📋 Strategy Information")
+        group_box = QGroupBox("💡 Strategy Information")
+        
+        # Set title font programmatically (CSS doesn't work for QGroupBox::title)
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        group_box.setFont(title_font)
         
         group_layout = QVBoxLayout()
         group_layout.setSpacing(20)  # Match backtest panel spacing
         group_layout.setContentsMargins(15, 20, 15, 15)  # Add internal padding
         
+        # Reset font for content (only title should be 12pt, not content)
+        # CRITICAL: Make it instance variable so it persists!
+        self.content_font = QFont()
+        self.content_font.setPointSize(10)  # Normal size for content
+        self.content_font.setBold(False)  # Explicitly not bold
+        
         # Strategy Name
         name_layout = QVBoxLayout()
         name_layout.setSpacing(8)
         name_label = QLabel("Strategy Name:")
-        name_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
+        name_label.setFont(self.content_font)
+        name_label.setStyleSheet(get_label_style('muted'))
         name_label.setToolTip("Enter a unique name for your strategy")
         self.name_input = QLineEdit()
+        self.name_input.setFont(self.content_font)
         self.name_input.setPlaceholderText("e.g., Example_MA_Crossover")
         self.name_input.setMaxLength(100)
         self.name_input.setMinimumHeight(36)  # Bigger input
@@ -94,17 +110,21 @@ class StrategyInfoPanel(QWidget):
         desc_layout = QVBoxLayout()
         desc_layout.setSpacing(8)
         self.desc_label = QLabel("Description:")
-        self.desc_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
+        self.desc_label.setFont(self.content_font)
+        self.desc_label.setStyleSheet(get_label_style('muted'))
         self.desc_label.setToolTip("Strategy description (auto-generated from blocks)")
         self.description_text = QTextEdit()
+        self.description_text.setFont(self.content_font)
+        # Apply muted text styling for better readability
+        self.description_text.setStyleSheet(f"color: {get_color('text_muted')}; background-color: {get_color('bg_input')};")
         self.description_text.setPlaceholderText(
             "Description will be auto-generated when you add building blocks...\n\n"
             "Example:\n"
             "Moving Average crossover with momentum confirmation. "
             "Entry on golden cross with volume confirmation within 5 candles..."
         )
-        self.description_text.setMinimumHeight(120)  # Allow scrolling instead of max
-        self.description_text.setMaximumHeight(180)  # Cap the max height
+        self.description_text.setMinimumHeight(130)  # Allow scrolling instead of max
+        self.description_text.setMaximumHeight(190)  # Cap the max height
         self.description_text.setWordWrapMode(1)  # Enable word wrap (WordWrap mode)
         self.description_text.setLineWrapMode(1)  # Wrap at widget width
         self.description_text.setReadOnly(True)  # Auto-generated, not editable
@@ -118,18 +138,20 @@ class StrategyInfoPanel(QWidget):
         
         # Strategy Type
         type_label = QLabel("Strategy Type:")
-        type_label.setStyleSheet("color: #A0AEC0;")
+        type_label.setStyleSheet(get_label_style('muted'))
         type_label.setToolTip("Select whether this is a bullish or bearish strategy")
         meta_layout.addWidget(type_label)
         
         self.bullish_radio = QRadioButton("Bullish")
-        self.bullish_radio.setStyleSheet("QRadioButton { color: #10B981; background: transparent; }")
+        self.bullish_radio.setFont(self.content_font)
+        self.bullish_radio.setStyleSheet(get_radio_button_style('bullish'))
         self.bullish_radio.setToolTip("Strategy designed for uptrending markets")
         self.bullish_radio.setChecked(True)
         meta_layout.addWidget(self.bullish_radio)
         
         self.bearish_radio = QRadioButton("Bearish")
-        self.bearish_radio.setStyleSheet("QRadioButton { color: #EF4444; background: transparent; }")
+        self.bearish_radio.setFont(self.content_font)
+        self.bearish_radio.setStyleSheet(get_radio_button_style('bearish'))
         self.bearish_radio.setToolTip("Strategy designed for downtrending markets")
         meta_layout.addWidget(self.bearish_radio)
         
@@ -140,12 +162,12 @@ class StrategyInfoPanel(QWidget):
         
         # Separator
         sep1 = QLabel("|")
-        sep1.setStyleSheet("color: #4A5568; font-weight: bold;")
+        sep1.setStyleSheet(f"color: {get_color('text_muted')}; font-weight: bold;")
         meta_layout.addWidget(sep1)
         
         # Required Signals
         req_sig_label = QLabel("Required Signals:")
-        req_sig_label.setStyleSheet("color: #A0AEC0;")
+        req_sig_label.setStyleSheet(get_label_style('muted'))
         req_sig_label.setToolTip("Number of signals required for strategy entry")
         meta_layout.addWidget(req_sig_label)
         
@@ -154,17 +176,17 @@ class StrategyInfoPanel(QWidget):
         required_signals_font.setBold(True)
         required_signals_font.setPointSize(10)
         self.required_signals_label.setFont(required_signals_font)
-        self.required_signals_label.setStyleSheet("color: #10B981;")
+        self.required_signals_label.setStyleSheet(f"color: {get_color('success')};")
         meta_layout.addWidget(self.required_signals_label)
         
         # Separator
         sep2 = QLabel("|")
-        sep2.setStyleSheet("color: #4A5568; font-weight: bold;")
+        sep2.setStyleSheet(f"color: {get_color('text_muted')}; font-weight: bold;")
         meta_layout.addWidget(sep2)
         
         # Optional Signals
         opt_sig_label = QLabel("Optional Signals:")
-        opt_sig_label.setStyleSheet("color: #A0AEC0;")
+        opt_sig_label.setStyleSheet(get_label_style('muted'))
         opt_sig_label.setToolTip("Number of optional signals (boosters)")
         meta_layout.addWidget(opt_sig_label)
         
@@ -173,17 +195,36 @@ class StrategyInfoPanel(QWidget):
         optional_signals_font.setBold(True)
         optional_signals_font.setPointSize(10)
         self.optional_signals_label.setFont(optional_signals_font)
-        self.optional_signals_label.setStyleSheet("color: #214fa2;")
+        self.optional_signals_label.setStyleSheet(f"color: {get_color('info')};")
         meta_layout.addWidget(self.optional_signals_label)
         
         # Separator
         sep3 = QLabel("|")
-        sep3.setStyleSheet("color: #4A5568; font-weight: bold;")
+        sep3.setStyleSheet(f"color: {get_color('text_muted')}; font-weight: bold;")
         meta_layout.addWidget(sep3)
+        
+        # Rechecked Signals
+        recheck_sig_label = QLabel("Rechecked Signals:")
+        recheck_sig_label.setStyleSheet(get_label_style('muted'))
+        recheck_sig_label.setToolTip("Number of signals with recheck validation configured")
+        meta_layout.addWidget(recheck_sig_label)
+        
+        self.rechecked_signals_label = QLabel("0")
+        rechecked_signals_font = QFont()
+        rechecked_signals_font.setBold(True)
+        rechecked_signals_font.setPointSize(10)
+        self.rechecked_signals_label.setFont(rechecked_signals_font)
+        self.rechecked_signals_label.setStyleSheet(f"color: {get_color('warning')};")
+        meta_layout.addWidget(self.rechecked_signals_label)
+        
+        # Separator
+        sep4 = QLabel("|")
+        sep4.setStyleSheet(f"color: {get_color('text_muted')}; font-weight: bold;")
+        meta_layout.addWidget(sep4)
         
         # Time Constraint
         time_const_label = QLabel("Time Constraint:")
-        time_const_label.setStyleSheet("color: #A0AEC0;")
+        time_const_label.setStyleSheet(get_label_style('muted'))
         time_const_label.setToolTip("Whether timing constraints are configured")
         meta_layout.addWidget(time_const_label)
         
@@ -192,7 +233,7 @@ class StrategyInfoPanel(QWidget):
         time_constraint_font.setBold(True)
         time_constraint_font.setPointSize(10)
         self.time_constraint_label.setFont(time_constraint_font)
-        self.time_constraint_label.setStyleSheet("color: #888888;")
+        self.time_constraint_label.setStyleSheet(f"color: {get_color('text_disabled')};")
         meta_layout.addWidget(self.time_constraint_label)
         
         meta_layout.addStretch()
@@ -207,7 +248,7 @@ class StrategyInfoPanel(QWidget):
         # Status indicator (for future validation integration)
         status_layout = QHBoxLayout()
         self.status_label = QLabel("Status: Not configured")
-        self.status_label.setStyleSheet("color: #888888; font-style: italic;")
+        self.status_label.setStyleSheet(f"color: {get_color('text_disabled')}; font-style: italic;")
         status_layout.addWidget(self.status_label)
         status_layout.addStretch()
         group_layout.addLayout(status_layout)
@@ -249,10 +290,10 @@ class StrategyInfoPanel(QWidget):
         
         if not name:
             self.status_label.setText("Status: Enter strategy name")
-            self.status_label.setStyleSheet("color: #ff6600; font-style: italic;")
+            self.status_label.setStyleSheet(get_label_style('warning') + " font-style: italic;")
         else:
             self.status_label.setText("Status: Ready to add blocks")
-            self.status_label.setStyleSheet("color: #00aa00; font-style: italic;")
+            self.status_label.setStyleSheet(get_label_style('success') + " font-style: italic;")
     
     def get_strategy_name(self) -> str:
         """
@@ -333,19 +374,23 @@ class StrategyInfoPanel(QWidget):
                 required_blocks = [b for b in config.blocks if b.logic == 'AND']
                 optional_blocks = [b for b in config.blocks if b.logic == 'OR']
                 
-                # Count total required signals
+                # Count total required signals - ALL signals from REQUIRED blocks
                 total_required_signals = 0
                 for block in required_blocks:
-                    total_required_signals += sum(1 for s in block.signals if s.logic == 'AND')
+                    total_required_signals += len(block.signals)
                 
-                # Build stats string for label
-                stats_parts = []
-                stats_parts.append(f"Strategy has {len(config.blocks)} block(s) ({len(required_blocks)} required, {len(optional_blocks)} optional).")
-                if total_required_signals > 0:
-                    stats_parts.append(f"Total required signals: {total_required_signals}.")
+                # Count optional signals too for complete picture
+                total_optional_signals = 0
+                for block in optional_blocks:
+                    total_optional_signals += len(block.signals)
+                
+                # Build stats string for label - clearer wording
+                # Format: "Description: X blocks, Y signals (breakdown)"
+                block_text = f"{len(config.blocks)} block(s) ({len(required_blocks)} required, {len(optional_blocks)} optional)"
+                signal_text = f"{total_required_signals + total_optional_signals} signal(s) ({total_required_signals} required, {total_optional_signals} optional)"
                 
                 # Update label with stats
-                self.desc_label.setText(f"Description: {' '.join(stats_parts)}")
+                self.desc_label.setText(f"Description: {block_text}, {signal_text}.")
                 
                 # Set only the actual description in text area
                 description_lines = []
@@ -353,16 +398,27 @@ class StrategyInfoPanel(QWidget):
                 
                 # Add timing constraint info if any
                 has_timing = False
+                has_recheck = False
                 for block in config.blocks:
                     for signal in block.signals:
                         if signal.timing_constraint:
                             has_timing = True
+                        if hasattr(signal, 'recheck_config') and signal.recheck_config and signal.recheck_config.enabled:
+                            has_recheck = True
+                        if has_timing and has_recheck:
                             break
-                    if has_timing:
+                    if has_timing and has_recheck:
                         break
                 
+                # Combine timing and recheck info on one line if both exist
+                features = []
                 if has_timing:
-                    description_lines.append("\nIncludes timing constraints between signals.")
+                    features.append("timing constraints between signals")
+                if has_recheck:
+                    features.append("signal recheck validations")
+                
+                if features:
+                    description_lines.append(f"\nIncludes {' and '.join(features)}.")
                 
                 self.set_description("\n".join(description_lines))
             else:
@@ -402,41 +458,33 @@ class StrategyInfoPanel(QWidget):
         """
         self.required_signals_label.setText(str(count))
         
-        # Always use consistent green (#10B981) for any count > 0
+        # Always use consistent green for any count > 0
         if count == 0:
-            self.required_signals_label.setStyleSheet("color: #888888;")
+            self.required_signals_label.setStyleSheet(f"color: {get_color('text_disabled')};")
         else:
-            self.required_signals_label.setStyleSheet("color: #10B981; font-weight: bold;")
+            self.required_signals_label.setStyleSheet(f"color: {get_color('success')}; font-weight: bold;")
     
     def update_required_signals_from_config(self):
         """
         Update required signals count based on current strategy configuration.
         
-        Retrieves the count from the orchestrator's current config.
+        ALWAYS calculates from blocks - never trusts stored required_signals value
+        because it may be stale/incorrect when loading from JSON.
         """
         try:
             config = self.orchestrator.get_current_config()
             
-            if config and hasattr(config, 'required_signals'):
-                self.set_required_signals(config.required_signals)
-            else:
-                # Calculate manually from blocks
-                total_required = 0
-                if config and hasattr(config, 'blocks'):
-                    for block in config.blocks:
-                        if hasattr(block, 'logic') and block.logic == "AND":
-                            # For AND blocks, count all AND signals
-                            if hasattr(block, 'signals'):
-                                total_required += sum(
-                                    1 for s in block.signals 
-                                    if hasattr(s, 'logic') and s.logic == "AND"
-                                )
-                        elif hasattr(block, 'logic') and block.logic == "OR":
-                            # For OR blocks, count at least 1
-                            if hasattr(block, 'signals') and block.signals:
-                                total_required += 1
-                
-                self.set_required_signals(total_required)
+            # ALWAYS calculate from blocks - count ALL signals from REQUIRED blocks
+            # Don't use config.required_signals as it may be stale
+            total_required = 0
+            if config and hasattr(config, 'blocks'):
+                for block in config.blocks:
+                    if hasattr(block, 'logic') and block.logic == "AND":
+                        # For REQUIRED (AND) blocks: count ALL signals
+                        if hasattr(block, 'signals'):
+                            total_required += len(block.signals)
+            
+            self.set_required_signals(total_required)
         except Exception as e:
             # Gracefully handle errors
             self.set_required_signals(0)
@@ -472,27 +520,38 @@ class StrategyInfoPanel(QWidget):
             
             if not config or not config.blocks:
                 self.optional_signals_label.setText("0")
-                self.optional_signals_label.setStyleSheet("color: #888888;")
+                self.optional_signals_label.setStyleSheet(f"color: {get_color('text_disabled')};")
                 self.time_constraint_label.setText("No")
-                self.time_constraint_label.setStyleSheet("color: #888888;")
+                self.time_constraint_label.setStyleSheet(f"color: {get_color('text_disabled')};")
                 return
             
-            # Count optional signals (OR blocks/signals)
+            # Count optional signals - ONLY from OR (OPTIONAL) blocks
+            # Signal logic within blocks doesn't matter - block logic determines requirement
             optional_count = 0
             for block in config.blocks:
                 if block.logic == "OR":
-                    # Count all signals in OR block
+                    # Count all signals in OPTIONAL blocks
                     optional_count += len(block.signals) if hasattr(block, 'signals') else 0
-                elif block.logic == "AND":
-                    # Count OR signals within AND blocks
-                    if hasattr(block, 'signals'):
-                        optional_count += sum(1 for s in block.signals if s.logic == "OR")
             
             self.optional_signals_label.setText(str(optional_count))
             if optional_count > 0:
-                self.optional_signals_label.setStyleSheet("color: #214fa2; font-weight: bold;")
+                self.optional_signals_label.setStyleSheet(f"color: {get_color('info')}; font-weight: bold;")
             else:
-                self.optional_signals_label.setStyleSheet("color: #888888;")
+                self.optional_signals_label.setStyleSheet(f"color: {get_color('text_disabled')};")
+            
+            # Count rechecked signals - signals with recheck validation configured
+            recheck_count = 0
+            for block in config.blocks:
+                if hasattr(block, 'signals'):
+                    for signal in block.signals:
+                        if hasattr(signal, 'recheck_config') and signal.recheck_config and signal.recheck_config.enabled:
+                            recheck_count += 1
+            
+            self.rechecked_signals_label.setText(str(recheck_count))
+            if recheck_count > 0:
+                self.rechecked_signals_label.setStyleSheet(f"color: {get_color('warning')}; font-weight: bold;")
+            else:
+                self.rechecked_signals_label.setStyleSheet(f"color: {get_color('text_disabled')};")
             
             # Check for time constraints
             has_timing = False
@@ -507,10 +566,10 @@ class StrategyInfoPanel(QWidget):
             
             if has_timing:
                 self.time_constraint_label.setText("Yes")
-                self.time_constraint_label.setStyleSheet("color: #10B981; font-weight: bold;")  # Green
+                self.time_constraint_label.setStyleSheet(f"color: {get_color('success')}; font-weight: bold;")
             else:
                 self.time_constraint_label.setText("No")
-                self.time_constraint_label.setStyleSheet("color: #888888;")
+                self.time_constraint_label.setStyleSheet(f"color: {get_color('text_disabled')};")
                 
         except Exception as e:
             # Gracefully handle errors
@@ -529,7 +588,7 @@ class StrategyInfoPanel(QWidget):
         
         if not name:
             self.status_label.setText("Status: Name required!")
-            self.status_label.setStyleSheet("color: #ff0000; font-style: italic;")
+            self.status_label.setStyleSheet(get_label_style('error') + " font-style: italic;")
             return False
         
         try:
@@ -537,14 +596,14 @@ class StrategyInfoPanel(QWidget):
             
             if result.success:
                 self.status_label.setText("Status: Strategy created")
-                self.status_label.setStyleSheet("color: #00aa00; font-style: italic;")
+                self.status_label.setStyleSheet(get_label_style('success') + " font-style: italic;")
                 return True
             else:
                 error_msg = result.message if hasattr(result, 'message') else "Unknown error"
                 self.status_label.setText(f"Status: Error - {error_msg}")
-                self.status_label.setStyleSheet("color: #ff0000; font-style: italic;")
+                self.status_label.setStyleSheet(get_label_style('error') + " font-style: italic;")
                 return False
         except Exception as e:
             self.status_label.setText(f"Status: Exception - {str(e)}")
-            self.status_label.setStyleSheet("color: #ff0000; font-style: italic;")
+            self.status_label.setStyleSheet(get_label_style('error') + " font-style: italic;")
             return False

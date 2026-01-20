@@ -14,8 +14,8 @@ Date: 2026-01-16
 
 from typing import Optional, List, Dict
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QListWidget, QListWidgetItem, QGroupBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QLineEdit, QGroupBox, QSizePolicy, QSpacerItem,
     QComboBox, QTextEdit, QScrollArea, QFrame, QCheckBox
 )
 from PyQt5.QtCore import pyqtSignal, Qt, QEvent
@@ -25,6 +25,12 @@ from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
 )
 from src.strategy_builder.core.registry_interface import BlockInfo, SearchFilters
+
+# Import centralized styles
+from src.strategy_builder.ui.styles import (
+    get_label_style, get_expand_button_style, get_add_button_style,
+    get_checkbox_style, get_success_button_stylesheet, get_color
+)
 
 # Import institutional logger
 try:
@@ -90,7 +96,7 @@ class BlockListItem(QWidget):
         name_font.setBold(True)
         name_font.setPointSize(12)
         name_label.setFont(name_font)
-        name_label.setStyleSheet("color: #A0AEC0;")  # Text Primary (muted, matches dark UI)
+        name_label.setStyleSheet(get_label_style('default'))
         info_layout.addWidget(name_label)
         
         # Category and Type
@@ -98,7 +104,7 @@ class BlockListItem(QWidget):
         if hasattr(self.block_info, 'default_weight') and self.block_info.default_weight:
             meta_text += f" | Weight: {self.block_info.default_weight} points"
         meta_label = QLabel(meta_text)
-        meta_label.setStyleSheet("color: #718096; font-size: 9pt;")  # Text Secondary (darker)
+        meta_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt;")
         info_layout.addWidget(meta_label)
         
         layout.addLayout(info_layout)
@@ -140,7 +146,7 @@ class BlockListItem(QWidget):
         
         # Header with instruction
         signals_header = QLabel("Select signals to add:")
-        signals_header.setStyleSheet("font-weight: bold; color: #00D9FF; font-size: 10pt;")  # Primary Cyan
+        signals_header.setStyleSheet(f"font-weight: bold; color: {get_color('primary')}; font-size: 10pt;")
         signals_layout.addWidget(signals_header)
         
         # Display signals with checkboxes (filter out hidden signals)
@@ -195,7 +201,7 @@ class BlockListItem(QWidget):
             if hasattr(signal_info, 'description') and signal_info.description:
                 desc_label = QLabel(f"   {signal_info.description}")
                 desc_label.setWordWrap(True)
-                desc_label.setStyleSheet("color: #9AA0A6; font-size: 9pt; padding: 2px 0 4px 28px; font-style: italic;")
+                desc_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt; padding: 2px 0 4px 28px; font-style: italic;")
                 checkbox_layout.addWidget(desc_label)
             
             signals_layout.addLayout(checkbox_layout)
@@ -259,7 +265,7 @@ class BlockListItem(QWidget):
         
         # Note about data source
         note_label = QLabel("Note: Signal counts based on last 180 days of BTC data")
-        note_label.setStyleSheet("color: #9AA0A6; font-size: 9pt; font-style: italic; padding-top: 8px;")
+        note_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt; font-style: italic; padding-top: 8px;")
         signals_layout.addWidget(note_label)
         
         self.signals_widget.setLayout(signals_layout)
@@ -432,11 +438,23 @@ class BlockSearchPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         
         # Group box
-        group_box = QGroupBox("📦 Available Building Blocks")
+        group_box = QGroupBox("🔧 Available Building Blocks")
+        
+        # Set title font programmatically (CSS doesn't work for QGroupBox::title)
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        group_box.setFont(title_font)
         
         group_layout = QVBoxLayout()
         group_layout.setSpacing(15)
         group_layout.setContentsMargins(15, 20, 15, 15)  # Match backtest panel padding
+        
+        # Reset font for content (only title should be 12pt)
+        # CRITICAL: Make it instance variable so it persists!
+        self.content_font = QFont()
+        self.content_font.setPointSize(10)
+        self.content_font.setBold(False)  # Explicitly not bold
         
         # Search and filter controls - increased spacing
         controls_layout = QVBoxLayout()
@@ -446,9 +464,11 @@ class BlockSearchPanel(QWidget):
         search_layout = QHBoxLayout()
         search_layout.setSpacing(10)
         search_label = QLabel("🔍 Search:")
-        search_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
+        search_label.setFont(self.content_font)
+        search_label.setStyleSheet(get_label_style('muted'))
         search_label.setMinimumWidth(70)
         self.search_input = QLineEdit()
+        self.search_input.setFont(self.content_font)
         self.search_input.setPlaceholderText("Search by block name, description, or signal...")
         self.search_input.setMinimumHeight(36)  # Bigger input
         self.search_input.textChanged.connect(self._on_search_changed)
@@ -462,9 +482,11 @@ class BlockSearchPanel(QWidget):
         
         # Category filter
         category_label = QLabel("Category:")
-        category_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
+        category_label.setFont(self.content_font)
+        category_label.setStyleSheet(get_label_style('muted'))
         filters_layout.addWidget(category_label)
         self.category_filter = QComboBox()
+        self.category_filter.setFont(self.content_font)
         self.category_filter.addItem("All Categories")
         fix_combobox_white_bars(self.category_filter)  # Comprehensive fix
         self.category_filter.currentTextChanged.connect(self._on_filter_changed)
@@ -472,9 +494,11 @@ class BlockSearchPanel(QWidget):
         
         # Type filter
         type_label = QLabel("Type:")
-        type_label.setStyleSheet("color: #A0AEC0;")  # Softer label color
+        type_label.setFont(self.content_font)
+        type_label.setStyleSheet(get_label_style('muted'))
         filters_layout.addWidget(type_label)
         self.type_filter = QComboBox()
+        self.type_filter.setFont(self.content_font)
         self.type_filter.addItem("All Types")
         fix_combobox_white_bars(self.type_filter)  # Comprehensive fix
         self.type_filter.currentTextChanged.connect(self._on_filter_changed)
@@ -585,7 +609,7 @@ class BlockSearchPanel(QWidget):
                 
                 empty_label = QLabel("No blocks found in registry.")
                 empty_label.setAlignment(Qt.AlignCenter)
-                empty_label.setStyleSheet("color: #888888; font-size: 12pt; padding: 50px;")
+                empty_label.setStyleSheet(get_label_style('muted') + " font-size: 12pt; padding: 50px;")
                 self.blocks_layout.addWidget(empty_label)
                 return
             
@@ -657,7 +681,7 @@ class BlockSearchPanel(QWidget):
             
             # Show error state
             error_label = QLabel(f"Error loading blocks: {str(e)}")
-            error_label.setStyleSheet("color: #ff0000; font-size: 11pt; padding: 20px;")
+            error_label.setStyleSheet(get_label_style('error') + " font-size: 11pt; padding: 20px;")
             error_label.setWordWrap(True)
             self.blocks_layout.addWidget(error_label)
     

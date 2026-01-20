@@ -19,6 +19,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import pyqtSignal, Qt, QTimer
 from PyQt5.QtGui import QFont
 
+# Import centralized styles
+from src.strategy_builder.ui.styles import get_color
+
 
 class StepperRibbon(QWidget):
     """
@@ -84,7 +87,8 @@ class StepperRibbon(QWidget):
                 arrow_font.setPointSize(12)
                 arrow_font.setBold(True)
                 arrow.setFont(arrow_font)
-                arrow.setStyleSheet("color: #4A5568; background: transparent;")
+                from src.strategy_builder.ui.styles import get_color
+                arrow.setStyleSheet(f"color: {get_color('text_muted')}; background: transparent;")
                 self.arrow_labels.append(arrow)
                 layout.addWidget(arrow)
         
@@ -222,6 +226,14 @@ class StepperRibbon(QWidget):
         self.completed_steps.clear()
         self.error_steps.clear()
         self._update_display()
+    
+    def reset_all_steps(self):
+        """
+        Reset all steps to initial state (alias for reset()).
+        
+        Clears all completion and error states.
+        """
+        self.reset()
     
     def _update_display(self):
         """Update the visual display of all steps."""

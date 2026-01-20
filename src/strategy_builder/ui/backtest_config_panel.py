@@ -114,6 +114,11 @@ class BacktestConfigPanel(QWidget):
         super().__init__(parent)
         self.orchestrator = orchestrator
         self.worker: Optional[BacktestWorker] = None
+        
+        # Storage for custom preset values
+        self.custom_values = {}
+        self._loading_preset = False  # Flag to prevent auto-switch to Custom during preset load
+        
         self._init_ui()
     
     def _init_ui(self):
@@ -128,23 +133,23 @@ class BacktestConfigPanel(QWidget):
         
         # Tab 1: Configuration (existing content)
         config_tab = self._create_config_tab()
-        self.tab_widget.addTab(config_tab, "⚙️ Config")
+        self.tab_widget.addTab(config_tab, "💠 Config")
         
         # Tab 2: Live Output (placeholder)
         output_tab = self._create_placeholder_tab("📊 Live Output", "Real-time backtest output will appear here")
-        self.tab_widget.addTab(output_tab, "📊 Live Output")
+        self.tab_widget.addTab(output_tab, "💚 Live Output")
         
         # Tab 3: Trades (placeholder)
         trades_tab = self._create_placeholder_tab("📋 Trades", "Trade history table will appear here")
-        self.tab_widget.addTab(trades_tab, "📋 Trades")
+        self.tab_widget.addTab(trades_tab, "💰 Trades")
         
         # Tab 4: Metrics (placeholder)
-        metrics_tab = self._create_placeholder_tab("📈 Metrics", "Key metrics comparison will appear here")
-        self.tab_widget.addTab(metrics_tab, "📈 Metrics")
+        metrics_tab = self._create_placeholder_tab("💠 Metrics", "Key metrics comparison will appear here")
+        self.tab_widget.addTab(metrics_tab, "💹 Metrics")
         
         # Tab 5: Compare (placeholder)
         compare_tab = self._create_placeholder_tab("🔄 Compare", "Configuration comparison will appear here")
-        self.tab_widget.addTab(compare_tab, "🔄 Compare")
+        self.tab_widget.addTab(compare_tab, "🔁 Compare")
         
         main_layout.addWidget(self.tab_widget)
         self.setLayout(main_layout)
@@ -157,9 +162,16 @@ class BacktestConfigPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         
         # Title (using centralized panel title style - matches main window "Strategy Information")
-        title = QLabel("⚙️ Backtest Configuration")
-        title.setStyleSheet(get_panel_title_stylesheet())
-        layout.addWidget(title)
+        # Dynamic title with strategy name
+        strategy_name = self._get_strategy_name()
+        if strategy_name:
+            title_text = f"💠 Backtest Configuration - {strategy_name} Strategy"
+        else:
+            title_text = "💠 Backtest Configuration"
+        
+        self.title_label = QLabel(title_text)
+        self.title_label.setStyleSheet(get_panel_title_stylesheet())
+        layout.addWidget(self.title_label)
         
         # Configuration Group
         config_group = self._create_config_group()
@@ -176,12 +188,9 @@ class BacktestConfigPanel(QWidget):
         # Results Display
         self.results_text = QTextEdit()
         self.results_text.setReadOnly(True)
-        self.results_text.setMaximumHeight(150)
         self.results_text.setPlaceholderText("Backtest results will appear here...")
         layout.addWidget(QLabel("📊 Results:"))
-        layout.addWidget(self.results_text)
-        
-        layout.addStretch()
+        layout.addWidget(self.results_text)  # Will expand to fill remaining space
         widget.setLayout(layout)
         return widget
     
@@ -203,7 +212,7 @@ class BacktestConfigPanel(QWidget):
         # Coming soon message
         msg_label = QLabel(f"{message}\n\n🚧 Coming Soon 🚧")
         msg_label.setAlignment(Qt.AlignCenter)
-        msg_label.setStyleSheet("color: #9AA0A6; font-size: 14px; padding: 20px;")
+        msg_label.setStyleSheet(get_label_style('muted') + " font-size: 14px; padding: 20px;")
         layout.addWidget(msg_label)
         
         layout.addStretch()
@@ -213,22 +222,8 @@ class BacktestConfigPanel(QWidget):
     def _create_config_group(self) -> QGroupBox:
         """Create configuration controls group - 3-column layout with proper proportions"""
         group = QGroupBox("Configuration")
-        group.setStyleSheet("""
-            QGroupBox {
-                color: #9AA0A6;
-                font-weight: bold;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                color: #9AA0A6;
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
+        group.setStyleSheet(get_groupbox_header_stylesheet())
+        group.setMaximumHeight(600)  # Compact config panel - extra space goes to Results
         main_layout = QHBoxLayout()
         main_layout.setSpacing(20)
         
@@ -250,6 +245,10 @@ class BacktestConfigPanel(QWidget):
         self.conservative_radio.toggled.connect(lambda checked: self._apply_conservative_preset() if checked else None)
         self.balanced_radio.toggled.connect(lambda checked: self._apply_balanced_preset() if checked else None)
         self.aggressive_radio.toggled.connect(lambda checked: self._apply_aggressive_preset() if checked else None)
+        self.custom_radio.toggled.connect(lambda checked: self._apply_custom_preset() if checked else None)
+        
+        # Connect all spinboxes to detect manual changes and auto-switch to Custom
+        self._connect_value_change_detection()
         
         # Set default preset (this will trigger the signal and load values)
         self.balanced_radio.setChecked(True)
@@ -259,22 +258,8 @@ class BacktestConfigPanel(QWidget):
     def _create_basic_settings_column(self) -> QGroupBox:
         """Create Basic Settings column"""
         group = QGroupBox("Basic Settings")
-        group.setStyleSheet("""
-            QGroupBox {
-                color: #9AA0A6;
-                font-weight: bold;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                color: #9AA0A6;
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
+        group.setStyleSheet(get_groupbox_header_stylesheet())
+        # No height constraint - let layout manage naturally
         layout = QVBoxLayout()
         layout.setSpacing(12)
         
@@ -293,24 +278,7 @@ class BacktestConfigPanel(QWidget):
             # 2-digit: 65px, 3-digit: 67px
             width = 67 if days >= 100 else 65
             btn.setFixedSize(width, 50)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #1E293B;
-                    color: #CBD5E1;
-                    border: 1px solid #334155;
-                    border-radius: 4px;
-                    font-size: 8pt;
-                    font-weight: normal;
-                }
-                QPushButton:hover {
-                    background-color: #2563EB;
-                    color: white;
-                    border-color: #3B82F6;
-                }
-                QPushButton:pressed {
-                    background-color: #1D4ED8;
-                }
-            """)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, d=days: self.lookback_spin.setValue(d))
             lookback_layout.addWidget(btn)
         
@@ -347,24 +315,7 @@ class BacktestConfigPanel(QWidget):
             # 2-digit: 65px, 3-digit: 67px
             width = 67 if days >= 100 else 65
             btn.setFixedSize(width, 50)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #1E293B;
-                    color: #CBD5E1;
-                    border: 1px solid #334155;
-                    border-radius: 4px;
-                    font-size: 8pt;
-                    font-weight: normal;
-                }
-                QPushButton:hover {
-                    background-color: #2563EB;
-                    color: white;
-                    border-color: #3B82F6;
-                }
-                QPushButton:pressed {
-                    background-color: #1D4ED8;
-                }
-            """)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, d=days: self.training_spin.setValue(d))
             training_layout.addWidget(btn)
         
@@ -403,24 +354,7 @@ class BacktestConfigPanel(QWidget):
             # 2-digit: 65px, 3-digit: 67px
             width = 67 if days >= 100 else 65
             btn.setFixedSize(width, 50)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #1E293B;
-                    color: #CBD5E1;
-                    border: 1px solid #334155;
-                    border-radius: 4px;
-                    font-size: 8pt;
-                    font-weight: normal;
-                }
-                QPushButton:hover {
-                    background-color: #2563EB;
-                    color: white;
-                    border-color: #3B82F6;
-                }
-                QPushButton:pressed {
-                    background-color: #1D4ED8;
-                }
-            """)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, d=days: self.testing_spin.setValue(d))
             testing_layout.addWidget(btn)
         
@@ -446,7 +380,7 @@ class BacktestConfigPanel(QWidget):
         
         # Separator above Mode
         sep_top = QLabel()
-        sep_top.setStyleSheet("background-color: #3C4149; max-height: 1px; margin: 10px 0;")
+        sep_top.setStyleSheet(get_separator_stylesheet())
         sep_top.setFixedHeight(1)
         layout.addWidget(sep_top)
         
@@ -500,7 +434,7 @@ class BacktestConfigPanel(QWidget):
         
         # Separator below Mode
         sep_bottom = QLabel()
-        sep_bottom.setStyleSheet("background-color: #3C4149; max-height: 1px; margin: 10px 0;")
+        sep_bottom.setStyleSheet(get_separator_stylesheet())
         sep_bottom.setFixedHeight(1)
         layout.addWidget(sep_bottom)
         
@@ -514,7 +448,7 @@ class BacktestConfigPanel(QWidget):
         fix_combobox_white_bars(self.tpsl_combo)  # Comprehensive fix
         self.tpsl_combo.setToolTip(
             "TP/SL Initial Calculation Method\n\n"
-            "⚙️ This controls HOW initial TP/SL levels are calculated at entry.\n\n"
+            "💠 This controls HOW initial TP/SL levels are calculated at entry.\n\n"
             "Fibonacci:\n"
             "• TP levels at Fibonacci retracements (0.382, 0.618, 1.0)\n"
             "• SL at key Fibonacci support/resistance\n"
@@ -539,7 +473,7 @@ class BacktestConfigPanel(QWidget):
         
         # Stop Loss Adjustment Mode
         sl_layout = QVBoxLayout()
-        sl_label = QLabel("SL Adjustment:")
+        sl_label = QLabel("Stop Loss Adjustment:")
         sl_label.setStyleSheet(get_label_style('muted'))
         sl_layout.addWidget(sl_label)
         self.sl_combo = QComboBox()
@@ -584,22 +518,8 @@ class BacktestConfigPanel(QWidget):
     def _create_adaptive_sl_column(self) -> QGroupBox:
         """Create Adaptive SL v2.0 column"""
         group = QGroupBox("Adaptive SL v2.0")
-        group.setStyleSheet("""
-            QGroupBox {
-                color: #9AA0A6;
-                font-weight: bold;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                color: #9AA0A6;
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
+        group.setStyleSheet(get_groupbox_header_stylesheet())
+        # No height constraint - let layout manage naturally
         layout = QVBoxLayout()
         layout.setSpacing(12)
         
@@ -618,6 +538,28 @@ class BacktestConfigPanel(QWidget):
         self.balanced_radio.setStyleSheet(get_radio_button_style())
         self.aggressive_radio = QRadioButton("🚀 Aggressive")
         self.aggressive_radio.setStyleSheet(get_radio_button_style())
+        self.custom_radio = QRadioButton("💠 Custom")
+        self.custom_radio.setStyleSheet(get_radio_button_style())
+        self.custom_radio.setToolTip(
+            "💠 Custom Preset\n\n"
+            "Your manually configured settings.\n\n"
+            "How it works:\n"
+            "• When you select a preset (Conservative/Balanced/Aggressive)\n"
+            "• Then manually adjust any value\n"
+            "• Custom preset automatically activates\n"
+            "• Your manual settings are saved\n\n"
+            "Benefits:\n"
+            "• Experiment with preset starting points\n"
+            "• Fine-tune to your exact needs\n"
+            "• Always return to your custom configuration\n"
+            "• Never lose your manual adjustments\n\n"
+            "Example workflow:\n"
+            "1. Start with 'Balanced' preset\n"
+            "2. Change Emergency SL from 2% to 2.5%\n"
+            "3. Custom automatically selected\n"
+            "4. Try 'Aggressive' preset (Custom values saved)\n"
+            "5. Click 'Custom' to restore your 2.5% setting"
+        )
         
         self.conservative_radio.setToolTip(
             "🐢 Conservative Preset\n\n"
@@ -668,11 +610,13 @@ class BacktestConfigPanel(QWidget):
         self.preset_group.addButton(self.conservative_radio, 1)
         self.preset_group.addButton(self.balanced_radio, 2)
         self.preset_group.addButton(self.aggressive_radio, 3)
+        self.preset_group.addButton(self.custom_radio, 4)
         
         # Add radio buttons to horizontal layout
         presets_layout.addWidget(self.conservative_radio)
         presets_layout.addWidget(self.balanced_radio)
         presets_layout.addWidget(self.aggressive_radio)
+        presets_layout.addWidget(self.custom_radio)
         presets_layout.addStretch()
         
         # Add horizontal layout to main column layout
@@ -680,7 +624,7 @@ class BacktestConfigPanel(QWidget):
         
         # Separator above checkboxes
         sep_top = QLabel()
-        sep_top.setStyleSheet("background-color: #3C4149; max-height: 1px; margin: 10px 0;")
+        sep_top.setStyleSheet(get_separator_stylesheet())
         sep_top.setFixedHeight(1)
         layout.addWidget(sep_top)
         
@@ -731,19 +675,31 @@ class BacktestConfigPanel(QWidget):
         
         # Separator below checkboxes
         sep_bottom = QLabel()
-        sep_bottom.setStyleSheet("background-color: #3C4149; max-height: 1px; margin: 10px 0;")
+        sep_bottom.setStyleSheet(get_separator_stylesheet())
         sep_bottom.setFixedHeight(1)
         layout.addWidget(sep_bottom)
         
-        # Delay Period
+        # Delay Period WITH QUICK-SET BUTTONS
         delay_layout = QHBoxLayout()
-        delay_label = QLabel("Delay:")
+        delay_layout.setSpacing(8)
+        
+        delay_label = QLabel("Stop Loss Delay:")
         delay_label.setStyleSheet(get_label_style('muted'))
         delay_layout.addWidget(delay_label)
+        
+        # Quick preset buttons - UNIFORM GRID
+        for val in [1, 2, 3, 4, 5, 6, 7]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.delay_spin.setValue(v))
+            delay_layout.addWidget(btn)
+        
         self.delay_spin = QSpinBox()
         self.delay_spin.setRange(0, 20)
         self.delay_spin.setValue(2)
         self.delay_spin.setSuffix(" bars")
+        self.delay_spin.setFixedWidth(150)
         self.delay_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.delay_spin.setToolTip(
             "Stop Loss Delay Period\n\n"
@@ -760,16 +716,28 @@ class BacktestConfigPanel(QWidget):
         delay_layout.addWidget(self.delay_spin)
         layout.addLayout(delay_layout)
         
-        # Emergency SL
+        # Emergency SL WITH QUICK-SET BUTTONS
         emergency_layout = QHBoxLayout()
+        emergency_layout.setSpacing(8)
+        
         emergency_label = QLabel("Emergency:")
         emergency_label.setStyleSheet(get_label_style('muted'))
         emergency_layout.addWidget(emergency_label)
+        
+        # Quick preset buttons - UNIFORM GRID
+        for val_display, val_actual in [(1, 100), (1.25, 125), (1.5, 150), (1.75, 175), (2, 200), (2.15, 215), (2.25, 225)]:
+            btn = QPushButton(str(val_display))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val_actual: self.emergency_spin.setValue(int(v / 100)))
+            emergency_layout.addWidget(btn)
+        
         self.emergency_spin = QSpinBox()
         self.emergency_spin.setRange(1, 10)
         self.emergency_spin.setValue(2)
         self.emergency_spin.setSuffix("%")
         self.emergency_spin.setSingleStep(1)
+        self.emergency_spin.setFixedWidth(150)
         self.emergency_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.emergency_spin.setToolTip(
             "Emergency Stop Loss\n\n"
@@ -787,15 +755,27 @@ class BacktestConfigPanel(QWidget):
         emergency_layout.addWidget(self.emergency_spin)
         layout.addLayout(emergency_layout)
         
-        # Volatility Lookback
+        # Volatility Lookback WITH QUICK-SET BUTTONS
         vol_lookback_layout = QHBoxLayout()
-        vol_lookback_label = QLabel("Vol Lookback:")
+        vol_lookback_layout.setSpacing(8)
+        
+        vol_lookback_label = QLabel("Volatility Lookback:")
         vol_lookback_label.setStyleSheet(get_label_style('muted'))
         vol_lookback_layout.addWidget(vol_lookback_label)
+        
+        # Quick preset buttons - UNIFORM GRID
+        for val in [5, 10, 15, 20, 25, 30, 35]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.vol_lookback_spin.setValue(v))
+            vol_lookback_layout.addWidget(btn)
+        
         self.vol_lookback_spin = QSpinBox()
         self.vol_lookback_spin.setRange(5, 100)
         self.vol_lookback_spin.setValue(20)
         self.vol_lookback_spin.setSuffix(" bars")
+        self.vol_lookback_spin.setFixedWidth(150)
         self.vol_lookback_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.vol_lookback_spin.setToolTip(
             "Volatility Lookback Period\n\n"
@@ -813,16 +793,28 @@ class BacktestConfigPanel(QWidget):
         vol_lookback_layout.addWidget(self.vol_lookback_spin)
         layout.addLayout(vol_lookback_layout)
         
-        # Volatility Multiplier
+        # Volatility Multiplier WITH QUICK-SET BUTTONS
         vol_multi_layout = QHBoxLayout()
-        vol_multi_label = QLabel("Vol Multi:")
+        vol_multi_layout.setSpacing(8)
+        
+        vol_multi_label = QLabel("Volatility Multiplier:")
         vol_multi_label.setStyleSheet(get_label_style('muted'))
         vol_multi_layout.addWidget(vol_multi_label)
+        
+        # Quick preset buttons - UNIFORM GRID
+        for val in [12, 13, 14, 15, 16, 17, 18]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.vol_multi_spin.setValue(v))
+            vol_multi_layout.addWidget(btn)
+        
         self.vol_multi_spin = QSpinBox()
         self.vol_multi_spin.setRange(1, 30)
         self.vol_multi_spin.setValue(12)
         self.vol_multi_spin.setSuffix("x")
         self.vol_multi_spin.setSingleStep(1)
+        self.vol_multi_spin.setFixedWidth(150)
         self.vol_multi_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.vol_multi_spin.setToolTip(
             "Volatility Multiplier\n\n"
@@ -839,16 +831,28 @@ class BacktestConfigPanel(QWidget):
         vol_multi_layout.addWidget(self.vol_multi_spin)
         layout.addLayout(vol_multi_layout)
         
-        # Min SL %
+        # Min SL % WITH QUICK-SET BUTTONS
         min_sl_layout = QHBoxLayout()
-        min_sl_label = QLabel("Min SL:")
+        min_sl_layout.setSpacing(8)
+        
+        min_sl_label = QLabel("Min Stop Loss:")
         min_sl_label.setStyleSheet(get_label_style('muted'))
         min_sl_layout.addWidget(min_sl_label)
+        
+        # Quick preset buttons - UNIFORM GRID (removed 5, starts from 6)
+        for val in [6, 7, 8, 9, 10, 11, 12]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.min_sl_spin.setValue(v))
+            min_sl_layout.addWidget(btn)
+        
         self.min_sl_spin = QSpinBox()
         self.min_sl_spin.setRange(1, 50)
         self.min_sl_spin.setValue(7)
         self.min_sl_spin.setSuffix("%")
         self.min_sl_spin.setSingleStep(1)
+        self.min_sl_spin.setFixedWidth(150)
         self.min_sl_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.min_sl_spin.setToolTip(
             "Minimum Stop Loss Distance\n\n"
@@ -866,16 +870,28 @@ class BacktestConfigPanel(QWidget):
         min_sl_layout.addWidget(self.min_sl_spin)
         layout.addLayout(min_sl_layout)
         
-        # Max SL %
+        # Max SL % WITH QUICK-SET BUTTONS
         max_sl_layout = QHBoxLayout()
-        max_sl_label = QLabel("Max SL:")
+        max_sl_layout.setSpacing(8)
+        
+        max_sl_label = QLabel("Max Stop Loss:")
         max_sl_label.setStyleSheet(get_label_style('muted'))
         max_sl_layout.addWidget(max_sl_label)
+        
+        # Quick preset buttons - UNIFORM GRID
+        for val in [10, 11, 12, 13, 14, 15, 16]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.max_sl_spin.setValue(v))
+            max_sl_layout.addWidget(btn)
+        
         self.max_sl_spin = QSpinBox()
         self.max_sl_spin.setRange(1, 100)
         self.max_sl_spin.setValue(20)
         self.max_sl_spin.setSuffix("%")
         self.max_sl_spin.setSingleStep(1)
+        self.max_sl_spin.setFixedWidth(150)
         self.max_sl_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.max_sl_spin.setToolTip(
             "Maximum Stop Loss Distance\n\n"
@@ -900,35 +916,33 @@ class BacktestConfigPanel(QWidget):
     def _create_risk_reward_column(self) -> QGroupBox:
         """Create Risk/Reward column"""
         group = QGroupBox("Risk/Reward")
-        group.setStyleSheet("""
-            QGroupBox {
-                color: #9AA0A6;
-                font-weight: bold;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                color: #9AA0A6;
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
+        group.setStyleSheet(get_groupbox_header_stylesheet())
+        # No height constraint - let layout manage naturally
         layout = QVBoxLayout()
         layout.setSpacing(12)
         
-        # Min R:R Ratio
+        # Min R:R Ratio WITH QUICK-SET BUTTONS
         rr_layout = QHBoxLayout()
+        rr_layout.setSpacing(8)
+        
         rr_label = QLabel("Min Risk:Reward:")
         rr_label.setStyleSheet(get_label_style('muted'))
         rr_layout.addWidget(rr_label)
+        
+        # Quick preset buttons - UNIFORM GRID
+        for val in [12, 15, 20, 22, 25, 27, 30]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.rr_spin.setValue(v))
+            rr_layout.addWidget(btn)
+        
         self.rr_spin = QSpinBox()
         self.rr_spin.setRange(10, 50)
         self.rr_spin.setValue(12)
         self.rr_spin.setSuffix("")
         self.rr_spin.setSingleStep(1)
+        self.rr_spin.setFixedWidth(150)
         self.rr_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.rr_spin.setToolTip(
             "Minimum Risk to Reward Ratio\n\n"
@@ -947,15 +961,27 @@ class BacktestConfigPanel(QWidget):
         rr_layout.addWidget(self.rr_spin)
         layout.addLayout(rr_layout)
         
-        # Risk Per Trade %
+        # Risk Per Trade % WITH QUICK-SET BUTTONS
         risk_layout = QHBoxLayout()
-        risk_label = QLabel("Risk%:")
+        risk_layout.setSpacing(8)
+        
+        risk_label = QLabel("Risk %:")
         risk_label.setStyleSheet(get_label_style('muted'))
         risk_layout.addWidget(risk_label)
+        
+        # Quick preset buttons - UNIFORM GRID
+        for val in [1, 2, 5, 7, 10, 12, 15]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.risk_spin.setValue(v))
+            risk_layout.addWidget(btn)
+        
         self.risk_spin = QSpinBox()
         self.risk_spin.setRange(1, 100)
         self.risk_spin.setValue(10)
         self.risk_spin.setSuffix("%")
+        self.risk_spin.setFixedWidth(150)
         self.risk_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.risk_spin.setToolTip(
             "Risk Per Trade (% of Capital)\n\n"
@@ -973,15 +999,27 @@ class BacktestConfigPanel(QWidget):
         risk_layout.addWidget(self.risk_spin)
         layout.addLayout(risk_layout)
         
-        # Max Leverage
+        # Max Leverage WITH QUICK-SET BUTTONS
         leverage_layout = QHBoxLayout()
+        leverage_layout.setSpacing(8)
+        
         leverage_label = QLabel("Leverage:")
         leverage_label.setStyleSheet(get_label_style('muted'))
         leverage_layout.addWidget(leverage_label)
+        
+        # Quick preset buttons - UNIFORM GRID
+        for val in [3, 5, 10, 15, 20, 25, 30]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.leverage_spin.setValue(v))
+            leverage_layout.addWidget(btn)
+        
         self.leverage_spin = QSpinBox()
         self.leverage_spin.setRange(1, 100)
         self.leverage_spin.setValue(10)
         self.leverage_spin.setSuffix("x")
+        self.leverage_spin.setFixedWidth(150)
         self.leverage_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.leverage_spin.setToolTip(
             "Maximum Leverage Multiplier\n\n"
@@ -1000,15 +1038,61 @@ class BacktestConfigPanel(QWidget):
         leverage_layout.addWidget(self.leverage_spin)
         layout.addLayout(leverage_layout)
         
-        # Min Confluence
+        # Min Confluence WITH RESET & INCREMENT/DECREMENT BUTTONS
         confluence_layout = QHBoxLayout()
+        confluence_layout.setSpacing(8)
+        
         confluence_label = QLabel("Confluence:")
         confluence_label.setStyleSheet(get_label_style('muted'))
         confluence_layout.addWidget(confluence_label)
+        
+        # Reset From Strategy button
+        reset_btn = QPushButton("Reset From Strategy")
+        reset_btn.setFixedSize(241, 50)
+        reset_btn.setStyleSheet(get_preset_day_button_stylesheet())
+        reset_btn.setToolTip(
+            "Reset Confluence From Strategy\n\n"
+            "Automatically analyzes your current strategy configuration:\n"
+            "• Counts required blocks (AND logic)\n"
+            "• Counts optional blocks (OR logic)\n"
+            "• Calculates total possible confluence points\n"
+            "• Sets recommended threshold\n\n"
+            "Formula:\n"
+            "• Required points: Sum of all AND block weights\n"
+            "• Optional points: Sum of all OR block weights\n"
+            "• Recommended: 60-70% of total points\n\n"
+            "Example:\n"
+            "If strategy has 50 required + 25 optional = 75 total pts\n"
+            "Recommended confluence = 50 pts (67% of total)\n\n"
+            "This ensures:\n"
+            "✓ All required signals must trigger\n"
+            "✓ Most optional signals should trigger\n"
+            "✓ Quality trades over quantity"
+        )
+        reset_btn.clicked.connect(self._calculate_confluence_from_strategy)
+        confluence_layout.addWidget(reset_btn)
+        
+        # Decrement buttons
+        for val in [-1, -2]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.confluence_spin.setValue(self.confluence_spin.value() + v))
+            confluence_layout.addWidget(btn)
+        
+        # Increment buttons
+        for val in [+1, +2]:
+            btn = QPushButton(f"+{val}")
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.confluence_spin.setValue(self.confluence_spin.value() + v))
+            confluence_layout.addWidget(btn)
+        
         self.confluence_spin = QSpinBox()
         self.confluence_spin.setRange(0, 100)
         self.confluence_spin.setValue(40)
         self.confluence_spin.setSuffix(" pts")
+        self.confluence_spin.setFixedWidth(150)
         self.confluence_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.confluence_spin.setToolTip(
             "Minimum Confluence Points (Strategy-Specific)\n\n"
@@ -1039,15 +1123,27 @@ class BacktestConfigPanel(QWidget):
         confluence_layout.addWidget(self.confluence_spin)
         layout.addLayout(confluence_layout)
         
-        # Max Bars Held
+        # Max Bars Held WITH QUICK-SET BUTTONS
         bars_layout = QHBoxLayout()
+        bars_layout.setSpacing(8)
+        
         bars_label = QLabel("Max Bars Held:")
         bars_label.setStyleSheet(get_label_style('muted'))
         bars_layout.addWidget(bars_label)
+        
+        # Quick preset buttons - UNIFORM GRID
+        for val in [15, 20, 25, 30, 40, 50, 75]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.max_bars_spin.setValue(v))
+            bars_layout.addWidget(btn)
+        
         self.max_bars_spin = QSpinBox()
         self.max_bars_spin.setRange(1, 500)
         self.max_bars_spin.setValue(200)
         self.max_bars_spin.setSuffix(" bars")
+        self.max_bars_spin.setFixedWidth(150)
         self.max_bars_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.max_bars_spin.setToolTip(
             "Maximum Position Hold Time\n\n"
@@ -1075,22 +1171,7 @@ class BacktestConfigPanel(QWidget):
     def _create_progress_group(self) -> QGroupBox:
         """Create progress monitoring group - COMPACT INLINE DESIGN"""
         group = QGroupBox("Progress")
-        group.setStyleSheet("""
-            QGroupBox {
-                color: #9AA0A6;
-                font-weight: bold;
-                border: 1px solid #3C4149;
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                color: #9AA0A6;
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
+        group.setStyleSheet(get_groupbox_header_stylesheet())
         layout = QVBoxLayout()
         layout.setSpacing(8)
         
@@ -1107,29 +1188,30 @@ class BacktestConfigPanel(QWidget):
         
         # Candles (inline)
         candles_widget = QLabel("Candles: <b>0 / 0</b>")
-        candles_widget.setStyleSheet("color: #E8EAED;")
+        from src.strategy_builder.ui.styles import get_color
+        candles_widget.setStyleSheet(f"color: {get_color('text_primary')};")
         self.candles_label = candles_widget  # Store reference
         stats_line.addWidget(candles_widget)
         
         # Separator
         sep1 = QLabel("|")
-        sep1.setStyleSheet("color: #3C4149;")
+        sep1.setStyleSheet(f"color: {get_color('border')};")
         stats_line.addWidget(sep1)
         
         # Trades (inline)
         trades_widget = QLabel("Trades: <b>0</b>")
-        trades_widget.setStyleSheet("color: #E8EAED;")
+        trades_widget.setStyleSheet(f"color: {get_color('text_primary')};")
         self.trades_label = trades_widget  # Store reference
         stats_line.addWidget(trades_widget)
         
         # Separator
         sep2 = QLabel("|")
-        sep2.setStyleSheet("color: #3C4149;")
+        sep2.setStyleSheet(f"color: {get_color('border')};")
         stats_line.addWidget(sep2)
         
         # TP/SL Adjustments (inline with breakdown)
         adj_widget = QLabel("TP/SL Adjustments: <b>0</b> <span style='color: #9AA0A6;'>(TP1: 0, TP2: 0, TP3: 0, SL: 0)</span>")
-        adj_widget.setStyleSheet("color: #E8EAED;")
+        adj_widget.setStyleSheet(f"color: {get_color('text_primary')};")
         self.adjustments_label = adj_widget  # Store reference
         self.breakdown_label = adj_widget  # Same widget contains breakdown
         stats_line.addWidget(adj_widget)
@@ -1147,22 +1229,7 @@ class BacktestConfigPanel(QWidget):
         # Run Button
         self.run_btn = QPushButton("▶️ Run Test")
         self.run_btn.clicked.connect(self._on_run_clicked)
-        self.run_btn.setStyleSheet("""
-                    QPushButton {
-                background-color: #204486;
-                color: white;
-                font-weight: bold;
-                padding: 10px 20px;
-                border-radius: 6px;
-            }
-            QPushButton:hover {
-                background-color: #1557CC;
-            }
-            QPushButton:disabled {
-                background-color: #3C4149;
-                color: #6B7280;
-            }
-        """)
+        self.run_btn.setStyleSheet(get_primary_button_stylesheet())
         layout.addWidget(self.run_btn)
         
         # Pause Button
@@ -1180,7 +1247,7 @@ class BacktestConfigPanel(QWidget):
         layout.addStretch()
         
         # View Results Button
-        self.results_btn = QPushButton("📈 View Live Results")
+        self.results_btn = QPushButton("💠 View Live Results")
         self.results_btn.setEnabled(False)
         layout.addWidget(self.results_btn)
         
@@ -1282,8 +1349,27 @@ class BacktestConfigPanel(QWidget):
             'sl_mode': self.sl_combo.currentText()
         }
     
+    def _get_strategy_name(self) -> str:
+        """Get current strategy name from orchestrator"""
+        try:
+            config = self.orchestrator.get_current_config()
+            if config and hasattr(config, 'name') and config.name:
+                return config.name
+            return ""
+        except:
+            return ""
+    
+    def update_strategy_title(self):
+        """Update title when strategy changes"""
+        strategy_name = self._get_strategy_name()
+        if strategy_name:
+            self.title_label.setText(f"💠 Backtest Configuration - {strategy_name} Strategy")
+        else:
+            self.title_label.setText("💠 Backtest Configuration")
+    
     def _apply_conservative_preset(self):
         """Apply conservative SL preset (wider SLs, higher win rate, fewer trades)"""
+        self._loading_preset = True
         self.delayed_sl_check.setChecked(True)
         self.delay_spin.setValue(3)
         self.emergency_spin.setValue(3)
@@ -1292,9 +1378,11 @@ class BacktestConfigPanel(QWidget):
         self.min_sl_spin.setValue(10)  # 1.0%
         self.max_sl_spin.setValue(25)  # 2.5%
         self.structure_check.setChecked(True)
+        self._loading_preset = False
     
     def _apply_balanced_preset(self):
         """Apply balanced SL preset (default settings)"""
+        self._loading_preset = True
         self.delayed_sl_check.setChecked(True)
         self.delay_spin.setValue(2)
         self.emergency_spin.setValue(2)
@@ -1303,9 +1391,11 @@ class BacktestConfigPanel(QWidget):
         self.min_sl_spin.setValue(7)  # 0.7%
         self.max_sl_spin.setValue(20)  # 2.0%
         self.structure_check.setChecked(True)
+        self._loading_preset = False
     
     def _apply_aggressive_preset(self):
         """Apply aggressive SL preset (tighter SLs, more trades, lower win rate)"""
+        self._loading_preset = True
         self.delayed_sl_check.setChecked(True)
         self.delay_spin.setValue(1)
         self.emergency_spin.setValue(2)
@@ -1314,3 +1404,144 @@ class BacktestConfigPanel(QWidget):
         self.min_sl_spin.setValue(6)  # 0.6%
         self.max_sl_spin.setValue(15)  # 1.5%
         self.structure_check.setChecked(True)
+        self._loading_preset = False
+    
+    def _apply_custom_preset(self):
+        """Load saved custom values when Custom preset is selected"""
+        if not self.custom_values:
+            # No custom values saved yet, use current Balanced defaults
+            return
+        
+        self._loading_preset = True
+        self.delayed_sl_check.setChecked(self.custom_values.get('delayed_sl', True))
+        self.delay_spin.setValue(self.custom_values.get('delay', 2))
+        self.emergency_spin.setValue(self.custom_values.get('emergency', 2))
+        self.vol_lookback_spin.setValue(self.custom_values.get('vol_lookback', 20))
+        self.vol_multi_spin.setValue(self.custom_values.get('vol_multi', 12))
+        self.min_sl_spin.setValue(self.custom_values.get('min_sl', 7))
+        self.max_sl_spin.setValue(self.custom_values.get('max_sl', 20))
+        self.structure_check.setChecked(self.custom_values.get('structure', True))
+        self._loading_preset = False
+    
+    def _save_custom_values(self):
+        """Save current values to custom preset storage"""
+        self.custom_values = {
+            'delayed_sl': self.delayed_sl_check.isChecked(),
+            'delay': self.delay_spin.value(),
+            'emergency': self.emergency_spin.value(),
+            'vol_lookback': self.vol_lookback_spin.value(),
+            'vol_multi': self.vol_multi_spin.value(),
+            'min_sl': self.min_sl_spin.value(),
+            'max_sl': self.max_sl_spin.value(),
+            'structure': self.structure_check.isChecked()
+        }
+    
+    def _on_manual_value_change(self):
+        """Detect manual value changes and auto-activate Custom preset"""
+        # Skip if we're currently loading a preset
+        if self._loading_preset:
+            return
+        
+        # Skip if Custom is already selected
+        if self.custom_radio.isChecked():
+            # Still save the new custom value
+            self._save_custom_values()
+            return
+        
+        # Save current values to custom storage
+        self._save_custom_values()
+        
+        # Auto-activate Custom preset
+        self._loading_preset = True  # Prevent recursion
+        self.custom_radio.setChecked(True)
+        self._loading_preset = False
+    
+    def _connect_value_change_detection(self):
+        """Connect all value-changing widgets to detect manual changes"""
+        # Connect spinboxes
+        self.delay_spin.valueChanged.connect(self._on_manual_value_change)
+        self.emergency_spin.valueChanged.connect(self._on_manual_value_change)
+        self.vol_lookback_spin.valueChanged.connect(self._on_manual_value_change)
+        self.vol_multi_spin.valueChanged.connect(self._on_manual_value_change)
+        self.min_sl_spin.valueChanged.connect(self._on_manual_value_change)
+        self.max_sl_spin.valueChanged.connect(self._on_manual_value_change)
+        
+        # Connect checkboxes
+        self.delayed_sl_check.stateChanged.connect(self._on_manual_value_change)
+        self.structure_check.stateChanged.connect(self._on_manual_value_change)
+    
+    def _calculate_confluence_from_strategy(self):
+        """
+        Calculate optimal confluence points from current strategy configuration.
+        
+        NAUTILUS EXPERT: Analyze strategy blocks and signals to determine
+        the recommended confluence threshold based on required vs optional signals.
+        """
+        try:
+            # Get current strategy configuration from orchestrator
+            config = self.orchestrator.get_current_config()
+            
+            if not config or not hasattr(config, 'blocks') or not config.blocks:
+                self.results_text.setText(
+                    "⚠️ No strategy configured yet!\n\n"
+                    "Please add building blocks to your strategy first,\n"
+                    "then click 'Calculate' to determine optimal confluence."
+                )
+                return
+            
+            # Calculate required and optional points
+            required_points = 0
+            optional_points = 0
+            
+            for block in config.blocks:
+                if not hasattr(block, 'signals'):
+                    continue
+                
+                for signal in block.signals:
+                    # Each signal typically contributes 10-15 points
+                    # This is a simplified calculation - backend may have more sophisticated weighting
+                    signal_weight = 10
+                    
+                    if hasattr(signal, 'logic'):
+                        if signal.logic == 'AND':
+                            required_points += signal_weight
+                        elif signal.logic == 'OR':
+                            optional_points += signal_weight
+            
+            total_points = required_points + optional_points
+            
+            if total_points == 0:
+                self.results_text.setText(
+                    "⚠️ No signals detected in strategy!\n\n"
+                    "Add signals to your building blocks first."
+                )
+                return
+            
+            # Recommended confluence: Required points + 50-70% of optional points
+            # This ensures all required signals trigger + most optional signals
+            recommended = required_points + int(optional_points * 0.6)
+            
+            # Set the calculated value
+            self.confluence_spin.setValue(recommended)
+            
+            # Show calculation details in results
+            self.results_text.setText(
+                f"📊 Confluence Calculated from Strategy:\n\n"
+                f"Required Signals: {required_points} pts (AND logic)\n"
+                f"Optional Signals: {optional_points} pts (OR logic)\n"
+                f"Total Possible: {total_points} pts\n\n"
+                f"✅ Recommended Confluence: {recommended} pts\n"
+                f"   ({int((recommended / total_points) * 100)}% of total)\n\n"
+                f"This ensures:\n"
+                f"• All required signals must trigger\n"
+                f"• ~60% of optional signals should trigger\n"
+                f"• Quality trades over quantity\n\n"
+                f"You can adjust manually if needed."
+            )
+            
+        except Exception as e:
+            self.results_text.setText(
+                f"❌ Error calculating confluence:\n{str(e)}\n\n"
+                "Using default value of 40 pts."
+            )
+            self.confluence_spin.setValue(40)
