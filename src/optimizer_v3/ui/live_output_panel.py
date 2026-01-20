@@ -241,10 +241,12 @@ class LiveOutputPanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 15, 10, 10)  # Increased top margin for label visibility
         
-        # Text edit for output - using helper from styles.py (ZERO hardcoded styles)
+        # Text edit for output - using helper from styles.py with LARGER FONT
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
-        self.output_text.setStyleSheet(get_text_edit_stylesheet())
+        # Get base stylesheet and add larger font size for readability
+        base_style = get_text_edit_stylesheet()
+        self.output_text.setStyleSheet(base_style + " font-size: 13px; line-height: 1.4;")
         
         layout.addWidget(self.output_text)
         group.setLayout(layout)
