@@ -244,9 +244,9 @@ class LiveOutputPanel(QWidget):
         # Text edit for output - using helper from styles.py with LARGER FONT
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
-        # Get base stylesheet and add larger font size for readability
+        # Get base stylesheet and add MUCH larger font size for readability
         base_style = get_text_edit_stylesheet()
-        self.output_text.setStyleSheet(base_style + " font-size: 13px; line-height: 1.4;")
+        self.output_text.setStyleSheet(base_style + " font-size: 16px; line-height: 1.6;")
         
         layout.addWidget(self.output_text)
         group.setLayout(layout)

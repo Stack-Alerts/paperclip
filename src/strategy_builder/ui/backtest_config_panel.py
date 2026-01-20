@@ -58,15 +58,29 @@ class BacktestWorker(QThread):
         self.output_panel = output_panel  # Store reference to output panel
     
     def run(self):
-        """Run backtest in background thread"""
+        """Run backtest in background thread with LIVE message streaming"""
         try:
             # TODO: Implement actual backtest execution
             # This is a placeholder that simulates backtest progress
             
             total_candles = 14040  # Example from spec
+            trade_count = 0
+            
+            # Emit start message LIVE
+            self.live_message.emit("Backtest started - loading historical data...", "INFO", "SYSTEM")
+            self.msleep(200)
+            
+            self.live_message.emit(f"Processing {total_candles:,} candles...", "INFO", "SYSTEM")
+            self.msleep(200)
+            
+            # Simulate trades happening during execution
+            trade_triggers = [500, 1200, 2300, 3100, 4200, 5500, 6300, 7100, 8200, 9100, 
+                            9800, 10500, 11200, 11800, 12300, 12800, 13100, 13400, 13600, 13750,
+                            13850, 13900, 13950, 14000]  # 24 trades at various candle positions
             
             for i in range(0, total_candles, 100):
                 if self.should_stop:
+                    self.live_message.emit("Backtest stopped by user", "WARNING", "SYSTEM")
                     self.backtest_finished.emit(False, {'error': 'Stopped by user'})
                     return
                 
@@ -78,18 +92,60 @@ class BacktestWorker(QThread):
                 progress_msg = f"Processing candles {i}/{total_candles}"
                 self.progress_updated.emit(i, total_candles, progress_msg)
                 
+                # Check if any trades should trigger at this candle range
+                for trigger_candle in trade_triggers:
+                    if i <= trigger_candle < i + 100:
+                        trade_count += 1
+                        is_win = trade_count <= 14  # First 14 are wins (58% win rate)
+                        
+                        if is_win:
+                            pnl = 75.0 + (trade_count * 0.5)  # Vary PnL slightly
+                            self.live_message.emit(
+                                f"Trade {trade_count} closed: WIN - PnL: ${pnl:.2f}",
+                                "ACTION",
+                                "TRADE"
+                            )
+                        else:
+                            pnl = -50.0 - (trade_count * 0.3)
+                            self.live_message.emit(
+                                f"Trade {trade_count} closed: LOSS - PnL: ${pnl:.2f}",
+                                "WARNING",
+                                "TRADE"
+                            )
+                
+                # Emit progress messages periodically
+                if i % 2000 == 0 and i > 0:
+                    self.live_message.emit(
+                        f"Progress: {int((i/total_candles)*100)}% complete, {trade_count} trades executed",
+                        "INFO",
+                        "OPTIMIZER"
+                    )
+                
                 # Simulate work
                 self.msleep(50)
             
-            # Emit completion
+            # Emit completion message LIVE
+            self.live_message.emit(
+                f"✅ Backtest completed successfully! {trade_count} trades executed.",
+                "INFO",
+                "SYSTEM"
+            )
+            self.live_message.emit(
+                f"Total candles processed: {total_candles:,}",
+                "INFO",
+                "SYSTEM"
+            )
+            
+            # Calculate results
             results = {
                 'total_candles': total_candles,
-                'trades': 24,
+                'trades': trade_count,
                 'tp_adjustments': {'TP1': 12, 'TP2': 18, 'TP3': 9, 'SL': 8}
             }
             self.backtest_finished.emit(True, results)
             
         except Exception as e:
+            self.live_message.emit(f"Error: {str(e)}", "ERROR", "SYSTEM")
             self.backtest_finished.emit(False, {'error': str(e)})
     
     def pause(self):
@@ -1277,10 +1333,12 @@ class BacktestConfigPanel(QWidget):
             'sl_mode': self.sl_combo.currentText()
         }
         
-        # Create and start worker
-        self.worker = BacktestWorker(self.orchestrator, config)
+        # Create and start worker - WIRE UP LIVE MESSAGES
+        self.worker = BacktestWorker(self.orchestrator, config, self.output_panel)
         self.worker.progress_updated.connect(self._on_progress_updated)
         self.worker.backtest_finished.connect(self._on_backtest_finished)
+        # Connect live messages to output panel for REAL-TIME display
+        self.worker.live_message.connect(self.output_panel.add_message)
         self.worker.start()
         
         # Update UI state
