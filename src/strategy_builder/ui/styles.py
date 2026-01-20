@@ -847,6 +847,7 @@ def get_table_stylesheet() -> str:
     return f"""
         QTableWidget {{
             background-color: {COLORS['bg_dark']};
+            alternate-background-color: {COLORS['bg_medium']};
             color: {COLORS['text_primary']};
             border: 1px solid {COLORS['border']};
             gridline-color: {COLORS['border']};
@@ -855,6 +856,7 @@ def get_table_stylesheet() -> str:
         }}
         QTableWidget::item {{
             padding: 8px;
+            background-color: transparent;
         }}
         QHeaderView::section {{
             background-color: {COLORS['bg_secondary']};
