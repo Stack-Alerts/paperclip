@@ -1,6 +1,6 @@
 """
 Database Infrastructure for Optimizer V3
-Tasks 0.2-0.4: Database Configuration, Connection Pooling, Models & Validation
+Tasks 0.2-0.6: Database Configuration, Connection Pooling, Models, Validation & Manager
 """
 
 from .config import (
@@ -53,6 +53,12 @@ from .validators import (
     ValidationError,
 )
 
+from .manager import (
+    DatabaseManager,
+    get_db_manager,
+    close_db_manager,
+)
+
 __all__ = [
     # Configuration
     "get_db_config",
@@ -92,4 +98,8 @@ __all__ = [
     # Validators
     "NautilusDataValidator",
     "ValidationError",
+    # Database Manager
+    "DatabaseManager",
+    "get_db_manager",
+    "close_db_manager",
 ]
