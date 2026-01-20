@@ -123,6 +123,7 @@ class MetricsDisplayPanel(QWidget):
         self.perf_table.setAlternatingRowColors(True)
         self.perf_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.perf_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.perf_table.setSortingEnabled(True)  # Excel-like sorting
         self.perf_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.perf_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self.perf_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
@@ -186,6 +187,7 @@ class MetricsDisplayPanel(QWidget):
         self.risk_table.setAlternatingRowColors(True)
         self.risk_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.risk_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.risk_table.setSortingEnabled(True)  # Excel-like sorting
         self.risk_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.risk_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self.risk_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
@@ -253,6 +255,7 @@ class MetricsDisplayPanel(QWidget):
         self.comp_table.setAlternatingRowColors(True)
         self.comp_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.comp_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.comp_table.setSortingEnabled(True)  # Excel-like sorting
         self.comp_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.comp_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self.comp_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
