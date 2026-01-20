@@ -80,6 +80,7 @@ class ProgressTracker:
         self._callbacks: List[Callable] = []
         self._last_update = datetime.now()
         self._start_time = datetime.now()
+        self._active = False
         
         self.logger.info(
             "ProgressTracker initialized",
@@ -384,3 +385,30 @@ class ProgressTracker:
             self._last_update = datetime.now()
             
             self.logger.info("ProgressTracker reset")
+    
+    # Compatibility methods for simple API
+    def start(self, total: int, description: str = "") -> None:
+        """Start tracking (compatibility method)"""
+        with self._lock:
+            self.total_tasks = total
+            self._start_time = datetime.now()
+            self._active = True
+            self.logger.info(f"Progress tracking started: {description}", total=total)
+    
+    def update(self, n: int = 1) -> None:
+        """Update progress (compatibility method)"""
+        for i in range(n):
+            task_id = f"task_{len(self._tasks)}"
+            self.register_task(task_id)
+            self.complete_task(task_id)
+    
+    def complete(self) -> None:
+        """Complete tracking (compatibility method)"""
+        with self._lock:
+            self._active = False
+            self.logger.info("Progress tracking complete")
+    
+    def is_active(self) -> bool:
+        """Check if tracking is active (compatibility method)"""
+        with self._lock:
+            return self._active
