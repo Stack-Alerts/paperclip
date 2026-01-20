@@ -168,15 +168,14 @@ class TradesPanel(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.verticalHeader().setVisible(False)
         
-        # Set column widths - uniform sizing per user requirement
-        # ID stays at 80px, all others equal at 120px, Notes 3x = 360px
+        # Set column widths - uniform sizing per user requirement  
+        # ID=80px, all others=120px, Notes=360px (3x) - ALL FIXED, NO STRETCH
         # ID, Time, Symbol, Side, Size, Entry, Exit, Duration, P&L, P&L %, Status, Notes
         column_widths = [80, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 360]
         for i, width in enumerate(column_widths):
             self.table.setColumnWidth(i, width)
         
-        # Make Notes column stretch to fill remaining space
-        self.table.horizontalHeader().setSectionResizeMode(11, QHeaderView.ResizeMode.Stretch)  # Notes only
+        # NO STRETCH - all columns fixed width as specified
         
         # Connect signals
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
