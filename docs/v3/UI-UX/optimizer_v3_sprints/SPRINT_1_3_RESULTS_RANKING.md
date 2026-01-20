@@ -65,15 +65,15 @@ This sprint integrates with the following detailed specifications:
 - [x] 1.3.6 Statistical comparison
 - [x] 1.3.7 Config diff highlighter
 - [x] 1.3.8 CSV export
-- [ ] 1.3.9 Unit tests
-- [ ] 1.3.10 Sprint sign-off
+- [x] 1.3.9 Unit tests
+- [x] 1.3.10 Sprint sign-off
 
 ### State Management
 - [x] 1.3.11 State manager
 - [x] 1.3.12 Session history
 - [x] 1.3.13 Resume from last session
 - [x] 1.3.14 State migration tools
-- [ ] 1.3.15 State validation tests
+- [x] 1.3.15 State validation tests
 
 ## 📝 TASK DETAILS
 
