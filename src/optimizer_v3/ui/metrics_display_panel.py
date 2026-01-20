@@ -126,8 +126,8 @@ class MetricsDisplayPanel(QWidget):
         self.perf_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.perf_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self.perf_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        self.perf_table.setColumnWidth(1, 150)
-        self.perf_table.setColumnWidth(2, 100)
+        self.perf_table.setColumnWidth(1, 200)  # Value column - wider for readability
+        self.perf_table.setColumnWidth(2, 120)  # Rating column - wider for readability
         self.perf_table.verticalHeader().setVisible(False)
         
         # Populate with metric rows
@@ -189,8 +189,8 @@ class MetricsDisplayPanel(QWidget):
         self.risk_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.risk_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self.risk_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        self.risk_table.setColumnWidth(1, 150)
-        self.risk_table.setColumnWidth(2, 100)
+        self.risk_table.setColumnWidth(1, 200)  # Value column - wider for readability
+        self.risk_table.setColumnWidth(2, 120)  # Status column - wider for readability
         self.risk_table.verticalHeader().setVisible(False)
         
         # Populate with risk metrics
