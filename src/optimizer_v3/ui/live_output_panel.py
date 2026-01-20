@@ -32,8 +32,8 @@ from src.strategy_builder.ui.styles import (
     get_panel_title_stylesheet,
     get_primary_button_stylesheet,
     get_checkbox_style,
-    get_color,
-    COLORS
+    get_text_edit_stylesheet,
+    get_color
 )
 
 
@@ -149,11 +149,11 @@ class LiveOutputPanel(QWidget):
         layout.addWidget(self.filtered_count_label)
         
         self.error_count_label = QLabel("⛔ Errors: <b>0</b>")
-        self.error_count_label.setStyleSheet(f"color: {COLORS['error']};")
+        self.error_count_label.setStyleSheet(f"color: {get_color('error')};")
         layout.addWidget(self.error_count_label)
         
         self.warning_count_label = QLabel("⚠️ Warnings: <b>0</b>")
-        self.warning_count_label.setStyleSheet(f"color: {COLORS['warning']};")
+        self.warning_count_label.setStyleSheet(f"color: {get_color('warning')};")
         layout.addWidget(self.warning_count_label)
         
         # Stretch pushes buttons to the right
@@ -204,7 +204,7 @@ class LiveOutputPanel(QWidget):
         
         # Separator between Levels and Categories
         separator = QLabel("|")
-        separator.setStyleSheet(f"color: {COLORS['border']}; font-size: 18px; padding: 0 10px;")
+        separator.setStyleSheet(f"color: {get_color('border')}; font-size: 18px; padding: 0 10px;")
         layout.addWidget(separator)
         
         # Category filters
@@ -241,19 +241,10 @@ class LiveOutputPanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 15, 10, 10)  # Increased top margin for label visibility
         
-        # Text edit for output
+        # Text edit for output - using helper from styles.py (ZERO hardcoded styles)
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
-        self.output_text.setStyleSheet(
-            f"QTextEdit {{"
-            f"background-color: {COLORS['bg_dark']}; "
-            f"color: {COLORS['text_primary']}; "
-            f"border: 1px solid {COLORS['border']}; "
-            f"padding: 8px; "
-            f"font-family: 'Consolas', 'Monaco', monospace; "
-            f"font-size: 12px; "
-            f"}}"
-        )
+        self.output_text.setStyleSheet(get_text_edit_stylesheet())
         
         layout.addWidget(self.output_text)
         group.setLayout(layout)
@@ -305,14 +296,14 @@ class LiveOutputPanel(QWidget):
         """Append message with color coding"""
         # Get color based on level
         color_map = {
-            MessageLevel.INFO: COLORS['info'],
-            MessageLevel.DECISION: COLORS['success'],
-            MessageLevel.ACTION: COLORS['info'],
-            MessageLevel.WARNING: COLORS['warning'],
-            MessageLevel.ERROR: COLORS['error']
+            MessageLevel.INFO: get_color('info'),
+            MessageLevel.DECISION: get_color('success'),
+            MessageLevel.ACTION: get_color('info'),
+            MessageLevel.WARNING: get_color('warning'),
+            MessageLevel.ERROR: get_color('error')
         }
         
-        color = color_map.get(msg_data['level'], COLORS['text_primary'])
+        color = color_map.get(msg_data['level'], get_color('text_primary'))
         
         # Format message
         timestamp = msg_data['timestamp']
@@ -322,10 +313,10 @@ class LiveOutputPanel(QWidget):
         
         # Build HTML
         html = (
-            f"<span style='color: {COLORS['text_muted']};'>{timestamp}</span> "
+            f"<span style='color: {get_color('text_muted')};'>{timestamp}</span> "
             f"<span style='color: {color}; font-weight: bold;'>[{level}]</span> "
-            f"<span style='color: {COLORS['secondary']};'>[{category}]</span> "
-            f"<span style='color: {COLORS['text_primary']};'>{message}</span>"
+            f"<span style='color: {get_color('secondary')};'>[{category}]</span> "
+            f"<span style='color: {get_color('text_primary')};'>{message}</span>"
         )
         
         self.output_text.append(html)

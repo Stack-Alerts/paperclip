@@ -34,8 +34,8 @@ from src.strategy_builder.ui.styles import (
     get_label_style,
     get_panel_title_stylesheet,
     get_primary_button_stylesheet,
-    get_color,
-    COLORS
+    get_table_stylesheet,
+    get_color
 )
 
 
@@ -156,27 +156,8 @@ class TradesPanel(QWidget):
             'Exit', 'Duration', 'P&L', 'P&L %', 'Status', 'Notes'
         ])
         
-        # Table styling using COLORS from styles.py
-        self.table.setStyleSheet(
-            f"QTableWidget {{"
-            f"background-color: {COLORS['bg_dark']}; "
-            f"color: {COLORS['text_primary']}; "
-            f"border: 1px solid {COLORS['border']}; "
-            f"gridline-color: {COLORS['border']}; "
-            f"selection-background-color: {COLORS['info']}40; "
-            f"selection-color: {COLORS['text_primary']}; "
-            f"}} "
-            f"QTableWidget::item {{"
-            f"padding: 8px; "
-            f"}} "
-            f"QHeaderView::section {{"
-            f"background-color: {COLORS['bg_secondary']}; "
-            f"color: {COLORS['text_primary']}; "
-            f"padding: 10px; "
-            f"border: 1px solid {COLORS['border']}; "
-            f"font-weight: 600; "
-            f"}}"
-        )
+        # Table styling - using helper function from styles.py (ZERO hardcoded styles)
+        self.table.setStyleSheet(get_table_stylesheet())
         
         # Table configuration
         self.table.setAlternatingRowColors(True)
@@ -265,9 +246,9 @@ class TradesPanel(QWidget):
             side = trade.get('side', 'BUY')
             side_item = self._create_item(side)
             if side == 'BUY':
-                side_item.setForeground(QColor(COLORS['success']))
+                side_item.setForeground(QColor(get_color('success')))
             else:
-                side_item.setForeground(QColor(COLORS['error']))
+                side_item.setForeground(QColor(get_color('error')))
             self.table.setItem(row, 3, side_item)
             
             # Size
@@ -293,27 +274,27 @@ class TradesPanel(QWidget):
             pnl = trade.get('pnl', 0.0)
             pnl_item = self._create_item(f"${float(pnl):,.2f}")
             if float(pnl) > 0:
-                pnl_item.setForeground(QColor(COLORS['success']))
+                pnl_item.setForeground(QColor(get_color('success')))
             elif float(pnl) < 0:
-                pnl_item.setForeground(QColor(COLORS['error']))
+                pnl_item.setForeground(QColor(get_color('error')))
             self.table.setItem(row, 8, pnl_item)
             
             # P&L %
             pnl_pct = trade.get('pnl_pct', 0.0)
             pnl_pct_item = self._create_item(f"{float(pnl_pct):.2f}%")
             if float(pnl_pct) > 0:
-                pnl_pct_item.setForeground(QColor(COLORS['success']))
+                pnl_pct_item.setForeground(QColor(get_color('success')))
             elif float(pnl_pct) < 0:
-                pnl_pct_item.setForeground(QColor(COLORS['error']))
+                pnl_pct_item.setForeground(QColor(get_color('error')))
             self.table.setItem(row, 9, pnl_pct_item)
             
             # Status
             status = trade.get('status', 'OPEN')
             status_item = self._create_item(status)
             if status == 'CLOSED':
-                status_item.setForeground(QColor(COLORS['text_muted']))
+                status_item.setForeground(QColor(get_color('text_muted')))
             elif status == 'OPEN':
-                status_item.setForeground(QColor(COLORS['success']))
+                status_item.setForeground(QColor(get_color('success')))
             self.table.setItem(row, 10, status_item)
             
             # Notes
@@ -348,9 +329,9 @@ class TradesPanel(QWidget):
         # Update labels with color coding
         pnl_text = f"Total P&L: <b>${total_pnl:,.2f}</b>"
         if total_pnl > 0:
-            self.pnl_label.setStyleSheet(f"color: {COLORS['success']}; font-size: 14px;")
+            self.pnl_label.setStyleSheet(f"color: {get_color('success')}; font-size: 14px;")
         elif total_pnl < 0:
-            self.pnl_label.setStyleSheet(f"color: {COLORS['error']}; font-size: 14px;")
+            self.pnl_label.setStyleSheet(f"color: {get_color('error')}; font-size: 14px;")
         else:
             self.pnl_label.setStyleSheet(get_label_style())
         self.pnl_label.setText(pnl_text)
