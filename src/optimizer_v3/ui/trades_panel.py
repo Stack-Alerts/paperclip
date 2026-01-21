@@ -200,13 +200,13 @@ class TradesPanel(QWidget):
         
         layout.addStretch()
         
-        # Clear button
-        clear_btn = QPushButton("🗑️ Clear All")
-        clear_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        clear_btn.setFixedSize(130, 42)
-        clear_btn.clicked.connect(self._clear_trades)
-        clear_btn.setToolTip("Clear all trades")
-        layout.addWidget(clear_btn)
+        # Copy button (matches Live Output)
+        copy_btn = QPushButton("📋 Copy")
+        copy_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        copy_btn.setFixedSize(130, 42)
+        copy_btn.clicked.connect(self._copy_trades)
+        copy_btn.setToolTip("Copy trades to clipboard")
+        layout.addWidget(copy_btn)
         
         # Export button
         export_btn = QPushButton("💾 Export")
@@ -373,12 +373,49 @@ class TradesPanel(QWidget):
         
         self.table.sortItems(logical_index, self.current_sort_order)
     
-    def _clear_trades(self) -> None:
-        """Clear all trades"""
-        self.trades.clear()
-        self.filtered_trades.clear()
-        self.table.setRowCount(0)
-        self._update_metrics()
+    def _copy_trades(self) -> None:
+        """Copy trades to clipboard in CSV format"""
+        from PyQt5.QtWidgets import QApplication
+        
+        if not self.trades:
+            print("⚠️ No trades to copy")
+            return
+        
+        try:
+            # Build CSV content
+            lines = []
+            # Header
+            lines.append("ID\tTime\tSymbol\tSide\tSize\tEntry\tExit\tDuration\tP&L\tP&L %\tStatus\tNotes")
+            
+            # Data rows
+            for trade in self.trades:
+                timestamp = trade.get('timestamp', datetime.now())
+                time_str = timestamp.strftime('%H:%M:%S') if isinstance(timestamp, datetime) else str(timestamp)
+                
+                lines.append(
+                    f"{trade.get('id', '')}\t"
+                    f"{time_str}\t"
+                    f"{trade.get('symbol', '')}\t"
+                    f"{trade.get('side', '')}\t"
+                    f"{trade.get('size', '')}\t"
+                    f"${float(trade.get('entry_price', 0)):,.2f}\t"
+                    f"${float(trade.get('exit_price', 0)):,.2f}\t"
+                    f"{trade.get('duration', '')}\t"
+                    f"${float(trade.get('pnl', 0)):,.2f}\t"
+                    f"{float(trade.get('pnl_pct', 0)):.2f}%\t"
+                    f"{trade.get('status', '')}\t"
+                    f"{trade.get('notes', '')}"
+                )
+            
+            # Copy to clipboard
+            csv_content = '\n'.join(lines)
+            clipboard = QApplication.clipboard()
+            clipboard.setText(csv_content)
+            
+            print(f"✅ {len(self.trades)} trades copied to clipboard")
+            
+        except Exception as e:
+            print(f"❌ Copy failed: {str(e)}")
     
     def _export_trades(self) -> None:
         """Export trades to Excel/CSV"""
