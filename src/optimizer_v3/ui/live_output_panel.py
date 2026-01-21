@@ -649,8 +649,8 @@ class LiveOutputPanel(QWidget):
         losses = len([m for m in self.messages if m['level'] in [MessageLevel.LOSS, MessageLevel.WARNING]])
         stop_losses = len([m for m in self.messages if m['level'] in [MessageLevel.STOP_LOSS, MessageLevel.ERROR]])
         
-        # Total trades = winners + losses + stop losses
-        total_trades = winners + losses + stop_losses
+        # Total trades = winners + losses ONLY (stop loss is informational, not a separate trade)
+        total_trades = winners + losses
         
         # Update labels
         self.msg_count_label.setText(f"Messages: <b>{total}</b>")
