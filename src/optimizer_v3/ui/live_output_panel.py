@@ -80,13 +80,13 @@ class HoverHighlightTextEdit(QTextEdit):
         super().leaveEvent(event)
     
     def _highlight_block(self, block):
-        """Apply dark blue background to a block (line) for hover visibility"""
+        """Apply purple background to a block (line) for hover visibility"""
         cursor = QTextCursor(block)
         cursor.select(QTextCursor.BlockUnderCursor)
         
-        # Create format with dark blue background (high contrast)
+        # Create format with purple background (high contrast)
         fmt = QTextCharFormat()
-        fmt.setBackground(QColor("#041f5c"))  # Dark blue - clearly visible against #15191E
+        fmt.setBackground(QColor("#6a15b3"))  # Purple - clearly visible against #15191E
         cursor.mergeCharFormat(fmt)
     
     def _clear_block_highlight(self, block):
