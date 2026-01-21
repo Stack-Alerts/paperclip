@@ -139,12 +139,13 @@ class BacktestWorker(QThread):
                             'status': 'OPEN',  # Trade is OPEN
                             'notes': f'Demo trade #{trade_count} - OPEN'
                         }
-                        self.trade_closed.emit(open_trade_data)  # Emit OPEN trade immediately
+                        self.trade_data_emit.emit(open_trade_data)  # Emit OPEN trade immediately
                         
                         # Wait a bit to simulate trade duration
                         self.msleep(50)
                         
-                        # Now close the trade and update with exit info
+                        # Now close the trade - emit FULL trade data again with CLOSED status
+                        # trades_panel.update_trade() will find by ID and update it
                         if is_win:
                             pnl = 75.0 + (trade_count * 0.5)  # Vary PnL slightly
                             exit_price = entry_price * 1.015
@@ -164,9 +165,14 @@ class BacktestWorker(QThread):
                                 "TRADE"
                             )
                         
-                        # UPDATE TRADE TO CLOSED (updates existing trade in Trades tab)
+                        # Emit FULL CLOSED trade data (will update existing OPEN trade by ID)
                         closed_trade_data = {
                             'id': str(trade_count),
+                            'timestamp': entry_timestamp,
+                            'symbol': 'BTC.P/USDT',
+                            'side': 'LONG' if trade_count % 2 == 0 else 'SHORT',
+                            'size': 0.1,
+                            'entry_price': entry_price,
                             'exit_price': exit_price,
                             'duration': f'{20 + (trade_count % 40)} bars',
                             'pnl': pnl,
@@ -174,16 +180,7 @@ class BacktestWorker(QThread):
                             'status': 'CLOSED',
                             'notes': f'Demo trade #{trade_count} - CLOSED'
                         }
-                        # Use update instead of add - prevents duplicate IDs
-                        # The trades_panel will find the trade by ID and update it
-                        from PyQt5.QtCore import QMetaObject, Q_ARG
-                        QMetaObject.invokeMethod(
-                            self.output_panel.parent().trades_panel, 
-                            "update_trade",
-                            Qt.QueuedConnection,
-                            Q_ARG(int, trade_count),
-                            Q_ARG(dict, closed_trade_data)
-                        )
+                        self.trade_data_emit.emit(closed_trade_data)  # Update to CLOSED
                         
                         # Occasionally emit ERROR messages (every 8th trade)
                         if trade_count % 8 == 0:
@@ -1424,8 +1421,8 @@ class BacktestConfigPanel(QWidget):
         self.worker.backtest_finished.connect(self._on_backtest_finished)
         # Connect live messages to output panel for REAL-TIME display
         self.worker.live_message.connect(self.output_panel.add_message)
-        # Connect trade_closed signal for REAL-TIME TRADE STREAMING
-        self.worker.trade_closed.connect(self.trades_panel.add_trade)
+        # Connect trade_data_emit signal - handles both OPEN (add) and CLOSED (update)
+        self.worker.trade_data_emit.connect(self._on_trade_data)
         self.worker.start()
         
         # Update UI state
@@ -1459,6 +1456,23 @@ class BacktestConfigPanel(QWidget):
         if self.worker and self.worker.isRunning():
             self.worker.stop()
             self.results_text.append("⏹️ Stopping...")
+    
+    def _on_trade_data(self, trade_data: dict):
+        """
+        Handle trade data from worker - intelligently adds OPEN or updates to CLOSED.
+        
+        When status is OPEN: Add new trade to table
+        When status is CLOSED: Update existing trade by ID
+        """
+        trade_id = trade_data.get('id')
+        status = trade_data.get('status')
+        
+        if status == 'OPEN':
+            # New trade opened - add to table
+            self.trades_panel.add_trade(trade_data)
+        elif status == 'CLOSED':
+            # Trade closed - update existing trade
+            self.trades_panel.update_trade(trade_id, trade_data)
     
     def _on_progress_updated(self, current: int, total: int, message: str):
         """Handle progress update from worker - INLINE HTML FORMAT"""
