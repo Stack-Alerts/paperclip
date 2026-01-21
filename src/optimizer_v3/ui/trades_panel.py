@@ -169,9 +169,9 @@ class TradesPanel(QWidget):
         self.table.verticalHeader().setVisible(False)
         
         # Set column widths - ID fixed, Notes fixed, all others stretch equally
-        # ID=80px (fixed), Notes=500px (fixed), 10 standard columns stretch to fill window
+        # ID=85px (fixed +5px), Notes=500px (fixed), 10 standard columns stretch to fill window
         # ID, Time, Symbol, Side, Size, Entry, Exit, Duration, P&L, P&L %, Status, Notes
-        column_widths = [80, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 500]
+        column_widths = [85, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 500]
         for i, width in enumerate(column_widths):
             self.table.setColumnWidth(i, width)
         
@@ -179,6 +179,11 @@ class TradesPanel(QWidget):
         # ID (0) and Notes (11) stay fixed
         for i in range(1, 11):  # Columns 1-10 (Time through Status)
             self.table.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
+        
+        # Set default sort on ID column (ascending 1,2,3,4...)
+        self.table.sortItems(0, Qt.SortOrder.AscendingOrder)
+        self.current_sort_column = 0
+        self.current_sort_order = Qt.SortOrder.AscendingOrder
         
         # Connect signals
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
