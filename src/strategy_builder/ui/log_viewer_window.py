@@ -279,22 +279,17 @@ class LogViewerWindow(QDialog):
         self._update_stats(content, filtered)
     
     def _create_event_filters(self) -> QGroupBox:
-        """Create institutional-grade event-based filters"""
+        """Create institutional-grade event-based filters - COMPACT LAYOUT"""
         group = QGroupBox("Event Filters (Institutional Grade)")
         group.setStyleSheet(get_groupbox_header_stylesheet())
-        group.setMaximumHeight(200)  # Taller for more filters
-        
-        # Scrollable area for filters
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        group.setMaximumHeight(150)  # Reduced height - more compact
         
         container = QWidget()
         layout = QVBoxLayout()
-        layout.setSpacing(15)
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(8)  # Reduced spacing
+        layout.setContentsMargins(10, 10, 10, 10)
         
-        # Group events by category
+        # Group events by category - COMPACT GRID LAYOUT
         categories = {
             'Trade Events': ['TRADE_OPENED', 'TRADE_CLOSED', 'TRADE_UPDATED', 'POSITIONS_SNAPSHOT', 'TRADE_NOT_FOUND', 'MULTIPLE_POSITIONS'],
             'Config Events': ['CONFIG_INITIALIZED', 'CONFIG_READ', 'CONFIG_VALIDATED', 'CONFIG_MISMATCH', 'CONFIG_MISSING'],
@@ -310,52 +305,51 @@ class LogViewerWindow(QDialog):
             # Category row container
             row_widget = QWidget()
             row_layout = QHBoxLayout()
-            row_layout.setSpacing(15)
+            row_layout.setSpacing(8)  # Compact spacing
             row_layout.setContentsMargins(0, 0, 0, 0)
             
-            # Category label
+            # Category label - SMALLER
             cat_label = QLabel(f"{category_name}:")
-            cat_label.setStyleSheet(get_label_style('muted') + "font-weight: bold;")
-            cat_label.setMinimumWidth(140)
+            cat_label.setStyleSheet(get_label_style('muted') + "font-weight: bold; font-size: 12px;")
+            cat_label.setFixedWidth(110)  # Fixed smaller width
             row_layout.addWidget(cat_label)
             
-            # Event checkboxes
+            # Event checkboxes - COMPACT
             for event in events:
                 if event in EVENT_PATTERNS:
                     _, color = EVENT_PATTERNS[event]
-                    checkbox = QCheckBox(event.replace('_', ' ').title())
+                    # Shorter names for compact display
+                    short_name = event.replace('_', ' ').replace('Positions', 'Pos').replace('Multiple', 'Multi')
+                    checkbox = QCheckBox(short_name.title())
                     checkbox.setChecked(True)
-                    checkbox.setStyleSheet(f"QCheckBox {{ color: {color}; background: transparent; }}")
+                    checkbox.setStyleSheet(f"QCheckBox {{ color: {color}; background: transparent; font-size: 12px; }}")
                     checkbox.stateChanged.connect(lambda state, e=event: self._on_event_filter_changed(e, state))
                     self.event_checkboxes[event] = checkbox
                     row_layout.addWidget(checkbox)
             
-            row_layout.addStretch()
+            # NO stretch - use all available space
             row_widget.setLayout(row_layout)
             layout.addWidget(row_widget)
             
             # Store reference for show/hide
             self.filter_category_widgets[category_name] = row_widget
         
-        # Control buttons row
+        # Control buttons row - COMPACT
         controls_layout = QHBoxLayout()
-        controls_layout.addStretch()
         
         self.toggle_all_btn = QPushButton("Unselect All")
         self.toggle_all_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        self.toggle_all_btn.setFixedHeight(35)
+        self.toggle_all_btn.setFixedHeight(30)  # Smaller
         self.toggle_all_btn.clicked.connect(self._toggle_all_filters)
         controls_layout.addWidget(self.toggle_all_btn)
         
+        controls_layout.addStretch()
         layout.addLayout(controls_layout)
         
         container.setLayout(layout)
-        scroll.setWidget(container)
-        
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.addWidget(scroll)
-        group.setLayout(main_layout)
+        group.setLayout(QVBoxLayout())
+        group.layout().setContentsMargins(0, 0, 0, 0)
+        group.layout().addWidget(container)
         
         return group
     
@@ -393,6 +387,13 @@ class LogViewerWindow(QDialog):
         copy_selection_btn.setFixedSize(180, 52)
         copy_selection_btn.clicked.connect(self._copy_selection)
         layout.addWidget(copy_selection_btn)
+        
+        clear_logs_btn = QPushButton("🗑️ Clear All Logs")
+        clear_logs_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        clear_logs_btn.setFixedSize(180, 52)
+        clear_logs_btn.clicked.connect(self._clear_all_logs)
+        clear_logs_btn.setToolTip("Delete ALL log files from logs directory")
+        layout.addWidget(clear_logs_btn)
         
         close_btn = QPushButton("✖ Close")
         close_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
@@ -559,6 +560,68 @@ class LogViewerWindow(QDialog):
         QApplication.clipboard().setText(selected)
         line_count = len(selected.split('\n'))
         self.filtered_count_label.setText(f"✅ Copied {line_count:,} selected lines")
+    
+    def _clear_all_logs(self):
+        """Delete ALL log files from logs directory"""
+        # Ask for confirmation
+        reply = QMessageBox.question(
+            self,
+            "Clear All Logs",
+            "⚠️  This will DELETE ALL log files from the logs directory!\n\n"
+            "This action cannot be undone.\n\n"
+            "Are you sure you want to continue?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply != QMessageBox.Yes:
+            return
+        
+        try:
+            # Delete all log files
+            deleted_count = 0
+            total_size = 0
+            
+            for log_file in self.all_log_files:
+                try:
+                    file_size = log_file.stat().st_size
+                    log_file.unlink()
+                    deleted_count += 1
+                    total_size += file_size
+                except Exception as e:
+                    print(f"Error deleting {log_file}: {e}")
+            
+            # Show result
+            size_mb = total_size / (1024 * 1024)
+            QMessageBox.information(
+                self,
+                "Logs Cleared",
+                f"Successfully deleted {deleted_count} log files.\n\n"
+                f"Space freed: {size_mb:.2f} MB"
+            )
+            
+            # Clear viewer and reload
+            self.all_log_files.clear()
+            self.log_directories.clear()
+            self.tab_data.clear()
+            
+            # Remove all tabs except first
+            while self.tabs.count() > 1:
+                self.tabs.removeTab(1)
+            
+            # Clear first tab
+            if 0 in self.tab_data:
+                self.tab_data[0]['content'] = "(No logs available)"
+                self.tab_data[0]['widget'].text_edit.setPlainText("(No logs available)")
+            
+            self.filtered_count_label.setText(f"✅ Cleared {deleted_count} log files ({size_mb:.1f} MB)")
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error clearing logs:\n\n{str(e)}"
+            )
     
     def _restore_geometry(self):
         """Restore window geometry"""
