@@ -87,7 +87,11 @@ class LogViewerWindow(QDialog):
     def __init__(self, log_file_path: Path = None, parent=None):
         super().__init__(parent)
         
-        self.logs_base_dir = Path('logs')
+        # Use absolute path to logs directory (relative to project root)
+        import os
+        project_root = Path(__file__).resolve().parent.parent.parent.parent
+        self.logs_base_dir = project_root / 'logs'
+        
         self.current_log_file = log_file_path
         self.all_log_files: List[Path] = []
         self.log_directories: Set[str] = set()
