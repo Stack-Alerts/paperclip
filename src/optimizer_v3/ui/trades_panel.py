@@ -169,7 +169,8 @@ class TradesPanel(QWidget):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)  # Allow multi-selection
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.setSortingEnabled(True)
+        # CRITICAL: Disable Qt sorting - we pre-sort data ourselves for correct numeric order
+        self.table.setSortingEnabled(False)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.verticalHeader().setVisible(False)
         
@@ -185,14 +186,9 @@ class TradesPanel(QWidget):
         for i in range(1, 11):  # Columns 1-10 (Time through Status)
             self.table.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
         
-        # Set default sort on ID column (ascending 1,2,3,4...)
-        self.table.sortItems(0, Qt.SortOrder.AscendingOrder)
-        self.current_sort_column = 0
-        self.current_sort_order = Qt.SortOrder.AscendingOrder
-        
         # Connect signals
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
-        self.table.horizontalHeader().sectionClicked.connect(self._on_header_clicked)
+        # Note: Header sorting disabled - data is pre-sorted by ID
         
         layout.addWidget(self.table)
         group.setLayout(layout)
@@ -307,17 +303,11 @@ class TradesPanel(QWidget):
     def _update_table(self) -> None:
         """Update table with current trades - INSTITUTIONAL REFRESH"""
         # CRITICAL: Sort filtered_trades by ID (numeric) before displaying
-        # This ensures proper 1,2,3...10,11...24 order even with string IDs
+        # This ensures proper 1,2,3...10,11...24 order
         try:
             self.filtered_trades.sort(key=lambda t: int(t.get('id', 0)))
         except (ValueError, TypeError):
-            # Fallback to string sort if conversion fails
-            pass
-        
-        # CRITICAL: Disable sorting during update to prevent display artifacts
-        was_sorting_enabled = self.table.isSortingEnabled()
-        if was_sorting_enabled:
-            self.table.setSortingEnabled(False)
+            pass  # Fallback if conversion fails
         
         self.table.setRowCount(len(self.filtered_trades))
         
@@ -395,15 +385,7 @@ class TradesPanel(QWidget):
             notes = trade.get('notes', '')
             self.table.setItem(row, 11, self._create_item(str(notes)))
         
-        # CRITICAL: Re-enable sorting and refresh display  
-        if was_sorting_enabled:
-            self.table.setSortingEnabled(True)
-            # FORCE ID column to ascending order (data is pre-sorted)
-            # This prevents Qt from re-sorting with string comparison
-            if self.current_sort_column == 0:  # ID column
-                self.current_sort_order = Qt.SortOrder.AscendingOrder
-            # Re-apply current sort
-            self.table.sortItems(self.current_sort_column, self.current_sort_order)
+        # Table is already pre-sorted by ID (numeric), no Qt sorting needed
     
     def _create_item(self, text: str) -> QTableWidgetItem:
         """Create centered table item"""
@@ -461,21 +443,6 @@ class TradesPanel(QWidget):
             row = selected_rows[0].row()
             if row < len(self.filtered_trades):
                 self.trade_selected.emit(self.filtered_trades[row])
-    
-    def _on_header_clicked(self, logical_index: int) -> None:
-        """Handle column header click for sorting"""
-        # Toggle sort order if same column
-        if logical_index == self.current_sort_column:
-            self.current_sort_order = (
-                Qt.SortOrder.AscendingOrder 
-                if self.current_sort_order == Qt.SortOrder.DescendingOrder 
-                else Qt.SortOrder.DescendingOrder
-            )
-        else:
-            self.current_sort_column = logical_index
-            self.current_sort_order = Qt.SortOrder.DescendingOrder
-        
-        self.table.sortItems(logical_index, self.current_sort_order)
     
     def _copy_selection(self) -> None:
         """Copy selected trades to clipboard in CSV format"""
