@@ -357,12 +357,19 @@ class LogViewerWindow(QDialog):
                 _, color = EVENT_PATTERNS[event_key]
                 checkbox = QCheckBox(display_name)
                 checkbox.setChecked(True)
+                
+                # Set font using QFont (NOT CSS - CSS gets overridden!)
+                checkbox_font = QFont()
+                checkbox_font.setPointSize(14)  # 14pt = ~19px
+                checkbox_font.setFamily("Segoe UI")
+                checkbox.setFont(checkbox_font)
+                
                 checkbox.setStyleSheet(f"""
                     QCheckBox {{
                         color: {color};
                         background: transparent;
-                        font-size: 20px;
                         padding: 5px;
+                        min-width: 180px;
                     }}
                     QCheckBox::indicator {{
                         width: 20px;
@@ -373,6 +380,8 @@ class LogViewerWindow(QDialog):
                 self.event_checkboxes[event_key] = checkbox
                 
                 grid_layout.addWidget(checkbox, row, col)
+                # Set column stretch to space evenly
+                grid_layout.setColumnStretch(col, 1)
                 
                 col += 1
                 if col >= max_cols:
@@ -431,7 +440,7 @@ class LogViewerWindow(QDialog):
         
         copy_selection_btn = QPushButton("📋 Copy Selection")
         copy_selection_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        copy_selection_btn.setFixedSize(220, 52)
+        copy_selection_btn.setFixedSize(230, 52)
         copy_selection_btn.clicked.connect(self._copy_selection)
         layout.addWidget(copy_selection_btn)
         
