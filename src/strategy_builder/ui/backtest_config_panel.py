@@ -124,6 +124,9 @@ class BacktestWorker(QThread):
                 # Simulate work (reduced sleep since processing smaller chunks)
                 self.msleep(10)
             
+            # Emit FINAL 100% progress update
+            self.progress_updated.emit(total_candles, total_candles, f"Processing candles {total_candles}/{total_candles}")
+            
             # Emit completion message LIVE
             self.live_message.emit(
                 f"✅ Backtest completed successfully! {trade_count} trades executed.",
