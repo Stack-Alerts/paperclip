@@ -110,6 +110,12 @@ class TradesPanel(QWidget):
         self.metrics_timer.timeout.connect(self._update_metrics)
         self.metrics_timer.start(1000)  # Update every second
     
+    def _console_print(self, message: str):
+        """Print to console only if console debugging is enabled"""
+        from src.debugger_logger.config_debugger import ConfigDebugger
+        if ConfigDebugger.CONSOLE_ENABLED:
+            print(message)
+    
     def _init_ui(self) -> None:
         """Initialize the user interface"""
         layout = QVBoxLayout()
@@ -278,7 +284,7 @@ class TradesPanel(QWidget):
         self.filtered_trades.clear()
         self._update_table()
         self._update_metrics()
-        print("🧹 Trades panel cleared for new backtest")
+        self._console_print("🧹 Trades panel cleared for new backtest")
     
     def add_trade(self, trade_data: Dict) -> None:
         """
@@ -550,7 +556,7 @@ class TradesPanel(QWidget):
         # Get selected row indices
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
-            print("⚠️ No trades selected - select rows with Ctrl+Click or Shift+Click")
+            self._console_print("⚠️ No trades selected - select rows with Ctrl+Click or Shift+Click")
             return
         
         try:
@@ -598,7 +604,7 @@ class TradesPanel(QWidget):
         from PyQt5.QtWidgets import QApplication
         
         if not self.trades:
-            print("⚠️ No trades to copy")
+            self._console_print("⚠️ No trades to copy")
             return
         
         try:

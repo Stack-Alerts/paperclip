@@ -43,8 +43,9 @@ class ConfigDebugger:
     """
     
     # Class-level flags for global control (can be toggled via UI)
-    CONSOLE_ENABLED = True
-    LOGFILE_ENABLED = True
+    # DEFAULT: Disabled - no console spam, user must enable if needed
+    CONSOLE_ENABLED = False
+    LOGFILE_ENABLED = False
     
     def __init__(
         self,

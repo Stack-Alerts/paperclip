@@ -113,8 +113,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Auto-create initial strategy so users can immediately add blocks
         self.orchestrator.create_strategy("New_Strategy")
         
-        # Restore window geometry from settings
+        # Restore window geometry and debug settings
         self._restore_settings()
+        self._restore_debug_settings()
         
         # Show data update modal on startup (after window is shown)
         QTimer.singleShot(500, self._show_data_update_modal)
@@ -1216,15 +1217,14 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Update global console logging state
         ConfigDebugger.CONSOLE_ENABLED = checked
         
+        # Update menu text  
+        self._update_console_menu_text(checked)
+        
+        # Save setting
+        self._save_debug_settings()
+        
         status = "enabled" if checked else "disabled"
         self._update_status(f"Console debugging {status}")
-        
-        QMessageBox.information(
-            self,
-            "Console Debugging",
-            f"Console debugging has been {status}.\n\n"
-            f"{'Debug messages will now appear in the console/terminal.' if checked else 'Debug messages will not appear in console.'}"
-        )
     
     def _on_toggle_logfile_debug(self, checked: bool):
         """Toggle debug output to log files."""
@@ -1233,15 +1233,14 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Update global file logging state
         ConfigDebugger.LOGFILE_ENABLED = checked
         
+        # Update menu text
+        self._update_logfile_menu_text(checked)
+        
+        # Save setting
+        self._save_debug_settings()
+        
         status = "enabled" if checked else "disabled"
         self._update_status(f"Log file debugging {status}")
-        
-        QMessageBox.information(
-            self,
-            "Log File Debugging",
-            f"Log file debugging has been {status}.\n\n"
-            f"{'Debug messages will now be written to log files in logs/ directory.' if checked else 'Debug messages will not be written to log files.'}"
-        )
     
     def _on_clear_old_logs(self):
         """Delete old log files."""
@@ -1386,11 +1385,52 @@ class StrategyBuilderMainWindow(QMainWindow):
                 f"Error finding log file:\n\n{str(e)}"
             )
     
+    def _restore_debug_settings(self):
+        """Restore debug logger settings."""
+        from src.debugger_logger.config_debugger import ConfigDebugger
+        
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        
+        # Restore console debug setting (default: False - disabled)
+        console_enabled = settings.value("debug/consoleEnabled", False, type=bool)
+        ConfigDebugger.CONSOLE_ENABLED = console_enabled
+        self.enable_console_action.setChecked(console_enabled)
+        self._update_console_menu_text(console_enabled)
+        
+        # Restore logfile debug setting (default: False - disabled)
+        logfile_enabled = settings.value("debug/logfileEnabled", False, type=bool)
+        ConfigDebugger.LOGFILE_ENABLED = logfile_enabled
+        self.enable_logfile_action.setChecked(logfile_enabled)
+        self._update_logfile_menu_text(logfile_enabled)
+    
+    def _save_debug_settings(self):
+        """Save debug logger settings."""
+        from src.debugger_logger.config_debugger import ConfigDebugger
+        
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        settings.setValue("debug/consoleEnabled", ConfigDebugger.CONSOLE_ENABLED)
+        settings.setValue("debug/logfileEnabled", ConfigDebugger.LOGFILE_ENABLED)
+    
+    def _update_console_menu_text(self, enabled: bool):
+        """Update console debug menu text based on state."""
+        if enabled:
+            self.enable_console_action.setText("Disable Debugger in Console")
+        else:
+            self.enable_console_action.setText("Enable Debugger in Console")
+    
+    def _update_logfile_menu_text(self, enabled: bool):
+        """Update logfile debug menu text based on state."""
+        if enabled:
+            self.enable_logfile_action.setText("Disable Debugger in Log File")
+        else:
+            self.enable_logfile_action.setText("Enable Debugger in Log File")
+    
     def _save_settings(self):
-        """Save window geometry and state to settings."""
+        """Save window geometry, state, and debug settings."""
         settings = QSettings("BTC_Engine", "StrategyBuilder")
         settings.setValue("geometry", self.saveGeometry())
         settings.setValue("windowState", self.saveState())
+        self._save_debug_settings()
     
     def closeEvent(self, event):
         """Handle window close event."""
