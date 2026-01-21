@@ -80,12 +80,12 @@ class HoverHighlightTextEdit(QTextEdit):
         super().leaveEvent(event)
     
     def _highlight_block(self, block):
-        """Apply purple background to entire row (full width) for hover visibility"""
+        """Apply dark teal background to entire row (full width) for hover visibility"""
         cursor = QTextCursor(block)
         
         # Use block format to highlight the ENTIRE row (full width)
         block_fmt = QTextBlockFormat()
-        block_fmt.setBackground(QColor("#6a15b3"))  # Purple - clearly visible against #15191E
+        block_fmt.setBackground(QColor("#0b676d"))  # Dark teal - clearly visible against #15191E
         cursor.setBlockFormat(block_fmt)
     
     def _clear_block_highlight(self, block):
