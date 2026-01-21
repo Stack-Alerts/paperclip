@@ -1497,9 +1497,9 @@ class BacktestConfigPanel(QWidget):
                 pnl_pct = -1.0
             
             trade_data = {
-                'id': f'TRADE_{i+1:03d}',
+                'id': str(i+1),  # Just the number, not "TRADE_001"
                 'timestamp': base_time + timedelta(minutes=i*30),
-                'symbol': 'BTC/USDT',
+                'symbol': 'BTC.P/USDT',  # Futures symbol
                 'side': 'BUY' if i % 2 == 0 else 'SELL',
                 'size': 0.1,
                 'entry_price': entry_price,
