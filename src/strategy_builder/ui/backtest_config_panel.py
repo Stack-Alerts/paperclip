@@ -48,6 +48,7 @@ class BacktestWorker(QThread):
     progress_updated = pyqtSignal(int, int, str)  # current, total, message
     backtest_finished = pyqtSignal(bool, dict)  # success, results
     live_message = pyqtSignal(str, str, str)  # message, level, category - NEW for real-time messages
+    trade_closed = pyqtSignal(dict)  # trade_data - NEW for real-time trade updates
     
     def __init__(self, orchestrator, config: dict, output_panel=None):
         super().__init__()
@@ -118,8 +119,13 @@ class BacktestWorker(QThread):
                             "RISK"
                         )
                         
+                        # Generate realistic trade data
+                        from datetime import datetime, timedelta
+                        entry_price = 50000 + (trade_count * 100)
                         if is_win:
                             pnl = 75.0 + (trade_count * 0.5)  # Vary PnL slightly
+                            exit_price = entry_price * 1.015
+                            pnl_pct = 1.5
                             self.live_message.emit(
                                 f"Trade {trade_count} closed: WIN - PnL: ${pnl:.2f}",
                                 "ACTION",
@@ -127,11 +133,30 @@ class BacktestWorker(QThread):
                             )
                         else:
                             pnl = -50.0 - (trade_count * 0.3)
+                            exit_price = entry_price * 0.99
+                            pnl_pct = -1.0
                             self.live_message.emit(
                                 f"Trade {trade_count} closed: LOSS - PnL: ${pnl:.2f}",
                                 "WARNING",
                                 "TRADE"
                             )
+                        
+                        # EMIT TRADE DATA IN REAL-TIME (streams to Trades tab immediately)
+                        trade_data = {
+                            'id': str(trade_count),
+                            'timestamp': datetime.now() - timedelta(minutes=(24-trade_count)*30),
+                            'symbol': 'BTC.P/USDT',
+                            'side': 'BUY' if trade_count % 2 == 0 else 'SELL',
+                            'size': 0.1,
+                            'entry_price': entry_price,
+                            'exit_price': exit_price,
+                            'duration': f'{20 + (trade_count % 40)} bars',
+                            'pnl': pnl,
+                            'pnl_pct': pnl_pct,
+                            'status': 'CLOSED',
+                            'notes': f'Demo trade #{trade_count}'
+                        }
+                        self.trade_closed.emit(trade_data)  # Real-time trade streaming
                         
                         # Occasionally emit ERROR messages (every 8th trade)
                         if trade_count % 8 == 0:
@@ -1366,12 +1391,14 @@ class BacktestConfigPanel(QWidget):
             'sl_mode': self.sl_combo.currentText()
         }
         
-        # Create and start worker - WIRE UP LIVE MESSAGES
+        # Create and start worker - WIRE UP LIVE MESSAGES AND TRADES
         self.worker = BacktestWorker(self.orchestrator, config, self.output_panel)
         self.worker.progress_updated.connect(self._on_progress_updated)
         self.worker.backtest_finished.connect(self._on_backtest_finished)
         # Connect live messages to output panel for REAL-TIME display
         self.worker.live_message.connect(self.output_panel.add_message)
+        # Connect trade_closed signal for REAL-TIME TRADE STREAMING
+        self.worker.trade_closed.connect(self.trades_panel.add_trade)
         self.worker.start()
         
         # Update UI state
@@ -1474,48 +1501,13 @@ class BacktestConfigPanel(QWidget):
             "SYSTEM"
         )
         
-        # Generate demo trades for Trades tab
-        # TODO: Replace with actual trade data from backtest engine
-        usd = Currency.from_str("USD")
-        base_time = datetime.now() - timedelta(hours=trade_count)
-        
-        winning_trades = int(trade_count * 0.58)  # 58% win rate (realistic)
-        
-        # Populate Trades tab with trade data (NO duplicate Live Output messages)
-        for i in range(trade_count):
-            is_winner = i < winning_trades
-            
-            # Generate realistic trade data
-            entry_price = 50000 + (i * 100)  # Vary entry prices
-            if is_winner:
-                exit_price = entry_price * 1.015  # +1.5% profit
-                pnl_value = (exit_price - entry_price) * 0.1  # Assume 0.1 BTC position
-                pnl_pct = 1.5
-            else:
-                exit_price = entry_price * 0.99  # -1% loss
-                pnl_value = (exit_price - entry_price) * 0.1
-                pnl_pct = -1.0
-            
-            trade_data = {
-                'id': str(i+1),  # Just the number, not "TRADE_001"
-                'timestamp': base_time + timedelta(minutes=i*30),
-                'symbol': 'BTC.P/USDT',  # Futures symbol
-                'side': 'BUY' if i % 2 == 0 else 'SELL',
-                'size': 0.1,
-                'entry_price': entry_price,
-                'exit_price': exit_price,
-                'duration': f'{20 + (i % 40)} bars',
-                'pnl': pnl_value,
-                'pnl_pct': pnl_pct,
-                'status': 'CLOSED',
-                'notes': f'Demo trade #{i+1}'
-            }
-            
-            # Populate Trades tab (NOT Live Output - trades already reported in real-time!)
-            self.trades_panel.add_trade(trade_data)
+        # NOTE: Trades are now streamed in real-time via trade_closed signal during execution
+        # No need to populate trades in batch after completion - they're already in the Trades tab!
         
         # Generate metrics for Metrics tab
         # TODO: Replace with actual metrics from backtest engine
+        usd = Currency.from_str("USD")
+        winning_trades = int(trade_count * 0.58)  # 58% win rate
         total_pnl = sum([
             (50000 * 1.015 - 50000) * 0.1 if i < winning_trades 
             else (50000 * 0.99 - 50000) * 0.1
