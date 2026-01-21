@@ -162,7 +162,7 @@ class TradesPanel(QWidget):
         # Table configuration
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)  # Allow multi-selection
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSortingEnabled(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
@@ -200,12 +200,20 @@ class TradesPanel(QWidget):
         
         layout.addStretch()
         
-        # Copy button (matches Live Output)
-        copy_btn = QPushButton("📋 Copy")
+        # Copy Selection button (for selected rows)
+        copy_selection_btn = QPushButton("📋 Copy Selection")
+        copy_selection_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        copy_selection_btn.setFixedSize(160, 42)
+        copy_selection_btn.clicked.connect(self._copy_selection)
+        copy_selection_btn.setToolTip("Copy selected trades to clipboard (Ctrl+Click for multi-select)")
+        layout.addWidget(copy_selection_btn)
+        
+        # Copy All button
+        copy_btn = QPushButton("📋 Copy All")
         copy_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
         copy_btn.setFixedSize(130, 42)
         copy_btn.clicked.connect(self._copy_trades)
-        copy_btn.setToolTip("Copy trades to clipboard")
+        copy_btn.setToolTip("Copy all trades to clipboard")
         layout.addWidget(copy_btn)
         
         # Export button
@@ -213,7 +221,7 @@ class TradesPanel(QWidget):
         export_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
         export_btn.setFixedSize(130, 42)
         export_btn.clicked.connect(self._export_trades)
-        export_btn.setToolTip("Export trades to Excel")
+        export_btn.setToolTip("Export all trades to CSV file")
         layout.addWidget(export_btn)
         
         return layout
@@ -373,8 +381,58 @@ class TradesPanel(QWidget):
         
         self.table.sortItems(logical_index, self.current_sort_order)
     
+    def _copy_selection(self) -> None:
+        """Copy selected trades to clipboard in CSV format"""
+        from PyQt5.QtWidgets import QApplication
+        
+        # Get selected row indices
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
+            print("⚠️ No trades selected - select rows with Ctrl+Click or Shift+Click")
+            return
+        
+        try:
+            # Get selected trade indices
+            selected_indices = sorted([row.row() for row in selected_rows])
+            selected_trades = [self.filtered_trades[i] for i in selected_indices]
+            
+            # Build CSV content
+            lines = []
+            # Header
+            lines.append("ID\tTime\tSymbol\tSide\tSize\tEntry\tExit\tDuration\tP&L\tP&L %\tStatus\tNotes")
+            
+            # Data rows (only selected)
+            for trade in selected_trades:
+                timestamp = trade.get('timestamp', datetime.now())
+                time_str = timestamp.strftime('%H:%M:%S') if isinstance(timestamp, datetime) else str(timestamp)
+                
+                lines.append(
+                    f"{trade.get('id', '')}\t"
+                    f"{time_str}\t"
+                    f"{trade.get('symbol', '')}\t"
+                    f"{trade.get('side', '')}\t"
+                    f"{trade.get('size', '')}\t"
+                    f"${float(trade.get('entry_price', 0)):,.2f}\t"
+                    f"${float(trade.get('exit_price', 0)):,.2f}\t"
+                    f"{trade.get('duration', '')}\t"
+                    f"${float(trade.get('pnl', 0)):,.2f}\t"
+                    f"{float(trade.get('pnl_pct', 0)):.2f}%\t"
+                    f"{trade.get('status', '')}\t"
+                    f"{trade.get('notes', '')}"
+                )
+            
+            # Copy to clipboard
+            csv_content = '\n'.join(lines)
+            clipboard = QApplication.clipboard()
+            clipboard.setText(csv_content)
+            
+            print(f"✅ {len(selected_trades)} selected trades copied to clipboard")
+            
+        except Exception as e:
+            print(f"❌ Copy selection failed: {str(e)}")
+    
     def _copy_trades(self) -> None:
-        """Copy trades to clipboard in CSV format"""
+        """Copy all trades to clipboard in CSV format"""
         from PyQt5.QtWidgets import QApplication
         
         if not self.trades:
