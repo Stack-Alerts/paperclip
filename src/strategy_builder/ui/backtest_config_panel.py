@@ -78,7 +78,7 @@ class BacktestWorker(QThread):
                             9800, 10500, 11200, 11800, 12300, 12800, 13100, 13400, 13600, 13750,
                             13850, 13900, 13950, 14000]  # 24 trades at various candle positions
             
-            for i in range(0, total_candles, 100):
+            for i in range(0, total_candles, 20):  # Process 20 candles at a time for more frequent updates
                 if self.should_stop:
                     self.live_message.emit("Backtest stopped by user", "WARNING", "SYSTEM")
                     self.backtest_finished.emit(False, {'error': 'Stopped by user'})
@@ -88,13 +88,13 @@ class BacktestWorker(QThread):
                 while self.is_paused and not self.should_stop:
                     self.msleep(100)
                 
-                # Emit progress
+                # Emit progress every iteration (every 20 candles)
                 progress_msg = f"Processing candles {i}/{total_candles}"
                 self.progress_updated.emit(i, total_candles, progress_msg)
                 
                 # Check if any trades should trigger at this candle range
                 for trigger_candle in trade_triggers:
-                    if i <= trigger_candle < i + 100:
+                    if i <= trigger_candle < i + 20:
                         trade_count += 1
                         is_win = trade_count <= 14  # First 14 are wins (58% win rate)
                         
@@ -113,16 +113,16 @@ class BacktestWorker(QThread):
                                 "TRADE"
                             )
                 
-                # Emit progress messages periodically
-                if i % 2000 == 0 and i > 0:
+                # Emit progress messages every 500 candles for summary
+                if i % 500 == 0 and i > 0:
                     self.live_message.emit(
                         f"Progress: {int((i/total_candles)*100)}% complete, {trade_count} trades executed",
                         "INFO",
                         "OPTIMIZER"
                     )
                 
-                # Simulate work
-                self.msleep(50)
+                # Simulate work (reduced sleep since processing smaller chunks)
+                self.msleep(10)
             
             # Emit completion message LIVE
             self.live_message.emit(
