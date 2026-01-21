@@ -193,11 +193,22 @@ class LiveOutputPanel(QWidget):
         level_label.setContentsMargins(0, 0, 10, 0)  # Add right margin before checkboxes
         layout.addWidget(level_label)
         
+        # Level filter checkboxes - COLOR CODED to match message types
+        level_colors = {
+            MessageLevel.INFO: get_color('info'),         # Blue
+            MessageLevel.DECISION: get_color('success'),  # Green
+            MessageLevel.ACTION: get_color('info'),       # Blue
+            MessageLevel.WARNING: get_color('warning'),   # Orange
+            MessageLevel.ERROR: get_color('error')        # Red
+        }
+        
         self.level_checkboxes = {}
         for level in MessageLevel:
             checkbox = QCheckBox(level.value)
             checkbox.setChecked(True)
-            checkbox.setStyleSheet(get_checkbox_style())
+            # Apply color-coded style
+            color = level_colors.get(level, get_color('text_primary'))
+            checkbox.setStyleSheet(f"QCheckBox {{ color: {color}; background: transparent; }}")
             checkbox.stateChanged.connect(lambda state, l=level: self._toggle_level_filter(l, state))
             layout.addWidget(checkbox)
             self.level_checkboxes[level] = checkbox
@@ -212,11 +223,22 @@ class LiveOutputPanel(QWidget):
         category_label.setStyleSheet(get_label_style('muted'))
         layout.addWidget(category_label)
         
+        # Category filter checkboxes - COLOR CODED to match category types
+        category_colors = {
+            MessageCategory.SIGNAL: get_color('success'),    # Green (trading signals)
+            MessageCategory.TRADE: get_color('info'),        # Blue (trade execution)
+            MessageCategory.RISK: get_color('error'),        # Red (risk management)
+            MessageCategory.SYSTEM: get_color('text_muted'), # Gray (system messages)
+            MessageCategory.OPTIMIZER: get_color('warning')  # Orange (optimizer)
+        }
+        
         self.category_checkboxes = {}
         for category in MessageCategory:
             checkbox = QCheckBox(category.value)
             checkbox.setChecked(True)
-            checkbox.setStyleSheet(get_checkbox_style())
+            # Apply color-coded style
+            color = category_colors.get(category, get_color('text_primary'))
+            checkbox.setStyleSheet(f"QCheckBox {{ color: {color}; background: transparent; }}")
             checkbox.stateChanged.connect(lambda state, c=category: self._toggle_category_filter(c, state))
             layout.addWidget(checkbox)
             self.category_checkboxes[category] = checkbox
