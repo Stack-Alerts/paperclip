@@ -295,7 +295,7 @@ class LiveOutputPanel(QWidget):
         return level_match and category_match
     
     def _append_colored_message(self, msg_data: Dict) -> None:
-        """Append message with color coding"""
+        """Append message with color coding - 16PX FONT SIZE"""
         # Get color based on level
         color_map = {
             MessageLevel.INFO: get_color('info'),
@@ -313,12 +313,12 @@ class LiveOutputPanel(QWidget):
         category = msg_data['category'].value
         message = msg_data['message']
         
-        # Build HTML
+        # Build HTML with EXPLICIT 16px font-size on every span
         html = (
-            f"<span style='color: {get_color('text_muted')};'>{timestamp}</span> "
-            f"<span style='color: {color}; font-weight: bold;'>[{level}]</span> "
-            f"<span style='color: {get_color('secondary')};'>[{category}]</span> "
-            f"<span style='color: {get_color('text_primary')};'>{message}</span>"
+            f"<span style='color: {get_color('text_muted')}; font-size: 16px;'>{timestamp}</span> "
+            f"<span style='color: {color}; font-weight: bold; font-size: 16px;'>[{level}]</span> "
+            f"<span style='color: {get_color('secondary')}; font-size: 16px;'>[{category}]</span> "
+            f"<span style='color: {get_color('text_primary')}; font-size: 16px;'>{message}</span>"
         )
         
         self.output_text.append(html)
