@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
     QGroupBox, QTextEdit, QCheckBox, QScrollArea
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QTextCursor, QColor
+from PyQt5.QtGui import QTextCursor, QColor, QFont
 from datetime import datetime
 from enum import Enum
 
@@ -241,12 +241,18 @@ class LiveOutputPanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 15, 10, 10)  # Increased top margin for label visibility
         
-        # Text edit for output - using helper from styles.py with MUCH LARGER FONT
+        # Text edit for output - INSTITUTIONAL-GRADE FONT SETTING
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
-        # Get base stylesheet and add MUCH larger font size for readability (20px)
+        
+        # PROPER Qt way: Set default font on the document itself
+        document_font = QFont("Courier New", 14)  # 14pt = ~18.67px, monospace for alignment
+        document_font.setStyleHint(QFont.Monospace)
+        self.output_text.document().setDefaultFont(document_font)
+        
+        # Apply base stylesheet (colors, background)
         base_style = get_text_edit_stylesheet()
-        self.output_text.setStyleSheet(base_style + " font-size: 20px; line-height: 1.8;")
+        self.output_text.setStyleSheet(base_style)
         
         layout.addWidget(self.output_text)
         group.setLayout(layout)
@@ -295,7 +301,7 @@ class LiveOutputPanel(QWidget):
         return level_match and category_match
     
     def _append_colored_message(self, msg_data: Dict) -> None:
-        """Append message with color coding - 20PX FONT SIZE"""
+        """Append message with color coding - Uses document default font (14pt Courier New)"""
         # Get color based on level
         color_map = {
             MessageLevel.INFO: get_color('info'),
@@ -313,12 +319,12 @@ class LiveOutputPanel(QWidget):
         category = msg_data['category'].value
         message = msg_data['message']
         
-        # Build HTML with EXPLICIT 20px font-size on every span
+        # Build HTML - NO inline font-size (uses document default font: 14pt Courier New)
         html = (
-            f"<span style='color: {get_color('text_muted')}; font-size: 20px;'>{timestamp}</span> "
-            f"<span style='color: {color}; font-weight: bold; font-size: 20px;'>[{level}]</span> "
-            f"<span style='color: {get_color('secondary')}; font-size: 20px;'>[{category}]</span> "
-            f"<span style='color: {get_color('text_primary')}; font-size: 20px;'>{message}</span>"
+            f"<span style='color: {get_color('text_muted')};'>{timestamp}</span> "
+            f"<span style='color: {color}; font-weight: bold;'>[{level}]</span> "
+            f"<span style='color: {get_color('secondary')};'>[{category}]</span> "
+            f"<span style='color: {get_color('text_primary')};'>{message}</span>"
         )
         
         self.output_text.append(html)
