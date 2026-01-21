@@ -241,18 +241,25 @@ class LiveOutputPanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 15, 10, 10)  # Increased top margin for label visibility
         
-        # Text edit for output - INSTITUTIONAL-GRADE FONT SETTING
+        # Text edit for output - MAXIMUM FONT SIZE WITH TRIPLE PROTECTION
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
         
-        # PROPER Qt way: Set default font on the document itself
-        document_font = QFont("Courier New", 14)  # 14pt = ~18.67px, monospace for alignment
-        document_font.setStyleHint(QFont.Monospace)
-        self.output_text.document().setDefaultFont(document_font)
+        # TRIPLE FONT PROTECTION (institutional-grade + nuclear option)
+        # 1. Create large monospace font - Use PIXEL SIZE (not points) to avoid DPI scaling
+        large_font = QFont("Courier New")
+        large_font.setPixelSize(18)  # 18 PIXELS - absolute size, no DPI scaling
+        large_font.setStyleHint(QFont.Monospace)
+        large_font.setBold(False)
         
-        # Apply base stylesheet (colors, background)
-        base_style = get_text_edit_stylesheet()
-        self.output_text.setStyleSheet(base_style)
+        # 2. Set on widget itself
+        self.output_text.setFont(large_font)
+        
+        # 3. Set on document
+        self.output_text.document().setDefaultFont(large_font)
+        
+        # Minimal stylesheet (no font properties that could override)
+        self.output_text.setStyleSheet(f"background-color: {get_color('background')}; color: {get_color('text_primary')}; border: 1px solid {get_color('border')}; padding: 8px;")
         
         layout.addWidget(self.output_text)
         group.setLayout(layout)
