@@ -103,8 +103,12 @@ class MessageLevel(Enum):
     INFO = "INFO"
     DECISION = "DECISION"
     ACTION = "ACTION"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
+    LOSS = "LOSS"           # Losing trades (was WARNING)
+    STOP_LOSS = "STOP LOSS" # Stop loss triggers (was ERROR)
+    
+    # Backward compatibility aliases
+    WARNING = "LOSS"
+    ERROR = "STOP LOSS"
 
 
 class MessageCategory(Enum):
@@ -258,13 +262,20 @@ class LiveOutputPanel(QWidget):
         level_colors = {
             MessageLevel.INFO: '#2070FF',      # Blue
             MessageLevel.DECISION: '#10B981',  # Green
-            MessageLevel.ACTION: '#14B8A6',    # Cyan/Teal (distinct from blue)
-            MessageLevel.WARNING: '#FFA500',   # Orange
-            MessageLevel.ERROR: '#C35252'      # Red
+            MessageLevel.ACTION: '#14B8A6',    # Cyan/Teal (WIN trades)
+            MessageLevel.LOSS: '#FFA500',      # Orange (LOSS trades)
+            MessageLevel.STOP_LOSS: '#C35252', # Red (Stop loss)
+            # Backward compatibility
+            MessageLevel.WARNING: '#FFA500',
+            MessageLevel.ERROR: '#C35252'
         }
         
+        # Only show main levels (not backward compatibility aliases)
+        main_levels = [MessageLevel.INFO, MessageLevel.DECISION, MessageLevel.ACTION, 
+                      MessageLevel.LOSS, MessageLevel.STOP_LOSS]
+        
         self.level_checkboxes = {}
-        for level in MessageLevel:
+        for level in main_levels:
             checkbox = QCheckBox(level.value)
             checkbox.setChecked(True)
             # Apply color-coded style
@@ -405,9 +416,12 @@ class LiveOutputPanel(QWidget):
         level_color_map = {
             MessageLevel.INFO: '#2070FF',      # Blue
             MessageLevel.DECISION: '#10B981',  # Green
-            MessageLevel.ACTION: '#14B8A6',    # Cyan/Teal
-            MessageLevel.WARNING: '#FFA500',   # Orange
-            MessageLevel.ERROR: '#C35252'      # Red
+            MessageLevel.ACTION: '#14B8A6',    # Cyan/Teal (WIN trades)
+            MessageLevel.LOSS: '#FFA500',      # Orange (LOSS trades)
+            MessageLevel.STOP_LOSS: '#C35252', # Red (Stop loss)
+            # Backward compatibility
+            MessageLevel.WARNING: '#FFA500',
+            MessageLevel.ERROR: '#C35252'
         }
         
         # Get color based on category - UNIQUE colors matching filter checkboxes
@@ -507,13 +521,13 @@ class LiveOutputPanel(QWidget):
         """Update statistics labels"""
         total = len(self.messages)
         displayed = len(self.filtered_messages)
-        errors = len([m for m in self.messages if m['level'] == MessageLevel.ERROR])
-        warnings = len([m for m in self.messages if m['level'] == MessageLevel.WARNING])
+        stop_losses = len([m for m in self.messages if m['level'] in [MessageLevel.STOP_LOSS, MessageLevel.ERROR]])
+        losses = len([m for m in self.messages if m['level'] in [MessageLevel.LOSS, MessageLevel.WARNING]])
         
         self.msg_count_label.setText(f"Messages: <b>{total}</b>")
         self.filtered_count_label.setText(f"Displayed: <b>{displayed}</b>")
-        self.error_count_label.setText(f"⛔ Errors: <b>{errors}</b>")
-        self.warning_count_label.setText(f"⚠️ Warnings: <b>{warnings}</b>")
+        self.error_count_label.setText(f"⛔ Stop Loss: <b>{stop_losses}</b>")
+        self.warning_count_label.setText(f"📉 Losses: <b>{losses}</b>")
     
     def get_messages(self) -> List[Dict]:
         """Get all messages"""
