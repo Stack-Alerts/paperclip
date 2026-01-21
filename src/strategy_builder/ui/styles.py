@@ -851,7 +851,7 @@ def get_table_stylesheet() -> str:
             color: {COLORS['text_muted']};
             border: 1px solid {COLORS['border']};
             gridline-color: {COLORS['border']};
-            selection-background-color: #021a1e;
+            selection-background-color: #053336;
             selection-color: {COLORS['text_muted']};
         }}
         QTableWidget::item {{
@@ -859,7 +859,7 @@ def get_table_stylesheet() -> str:
             background-color: transparent;
         }}
         QTableWidget::item:hover {{
-            background-color: #053336;
+            background-color: #021a1e;
         }}
         QHeaderView::section {{
             background-color: {COLORS['bg_secondary']};
