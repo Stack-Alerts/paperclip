@@ -246,13 +246,32 @@ class TradesPanel(QWidget):
     
     def add_trade(self, trade_data: Dict) -> None:
         """
-        Add trade to panel.
+        Add trade to panel with duplicate protection.
+        
+        INSTITUTIONAL-GRADE: Prevents duplicate IDs by checking existing trades first.
+        If trade ID already exists, updates it instead of adding duplicate.
         
         Args:
             trade_data: Dictionary with trade information
                 Required keys: id, timestamp, symbol, side, size, entry_price
                 Optional keys: exit_price, exit_timestamp, pnl, status, notes
         """
+        trade_id = trade_data.get('id')
+        
+        # CRITICAL: Check if trade with this ID already exists
+        trade_id_str = str(trade_id)
+        for i, existing_trade in enumerate(self.trades):
+            if str(existing_trade.get('id')) == trade_id_str:
+                # Trade exists - UPDATE it instead of adding duplicate
+                print(f"🔄 Trade #{trade_id} already exists - updating instead of adding")
+                self.trades[i].update(trade_data)
+                self.filtered_trades = self.trades.copy()
+                self._update_table()
+                self._update_metrics()
+                return
+        
+        # Trade doesn't exist - safe to add
+        print(f"➕ Adding new trade #{trade_id}")
         self.trades.append(trade_data)
         self.filtered_trades = self.trades.copy()
         self._update_table()
