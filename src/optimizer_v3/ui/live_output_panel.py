@@ -241,12 +241,12 @@ class LiveOutputPanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 15, 10, 10)  # Increased top margin for label visibility
         
-        # Text edit for output - using helper from styles.py with LARGER FONT
+        # Text edit for output - using helper from styles.py with MUCH LARGER FONT
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
-        # Get base stylesheet and add MUCH larger font size for readability
+        # Get base stylesheet and add MUCH larger font size for readability (20px)
         base_style = get_text_edit_stylesheet()
-        self.output_text.setStyleSheet(base_style + " font-size: 16px; line-height: 1.6;")
+        self.output_text.setStyleSheet(base_style + " font-size: 20px; line-height: 1.8;")
         
         layout.addWidget(self.output_text)
         group.setLayout(layout)
@@ -295,7 +295,7 @@ class LiveOutputPanel(QWidget):
         return level_match and category_match
     
     def _append_colored_message(self, msg_data: Dict) -> None:
-        """Append message with color coding - 16PX FONT SIZE"""
+        """Append message with color coding - 20PX FONT SIZE"""
         # Get color based on level
         color_map = {
             MessageLevel.INFO: get_color('info'),
@@ -313,12 +313,12 @@ class LiveOutputPanel(QWidget):
         category = msg_data['category'].value
         message = msg_data['message']
         
-        # Build HTML with EXPLICIT 16px font-size on every span
+        # Build HTML with EXPLICIT 20px font-size on every span
         html = (
-            f"<span style='color: {get_color('text_muted')}; font-size: 16px;'>{timestamp}</span> "
-            f"<span style='color: {color}; font-weight: bold; font-size: 16px;'>[{level}]</span> "
-            f"<span style='color: {get_color('secondary')}; font-size: 16px;'>[{category}]</span> "
-            f"<span style='color: {get_color('text_primary')}; font-size: 16px;'>{message}</span>"
+            f"<span style='color: {get_color('text_muted')}; font-size: 20px;'>{timestamp}</span> "
+            f"<span style='color: {color}; font-weight: bold; font-size: 20px;'>[{level}]</span> "
+            f"<span style='color: {get_color('secondary')}; font-size: 20px;'>[{category}]</span> "
+            f"<span style='color: {get_color('text_primary')}; font-size: 20px;'>{message}</span>"
         )
         
         self.output_text.append(html)
