@@ -200,7 +200,7 @@ class BacktestConfigPanel(QWidget):
         from src.optimizer_v3.ui.live_output_panel import LiveOutputPanel
         strategy_name = self._get_strategy_name()
         self.output_panel = LiveOutputPanel(strategy_name=strategy_name)
-        self.tab_widget.addTab(self.output_panel, "🔴 Live Output")
+        self.live_output_tab_index = self.tab_widget.addTab(self.output_panel, "🔴 Live Output")
         
         # Tab 3: Trades (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.trades_panel import TradesPanel
@@ -1350,8 +1350,9 @@ class BacktestConfigPanel(QWidget):
         self.stop_btn.setEnabled(True)
         self.results_btn.setEnabled(True)
         
-        # Update Live Output icon to green (running)
+        # Update Live Output icon to green (running) - both panel title AND tab text
         self.output_panel.set_running(True)
+        self.tab_widget.setTabText(self.live_output_tab_index, "🟢 Live Output")
         
         self.results_text.setText("🔄 Backtest started...\n")
     
@@ -1387,8 +1388,9 @@ class BacktestConfigPanel(QWidget):
         self.stop_btn.setEnabled(False)
         self.pause_btn.setText("⏸️ Pause")
         
-        # Update Live Output icon to red (idle)
+        # Update Live Output icon to red (idle) - both panel title AND tab text
         self.output_panel.set_running(False)
+        self.tab_widget.setTabText(self.live_output_tab_index, "🔴 Live Output")
         
         if success:
             # Update displays - INLINE HTML FORMAT
