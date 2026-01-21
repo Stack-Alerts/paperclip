@@ -80,12 +80,52 @@ class BacktestWorker(QThread):
             self.live_message.emit("Position entry decision: Market conditions favorable", "DECISION", "TRADE")
             self.msleep(100)
             
-            # Simulate trades happening during execution
-            trade_triggers = [500, 1200, 2300, 3100, 4200, 5500, 6300, 7100, 8200, 9100, 
-                            9800, 10500, 11200, 11800, 12300, 12800, 13100, 13400, 13600, 13750,
-                            13850, 13900, 13950, 14000]  # 24 trades at various candle positions
+            # MODIFIED: Simulate trades with OVERLAPPING positions to test multiple simultaneous positions
+            # This creates scenarios where multiple positions are open at once, then some close while others remain
             
-            for i in range(0, total_candles, 20):  # Process 20 candles at a time for more frequent updates
+            # Define trade entry and exit points separately to create overlaps
+            trade_schedule = [
+                # (entry_candle, entry_id, exit_candle)
+                # Open 5 positions first
+                (500, 1, 1500),   # Stays open for 1000 candles
+                (800, 2, 2200),   # Stays open for 1400 candles  
+                (1100, 3, 1800),  # Closes first while others open
+                (1400, 4, 3000),  # Long hold
+                (1700, 5, 2500),  # Medium hold
+                # Now 5 positions are open, start closing some
+                # Trade 3 closes at 1800 (2,4,5 still OPEN)
+                # Trade 1 closes at 1500 (already happened, but delayed for effect)
+                (2000, 6, 3200),  # Open while others are still open
+                # Trade 2 closes at 2200 (4,5,6 still OPEN)
+                (2400, 7, 4000),  
+                # Trade 5 closes at 2500 (4,6,7 still OPEN)
+                (2800, 8, 4500),
+                # Trade 4 closes at 3000 (6,7,8 still OPEN)
+                (3200, 9, 5000),
+                # Trade 6 closes at 3200, Trade 9 opens same time (7,8,9 OPEN)
+                (3600, 10, 5500),
+                (4000, 11, 6000),
+                # Trade 7 closes at 4000, 11 opens (8,9,10,11 OPEN)
+                (4400, 12, 6500),
+                # More overlapping trades
+                (4800, 13, 7000),
+                (5200, 14, 7500),
+                (5600, 15, 8000),
+                (6000, 16, 8500),
+                (6400, 17, 9000),
+                (6800, 18, 9500),
+                (7200, 19, 10000),
+                (7600, 20, 10500),
+                (8000, 21, 11000),
+                (8400, 22, 11500),
+                (8800, 23, 12000),
+                (9200, 24, 12500),
+            ]
+            
+            # Track open positions
+            open_positions = {}  # {trade_id: (entry_price, entry_timestamp, side)}
+            
+            for i in range(0, total_candles, 20):  # Process 20 candles at a time
                 if self.should_stop:
                     self.live_message.emit("Backtest stopped by user", "WARNING", "SYSTEM")
                     self.backtest_finished.emit(False, {'error': 'Stopped by user'})
@@ -95,19 +135,18 @@ class BacktestWorker(QThread):
                 while self.is_paused and not self.should_stop:
                     self.msleep(100)
                 
-                # Emit progress every iteration (every 20 candles)
+                # Emit progress every iteration
                 progress_msg = f"Processing candles {i}/{total_candles}"
                 self.progress_updated.emit(i, total_candles, progress_msg)
                 
-                # Check if any trades should trigger at this candle range
-                for trigger_candle in trade_triggers:
-                    if i <= trigger_candle < i + 20:
+                # Check for trade ENTRIES in this candle range
+                for entry_candle, trade_id, exit_candle in trade_schedule:
+                    if i <= entry_candle < i + 20 and trade_id not in open_positions:
                         trade_count += 1
-                        is_win = trade_count <= 14  # First 14 are wins (58% win rate)
                         
                         # Emit DECISION message before trade entry
                         self.live_message.emit(
-                            f"Entry decision: Confluence threshold met, opening position #{trade_count}",
+                            f"Entry decision: Confluence threshold met, opening position #{trade_id}",
                             "DECISION",
                             "SIGNAL"
                         )
@@ -121,74 +160,96 @@ class BacktestWorker(QThread):
                         
                         # Generate realistic trade data
                         from datetime import datetime, timedelta
-                        entry_price = 50000 + (trade_count * 100)
-                        entry_timestamp = datetime.now() - timedelta(minutes=(24-trade_count)*30)
+                        entry_price = 50000 + (trade_id * 100)
+                        entry_timestamp = datetime.now() - timedelta(minutes=(24-trade_id)*30)
+                        side = 'LONG' if trade_id % 2 == 0 else 'SHORT'
                         
-                        # EMIT TRADE AS OPEN (shows in Trades tab immediately with OPEN status)
+                        # Store open position
+                        open_positions[trade_id] = (entry_price, entry_timestamp, side)
+                        
+                        # EMIT TRADE AS OPEN
                         open_trade_data = {
-                            'id': str(trade_count),
+                            'id': str(trade_id),
                             'timestamp': entry_timestamp,
                             'symbol': 'BTC.P/USDT',
-                            'side': 'LONG' if trade_count % 2 == 0 else 'SHORT',  # Futures: LONG/SHORT not BUY/SELL
+                            'side': side,
                             'size': 0.1,
                             'entry_price': entry_price,
-                            'exit_price': None,  # No exit yet (trade OPEN)
-                            'duration': '-',  # Unknown duration (trade ongoing)
-                            'pnl': 0.0,  # No P&L yet (trade OPEN)
+                            'exit_price': None,
+                            'duration': '-',
+                            'pnl': 0.0,
                             'pnl_pct': 0.0,
-                            'status': 'OPEN',  # Trade is OPEN
-                            'notes': f'Demo trade #{trade_count} - OPEN'
+                            'status': 'OPEN',
+                            'notes': f'Demo trade #{trade_id} - OPEN'
                         }
-                        self.trade_data_emit.emit(open_trade_data)  # Emit OPEN trade immediately
+                        self.trade_data_emit.emit(open_trade_data)
                         
-                        # Wait a bit to simulate trade duration
+                        # Log multiple open positions if applicable
+                        if len(open_positions) > 1:
+                            self.live_message.emit(
+                                f"📊 Multiple positions OPEN: {len(open_positions)} trades (IDs: {', '.join(map(str, sorted(open_positions.keys())))})",
+                                "INFO",
+                                "TRADE"
+                            )
+                        
                         self.msleep(50)
+                
+                # Check for trade EXITS in this candle range
+                for entry_candle, trade_id, exit_candle in trade_schedule:
+                    if i <= exit_candle < i + 20 and trade_id in open_positions:
+                        entry_price, entry_timestamp, side = open_positions[trade_id]
                         
-                        # Now close the trade - emit FULL trade data again with CLOSED status
-                        # trades_panel.update_trade() will find by ID and update it
+                        # Determine win/loss
+                        is_win = trade_id <= 14  # First 14 are wins
+                        
                         if is_win:
-                            pnl = 75.0 + (trade_count * 0.5)  # Vary PnL slightly
+                            pnl = 75.0 + (trade_id * 0.5)
                             exit_price = entry_price * 1.015
                             pnl_pct = 1.5
                             self.live_message.emit(
-                                f"Trade {trade_count} closed: WIN - PnL: ${pnl:.2f}",
+                                f"Trade {trade_id} closed: WIN - PnL: ${pnl:.2f} (Remaining open: {len(open_positions)-1})",
                                 "ACTION",
                                 "TRADE"
                             )
                         else:
-                            pnl = -50.0 - (trade_count * 0.3)
+                            pnl = -50.0 - (trade_id * 0.3)
                             exit_price = entry_price * 0.99
                             pnl_pct = -1.0
                             self.live_message.emit(
-                                f"Trade {trade_count} closed: LOSS - PnL: ${pnl:.2f}",
+                                f"Trade {trade_id} closed: LOSS - PnL: ${pnl:.2f} (Remaining open: {len(open_positions)-1})",
                                 "WARNING",
                                 "TRADE"
                             )
                         
-                        # Emit FULL CLOSED trade data (will update existing OPEN trade by ID)
+                        # Emit CLOSED trade data
                         closed_trade_data = {
-                            'id': str(trade_count),
+                            'id': str(trade_id),
                             'timestamp': entry_timestamp,
                             'symbol': 'BTC.P/USDT',
-                            'side': 'LONG' if trade_count % 2 == 0 else 'SHORT',
+                            'side': side,
                             'size': 0.1,
                             'entry_price': entry_price,
                             'exit_price': exit_price,
-                            'duration': f'{20 + (trade_count % 40)} bars',
+                            'duration': f'{exit_candle - entry_candle} bars',
                             'pnl': pnl,
                             'pnl_pct': pnl_pct,
                             'status': 'CLOSED',
-                            'notes': f'Demo trade #{trade_count} - CLOSED'
+                            'notes': f'Demo trade #{trade_id} - CLOSED'
                         }
-                        self.trade_data_emit.emit(closed_trade_data)  # Update to CLOSED
+                        self.trade_data_emit.emit(closed_trade_data)
                         
-                        # Occasionally emit ERROR messages (every 8th trade)
-                        if trade_count % 8 == 0:
+                        # Remove from open positions
+                        del open_positions[trade_id]
+                        
+                        # Log remaining open positions
+                        if open_positions:
                             self.live_message.emit(
-                                f"Stop loss triggered early on trade {trade_count} - volatility spike detected",
-                                "ERROR",
-                                "RISK"
+                                f"📊 Remaining OPEN positions: {len(open_positions)} trades (IDs: {', '.join(map(str, sorted(open_positions.keys())))})",
+                                "INFO",
+                                "TRADE"
                             )
+                        
+                        self.msleep(50)
                 
                 # Emit progress messages every 500 candles for summary
                 if i % 500 == 0 and i > 0:
