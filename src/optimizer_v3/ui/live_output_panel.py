@@ -113,9 +113,9 @@ class LiveOutputPanel(QWidget):
         
         # Title - Dynamic with strategy name
         if self.strategy_name:
-            title_text = f"🔴 Live Output - {self.strategy_name}"
+            title_text = f"● Live Output - {self.strategy_name}"
         else:
-            title_text = "🔴 Live Output"
+            title_text = "● Live Output"
         self.title_label = QLabel(title_text)
         self.title_label.setStyleSheet(get_panel_title_stylesheet())
         layout.addWidget(self.title_label)
@@ -440,7 +440,7 @@ class LiveOutputPanel(QWidget):
     
     def _update_title_icon(self) -> None:
         """Update title icon based on running state"""
-        icon = "🟢" if self.is_running else "🔴"
+        icon = "▶" if self.is_running else "●"  # Play symbol when running, circle when stopped
         
         if self.strategy_name:
             title_text = f"{icon} Live Output - {self.strategy_name}"
