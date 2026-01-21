@@ -226,9 +226,12 @@ class BacktestConfigPanel(QWidget):
         
         # Tab 2: Live Output (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.live_output_panel import LiveOutputPanel
+        from PyQt5.QtGui import QColor
         strategy_name = self._get_strategy_name()
         self.output_panel = LiveOutputPanel(strategy_name=strategy_name)
+        # Create tab with red colored text for idle state
         self.live_output_tab_index = self.tab_widget.addTab(self.output_panel, "● Live Output")
+        self.tab_widget.tabBar().setTabTextColor(self.live_output_tab_index, QColor("#C35252"))  # Red
         
         # Tab 3: Trades (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.trades_panel import TradesPanel
@@ -1381,6 +1384,7 @@ class BacktestConfigPanel(QWidget):
         # Update Live Output icon to green (running) - both panel title AND tab text  
         self.output_panel.set_running(True)
         self.tab_widget.setTabText(self.live_output_tab_index, "▶ Live Output")
+        self.tab_widget.tabBar().setTabTextColor(self.live_output_tab_index, QColor("#10B981"))  # Green
         
         self.results_text.setText("🔄 Backtest started...\n")
     
@@ -1419,6 +1423,7 @@ class BacktestConfigPanel(QWidget):
         # Update Live Output icon to stopped (idle) - both panel title AND tab text
         self.output_panel.set_running(False)
         self.tab_widget.setTabText(self.live_output_tab_index, "● Live Output")
+        self.tab_widget.tabBar().setTabTextColor(self.live_output_tab_index, QColor("#C35252"))  # Red
         
         if success:
             # Update displays - INLINE HTML FORMAT
