@@ -1243,53 +1243,45 @@ class StrategyBuilderMainWindow(QMainWindow):
         self._update_status(f"Log file debugging {status}")
     
     def _on_clear_old_logs(self):
-        """Delete old log files."""
+        """Delete ALL log files."""
         import os
         from pathlib import Path
+        
+        # Use ABSOLUTE path to logs directory
+        project_root = Path(__file__).resolve().parent.parent.parent.parent
+        logs_dir = project_root / 'logs'
         
         # Ask for confirmation
         reply = ask_question(
             self,
             "Clear Old Logs",
             "Delete Old Log Files",
-            "This will delete all log files older than today.\n\n"
-            "Are you sure you want to continue?"
+            f"This will delete ALL log files from:\n{logs_dir}\n\nAre you sure you want to continue?"
         )
         
         if reply != 'yes':
             return
         
         try:
-            # Get logs directory
-            logs_dir = Path('logs')
             if not logs_dir.exists():
                 QMessageBox.information(
                     self,
                     "No Logs Found",
-                    "No logs directory found."
+                    f"No logs directory found at:\n{logs_dir}"
                 )
                 return
-            
-            # Get today's date
-            today = datetime.now().date()
             
             # Count files
             deleted_count = 0
             total_size = 0
             
-            # Recursively find and delete old log files
+            # Recursively find and delete ALL log files
             for log_file in logs_dir.rglob('*.log'):
                 try:
-                    # Get file modification time
-                    file_mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
-                    file_date = file_mtime.date()
-                    
-                    # Delete if older than today
-                    if file_date < today:
-                        file_size = log_file.stat().st_size
-                        log_file.unlink()
-                        deleted_count += 1
-                        total_size += file_size
+                    file_size = log_file.stat().st_size
+                    log_file.unlink()
+                    deleted_count += 1
+                    total_size += file_size
                 except Exception as e:
                     print(f"Error deleting {log_file}: {e}")
             
@@ -1298,16 +1290,16 @@ class StrategyBuilderMainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "Logs Cleared",
-                f"Successfully deleted {deleted_count} old log files.\n\n"
+                f"Successfully deleted {deleted_count} log files.\n\n"
                 f"Space freed: {size_mb:.2f} MB"
             )
-            self._update_status(f"Deleted {deleted_count} old log files ({size_mb:.1f} MB)")
+            self._update_status(f"Deleted {deleted_count} log files ({size_mb:.1f} MB)")
             
         except Exception as e:
             QMessageBox.critical(
                 self,
                 "Error",
-                f"Error clearing old logs:\n\n{str(e)}"
+                f"Error clearing logs:\n\n{str(e)}"
             )
     
     def _on_view_current_log(self):
