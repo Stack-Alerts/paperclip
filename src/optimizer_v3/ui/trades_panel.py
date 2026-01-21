@@ -305,7 +305,12 @@ class TradesPanel(QWidget):
         self.add_trade(trade_data)
     
     def _update_table(self) -> None:
-        """Update table with current trades"""
+        """Update table with current trades - INSTITUTIONAL REFRESH"""
+        # CRITICAL: Disable sorting during update to prevent display artifacts
+        was_sorting_enabled = self.table.isSortingEnabled()
+        if was_sorting_enabled:
+            self.table.setSortingEnabled(False)
+        
         self.table.setRowCount(len(self.filtered_trades))
         
         for row, trade in enumerate(self.filtered_trades):
@@ -378,6 +383,12 @@ class TradesPanel(QWidget):
             # Notes
             notes = trade.get('notes', '')
             self.table.setItem(row, 11, self._create_item(str(notes)))
+        
+        # CRITICAL: Re-enable sorting and refresh display
+        if was_sorting_enabled:
+            self.table.setSortingEnabled(True)
+            # Re-apply current sort to ensure display is correct
+            self.table.sortItems(self.current_sort_column, self.current_sort_order)
     
     def _create_item(self, text: str) -> QTableWidgetItem:
         """Create centered table item"""
