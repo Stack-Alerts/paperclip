@@ -243,6 +243,37 @@ class StrategyBuilderMainWindow(QMainWindow):
         update_data_action.triggered.connect(self._on_update_data)
         tools_menu.addAction(update_data_action)
         
+        tools_menu.addSeparator()
+        
+        # Debug Logger submenu
+        debug_menu = tools_menu.addMenu(style.standardIcon(QStyle.SP_FileDialogInfoView), "&Debug Logger")
+        
+        self.enable_console_action = QAction("Enable Debugger in Console", self)
+        self.enable_console_action.setCheckable(True)
+        self.enable_console_action.setChecked(True)  # Default: enabled
+        self.enable_console_action.setStatusTip("Toggle debug output to console")
+        self.enable_console_action.triggered.connect(self._on_toggle_console_debug)
+        debug_menu.addAction(self.enable_console_action)
+        
+        self.enable_logfile_action = QAction("Enable Debugger in Log File", self)
+        self.enable_logfile_action.setCheckable(True)
+        self.enable_logfile_action.setChecked(True)  # Default: enabled
+        self.enable_logfile_action.setStatusTip("Toggle debug output to log files")
+        self.enable_logfile_action.triggered.connect(self._on_toggle_logfile_debug)
+        debug_menu.addAction(self.enable_logfile_action)
+        
+        debug_menu.addSeparator()
+        
+        clear_logs_action = QAction(style.standardIcon(QStyle.SP_TrashIcon), "Clear Old Logs", self)
+        clear_logs_action.setStatusTip("Delete old log files")
+        clear_logs_action.triggered.connect(self._on_clear_old_logs)
+        debug_menu.addAction(clear_logs_action)
+        
+        view_log_action = QAction(style.standardIcon(QStyle.SP_FileDialogDetailedView), "View Current Log File", self)
+        view_log_action.setStatusTip("Open the current log file")
+        view_log_action.triggered.connect(self._on_view_current_log)
+        debug_menu.addAction(view_log_action)
+        
         # Help Menu
         help_menu = menu_bar.addMenu("&Help")
         
@@ -1177,6 +1208,166 @@ class StrategyBuilderMainWindow(QMainWindow):
             )
             return False
         return True
+    
+    def _on_toggle_console_debug(self, checked: bool):
+        """Toggle debug output to console."""
+        from src.debugger_logger.config_debugger import ConfigDebugger
+        
+        # Update global console logging state
+        ConfigDebugger.CONSOLE_ENABLED = checked
+        
+        status = "enabled" if checked else "disabled"
+        self._update_status(f"Console debugging {status}")
+        
+        QMessageBox.information(
+            self,
+            "Console Debugging",
+            f"Console debugging has been {status}.\n\n"
+            f"{'Debug messages will now appear in the console/terminal.' if checked else 'Debug messages will not appear in console.'}"
+        )
+    
+    def _on_toggle_logfile_debug(self, checked: bool):
+        """Toggle debug output to log files."""
+        from src.debugger_logger.config_debugger import ConfigDebugger
+        
+        # Update global file logging state
+        ConfigDebugger.LOGFILE_ENABLED = checked
+        
+        status = "enabled" if checked else "disabled"
+        self._update_status(f"Log file debugging {status}")
+        
+        QMessageBox.information(
+            self,
+            "Log File Debugging",
+            f"Log file debugging has been {status}.\n\n"
+            f"{'Debug messages will now be written to log files in logs/ directory.' if checked else 'Debug messages will not be written to log files.'}"
+        )
+    
+    def _on_clear_old_logs(self):
+        """Delete old log files."""
+        import os
+        from pathlib import Path
+        
+        # Ask for confirmation
+        reply = ask_question(
+            self,
+            "Clear Old Logs",
+            "Delete Old Log Files",
+            "This will delete all log files older than today.\n\n"
+            "Are you sure you want to continue?"
+        )
+        
+        if reply != 'yes':
+            return
+        
+        try:
+            # Get logs directory
+            logs_dir = Path('logs')
+            if not logs_dir.exists():
+                QMessageBox.information(
+                    self,
+                    "No Logs Found",
+                    "No logs directory found."
+                )
+                return
+            
+            # Get today's date
+            today = datetime.now().date()
+            
+            # Count files
+            deleted_count = 0
+            total_size = 0
+            
+            # Recursively find and delete old log files
+            for log_file in logs_dir.rglob('*.log'):
+                try:
+                    # Get file modification time
+                    file_mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
+                    file_date = file_mtime.date()
+                    
+                    # Delete if older than today
+                    if file_date < today:
+                        file_size = log_file.stat().st_size
+                        log_file.unlink()
+                        deleted_count += 1
+                        total_size += file_size
+                except Exception as e:
+                    print(f"Error deleting {log_file}: {e}")
+            
+            # Show result
+            size_mb = total_size / (1024 * 1024)
+            QMessageBox.information(
+                self,
+                "Logs Cleared",
+                f"Successfully deleted {deleted_count} old log files.\n\n"
+                f"Space freed: {size_mb:.2f} MB"
+            )
+            self._update_status(f"Deleted {deleted_count} old log files ({size_mb:.1f} MB)")
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error clearing old logs:\n\n{str(e)}"
+            )
+    
+    def _on_view_current_log(self):
+        """Open the most recent log file."""
+        import os
+        import subprocess
+        from pathlib import Path
+        
+        try:
+            # Get logs directory
+            logs_dir = Path('logs')
+            if not logs_dir.exists():
+                QMessageBox.information(
+                    self,
+                    "No Logs Found",
+                    "No logs directory found."
+                )
+                return
+            
+            # Find all log files
+            log_files = list(logs_dir.rglob('*.log'))
+            
+            if not log_files:
+                QMessageBox.information(
+                    self,
+                    "No Logs Found",
+                    "No log files found in logs directory."
+                )
+                return
+            
+            # Sort by modification time (newest first)
+            log_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+            
+            # Get the newest log file
+            newest_log = log_files[0]
+            
+            # Open with default text editor
+            # Use xdg-open on Linux, open on macOS, start on Windows
+            if os.name == 'posix':
+                subprocess.Popen(['xdg-open', str(newest_log)])
+            elif os.name == 'nt':
+                os.startfile(str(newest_log))
+            else:
+                # Fallback: just show the path
+                QMessageBox.information(
+                    self,
+                    "Log File Location",
+                    f"Most recent log file:\n\n{newest_log}"
+                )
+                return
+            
+            self._update_status(f"Opened log file: {newest_log.name}")
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error opening log file:\n\n{str(e)}"
+            )
     
     def _save_settings(self):
         """Save window geometry and state to settings."""
