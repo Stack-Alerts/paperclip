@@ -80,13 +80,13 @@ class HoverHighlightTextEdit(QTextEdit):
         super().leaveEvent(event)
     
     def _highlight_block(self, block):
-        """Apply darker background to a block (line)"""
+        """Apply much darker background to a block (line)"""
         cursor = QTextCursor(block)
         cursor.select(QTextCursor.BlockUnderCursor)
         
-        # Create format with darker background
+        # Create format with MUCH DARKER background (almost black)
         fmt = QTextCharFormat()
-        fmt.setBackground(QColor("#2A2F3A"))  # Darker than default #15191E
+        fmt.setBackground(QColor("#0A0D10"))  # Much darker than default #15191E
         cursor.mergeCharFormat(fmt)
     
     def _clear_block_highlight(self, block):
