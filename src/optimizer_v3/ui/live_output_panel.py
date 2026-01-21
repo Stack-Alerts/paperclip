@@ -193,13 +193,13 @@ class LiveOutputPanel(QWidget):
         level_label.setContentsMargins(0, 0, 10, 0)  # Add right margin before checkboxes
         layout.addWidget(level_label)
         
-        # Level filter checkboxes - COLOR CODED to match message types
+        # Level filter checkboxes - UNIQUE COLOR for each level (no duplicates)
         level_colors = {
-            MessageLevel.INFO: get_color('info'),         # Blue
-            MessageLevel.DECISION: get_color('success'),  # Green
-            MessageLevel.ACTION: get_color('info'),       # Blue
-            MessageLevel.WARNING: get_color('warning'),   # Orange
-            MessageLevel.ERROR: get_color('error')        # Red
+            MessageLevel.INFO: '#2070FF',      # Blue
+            MessageLevel.DECISION: '#10B981',  # Green
+            MessageLevel.ACTION: '#14B8A6',    # Cyan/Teal (distinct from blue)
+            MessageLevel.WARNING: '#FFA500',   # Orange
+            MessageLevel.ERROR: '#C35252'      # Red
         }
         
         self.level_checkboxes = {}
@@ -223,13 +223,13 @@ class LiveOutputPanel(QWidget):
         category_label.setStyleSheet(get_label_style('muted'))
         layout.addWidget(category_label)
         
-        # Category filter checkboxes - COLOR CODED to match category types
+        # Category filter checkboxes - UNIQUE COLOR for each category (no duplicates)
         category_colors = {
-            MessageCategory.SIGNAL: get_color('success'),    # Green (trading signals)
-            MessageCategory.TRADE: get_color('info'),        # Blue (trade execution)
-            MessageCategory.RISK: get_color('error'),        # Red (risk management)
-            MessageCategory.SYSTEM: get_color('text_muted'), # Gray (system messages)
-            MessageCategory.OPTIMIZER: get_color('warning')  # Orange (optimizer)
+            MessageCategory.SIGNAL: '#10B981',   # Green (trading signals)
+            MessageCategory.TRADE: '#8B5CF6',    # Purple/Violet (distinct color)
+            MessageCategory.RISK: '#C35252',     # Red (risk management)
+            MessageCategory.SYSTEM: '#9AA0A6',   # Gray (system messages)
+            MessageCategory.OPTIMIZER: '#FFA500' # Orange (optimizer)
         }
         
         self.category_checkboxes = {}
@@ -281,12 +281,14 @@ class LiveOutputPanel(QWidget):
         self.output_text.document().setDefaultFont(large_font)
         
         # DARK BACKGROUND - correct color from styles.py (#15191E)
+        # WITH HOVER HIGHLIGHTING - darker background on line hover
         self.output_text.setStyleSheet(
             "QTextEdit {"
             "   background-color: #15191E;"  # Correct dark background (bg_dark from styles.py)
             "   color: #E8EAED;"              # Light text
             "   border: 1px solid #3C4149;"  # Dark border
             "   padding: 8px;"
+            "   selection-background-color: #2A2F3A;"  # Darker background for selection
             "}"
         )
         
@@ -338,13 +340,13 @@ class LiveOutputPanel(QWidget):
     
     def _append_colored_message(self, msg_data: Dict) -> None:
         """Append message with color coding - Uses document default font (14pt Courier New)"""
-        # Get color based on level
+        # Get color based on level - UNIQUE colors matching filter checkboxes
         color_map = {
-            MessageLevel.INFO: get_color('info'),
-            MessageLevel.DECISION: get_color('success'),
-            MessageLevel.ACTION: get_color('info'),
-            MessageLevel.WARNING: get_color('warning'),
-            MessageLevel.ERROR: get_color('error')
+            MessageLevel.INFO: '#2070FF',      # Blue
+            MessageLevel.DECISION: '#10B981',  # Green
+            MessageLevel.ACTION: '#14B8A6',    # Cyan/Teal
+            MessageLevel.WARNING: '#FFA500',   # Orange
+            MessageLevel.ERROR: '#C35252'      # Red
         }
         
         color = color_map.get(msg_data['level'], get_color('text_primary'))
