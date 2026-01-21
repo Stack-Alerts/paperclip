@@ -20,8 +20,8 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QTextEdit, QCheckBox, QScrollArea
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QTextCursor, QColor, QFont
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent
+from PyQt5.QtGui import QTextCursor, QColor, QFont, QTextCharFormat
 from datetime import datetime
 from enum import Enum
 
@@ -35,6 +35,69 @@ from src.strategy_builder.ui.styles import (
     get_text_edit_stylesheet,
     get_color
 )
+
+
+class HoverHighlightTextEdit(QTextEdit):
+    """
+    Custom QTextEdit with line hover highlighting.
+    
+    When mouse hovers over a line, that line's background darkens
+    to provide visual feedback.
+    """
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMouseTracking(True)  # Enable mouse tracking for hover
+        self.current_hover_block = None  # Track currently hovered block
+    
+    def mouseMoveEvent(self, event):
+        """Handle mouse move to highlight line under cursor"""
+        # Get cursor position at mouse coordinates
+        cursor = self.cursorForPosition(event.pos())
+        block = cursor.block()
+        
+        # If we're hovering over a different block, update highlight
+        if block != self.current_hover_block:
+            # Clear previous highlight
+            if self.current_hover_block and self.current_hover_block.isValid():
+                self._clear_block_highlight(self.current_hover_block)
+            
+            # Apply new highlight
+            if block.isValid() and block.text().strip():  # Only highlight non-empty lines
+                self._highlight_block(block)
+                self.current_hover_block = block
+            else:
+                self.current_hover_block = None
+        
+        # Call parent implementation
+        super().mouseMoveEvent(event)
+    
+    def leaveEvent(self, event):
+        """Clear highlight when mouse leaves widget"""
+        if self.current_hover_block and self.current_hover_block.isValid():
+            self._clear_block_highlight(self.current_hover_block)
+            self.current_hover_block = None
+        super().leaveEvent(event)
+    
+    def _highlight_block(self, block):
+        """Apply darker background to a block (line)"""
+        cursor = QTextCursor(block)
+        cursor.select(QTextCursor.BlockUnderCursor)
+        
+        # Create format with darker background
+        fmt = QTextCharFormat()
+        fmt.setBackground(QColor("#2A2F3A"))  # Darker than default #15191E
+        cursor.mergeCharFormat(fmt)
+    
+    def _clear_block_highlight(self, block):
+        """Remove highlight from a block"""
+        cursor = QTextCursor(block)
+        cursor.select(QTextCursor.BlockUnderCursor)
+        
+        # Reset to transparent background (uses stylesheet default)
+        fmt = QTextCharFormat()
+        fmt.setBackground(Qt.transparent)
+        cursor.mergeCharFormat(fmt)
 
 
 class MessageLevel(Enum):
@@ -263,8 +326,8 @@ class LiveOutputPanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 15, 10, 10)  # Increased top margin for label visibility
         
-        # Text edit for output - HUGE FONT (26px) + DARK BACKGROUND
-        self.output_text = QTextEdit()
+        # Text edit for output - HUGE FONT (26px) + DARK BACKGROUND + HOVER HIGHLIGHTING
+        self.output_text = HoverHighlightTextEdit()  # Use custom hover-enabled widget
         self.output_text.setReadOnly(True)
         
         # TRIPLE FONT PROTECTION - 26 PIXELS (much larger)
