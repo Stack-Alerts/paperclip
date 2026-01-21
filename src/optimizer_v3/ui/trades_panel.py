@@ -250,17 +250,20 @@ class TradesPanel(QWidget):
         self._update_table()
         self._update_metrics()
     
-    def update_trade(self, trade_id: int, trade_data: Dict) -> None:
+    def update_trade(self, trade_id, trade_data: Dict) -> None:
         """
         Update existing trade in real-time (called when trade closes during execution).
         
         Args:
-            trade_id: ID of trade to update
+            trade_id: ID of trade to update (string or int)
             trade_data: Updated trade information (exit_price, pnl, status, etc.)
         """
+        # Convert to string for comparison (IDs stored as strings)
+        trade_id_str = str(trade_id)
+        
         # Find trade by ID and update it
         for i, trade in enumerate(self.trades):
-            if trade.get('id') == trade_id:
+            if str(trade.get('id')) == trade_id_str:
                 # Update trade with new data
                 self.trades[i].update(trade_data)
                 self.filtered_trades = self.trades.copy()
@@ -270,7 +273,9 @@ class TradesPanel(QWidget):
                 print(f"✅ Trade #{trade_id} updated in real-time")
                 return
         
-        print(f"⚠️ Trade #{trade_id} not found for update")
+        print(f"⚠️ Trade #{trade_id} not found for update - adding as new trade")
+        # If not found, add as new trade (shouldn't happen, but safety fallback)
+        self.add_trade(trade_data)
     
     def _update_table(self) -> None:
         """Update table with current trades"""
