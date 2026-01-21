@@ -105,8 +105,15 @@ class LogViewerWindow(QDialog):
     
     def _init_ui(self):
         """Initialize UI with tabs and filters"""
-        # Enable maximize button
-        self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint)
+        # Enable maximize button - proper combination of flags
+        self.setWindowFlags(
+            Qt.Window |
+            Qt.WindowTitleHint |
+            Qt.WindowSystemMenuHint |
+            Qt.WindowMinimizeButtonHint |
+            Qt.WindowMaximizeButtonHint |
+            Qt.WindowCloseButtonHint
+        )
         
         # Window properties
         log_name = self.current_log_file.name if self.current_log_file else "All Logs"
@@ -297,11 +304,14 @@ class LogViewerWindow(QDialog):
         }
         
         self.event_checkboxes = {}
+        self.filter_category_widgets = {}  # Track category rows for show/hide
         
         for category_name, events in categories.items():
-            # Category row
+            # Category row container
+            row_widget = QWidget()
             row_layout = QHBoxLayout()
             row_layout.setSpacing(15)
+            row_layout.setContentsMargins(0, 0, 0, 0)
             
             # Category label
             cat_label = QLabel(f"{category_name}:")
@@ -321,7 +331,11 @@ class LogViewerWindow(QDialog):
                     row_layout.addWidget(checkbox)
             
             row_layout.addStretch()
-            layout.addLayout(row_layout)
+            row_widget.setLayout(row_layout)
+            layout.addWidget(row_widget)
+            
+            # Store reference for show/hide
+            self.filter_category_widgets[category_name] = row_widget
         
         # Control buttons row
         controls_layout = QHBoxLayout()
@@ -440,8 +454,40 @@ class LogViewerWindow(QDialog):
         self._refresh_current_tab()
     
     def _on_tab_changed(self, index: int):
-        """Handle tab change"""
+        """Handle tab change and update filter visibility"""
+        self._update_filter_visibility(index)
         self._refresh_current_tab()
+    
+    def _update_filter_visibility(self, tab_index: int):
+        """Show only relevant filters for the selected tab"""
+        tab_name = self.tabs.tabText(tab_index).replace('📄 ', '').lower()
+        
+        # Define which categories are relevant for each tab type
+        tab_filter_map = {
+            'all logs': ['Trade Events', 'Config Events', 'System Events', 'Error Events', 'Strategy Events'],
+            'trades': ['Trade Events', 'Error Events'],
+            'strategy builder': ['Strategy Events', 'Config Events', 'System Events', 'Error Events'],
+            'optimizer': ['System Events', 'Error Events'],
+            'backtest': ['Trade Events', 'System Events', 'Error Events'],
+        }
+        
+        # Find matching categories (default to all if unknown tab)
+        relevant_categories = None
+        for key, categories in tab_filter_map.items():
+            if key in tab_name:
+                relevant_categories = categories
+                break
+        
+        # If no match or specific file, show all
+        if relevant_categories is None or '.' in tab_name:  # File extension means specific file
+            relevant_categories = list(self.filter_category_widgets.keys())
+        
+        # Show/hide category rows
+        for category_name, widget in self.filter_category_widgets.items():
+            if category_name in relevant_categories:
+                widget.show()
+            else:
+                widget.hide()
     
     def _refresh_current_tab(self):
         """Refresh display for current tab"""
