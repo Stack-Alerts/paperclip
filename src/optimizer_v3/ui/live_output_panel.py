@@ -404,7 +404,7 @@ class LiveOutputPanel(QWidget):
     def _append_colored_message(self, msg_data: Dict) -> None:
         """Append message with color coding - Uses document default font (14pt Courier New)"""
         # Get color based on level - UNIQUE colors matching filter checkboxes
-        color_map = {
+        level_color_map = {
             MessageLevel.INFO: '#2070FF',      # Blue
             MessageLevel.DECISION: '#10B981',  # Green
             MessageLevel.ACTION: '#14B8A6',    # Cyan/Teal
@@ -412,7 +412,17 @@ class LiveOutputPanel(QWidget):
             MessageLevel.ERROR: '#C35252'      # Red
         }
         
-        color = color_map.get(msg_data['level'], get_color('text_primary'))
+        # Get color based on category - UNIQUE colors matching filter checkboxes
+        category_color_map = {
+            MessageCategory.SIGNAL: '#10B981',   # Green
+            MessageCategory.TRADE: '#8B5CF6',    # Purple/Violet
+            MessageCategory.RISK: '#C35252',     # Red
+            MessageCategory.SYSTEM: '#9AA0A6',   # Gray
+            MessageCategory.OPTIMIZER: '#FFA500' # Orange
+        }
+        
+        level_color = level_color_map.get(msg_data['level'], get_color('text_primary'))
+        category_color = category_color_map.get(msg_data['category'], get_color('secondary'))
         
         # Format message
         timestamp = msg_data['timestamp']
@@ -420,11 +430,11 @@ class LiveOutputPanel(QWidget):
         category = msg_data['category'].value
         message = msg_data['message']
         
-        # Build HTML - NO inline font-size (uses document default font: 14pt Courier New)
+        # Build HTML - Colors match filter checkboxes exactly
         html = (
             f"<span style='color: {get_color('text_muted')};'>{timestamp}</span> "
-            f"<span style='color: {color}; font-weight: bold;'>[{level}]</span> "
-            f"<span style='color: {get_color('secondary')};'>[{category}]</span> "
+            f"<span style='color: {level_color}; font-weight: bold;'>[{level}]</span> "
+            f"<span style='color: {category_color}; font-weight: bold;'>[{category}]</span> "
             f"<span style='color: {get_color('text_primary')};'>{message}</span>"
         )
         
