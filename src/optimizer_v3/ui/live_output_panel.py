@@ -18,7 +18,7 @@ Sprint: 1.4 (UI Integration - Task 1.4.4)
 from typing import List, Dict, Optional
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGroupBox, QTextEdit, QCheckBox, QScrollArea
+    QGroupBox, QTextEdit, QCheckBox, QScrollArea, QApplication
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent
 from PyQt5.QtGui import QTextCursor, QColor, QFont, QTextCharFormat, QTextBlockFormat
@@ -102,11 +102,12 @@ class MessageLevel(Enum):
     """Message level enumeration"""
     INFO = "INFO"
     DECISION = "DECISION"
-    ACTION = "ACTION"
+    WIN = "WIN"             # Winning trades (new)
     LOSS = "LOSS"           # Losing trades (was WARNING)
     STOP_LOSS = "STOP LOSS" # Stop loss triggers (was ERROR)
     
     # Backward compatibility aliases
+    ACTION = "WIN"          # ACTION now maps to WIN
     WARNING = "LOSS"
     ERROR = "STOP LOSS"
 
@@ -150,6 +151,10 @@ class LiveOutputPanel(QWidget):
         self.level_filters = {
             MessageLevel.INFO: True,
             MessageLevel.DECISION: True,
+            MessageLevel.WIN: True,
+            MessageLevel.LOSS: True,
+            MessageLevel.STOP_LOSS: True,
+            # Backward compatibility
             MessageLevel.ACTION: True,
             MessageLevel.WARNING: True,
             MessageLevel.ERROR: True
@@ -225,6 +230,13 @@ class LiveOutputPanel(QWidget):
         layout.addStretch()
         
         # Buttons on the right
+        copy_btn = QPushButton("📋 Copy")
+        copy_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        copy_btn.setFixedSize(130, 52)
+        copy_btn.clicked.connect(self._copy_to_clipboard)
+        copy_btn.setToolTip("Copy filtered output to clipboard")
+        layout.addWidget(copy_btn)
+        
         clear_btn = QPushButton("🗑️ Clear")
         clear_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
         clear_btn.setFixedSize(130, 52)
@@ -262,16 +274,17 @@ class LiveOutputPanel(QWidget):
         level_colors = {
             MessageLevel.INFO: '#2070FF',      # Blue
             MessageLevel.DECISION: '#10B981',  # Green
-            MessageLevel.ACTION: '#14B8A6',    # Cyan/Teal (WIN trades)
+            MessageLevel.WIN: '#14B8A6',       # Cyan/Teal (WIN trades)
             MessageLevel.LOSS: '#FFA500',      # Orange (LOSS trades)
             MessageLevel.STOP_LOSS: '#C35252', # Red (Stop loss)
             # Backward compatibility
+            MessageLevel.ACTION: '#14B8A6',
             MessageLevel.WARNING: '#FFA500',
             MessageLevel.ERROR: '#C35252'
         }
         
         # Only show main levels (not backward compatibility aliases)
-        main_levels = [MessageLevel.INFO, MessageLevel.DECISION, MessageLevel.ACTION, 
+        main_levels = [MessageLevel.INFO, MessageLevel.DECISION, MessageLevel.WIN, 
                       MessageLevel.LOSS, MessageLevel.STOP_LOSS]
         
         self.level_checkboxes = {}
@@ -316,6 +329,13 @@ class LiveOutputPanel(QWidget):
             self.category_checkboxes[category] = checkbox
         
         layout.addStretch()
+        
+        # Unselect All / Select All button
+        self.toggle_all_btn = QPushButton("Unselect All")
+        self.toggle_all_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        self.toggle_all_btn.setFixedHeight(35)
+        self.toggle_all_btn.clicked.connect(self._toggle_all_filters)
+        layout.addWidget(self.toggle_all_btn)
         
         # Auto-scroll checkbox at the very right
         self.auto_scroll_check = QCheckBox("Auto-scroll")
@@ -416,10 +436,11 @@ class LiveOutputPanel(QWidget):
         level_color_map = {
             MessageLevel.INFO: '#2070FF',      # Blue
             MessageLevel.DECISION: '#10B981',  # Green
-            MessageLevel.ACTION: '#14B8A6',    # Cyan/Teal (WIN trades)
+            MessageLevel.WIN: '#14B8A6',       # Cyan/Teal (WIN trades)
             MessageLevel.LOSS: '#FFA500',      # Orange (LOSS trades)
             MessageLevel.STOP_LOSS: '#C35252', # Red (Stop loss)
             # Backward compatibility
+            MessageLevel.ACTION: '#14B8A6',
             MessageLevel.WARNING: '#FFA500',
             MessageLevel.ERROR: '#C35252'
         }
@@ -471,6 +492,56 @@ class LiveOutputPanel(QWidget):
         """Toggle category filter"""
         self.category_filters[category] = (state == Qt.Checked)
         self._reapply_filters()
+    
+    def _toggle_all_filters(self) -> None:
+        """Toggle all filters on/off"""
+        # Check if any filter is currently checked
+        any_checked = any(self.level_filters.values()) or any(self.category_filters.values())
+        
+        # If any checked, unselect all. Otherwise, select all.
+        new_state = not any_checked
+        
+        # Update all level filters
+        for level in self.level_filters:
+            self.level_filters[level] = new_state
+            if level in self.level_checkboxes:
+                self.level_checkboxes[level].setChecked(new_state)
+        
+        # Update all category filters
+        for category in self.category_filters:
+            self.category_filters[category] = new_state
+            if category in self.category_checkboxes:
+                self.category_checkboxes[category].setChecked(new_state)
+        
+        # Update button text
+        self.toggle_all_btn.setText("Unselect All" if new_state else "Select All")
+        
+        # Reapply filters
+        self._reapply_filters()
+    
+    def _copy_to_clipboard(self) -> None:
+        """Copy filtered output to clipboard"""
+        if not self.filtered_messages:
+            self.add_message("No messages to copy", "INFO", "SYSTEM")
+            return
+        
+        # Build plain text from filtered messages
+        lines = []
+        for msg in self.filtered_messages:
+            lines.append(
+                f"{msg['timestamp']} "
+                f"[{msg['level'].value}] "
+                f"[{msg['category'].value}] "
+                f"{msg['message']}"
+            )
+        
+        text = "\n".join(lines)
+        
+        # Copy to clipboard
+        clipboard = QApplication.clipboard()
+        clipboard.setText(text)
+        
+        self.add_message(f"Copied {len(self.filtered_messages)} messages to clipboard", "INFO", "SYSTEM")
     
     def _reapply_filters(self) -> None:
         """Reapply all filters and redisplay"""
