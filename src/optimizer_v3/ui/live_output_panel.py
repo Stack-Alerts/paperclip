@@ -219,19 +219,19 @@ class LiveOutputPanel(QWidget):
         layout.addWidget(self.filtered_count_label)
         
         self.decision_count_label = QLabel("🔍 Decisions: <b>0</b>")
-        self.decision_count_label.setStyleSheet(f"color: #10B981;")  # Green
+        self.decision_count_label.setStyleSheet(f"color: #10B981; min-width: 120px;")  # Green
         layout.addWidget(self.decision_count_label)
         
         self.winner_count_label = QLabel("✅ Winners: <b>0</b>")
-        self.winner_count_label.setStyleSheet(f"color: #14B8A6;")  # Cyan
+        self.winner_count_label.setStyleSheet(f"color: #FFD700; min-width: 110px;")  # Gold
         layout.addWidget(self.winner_count_label)
         
         self.loss_count_label = QLabel("📉 Losses: <b>0</b>")
-        self.loss_count_label.setStyleSheet(f"color: #FFA500;")  # Orange
+        self.loss_count_label.setStyleSheet(f"color: #FFA500; min-width: 100px;")  # Orange
         layout.addWidget(self.loss_count_label)
         
         self.stop_loss_count_label = QLabel("⛔ Stop Loss: <b>0</b>")
-        self.stop_loss_count_label.setStyleSheet(f"color: #C35252;")  # Red
+        self.stop_loss_count_label.setStyleSheet(f"color: #C35252; min-width: 120px;")  # Red
         layout.addWidget(self.stop_loss_count_label)
         
         self.trade_count_label = QLabel("📊 Trades: <b>0</b>")
@@ -282,15 +282,15 @@ class LiveOutputPanel(QWidget):
         level_label.setContentsMargins(0, 0, 10, 0)  # Add right margin before checkboxes
         layout.addWidget(level_label)
         
-        # Level filter checkboxes - UNIQUE COLOR for each level (no duplicates)
+        # Level filter checkboxes - UNIQUE COLOR for each level (highly distinct)
         level_colors = {
             MessageLevel.INFO: '#2070FF',      # Blue
             MessageLevel.DECISION: '#10B981',  # Green
-            MessageLevel.WIN: '#14B8A6',       # Cyan/Teal (WIN trades)
+            MessageLevel.WIN: '#FFD700',       # Gold/Yellow (highly distinct for wins)
             MessageLevel.LOSS: '#FFA500',      # Orange (LOSS trades)
             MessageLevel.STOP_LOSS: '#C35252', # Red (Stop loss)
             # Backward compatibility
-            MessageLevel.ACTION: '#14B8A6',
+            MessageLevel.ACTION: '#FFD700',
             MessageLevel.WARNING: '#FFA500',
             MessageLevel.ERROR: '#C35252'
         }
@@ -458,11 +458,11 @@ class LiveOutputPanel(QWidget):
         level_color_map = {
             MessageLevel.INFO: '#2070FF',      # Blue
             MessageLevel.DECISION: '#10B981',  # Green
-            MessageLevel.WIN: '#14B8A6',       # Cyan/Teal (WIN trades)
+            MessageLevel.WIN: '#FFD700',       # Gold/Yellow (highly distinct for wins)
             MessageLevel.LOSS: '#FFA500',      # Orange (LOSS trades)
             MessageLevel.STOP_LOSS: '#C35252', # Red (Stop loss)
             # Backward compatibility
-            MessageLevel.ACTION: '#14B8A6',
+            MessageLevel.ACTION: '#FFD700',
             MessageLevel.WARNING: '#FFA500',
             MessageLevel.ERROR: '#C35252'
         }
