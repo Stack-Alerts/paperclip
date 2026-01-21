@@ -568,14 +568,21 @@ class LogViewerWindow(QDialog):
     def _clear_all_logs(self):
         """Delete ALL log files from logs directory"""
         # Rescan to get fresh list of ALL log files (including new ones)
+        print(f"DEBUG: logs_base_dir = {self.logs_base_dir}")
+        print(f"DEBUG: logs_base_dir exists = {self.logs_base_dir.exists()}")
+        print(f"DEBUG: logs_base_dir absolute = {self.logs_base_dir.resolve()}")
+        
         if not self.logs_base_dir.exists():
-            QMessageBox.information(self, "No Logs", "Logs directory does not exist.")
+            QMessageBox.information(self, "No Logs", f"Logs directory does not exist:\n{self.logs_base_dir}")
             return
         
         fresh_log_files = list(self.logs_base_dir.rglob('*.log'))
+        print(f"DEBUG: Found {len(fresh_log_files)} log files")
+        if fresh_log_files:
+            print(f"DEBUG: First file: {fresh_log_files[0]}")
         
         if not fresh_log_files:
-            QMessageBox.information(self, "No Logs", "No log files found to delete.")
+            QMessageBox.information(self, "No Logs", f"No log files found to delete in:\n{self.logs_base_dir}")
             return
         
         # Ask for confirmation with count
