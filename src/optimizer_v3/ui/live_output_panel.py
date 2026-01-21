@@ -222,27 +222,27 @@ class LiveOutputPanel(QWidget):
         self.filtered_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.filtered_count_label)
         
-        self.decision_count_label = QLabel("🔍 Decisions: <b>0</b>")
-        self.decision_count_label.setStyleSheet(f"color: #FFD700; min-width: 120px; {base_style}")
+        self.decision_count_label = QLabel("Decisions: <b>0</b>")
+        self.decision_count_label.setStyleSheet(f"color: #FFD700; min-width: 110px; {base_style}")
         self.decision_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.decision_count_label)
         
-        self.winner_count_label = QLabel("✅ Winners: <b>0</b>")
-        self.winner_count_label.setStyleSheet(f"color: #10B981; min-width: 110px; {base_style}")
+        self.winner_count_label = QLabel("Winners: <b>0</b>")
+        self.winner_count_label.setStyleSheet(f"color: #10B981; min-width: 100px; {base_style}")
         self.winner_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.winner_count_label)
         
-        self.loss_count_label = QLabel("📉 Losses: <b>0</b>")
-        self.loss_count_label.setStyleSheet(f"color: #FF8C00; min-width: 100px; {base_style}")
+        self.loss_count_label = QLabel("Losses: <b>0</b>")
+        self.loss_count_label.setStyleSheet(f"color: #FF8C00; min-width: 90px; {base_style}")
         self.loss_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.loss_count_label)
         
-        self.stop_loss_count_label = QLabel("⛔ Stop Loss: <b>0</b>")
-        self.stop_loss_count_label.setStyleSheet(f"color: #C35252; min-width: 120px; {base_style}")
+        self.stop_loss_count_label = QLabel("Stop Loss: <b>0</b>")
+        self.stop_loss_count_label.setStyleSheet(f"color: #C35252; min-width: 110px; {base_style}")
         self.stop_loss_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.stop_loss_count_label)
         
-        self.trade_count_label = QLabel("📊 Trades: <b>0</b>")
+        self.trade_count_label = QLabel("Trades: <b>0</b>")
         self.trade_count_label.setStyleSheet(get_label_style() + base_style)
         self.trade_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.trade_count_label)
@@ -655,11 +655,11 @@ class LiveOutputPanel(QWidget):
         # Update labels
         self.msg_count_label.setText(f"Messages: <b>{total}</b>")
         self.filtered_count_label.setText(f"Displayed: <b>{displayed}</b>")
-        self.decision_count_label.setText(f"🔍 Decisions: <b>{decisions}</b>")
-        self.winner_count_label.setText(f"✅ Winners: <b>{winners}</b>")
-        self.loss_count_label.setText(f"📉 Losses: <b>{losses}</b>")
-        self.stop_loss_count_label.setText(f"⛔ Stop Loss: <b>{stop_losses}</b>")
-        self.trade_count_label.setText(f"📊 Trades: <b>{total_trades}</b>")
+        self.decision_count_label.setText(f"Decisions: <b>{decisions}</b>")
+        self.winner_count_label.setText(f"Winners: <b>{winners}</b>")
+        self.loss_count_label.setText(f"Losses: <b>{losses}</b>")
+        self.stop_loss_count_label.setText(f"Stop Loss: <b>{stop_losses}</b>")
+        self.trade_count_label.setText(f"Trades: <b>{total_trades}</b>")
     
     def get_messages(self) -> List[Dict]:
         """Get all messages"""
