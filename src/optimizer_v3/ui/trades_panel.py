@@ -306,6 +306,14 @@ class TradesPanel(QWidget):
     
     def _update_table(self) -> None:
         """Update table with current trades - INSTITUTIONAL REFRESH"""
+        # CRITICAL: Sort filtered_trades by ID (numeric) before displaying
+        # This ensures proper 1,2,3...10,11...24 order even with string IDs
+        try:
+            self.filtered_trades.sort(key=lambda t: int(t.get('id', 0)))
+        except (ValueError, TypeError):
+            # Fallback to string sort if conversion fails
+            pass
+        
         # CRITICAL: Disable sorting during update to prevent display artifacts
         was_sorting_enabled = self.table.isSortingEnabled()
         if was_sorting_enabled:
