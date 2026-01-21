@@ -73,6 +73,12 @@ class BacktestWorker(QThread):
             self.live_message.emit(f"Processing {total_candles:,} candles...", "INFO", "SYSTEM")
             self.msleep(200)
             
+            # Emit examples of ALL message types for filter demonstration
+            self.live_message.emit("Risk management initialized: Max position size = 0.1 BTC", "INFO", "RISK")
+            self.live_message.emit("Signal detection active: Pattern recognition enabled", "INFO", "SIGNAL")
+            self.live_message.emit("Position entry decision: Market conditions favorable", "DECISION", "TRADE")
+            self.msleep(100)
+            
             # Simulate trades happening during execution
             trade_triggers = [500, 1200, 2300, 3100, 4200, 5500, 6300, 7100, 8200, 9100, 
                             9800, 10500, 11200, 11800, 12300, 12800, 13100, 13400, 13600, 13750,
@@ -98,6 +104,20 @@ class BacktestWorker(QThread):
                         trade_count += 1
                         is_win = trade_count <= 14  # First 14 are wins (58% win rate)
                         
+                        # Emit DECISION message before trade entry
+                        self.live_message.emit(
+                            f"Entry decision: Confluence threshold met, opening position #{trade_count}",
+                            "DECISION",
+                            "SIGNAL"
+                        )
+                        
+                        # Emit RISK message for position sizing
+                        self.live_message.emit(
+                            f"Risk calculation: Position size 0.1 BTC, max loss $100",
+                            "INFO",
+                            "RISK"
+                        )
+                        
                         if is_win:
                             pnl = 75.0 + (trade_count * 0.5)  # Vary PnL slightly
                             self.live_message.emit(
@@ -111,6 +131,14 @@ class BacktestWorker(QThread):
                                 f"Trade {trade_count} closed: LOSS - PnL: ${pnl:.2f}",
                                 "WARNING",
                                 "TRADE"
+                            )
+                        
+                        # Occasionally emit ERROR messages (every 8th trade)
+                        if trade_count % 8 == 0:
+                            self.live_message.emit(
+                                f"Stop loss triggered early on trade {trade_count} - volatility spike detected",
+                                "ERROR",
+                                "RISK"
                             )
                 
                 # Emit progress messages every 500 candles for summary
