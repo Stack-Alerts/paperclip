@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
     QGroupBox, QTextEdit, QCheckBox, QScrollArea
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent
-from PyQt5.QtGui import QTextCursor, QColor, QFont, QTextCharFormat
+from PyQt5.QtGui import QTextCursor, QColor, QFont, QTextCharFormat, QTextBlockFormat
 from datetime import datetime
 from enum import Enum
 
@@ -80,24 +80,22 @@ class HoverHighlightTextEdit(QTextEdit):
         super().leaveEvent(event)
     
     def _highlight_block(self, block):
-        """Apply purple background to a block (line) for hover visibility"""
+        """Apply purple background to entire row (full width) for hover visibility"""
         cursor = QTextCursor(block)
-        cursor.select(QTextCursor.BlockUnderCursor)
         
-        # Create format with purple background (high contrast)
-        fmt = QTextCharFormat()
-        fmt.setBackground(QColor("#6a15b3"))  # Purple - clearly visible against #15191E
-        cursor.mergeCharFormat(fmt)
+        # Use block format to highlight the ENTIRE row (full width)
+        block_fmt = QTextBlockFormat()
+        block_fmt.setBackground(QColor("#6a15b3"))  # Purple - clearly visible against #15191E
+        cursor.setBlockFormat(block_fmt)
     
     def _clear_block_highlight(self, block):
-        """Remove highlight from a block"""
+        """Remove highlight from entire row"""
         cursor = QTextCursor(block)
-        cursor.select(QTextCursor.BlockUnderCursor)
         
         # Reset to transparent background (uses stylesheet default)
-        fmt = QTextCharFormat()
-        fmt.setBackground(Qt.transparent)
-        cursor.mergeCharFormat(fmt)
+        block_fmt = QTextBlockFormat()
+        block_fmt.setBackground(Qt.transparent)
+        cursor.setBlockFormat(block_fmt)
 
 
 class MessageLevel(Enum):
