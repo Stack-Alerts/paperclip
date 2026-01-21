@@ -207,9 +207,9 @@ class LiveOutputPanel(QWidget):
     def _create_bottom_bar(self) -> QHBoxLayout:
         """Create combined bottom bar: stats on left, buttons on right"""
         layout = QHBoxLayout()
-        layout.setSpacing(20)
+        layout.setSpacing(15)  # Reduced spacing to fit more stats
         
-        # Stats on the left
+        # Stats on the left - Complete set
         self.msg_count_label = QLabel("Messages: <b>0</b>")
         self.msg_count_label.setStyleSheet(get_label_style())
         layout.addWidget(self.msg_count_label)
@@ -218,13 +218,25 @@ class LiveOutputPanel(QWidget):
         self.filtered_count_label.setStyleSheet(get_label_style())
         layout.addWidget(self.filtered_count_label)
         
-        self.error_count_label = QLabel("⛔ Errors: <b>0</b>")
-        self.error_count_label.setStyleSheet(f"color: {get_color('error')};")
-        layout.addWidget(self.error_count_label)
+        self.decision_count_label = QLabel("🔍 Decisions: <b>0</b>")
+        self.decision_count_label.setStyleSheet(f"color: #10B981;")  # Green
+        layout.addWidget(self.decision_count_label)
         
-        self.warning_count_label = QLabel("⚠️ Warnings: <b>0</b>")
-        self.warning_count_label.setStyleSheet(f"color: {get_color('warning')};")
-        layout.addWidget(self.warning_count_label)
+        self.winner_count_label = QLabel("✅ Winners: <b>0</b>")
+        self.winner_count_label.setStyleSheet(f"color: #14B8A6;")  # Cyan
+        layout.addWidget(self.winner_count_label)
+        
+        self.loss_count_label = QLabel("📉 Losses: <b>0</b>")
+        self.loss_count_label.setStyleSheet(f"color: #FFA500;")  # Orange
+        layout.addWidget(self.loss_count_label)
+        
+        self.stop_loss_count_label = QLabel("⛔ Stop Loss: <b>0</b>")
+        self.stop_loss_count_label.setStyleSheet(f"color: #C35252;")  # Red
+        layout.addWidget(self.stop_loss_count_label)
+        
+        self.trade_count_label = QLabel("📊 Trades: <b>0</b>")
+        self.trade_count_label.setStyleSheet(get_label_style())
+        layout.addWidget(self.trade_count_label)
         
         # Stretch pushes buttons to the right
         layout.addStretch()
@@ -394,11 +406,21 @@ class LiveOutputPanel(QWidget):
         
         Args:
             message: Message text
-            level: Message level (INFO/DECISION/ACTION/WARNING/ERROR)
+            level: Message level (INFO/DECISION/WIN/LOSS/STOP_LOSS or old ACTION/WARNING/ERROR)
             category: Message category (SIGNAL/TRADE/RISK/SYSTEM/OPTIMIZER)
         """
+        # Backward compatibility mapping for old level names
+        level_mapping = {
+            "ACTION": "WIN",
+            "WARNING": "LOSS",
+            "ERROR": "STOP LOSS"
+        }
+        
+        # Map old level names to new names
+        normalized_level = level_mapping.get(level, level)
+        
         try:
-            msg_level = MessageLevel(level)
+            msg_level = MessageLevel(normalized_level)
             msg_category = MessageCategory(category)
         except ValueError:
             msg_level = MessageLevel.INFO
@@ -589,16 +611,27 @@ class LiveOutputPanel(QWidget):
             self.add_message(f"Export failed: {str(e)}", "ERROR", "SYSTEM")
     
     def _update_stats(self) -> None:
-        """Update statistics labels"""
+        """Update statistics labels - Complete set"""
         total = len(self.messages)
         displayed = len(self.filtered_messages)
-        stop_losses = len([m for m in self.messages if m['level'] in [MessageLevel.STOP_LOSS, MessageLevel.ERROR]])
-        losses = len([m for m in self.messages if m['level'] in [MessageLevel.LOSS, MessageLevel.WARNING]])
         
+        # Count by message level
+        decisions = len([m for m in self.messages if m['level'] == MessageLevel.DECISION])
+        winners = len([m for m in self.messages if m['level'] in [MessageLevel.WIN, MessageLevel.ACTION]])
+        losses = len([m for m in self.messages if m['level'] in [MessageLevel.LOSS, MessageLevel.WARNING]])
+        stop_losses = len([m for m in self.messages if m['level'] in [MessageLevel.STOP_LOSS, MessageLevel.ERROR]])
+        
+        # Total trades = winners + losses + stop losses
+        total_trades = winners + losses + stop_losses
+        
+        # Update labels
         self.msg_count_label.setText(f"Messages: <b>{total}</b>")
         self.filtered_count_label.setText(f"Displayed: <b>{displayed}</b>")
-        self.error_count_label.setText(f"⛔ Stop Loss: <b>{stop_losses}</b>")
-        self.warning_count_label.setText(f"📉 Losses: <b>{losses}</b>")
+        self.decision_count_label.setText(f"🔍 Decisions: <b>{decisions}</b>")
+        self.winner_count_label.setText(f"✅ Winners: <b>{winners}</b>")
+        self.loss_count_label.setText(f"📉 Losses: <b>{losses}</b>")
+        self.stop_loss_count_label.setText(f"⛔ Stop Loss: <b>{stop_losses}</b>")
+        self.trade_count_label.setText(f"📊 Trades: <b>{total_trades}</b>")
     
     def get_messages(self) -> List[Dict]:
         """Get all messages"""
