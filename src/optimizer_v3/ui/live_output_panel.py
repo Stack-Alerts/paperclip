@@ -506,22 +506,41 @@ class LiveOutputPanel(QWidget):
         self.auto_scroll = (state == Qt.Checked)
     
     def _toggle_level_filter(self, level: MessageLevel, state: int) -> None:
-        """Toggle level filter"""
+        """Toggle level filter and update button text"""
         self.level_filters[level] = (state == Qt.Checked)
+        self._update_toggle_button_text()
         self._reapply_filters()
     
     def _toggle_category_filter(self, category: MessageCategory, state: int) -> None:
-        """Toggle category filter"""
+        """Toggle category filter and update button text"""
         self.category_filters[category] = (state == Qt.Checked)
+        self._update_toggle_button_text()
         self._reapply_filters()
     
-    def _toggle_all_filters(self) -> None:
-        """Toggle all filters on/off"""
-        # Check if any filter is currently checked
-        any_checked = any(self.level_filters.values()) or any(self.category_filters.values())
+    def _update_toggle_button_text(self) -> None:
+        """Update toggle button text based on current filter state"""
+        # Check if all filters are selected
+        all_selected = all(self.level_filters.values()) and all(self.category_filters.values())
         
-        # If any checked, unselect all. Otherwise, select all.
-        new_state = not any_checked
+        # Update button text
+        if all_selected:
+            self.toggle_all_btn.setText("Unselect All")
+        else:
+            self.toggle_all_btn.setText("Select All")
+    
+    def _toggle_all_filters(self) -> None:
+        """Toggle all filters based on button text"""
+        # Button text tells us what action to take
+        button_text = self.toggle_all_btn.text()
+        
+        if button_text == "Select All":
+            # Select all filters
+            new_state = True
+            new_text = "Unselect All"
+        else:  # "Unselect All"
+            # Unselect all filters
+            new_state = False
+            new_text = "Select All"
         
         # Update all level filters
         for level in self.level_filters:
@@ -536,7 +555,7 @@ class LiveOutputPanel(QWidget):
                 self.category_checkboxes[category].setChecked(new_state)
         
         # Update button text
-        self.toggle_all_btn.setText("Unselect All" if new_state else "Select All")
+        self.toggle_all_btn.setText(new_text)
         
         # Reapply filters
         self._reapply_filters()
