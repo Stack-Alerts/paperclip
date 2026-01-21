@@ -241,14 +241,14 @@ class LiveOutputPanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 15, 10, 10)  # Increased top margin for label visibility
         
-        # Text edit for output - MAXIMUM FONT SIZE WITH TRIPLE PROTECTION
+        # Text edit for output - HUGE FONT (26px) + DARK BACKGROUND
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
         
-        # TRIPLE FONT PROTECTION (institutional-grade + nuclear option)
-        # 1. Create large monospace font - Use PIXEL SIZE (not points) to avoid DPI scaling
+        # TRIPLE FONT PROTECTION - 26 PIXELS (much larger)
+        # 1. Create LARGE monospace font - Use PIXEL SIZE (not points) to avoid DPI scaling
         large_font = QFont("Courier New")
-        large_font.setPixelSize(18)  # 18 PIXELS - absolute size, no DPI scaling
+        large_font.setPixelSize(26)  # 26 PIXELS - 44% larger than before
         large_font.setStyleHint(QFont.Monospace)
         large_font.setBold(False)
         
@@ -258,8 +258,15 @@ class LiveOutputPanel(QWidget):
         # 3. Set on document
         self.output_text.document().setDefaultFont(large_font)
         
-        # Minimal stylesheet (no font properties that could override)
-        self.output_text.setStyleSheet(f"background-color: {get_color('background')}; color: {get_color('text_primary')}; border: 1px solid {get_color('border')}; padding: 8px;")
+        # DARK BACKGROUND - use hardcoded dark color (get_color may not work)
+        self.output_text.setStyleSheet(
+            "QTextEdit {"
+            "   background-color: #1E1E1E;"  # Dark background
+            "   color: #E8EAED;"              # Light text
+            "   border: 1px solid #3C3C3C;"  # Dark border
+            "   padding: 8px;"
+            "}"
+        )
         
         layout.addWidget(self.output_text)
         group.setLayout(layout)
