@@ -459,3 +459,195 @@ Total Decisions: {len(self.decision_registry)}
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, 'w') as f:
             json.dump(data, f, indent=2, default=str)
+    
+    # ============================================================================
+    # TRADE ID TRACKING - For Multiple Simultaneous Positions
+    # ============================================================================
+    
+    def log_trade_opened(
+        self,
+        trade_id: Any,
+        position_details: Dict[str, Any],
+        location: Optional[str] = None
+    ):
+        """
+        Log when a trade/position is opened.
+        
+        Critical for tracking multiple simultaneous positions.
+        
+        Args:
+            trade_id: Unique trade identifier (MUST be unique per position)
+            position_details: All details about the position (side, size, entry, etc.)
+            location: Code location where position was opened
+        """
+        timestamp = datetime.now().isoformat()
+        
+        if location is None:
+            stack = traceback.extract_stack()
+            if len(stack) >= 2:
+                caller = stack[-2]
+                location = f"{caller.filename}:{caller.lineno}"
+        
+        msg = f"""
+╔{'═' * 78}╗
+║ 🟢 TRADE OPENED                                                            ║
+╚{'═' * 78}╝
+Timestamp: {timestamp}
+Trade ID: {trade_id} ({type(trade_id).__name__})
+Side: {position_details.get('side', 'UNKNOWN')}
+Size: {position_details.get('size', 'UNKNOWN')}
+Entry Price: {position_details.get('entry_price', 'UNKNOWN')}
+Status: {position_details.get('status', 'OPEN')}
+Location: {location}
+
+Full Details: {json.dumps(position_details, indent=2, default=str)}
+"""
+        self._write_log(msg, force=True)
+    
+    def log_trade_updated(
+        self,
+        trade_id: Any,
+        old_data: Dict[str, Any],
+        new_data: Dict[str, Any],
+        location: Optional[str] = None
+    ):
+        """
+        Log when a trade/position is updated (especially OPEN -> CLOSED).
+        
+        CRITICAL: This verifies the correct OPEN position is being closed.
+        
+        Args:
+            trade_id: Trade identifier being updated
+            old_data: Previous trade data
+            new_data: New trade data (with updates)
+            location: Code location where update occurred
+        """
+        timestamp = datetime.now().isoformat()
+        
+        if location is None:
+            stack = traceback.extract_stack()
+            if len(stack) >= 2:
+                caller = stack[-2]
+                location = f"{caller.filename}:{caller.lineno}"
+        
+        # Identify what changed
+        changes = {}
+        for key in set(list(old_data.keys()) + list(new_data.keys())):
+            old_val = old_data.get(key, 'NOT_SET')
+            new_val = new_data.get(key, 'NOT_SET')
+            if old_val != new_val:
+                changes[key] = {'from': old_val, 'to': new_val}
+        
+        msg = f"""
+╔{'═' * 78}╗
+║ 🔄 TRADE UPDATED                                                           ║
+╚{'═' * 78}╝
+Timestamp: {timestamp}
+Trade ID: {trade_id} ({type(trade_id).__name__})
+Location: {location}
+
+Changes Detected ({len(changes)}):
+{json.dumps(changes, indent=2, default=str)}
+
+Old Status: {old_data.get('status', 'UNKNOWN')}
+New Status: {new_data.get('status', 'UNKNOWN')}
+"""
+        
+        # CRITICAL: Check if this is a close event
+        if old_data.get('status') == 'OPEN' and new_data.get('status') == 'CLOSED':
+            msg += f"""
+⚠️  POSITION CLOSED DETECTED!
+   - ID: {trade_id}
+   - Entry: {old_data.get('entry_price', 'UNKNOWN')}
+   - Exit: {new_data.get('exit_price', 'UNKNOWN')}
+   - P&L: {new_data.get('pnl', 'UNKNOWN')}
+"""
+        
+        self._write_log(msg, force=True)
+    
+    def log_trade_not_found(
+        self,
+        trade_id: Any,
+        operation: str,
+        location: Optional[str] = None
+    ):
+        """
+        Log when a trade ID is not found (CRITICAL ERROR).
+        
+        This indicates attempting to update/close a position that doesn't exist.
+        
+        Args:
+            trade_id: Trade identifier that was not found
+            operation: What operation was attempted
+            location: Code location where error occurred
+        """
+        timestamp = datetime.now().isoformat()
+        
+        if location is None:
+            stack = traceback.extract_stack()
+            if len(stack) >= 2:
+                caller = stack[-2]
+                location = f"{caller.filename}:{caller.lineno}"
+        
+        msg = f"""
+╔{'═' * 78}╗
+║ ❌ TRADE ID NOT FOUND - CRITICAL ERROR                                     ║
+╚{'═' * 78}╝
+Timestamp: {timestamp}
+Trade ID: {trade_id} ({type(trade_id).__name__})
+Operation: {operation}
+Location: {location}
+
+⚠️  ATTEMPTING TO {operation.upper()} POSITION THAT DOESN'T EXIST!
+⚠️  THIS COULD INDICATE:
+    - ID mismatch between open and close
+    - Duplicate close attempts
+    - Race condition in position tracking
+    - ID generation collision
+"""
+        self._write_log(msg, force=True)
+    
+    def log_multiple_positions(
+        self,
+        open_positions: List[Dict[str, Any]],
+        location: Optional[str] = None
+    ):
+        """
+        Log state of all open positions (for debugging simultaneous positions).
+        
+        Args:
+            open_positions: List of all currently open position data
+            location: Code location where this snapshot was taken
+        """
+        timestamp = datetime.now().isoformat()
+        
+        if location is None:
+            stack = traceback.extract_stack()
+            if len(stack) >= 2:
+                caller = stack[-2]
+                location = f"{caller.filename}:{caller.lineno}"
+        
+        msg = f"""
+╔{'═' * 78}╗
+║ 📊 OPEN POSITIONS SNAPSHOT                                                 ║
+╚{'═' * 78}╝
+Timestamp: {timestamp}
+Total Open Positions: {len(open_positions)}
+Location: {location}
+
+"""
+        
+        if open_positions:
+            for i, pos in enumerate(open_positions, 1):
+                msg += f"""
+Position {i}:
+  ID: {pos.get('id', 'UNKNOWN')}
+  Side: {pos.get('side', 'UNKNOWN')}
+  Entry: {pos.get('entry_price', 'UNKNOWN')}
+  Status: {pos.get('status', 'UNKNOWN')}
+  Timestamp: {pos.get('timestamp', 'UNKNOWN')}
+"""
+        else:
+            msg += "  (No open positions)\n"
+        
+        self._write_log(msg)

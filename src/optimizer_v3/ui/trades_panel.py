@@ -20,6 +20,7 @@ Sprint: 1.4 (UI Integration - Task 1.4.5)
 from typing import List, Dict, Optional
 from decimal import Decimal
 from datetime import datetime
+from pathlib import Path
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -37,6 +38,9 @@ from src.strategy_builder.ui.styles import (
     get_table_stylesheet,
     get_color
 )
+
+# Import institutional-grade logger for trade tracking
+from src.debugger_logger.config_debugger import ConfigDebugger, DebugLevel
 
 
 class NumericTableWidgetItem(QTableWidgetItem):
@@ -84,6 +88,20 @@ class TradesPanel(QWidget):
         self.total_pnl = Decimal('0.0')
         self.win_count = 0
         self.loss_count = 0
+        
+        # Initialize institutional-grade logger for trade tracking
+        log_dir = Path("logs/trades")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / f"trades_panel_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        
+        self.logger = ConfigDebugger(
+            name="TradesPanel",
+            level=DebugLevel.HIGH,  # Log all important operations
+            log_file=log_file,
+            console_output=True  # Also print to console for real-time monitoring
+        )
+        
+        self.logger._write_log("✓ TradesPanel initialized with institutional-grade logging", force=True)
         
         self._init_ui()
         
@@ -251,6 +269,11 @@ class TradesPanel(QWidget):
     
     def clear_trades(self) -> None:
         """Clear all trades from panel (call at start of new backtest)"""
+        # Log snapshot of all trades before clearing
+        if self.trades:
+            self.logger.log_multiple_positions(self.trades, location="clear_trades()")
+            self.logger._write_log(f"🧹 Clearing {len(self.trades)} trades for new backtest", force=True)
+        
         self.trades.clear()
         self.filtered_trades.clear()
         self._update_table()
@@ -262,7 +285,7 @@ class TradesPanel(QWidget):
         Add trade to panel with duplicate protection.
         
         INSTITUTIONAL-GRADE: Prevents duplicate IDs by checking existing trades first.
-        If trade ID already exists, updates it instead of adding duplicate.
+       If trade ID already exists, updates it instead of adding duplicate.
         
         Args:
             trade_data: Dictionary with trade information
@@ -271,16 +294,30 @@ class TradesPanel(QWidget):
         """
         trade_id = trade_data.get('id')
         
+        # Log attempt to add trade
+        self.logger.log_trade_opened(trade_id, trade_data, location="add_trade()")
+        
         # CRITICAL: Check if trade with this ID already exists
         trade_id_str = str(trade_id)
         for i, existing_trade in enumerate(self.trades):
             if str(existing_trade.get('id')) == trade_id_str:
                 # Trade exists - UPDATE it instead of adding duplicate
+                self.logger.log_trade_updated(
+                    trade_id,
+                    old_data=existing_trade,
+                    new_data=trade_data,
+                    location="add_trade() - duplicate ID detected"
+                )
                 print(f"🔄 Trade #{trade_id} already exists - updating instead of adding")
                 self.trades[i].update(trade_data)
                 self.filtered_trades = self.trades.copy()
                 self._update_table()
                 self._update_metrics()
+                
+                # Log all open positions to verify state
+                open_positions = [t for t in self.trades if t.get('status') == 'OPEN']
+                if len(open_positions) > 0:
+                    self.logger.log_multiple_positions(open_positions, location="add_trade() - after update")
                 return
         
         # Trade doesn't exist - safe to add
@@ -289,10 +326,18 @@ class TradesPanel(QWidget):
         self.filtered_trades = self.trades.copy()
         self._update_table()
         self._update_metrics()
+        
+        # Log all open positions to monitor multiple simultaneous positions
+        open_positions = [t for t in self.trades if t.get('status') == 'OPEN']
+        if len(open_positions) > 1:
+            # MULTIPLE OPEN POSITIONS - Log for verification
+            self.logger.log_multiple_positions(open_positions, location="add_trade() - multiple open")
     
     def update_trade(self, trade_id, trade_data: Dict) -> None:
         """
         Update existing trade in real-time (called when trade closes during execution).
+        
+        CRITICAL: This is where positions are closed. Must ensure correct ID matching.
         
         Args:
             trade_id: ID of trade to update (string or int)
@@ -304,14 +349,50 @@ class TradesPanel(QWidget):
         # Find trade by ID and update it
         for i, trade in enumerate(self.trades):
             if str(trade.get('id')) == trade_id_str:
+                # FOUND MATCH - Log the update with old/new data comparison
+                old_data = self.trades[i].copy()
+                
+                self.logger.log_trade_updated(
+                    trade_id,
+                    old_data=old_data,
+                    new_data=trade_data,
+                    location="update_trade() - position found"
+                )
+                
                 # Update trade with new data
                 self.trades[i].update(trade_data)
                 self.filtered_trades = self.trades.copy()
+                
                 # Immediately refresh UI to show closed trade
                 self._update_table()
                 self._update_metrics()
+                
+                # Log remaining open positions after close
+                open_positions = [t for t in self.trades if t.get('status') == 'OPEN']
+                if open_positions:
+                    self.logger.log_multiple_positions(
+                        open_positions,
+                        location="update_trade() - after position closed"
+                    )
+                
                 print(f"✅ Trade #{trade_id} updated in real-time")
                 return
+        
+        # TRADE NOT FOUND - CRITICAL ERROR
+        self.logger.log_trade_not_found(
+            trade_id,
+            operation="UPDATE/CLOSE",
+            location="update_trade() - ID not in trades list"
+        )
+        
+        # Log all current trade IDs for debugging
+        all_ids = [str(t.get('id')) for t in self.trades]
+        self.logger._write_log(
+            f"⚠️ Current trade IDs in panel: {all_ids}\n"
+            f"   Attempted to update ID: {trade_id_str}\n"
+            f"   Total trades in panel: {len(self.trades)}",
+            force=True
+        )
         
         print(f"⚠️ Trade #{trade_id} not found for update - adding as new trade")
         # If not found, add as new trade (shouldn't happen, but safety fallback)
