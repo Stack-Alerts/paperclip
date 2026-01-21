@@ -258,12 +258,12 @@ class LiveOutputPanel(QWidget):
         # 3. Set on document
         self.output_text.document().setDefaultFont(large_font)
         
-        # DARK BACKGROUND - use hardcoded dark color (get_color may not work)
+        # DARK BACKGROUND - correct color from styles.py (#15191E)
         self.output_text.setStyleSheet(
             "QTextEdit {"
-            "   background-color: #1E1E1E;"  # Dark background
+            "   background-color: #15191E;"  # Correct dark background (bg_dark from styles.py)
             "   color: #E8EAED;"              # Light text
-            "   border: 1px solid #3C3C3C;"  # Dark border
+            "   border: 1px solid #3C4149;"  # Dark border
             "   padding: 8px;"
             "}"
         )
