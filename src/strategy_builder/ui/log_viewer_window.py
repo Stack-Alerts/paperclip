@@ -563,11 +563,22 @@ class LogViewerWindow(QDialog):
     
     def _clear_all_logs(self):
         """Delete ALL log files from logs directory"""
-        # Ask for confirmation
+        # Rescan to get fresh list of ALL log files (including new ones)
+        if not self.logs_base_dir.exists():
+            QMessageBox.information(self, "No Logs", "Logs directory does not exist.")
+            return
+        
+        fresh_log_files = list(self.logs_base_dir.rglob('*.log'))
+        
+        if not fresh_log_files:
+            QMessageBox.information(self, "No Logs", "No log files found to delete.")
+            return
+        
+        # Ask for confirmation with count
         reply = QMessageBox.question(
             self,
             "Clear All Logs",
-            "⚠️  This will DELETE ALL log files from the logs directory!\n\n"
+            f"⚠️  This will DELETE {len(fresh_log_files)} log files from the logs directory!\n\n"
             "This action cannot be undone.\n\n"
             "Are you sure you want to continue?",
             QMessageBox.Yes | QMessageBox.No,
@@ -581,14 +592,16 @@ class LogViewerWindow(QDialog):
             # Delete all log files
             deleted_count = 0
             total_size = 0
+            failed_files = []
             
-            for log_file in self.all_log_files:
+            for log_file in fresh_log_files:
                 try:
                     file_size = log_file.stat().st_size
                     log_file.unlink()
                     deleted_count += 1
                     total_size += file_size
                 except Exception as e:
+                    failed_files.append(f"{log_file.name}: {e}")
                     print(f"Error deleting {log_file}: {e}")
             
             # Show result
