@@ -1383,6 +1383,8 @@ class BacktestConfigPanel(QWidget):
         # Update Live Output icon to green (running) - both panel title AND tab text  
         self.output_panel.set_running(True)
         self.tab_widget.setTabText(self.live_output_tab_index, "▶ Live Output")
+        # Reset stylesheet and apply green color
+        self.tab_widget.setStyleSheet(get_tab_widget_stylesheet())
         self.tab_widget.tabBar().setTabTextColor(self.live_output_tab_index, QColor("#10B981"))  # Green
         
         self.results_text.setText("🔄 Backtest started...\n")
