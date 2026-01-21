@@ -1415,6 +1415,9 @@ class BacktestConfigPanel(QWidget):
             'sl_mode': self.sl_combo.currentText()
         }
         
+        # Clear previous trades before starting new backtest
+        self.trades_panel.clear_trades()
+        
         # Create and start worker - WIRE UP LIVE MESSAGES AND TRADES
         self.worker = BacktestWorker(self.orchestrator, config, self.output_panel)
         self.worker.progress_updated.connect(self._on_progress_updated)

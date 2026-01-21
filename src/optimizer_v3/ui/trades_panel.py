@@ -236,6 +236,14 @@ class TradesPanel(QWidget):
         
         return layout
     
+    def clear_trades(self) -> None:
+        """Clear all trades from panel (call at start of new backtest)"""
+        self.trades.clear()
+        self.filtered_trades.clear()
+        self._update_table()
+        self._update_metrics()
+        print("🧹 Trades panel cleared for new backtest")
+    
     def add_trade(self, trade_data: Dict) -> None:
         """
         Add trade to panel.
