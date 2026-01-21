@@ -219,15 +219,15 @@ class LiveOutputPanel(QWidget):
         layout.addWidget(self.filtered_count_label)
         
         self.decision_count_label = QLabel("🔍 Decisions: <b>0</b>")
-        self.decision_count_label.setStyleSheet(f"color: #10B981; min-width: 120px;")  # Green
+        self.decision_count_label.setStyleSheet(f"color: #FFD700; min-width: 120px;")  # Gold
         layout.addWidget(self.decision_count_label)
         
         self.winner_count_label = QLabel("✅ Winners: <b>0</b>")
-        self.winner_count_label.setStyleSheet(f"color: #FFD700; min-width: 110px;")  # Gold
+        self.winner_count_label.setStyleSheet(f"color: #10B981; min-width: 110px;")  # Green
         layout.addWidget(self.winner_count_label)
         
         self.loss_count_label = QLabel("📉 Losses: <b>0</b>")
-        self.loss_count_label.setStyleSheet(f"color: #FFA500; min-width: 100px;")  # Orange
+        self.loss_count_label.setStyleSheet(f"color: #FF8C00; min-width: 100px;")  # Dark Orange
         layout.addWidget(self.loss_count_label)
         
         self.stop_loss_count_label = QLabel("⛔ Stop Loss: <b>0</b>")
@@ -285,13 +285,13 @@ class LiveOutputPanel(QWidget):
         # Level filter checkboxes - UNIQUE COLOR for each level (highly distinct)
         level_colors = {
             MessageLevel.INFO: '#2070FF',      # Blue
-            MessageLevel.DECISION: '#10B981',  # Green
-            MessageLevel.WIN: '#FFD700',       # Gold/Yellow (highly distinct for wins)
-            MessageLevel.LOSS: '#FFA500',      # Orange (LOSS trades)
+            MessageLevel.DECISION: '#FFD700',  # Gold/Yellow (decisions get gold)
+            MessageLevel.WIN: '#10B981',       # Green (wins get green)
+            MessageLevel.LOSS: '#FF8C00',      # Dark Orange (more orange than before)
             MessageLevel.STOP_LOSS: '#C35252', # Red (Stop loss)
             # Backward compatibility
-            MessageLevel.ACTION: '#FFD700',
-            MessageLevel.WARNING: '#FFA500',
+            MessageLevel.ACTION: '#10B981',
+            MessageLevel.WARNING: '#FF8C00',
             MessageLevel.ERROR: '#C35252'
         }
         
@@ -457,13 +457,13 @@ class LiveOutputPanel(QWidget):
         # Get color based on level - UNIQUE colors matching filter checkboxes
         level_color_map = {
             MessageLevel.INFO: '#2070FF',      # Blue
-            MessageLevel.DECISION: '#10B981',  # Green
-            MessageLevel.WIN: '#FFD700',       # Gold/Yellow (highly distinct for wins)
-            MessageLevel.LOSS: '#FFA500',      # Orange (LOSS trades)
+            MessageLevel.DECISION: '#FFD700',  # Gold/Yellow (decisions get gold)
+            MessageLevel.WIN: '#10B981',       # Green (wins get green)
+            MessageLevel.LOSS: '#FF8C00',      # Dark Orange (more orange than before)
             MessageLevel.STOP_LOSS: '#C35252', # Red (Stop loss)
             # Backward compatibility
-            MessageLevel.ACTION: '#FFD700',
-            MessageLevel.WARNING: '#FFA500',
+            MessageLevel.ACTION: '#10B981',
+            MessageLevel.WARNING: '#FF8C00',
             MessageLevel.ERROR: '#C35252'
         }
         
