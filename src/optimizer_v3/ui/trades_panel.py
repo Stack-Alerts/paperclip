@@ -120,20 +120,25 @@ class TradesPanel(QWidget):
         self.winrate_label.setStyleSheet(get_label_style())
         layout.addWidget(self.winrate_label)
         
-        # Total Trades with LONG/SHORT breakdown
-        self.trades_count_label = QLabel("Total Trades: <b>0</b> (LONG:0 SHORT:0)")
-        self.trades_count_label.setStyleSheet(get_label_style())
-        layout.addWidget(self.trades_count_label)
+        # Long Trades
+        self.long_trades_label = QLabel("Long Trades: <b>0</b>")
+        self.long_trades_label.setStyleSheet(get_label_style())
+        layout.addWidget(self.long_trades_label)
         
-        # Average Trade
-        self.avg_trade_label = QLabel("Avg Trade: <b>$0.00</b>")
-        self.avg_trade_label.setStyleSheet(get_label_style())
-        layout.addWidget(self.avg_trade_label)
+        # Short Trades
+        self.short_trades_label = QLabel("Short Trades: <b>0</b>")
+        self.short_trades_label.setStyleSheet(get_label_style())
+        layout.addWidget(self.short_trades_label)
         
-        # Profit Factor
-        self.pf_label = QLabel("Profit Factor: <b>0.00</b>")
-        self.pf_label.setStyleSheet(get_label_style())
-        layout.addWidget(self.pf_label)
+        # Winning Trades
+        self.winning_trades_label = QLabel("Winning Trades: <b>0</b>")
+        self.winning_trades_label.setStyleSheet(get_label_style())
+        layout.addWidget(self.winning_trades_label)
+        
+        # Losing Trades
+        self.losing_trades_label = QLabel("Losing Trades: <b>0</b>")
+        self.losing_trades_label.setStyleSheet(get_label_style())
+        layout.addWidget(self.losing_trades_label)
         
         layout.addStretch()
         
@@ -381,10 +386,12 @@ class TradesPanel(QWidget):
         long_trades = len([t for t in self.trades if t.get('side') == 'LONG'])
         short_trades = len([t for t in self.trades if t.get('side') == 'SHORT'])
         
+        # Update individual labels
         self.winrate_label.setText(f"Win Rate: <b>{win_rate:.2f}%</b>")
-        self.trades_count_label.setText(f"Total Trades: <b>{total_trades}</b> (LONG:{long_trades} SHORT:{short_trades} W:{wins} L:{losses})")
-        self.avg_trade_label.setText(f"Avg Trade: <b>${avg_trade:,.2f}</b>")
-        self.pf_label.setText(f"Profit Factor: <b>{profit_factor:.2f}</b>")
+        self.long_trades_label.setText(f"Long Trades: <b>{long_trades}</b>")
+        self.short_trades_label.setText(f"Short Trades: <b>{short_trades}</b>")
+        self.winning_trades_label.setText(f"Winning Trades: <b>{wins}</b>")
+        self.losing_trades_label.setText(f"Losing Trades: <b>{losses}</b>")
         
         # Update filter label
         self.filter_label.setText(f"Showing: <b>All Trades ({len(self.filtered_trades)})</b>")

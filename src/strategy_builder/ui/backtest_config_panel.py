@@ -48,7 +48,7 @@ class BacktestWorker(QThread):
     progress_updated = pyqtSignal(int, int, str)  # current, total, message
     backtest_finished = pyqtSignal(bool, dict)  # success, results
     live_message = pyqtSignal(str, str, str)  # message, level, category - NEW for real-time messages
-    trade_closed = pyqtSignal(dict)  # trade_data - NEW for real-time trade updates
+    trade_data_emit = pyqtSignal(dict)  # Emits trade data (OPEN initially, then updates when CLOSED)
     
     def __init__(self, orchestrator, config: dict, output_panel=None):
         super().__init__()
@@ -122,6 +122,29 @@ class BacktestWorker(QThread):
                         # Generate realistic trade data
                         from datetime import datetime, timedelta
                         entry_price = 50000 + (trade_count * 100)
+                        entry_timestamp = datetime.now() - timedelta(minutes=(24-trade_count)*30)
+                        
+                        # EMIT TRADE AS OPEN (shows in Trades tab immediately with OPEN status)
+                        open_trade_data = {
+                            'id': str(trade_count),
+                            'timestamp': entry_timestamp,
+                            'symbol': 'BTC.P/USDT',
+                            'side': 'LONG' if trade_count % 2 == 0 else 'SHORT',  # Futures: LONG/SHORT not BUY/SELL
+                            'size': 0.1,
+                            'entry_price': entry_price,
+                            'exit_price': None,  # No exit yet (trade OPEN)
+                            'duration': '-',  # Unknown duration (trade ongoing)
+                            'pnl': 0.0,  # No P&L yet (trade OPEN)
+                            'pnl_pct': 0.0,
+                            'status': 'OPEN',  # Trade is OPEN
+                            'notes': f'Demo trade #{trade_count} - OPEN'
+                        }
+                        self.trade_closed.emit(open_trade_data)  # Emit OPEN trade immediately
+                        
+                        # Wait a bit to simulate trade duration
+                        self.msleep(50)
+                        
+                        # Now close the trade and update with exit info
                         if is_win:
                             pnl = 75.0 + (trade_count * 0.5)  # Vary PnL slightly
                             exit_price = entry_price * 1.015
@@ -141,22 +164,26 @@ class BacktestWorker(QThread):
                                 "TRADE"
                             )
                         
-                        # EMIT TRADE DATA IN REAL-TIME (streams to Trades tab immediately)
-                        trade_data = {
+                        # UPDATE TRADE TO CLOSED (updates existing trade in Trades tab)
+                        closed_trade_data = {
                             'id': str(trade_count),
-                            'timestamp': datetime.now() - timedelta(minutes=(24-trade_count)*30),
-                            'symbol': 'BTC.P/USDT',
-                            'side': 'LONG' if trade_count % 2 == 0 else 'SHORT',  # Futures: LONG/SHORT not BUY/SELL
-                            'size': 0.1,
-                            'entry_price': entry_price,
                             'exit_price': exit_price,
                             'duration': f'{20 + (trade_count % 40)} bars',
                             'pnl': pnl,
                             'pnl_pct': pnl_pct,
                             'status': 'CLOSED',
-                            'notes': f'Demo trade #{trade_count}'
+                            'notes': f'Demo trade #{trade_count} - CLOSED'
                         }
-                        self.trade_closed.emit(trade_data)  # Real-time trade streaming
+                        # Use update instead of add - prevents duplicate IDs
+                        # The trades_panel will find the trade by ID and update it
+                        from PyQt5.QtCore import QMetaObject, Q_ARG
+                        QMetaObject.invokeMethod(
+                            self.output_panel.parent().trades_panel, 
+                            "update_trade",
+                            Qt.QueuedConnection,
+                            Q_ARG(int, trade_count),
+                            Q_ARG(dict, closed_trade_data)
+                        )
                         
                         # Occasionally emit ERROR messages (every 8th trade)
                         if trade_count % 8 == 0:
