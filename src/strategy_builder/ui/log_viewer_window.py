@@ -569,34 +569,39 @@ class LogViewerWindow(QDialog):
         """Delete ALL log files from logs directory"""
         # Rescan to get fresh list of ALL log files (including new ones)
         
-        # DEBUG: Show path info in message box
-        debug_info = f"DEBUG INFO:\n\n"
-        debug_info += f"logs_base_dir = {self.logs_base_dir}\n"
-        debug_info += f"exists = {self.logs_base_dir.exists()}\n"
-        debug_info += f"absolute = {self.logs_base_dir.resolve()}\n\n"
-        
-        if not self.logs_base_dir.exists():
-            QMessageBox.critical(self, "Debug - Directory Not Found", 
-                               debug_info + "Directory does not exist!")
+        # Build debug info
+        try:
+            debug_info = f"DEBUG INFO:\n\n"
+            debug_info += f"logs_base_dir = {self.logs_base_dir}\n"
+            debug_info += f"exists = {self.logs_base_dir.exists()}\n"
+            debug_info += f"absolute = {self.logs_base_dir.resolve()}\n\n"
+            
+            if not self.logs_base_dir.exists():
+                QMessageBox.critical(self, "Debug - Directory Not Found", 
+                                   debug_info + "Directory does not exist!")
+                return
+            
+            fresh_log_files = list(self.logs_base_dir.rglob('*.log'))
+            debug_info += f"Files found: {len(fresh_log_files)}\n"
+            if fresh_log_files:
+                debug_info += f"First 3 files:\n"
+                for f in fresh_log_files[:3]:
+                    debug_info += f"  - {f}\n"
+        except Exception as e:
+            QMessageBox.critical(self, "Debug - Error", f"Error in debug: {e}")
             return
-        
-        fresh_log_files = list(self.logs_base_dir.rglob('*.log'))
-        debug_info += f"Files found: {len(fresh_log_files)}\n"
-        if fresh_log_files:
-            debug_info += f"First file: {fresh_log_files[0]}\n"
-        
-        # ALWAYS show debug info for now
-        QMessageBox.information(self, "Debug Info", debug_info)
         
         if not fresh_log_files:
-            QMessageBox.warning(self, "No Logs", f"No log files found to delete")
+            QMessageBox.warning(self, "No Logs", f"No log files found to delete:\n\n{debug_info}")
             return
         
-        # Ask for confirmation with count
+        # Ask for confirmation with DEBUG INFO INCLUDED
         reply = QMessageBox.question(
             self,
-            "Clear All Logs",
-            f"⚠️  This will DELETE {len(fresh_log_files)} log files from the logs directory!\n\n"
+            "Clear All Logs - DEBUG MODE",
+            f"{debug_info}\n\n"
+            f"{'='*50}\n\n"
+            f"⚠️  DELETE {len(fresh_log_files)} log files?\n\n"
             "This action cannot be undone.\n\n"
             "Are you sure you want to continue?",
             QMessageBox.Yes | QMessageBox.No,
