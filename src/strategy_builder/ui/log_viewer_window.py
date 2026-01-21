@@ -361,12 +361,12 @@ class LogViewerWindow(QDialog):
                     QCheckBox {{
                         color: {color};
                         background: transparent;
-                        font-size: 16px;
-                        padding: 4px;
+                        font-size: 20px;
+                        padding: 5px;
                     }}
                     QCheckBox::indicator {{
-                        width: 18px;
-                        height: 18px;
+                        width: 20px;
+                        height: 20px;
                     }}
                 """)
                 checkbox.stateChanged.connect(lambda state, e=event_key: self._on_event_filter_changed(e, state))
@@ -431,13 +431,13 @@ class LogViewerWindow(QDialog):
         
         copy_selection_btn = QPushButton("📋 Copy Selection")
         copy_selection_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        copy_selection_btn.setFixedSize(180, 52)
+        copy_selection_btn.setFixedSize(220, 52)
         copy_selection_btn.clicked.connect(self._copy_selection)
         layout.addWidget(copy_selection_btn)
         
         clear_logs_btn = QPushButton("🗑️ Clear All Logs")
         clear_logs_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        clear_logs_btn.setFixedSize(180, 52)
+        clear_logs_btn.setFixedSize(220, 52)
         clear_logs_btn.clicked.connect(self._clear_all_logs)
         clear_logs_btn.setToolTip("Delete ALL log files from logs directory")
         layout.addWidget(clear_logs_btn)
