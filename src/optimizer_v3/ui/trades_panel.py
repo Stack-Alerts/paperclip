@@ -332,12 +332,12 @@ class TradesPanel(QWidget):
         gross_loss = abs(sum(float(t.get('pnl', 0)) for t in self.trades if float(t.get('pnl', 0)) < 0))
         profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0.0
         
-        # Update labels with color coding
+        # Update labels with color coding - consistent font size with other labels
         pnl_text = f"Total P&L: <b>${total_pnl:,.2f}</b>"
         if total_pnl > 0:
-            self.pnl_label.setStyleSheet(f"color: {get_color('success')}; font-size: 14px;")
+            self.pnl_label.setStyleSheet(f"color: {get_color('success')};")
         elif total_pnl < 0:
-            self.pnl_label.setStyleSheet(f"color: {get_color('error')}; font-size: 14px;")
+            self.pnl_label.setStyleSheet(f"color: {get_color('error')};")
         else:
             self.pnl_label.setStyleSheet(get_label_style())
         self.pnl_label.setText(pnl_text)
