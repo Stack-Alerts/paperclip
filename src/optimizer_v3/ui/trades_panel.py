@@ -120,8 +120,8 @@ class TradesPanel(QWidget):
         self.winrate_label.setStyleSheet(get_label_style())
         layout.addWidget(self.winrate_label)
         
-        # Total Trades
-        self.trades_count_label = QLabel("Total Trades: <b>0</b>")
+        # Total Trades with LONG/SHORT breakdown
+        self.trades_count_label = QLabel("Total Trades: <b>0</b> (LONG:0 SHORT:0)")
         self.trades_count_label.setStyleSheet(get_label_style())
         layout.addWidget(self.trades_count_label)
         
@@ -377,8 +377,12 @@ class TradesPanel(QWidget):
             self.pnl_label.setStyleSheet(get_label_style())
         self.pnl_label.setText(pnl_text)
         
+        # Count LONG and SHORT trades
+        long_trades = len([t for t in self.trades if t.get('side') == 'LONG'])
+        short_trades = len([t for t in self.trades if t.get('side') == 'SHORT'])
+        
         self.winrate_label.setText(f"Win Rate: <b>{win_rate:.2f}%</b>")
-        self.trades_count_label.setText(f"Total Trades: <b>{total_trades}</b> (W:{wins} L:{losses})")
+        self.trades_count_label.setText(f"Total Trades: <b>{total_trades}</b> (LONG:{long_trades} SHORT:{short_trades} W:{wins} L:{losses})")
         self.avg_trade_label.setText(f"Avg Trade: <b>${avg_trade:,.2f}</b>")
         self.pf_label.setText(f"Profit Factor: <b>{profit_factor:.2f}</b>")
         
