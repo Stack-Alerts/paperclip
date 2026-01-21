@@ -208,7 +208,7 @@ class TradesPanel(QWidget):
         # Copy Selection button (for selected rows)
         copy_selection_btn = QPushButton("📋 Copy Selection")
         copy_selection_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        copy_selection_btn.setFixedSize(225, 42)
+        copy_selection_btn.setFixedSize(245, 42)
         copy_selection_btn.clicked.connect(self._copy_selection)
         copy_selection_btn.setToolTip("Copy selected trades to clipboard (Ctrl+Click for multi-select)")
         layout.addWidget(copy_selection_btn)
