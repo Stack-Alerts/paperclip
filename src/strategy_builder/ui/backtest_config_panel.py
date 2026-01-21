@@ -1481,40 +1481,18 @@ class BacktestConfigPanel(QWidget):
         
         winning_trades = int(trade_count * 0.58)  # 58% win rate (realistic)
         
-        for i in range(trade_count):
-            is_winner = i < winning_trades
-            
-            # Generate realistic trade data
-            entry_price = 50000 + (i * 100)  # Vary entry prices
-            if is_winner:
-                exit_price = entry_price * 1.015  # +1.5% profit
-                pnl_value = (exit_price - entry_price) * 0.1  # Assume 0.1 BTC position
-            else:
-                exit_price = entry_price * 0.99  # -1% loss
-                pnl_value = (exit_price - entry_price) * 0.1
-            
-            trade_data = {
-                'id': f'TRADE_{i+1:03d}',
-                'timestamp': base_time + timedelta(minutes=i*30),
-                'side': 'BUY' if i % 2 == 0 else 'SELL',
-                'entry_price': Price.from_str(str(entry_price)),
-                'exit_price': Price.from_str(str(exit_price)),
-                'quantity': Quantity.from_str('0.1'),
-                'pnl': Money(pnl_value, usd),
-                'duration': f'{20 + (i % 40)} bars',
-                'outcome': 'WIN' if is_winner else 'LOSS'
-            }
-            
-            # Add message to Live Output
-            outcome_level = "ACTION" if is_winner else "WARNING"
-            self.output_panel.add_message(
-                f"Trade {i+1} closed: {trade_data['outcome']} - PnL: ${pnl_value:.2f}",
-                outcome_level,
-                "TRADE"
-            )
-            
-            # TODO: Uncomment when TradesPanel has add_trade() method implemented
-            # self.trades_panel.add_trade(trade_data)
+        # REMOVED: Duplicate trade reporting
+        # Trades are already reported in real-time during BacktestWorker.run()
+        # This section was causing duplicate trade messages (24 real-time + 24 summary = 48 total)
+        #
+        # TODO: When TradesPanel.add_trade() is implemented, we can populate the Trades tab
+        # with trade data here, but we should NOT re-emit live messages for trades
+        # that were already reported during execution.
+        #
+        # for i in range(trade_count):
+        #     trade_data = {...}
+        #     self.trades_panel.add_trade(trade_data)  # Populate Trades tab
+        #     # NO self.output_panel.add_message() here - already reported during execution!
         
         # Generate metrics for Metrics tab
         # TODO: Replace with actual metrics from backtest engine
