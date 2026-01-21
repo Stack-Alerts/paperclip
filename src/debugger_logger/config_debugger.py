@@ -42,6 +42,10 @@ class ConfigDebugger:
     and logs every decision point.
     """
     
+    # Class-level flags for global control (can be toggled via UI)
+    CONSOLE_ENABLED = True
+    LOGFILE_ENABLED = True
+    
     def __init__(
         self,
         name: str,
@@ -100,11 +104,13 @@ class ConfigDebugger:
         self._write_log(header, force=True)
     
     def _write_log(self, message: str, force: bool = False):
-        """Write to log file and/or console"""
-        if self.console_output or force:
+        """Write to log file and/or console (respects global toggle flags)"""
+        # Check global console flag (can be toggled via UI)
+        if (self.console_output or force) and ConfigDebugger.CONSOLE_ENABLED:
             print(message, flush=True)
         
-        if self.log_file:
+        # Check global logfile flag (can be toggled via UI)
+        if self.log_file and ConfigDebugger.LOGFILE_ENABLED:
             with open(self.log_file, 'a') as f:
                 f.write(message + '\n')
     

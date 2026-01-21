@@ -1347,26 +1347,43 @@ class StrategyBuilderMainWindow(QMainWindow):
             
             # Open with default text editor
             # Use xdg-open on Linux, open on macOS, start on Windows
-            if os.name == 'posix':
-                subprocess.Popen(['xdg-open', str(newest_log)])
-            elif os.name == 'nt':
-                os.startfile(str(newest_log))
-            else:
-                # Fallback: just show the path
+            try:
+                if os.name == 'posix':
+                    # Linux/Mac - use xdg-open with detached process
+                    subprocess.Popen(
+                        ['xdg-open', str(newest_log)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True
+                    )
+                elif os.name == 'nt':
+                    # Windows
+                    os.startfile(str(newest_log))
+                else:
+                    # Unknown OS - just show path
+                    raise OSError("Unknown operating system")
+                
+                self._update_status(f"Opened log file: {newest_log.name}")
+                
+            except Exception as open_error:
+                # Fallback: Show path and copy to clipboard
+                from PyQt5.QtWidgets import QApplication
+                clipboard = QApplication.clipboard()
+                clipboard.setText(str(newest_log.absolute()))
+                
                 QMessageBox.information(
                     self,
                     "Log File Location",
-                    f"Most recent log file:\n\n{newest_log}"
+                    f"Most recent log file:\n\n{newest_log.absolute()}\n\n"
+                    f"(Path copied to clipboard)"
                 )
-                return
-            
-            self._update_status(f"Opened log file: {newest_log.name}")
+                self._update_status(f"Log file path copied to clipboard: {newest_log.name}")
             
         except Exception as e:
             QMessageBox.critical(
                 self,
                 "Error",
-                f"Error opening log file:\n\n{str(e)}"
+                f"Error finding log file:\n\n{str(e)}"
             )
     
     def _save_settings(self):
