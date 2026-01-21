@@ -29,11 +29,13 @@ from src.strategy_builder.ui.styles import (
     get_groupbox_header_stylesheet,
     get_primary_button_stylesheet,
     get_label_style,
-    get_color,
-    SPACING_UNIT,
-    FONT_FAMILY,
-    FONT_SIZE_BASE
+    get_color
 )
+
+# Style constants (matching styles.py values)
+SPACING_UNIT = 8
+FONT_FAMILY = "Segoe UI"
+FONT_SIZE_BASE = 14
 
 
 class LogViewerWindow(QDialog):
