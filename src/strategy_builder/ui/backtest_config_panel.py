@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QGroupBox, QTextEdit, QTabWidget, QCheckBox
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QColor
 
 # Import centralized styles
 from src.strategy_builder.ui.styles import (
@@ -226,7 +226,6 @@ class BacktestConfigPanel(QWidget):
         
         # Tab 2: Live Output (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.live_output_panel import LiveOutputPanel
-        from PyQt5.QtGui import QColor
         strategy_name = self._get_strategy_name()
         self.output_panel = LiveOutputPanel(strategy_name=strategy_name)
         # Create tab with red colored text for idle state
