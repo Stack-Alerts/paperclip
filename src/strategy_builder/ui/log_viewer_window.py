@@ -190,7 +190,13 @@ class LogViewerWindow(QDialog):
         # If specific file was provided, show it in dedicated tab
         if self.current_log_file and self.current_log_file.exists():
             specific_widget = self._create_log_panel()
-            self.tabs.addTab(specific_widget, f"📄 {self.current_log_file.name}")
+            # Simplify session filenames: session_20260121_140512.log → Session
+            tab_name = self.current_log_file.name
+            if tab_name.startswith('session_'):
+                tab_name = "Session"
+            else:
+                tab_name = f"📄 {tab_name}"
+            self.tabs.addTab(specific_widget, tab_name)
             
             with open(self.current_log_file, 'r', encoding='utf-8', errors='replace') as f:
                 specific_content = f.read()
@@ -289,26 +295,27 @@ class LogViewerWindow(QDialog):
         group = QGroupBox("📊 Event Filters")
         group.setStyleSheet(get_groupbox_header_stylesheet() + """
             QGroupBox {
-                font-size: 14px;
+                font-size: 18px;
                 font-weight: bold;
-                padding-top: 20px;
+                padding-top: 25px;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
                 left: 10px;
-                padding: 5px 10px;
+                padding: 8px 15px;
+                font-size: 18px;
             }
         """)
-        group.setMinimumHeight(200)
+        group.setMinimumHeight(220)
         
         # Main container with grid
         container = QWidget()
         grid_layout = QGridLayout()
-        grid_layout.setSpacing(10)
-        grid_layout.setContentsMargins(15, 25, 15, 15)
-        grid_layout.setVerticalSpacing(8)
-        grid_layout.setHorizontalSpacing(15)
+        grid_layout.setSpacing(12)
+        grid_layout.setContentsMargins(15, 30, 15, 15)
+        grid_layout.setVerticalSpacing(10)
+        grid_layout.setHorizontalSpacing(20)
         
         # All events in a clean list
         all_events = [
@@ -354,12 +361,12 @@ class LogViewerWindow(QDialog):
                     QCheckBox {{
                         color: {color};
                         background: transparent;
-                        font-size: 13px;
-                        padding: 3px;
+                        font-size: 16px;
+                        padding: 4px;
                     }}
                     QCheckBox::indicator {{
-                        width: 16px;
-                        height: 16px;
+                        width: 18px;
+                        height: 18px;
                     }}
                 """)
                 checkbox.stateChanged.connect(lambda state, e=event_key: self._on_event_filter_changed(e, state))
@@ -374,11 +381,11 @@ class LogViewerWindow(QDialog):
         
         # Control buttons at bottom
         row += 1
-        self.toggle_all_btn = QPushButton("Unselect All")
+        self.toggle_all_btn = QPushButton("Toggle All")
         self.toggle_all_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        self.toggle_all_btn.setFixedHeight(32)
+        self.toggle_all_btn.setFixedSize(140, 36)
         self.toggle_all_btn.clicked.connect(self._toggle_all_filters)
-        grid_layout.addWidget(self.toggle_all_btn, row, 0, 1, 2)
+        grid_layout.addWidget(self.toggle_all_btn, row, 0, 1, 1)
         
         container.setLayout(grid_layout)
         
