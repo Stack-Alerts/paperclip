@@ -39,6 +39,23 @@ from src.strategy_builder.ui.styles import (
 )
 
 
+class NumericTableWidgetItem(QTableWidgetItem):
+    """
+    Custom QTableWidgetItem that implements proper numeric comparison.
+    
+    This ensures ID column sorts numerically (1,2,3...10,11,12...)
+    instead of as strings (1,10,11,12...2,20,21...).
+    """
+    
+    def __lt__(self, other):
+        """Less than comparison using numeric value"""
+        try:
+            return int(self.text()) < int(other.text())
+        except ValueError:
+            # Fallback to string comparison if not numeric
+            return super().__lt__(other)
+
+
 class TradesPanel(QWidget):
     """
     Institutional-Grade Trades Panel
@@ -169,8 +186,8 @@ class TradesPanel(QWidget):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)  # Allow multi-selection
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        # CRITICAL: Disable Qt sorting - we pre-sort data ourselves for correct numeric order
-        self.table.setSortingEnabled(False)
+        # Enable sorting - ID column uses NumericTableWidgetItem for proper numeric sorting
+        self.table.setSortingEnabled(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.verticalHeader().setVisible(False)
         
@@ -302,20 +319,17 @@ class TradesPanel(QWidget):
     
     def _update_table(self) -> None:
         """Update table with current trades - INSTITUTIONAL REFRESH"""
-        # CRITICAL: Sort filtered_trades by ID (numeric) before displaying
-        # This ensures proper 1,2,3...10,11...24 order
-        try:
-            self.filtered_trades.sort(key=lambda t: int(t.get('id', 0)))
-        except (ValueError, TypeError):
-            pass  # Fallback if conversion fails
+        # Disable sorting during update to prevent visual artifacts
+        was_sorting_enabled = self.table.isSortingEnabled()
+        if was_sorting_enabled:
+            self.table.setSortingEnabled(False)
         
         self.table.setRowCount(len(self.filtered_trades))
         
         for row, trade in enumerate(self.filtered_trades):
-            # ID - CRITICAL: Set integer data for proper numeric sorting
-            id_item = self._create_item(str(trade.get('id', '')))
-            # Set UserRole data as integer for numeric sorting
-            id_item.setData(Qt.ItemDataRole.UserRole, int(trade.get('id', 0)))
+            # ID - Use NumericTableWidgetItem for proper numeric sorting
+            id_item = NumericTableWidgetItem(str(trade.get('id', '')))
+            id_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(row, 0, id_item)
             
             # Time
@@ -385,7 +399,11 @@ class TradesPanel(QWidget):
             notes = trade.get('notes', '')
             self.table.setItem(row, 11, self._create_item(str(notes)))
         
-        # Table is already pre-sorted by ID (numeric), no Qt sorting needed
+        # Re-enable sorting and apply default sort (ID ascending for chronological order)
+        if was_sorting_enabled:
+            self.table.setSortingEnabled(True)
+            # Sort by ID column (ascending) for chronological order
+            self.table.sortItems(0, Qt.SortOrder.AscendingOrder)
     
     def _create_item(self, text: str) -> QTableWidgetItem:
         """Create centered table item"""
