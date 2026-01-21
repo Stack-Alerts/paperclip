@@ -209,33 +209,42 @@ class LiveOutputPanel(QWidget):
         layout = QHBoxLayout()
         layout.setSpacing(15)  # Reduced spacing to fit more stats
         
-        # Stats on the left - Complete set
+        # Stats on the left - Complete set with perfect vertical alignment
+        base_style = "vertical-align: middle; padding: 0px; margin: 0px;"
+        
         self.msg_count_label = QLabel("Messages: <b>0</b>")
-        self.msg_count_label.setStyleSheet(get_label_style())
+        self.msg_count_label.setStyleSheet(get_label_style() + base_style)
+        self.msg_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.msg_count_label)
         
         self.filtered_count_label = QLabel("Displayed: <b>0</b>")
-        self.filtered_count_label.setStyleSheet(get_label_style())
+        self.filtered_count_label.setStyleSheet(get_label_style() + base_style)
+        self.filtered_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.filtered_count_label)
         
         self.decision_count_label = QLabel("🔍 Decisions: <b>0</b>")
-        self.decision_count_label.setStyleSheet(f"color: #FFD700; min-width: 120px;")  # Gold
+        self.decision_count_label.setStyleSheet(f"color: #FFD700; min-width: 120px; {base_style}")
+        self.decision_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.decision_count_label)
         
         self.winner_count_label = QLabel("✅ Winners: <b>0</b>")
-        self.winner_count_label.setStyleSheet(f"color: #10B981; min-width: 110px;")  # Green
+        self.winner_count_label.setStyleSheet(f"color: #10B981; min-width: 110px; {base_style}")
+        self.winner_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.winner_count_label)
         
         self.loss_count_label = QLabel("📉 Losses: <b>0</b>")
-        self.loss_count_label.setStyleSheet(f"color: #FF8C00; min-width: 100px;")  # Dark Orange
+        self.loss_count_label.setStyleSheet(f"color: #FF8C00; min-width: 100px; {base_style}")
+        self.loss_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.loss_count_label)
         
         self.stop_loss_count_label = QLabel("⛔ Stop Loss: <b>0</b>")
-        self.stop_loss_count_label.setStyleSheet(f"color: #C35252; min-width: 120px;")  # Red
+        self.stop_loss_count_label.setStyleSheet(f"color: #C35252; min-width: 120px; {base_style}")
+        self.stop_loss_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.stop_loss_count_label)
         
         self.trade_count_label = QLabel("📊 Trades: <b>0</b>")
-        self.trade_count_label.setStyleSheet(get_label_style())
+        self.trade_count_label.setStyleSheet(get_label_style() + base_style)
+        self.trade_count_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self.trade_count_label)
         
         # Stretch pushes buttons to the right
