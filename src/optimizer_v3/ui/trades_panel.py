@@ -169,9 +169,9 @@ class TradesPanel(QWidget):
         self.table.verticalHeader().setVisible(False)
         
         # Set column widths - ID fixed, Notes fixed, all others stretch equally
-        # ID=85px (fixed +5px), Notes=500px (fixed), 10 standard columns stretch to fill window
+        # ID=95px (fixed +15px total), Notes=500px (fixed), 10 standard columns stretch to fill window
         # ID, Time, Symbol, Side, Size, Entry, Exit, Duration, P&L, P&L %, Status, Notes
-        column_widths = [85, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 500]
+        column_widths = [95, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 500]
         for i, width in enumerate(column_widths):
             self.table.setColumnWidth(i, width)
         
