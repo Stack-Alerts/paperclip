@@ -568,21 +568,28 @@ class LogViewerWindow(QDialog):
     def _clear_all_logs(self):
         """Delete ALL log files from logs directory"""
         # Rescan to get fresh list of ALL log files (including new ones)
-        print(f"DEBUG: logs_base_dir = {self.logs_base_dir}")
-        print(f"DEBUG: logs_base_dir exists = {self.logs_base_dir.exists()}")
-        print(f"DEBUG: logs_base_dir absolute = {self.logs_base_dir.resolve()}")
+        
+        # DEBUG: Show path info in message box
+        debug_info = f"DEBUG INFO:\n\n"
+        debug_info += f"logs_base_dir = {self.logs_base_dir}\n"
+        debug_info += f"exists = {self.logs_base_dir.exists()}\n"
+        debug_info += f"absolute = {self.logs_base_dir.resolve()}\n\n"
         
         if not self.logs_base_dir.exists():
-            QMessageBox.information(self, "No Logs", f"Logs directory does not exist:\n{self.logs_base_dir}")
+            QMessageBox.critical(self, "Debug - Directory Not Found", 
+                               debug_info + "Directory does not exist!")
             return
         
         fresh_log_files = list(self.logs_base_dir.rglob('*.log'))
-        print(f"DEBUG: Found {len(fresh_log_files)} log files")
+        debug_info += f"Files found: {len(fresh_log_files)}\n"
         if fresh_log_files:
-            print(f"DEBUG: First file: {fresh_log_files[0]}")
+            debug_info += f"First file: {fresh_log_files[0]}\n"
+        
+        # ALWAYS show debug info for now
+        QMessageBox.information(self, "Debug Info", debug_info)
         
         if not fresh_log_files:
-            QMessageBox.information(self, "No Logs", f"No log files found to delete in:\n{self.logs_base_dir}")
+            QMessageBox.warning(self, "No Logs", f"No log files found to delete")
             return
         
         # Ask for confirmation with count
