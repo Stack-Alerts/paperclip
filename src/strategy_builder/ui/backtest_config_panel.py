@@ -228,9 +228,9 @@ class BacktestConfigPanel(QWidget):
         from src.optimizer_v3.ui.live_output_panel import LiveOutputPanel
         strategy_name = self._get_strategy_name()
         self.output_panel = LiveOutputPanel(strategy_name=strategy_name)
-        # Create tab and set initial red color
+        # Create tab and set initial red state
         self.live_output_tab_index = self.tab_widget.addTab(self.output_panel, "● Live Output")
-        self._set_live_output_color("#C35252")  # Red for idle
+        self._set_live_output_color("red")  # Red for idle
         
         # Tab 3: Trades (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.trades_panel import TradesPanel
@@ -1383,8 +1383,8 @@ class BacktestConfigPanel(QWidget):
         # Update Live Output icon to green (running) - both panel title AND tab text  
         self.output_panel.set_running(True)
         self.tab_widget.setTabText(self.live_output_tab_index, "▶ Live Output")
-        # Apply green color via stylesheet (only way that works reliably)
-        self._set_live_output_color("#10B981")
+        # Apply green color
+        self._set_live_output_color("green")
         
         self.results_text.setText("🔄 Backtest started...\n")
     
@@ -1423,8 +1423,8 @@ class BacktestConfigPanel(QWidget):
         # Update Live Output icon to stopped (idle) - both panel title AND tab text
         self.output_panel.set_running(False)
         self.tab_widget.setTabText(self.live_output_tab_index, "● Live Output")
-        # Apply red color via stylesheet
-        self._set_live_output_color("#C35252")
+        # Apply red color
+        self._set_live_output_color("red")
         
         if success:
             # Update displays - INLINE HTML FORMAT
@@ -1698,24 +1698,19 @@ class BacktestConfigPanel(QWidget):
     
     def _set_live_output_color(self, color: str) -> None:
         """
-        Set color for Live Output tab via stylesheet.
+        Set color for Live Output tab via dynamic property.
         
-        PyQt5 proper solution: Append tab-specific CSS rule to base stylesheet.
-        This is the ONLY way that works reliably since base TAB_WIDGET_STYLESHEET
-        has hardcoded color rules that override setTabTextColor().
+        Qt-native solution: Set property on tab bar, style via property selector.
         
         Args:
-            color: Hex color (e.g., "#10B981" for green, "#C35252" for red)
+            color: "red" or "green"
         """
-        base_style = get_tab_widget_stylesheet()
-        # Append tab-specific color rule using nth-child selector
-        # Tab indices: 0=Config, 1=Live Output, 2=Trades, 3=Metrics, 4=Compare
-        tab_specific_style = f"""
-            QTabBar::tab:nth-child({self.live_output_tab_index + 1}) {{
-                color: {color} !important;
-            }}
-        """
-        self.tab_widget.setStyleSheet(base_style + tab_specific_style)
+        # Set dynamic property on tab bar for Qt stylesheet selector
+        self.tab_widget.tabBar().setProperty("liveOutputState", color)
+        
+        # Force stylesheet refresh to apply property-based styling
+        self.tab_widget.style().unpolish(self.tab_widget.tabBar())
+        self.tab_widget.style().polish(self.tab_widget.tabBar())
     
     def _calculate_confluence_from_strategy(self):
         """
