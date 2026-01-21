@@ -314,8 +314,11 @@ class TradesPanel(QWidget):
         self.table.setRowCount(len(self.filtered_trades))
         
         for row, trade in enumerate(self.filtered_trades):
-            # ID
-            self.table.setItem(row, 0, self._create_item(str(trade.get('id', ''))))
+            # ID - CRITICAL: Set integer data for proper numeric sorting
+            id_item = self._create_item(str(trade.get('id', '')))
+            # Set UserRole data as integer for numeric sorting
+            id_item.setData(Qt.ItemDataRole.UserRole, int(trade.get('id', 0)))
+            self.table.setItem(row, 0, id_item)
             
             # Time
             timestamp = trade.get('timestamp', datetime.now())
