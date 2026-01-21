@@ -146,7 +146,7 @@ class BacktestWorker(QThread):
                             'id': str(trade_count),
                             'timestamp': datetime.now() - timedelta(minutes=(24-trade_count)*30),
                             'symbol': 'BTC.P/USDT',
-                            'side': 'BUY' if trade_count % 2 == 0 else 'SELL',
+                            'side': 'LONG' if trade_count % 2 == 0 else 'SHORT',  # Futures: LONG/SHORT not BUY/SELL
                             'size': 0.1,
                             'entry_price': entry_price,
                             'exit_price': exit_price,

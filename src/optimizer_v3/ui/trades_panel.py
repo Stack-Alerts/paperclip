@@ -283,13 +283,13 @@ class TradesPanel(QWidget):
             # Symbol
             self.table.setItem(row, 2, self._create_item(trade.get('symbol', 'BTC/USDT')))
             
-            # Side
-            side = trade.get('side', 'BUY')
+            # Side (LONG/SHORT for futures trading)
+            side = trade.get('side', 'LONG')
             side_item = self._create_item(side)
-            if side == 'BUY':
-                side_item.setForeground(QColor(get_color('success')))
-            else:
-                side_item.setForeground(QColor(get_color('error')))
+            if side == 'LONG':
+                side_item.setForeground(QColor(get_color('success')))  # Green for LONG
+            else:  # SHORT
+                side_item.setForeground(QColor(get_color('error')))  # Red for SHORT
             self.table.setItem(row, 3, side_item)
             
             # Size
