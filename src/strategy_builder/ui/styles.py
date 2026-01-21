@@ -842,7 +842,7 @@ def get_table_stylesheet() -> str:
     Get comprehensive table stylesheet for data tables.
     
     Returns:
-        Complete QTableWidget stylesheet with headers, rows, selection
+        Complete QTableWidget stylesheet with headers, rows, selection, hover
     """
     return f"""
         QTableWidget {{
@@ -858,12 +858,19 @@ def get_table_stylesheet() -> str:
             padding: 12px 8px;
             background-color: transparent;
         }}
+        QTableWidget::item:hover {{
+            background-color: #1a2532;
+        }}
         QHeaderView::section {{
             background-color: {COLORS['bg_secondary']};
             color: {COLORS['text_muted']};
             padding: 14px 12px;
             border: 1px solid {COLORS['border']};
             font-weight: 600;
+        }}
+        QHeaderView::section:hover {{
+            background-color: #252b36;
+            cursor: pointer;
         }}
     """
 
