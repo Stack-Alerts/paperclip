@@ -395,10 +395,14 @@ class TradesPanel(QWidget):
             notes = trade.get('notes', '')
             self.table.setItem(row, 11, self._create_item(str(notes)))
         
-        # CRITICAL: Re-enable sorting and refresh display
+        # CRITICAL: Re-enable sorting and refresh display  
         if was_sorting_enabled:
             self.table.setSortingEnabled(True)
-            # Re-apply current sort to ensure display is correct
+            # FORCE ID column to ascending order (data is pre-sorted)
+            # This prevents Qt from re-sorting with string comparison
+            if self.current_sort_column == 0:  # ID column
+                self.current_sort_order = Qt.SortOrder.AscendingOrder
+            # Re-apply current sort
             self.table.sortItems(self.current_sort_column, self.current_sort_order)
     
     def _create_item(self, text: str) -> QTableWidgetItem:
