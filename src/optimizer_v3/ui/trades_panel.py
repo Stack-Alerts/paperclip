@@ -216,7 +216,7 @@ class TradesPanel(QWidget):
         # Copy All button
         copy_btn = QPushButton("📋 Copy All")
         copy_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        copy_btn.setFixedSize(130, 42)
+        copy_btn.setFixedSize(135, 42)
         copy_btn.clicked.connect(self._copy_trades)
         copy_btn.setToolTip("Copy all trades to clipboard")
         layout.addWidget(copy_btn)
@@ -244,6 +244,28 @@ class TradesPanel(QWidget):
         self.filtered_trades = self.trades.copy()
         self._update_table()
         self._update_metrics()
+    
+    def update_trade(self, trade_id: int, trade_data: Dict) -> None:
+        """
+        Update existing trade in real-time (called when trade closes during execution).
+        
+        Args:
+            trade_id: ID of trade to update
+            trade_data: Updated trade information (exit_price, pnl, status, etc.)
+        """
+        # Find trade by ID and update it
+        for i, trade in enumerate(self.trades):
+            if trade.get('id') == trade_id:
+                # Update trade with new data
+                self.trades[i].update(trade_data)
+                self.filtered_trades = self.trades.copy()
+                # Immediately refresh UI to show closed trade
+                self._update_table()
+                self._update_metrics()
+                print(f"✅ Trade #{trade_id} updated in real-time")
+                return
+        
+        print(f"⚠️ Trade #{trade_id} not found for update")
     
     def _update_table(self) -> None:
         """Update table with current trades"""
