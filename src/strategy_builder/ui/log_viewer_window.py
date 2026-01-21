@@ -283,77 +283,113 @@ class LogViewerWindow(QDialog):
         self._update_stats(content, filtered)
     
     def _create_event_filters(self) -> QGroupBox:
-        """Create institutional-grade event-based filters - COMPACT LAYOUT"""
-        group = QGroupBox("Event Filters (Institutional Grade)")
-        group.setStyleSheet(get_groupbox_header_stylesheet())
-        group.setMaximumHeight(150)  # Reduced height - more compact
+        """Create institutional-grade event-based filters - CLEAN GRID LAYOUT"""
+        from PyQt5.QtWidgets import QGridLayout
         
+        group = QGroupBox("📊 Event Filters")
+        group.setStyleSheet(get_groupbox_header_stylesheet() + """
+            QGroupBox {
+                font-size: 14px;
+                font-weight: bold;
+                padding-top: 20px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 10px;
+                padding: 5px 10px;
+            }
+        """)
+        group.setMinimumHeight(200)
+        
+        # Main container with grid
         container = QWidget()
-        layout = QVBoxLayout()
-        layout.setSpacing(8)  # Reduced spacing
-        layout.setContentsMargins(10, 10, 10, 10)
+        grid_layout = QGridLayout()
+        grid_layout.setSpacing(10)
+        grid_layout.setContentsMargins(15, 25, 15, 15)
+        grid_layout.setVerticalSpacing(8)
+        grid_layout.setHorizontalSpacing(15)
         
-        # Group events by category - COMPACT GRID LAYOUT
-        categories = {
-            'Trade Events': ['TRADE_OPENED', 'TRADE_CLOSED', 'TRADE_UPDATED', 'POSITIONS_SNAPSHOT', 'TRADE_NOT_FOUND', 'MULTIPLE_POSITIONS'],
-            'Config Events': ['CONFIG_INITIALIZED', 'CONFIG_READ', 'CONFIG_VALIDATED', 'CONFIG_MISMATCH', 'CONFIG_MISSING'],
-            'System Events': ['STARTED', 'STOPPED', 'PROGRESS', 'COMPLETED'],
-            'Error Events': ['CRITICAL', 'ERROR', 'WARNING'],
-            'Strategy Events': ['BLOCK_LOADED', 'BLOCK_ADDED', 'SEARCH_RESULTS', 'DECISION', 'CONDITION_MET', 'SIGNAL_DETECTED'],
-        }
+        # All events in a clean list
+        all_events = [
+            ('TRADE_OPENED', '🟢 Trade Opened'),
+            ('TRADE_CLOSED', '📘 Trade Closed'),
+            ('TRADE_UPDATED', '🔄 Trade Updated'),
+            ('POSITIONS_SNAPSHOT', '📊 Positions'),
+            ('TRADE_NOT_FOUND', '❌ Not Found'),
+            ('MULTIPLE_POSITIONS', '🔀 Multi Pos'),
+            ('CONFIG_INITIALIZED', '✓ Config Init'),
+            ('CONFIG_READ', '📖 Config Read'),
+            ('CONFIG_VALIDATED', '✓ Validated'),
+            ('CONFIG_MISMATCH', '❌ Mismatch'),
+            ('CONFIG_MISSING', '⚠ Missing'),
+            ('STARTED', '▶ Started'),
+            ('STOPPED', '⏹ Stopped'),
+            ('PROGRESS', '⏳ Progress'),
+            ('COMPLETED', '✅ Completed'),
+            ('CRITICAL', '🔴 Critical'),
+            ('ERROR', '❌ Error'),
+            ('WARNING', '⚠ Warning'),
+            ('BLOCK_LOADED', '📦 Block Loaded'),
+            ('BLOCK_ADDED', '➕ Block Added'),
+            ('SEARCH_RESULTS', '🔍 Search'),
+            ('DECISION', '🎯 Decision'),
+            ('CONDITION_MET', '✓ Condition'),
+            ('SIGNAL_DETECTED', '📡 Signal'),
+        ]
         
         self.event_checkboxes = {}
-        self.filter_category_widgets = {}  # Track category rows for show/hide
         
-        for category_name, events in categories.items():
-            # Category row container
-            row_widget = QWidget()
-            row_layout = QHBoxLayout()
-            row_layout.setSpacing(8)  # Compact spacing
-            row_layout.setContentsMargins(0, 0, 0, 0)
-            
-            # Category label - SMALLER
-            cat_label = QLabel(f"{category_name}:")
-            cat_label.setStyleSheet(get_label_style('muted') + "font-weight: bold; font-size: 12px;")
-            cat_label.setFixedWidth(110)  # Fixed smaller width
-            row_layout.addWidget(cat_label)
-            
-            # Event checkboxes - COMPACT
-            for event in events:
-                if event in EVENT_PATTERNS:
-                    _, color = EVENT_PATTERNS[event]
-                    # Shorter names for compact display
-                    short_name = event.replace('_', ' ').replace('Positions', 'Pos').replace('Multiple', 'Multi')
-                    checkbox = QCheckBox(short_name.title())
-                    checkbox.setChecked(True)
-                    checkbox.setStyleSheet(f"QCheckBox {{ color: {color}; background: transparent; font-size: 12px; }}")
-                    checkbox.stateChanged.connect(lambda state, e=event: self._on_event_filter_changed(e, state))
-                    self.event_checkboxes[event] = checkbox
-                    row_layout.addWidget(checkbox)
-            
-            # NO stretch - use all available space
-            row_widget.setLayout(row_layout)
-            layout.addWidget(row_widget)
-            
-            # Store reference for show/hide
-            self.filter_category_widgets[category_name] = row_widget
+        # Layout in 6 columns x 4 rows
+        col = 0
+        row = 0
+        max_cols = 6
         
-        # Control buttons row - COMPACT
-        controls_layout = QHBoxLayout()
+        for event_key, display_name in all_events:
+            if event_key in EVENT_PATTERNS:
+                _, color = EVENT_PATTERNS[event_key]
+                checkbox = QCheckBox(display_name)
+                checkbox.setChecked(True)
+                checkbox.setStyleSheet(f"""
+                    QCheckBox {{
+                        color: {color};
+                        background: transparent;
+                        font-size: 13px;
+                        padding: 3px;
+                    }}
+                    QCheckBox::indicator {{
+                        width: 16px;
+                        height: 16px;
+                    }}
+                """)
+                checkbox.stateChanged.connect(lambda state, e=event_key: self._on_event_filter_changed(e, state))
+                self.event_checkboxes[event_key] = checkbox
+                
+                grid_layout.addWidget(checkbox, row, col)
+                
+                col += 1
+                if col >= max_cols:
+                    col = 0
+                    row += 1
         
+        # Control buttons at bottom
+        row += 1
         self.toggle_all_btn = QPushButton("Unselect All")
         self.toggle_all_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        self.toggle_all_btn.setFixedHeight(30)  # Smaller
+        self.toggle_all_btn.setFixedHeight(32)
         self.toggle_all_btn.clicked.connect(self._toggle_all_filters)
-        controls_layout.addWidget(self.toggle_all_btn)
+        grid_layout.addWidget(self.toggle_all_btn, row, 0, 1, 2)
         
-        controls_layout.addStretch()
-        layout.addLayout(controls_layout)
+        container.setLayout(grid_layout)
         
-        container.setLayout(layout)
-        group.setLayout(QVBoxLayout())
-        group.layout().setContentsMargins(0, 0, 0, 0)
-        group.layout().addWidget(container)
+        # Set group layout
+        group_layout = QVBoxLayout()
+        group_layout.setContentsMargins(0, 0, 0, 0)
+        group_layout.addWidget(container)
+        group.setLayout(group_layout)
+        
+        # Remove category tracking (no longer needed)
+        self.filter_category_widgets = {}
         
         return group
     
