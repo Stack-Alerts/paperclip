@@ -26,6 +26,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QApplication
 
 # Import centralized styles - ZERO hardcoded styles
 from src.strategy_builder.ui.styles import (
@@ -37,6 +38,10 @@ from src.strategy_builder.ui.styles import (
     get_table_stylesheet,
     get_color
 )
+
+# Import recommendation engine for intelligent recommendations
+from src.optimizer_v3.core.recommendation_engine import RecommendationEngine, Recommendation
+from src.detectors.building_blocks.registry import BlockRegistry
 
 
 class MetricsDisplayPanel(QWidget):
@@ -60,6 +65,10 @@ class MetricsDisplayPanel(QWidget):
         self.current_metrics: Dict = {}
         self.baseline_metrics: Dict = {}
         
+        # Intelligent recommendation engine (initialized lazily)
+        self.rec_engine: Optional[RecommendationEngine] = None
+        self.recommendation_cache: Dict[str, Optional[Recommendation]] = {}  # Cache recommendation objects
+        
         self._init_ui()
     
     def _init_ui(self) -> None:
@@ -73,19 +82,15 @@ class MetricsDisplayPanel(QWidget):
         title_label.setStyleSheet(get_panel_title_stylesheet())
         layout.addWidget(title_label)
         
-        # Two-column layout: Performance (left) and Risk (right) side-by-side
-        metrics_layout = QHBoxLayout()
-        metrics_layout.setSpacing(20)
+        # STACKED LAYOUT (Design v2): Performance on top, Risk below - FULL WIDTH TABLES
         
-        # Left column: Performance Metrics
+        # Performance Metrics (top, full width)
         perf_group = self._create_performance_group()
-        metrics_layout.addWidget(perf_group, 1)  # Equal stretch
+        layout.addWidget(perf_group)
         
-        # Right column: Risk Metrics
+        # Risk Metrics (bottom, full width)
         risk_group = self._create_risk_group()
-        metrics_layout.addWidget(risk_group, 1)  # Equal stretch
-        
-        layout.addLayout(metrics_layout)
+        layout.addWidget(risk_group)
         
         # Control buttons at bottom
         control_bar = self._create_control_bar()
@@ -94,7 +99,7 @@ class MetricsDisplayPanel(QWidget):
         self.setLayout(layout)
     
     def _create_performance_group(self) -> QGroupBox:
-        """Create performance metrics group"""
+        """Create performance metrics group - Design v2 with checkboxes"""
         # Performance metrics table
         perf_group = QGroupBox("📊 Performance Metrics")
         perf_group.setStyleSheet(get_groupbox_header_stylesheet())
@@ -102,27 +107,34 @@ class MetricsDisplayPanel(QWidget):
         perf_layout = QVBoxLayout()
         perf_layout.setContentsMargins(10, 15, 10, 10)
         
-        # Create metrics table with Recommendations column
+        # Create metrics table with Recommendations + CHECKBOX column (Design v2)
+        # Checkbox is ON THE RIGHT (after recommendation)
         self.perf_table = QTableWidget()
-        self.perf_table.setColumnCount(4)
-        self.perf_table.setHorizontalHeaderLabels(['Metric', 'Value', 'Rating', 'Recommendation'])
+        self.perf_table.setColumnCount(5)  # Added checkbox column at END
+        self.perf_table.setHorizontalHeaderLabels(['Metric', 'Value', 'Rating', 'Recommendation', '☐'])
         
         # Table styling
         # Use centralized table stylesheet (ZERO hardcoded styles)
         self.perf_table.setStyleSheet(get_table_stylesheet())
         
         self.perf_table.setAlternatingRowColors(True)
-        self.perf_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.perf_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)  # FIXED: Multi-row selection (Ctrl+Click, Shift+Click)
         self.perf_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.perf_table.setSortingEnabled(True)  # Excel-like sorting
-        self.perf_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        self.perf_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        self.perf_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        self.perf_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        self.perf_table.setColumnWidth(0, 180)  # Metric name
-        self.perf_table.setColumnWidth(1, 120)  # Value column
-        self.perf_table.setColumnWidth(2, 100)  # Rating column
-        # Column 3 (Recommendation) stretches to fill remaining space
+        self.perf_table.setSortingEnabled(False)  # Disable sorting (checkboxes break it)
+        
+        # Column widths: Metric | Value | Rating | Recommendation | Checkbox
+        # READABLE widths - we have FULL WIDTH now (stacked layout)
+        self.perf_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)  # Metric
+        self.perf_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)  # Value
+        self.perf_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)  # Rating
+        self.perf_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Recommendation (takes remaining space)
+        self.perf_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)  # Checkbox
+        
+        self.perf_table.setColumnWidth(0, 350)  # Metric name (VERY WIDE per user request)
+        self.perf_table.setColumnWidth(1, 350)  # Value column (VERY WIDE per user request)
+        self.perf_table.setColumnWidth(2, 350)  # Rating column (VERY WIDE per user request)
+        # Column 3 (Recommendation) stretches to fill remaining width
+        self.perf_table.setColumnWidth(4, 50)   # Checkbox column
         self.perf_table.verticalHeader().setVisible(False)
         
         # Populate with metric rows with institutional-grade tooltips
@@ -345,11 +357,29 @@ class MetricsDisplayPanel(QWidget):
         
         self.perf_table.setRowCount(len(metrics))
         for row, (metric, value, rating, tooltip) in enumerate(metrics):
+            # Column 0: Metric name
             item_metric = self._create_item(metric, align_left=True)
             item_metric.setToolTip(tooltip)
             self.perf_table.setItem(row, 0, item_metric)
+            
+            # Column 1: Value
             self.perf_table.setItem(row, 1, self._create_item(value))
+            
+            # Column 2: Rating
             self.perf_table.setItem(row, 2, self._create_item(rating))
+            
+            # Column 3: Recommendation (populated later by _update_performance_table)
+            
+            # Column 4: Checkbox (AT THE END, on the right)
+            # Add empty string to make checkbox render properly
+            checkbox_item = QTableWidgetItem("")
+            checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+            checkbox_item.setCheckState(Qt.CheckState.Unchecked)
+            checkbox_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.perf_table.setItem(row, 4, checkbox_item)
+        
+        # Connect checkbox state changes to update button
+        self.perf_table.itemChanged.connect(self._on_checkbox_changed)
         
         perf_layout.addWidget(self.perf_table)
         perf_group.setLayout(perf_layout)
@@ -357,7 +387,7 @@ class MetricsDisplayPanel(QWidget):
         return perf_group
     
     def _create_risk_group(self) -> QGroupBox:
-        """Create risk metrics group"""
+        """Create risk metrics group - Design v2 with checkboxes"""
         # Risk metrics table
         risk_group = QGroupBox("⚠️ Risk Metrics")
         risk_group.setStyleSheet(get_groupbox_header_stylesheet())
@@ -365,26 +395,33 @@ class MetricsDisplayPanel(QWidget):
         risk_layout = QVBoxLayout()
         risk_layout.setContentsMargins(10, 15, 10, 10)
         
-        # Create risk table with Recommendations column
+        # Create risk table with Recommendations + CHECKBOX column (Design v2)
+        # Checkbox is ON THE RIGHT (after recommendation)
         self.risk_table = QTableWidget()
-        self.risk_table.setColumnCount(4)
-        self.risk_table.setHorizontalHeaderLabels(['Metric', 'Value', 'Status', 'Recommendation'])
+        self.risk_table.setColumnCount(5)  # Added checkbox column at END
+        self.risk_table.setHorizontalHeaderLabels(['Metric', 'Value', 'Status', 'Recommendation', '☐'])
         
         # Use centralized table stylesheet (ZERO hardcoded styles)
         self.risk_table.setStyleSheet(get_table_stylesheet())
         
         self.risk_table.setAlternatingRowColors(True)
-        self.risk_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.risk_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)  # FIXED: Multi-row selection (Ctrl+Click, Shift+Click)
         self.risk_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.risk_table.setSortingEnabled(True)  # Excel-like sorting
-        self.risk_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        self.risk_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        self.risk_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        self.risk_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        self.risk_table.setColumnWidth(0, 180)  # Metric name
-        self.risk_table.setColumnWidth(1, 120)  # Value column
-        self.risk_table.setColumnWidth(2, 100)  # Status column
-        # Column 3 (Recommendation) stretches to fill remaining space
+        self.risk_table.setSortingEnabled(False)  # Disable sorting (checkboxes break it)
+        
+        # Column widths: Metric | Value | Status | Recommendation | Checkbox
+        # READABLE widths - we have FULL WIDTH now (stacked layout)
+        self.risk_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)  # Metric
+        self.risk_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)  # Value
+        self.risk_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)  # Status
+        self.risk_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Recommendation (takes remaining space)
+        self.risk_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)  # Checkbox
+        
+        self.risk_table.setColumnWidth(0, 350)  # Metric name (VERY WIDE per user request)
+        self.risk_table.setColumnWidth(1, 350)  # Value column (VERY WIDE per user request)
+        self.risk_table.setColumnWidth(2, 350)  # Status column (VERY WIDE per user request)
+        # Column 3 (Recommendation) stretches to fill remaining width
+        self.risk_table.setColumnWidth(4, 50)   # Checkbox column
         self.risk_table.verticalHeader().setVisible(False)
         
         # Populate with risk metrics with institutional-grade tooltips
@@ -603,11 +640,29 @@ class MetricsDisplayPanel(QWidget):
         
         self.risk_table.setRowCount(len(risk_metrics))
         for row, (metric, value, status, tooltip) in enumerate(risk_metrics):
+            # Column 0: Metric name
             item_metric = self._create_item(metric, align_left=True)
             item_metric.setToolTip(tooltip)
             self.risk_table.setItem(row, 0, item_metric)
+            
+            # Column 1: Value
             self.risk_table.setItem(row, 1, self._create_item(value))
+            
+            # Column 2: Status
             self.risk_table.setItem(row, 2, self._create_item(status))
+            
+            # Column 3: Recommendation (populated later by _update_risk_table)
+            
+            # Column 4: Checkbox (AT THE END, on the right)
+            # Add empty string to make checkbox render properly
+            checkbox_item = QTableWidgetItem("")
+            checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+            checkbox_item.setCheckState(Qt.CheckState.Unchecked)
+            checkbox_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.risk_table.setItem(row, 4, checkbox_item)
+        
+        # Connect checkbox state changes to update button
+        self.risk_table.itemChanged.connect(self._on_checkbox_changed)
         
         risk_layout.addWidget(self.risk_table)
         risk_group.setLayout(risk_layout)
@@ -664,9 +719,9 @@ class MetricsDisplayPanel(QWidget):
         return widget
     
     def _create_control_bar(self) -> QHBoxLayout:
-        """Create control buttons at bottom"""
+        """Create control buttons at bottom - Design v2 with selection controls"""
         layout = QHBoxLayout()
-        layout.setSpacing(20)
+        layout.setSpacing(15)
         
         # Status info
         self.status_label = QLabel("Status: <b>No data</b>")
@@ -675,18 +730,69 @@ class MetricsDisplayPanel(QWidget):
         
         layout.addStretch()
         
-        # Refresh button
-        refresh_btn = QPushButton("🔄 Refresh")
-        refresh_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        refresh_btn.setFixedSize(130, 42)
-        refresh_btn.clicked.connect(self._refresh_metrics)
-        refresh_btn.setToolTip("Refresh metrics display")
-        layout.addWidget(refresh_btn)
+        # Copy All button (matches Trades tab naming)
+        copy_btn = QPushButton("📋 Copy All")
+        copy_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        copy_btn.setFixedSize(170, 52)
+        copy_btn.clicked.connect(self._copy_all_metrics)
+        copy_btn.setToolTip("Copy all metrics to clipboard")
+        layout.addWidget(copy_btn)
         
-        # Export button
+        # Copy Selection button (matches Trades tab naming)
+        copy_sel_btn = QPushButton("📋 Copy Selection")
+        copy_sel_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        copy_sel_btn.setFixedSize(260, 52)
+        copy_sel_btn.clicked.connect(self._copy_selected_metrics)
+        copy_sel_btn.setToolTip("Copy selected rows to clipboard")
+        layout.addWidget(copy_sel_btn)
+        
+        # Select All button
+        select_all_btn = QPushButton("☑ Select All")
+        select_all_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        select_all_btn.setFixedSize(170, 52)
+        select_all_btn.clicked.connect(self._select_all_recommendations)
+        select_all_btn.setToolTip("Select all recommendations for application")
+        layout.addWidget(select_all_btn)
+        
+        # Clear All button
+        clear_all_btn = QPushButton("☐ Clear All")
+        clear_all_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        clear_all_btn.setFixedSize(170, 52)
+        clear_all_btn.clicked.connect(self._clear_all_recommendations)
+        clear_all_btn.setToolTip("Deselect all recommendations")
+        layout.addWidget(clear_all_btn)
+        
+        # Apply Recommendation(s) button (Design v2 - PRIMARY ACTION)
+        self.apply_btn = QPushButton("💡 Apply Recommendation(s)")
+        self.apply_btn.setStyleSheet(get_primary_button_stylesheet(compact=False))  # Prominent
+        self.apply_btn.setFixedSize(380, 52)
+        self.apply_btn.clicked.connect(self._apply_selected_recommendations)
+        self.apply_btn.setEnabled(False)  # Disabled until selections made
+        self.apply_btn.setToolTip("Apply selected recommendations to strategy configuration")
+        layout.addWidget(self.apply_btn)
+        
+        # Auto-Retest checkbox
+        self.auto_retest_check = QPushButton("🔄 Auto-Retest")
+        self.auto_retest_check.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        self.auto_retest_check.setCheckable(True)
+        self.auto_retest_check.setChecked(False)
+        self.auto_retest_check.setFixedSize(200, 52)
+        self.auto_retest_check.setToolTip(
+            "Auto-Retest After Applying Recommendations\n\n"
+            "When enabled:\n"
+            "• Recommendations are applied to config\n"
+            "• Backtest runs automatically\n"
+            "• Results compared with original\n\n"
+            "When disabled:\n"
+            "• Recommendations applied only\n"
+            "• Manual retest required"
+        )
+        layout.addWidget(self.auto_retest_check)
+        
+        # Export button (moved to end)
         export_btn = QPushButton("💾 Export")
         export_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        export_btn.setFixedSize(130, 42)
+        export_btn.setFixedSize(140, 52)  # FIXED: Wider for consistency
         export_btn.clicked.connect(self._export_metrics)
         export_btn.setToolTip("Export metrics to CSV")
         layout.addWidget(export_btn)
@@ -720,6 +826,10 @@ class MetricsDisplayPanel(QWidget):
         if not self.current_metrics:
             return
         
+        # Initialize recommendation engine on first use
+        if self.rec_engine is None:
+            self._initialize_recommendation_engine()
+        
         # Update each row with actual data
         metrics_map = {
             0: ('total_pnl', lambda x: f"${float(x):,.2f}"),
@@ -751,7 +861,7 @@ class MetricsDisplayPanel(QWidget):
                     elif float(value) < 0:
                         item.setForeground(QColor(get_color('error')))
                 
-                self.perf_table.setItem(row, 1, item)
+                self.perf_table.setItem(row, 1, item)  # Column 1: Value
                 
                 # Set rating
                 rating = self._get_rating(key, value)
@@ -762,12 +872,48 @@ class MetricsDisplayPanel(QWidget):
                     rating_item.setForeground(QColor(get_color('warning')))
                 elif rating == '✗ Poor':
                     rating_item.setForeground(QColor(get_color('error')))
-                self.perf_table.setItem(row, 2, rating_item)
+                self.perf_table.setItem(row, 2, rating_item)  # Column 2: Rating
+                
+                # Generate intelligent recommendation
+                rec_obj = None
+                rec_text = ""
+                
+                if self.rec_engine and rating in ['⚠ Fair', '✗ Poor']:
+                    rec_obj = self.rec_engine.generate_recommendation(key, float(value), rating)
+                    if rec_obj:
+                        rec_text = self.rec_engine.format_recommendation_text(rec_obj)
+                        # Cache the recommendation object
+                        self.recommendation_cache[f"perf_{row}"] = rec_obj
+                    else:
+                        # No intelligent recommendation available - use generic
+                        rec_text = self._get_generic_recommendation(key, value, rating)
+                        self.recommendation_cache[f"perf_{row}"] = None
+                else:
+                    self.recommendation_cache[f"perf_{row}"] = None
+                
+                rec_item = self._create_item(rec_text, align_left=True)
+                self.perf_table.setItem(row, 3, rec_item)  # Column 3: Recommendation
+                
+                # Enable/disable checkbox - ONLY for intelligent recommendations
+                checkbox_item = self.perf_table.item(row, 4)
+                if checkbox_item:
+                    # Only enable if we have an intelligent recommendation
+                    is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
+                    if is_actionable:
+                        checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+                    else:
+                        # Disable checkbox for non-actionable items
+                        checkbox_item.setFlags(Qt.ItemFlag.NoItemFlags)
+                        checkbox_item.setCheckState(Qt.CheckState.Unchecked)
     
     def _update_risk_table(self) -> None:
         """Update risk metrics table"""
         if not self.current_metrics:
             return
+        
+        # Initialize recommendation engine on first use
+        if self.rec_engine is None:
+            self._initialize_recommendation_engine()
         
         # Update each row with actual risk data
         risk_metrics_map = {
@@ -800,7 +946,7 @@ class MetricsDisplayPanel(QWidget):
                     else:
                         item.setForeground(QColor(get_color('error')))
                 
-                self.risk_table.setItem(row, 1, item)
+                self.risk_table.setItem(row, 1, item)  # Column 1: Value
                 
                 # Set status
                 status = self._get_risk_status(key, value)
@@ -809,9 +955,41 @@ class MetricsDisplayPanel(QWidget):
                     status_item.setForeground(QColor(get_color('success')))
                 elif status == '⚠ Monitor':
                     status_item.setForeground(QColor(get_color('warning')))
-                elif status == '✗ High':
-                    status_item.setForeground(QColor(get_color('error')))
-                self.risk_table.setItem(row, 2, status_item)
+                elif status == '✗ High' or status == '✗ Poor':
+                    status_item.setForeground(QColor(get_color('error')))  # RED for Poor/High
+                self.risk_table.setItem(row, 2, status_item)  # Column 2: Status
+                
+                # Generate intelligent recommendation for risk metrics
+                rec_obj = None
+                rec_text = ""
+                
+                if self.rec_engine and status in ['⚠ Monitor', '✗ High', '✗ Poor']:
+                    rec_obj = self.rec_engine.generate_recommendation(key, float(value), status)
+                    if rec_obj:
+                        rec_text = self.rec_engine.format_recommendation_text(rec_obj)
+                        # Cache the recommendation object
+                        self.recommendation_cache[f"risk_{row}"] = rec_obj
+                    else:
+                        # No intelligent recommendation available - use generic
+                        rec_text = self._get_risk_recommendation_generic(key, value, status)
+                        self.recommendation_cache[f"risk_{row}"] = None
+                else:
+                    self.recommendation_cache[f"risk_{row}"] = None
+                
+                rec_item = self._create_item(rec_text, align_left=True)
+                self.risk_table.setItem(row, 3, rec_item)  # Column 3: Recommendation
+                
+                # Enable/disable checkbox - ONLY for intelligent recommendations
+                checkbox_item = self.risk_table.item(row, 4)
+                if checkbox_item:
+                    # Only enable if we have an intelligent recommendation
+                    is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
+                    if is_actionable:
+                        checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+                    else:
+                        # Disable checkbox for non-actionable items
+                        checkbox_item.setFlags(Qt.ItemFlag.NoItemFlags)
+                        checkbox_item.setCheckState(Qt.CheckState.Unchecked)
     
     def _get_risk_status(self, metric_key: str, value) -> str:
         """Get status for risk metric value"""
@@ -1056,6 +1234,445 @@ class MetricsDisplayPanel(QWidget):
         except Exception as e:
             print(f"❌ Export failed: {str(e)}")
     
+    def _initialize_recommendation_engine(self) -> None:
+        """Initialize intelligent recommendation engine"""
+        try:
+            # Get current strategy configuration
+            strategy_config = self._get_current_strategy_config()
+            self.rec_engine = RecommendationEngine(strategy_config, BlockRegistry)
+            print("✅ Intelligent recommendation engine initialized")
+        except Exception as e:
+            print(f"⚠️ Failed to initialize recommendation engine: {str(e)}")
+            self.rec_engine = None
+    
+    def _get_current_strategy_config(self):
+        """Get current strategy config from orchestrator"""
+        try:
+            # Access main window orchestrator
+            main_window = self.window()
+            if hasattr(main_window, 'orchestrator'):
+                return main_window.orchestrator.get_current_config()
+        except Exception as e:
+            print(f"⚠️ Could not access strategy config: {str(e)}")
+        return None
+    
+    def _is_intelligent_recommendation(self, rec_text: str) -> bool:
+        """Check if recommendation is intelligent (from engine) vs generic"""
+        # Intelligent recommendations start with "Add '"
+        return rec_text.startswith("Add '")
+    
+    def _get_generic_recommendation(self, metric_key: str, value, rating: str) -> str:
+        """Generate actionable recommendation text for performance metrics"""
+        try:
+            val = float(value)
+            
+            if rating == '✓ Good':
+                return ""  # No recommendation needed - performance is good
+            elif rating == '⚠ Fair':
+                if metric_key == 'total_pnl':
+                    return "Positive but could be improved - optimize entry/exit rules"
+                elif metric_key == 'total_return':
+                    return "Matches market - consider improving R:R ratio"
+                elif metric_key == 'sharpe_ratio':
+                    return "Acceptable - reduce volatility or improve consistency"
+                elif metric_key == 'win_rate':
+                    return "Average - balance with higher R:R ratio"
+                elif metric_key == 'profit_factor':
+                    return "Profitable but marginal - tighten entry criteria"
+                elif metric_key == 'avg_trade_pnl':
+                    return "Positive - increase position size cautiously"
+                else:
+                    return "Monitor performance - room for improvement"
+            elif rating == '✗ Poor':
+                if metric_key == 'total_pnl':
+                    return "Strategy losing money - review all parameters urgently"
+                elif metric_key == 'total_return':
+                    return "Underperforming - consider alternative strategies"
+                elif metric_key == 'sharpe_ratio':
+                    return "Poor risk-adjusted returns - improve or abandon strategy"
+                elif metric_key == 'win_rate':
+                    if val < 50.0:
+                        return "Low win rate - need R:R ≥2.0 to be profitable"
+                    else:
+                        return "Review entry/exit criteria"
+                elif metric_key == 'profit_factor':
+                    return "Unprofitable - stop trading this strategy"
+                elif metric_key == 'total_trades':
+                    return "Insufficient sample size - collect more data before concluding"
+                elif metric_key == 'avg_trade_pnl':
+                    return "Losing per trade - stop and review strategy completely"
+                else:
+                    return "Needs immediate attention - review parameters"
+            else:
+                return "Awaiting more data..."
+        except:
+            return "Awaiting more data..."
+    
+    def _get_risk_recommendation_generic(self, metric_key: str, value, status: str) -> str:
+        """Generate actionable recommendation text for risk metrics"""
+        try:
+            val = float(value)
+            
+            if status == '✓ Good':
+                return ""  # No recommendation needed - risk is well-managed
+            elif status == '⚠ Monitor':
+                if metric_key == 'max_drawdown_pct':
+                    return "Drawdown elevated - consider reducing position size"
+                elif metric_key == 'max_drawdown_duration':
+                    return "Recovery taking time - review strategy resilience"
+                elif metric_key == 'var_95':
+                    return "Tail risk increasing - tighten stop losses"
+                elif metric_key == 'expected_shortfall':
+                  return "Worst-case losses growing - review risk limits"
+                elif metric_key == 'sortino_ratio':
+                    return "Downside volatility high - improve stop loss strategy"
+                elif metric_key == 'calmar_ratio':
+                    return "Returns not justifying drawdowns - optimize exits"
+                elif metric_key == 'max_consecutive_losses':
+                    return "Losing streaks lengthening - review entry criteria"
+                elif metric_key == 'std_deviation':
+                    return "Volatility rising - consider position sizing adjustment"
+                elif metric_key == 'ulcer_index':
+                    return "Drawdown stress increasing - improve risk management"
+                else:
+                    return "Monitor closely - risk increasing"
+            elif status == '✗ High' or status == '✗ Poor':
+                if metric_key == 'max_drawdown_pct':
+                    return "CRITICAL: Reduce position size immediately - risk of ruin"
+                elif metric_key == 'max_drawdown_duration':
+                    return "CONCERN: Recovery too slow - consider strategy change"
+                elif metric_key == 'var_95':
+                    return "HIGH RISK: Tail losses excessive - tighten all stops"
+                elif metric_key == 'expected_shortfall':
+                    return "DANGER: Catastrophic loss potential - reduce exposure"
+                elif metric_key == 'sortino_ratio':
+                    return "POOR: Downside risk not managed - overhaul strategy"
+                elif metric_key == 'calmar_ratio':
+                    return "POOR: Drawdowns too large for returns - abandon strategy"
+                elif metric_key == 'max_consecutive_losses':
+                    return "WARNING: Losing streaks too long - halt trading and review"
+                elif metric_key == 'std_deviation':
+                    return "HIGH: Excessive volatility - reduce positions significantly"
+                elif metric_key == 'ulcer_index':
+                    return "SEVERE: Unacceptable drawdown stress - stop trading"
+                else:
+                    return "HIGH RISK: Take immediate corrective action"
+            else:
+                return "Awaiting more data..."
+        except:
+            return "Awaiting more data..."
+    
     def get_metrics(self) -> Dict:
         """Get current metrics"""
         return self.current_metrics.copy()
+    
+    def _copy_all_metrics(self) -> None:
+        """Copy all metrics to clipboard in tab-delimited format"""
+        try:
+            # Build tab-delimited text
+            lines = []
+            
+            # Performance Metrics
+            lines.append("PERFORMANCE METRICS")
+            lines.append("Metric\tValue\tRating\tRecommendation")
+            for row in range(self.perf_table.rowCount()):
+                metric = self.perf_table.item(row, 0).text() if self.perf_table.item(row, 0) else ""
+                value = self.perf_table.item(row, 1).text() if self.perf_table.item(row, 1) else ""
+                rating = self.perf_table.item(row, 2).text() if self.perf_table.item(row, 2) else ""
+                rec = self.perf_table.item(row, 3).text() if self.perf_table.item(row, 3) else ""
+                lines.append(f"{metric}\t{value}\t{rating}\t{rec}")
+            
+            lines.append("")  # Blank line
+            
+            # Risk Metrics
+            lines.append("RISK METRICS")
+            lines.append("Metric\tValue\tStatus\tRecommendation")
+            for row in range(self.risk_table.rowCount()):
+                metric = self.risk_table.item(row, 0).text() if self.risk_table.item(row, 0) else ""
+                value = self.risk_table.item(row, 1).text() if self.risk_table.item(row, 1) else ""
+                status = self.risk_table.item(row, 2).text() if self.risk_table.item(row, 2) else ""
+                rec = self.risk_table.item(row, 3).text() if self.risk_table.item(row, 3) else ""
+                lines.append(f"{metric}\t{value}\t{status}\t{rec}")
+            
+            # Copy to clipboard
+            clipboard_text = "\n".join(lines)
+            QApplication.clipboard().setText(clipboard_text)
+            
+            print(f"✅ Copied all metrics ({len(lines)} lines) to clipboard")
+            self.status_label.setText("Status: <b>All metrics copied to clipboard</b>")
+            
+        except Exception as e:
+            print(f"❌ Copy failed: {str(e)}")
+            self.status_label.setText(f"Status: <b>Copy failed: {str(e)}</b>")
+    
+    def _copy_selected_metrics(self) -> None:
+        """Copy selected rows to clipboard in tab-delimited format"""
+        try:
+            lines = []
+            
+            # Get selected rows from performance table
+            perf_selected_rows = set()
+            for index in self.perf_table.selectedIndexes():
+                perf_selected_rows.add(index.row())
+            
+            if perf_selected_rows:
+                lines.append("PERFORMANCE METRICS")
+                lines.append("Metric\tValue\tRating\tRecommendation")
+                for row in sorted(perf_selected_rows):
+                    metric = self.perf_table.item(row, 0).text() if self.perf_table.item(row, 0) else ""
+                    value = self.perf_table.item(row, 1).text() if self.perf_table.item(row, 1) else ""
+                    rating = self.perf_table.item(row, 2).text() if self.perf_table.item(row, 2) else ""
+                    rec = self.perf_table.item(row, 3).text() if self.perf_table.item(row, 3) else ""
+                    lines.append(f"{metric}\t{value}\t{rating}\t{rec}")
+                lines.append("")  # Blank line
+            
+            # Get selected rows from risk table
+            risk_selected_rows = set()
+            for index in self.risk_table.selectedIndexes():
+                risk_selected_rows.add(index.row())
+            
+            if risk_selected_rows:
+                lines.append("RISK METRICS")
+                lines.append("Metric\tValue\tStatus\tRecommendation")
+                for row in sorted(risk_selected_rows):
+                    metric = self.risk_table.item(row, 0).text() if self.risk_table.item(row, 0) else ""
+                    value = self.risk_table.item(row, 1).text() if self.risk_table.item(row, 1) else ""
+                    status = self.risk_table.item(row, 2).text() if self.risk_table.item(row, 2) else ""
+                    rec = self.risk_table.item(row, 3).text() if self.risk_table.item(row, 3) else ""
+                    lines.append(f"{metric}\t{value}\t{status}\t{rec}")
+            
+            if not lines:
+                print("⚠️ No rows selected")
+                self.status_label.setText("Status: <b>No rows selected</b>")
+                return
+            
+            # Copy to clipboard
+            clipboard_text = "\n".join(lines)
+            QApplication.clipboard().setText(clipboard_text)
+            
+            total_selected = len(perf_selected_rows) + len(risk_selected_rows)
+            print(f"✅ Copied {total_selected} selected rows to clipboard")
+            self.status_label.setText(f"Status: <b>{total_selected} selected rows copied to clipboard</b>")
+            
+        except Exception as e:
+            print(f"❌ Copy failed: {str(e)}")
+            self.status_label.setText(f"Status: <b>Copy failed: {str(e)}</b>")
+    
+    def _select_all_recommendations(self) -> None:
+        """Select all recommendation checkboxes"""
+        # Select all performance metrics (checkbox is column 4)
+        for row in range(self.perf_table.rowCount()):
+            item = self.perf_table.item(row, 4)
+            if item:
+                item.setCheckState(Qt.CheckState.Checked)
+        
+        # Select all risk metrics (checkbox is column 4)
+        for row in range(self.risk_table.rowCount()):
+            item = self.risk_table.item(row, 4)
+            if item:
+                item.setCheckState(Qt.CheckState.Checked)
+        
+        # Update apply button
+        self._update_apply_button()
+    
+    def _clear_all_recommendations(self) -> None:
+        """Clear all recommendation checkboxes"""
+        # Clear all performance metrics (checkbox is column 4)
+        for row in range(self.perf_table.rowCount()):
+            item = self.perf_table.item(row, 4)
+            if item:
+                item.setCheckState(Qt.CheckState.Unchecked)
+        
+        # Clear all risk metrics (checkbox is column 4)
+        for row in range(self.risk_table.rowCount()):
+            item = self.risk_table.item(row, 4)
+            if item:
+                item.setCheckState(Qt.CheckState.Unchecked)
+        
+        # Update apply button
+        self._update_apply_button()
+    
+    def _on_checkbox_changed(self, item: QTableWidgetItem) -> None:
+        """Handle checkbox state change"""
+        # Only update if it's a checkbox column (column 4)
+        if item and item.column() == 4:
+            self._update_apply_button()
+    
+    def _update_apply_button(self) -> None:
+        """Update apply button text and enabled state based on selections"""
+        # Count selected checkboxes (checkbox is column 4)
+        selected_count = 0
+        
+        # Count performance metrics
+        for row in range(self.perf_table.rowCount()):
+            item = self.perf_table.item(row, 4)
+            if item and item.checkState() == Qt.CheckState.Checked:
+                selected_count += 1
+        
+        # Count risk metrics
+        for row in range(self.risk_table.rowCount()):
+            item = self.risk_table.item(row, 4)
+            if item and item.checkState() == Qt.CheckState.Checked:
+                selected_count += 1
+        
+        # Update button (show count when >0)
+        if selected_count > 0:
+            self.apply_btn.setText(f"💡 Apply Recommendation(s) ({selected_count})")
+        else:
+            self.apply_btn.setText("💡 Apply Recommendation(s)")
+        self.apply_btn.setEnabled(selected_count > 0)
+    
+    def _apply_selected_recommendations(self) -> None:
+        """Apply selected recommendations to strategy configuration"""
+        # Collect selected recommendations with cached objects
+        selected_recs = []
+        
+        # Collect from performance metrics (checkbox is column 4)
+        for row in range(self.perf_table.rowCount()):
+            checkbox_item = self.perf_table.item(row, 4)
+            if checkbox_item and checkbox_item.checkState() == Qt.CheckState.Checked:
+                rec = self.recommendation_cache.get(f"perf_{row}")
+                if rec:
+                    selected_recs.append(rec)
+        
+        # Collect from risk metrics (checkbox is column 4)
+        for row in range(self.risk_table.rowCount()):
+            checkbox_item = self.risk_table.item(row, 4)
+            if checkbox_item and checkbox_item.checkState() == Qt.CheckState.Checked:
+                rec = self.recommendation_cache.get(f"risk_{row}")
+                if rec:
+                    selected_recs.append(rec)
+        
+        if not selected_recs:
+            return
+        
+        # Apply each recommendation
+        applied_count = 0
+        for rec in selected_recs:
+            if self._apply_single_recommendation(rec):
+                applied_count += 1
+        
+        # Update status
+        self.status_label.setText(
+            f"Status: <b>{applied_count}/{len(selected_recs)} recommendations applied</b>"
+        )
+        
+        # Auto-retest if enabled
+        if applied_count > 0 and self.auto_retest_check.isChecked():
+            self._trigger_retest()
+    
+    def _apply_single_recommendation(self, rec: Recommendation) -> bool:
+        """
+        Apply a single recommendation
+        
+        Args:
+            rec: Recommendation object
+        
+        Returns:
+            True if successfully applied, False otherwise
+        """
+        try:
+            if rec.action_type == 'ADD_BLOCK':
+                # Add building block to strategy
+                success = self._add_building_block(rec.block_name)
+                if success:
+                    print(f"✅ Added building block: {rec.block_name}")
+                return success
+                
+            elif rec.action_type == 'ADJUST_PARAMETER':
+                # Modify parameter (SL, TP, position size, etc.)
+                success = self._adjust_parameter(rec.parameter_name, rec.new_value)
+                if success:
+                    print(f"✅ Adjusted {rec.parameter_name}: {rec.new_value}")
+                return success
+            
+            return False
+            
+        except Exception as e:
+            print(f"❌ Failed to apply recommendation: {str(e)}")
+            return False
+    
+    def _add_building_block(self, block_name: str) -> bool:
+        """
+        Add building block to current strategy
+        
+        Args:
+            block_name: Registry name of block to add
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Access orchestrator
+            orchestrator = self._get_orchestrator()
+            if not orchestrator:
+                print("⚠️ Orchestrator not available")
+                return False
+            
+            # Add block via orchestrator
+            if hasattr(orchestrator, 'add_building_block'):
+                return orchestrator.add_building_block(block_name)
+            else:
+                print("⚠️ Orchestrator does not support add_building_block method")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Failed to add block {block_name}: {str(e)}")
+            return False
+    
+    def _adjust_parameter(self, param_name: str, new_value) -> bool:
+        """
+        Adjust strategy parameter
+        
+        Args:
+            param_name: Parameter to adjust
+            new_value: New parameter value
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            orchestrator = self._get_orchestrator()
+            if not orchestrator:
+                return False
+            
+            # Adjust parameter via orchestrator
+            if hasattr(orchestrator, 'update_parameter'):
+                return orchestrator.update_parameter(param_name, new_value)
+            else:
+                print("⚠️ Orchestrator does not support update_parameter method")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Failed to adjust {param_name}: {str(e)}")
+            return False
+    
+    def _get_orchestrator(self):
+        """Get orchestrator from main window"""
+        try:
+            main_window = self.window()
+            if hasattr(main_window, 'orchestrator'):
+                return main_window.orchestrator
+        except:
+            pass
+        return None
+    
+    def _trigger_retest(self) -> None:
+        """Trigger automatic backtest retest after applying recommendations"""
+        try:
+            # Access backtest config panel
+            main_window = self.window()
+            if hasattr(main_window, 'backtest_config_panel'):
+                config_panel = main_window.backtest_config_panel
+                
+                # Trigger backtest run
+                if hasattr(config_panel, '_on_run_clicked'):
+                    config_panel._on_run_clicked()
+                    print("🔄 Auto-retest triggered - backtest started")
+                else:
+                    print("⚠️ Backtest panel does not support _on_run_clicked method")
+            else:
+                print("⚠️ Backtest panel not accessible for auto-retest")
+                
+        except Exception as e:
+            print(f"❌ Auto-retest failed: {str(e)}")
