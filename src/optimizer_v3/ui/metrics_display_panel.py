@@ -904,16 +904,28 @@ class MetricsDisplayPanel(QWidget):
                 rec_item = self._create_item(rec_text, align_left=True)
                 self.perf_table.setItem(row, 3, rec_item)  # Column 3: Recommendation
                 
-                # Enable/disable checkbox - ONLY for intelligent recommendations
+                # Show/hide checkbox - ONLY visible for intelligent recommendations
                 checkbox_widget = self.perf_table.cellWidget(row, 4)
                 if checkbox_widget:
                     # Find the QCheckBox inside the container widget
                     checkbox = checkbox_widget.findChild(QCheckBox)
                     if checkbox:
-                        # Only enable if we have an intelligent recommendation
+                        # Only show checkbox if we have an intelligent recommendation
                         is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
-                        checkbox.setEnabled(is_actionable)  # Enabled = clickable, Disabled = grayed out
-                        checkbox.setChecked(False)  # Always start unchecked
+                        
+                        if is_actionable:
+                            # Show and enable checkbox for intelligent recommendations
+                            checkbox_widget.setVisible(True)
+                            checkbox.blockSignals(True)  # Block signals to prevent recursive updates
+                            checkbox.setEnabled(True)
+                            checkbox.setChecked(False)
+                            checkbox.blockSignals(False)  # Re-enable signals
+                        else:
+                            # Hide checkbox completely for non-actionable recommendations
+                            checkbox_widget.setVisible(False)
+                            checkbox.blockSignals(True)
+                            checkbox.setChecked(False)
+                            checkbox.blockSignals(False)
     
     def _update_risk_table(self) -> None:
         """Update risk metrics table"""
@@ -988,16 +1000,28 @@ class MetricsDisplayPanel(QWidget):
                 rec_item = self._create_item(rec_text, align_left=True)
                 self.risk_table.setItem(row, 3, rec_item)  # Column 3: Recommendation
                 
-                # Enable/disable checkbox - ONLY for intelligent recommendations
+                # Show/hide checkbox - ONLY visible for intelligent recommendations
                 checkbox_widget = self.risk_table.cellWidget(row, 4)
                 if checkbox_widget:
                     # Find the QCheckBox inside the container widget
                     checkbox = checkbox_widget.findChild(QCheckBox)
                     if checkbox:
-                        # Only enable if we have an intelligent recommendation
+                        # Only show checkbox if we have an intelligent recommendation
                         is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
-                        checkbox.setEnabled(is_actionable)  # Enabled = clickable, Disabled = grayed out
-                        checkbox.setChecked(False)  # Always start unchecked
+                        
+                        if is_actionable:
+                            # Show and enable checkbox for intelligent recommendations
+                            checkbox_widget.setVisible(True)
+                            checkbox.blockSignals(True)  # Block signals to prevent recursive updates
+                            checkbox.setEnabled(True)
+                            checkbox.setChecked(False)
+                            checkbox.blockSignals(False)  # Re-enable signals
+                        else:
+                            # Hide checkbox completely for non-actionable recommendations
+                            checkbox_widget.setVisible(False)
+                            checkbox.blockSignals(True)
+                            checkbox.setChecked(False)
+                            checkbox.blockSignals(False)
     
     def _get_risk_status(self, metric_key: str, value) -> str:
         """Get status for risk metric value"""
