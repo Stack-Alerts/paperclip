@@ -39,7 +39,7 @@ from src.strategy_builder.ui.styles import (
 )
 
 
-# Institutional-grade event patterns (extensible) - BROAD PATTERNS
+# Institutional-grade event patterns - MATCH REAL LOG FORMAT
 EVENT_PATTERNS = {
     # Trade Events
     'TRADE_OPENED': (r'TRADE OPENED|trade.*opened|Opening trade|🟢.*TRADE', '#10B981'),
@@ -49,33 +49,33 @@ EVENT_PATTERNS = {
     'TRADE_NOT_FOUND': (r'TRADE.*NOT FOUND|Trade.*not found|❌.*TRADE', '#C35252'),
     'MULTIPLE_POSITIONS': (r'multiple.*position|Multiple.*open|Several.*position|🔀', '#FF8C00'),
     
-    # Configuration Events  
-    'CONFIG_INITIALIZED': (r'initialized|initialization|init.*complete|CONFIG.*INIT|Setup complete|✓.*init', '#10B981'),
-    'CONFIG_READ': (r'Reading|Loading.*config|Config.*read|Config.*load|Loaded.*config|📖', '#2070FF'),
-    'CONFIG_VALIDATED': (r'validated|validation.*pass|Config.*valid|Validation complete|✓.*valid', '#10B981'),
-    'CONFIG_MISMATCH': (r'MISMATCH|mismatch|Config.*error|Invalid.*config|❌.*config', '#C35252'),
-    'CONFIG_MISSING': (r'not found|missing|Config.*missing|Cannot find|⚠.*config', '#FF8C00'),
+    # Configuration Events - Match actual log format
+    'CONFIG_INITIALIZED': (r'initialized|Initializing|Logger initialized|BlockRegistryAdapter initialized', '#10B981'),
+    'CONFIG_READ': (r'Reading|Loading|load blocks from registry|Calling.*search_blocks', '#2070FF'),
+    'CONFIG_VALIDATED': (r'validated|validation.*pass|Config.*valid|Validation complete', '#10B981'),
+    'CONFIG_MISMATCH': (r'MISMATCH|mismatch|Config.*error|Invalid.*config', '#C35252'),
+    'CONFIG_MISSING': (r'not found|missing|Config.*missing|Cannot find', '#FF8C00'),
     
-    # System Events
-    'STARTED': (r'Started|Starting|Launching|Initiating|Begin|▶|Startup', '#10B981'),
-    'STOPPED': (r'Stopped|Stopping|Shutdown|Terminated|Ending|⏹|Exit', '#9AA0A6'),
-    'PROGRESS': (r'Progress|Loading|Processing|Working|Running|⏳|In progress', '#2070FF'),
-    'COMPLETED': (r'completed|complete|Successfully|Success|Finished|Done|✅|✓.*complete', '#10B981'),
+    # System Events - Match actual format
+    'STARTED': (r'Starting to load|Starting|Launching|Initiating|Begin', '#10B981'),
+    'STOPPED': (r'Stopped|Stopping|Shutdown|Terminated|Ending', '#9AA0A6'),
+    'PROGRESS': (r'Processing|Working|Running|In progress', '#2070FF'),
+    'COMPLETED': (r'Successfully loaded|Successfully|Success|Finished|Done', '#10B981'),
     
-    # Error Events
-    'CRITICAL': (r'CRITICAL|FATAL|critical.*error|Fatal.*error|🔴', '#C35252'),
-    'ERROR': (r'ERROR|error|failed|failure|exception|❌|Error:', '#FF8C00'),
-    'WARNING': (r'WARNING|warning|warn|caution|⚠|Warning:', '#FFD700'),
+    # Error Events - Match INFO/DEBUG/ERROR log levels
+    'CRITICAL': (r'CRITICAL|FATAL', '#C35252'),
+    'ERROR': (r' - ERROR - |ERROR', '#FF8C00'),
+    'WARNING': (r' - WARNING - |WARNING', '#FFD700'),
     
-    # Block/Strategy Events
-    'BLOCK_LOADED': (r'Retrieved.*block|Loaded.*block|Block.*loaded|📦|blocks.*loaded', '#8B5CF6'),
-    'BLOCK_ADDED': (r'Added.*block|Block.*added|Block.*config|➕|New block', '#10B981'),
-    'SEARCH_RESULTS': (r'Retrieved.*search|Search.*result|Found.*result|🔍|search.*complete', '#2070FF'),
+    # Block/Strategy Events - Match actual messages
+    'BLOCK_LOADED': (r'Successfully loaded.*blocks|Loaded.*block|Processing first block', '#8B5CF6'),
+    'BLOCK_ADDED': (r'Added.*block|Block.*added|Block.*config', '#10B981'),
+    'SEARCH_RESULTS': (r'Retrieved.*search results|Retrieved \d+ search results', '#2070FF'),
     
     # Decision Events  
-    'DECISION': (r'decision|deciding|evaluate|🎯|Decision:', '#FFD700'),
-    'CONDITION_MET': (r'Condition.*met|Threshold.*met|Criteria.*met|✓.*condition', '#10B981'),
-    'SIGNAL_DETECTED': (r'Signal.*detect|Pattern.*found|Signal.*found|📡|Detected:', '#10B981'),
+    'DECISION': (r'decision|deciding|evaluate|Decision:', '#FFD700'),
+    'CONDITION_MET': (r'Condition.*met|Threshold.*met|Criteria.*met', '#10B981'),
+    'SIGNAL_DETECTED': (r'Signal.*detect|Pattern.*found|Signal.*found|Detected:', '#10B981'),
 }
 
 
