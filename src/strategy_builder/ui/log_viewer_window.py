@@ -39,43 +39,43 @@ from src.strategy_builder.ui.styles import (
 )
 
 
-# Institutional-grade event patterns (extensible)
+# Institutional-grade event patterns (extensible) - BROAD PATTERNS
 EVENT_PATTERNS = {
     # Trade Events
-    'TRADE_OPENED': (r'🟢 TRADE OPENED', '#10B981'),
-    'TRADE_CLOSED': (r'TRADE CLOSED|Position closed', '#2070FF'),
-    'TRADE_UPDATED': (r'🔄 TRADE UPDATED', '#FFD700'),
-    'POSITIONS_SNAPSHOT': (r'📊 OPEN POSITIONS SNAPSHOT', '#8B5CF6'),
-    'TRADE_NOT_FOUND': (r'❌ TRADE ID NOT FOUND', '#C35252'),
-    'MULTIPLE_POSITIONS': (r'multiple open', '#FF8C00'),
+    'TRADE_OPENED': (r'TRADE OPENED|trade.*opened|Opening trade|🟢.*TRADE', '#10B981'),
+    'TRADE_CLOSED': (r'TRADE CLOSED|trade.*closed|Position closed|Closing trade|📘.*TRADE', '#2070FF'),
+    'TRADE_UPDATED': (r'TRADE UPDATED|trade.*updated|Update.*trade|🔄.*TRADE', '#FFD700'),
+    'POSITIONS_SNAPSHOT': (r'POSITIONS SNAPSHOT|OPEN POSITIONS|Position.*snapshot|📊', '#8B5CF6'),
+    'TRADE_NOT_FOUND': (r'TRADE.*NOT FOUND|Trade.*not found|❌.*TRADE', '#C35252'),
+    'MULTIPLE_POSITIONS': (r'multiple.*position|Multiple.*open|Several.*position|🔀', '#FF8C00'),
     
-    # Configuration Events
-    'CONFIG_INITIALIZED': (r'✓.*initialized|CONFIG DEBUGGER', '#10B981'),
-    'CONFIG_READ': (r'Reading config|Loading config', '#2070FF'),
-    'CONFIG_VALIDATED': (r'Config validated|Validation passed', '#10B981'),
-    'CONFIG_MISMATCH': (r'❌.*MISMATCH', '#C35252'),
-    'CONFIG_MISSING': (r'Config not found|Missing config', '#FF8C00'),
+    # Configuration Events  
+    'CONFIG_INITIALIZED': (r'initialized|initialization|init.*complete|CONFIG.*INIT|Setup complete|✓.*init', '#10B981'),
+    'CONFIG_READ': (r'Reading|Loading.*config|Config.*read|Config.*load|Loaded.*config|📖', '#2070FF'),
+    'CONFIG_VALIDATED': (r'validated|validation.*pass|Config.*valid|Validation complete|✓.*valid', '#10B981'),
+    'CONFIG_MISMATCH': (r'MISMATCH|mismatch|Config.*error|Invalid.*config|❌.*config', '#C35252'),
+    'CONFIG_MISSING': (r'not found|missing|Config.*missing|Cannot find|⚠.*config', '#FF8C00'),
     
     # System Events
-    'STARTED': (r'Started:|Launching|Initiating', '#10B981'),
-    'STOPPED': (r'Stopped|Shutdown|Terminated', '#9AA0A6'),
-    'PROGRESS': (r'Progress:|Loading:|Processing:', '#2070FF'),
-    'COMPLETED': (r'✓.*completed|Successfully|Success', '#10B981'),
+    'STARTED': (r'Started|Starting|Launching|Initiating|Begin|▶|Startup', '#10B981'),
+    'STOPPED': (r'Stopped|Stopping|Shutdown|Terminated|Ending|⏹|Exit', '#9AA0A6'),
+    'PROGRESS': (r'Progress|Loading|Processing|Working|Running|⏳|In progress', '#2070FF'),
+    'COMPLETED': (r'completed|complete|Successfully|Success|Finished|Done|✅|✓.*complete', '#10B981'),
     
     # Error Events
-    'CRITICAL': (r'CRITICAL|FATAL', '#C35252'),
-    'ERROR': (r'❌|ERROR', '#FF8C00'),
-    'WARNING': (r'⚠|WARNING', '#FFD700'),
+    'CRITICAL': (r'CRITICAL|FATAL|critical.*error|Fatal.*error|🔴', '#C35252'),
+    'ERROR': (r'ERROR|error|failed|failure|exception|❌|Error:', '#FF8C00'),
+    'WARNING': (r'WARNING|warning|warn|caution|⚠|Warning:', '#FFD700'),
     
     # Block/Strategy Events
-    'BLOCK_LOADED': (r'Retrieved.*blocks|Loaded.*block', '#8B5CF6'),
-    'BLOCK_ADDED': (r'Added block|Block configured', '#10B981'),
-    'SEARCH_RESULTS': (r'Retrieved.*search results', '#2070FF'),
+    'BLOCK_LOADED': (r'Retrieved.*block|Loaded.*block|Block.*loaded|📦|blocks.*loaded', '#8B5CF6'),
+    'BLOCK_ADDED': (r'Added.*block|Block.*added|Block.*config|➕|New block', '#10B981'),
+    'SEARCH_RESULTS': (r'Retrieved.*search|Search.*result|Found.*result|🔍|search.*complete', '#2070FF'),
     
     # Decision Events  
-    'DECISION': (r'Entry decision|Exit decision|DECISION', '#FFD700'),
-    'CONDITION_MET': (r'Condition met|Threshold met', '#10B981'),
-    'SIGNAL_DETECTED': (r'Signal detected|Pattern found', '#10B981'),
+    'DECISION': (r'decision|deciding|evaluate|🎯|Decision:', '#FFD700'),
+    'CONDITION_MET': (r'Condition.*met|Threshold.*met|Criteria.*met|✓.*condition', '#10B981'),
+    'SIGNAL_DETECTED': (r'Signal.*detect|Pattern.*found|Signal.*found|📡|Detected:', '#10B981'),
 }
 
 
@@ -441,7 +441,7 @@ class LogViewerWindow(QDialog):
         
         copy_selection_btn = QPushButton("📋 Copy Selection")
         copy_selection_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        copy_selection_btn.setFixedSize(230, 52)
+        copy_selection_btn.setFixedSize(240, 52)
         copy_selection_btn.clicked.connect(self._copy_selection)
         layout.addWidget(copy_selection_btn)
         
