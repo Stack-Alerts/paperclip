@@ -908,6 +908,11 @@ class StrategyBuilderOrchestrator:
             if 'generation_status' in config_dict:
                 setattr(self.config_engine.config, 'generation_status', config_dict['generation_status'])
             
+            # CRITICAL: Track loaded strategy path for version control (Sprint 1.6)
+            # This allows version control to work on ANY loaded strategy, not hardcoded
+            self.loaded_strategy_path = filepath
+            print(f"ℹ️ Loaded strategy path set: {filepath}")
+            
             return WorkflowResult(
                 success=True,
                 step=WorkflowStep.CREATE_STRATEGY,
@@ -984,11 +989,14 @@ class StrategyBuilderOrchestrator:
     
     def add_building_block(self, block_name: str) -> bool:
         """
-        Add building block with signals to current strategy (Sprint 1.6 Integration)
+        Add building block with INTELLIGENT signal filtering (Sprint 1.6 Integration)
         
-        CRITICAL FIX: Uses add_block_with_signals() to ensure signals are included.
-        The block intelligence database recommends blocks for their signals,
-        so we must add both the block AND its default signals.
+        CRITICAL FIXES:
+        1. Uses add_block_with_signals() to ensure signals are included
+        2. INTELLIGENT signal filtering based on strategy type (Bearish → only BEARISH signals)
+        3. Uses signal_mapping.py for strategy-appropriate signal selection
+        
+        Example: liquidity_sweep + Bearish strategy → only BEARISH_SWEEP (not BULLISH+ERROR+NEUTRAL)
         
         Args:
             block_name: Registry name of block to add (e.g., 'liquidity_sweep')
@@ -997,28 +1005,39 @@ class StrategyBuilderOrchestrator:
             True if successful, False otherwise
         """
         try:
-            # Get block metadata from registry to find available signals
+            from src.optimizer_v3.core.signal_mapping import get_signals_for_strategy
+            
+            # Get block metadata from registry
             block_metadata = self.registry.get_block(block_name)
             if not block_metadata:
                 print(f"❌ Block '{block_name}' not found in registry")
                 return False
             
-            # Extract signal names from block metadata
-            signal_names = []
-            if 'signals' in block_metadata:
-                for signal in block_metadata['signals']:
-                    if isinstance(signal, dict) and 'name' in signal:
-                        signal_names.append(signal['name'])
-                    elif isinstance(signal, str):
-                        signal_names.append(signal)
+            # Get strategy type from config (Bullish, Bearish, Neutral)
+            strategy_type = getattr(self.config_engine.config, 'strategy_type', 'Bearish')
+            print(f"📊 Strategy type: {strategy_type}")
             
-            # If no signals found, try to get them from block description
+            # INTELLIGENT: Get strategy-appropriate signals from mapping
+            signal_names = get_signals_for_strategy(block_name, strategy_type)
+            
+            if not signal_names:
+                # Fallback: No mapping found - use all registry signals (old behavior)
+                print(f"⚠️ No intelligent mapping for '{block_name}' - using registry signals")
+                if 'signals' in block_metadata:
+                    for signal in block_metadata['signals']:
+                        if isinstance(signal, dict) and 'name' in signal:
+                            signal_names.append(signal['name'])
+                        elif isinstance(signal, str):
+                            signal_names.append(signal)
+            
             if not signal_names:
                 print(f"⚠️ No signals found for block '{block_name}', adding block only")
                 result = self.add_block(block_name, logic="AND")
                 return result.success
             
-            # Add block WITH signals using institutional-grade method
+            print(f"🎯 Intelligent signal selection: {signal_names}")
+            
+            # Add block WITH filtered signals using institutional-grade method
             result = self.add_block_with_signals(
                 block_name=block_name,
                 signal_names=signal_names,
@@ -1097,6 +1116,10 @@ class StrategyBuilderOrchestrator:
         Version control integration using Git commits for tracking
         configuration changes made via intelligent recommendations.
         
+        CRITICAL FIX: Uses self.loaded_strategy_path to save to the LOADED strategy file,
+        not hardcoded current_strategy.json. Works for ANY loaded strategy (HOD Rejection,
+        RSI VWAP, or any of 100s of strategies).
+        
         Args:
             message: Commit message describing the change
                     (e.g., "Added building block: liquidity_sweep (via metrics recommendation)")
@@ -1112,8 +1135,15 @@ class StrategyBuilderOrchestrator:
             # Get project root (assumption: orchestrator is in src/strategy_builder/integration)
             project_root = Path(__file__).parent.parent.parent.parent
             
-            # Save current strategy configuration to file first
-            config_file = project_root / "user_strategies" / "current_strategy.json"
+            # CRITICAL: Use loaded strategy path if available (dynamically tracks ANY loaded strategy)
+            if self.loaded_strategy_path:
+                config_file = Path(self.loaded_strategy_path)
+                print(f"💾 Saving to loaded strategy: {config_file.name}")
+            else:
+                # Fallback to current_strategy.json if no strategy loaded
+                config_file = project_root / "user_strategies" / "current_strategy.json"
+                print(f"💾 No loaded strategy path - saving to: current_strategy.json")
+            
             config_file.parent.mkdir(parents=True, exist_ok=True)
             
             # Persist current config
