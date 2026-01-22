@@ -312,14 +312,10 @@ class LogViewerWindow(QDialog):
         # Main container with grid
         container = QWidget()
         grid_layout = QGridLayout()
-        grid_layout.setSpacing(12)
+        grid_layout.setSpacing(15)
         grid_layout.setContentsMargins(15, 30, 15, 15)
-        grid_layout.setVerticalSpacing(10)
-        grid_layout.setHorizontalSpacing(25)  # Increased horizontal spacing
-        
-        # Set uniform column widths for equal grid
-        for col_idx in range(6):
-            grid_layout.setColumnMinimumWidth(col_idx, 220)
+        grid_layout.setVerticalSpacing(12)
+        grid_layout.setHorizontalSpacing(30)
         
         # All events in a clean list
         all_events = [
@@ -368,12 +364,12 @@ class LogViewerWindow(QDialog):
                 checkbox_font.setFamily("Segoe UI")
                 checkbox.setFont(checkbox_font)
                 
+                checkbox.setFixedWidth(210)  # Fixed width for uniform grid
                 checkbox.setStyleSheet(f"""
                     QCheckBox {{
                         color: {color};
                         background: transparent;
                         padding: 3px;
-                        max-width: 200px;
                     }}
                     QCheckBox::indicator {{
                         width: 18px;
@@ -383,7 +379,7 @@ class LogViewerWindow(QDialog):
                 checkbox.stateChanged.connect(lambda state, e=event_key: self._on_event_filter_changed(e, state))
                 self.event_checkboxes[event_key] = checkbox
                 
-                grid_layout.addWidget(checkbox, row, col, Qt.AlignLeft)
+                grid_layout.addWidget(checkbox, row, col)
                 
                 col += 1
                 if col >= max_cols:
