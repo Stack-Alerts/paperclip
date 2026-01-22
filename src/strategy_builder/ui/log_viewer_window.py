@@ -315,7 +315,11 @@ class LogViewerWindow(QDialog):
         grid_layout.setSpacing(12)
         grid_layout.setContentsMargins(15, 30, 15, 15)
         grid_layout.setVerticalSpacing(10)
-        grid_layout.setHorizontalSpacing(20)
+        grid_layout.setHorizontalSpacing(25)  # Increased horizontal spacing
+        
+        # Set uniform column widths for equal grid
+        for col_idx in range(6):
+            grid_layout.setColumnMinimumWidth(col_idx, 220)
         
         # All events in a clean list
         all_events = [
