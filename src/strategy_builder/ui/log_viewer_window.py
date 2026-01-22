@@ -295,7 +295,7 @@ class LogViewerWindow(QDialog):
         group = QGroupBox("📊 Event Filters")
         group.setStyleSheet(get_groupbox_header_stylesheet() + """
             QGroupBox {
-                font-size: 22px;
+                font-size: 28px;
                 font-weight: bold;
                 padding-top: 30px;
             }
@@ -304,7 +304,7 @@ class LogViewerWindow(QDialog):
                 subcontrol-position: top left;
                 left: 10px;
                 padding: 10px 15px;
-                font-size: 22px;
+                font-size: 28px;
             }
         """)
         group.setMinimumHeight(240)
@@ -312,10 +312,10 @@ class LogViewerWindow(QDialog):
         # Main container with grid
         container = QWidget()
         grid_layout = QGridLayout()
-        grid_layout.setSpacing(15)
-        grid_layout.setContentsMargins(15, 30, 15, 15)
+        grid_layout.setSpacing(10)
+        grid_layout.setContentsMargins(15, 20, 15, 15)
         grid_layout.setVerticalSpacing(12)
-        grid_layout.setHorizontalSpacing(30)
+        grid_layout.setHorizontalSpacing(20)
         
         # All events in a clean list
         all_events = [
@@ -364,7 +364,7 @@ class LogViewerWindow(QDialog):
                 checkbox_font.setFamily("Segoe UI")
                 checkbox.setFont(checkbox_font)
                 
-                checkbox.setFixedWidth(240)  # Fixed width for uniform grid - wider for full text
+                checkbox.setFixedWidth(320)  # Fixed width for uniform grid - wider for full text
                 checkbox.setStyleSheet(f"""
                     QCheckBox {{
                         color: {color};
@@ -372,7 +372,7 @@ class LogViewerWindow(QDialog):
                         padding: 3px;
                     }}
                     QCheckBox::indicator {{
-                        width: 18px;
+                        width: 40px;
                         height: 18px;
                     }}
                 """)
@@ -465,9 +465,9 @@ class LogViewerWindow(QDialog):
         lines = content.split('\n')
         filtered = []
         
-        # If all filters disabled, show everything
+        # If all filters disabled, show NOTHING
         if not any(self.event_filters.values()):
-            return content
+            return ""
         
         for line in lines:
             if self._line_matches_event_filters(line):
@@ -476,29 +476,16 @@ class LogViewerWindow(QDialog):
         return '\n'.join(filtered)
     
     def _line_matches_event_filters(self, line: str) -> bool:
-        """Check if line matches any enabled event filter"""
+        """Check if line matches any enabled event filter - STRICT MODE"""
         if not line.strip():
-            return True  # Always show empty lines
+            return False  # Don't show empty lines when filtering
         
-        # Always show structural elements
-        if any(char in line for char in ['═', '─', '║', '╔', '╚', '=====', '-----']):
-            return True
-        
-        # Always show file headers
-        if line.startswith('LOG FILE:') or 'Log file:' in line:
-            return True
-        
-        # Check against enabled event patterns
+        # Check against enabled event patterns ONLY
         for event, enabled in self.event_filters.items():
             if enabled and event in EVENT_PATTERNS:
                 pattern, _ = EVENT_PATTERNS[event]
                 if re.search(pattern, line, re.IGNORECASE):
                     return True
-        
-        # If line is part of a multi-line event block, include it
-        # (e.g., details under a trade event)
-        if line.startswith('  ') or line.startswith('\t'):
-            return True
         
         return False
     
