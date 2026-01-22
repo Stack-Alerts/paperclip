@@ -981,10 +981,11 @@ class StrategyBuilderOrchestrator:
     
     def add_building_block(self, block_name: str) -> bool:
         """
-        Add building block to current strategy (Sprint 1.6 Integration)
+        Add building block with signals to current strategy (Sprint 1.6 Integration)
         
-        This is an alias/wrapper for add_block() to support the
-        intelligent recommendation system's apply functionality.
+        CRITICAL FIX: Uses add_block_with_signals() to ensure signals are included.
+        The block intelligence database recommends blocks for their signals,
+        so we must add both the block AND its default signals.
         
         Args:
             block_name: Registry name of block to add (e.g., 'liquidity_sweep')
@@ -993,8 +994,40 @@ class StrategyBuilderOrchestrator:
             True if successful, False otherwise
         """
         try:
-            result = self.add_block(block_name, logic="AND")
+            # Get block metadata from registry to find available signals
+            block_metadata = self.registry.get_block(block_name)
+            if not block_metadata:
+                print(f"❌ Block '{block_name}' not found in registry")
+                return False
+            
+            # Extract signal names from block metadata
+            signal_names = []
+            if 'signals' in block_metadata:
+                for signal in block_metadata['signals']:
+                    if isinstance(signal, dict) and 'name' in signal:
+                        signal_names.append(signal['name'])
+                    elif isinstance(signal, str):
+                        signal_names.append(signal)
+            
+            # If no signals found, try to get them from block description
+            if not signal_names:
+                print(f"⚠️ No signals found for block '{block_name}', adding block only")
+                result = self.add_block(block_name, logic="AND")
+                return result.success
+            
+            # Add block WITH signals using institutional-grade method
+            result = self.add_block_with_signals(
+                block_name=block_name,
+                signal_names=signal_names,
+                block_logic="AND",
+                signal_logic="AND"
+            )
+            
+            if result.success:
+                print(f"✅ Added building block '{block_name}' with {len(signal_names)} signal(s)")
+            
             return result.success
+            
         except Exception as e:
             print(f"❌ Failed to add building block '{block_name}': {str(e)}")
             return False
