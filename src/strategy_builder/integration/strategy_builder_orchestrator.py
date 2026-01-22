@@ -1052,6 +1052,81 @@ class StrategyBuilderOrchestrator:
         except Exception as e:
             print(f"❌ Failed to update parameter '{param_name}': {str(e)}")
             return False
+    
+    def save_config_version(self, message: str) -> bool:
+        """
+        Save current configuration version with Git commit
+        
+        Sprint 1.6 Requirement (Task 1.6.8):
+        Version control integration using Git commits for tracking
+        configuration changes made via intelligent recommendations.
+        
+        Args:
+            message: Commit message describing the change
+                    (e.g., "Added building block: liquidity_sweep (via metrics recommendation)")
+        
+        Returns:
+            True if successfully saved, False otherwise
+        """
+        try:
+            import subprocess
+            import os
+            from pathlib import Path
+            
+            # Get project root (assumption: orchestrator is in src/strategy_builder/integration)
+            project_root = Path(__file__).parent.parent.parent.parent
+            
+            # Save current strategy configuration to file first
+            config_file = project_root / "user_strategies" / "current_strategy.json"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Persist current config
+            save_result = self.save_strategy(str(config_file))
+            if not save_result.success:
+                print(f"⚠️ Failed to save config file before version commit")
+                return False
+            
+            # Git add the configuration file
+            result_add = subprocess.run(
+                ['git', 'add', str(config_file)],
+                cwd=str(project_root),
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result_add.returncode != 0:
+                print(f"⚠️ Git add failed: {result_add.stderr}")
+                return False
+            
+            # Git commit with message
+            result_commit = subprocess.run(
+                ['git', 'commit', '-m', f"[Strategy Config] {message}"],
+                cwd=str(project_root),
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result_commit.returncode == 0:
+                print(f"✅ Configuration version saved: {message}")
+                return True
+            elif "nothing to commit" in result_commit.stdout.lower():
+                print(f"ℹ️ No changes to commit (already saved)")
+                return True
+            else:
+                print(f"⚠️ Git commit failed: {result_commit.stderr}")
+                return False
+            
+        except subprocess.TimeoutExpired:
+            print(f"❌ Git operation timed out")
+            return False
+        except FileNotFoundError:
+            print(f"⚠️ Git not available - version control disabled")
+            return False
+        except Exception as e:
+            print(f"❌ Version save failed: {str(e)}")
+            return False
         
     def reset(self):
         """Reset orchestrator state"""

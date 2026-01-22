@@ -1645,25 +1645,17 @@ class MetricsDisplayPanel(QWidget):
         if not selected_recs:
             return
         
-        # Create version BEFORE applying recommendations
-        orchestrator = self._get_orchestrator()
-        if orchestrator:
-            # Build version description
-            block_names = [rec.block_name for rec in selected_recs if rec.action_type == 'ADD_BLOCK']
-            param_names = [rec.parameter_name for rec in selected_recs if rec.action_type == 'ADJUST_PARAMETER']
-            
-            description_parts = []
-            if block_names:
-                description_parts.append(f"Added: {', '.join(block_names)}")
-            if param_names:
-                description_parts.append(f"Updated: {', '.join(param_names)}")
-            
-            version_description = " | ".join(description_parts) if description_parts else "Applied recommendations"
-            
-            # Create version snapshot
-            if hasattr(orchestrator, 'create_version'):
-                orchestrator.create_version(description=version_description)
-                print(f"📸 Created version snapshot: {version_description}")
+        # Build version description for Git commit
+        block_names = [rec.block_name for rec in selected_recs if rec.action_type == 'ADD_BLOCK']
+        param_names = [rec.parameter_name for rec in selected_recs if rec.action_type == 'ADJUST_PARAMETER']
+        
+        description_parts = []
+        if block_names:
+            description_parts.append(f"blocks={', '.join(block_names)}")
+        if param_names:
+            description_parts.append(f"params={', '.join(param_names)}")
+        
+        version_message = "Applied recommendations: " + (" | ".join(description_parts) if description_parts else "multiple changes")
         
         # Apply each recommendation
         applied_count = 0
@@ -1677,6 +1669,12 @@ class MetricsDisplayPanel(QWidget):
                     applied_blocks.append(rec.block_name)
                 elif rec.action_type == 'ADJUST_PARAMETER':
                     applied_params.append(rec.parameter_name)
+        
+        # Save configuration version (Git commit) - Sprint 1.6 Task 1.6.8
+        if applied_count > 0:
+            orchestrator = self._get_orchestrator()
+            if orchestrator and hasattr(orchestrator, 'save_config_version'):
+                orchestrator.save_config_version(version_message)
         
         # Refresh Strategy Builder UI
         if applied_count > 0:
