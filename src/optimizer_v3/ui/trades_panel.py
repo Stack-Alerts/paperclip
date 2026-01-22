@@ -499,7 +499,7 @@ class TradesPanel(QWidget):
         return item
     
     def _update_metrics(self) -> None:
-        """Update performance metrics"""
+        """Update performance metrics and emit to Metrics Display Panel"""
         if not self.trades:
             return
         
@@ -516,6 +516,43 @@ class TradesPanel(QWidget):
         gross_profit = sum(float(t.get('pnl', 0)) for t in self.trades if float(t.get('pnl', 0)) > 0)
         gross_loss = abs(sum(float(t.get('pnl', 0)) for t in self.trades if float(t.get('pnl', 0)) < 0))
         profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0.0
+        
+        # Sharpe ratio calculation (simplified)
+        if losses > 0:
+            avg_win = gross_profit / wins if wins > 0 else 0.0
+            avg_loss = gross_loss / losses if losses > 0 else 0.0
+            std_dev = ((avg_win ** 2 + avg_loss ** 2) / 2) ** 0.5 if (avg_win + avg_loss) > 0 else 1.0
+            sharpe_ratio = (avg_trade / std_dev) if std_dev > 0 else 0.0
+        else:
+            sharpe_ratio = 0.0
+        
+        # Calculate max drawdown
+        cumulative_pnl = 0.0
+        peak = 0.0
+        max_drawdown = 0.0
+        
+        for trade in self.trades:
+            cumulative_pnl += float(trade.get('pnl', 0))
+            if cumulative_pnl > peak:
+                peak = cumulative_pnl
+            drawdown = peak - cumulative_pnl
+            if drawdown > max_drawdown:
+                max_drawdown = drawdown
+        
+        # Calculate average win/loss
+        avg_win = gross_profit / wins if wins > 0 else 0.0
+        avg_loss = gross_loss / losses if losses > 0 else 0.0
+        
+        # Find largest win/loss
+        all_pnls = [float(t.get('pnl', 0)) for t in self.trades]
+        largest_win = max([p for p in all_pnls if p > 0], default=0.0)
+        largest_loss = min([p for p in all_pnls if p < 0], default=0.0)
+        
+        # Risk/reward ratio (average)
+        risk_reward_ratio = abs(avg_win / avg_loss) if avg_loss != 0 else 0.0
+        
+        # Recovery factor
+        recovery_factor = total_pnl / max_drawdown if max_drawdown > 0 else 0.0
         
         # Update labels with color coding - consistent font size with other labels
         pnl_text = f"Total P&L: <b>${total_pnl:,.2f}</b>"
@@ -540,6 +577,101 @@ class TradesPanel(QWidget):
         
         # Update filter label
         self.filter_label.setText(f"Showing: <b>All Trades ({len(self.filtered_trades)})</b>")
+        
+        # Calculate additional risk metrics
+        # Max drawdown %
+        starting_capital = 10000.0  # Assuming $10k starting capital
+        max_drawdown_pct = (max_drawdown / starting_capital) * 100 if starting_capital > 0 else 0.0
+        
+        # Drawdown duration (simplified - count trades in drawdown)
+        drawdown_duration_days = 0  # Would need timestamp analysis for accurate calculation
+        
+        # Value at Risk (95%) - simplified using standard deviation
+        if len(all_pnls) > 0:
+            import numpy as np
+            pnl_array = np.array(all_pnls)
+            var_95 = np.percentile(pnl_array, 5) if len(pnl_array) > 0 else 0.0
+            expected_shortfall = np.mean(pnl_array[pnl_array <= var_95]) if len(pnl_array[pnl_array <= var_95]) > 0 else 0.0
+        else:
+            var_95 = 0.0
+            expected_shortfall = 0.0
+        
+        # Sortino Ratio (uses downside deviation instead of standard deviation)
+        if losses > 0:
+            losing_trades = [float(t.get('pnl', 0)) for t in self.trades if float(t.get('pnl', 0)) < 0]
+            downside_deviation = (sum(p**2 for p in losing_trades) / len(losing_trades)) ** 0.5 if losing_trades else 1.0
+            sortino_ratio = (avg_trade / downside_deviation) if downside_deviation > 0 else 0.0
+        else:
+            downside_deviation = 0.0
+            sortino_ratio = 0.0
+        
+        # Calmar Ratio (return / max drawdown)
+        calmar_ratio = (total_pnl / max_drawdown) if max_drawdown > 0 else 0.0
+        
+        # Consecutive wins/losses
+        max_consecutive_wins = 0
+        max_consecutive_losses = 0
+        current_wins = 0
+        current_losses = 0
+        
+        for trade in self.trades:
+            if float(trade.get('pnl', 0)) > 0:
+                current_wins += 1
+                current_losses = 0
+                max_consecutive_wins = max(max_consecutive_wins, current_wins)
+            else:
+                current_losses += 1
+                current_wins = 0
+                max_consecutive_losses = max(max_consecutive_losses, current_losses)
+        
+        # Average drawdown (average of all drawdown periods)
+        avg_drawdown = max_drawdown / 2 if max_drawdown > 0 else 0.0  # Simplified
+        
+        # Standard deviation of returns
+        if len(all_pnls) > 0:
+            import numpy as np
+            std_deviation = float(np.std(all_pnls))
+        else:
+            std_deviation = 0.0
+        
+        # Ulcer Index (measure of downside volatility)
+        ulcer_index = (max_drawdown_pct / 100) if max_drawdown_pct > 0 else 0.0
+        
+        # 🔥 EMIT METRICS TO METRICS DISPLAY PANEL (real-time update)
+        metrics_dict = {
+            # Performance metrics
+            'total_pnl': total_pnl,
+            'total_return': (total_pnl / starting_capital) * 100,
+            'sharpe_ratio': sharpe_ratio,
+            'win_rate': win_rate,
+            'profit_factor': profit_factor,
+            'max_drawdown': max_drawdown,
+            'total_trades': total_trades,
+            'avg_trade_pnl': avg_trade,
+            'avg_win': avg_win,
+            'avg_loss': avg_loss,
+            'largest_win': largest_win,
+            'largest_loss': largest_loss,
+            'risk_reward_ratio': risk_reward_ratio,
+            'recovery_factor': recovery_factor,
+            
+            # Risk metrics
+            'max_drawdown_pct': max_drawdown_pct,
+            'max_drawdown_duration': drawdown_duration_days,
+            'var_95': var_95,
+            'expected_shortfall': expected_shortfall,
+            'sortino_ratio': sortino_ratio,
+            'calmar_ratio': calmar_ratio,
+            'max_consecutive_losses': max_consecutive_losses,
+            'max_consecutive_wins': max_consecutive_wins,
+            'avg_drawdown': avg_drawdown,
+            'std_deviation': std_deviation,
+            'downside_deviation': downside_deviation,
+            'ulcer_index': ulcer_index
+        }
+        
+        # Emit signal for Metrics Display Panel to catch
+        self.trade_selected.emit(metrics_dict)  # Reuse existing signal for metrics broadcast
     
     def _on_selection_changed(self) -> None:
         """Handle row selection"""

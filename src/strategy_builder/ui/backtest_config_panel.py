@@ -352,6 +352,10 @@ class BacktestConfigPanel(QWidget):
         self.metrics_panel = MetricsDisplayPanel()
         self.tab_widget.addTab(self.metrics_panel, "💹 Metrics")
         
+        # 🔥 CONNECT TRADES PANEL TO METRICS PANEL (Real-time updates)
+        # When trades panel updates metrics (every second), update metrics display panel
+        self.trades_panel.trade_selected.connect(self.metrics_panel.update_metrics)
+        
         # Tab 5: Compare (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.compare_view_panel import CompareViewPanel
         self.compare_panel = CompareViewPanel()
