@@ -501,35 +501,63 @@ class LogViewerWindow(QDialog):
         self._refresh_current_tab()
     
     def _update_filter_visibility(self, tab_index: int):
-        """Show only relevant filters for the selected tab"""
+        """Show only relevant filters for the selected tab - DYNAMIC PER TAB"""
         tab_name = self.tabs.tabText(tab_index).replace('📄 ', '').lower()
         
-        # Define which categories are relevant for each tab type
-        tab_filter_map = {
-            'all logs': ['Trade Events', 'Config Events', 'System Events', 'Error Events', 'Strategy Events'],
-            'trades': ['Trade Events', 'Error Events'],
-            'strategy builder': ['Strategy Events', 'Config Events', 'System Events', 'Error Events'],
-            'optimizer': ['System Events', 'Error Events'],
-            'backtest': ['Trade Events', 'System Events', 'Error Events'],
+        # Define which EVENT FILTERS are relevant for each tab type
+        tab_event_map = {
+            'all logs': list(EVENT_PATTERNS.keys()),  # Show all filters
+            
+            'trades': [
+                'TRADE_OPENED', 'TRADE_CLOSED', 'TRADE_UPDATED', 
+                'POSITIONS_SNAPSHOT', 'TRADE_NOT_FOUND', 'MULTIPLE_POSITIONS',
+                'CRITICAL', 'ERROR', 'WARNING'
+            ],
+            
+            'strategy builder': [
+                'CONFIG_INITIALIZED', 'CONFIG_READ', 'CONFIG_VALIDATED',
+                'CONFIG_MISMATCH', 'CONFIG_MISSING',
+                'STARTED', 'STOPPED', 'PROGRESS', 'COMPLETED',
+                'CRITICAL', 'ERROR', 'WARNING',
+                'BLOCK_LOADED', 'BLOCK_ADDED', 'SEARCH_RESULTS'
+            ],
+            
+            'session': [  # Session logs (UI events)
+                'CONFIG_INITIALIZED', 'CONFIG_READ', 'CONFIG_VALIDATED',
+                'STARTED', 'STOPPED', 'COMPLETED',
+                'ERROR', 'WARNING',
+                'BLOCK_LOADED', 'SEARCH_RESULTS'
+            ],
+            
+            'optimizer': [
+                'STARTED', 'STOPPED', 'PROGRESS', 'COMPLETED',
+                'CRITICAL', 'ERROR', 'WARNING'
+            ],
+            
+            'backtest': [
+                'TRADE_OPENED', 'TRADE_CLOSED', 'TRADE_UPDATED',
+                'STARTED', 'STOPPED', 'PROGRESS', 'COMPLETED',
+                'CRITICAL', 'ERROR', 'WARNING'
+            ],
         }
         
-        # Find matching categories (default to all if unknown tab)
-        relevant_categories = None
-        for key, categories in tab_filter_map.items():
+        # Find matching event list (default to all)
+        relevant_events = None
+        for key, events in tab_event_map.items():
             if key in tab_name:
-                relevant_categories = categories
+                relevant_events = events
                 break
         
-        # If no match or specific file, show all
-        if relevant_categories is None or '.' in tab_name:  # File extension means specific file
-            relevant_categories = list(self.filter_category_widgets.keys())
+        # Default: show all if no match
+        if relevant_events is None:
+            relevant_events = list(EVENT_PATTERNS.keys())
         
-        # Show/hide category rows
-        for category_name, widget in self.filter_category_widgets.items():
-            if category_name in relevant_categories:
-                widget.show()
+        # Show/hide individual checkboxes based on relevance
+        for event_key, checkbox in self.event_checkboxes.items():
+            if event_key in relevant_events:
+                checkbox.show()
             else:
-                widget.hide()
+                checkbox.hide()
     
     def _refresh_current_tab(self):
         """Refresh display for current tab"""
