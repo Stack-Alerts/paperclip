@@ -11,7 +11,9 @@
           "logic": "AND",
           "recheck_config": {
             "enabled": true,
-            "bar_delay": 25
+            "bar_delay": 25,
+            "validation_mode": "SIGNAL",
+            "parent_signal": null
           }
         }
       ]
@@ -32,7 +34,21 @@
       "signals": [
         {
           "name": "BEARISH_DIVERGENCE",
-          "logic": "AND"
+          "logic": "AND",
+          "recheck_config": {
+            "enabled": true,
+            "bar_delay": 10,
+            "validation_mode": "SIGNAL",
+            "parent_signal": null
+          },
+          "recheck_chain": [
+            {
+              "enabled": true,
+              "bar_delay": 25,
+              "validation_mode": "RECHECK",
+              "parent_signal": null
+            }
+          ]
         },
         {
           "name": "OVERBOUGHT",
@@ -43,8 +59,30 @@
           },
           "recheck_config": {
             "enabled": true,
-            "bar_delay": 25
-          }
+            "bar_delay": 25,
+            "validation_mode": "SIGNAL",
+            "parent_signal": null
+          },
+          "recheck_chain": [
+            {
+              "enabled": true,
+              "bar_delay": 25,
+              "validation_mode": "SIGNAL",
+              "parent_signal": null
+            },
+            {
+              "enabled": true,
+              "bar_delay": 25,
+              "validation_mode": "RECHECK",
+              "parent_signal": null
+            },
+            {
+              "enabled": true,
+              "bar_delay": 20,
+              "validation_mode": "RECHECK",
+              "parent_signal": null
+            }
+          ]
         }
       ]
     },
@@ -55,6 +93,38 @@
         {
           "name": "BEARISH_OB",
           "logic": "OR"
+        }
+      ]
+    },
+    {
+      "name": "liquidity_sweep",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "BEARISH_SWEEP",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "atr",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "NORMAL",
+          "logic": "AND"
+        },
+        {
+          "name": "HIGH",
+          "logic": "AND"
+        },
+        {
+          "name": "VERY_HIGH",
+          "logic": "AND"
+        },
+        {
+          "name": "EXTREME",
+          "logic": "AND"
         }
       ]
     }
