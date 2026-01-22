@@ -1645,16 +1645,50 @@ class MetricsDisplayPanel(QWidget):
         if not selected_recs:
             return
         
+        # Create version BEFORE applying recommendations
+        orchestrator = self._get_orchestrator()
+        if orchestrator:
+            # Build version description
+            block_names = [rec.block_name for rec in selected_recs if rec.action_type == 'ADD_BLOCK']
+            param_names = [rec.parameter_name for rec in selected_recs if rec.action_type == 'ADJUST_PARAMETER']
+            
+            description_parts = []
+            if block_names:
+                description_parts.append(f"Added: {', '.join(block_names)}")
+            if param_names:
+                description_parts.append(f"Updated: {', '.join(param_names)}")
+            
+            version_description = " | ".join(description_parts) if description_parts else "Applied recommendations"
+            
+            # Create version snapshot
+            if hasattr(orchestrator, 'create_version'):
+                orchestrator.create_version(description=version_description)
+                print(f"📸 Created version snapshot: {version_description}")
+        
         # Apply each recommendation
         applied_count = 0
+        applied_blocks = []
+        applied_params = []
+        
         for rec in selected_recs:
             if self._apply_single_recommendation(rec):
                 applied_count += 1
+                if rec.action_type == 'ADD_BLOCK':
+                    applied_blocks.append(rec.block_name)
+                elif rec.action_type == 'ADJUST_PARAMETER':
+                    applied_params.append(rec.parameter_name)
+        
+        # Refresh Strategy Builder UI
+        if applied_count > 0:
+            self._refresh_strategy_builder_ui()
         
         # Update status
-        self.status_label.setText(
-            f"Status: <b>{applied_count}/{len(selected_recs)} recommendations applied</b>"
-        )
+        status_text = f"Status: <b>{applied_count}/{len(selected_recs)} recommendations applied</b>"
+        if applied_blocks:
+            status_text += f" | Blocks: {', '.join(applied_blocks)}"
+        if applied_params:
+            status_text += f" | Params: {', '.join(applied_params)}"
+        self.status_label.setText(status_text)
         
         # Auto-retest if enabled
         if applied_count > 0 and self.auto_retest_check.isChecked():
@@ -1755,6 +1789,43 @@ class MetricsDisplayPanel(QWidget):
         except:
             pass
         return None
+    
+    def _refresh_strategy_builder_ui(self) -> None:
+        """
+        Refresh Strategy Builder UI after applying recommendations
+        
+        Forces the Strategy Blocks Panel to reload and display updated configuration
+        """
+        try:
+            main_window = self.window()
+            
+            # Access Strategy Blocks Panel
+            if hasattr(main_window, 'strategy_blocks_panel'):
+                blocks_panel = main_window.strategy_blocks_panel
+                
+                # Refresh the UI
+                if hasattr(blocks_panel, 'refresh_blocks'):
+                    blocks_panel.refresh_blocks()
+                    print("🔄 Strategy Builder UI refreshed")
+                elif hasattr(blocks_panel, '_refresh_ui'):
+                    blocks_panel._refresh_ui()
+                    print("🔄 Strategy Builder UI refreshed")
+                elif hasattr(blocks_panel, 'load_strategy'):
+                    # Reload current config
+                    orchestrator = self._get_orchestrator()
+                    if orchestrator:
+                        blocks_panel.load_strategy(orchestrator.get_current_config())
+                        print("🔄 Strategy Builder UI reloaded")
+                else:
+                    print("⚠️ Strategy Blocks Panel has no refresh method - trying generic update")
+                    # Force Qt to update the widget
+                    blocks_panel.update()
+                    blocks_panel.repaint()
+            else:
+                print("⚠️ Strategy Blocks Panel not accessible for UI refresh")
+                
+        except Exception as e:
+            print(f"❌ UI refresh failed: {str(e)}")
     
     def _trigger_retest(self) -> None:
         """Trigger automatic backtest retest after applying recommendations"""
