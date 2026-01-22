@@ -111,7 +111,7 @@ class MetricsDisplayPanel(QWidget):
         # Checkbox is ON THE RIGHT (after recommendation)
         self.perf_table = QTableWidget()
         self.perf_table.setColumnCount(5)  # Added checkbox column at END
-        self.perf_table.setHorizontalHeaderLabels(['Metric', 'Value', 'Rating', 'Recommendation', '☐'])
+        self.perf_table.setHorizontalHeaderLabels(['Metric', 'Value', 'Rating', 'Recommendation', ''])  # No checkbox in header
         
         # Table styling
         # Use centralized table stylesheet (ZERO hardcoded styles)
@@ -375,7 +375,7 @@ class MetricsDisplayPanel(QWidget):
             checkbox = QCheckBox()
             checkbox.setChecked(False)
             checkbox.stateChanged.connect(self._on_checkbox_changed)
-            checkbox.setStyleSheet("QCheckBox { margin-left: 15px; }")  # Center in column
+            checkbox.setStyleSheet("QCheckBox { margin-left: 15px; background: transparent; }")  # Transparent background
             
             # Create container widget for centering
             checkbox_widget = QWidget()
@@ -404,7 +404,7 @@ class MetricsDisplayPanel(QWidget):
         # Checkbox is ON THE RIGHT (after recommendation)
         self.risk_table = QTableWidget()
         self.risk_table.setColumnCount(5)  # Added checkbox column at END
-        self.risk_table.setHorizontalHeaderLabels(['Metric', 'Value', 'Status', 'Recommendation', '☐'])
+        self.risk_table.setHorizontalHeaderLabels(['Metric', 'Value', 'Status', 'Recommendation', ''])  # No checkbox in header
         
         # Use centralized table stylesheet (ZERO hardcoded styles)
         self.risk_table.setStyleSheet(get_table_stylesheet())
@@ -663,7 +663,7 @@ class MetricsDisplayPanel(QWidget):
             checkbox = QCheckBox()
             checkbox.setChecked(False)
             checkbox.stateChanged.connect(self._on_checkbox_changed)
-            checkbox.setStyleSheet("QCheckBox { margin-left: 15px; }")  # Center in column
+            checkbox.setStyleSheet("QCheckBox { margin-left: 15px; background: transparent; }")  # Transparent background
             
             # Create container widget for centering
             checkbox_widget = QWidget()
@@ -825,11 +825,57 @@ class MetricsDisplayPanel(QWidget):
         Args:
             metrics: Dictionary with performance metrics
         """
+        # SAVE checkbox states BEFORE updating (critical fix for auto-uncheck bug)
+        saved_perf_states = self._save_checkbox_states(self.perf_table)
+        saved_risk_states = self._save_checkbox_states(self.risk_table)
+        
         self.current_metrics = metrics
         self._update_performance_table()
         self._update_risk_table()
+        
+        # RESTORE checkbox states AFTER updating (preserves user selections)
+        self._restore_checkbox_states(self.perf_table, saved_perf_states)
+        self._restore_checkbox_states(self.risk_table, saved_risk_states)
+        
         self.status_label.setText("Status: <b>Data loaded</b>")
         self.metrics_updated.emit(metrics)
+    
+    def _save_checkbox_states(self, table: QTableWidget) -> Dict[int, bool]:
+        """
+        Save checkbox states from a table.
+        
+        Args:
+            table: The table to save states from
+        
+        Returns:
+            Dictionary mapping row number to checkbox checked state
+        """
+        states = {}
+        for row in range(table.rowCount()):
+            checkbox_widget = table.cellWidget(row, 4)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isVisible():
+                    states[row] = checkbox.isChecked()
+        return states
+    
+    def _restore_checkbox_states(self, table: QTableWidget, states: Dict[int, bool]) -> None:
+        """
+        Restore checkbox states to a table.
+        
+        Args:
+            table: The table to restore states to
+            states: Dictionary mapping row number to checkbox checked state
+        """
+        for row, checked in states.items():
+            checkbox_widget = table.cellWidget(row, 4)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isVisible() and checkbox.isEnabled():
+                    # Block signals while restoring state to prevent triggering updates
+                    checkbox.blockSignals(True)
+                    checkbox.setChecked(checked)
+                    checkbox.blockSignals(False)
     
     def _update_performance_table(self) -> None:
         """Update performance metrics table"""
@@ -913,19 +959,22 @@ class MetricsDisplayPanel(QWidget):
                         # Only show checkbox if we have an intelligent recommendation
                         is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
                         
+                        # Block signals BEFORE any state changes
+                        checkbox.blockSignals(True)
+                        
                         if is_actionable:
                             # Show and enable checkbox for intelligent recommendations
                             checkbox_widget.setVisible(True)
-                            checkbox.blockSignals(True)  # Block signals to prevent recursive updates
                             checkbox.setEnabled(True)
-                            checkbox.setChecked(False)
-                            checkbox.blockSignals(False)  # Re-enable signals
+                            # DON'T reset checked state - preserve user's selection
                         else:
                             # Hide checkbox completely for non-actionable recommendations
                             checkbox_widget.setVisible(False)
-                            checkbox.blockSignals(True)
-                            checkbox.setChecked(False)
-                            checkbox.blockSignals(False)
+                            checkbox.setEnabled(False)
+                            checkbox.setChecked(False)  # Reset when hiding
+                        
+                        # Re-enable signals AFTER all state changes complete
+                        checkbox.blockSignals(False)
     
     def _update_risk_table(self) -> None:
         """Update risk metrics table"""
@@ -1009,19 +1058,22 @@ class MetricsDisplayPanel(QWidget):
                         # Only show checkbox if we have an intelligent recommendation
                         is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
                         
+                        # Block signals BEFORE any state changes
+                        checkbox.blockSignals(True)
+                        
                         if is_actionable:
                             # Show and enable checkbox for intelligent recommendations
                             checkbox_widget.setVisible(True)
-                            checkbox.blockSignals(True)  # Block signals to prevent recursive updates
                             checkbox.setEnabled(True)
-                            checkbox.setChecked(False)
-                            checkbox.blockSignals(False)  # Re-enable signals
+                            # DON'T reset checked state - preserve user's selection
                         else:
                             # Hide checkbox completely for non-actionable recommendations
                             checkbox_widget.setVisible(False)
-                            checkbox.blockSignals(True)
-                            checkbox.setChecked(False)
-                            checkbox.blockSignals(False)
+                            checkbox.setEnabled(False)
+                            checkbox.setChecked(False)  # Reset when hiding
+                        
+                        # Re-enable signals AFTER all state changes complete
+                        checkbox.blockSignals(False)
     
     def _get_risk_status(self, metric_key: str, value) -> str:
         """Get status for risk metric value"""
