@@ -277,13 +277,16 @@ class LogViewerWindow(QDialog):
         return widget
     
     def _display_content(self, tab_index: int, content: str):
-        """Display content in a specific tab's text widget"""
+        """Display content in a specific tab's text widget - WITH COLOR CODING"""
         if tab_index not in self.tab_data:
             return
         
         widget = self.tab_data[tab_index]['widget']
         filtered = self._apply_event_filters(content)
-        widget.text_edit.setPlainText(filtered)
+        
+        # Apply color coding to filtered content
+        colored_html = self._apply_color_coding(filtered)
+        widget.text_edit.setHtml(colored_html)
         
         # Update stats
         self._update_stats(content, filtered)
@@ -505,6 +508,44 @@ class LogViewerWindow(QDialog):
                     return True
         
         return False
+    
+    def _apply_color_coding(self, content: str) -> str:
+        """Apply color coding to match filter colors - INSTITUTIONAL GRADE"""
+        if not content:
+            return ""
+        
+        lines = content.split('\n')
+        html_lines = []
+        
+        # HTML header with monospace font
+        html_lines.append('<html><head><style>')
+        html_lines.append('body { background-color: #15191E; color: #E8EAED; font-family: "Courier New", monospace; font-size: 26px; }')
+        html_lines.append('</style></head><body><pre style="margin: 0; padding: 0;">')
+        
+        for line in lines:
+            # HTML escape special characters
+            escaped_line = (line
+                           .replace('&', '&amp;')
+                           .replace('<', '&lt;')
+                           .replace('>', '&gt;')
+                           .replace('"', '&quot;'))
+            
+            # Check which event pattern this line matches
+            matched_color = None
+            for event_key, (pattern, color) in EVENT_PATTERNS.items():
+                if re.search(pattern, line, re.IGNORECASE):
+                    matched_color = color
+                    break
+            
+            # Apply color if matched
+            if matched_color:
+                html_lines.append(f'<span style="color: {matched_color};">{escaped_line}</span>')
+            else:
+                # Default color for context lines
+                html_lines.append(f'<span style="color: #E8EAED;">{escaped_line}</span>')
+        
+        html_lines.append('</pre></body></html>')
+        return '\n'.join(html_lines)
     
     def _on_event_filter_changed(self, event: str, state: int):
         """Handle event filter change"""
