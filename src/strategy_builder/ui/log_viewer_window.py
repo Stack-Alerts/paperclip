@@ -39,7 +39,7 @@ from src.strategy_builder.ui.styles import (
 )
 
 
-# Institutional-grade event patterns - MATCH REAL LOG FORMAT
+# Institutional-grade event patterns - VERIFIED AGAINST ACTUAL LOGS
 EVENT_PATTERNS = {
     # Trade Events
     'TRADE_OPENED': (r'TRADE OPENED|trade.*opened|Opening trade|🟢.*TRADE', '#10B981'),
@@ -49,28 +49,28 @@ EVENT_PATTERNS = {
     'TRADE_NOT_FOUND': (r'TRADE.*NOT FOUND|Trade.*not found|❌.*TRADE', '#C35252'),
     'MULTIPLE_POSITIONS': (r'multiple.*position|Multiple.*open|Several.*position|🔀', '#FF8C00'),
     
-    # Configuration Events - Match actual log format
-    'CONFIG_INITIALIZED': (r'initialized|Initializing|Logger initialized|BlockRegistryAdapter initialized', '#10B981'),
-    'CONFIG_READ': (r'Reading|Loading|load blocks from registry|Calling.*search_blocks', '#2070FF'),
+    # Configuration Events - VERIFIED: Logger initialized, BlockRegistryAdapter initialized
+    'CONFIG_INITIALIZED': (r'Logger initialized|BlockRegistryAdapter initialized|Institutional Logger initialized', '#10B981'),
+    'CONFIG_READ': (r'Reading|Loading|load blocks|Calling.*search', '#2070FF'),
     'CONFIG_VALIDATED': (r'validated|validation.*pass|Config.*valid|Validation complete', '#10B981'),
     'CONFIG_MISMATCH': (r'MISMATCH|mismatch|Config.*error|Invalid.*config', '#C35252'),
     'CONFIG_MISSING': (r'not found|missing|Config.*missing|Cannot find', '#FF8C00'),
     
-    # System Events - Match actual format
-    'STARTED': (r'Starting to load|Starting|Launching|Initiating|Begin', '#10B981'),
+    # System Events - VERIFIED: Starting to load blocks
+    'STARTED': (r'Starting to load|Starting', '#10B981'),
     'STOPPED': (r'Stopped|Stopping|Shutdown|Terminated|Ending', '#9AA0A6'),
-    'PROGRESS': (r'Processing|Working|Running|In progress', '#2070FF'),
-    'COMPLETED': (r'Successfully loaded|Successfully|Success|Finished|Done', '#10B981'),
+    'PROGRESS': (r'Processing|Working|Running|progress', '#2070FF'),
+    'COMPLETED': (r'Successfully loaded|Successfully|Success|Finished', '#10B981'),
     
-    # Error Events - Match INFO/DEBUG/ERROR log levels
+    # Error Events - Match Python logging format
     'CRITICAL': (r'CRITICAL|FATAL', '#C35252'),
-    'ERROR': (r' - ERROR - |ERROR', '#FF8C00'),
-    'WARNING': (r' - WARNING - |WARNING', '#FFD700'),
+    'ERROR': (r'ERROR', '#FF8C00'),
+    'WARNING': (r'WARNING', '#FFD700'),
     
-    # Block/Strategy Events - Match actual messages
-    'BLOCK_LOADED': (r'Successfully loaded.*blocks|Loaded.*block|Processing first block', '#8B5CF6'),
+    # Block/Strategy Events - VERIFIED: Successfully loaded 83 blocks, Retrieved 83 search results
+    'BLOCK_LOADED': (r'Successfully loaded \d+ blocks|loaded.*blocks|Processing first block', '#8B5CF6'),
     'BLOCK_ADDED': (r'Added.*block|Block.*added|Block.*config', '#10B981'),
-    'SEARCH_RESULTS': (r'Retrieved.*search results|Retrieved \d+ search results', '#2070FF'),
+    'SEARCH_RESULTS': (r'Retrieved \d+ search results|Retrieved.*search', '#2070FF'),
     
     # Decision Events  
     'DECISION': (r'decision|deciding|evaluate|Decision:', '#FFD700'),
