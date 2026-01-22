@@ -458,7 +458,7 @@ class LogViewerWindow(QDialog):
         return layout
     
     def _apply_event_filters(self, content: str) -> str:
-        """Apply event-based filters to content"""
+        """Apply event-based filters to content - WITH CONTEXT"""
         if not content:
             return ""
         
@@ -469,9 +469,26 @@ class LogViewerWindow(QDialog):
         if not any(self.event_filters.values()):
             return ""
         
+        # Track if we're in a matched event block
+        in_event_block = False
+        
         for line in lines:
+            # Check if this line matches an event pattern
             if self._line_matches_event_filters(line):
                 filtered.append(line)
+                in_event_block = True
+            # Include indented lines after matched events (trade details, etc.)
+            elif in_event_block and (line.startswith('  ') or line.startswith('\t') or line.startswith('Location:') or line.startswith('Timestamp:') or line.startswith('Trade ID:') or line.startswith('Side:') or line.startswith('Size:') or line.startswith('Entry Price:') or line.startswith('Status:')):
+                filtered.append(line)
+            # Reset block tracking if we hit a non-indented, non-matching line
+            elif not line.strip():
+                # Empty line might end block, but include it for readability
+                if in_event_block:
+                    filtered.append(line)
+                in_event_block = False
+            else:
+                # Non-matching, non-indented line - end of event block
+                in_event_block = False
         
         return '\n'.join(filtered)
     
