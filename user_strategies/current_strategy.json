@@ -1,0 +1,119 @@
+{
+  "name": "HOD Rejection",
+  "description": "Strategy: New_Strategy",
+  "blocks": [
+    {
+      "name": "hod",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "HOD_REJECTION",
+          "logic": "AND",
+          "recheck_config": {
+            "enabled": true,
+            "bar_delay": 25,
+            "validation_mode": "SIGNAL",
+            "parent_signal": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "stochastic_rsi",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "BEARISH_CROSS",
+          "logic": "AND"
+        }
+      ]
+    },
+    {
+      "name": "rsi_divergence",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "BEARISH_DIVERGENCE",
+          "logic": "AND",
+          "recheck_config": {
+            "enabled": true,
+            "bar_delay": 10,
+            "validation_mode": "SIGNAL",
+            "parent_signal": null
+          },
+          "recheck_chain": [
+            {
+              "enabled": true,
+              "bar_delay": 25,
+              "validation_mode": "RECHECK",
+              "parent_signal": null
+            }
+          ]
+        },
+        {
+          "name": "OVERBOUGHT",
+          "logic": "OR",
+          "timing_constraint": {
+            "max_candles": 20,
+            "reference": "hod::HOD_REJECTION"
+          },
+          "recheck_config": {
+            "enabled": true,
+            "bar_delay": 25,
+            "validation_mode": "SIGNAL",
+            "parent_signal": null
+          },
+          "recheck_chain": [
+            {
+              "enabled": true,
+              "bar_delay": 25,
+              "validation_mode": "SIGNAL",
+              "parent_signal": null
+            },
+            {
+              "enabled": true,
+              "bar_delay": 25,
+              "validation_mode": "RECHECK",
+              "parent_signal": null
+            },
+            {
+              "enabled": true,
+              "bar_delay": 20,
+              "validation_mode": "RECHECK",
+              "parent_signal": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "order_block",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "BEARISH_OB",
+          "logic": "OR"
+        }
+      ]
+    },
+    {
+      "name": "liquidity_sweep",
+      "logic": "AND",
+      "signals": []
+    },
+    {
+      "name": "break_even_stop",
+      "logic": "AND",
+      "signals": []
+    },
+    {
+      "name": "atr",
+      "logic": "AND",
+      "signals": []
+    }
+  ],
+  "version": "1.0.0",
+  "strategy_type": "Bearish",
+  "validation_status": "passed",
+  "generation_status": "success"
+}
