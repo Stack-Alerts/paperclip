@@ -978,6 +978,80 @@ class StrategyBuilderOrchestrator:
             Current StrategyConfig
         """
         return self.config_engine.config
+    
+    def add_building_block(self, block_name: str) -> bool:
+        """
+        Add building block to current strategy (Sprint 1.6 Integration)
+        
+        This is an alias/wrapper for add_block() to support the
+        intelligent recommendation system's apply functionality.
+        
+        Args:
+            block_name: Registry name of block to add (e.g., 'liquidity_sweep')
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            result = self.add_block(block_name, logic="AND")
+            return result.success
+        except Exception as e:
+            print(f"❌ Failed to add building block '{block_name}': {str(e)}")
+            return False
+    
+    def update_parameter(self, param_name: str, new_value) -> bool:
+        """
+        Update strategy parameter (Sprint 1.6 Integration)
+        
+        Supports updating common strategy parameters like:
+        - stop_loss: Stop loss percentage
+        - take_profit: Take profit percentage
+        - position_size: Position size
+        - risk_per_trade: Risk per trade
+        
+        Args:
+            param_name: Parameter name to update
+            new_value: New parameter value
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            config = self.config_engine.config
+            
+            # Map parameter names to config attributes
+            param_mapping = {
+                'stop_loss': 'stop_loss',
+                'take_profit': 'take_profit',
+                'position_size': 'position_size',
+                'risk_per_trade': 'risk_per_trade',
+                'max_trades': 'max_trades',
+                'session_filter': 'session_filter'
+            }
+            
+            # Check if parameter is supported
+            if param_name not in param_mapping:
+                print(f"⚠️ Parameter '{param_name}' not yet supported for update")
+                print(f"   Supported parameters: {list(param_mapping.keys())}")
+                return False
+            
+            # Get config attribute name
+            config_attr = param_mapping[param_name]
+            
+            # Update parameter
+            if hasattr(config, config_attr):
+                setattr(config, config_attr, new_value)
+                print(f"✅ Updated {param_name} = {new_value}")
+                return True
+            else:
+                # Add parameter if it doesn't exist
+                setattr(config, config_attr, new_value)
+                print(f"✅ Added {param_name} = {new_value}")
+                return True
+                
+        except Exception as e:
+            print(f"❌ Failed to update parameter '{param_name}': {str(e)}")
+            return False
         
     def reset(self):
         """Reset orchestrator state"""
