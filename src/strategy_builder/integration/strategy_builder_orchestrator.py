@@ -133,6 +133,9 @@ class StrategyBuilderOrchestrator:
         self.test_engine = WalkforwardTestEngine()
         self.persistence = StrategyPersistence()
         
+        # Track loaded strategy file path for version control
+        self.loaded_strategy_path: Optional[str] = None
+        
     def create_strategy(
         self,
         name: str,
