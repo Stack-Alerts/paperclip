@@ -13,11 +13,12 @@ Date: 2026-01-17
 
 from datetime import datetime, timedelta
 from typing import Optional
+import pandas as pd
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QProgressBar, QTextEdit, QGroupBox
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont
 
 # Import UnifiedDataManager - THE ONLY DATA SOURCE!
@@ -34,6 +35,11 @@ class DataUpdateThread(QThread):
     """
     Background thread for downloading data from Binance
     
+    INSTITUTIONAL FIX: Implements retry logic for delayed Binance candles
+    - Binance may not have latest 15min candle ready immediately
+    - Retries up to 3 times with exponential backoff (10s, 20s, 30s)
+    - Ensures we get the freshest possible data
+    
     Signals:
         progress: (current, total, message) - Progress updates
         finished: (success, message) - Completion status
@@ -47,21 +53,27 @@ class DataUpdateThread(QThread):
         self.start_date = start_date
         self.end_date = end_date
         self.manager = UnifiedDataManager()
+        self.max_retries = 3
+        self.retry_delays = [10, 20, 30]  # Seconds between retries
     
     def run(self):
-        """Download missing data from Binance AND SAVE TO DISK"""
+        """
+        Download missing data from Binance AND SAVE TO DISK
+        
+        INSTITUTIONAL FIX: Implements retry logic for delayed Binance candles
+        """
         try:
             from pathlib import Path
+            import time
             
             self.progress.emit(0, 100, "Initializing Binance connection...")
             
-            # Download 15min bars (primary timeframe)
-            self.progress.emit(20, 100, "Downloading 15min bars from Binance...")
-            bars_15m = self.manager.get_bars(
+            # INSTITUTIONAL: Download with retry logic for delayed candles
+            self.progress.emit(15, 100, "Downloading 15min bars from Binance (with retry logic)...")
+            bars_15m = self._download_with_retry(
                 timeframe='15m',
                 start_date=self.start_date,
-                end_date=self.end_date,
-                source=DataSource.BINANCE  # Force Binance only!
+                end_date=self.end_date
             )
             
             self.progress.emit(40, 100, f"Downloaded {len(bars_15m)} bars (15min)")
@@ -70,13 +82,12 @@ class DataUpdateThread(QThread):
             self.progress.emit(45, 100, "Saving 15min bars to disk...")
             saved_files_15m = self._save_bars_to_disk(bars_15m, '15m')
             
-            # Download 1h bars (secondary timeframe)
-            self.progress.emit(60, 100, "Downloading 1h bars from Binance...")
-            bars_1h = self.manager.get_bars(
+            # INSTITUTIONAL: Download 1h bars with retry logic
+            self.progress.emit(60, 100, "Downloading 1h bars from Binance (with retry logic)...")
+            bars_1h = self._download_with_retry(
                 timeframe='1h',
                 start_date=self.start_date,
-                end_date=self.end_date,
-                source=DataSource.BINANCE
+                end_date=self.end_date
             )
             
             self.progress.emit(80, 100, f"Downloaded {len(bars_1h)} bars (1h)")
@@ -102,6 +113,70 @@ class DataUpdateThread(QThread):
                 f"❌ Download failed:\n\n{str(e)}\n\n"
                 f"You can try again later or continue without update."
             )
+    
+    def _download_with_retry(self, timeframe: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
+        """
+        Download bars with retry logic for delayed Binance candles
+        
+        INSTITUTIONAL FIX: Binance may not have latest 15min candle ready immediately.
+        This method retries up to 3 times with exponential backoff if data is stale.
+        
+        Args:
+            timeframe: Bar timeframe ('15m', '1h', etc.)
+            start_date: Start date
+            end_date: End date
+        
+        Returns:
+            DataFrame with bars (freshest possible)
+        """
+        import time
+        
+        for attempt in range(self.max_retries + 1):
+            # Download data
+            bars = self.manager.get_bars(
+                timeframe=timeframe,
+                start_date=start_date,
+                end_date=end_date,
+                source=DataSource.BINANCE
+            )
+            
+            if len(bars) == 0:
+                raise ValueError(f"No {timeframe} bars received from Binance")
+            
+            # Check freshness (how old is the latest candle?)
+            latest_candle = pd.to_datetime(bars['timestamp'].iloc[-1])
+            delay_minutes = (datetime.now() - latest_candle).total_seconds() / 60
+            
+            # For 15min timeframe: acceptable if < 20 min delay
+            # For 1h timeframe: acceptable if < 65 min delay
+            acceptable_delay = 20 if timeframe == '15m' else 65
+            
+            if delay_minutes <= acceptable_delay:
+                # Data is fresh enough!
+                self.progress.emit(
+                    0, 100,
+                    f"✅ {timeframe} data fresh ({delay_minutes:.1f} min delay) - attempt {attempt + 1}"
+                )
+                return bars
+            
+            # Data is stale - retry if we have attempts left
+            if attempt < self.max_retries:
+                retry_delay = self.retry_delays[attempt]
+                self.progress.emit(
+                    0, 100,
+                    f"⏳ {timeframe} data stale ({delay_minutes:.0f} min delay) - "
+                    f"waiting {retry_delay}s before retry {attempt + 2}/{self.max_retries + 1}..."
+                )
+                time.sleep(retry_delay)
+            else:
+                # Final attempt failed, but return what we have
+                self.progress.emit(
+                    0, 100,
+                    f"⚠️  {timeframe} still stale after {self.max_retries} retries ({delay_minutes:.0f} min delay) - using anyway"
+                )
+                return bars
+        
+        return bars
     
     def _save_bars_to_disk(self, bars, timeframe: str) -> list:
         """INSTITUTIONAL: Merge new bars with existing data"""
@@ -162,10 +237,24 @@ class DataUpdateModal(QDialog):
     """
     Modal dialog for checking and updating data
     
-    Shown on Strategy Builder startup to ensure data is current
+    INSTITUTIONAL FIX: Auto-updates if gaps detected, auto-closes after 3 seconds
+    
+    Shown on Strategy Builder startup to ensure data is current.
+    
+    Behavior:
+    - If gaps detected: Auto-updates, then closes after 3s
+    - If data complete: Shows "all good" message, closes after 3s
     """
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, auto_mode: bool = True):
+        """
+        Initialize the data update modal
+        
+        Args:
+            parent: Parent widget
+            auto_mode: If True (startup), auto-update and auto-close. 
+                      If False (manual), require user interaction.
+        """
         super().__init__(parent)
         
         self.manager = UnifiedDataManager()
@@ -173,6 +262,15 @@ class DataUpdateModal(QDialog):
         self.gap_days = 0
         self.lakeapi_end: Optional[datetime] = None
         self.current_time: Optional[datetime] = None
+        self.has_gaps = False
+        self.auto_started = False  # Track if we auto-started update
+        self.auto_mode = auto_mode  # True = startup (auto), False = manual (no auto)
+        
+        # Countdown timer for auto-close (updates every second)
+        self.countdown_seconds = 3
+        self.countdown_timer = QTimer()
+        self.countdown_timer.timeout.connect(self._update_countdown)
+        self.original_status_text = ""  # Store original message
         
         self._init_ui()
         self._check_data_gap()
@@ -329,8 +427,9 @@ class DataUpdateModal(QDialog):
             report_lines.append(f"Current Time: {self.current_time.strftime('%Y-%m-%d %H:%M')}\n")
             
             if any_gaps:
+                self.has_gaps = True
                 self.status_label.setText(
-                    f"⚠️ DATA GAPS DETECTED: Up to {max_gap} days MISSING"
+                    f"⚠️ DATA GAPS DETECTED: Up to {max_gap} days MISSING - Auto-updating..."
                 )
                 self.status_label.setStyleSheet(get_status_label_style('error'))
                 
@@ -338,20 +437,34 @@ class DataUpdateModal(QDialog):
                 report_lines.append("   - Trade management needs funding rates")
                 report_lines.append("   - Building blocks need liquidations")
                 report_lines.append("   - Advanced blocks need orderbook\n")
-                report_lines.append("Click 'Update Data' to fill ALL gaps.")
+                report_lines.append("🔄 Auto-updating data now...")
                 
                 self.details_text.setText("\n".join(report_lines))
                 self.update_button.setEnabled(True)
+                
+                # INSTITUTIONAL FIX: Auto-start update after 1 second (ONLY in auto mode)
+                if self.auto_mode:
+                    QTimer.singleShot(1000, self._auto_start_update)
             else:
-                self.status_label.setText("✅ ALL DATA COMPLETE - 100% ACCURATE")
+                self.has_gaps = False
+                self.status_label.setText("✅ ALL DATA COMPLETE - 100% ACCURATE - Closing in 3s...")
                 self.status_label.setStyleSheet(get_status_label_style('success'))
                 
                 report_lines.append("✅ PERFECT: All data types complete!")
                 report_lines.append("   Building blocks have full data access")
-                report_lines.append("   Trade Manager ready for deployment")
+                report_lines.append("   Trade Manager ready for deployment\n")
+                report_lines.append("Window will close automatically in 3 seconds...")
                 
                 self.details_text.setText("\n".join(report_lines))
                 self.skip_button.setText("Continue")
+                
+                # INSTITUTIONAL FIX: Auto-close with countdown (ONLY in auto mode)
+                if self.auto_mode:
+                    self.original_status_text = "✅ ALL DATA COMPLETE - 100% ACCURATE"
+                    self._start_countdown()
+                else:
+                    # Manual mode - just show status without countdown
+                    self.status_label.setText("✅ ALL DATA COMPLETE - 100% ACCURATE")
         
         except Exception as e:
             self.status_label.setText("❌ Error checking data")
@@ -363,8 +476,17 @@ class DataUpdateModal(QDialog):
                 f"You can skip this check and continue."
             )
     
+    def _auto_start_update(self):
+        """
+        INSTITUTIONAL FIX: Auto-start update if gaps detected
+        Called 1 second after modal shows (if gaps exist)
+        """
+        if self.has_gaps and not self.auto_started:
+            self.auto_started = True
+            self._start_update()
+    
     def _start_update(self):
-        """Start the data update process"""
+        """Start the data update process (manual or auto)"""
         if not self.lakeapi_end or not self.current_time:
             return
         
@@ -376,9 +498,9 @@ class DataUpdateModal(QDialog):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.progress_label.setVisible(True)
-        self.progress_label.setText("Starting download...")
+        self.progress_label.setText("Starting download with retry logic...")
         
-        # Create and start update thread
+        # Create and start update thread (with retry logic!)
         self.update_thread = DataUpdateThread(
             self.lakeapi_end,
             self.current_time
@@ -397,13 +519,26 @@ class DataUpdateModal(QDialog):
         self.progress_label.setText(message)
     
     def _on_finished(self, success: bool, message: str):
-        """Handle completion"""
+        """
+        Handle completion
+        
+        INSTITUTIONAL FIX: Auto-close 3 seconds after successful update
+        """
         self.progress_bar.setVisible(False)
         self.progress_label.setVisible(False)
         
         if success:
-            self.status_label.setText("✅ Update Complete!")
+            self.status_label.setText("✅ Update Complete! - Closing in 3s...")
             self.status_label.setStyleSheet(get_status_label_style('success'))
+            
+            # INSTITUTIONAL FIX: Auto-close with countdown (ONLY in auto mode)
+            if self.auto_mode:
+                message += "\n\nWindow will close automatically in 3 seconds..."
+                self.original_status_text = "✅ Update Complete!"
+                self._start_countdown()
+            else:
+                # Manual mode - show completion without auto-close
+                message += "\n\nClick 'Continue' to close."
         else:
             self.status_label.setText("❌ Update Failed")
             self.status_label.setStyleSheet(get_status_label_style('error'))
@@ -414,3 +549,22 @@ class DataUpdateModal(QDialog):
         self.update_button.setVisible(False)
         self.skip_button.setVisible(False)
         self.close_button.setVisible(True)
+    
+    def _start_countdown(self):
+        """Start the countdown timer (3s, 2s, 1s)"""
+        self.countdown_seconds = 3
+        self._update_countdown()  # Show initial countdown
+        self.countdown_timer.start(1000)  # Update every second
+    
+    def _update_countdown(self):
+        """Update countdown display and close when reaches 0"""
+        if self.countdown_seconds > 0:
+            # Update status label with countdown
+            self.status_label.setText(
+                f"{self.original_status_text} - Closing in {self.countdown_seconds}s..."
+            )
+            self.countdown_seconds -= 1
+        else:
+            # Countdown finished - close dialog
+            self.countdown_timer.stop()
+            self.accept()

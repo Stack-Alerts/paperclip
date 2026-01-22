@@ -790,9 +790,14 @@ class StrategyBuilderMainWindow(QMainWindow):
             self._update_status("Publish status management coming soon")
     
     def _on_update_data(self):
-        """Open the data update modal."""
+        """
+        Open the data update modal (manual mode - no auto-close).
+        
+        Called from Tools menu - user-initiated action.
+        """
         try:
-            modal = DataUpdateModal(self)
+            # Manual mode: no auto-update, no auto-close
+            modal = DataUpdateModal(self, auto_mode=False)
             modal.exec_()  # Show modal (blocks until closed)
             self._update_status("Data update check complete")
         except Exception as e:
@@ -970,9 +975,14 @@ class StrategyBuilderMainWindow(QMainWindow):
             return True
     
     def _show_data_update_modal(self):
-        """Show the data update modal on startup."""
+        """
+        Show the data update modal on startup (auto mode - auto-close).
+        
+        Called automatically on startup - auto-updates and auto-closes.
+        """
         try:
-            modal = DataUpdateModal(self)
+            # Auto mode (default): auto-update gaps, auto-close after countdown
+            modal = DataUpdateModal(self, auto_mode=True)
             modal.exec_()  # Show modal (blocks until closed)
         except Exception as e:
             # Don't block app startup if modal fails
