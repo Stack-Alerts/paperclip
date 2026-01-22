@@ -1797,9 +1797,9 @@ class MetricsDisplayPanel(QWidget):
         try:
             main_window = self.window()
             
-            # Access Strategy Blocks Panel
-            if hasattr(main_window, 'strategy_blocks_panel'):
-                blocks_panel = main_window.strategy_blocks_panel
+            # Access Strategy Blocks Panel (correct attribute: blocks_panel)
+            if hasattr(main_window, 'blocks_panel'):
+                blocks_panel = main_window.blocks_panel
                 
                 # Refresh the UI
                 if hasattr(blocks_panel, 'refresh_blocks'):
@@ -1821,6 +1821,7 @@ class MetricsDisplayPanel(QWidget):
                     blocks_panel.repaint()
             else:
                 print("⚠️ Strategy Blocks Panel not accessible for UI refresh")
+                print("   (Main window may not be StrategyBuilderMainWindow)")
                 
         except Exception as e:
             print(f"❌ UI refresh failed: {str(e)}")
