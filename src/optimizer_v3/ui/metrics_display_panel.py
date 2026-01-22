@@ -900,14 +900,13 @@ class MetricsDisplayPanel(QWidget):
                     # Only enable if we have an intelligent recommendation
                     is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
                     if is_actionable:
-                        # Enable checkbox for intelligent recommendations
+                        # Enable checkbox for intelligent recommendations (clickable)
                         checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
                         checkbox_item.setCheckState(Qt.CheckState.Unchecked)
                     else:
-                        # Disable checkbox but keep it visible for non-actionable items
-                        checkbox_item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # Visible but not checkable
+                        # Disable checkbox but keep it visible (non-clickable)
+                        checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable)  # Visible but NOT enabled = grayed out
                         checkbox_item.setCheckState(Qt.CheckState.Unchecked)
-                        checkbox_item.setText("")  # Clear any text
     
     def _update_risk_table(self) -> None:
         """Update risk metrics table"""
@@ -988,14 +987,13 @@ class MetricsDisplayPanel(QWidget):
                     # Only enable if we have an intelligent recommendation
                     is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
                     if is_actionable:
-                        # Enable checkbox for intelligent recommendations
+                        # Enable checkbox for intelligent recommendations (clickable)
                         checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
                         checkbox_item.setCheckState(Qt.CheckState.Unchecked)
                     else:
-                        # Disable checkbox but keep it visible for non-actionable items
-                        checkbox_item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # Visible but not checkable
+                        # Disable checkbox but keep it visible (non-clickable)
+                        checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable)  # Visible but NOT enabled = grayed out
                         checkbox_item.setCheckState(Qt.CheckState.Unchecked)
-                        checkbox_item.setText("")  # Clear any text
     
     def _get_risk_status(self, metric_key: str, value) -> str:
         """Get status for risk metric value"""
