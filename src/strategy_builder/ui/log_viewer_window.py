@@ -501,7 +501,7 @@ class LogViewerWindow(QDialog):
         self._refresh_current_tab()
     
     def _update_filter_visibility(self, tab_index: int):
-        """Show only relevant filters for the selected tab - DYNAMIC PER TAB"""
+        """Show only relevant filters for the selected tab - REPACK GRID DYNAMICALLY"""
         tab_name = self.tabs.tabText(tab_index).replace('📄 ', '').lower()
         
         # Define which EVENT FILTERS are relevant for each tab type
@@ -516,7 +516,7 @@ class LogViewerWindow(QDialog):
             
             'strategy builder': [
                 'CONFIG_INITIALIZED', 'CONFIG_READ', 'CONFIG_VALIDATED',
-                'CONFIG_MISMATCH', 'CONFIG_MISSING',
+                'CONFIG_MISMATCH', '​CONFIG_MISSING',
                 'STARTED', 'STOPPED', 'PROGRESS', 'COMPLETED',
                 'CRITICAL', 'ERROR', 'WARNING',
                 'BLOCK_LOADED', 'BLOCK_ADDED', 'SEARCH_RESULTS'
@@ -552,12 +552,58 @@ class LogViewerWindow(QDialog):
         if relevant_events is None:
             relevant_events = list(EVENT_PATTERNS.keys())
         
-        # Show/hide individual checkboxes based on relevance
+        # Get grid layout (need to access parent's layout)
+        # Find the grid layout from the filter group
+        filter_group = None
+        for i in range(self.layout().count()):
+            widget = self.layout().itemAt(i).widget()
+            if isinstance(widget, QGroupBox) and "Event Filters" in widget.title():
+                filter_group = widget
+                break
+        
+        if not filter_group:
+            return
+        
+        # Get the container widget and its grid layout
+        container = filter_group.layout().itemAt(0).widget()
+        from PyQt5.QtWidgets import QGridLayout
+        grid_layout = container.layout()
+        
+        if not isinstance(grid_layout, QGridLayout):
+            return
+        
+        # Remove all checkboxes from grid
         for event_key, checkbox in self.event_checkboxes.items():
-            if event_key in relevant_events:
+            grid_layout.removeWidget(checkbox)
+            checkbox.hide()
+        
+        # Re-add only visible checkboxes in packed grid
+        col = 0
+        row = 0
+        max_cols = 6
+        
+        # Maintain original order but pack tightly
+        all_events_ordered = [
+            'TRADE_OPENED', 'TRADE_CLOSED', 'TRADE_UPDATED',
+            'POSITIONS_SNAPSHOT', 'TRADE_NOT_FOUND', 'MULTIPLE_POSITIONS',
+            'CONFIG_INITIALIZED', 'CONFIG_READ', 'CONFIG_VALIDATED',
+            'CONFIG_MISMATCH', 'CONFIG_MISSING',
+            'STARTED', 'STOPPED', 'PROGRESS', 'COMPLETED',
+            'CRITICAL', 'ERROR', 'WARNING',
+            'BLOCK_LOADED', 'BLOCK_ADDED', 'SEARCH_RESULTS',
+            'DECISION', 'CONDITION_MET', 'SIGNAL_DETECTED',
+        ]
+        
+        for event_key in all_events_ordered:
+            if event_key in relevant_events and event_key in self.event_checkboxes:
+                checkbox = self.event_checkboxes[event_key]
                 checkbox.show()
-            else:
-                checkbox.hide()
+                grid_layout.addWidget(checkbox, row, col)
+                
+                col += 1
+                if col >= max_cols:
+                    col = 0
+                    row += 1
     
     def _refresh_current_tab(self):
         """Refresh display for current tab"""
