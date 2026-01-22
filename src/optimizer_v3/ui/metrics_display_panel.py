@@ -22,7 +22,7 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView, QScrollArea, QTabWidget
+    QAbstractItemView, QScrollArea, QTabWidget, QCheckBox
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
@@ -371,15 +371,20 @@ class MetricsDisplayPanel(QWidget):
             # Column 3: Recommendation (populated later by _update_performance_table)
             
             # Column 4: Checkbox (AT THE END, on the right)
-            # Add empty string to make checkbox render properly
-            checkbox_item = QTableWidgetItem("")
-            checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-            checkbox_item.setCheckState(Qt.CheckState.Unchecked)
-            checkbox_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.perf_table.setItem(row, 4, checkbox_item)
-        
-        # Connect checkbox state changes to update button
-        self.perf_table.itemChanged.connect(self._on_checkbox_changed)
+            # Use actual QCheckBox widget (proper Qt approach)
+            checkbox = QCheckBox()
+            checkbox.setChecked(False)
+            checkbox.stateChanged.connect(self._on_checkbox_changed)
+            checkbox.setStyleSheet("QCheckBox { margin-left: 15px; }")  # Center in column
+            
+            # Create container widget for centering
+            checkbox_widget = QWidget()
+            checkbox_layout = QHBoxLayout(checkbox_widget)
+            checkbox_layout.addWidget(checkbox)
+            checkbox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            checkbox_layout.setContentsMargins(0, 0, 0, 0)
+            
+            self.perf_table.setCellWidget(row, 4, checkbox_widget)
         
         perf_layout.addWidget(self.perf_table)
         perf_group.setLayout(perf_layout)
@@ -654,15 +659,20 @@ class MetricsDisplayPanel(QWidget):
             # Column 3: Recommendation (populated later by _update_risk_table)
             
             # Column 4: Checkbox (AT THE END, on the right)
-            # Add empty string to make checkbox render properly
-            checkbox_item = QTableWidgetItem("")
-            checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-            checkbox_item.setCheckState(Qt.CheckState.Unchecked)
-            checkbox_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.risk_table.setItem(row, 4, checkbox_item)
-        
-        # Connect checkbox state changes to update button
-        self.risk_table.itemChanged.connect(self._on_checkbox_changed)
+            # Use actual QCheckBox widget (proper Qt approach)
+            checkbox = QCheckBox()
+            checkbox.setChecked(False)
+            checkbox.stateChanged.connect(self._on_checkbox_changed)
+            checkbox.setStyleSheet("QCheckBox { margin-left: 15px; }")  # Center in column
+            
+            # Create container widget for centering
+            checkbox_widget = QWidget()
+            checkbox_layout = QHBoxLayout(checkbox_widget)
+            checkbox_layout.addWidget(checkbox)
+            checkbox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            checkbox_layout.setContentsMargins(0, 0, 0, 0)
+            
+            self.risk_table.setCellWidget(row, 4, checkbox_widget)
         
         risk_layout.addWidget(self.risk_table)
         risk_group.setLayout(risk_layout)
@@ -895,18 +905,15 @@ class MetricsDisplayPanel(QWidget):
                 self.perf_table.setItem(row, 3, rec_item)  # Column 3: Recommendation
                 
                 # Enable/disable checkbox - ONLY for intelligent recommendations
-                checkbox_item = self.perf_table.item(row, 4)
-                if checkbox_item:
-                    # Only enable if we have an intelligent recommendation
-                    is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
-                    if is_actionable:
-                        # Enable checkbox for intelligent recommendations (clickable)
-                        checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-                        checkbox_item.setCheckState(Qt.CheckState.Unchecked)
-                    else:
-                        # Disable checkbox but keep it visible (non-clickable)
-                        checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable)  # Visible but NOT enabled = grayed out
-                        checkbox_item.setCheckState(Qt.CheckState.Unchecked)
+                checkbox_widget = self.perf_table.cellWidget(row, 4)
+                if checkbox_widget:
+                    # Find the QCheckBox inside the container widget
+                    checkbox = checkbox_widget.findChild(QCheckBox)
+                    if checkbox:
+                        # Only enable if we have an intelligent recommendation
+                        is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
+                        checkbox.setEnabled(is_actionable)  # Enabled = clickable, Disabled = grayed out
+                        checkbox.setChecked(False)  # Always start unchecked
     
     def _update_risk_table(self) -> None:
         """Update risk metrics table"""
@@ -982,18 +989,15 @@ class MetricsDisplayPanel(QWidget):
                 self.risk_table.setItem(row, 3, rec_item)  # Column 3: Recommendation
                 
                 # Enable/disable checkbox - ONLY for intelligent recommendations
-                checkbox_item = self.risk_table.item(row, 4)
-                if checkbox_item:
-                    # Only enable if we have an intelligent recommendation
-                    is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
-                    if is_actionable:
-                        # Enable checkbox for intelligent recommendations (clickable)
-                        checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-                        checkbox_item.setCheckState(Qt.CheckState.Unchecked)
-                    else:
-                        # Disable checkbox but keep it visible (non-clickable)
-                        checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable)  # Visible but NOT enabled = grayed out
-                        checkbox_item.setCheckState(Qt.CheckState.Unchecked)
+                checkbox_widget = self.risk_table.cellWidget(row, 4)
+                if checkbox_widget:
+                    # Find the QCheckBox inside the container widget
+                    checkbox = checkbox_widget.findChild(QCheckBox)
+                    if checkbox:
+                        # Only enable if we have an intelligent recommendation
+                        is_actionable = rec_obj is not None and self._is_intelligent_recommendation(rec_text)
+                        checkbox.setEnabled(is_actionable)  # Enabled = clickable, Disabled = grayed out
+                        checkbox.setChecked(False)  # Always start unchecked
     
     def _get_risk_status(self, metric_key: str, value) -> str:
         """Get status for risk metric value"""
@@ -1466,15 +1470,19 @@ class MetricsDisplayPanel(QWidget):
         """Select all recommendation checkboxes"""
         # Select all performance metrics (checkbox is column 4)
         for row in range(self.perf_table.rowCount()):
-            item = self.perf_table.item(row, 4)
-            if item:
-                item.setCheckState(Qt.CheckState.Checked)
+            checkbox_widget = self.perf_table.cellWidget(row, 4)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isEnabled():  # Only check if enabled
+                    checkbox.setChecked(True)
         
         # Select all risk metrics (checkbox is column 4)
         for row in range(self.risk_table.rowCount()):
-            item = self.risk_table.item(row, 4)
-            if item:
-                item.setCheckState(Qt.CheckState.Checked)
+            checkbox_widget = self.risk_table.cellWidget(row, 4)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isEnabled():  # Only check if enabled
+                    checkbox.setChecked(True)
         
         # Update apply button
         self._update_apply_button()
@@ -1483,24 +1491,27 @@ class MetricsDisplayPanel(QWidget):
         """Clear all recommendation checkboxes"""
         # Clear all performance metrics (checkbox is column 4)
         for row in range(self.perf_table.rowCount()):
-            item = self.perf_table.item(row, 4)
-            if item:
-                item.setCheckState(Qt.CheckState.Unchecked)
+            checkbox_widget = self.perf_table.cellWidget(row, 4)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox:
+                    checkbox.setChecked(False)
         
         # Clear all risk metrics (checkbox is column 4)
         for row in range(self.risk_table.rowCount()):
-            item = self.risk_table.item(row, 4)
-            if item:
-                item.setCheckState(Qt.CheckState.Unchecked)
+            checkbox_widget = self.risk_table.cellWidget(row, 4)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox:
+                    checkbox.setChecked(False)
         
         # Update apply button
         self._update_apply_button()
     
-    def _on_checkbox_changed(self, item: QTableWidgetItem) -> None:
+    def _on_checkbox_changed(self, state) -> None:
         """Handle checkbox state change"""
-        # Only update if it's a checkbox column (column 4)
-        if item and item.column() == 4:
-            self._update_apply_button()
+        # Called when any checkbox changes state
+        self._update_apply_button()
     
     def _update_apply_button(self) -> None:
         """Update apply button text and enabled state based on selections"""
@@ -1509,15 +1520,19 @@ class MetricsDisplayPanel(QWidget):
         
         # Count performance metrics
         for row in range(self.perf_table.rowCount()):
-            item = self.perf_table.item(row, 4)
-            if item and item.checkState() == Qt.CheckState.Checked:
-                selected_count += 1
+            checkbox_widget = self.perf_table.cellWidget(row, 4)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isChecked():
+                    selected_count += 1
         
         # Count risk metrics
         for row in range(self.risk_table.rowCount()):
-            item = self.risk_table.item(row, 4)
-            if item and item.checkState() == Qt.CheckState.Checked:
-                selected_count += 1
+            checkbox_widget = self.risk_table.cellWidget(row, 4)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isChecked():
+                    selected_count += 1
         
         # Update button (show count when >0)
         if selected_count > 0:
@@ -1533,19 +1548,23 @@ class MetricsDisplayPanel(QWidget):
         
         # Collect from performance metrics (checkbox is column 4)
         for row in range(self.perf_table.rowCount()):
-            checkbox_item = self.perf_table.item(row, 4)
-            if checkbox_item and checkbox_item.checkState() == Qt.CheckState.Checked:
-                rec = self.recommendation_cache.get(f"perf_{row}")
-                if rec:
-                    selected_recs.append(rec)
+            checkbox_widget = self.perf_table.cellWidget(row, 4)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isChecked():
+                    rec = self.recommendation_cache.get(f"perf_{row}")
+                    if rec:
+                        selected_recs.append(rec)
         
         # Collect from risk metrics (checkbox is column 4)
         for row in range(self.risk_table.rowCount()):
-            checkbox_item = self.risk_table.item(row, 4)
-            if checkbox_item and checkbox_item.checkState() == Qt.CheckState.Checked:
-                rec = self.recommendation_cache.get(f"risk_{row}")
-                if rec:
-                    selected_recs.append(rec)
+            checkbox_widget = self.risk_table.cellWidget(row, 4)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isChecked():
+                    rec = self.recommendation_cache.get(f"risk_{row}")
+                    if rec:
+                        selected_recs.append(rec)
         
         if not selected_recs:
             return
