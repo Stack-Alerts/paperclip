@@ -364,7 +364,7 @@ class LogViewerWindow(QDialog):
                 checkbox_font.setFamily("Segoe UI")
                 checkbox.setFont(checkbox_font)
                 
-                checkbox.setFixedWidth(210)  # Fixed width for uniform grid
+                checkbox.setFixedWidth(240)  # Fixed width for uniform grid - wider for full text
                 checkbox.setStyleSheet(f"""
                     QCheckBox {{
                         color: {color};
