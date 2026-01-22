@@ -295,19 +295,19 @@ class LogViewerWindow(QDialog):
         group = QGroupBox("📊 Event Filters")
         group.setStyleSheet(get_groupbox_header_stylesheet() + """
             QGroupBox {
-                font-size: 18px;
+                font-size: 22px;
                 font-weight: bold;
-                padding-top: 25px;
+                padding-top: 30px;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
                 left: 10px;
-                padding: 8px 15px;
-                font-size: 18px;
+                padding: 10px 15px;
+                font-size: 22px;
             }
         """)
-        group.setMinimumHeight(220)
+        group.setMinimumHeight(240)
         
         # Main container with grid
         container = QWidget()
@@ -360,7 +360,7 @@ class LogViewerWindow(QDialog):
                 
                 # Set font using QFont (NOT CSS - CSS gets overridden!)
                 checkbox_font = QFont()
-                checkbox_font.setPointSize(14)  # 14pt = ~19px
+                checkbox_font.setPointSize(11)  # 11pt = readable but not too big
                 checkbox_font.setFamily("Segoe UI")
                 checkbox.setFont(checkbox_font)
                 
@@ -368,20 +368,18 @@ class LogViewerWindow(QDialog):
                     QCheckBox {{
                         color: {color};
                         background: transparent;
-                        padding: 5px;
-                        min-width: 180px;
+                        padding: 3px;
+                        max-width: 200px;
                     }}
                     QCheckBox::indicator {{
-                        width: 20px;
-                        height: 20px;
+                        width: 18px;
+                        height: 18px;
                     }}
                 """)
                 checkbox.stateChanged.connect(lambda state, e=event_key: self._on_event_filter_changed(e, state))
                 self.event_checkboxes[event_key] = checkbox
                 
-                grid_layout.addWidget(checkbox, row, col)
-                # Set column stretch to space evenly
-                grid_layout.setColumnStretch(col, 1)
+                grid_layout.addWidget(checkbox, row, col, Qt.AlignLeft)
                 
                 col += 1
                 if col >= max_cols:
