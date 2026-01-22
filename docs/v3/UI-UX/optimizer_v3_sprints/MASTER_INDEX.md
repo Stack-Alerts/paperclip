@@ -44,15 +44,25 @@
 **Status**: ✅ COMPLETE (15/15 tasks, 100% test coverage)  
 **Purpose**: Metrics, state management, session persistence
 
-#### **Sprint 1.4: UI Integration** (3 days, 8 tasks)
+#### **Sprint 1.4: UI Integration** (3 days, 10 tasks)
 **File**: `SPRINT_1_4_UI_INTEGRATION.md`  
-**Status**: ☐ Not Started  
-**Purpose**: Window 2 integration, progress tracking, styling
+**Status**: ✅ COMPLETE (10/10 tasks - Zero Hardcoded Styles)  
+**Purpose**: Window 2 integration, progress tracking, styling, zero hardcoded styles
 
-#### **Sprint 1.5: Testing & Polish** (2 days, 7 tasks)
-**File**: `SPRINT_1_5_TESTING_POLISH.md`  
-**Status**: ☐ Not Started  
-**Purpose**: Multi-strategy testing, performance profiling
+#### **Sprint 1.5: Metrics Tab Real-Time Updates** (1 day, 8 tasks)
+**File**: `SPRINT_1_5_METRICS_REALTIME.md`  
+**Status**: ✅ COMPLETE (8/8 tasks, 1 day)  
+**Purpose**: Real-time metrics calculations, signal emission fixes, UI polish
+
+#### **Sprint 1.6: Intelligent Recommendation System** (5 days, 18 tasks)
+**File**: `SPRINT_1_6_INTELLIGENT_RECOMMENDATIONS.md`  
+**Status**: ✅ COMPLETE (18/18 tasks, 2026-01-22)  
+**Purpose**: Context-aware recommendations, building block intelligence, one-click improvements
+
+#### **Sprint 1.7: Nested RECHECK Foundation** (1 day, 14 tasks)
+**File**: `SPRINT_1_7_NESTED_RECHECK_FOUNDATION.md`  
+**Status**: ✅ COMPLETE (14/14 tasks, 2026-01-22)  
+**Purpose**: UI, data structures, persistence for nested RECHECK validation. Execution layer in Sprint 2.2.
 
 ---
 
@@ -126,9 +136,11 @@
 - [x] Sprint 1.2: Parallel Execution (20/20 tasks COMPLETE ✅ - Institutional Grade)
 - [x] Sprint 1.3: Results Ranking (15/15 tasks COMPLETE ✅ - 100% Test Coverage)
 - [x] Sprint 1.4: UI Integration (10/10 tasks COMPLETE ✅ - Zero Hardcoded Styles)
-- [x] Sprint 1.5: Testing & Polish (7/7 tasks COMPLETE ✅ - 100% Test Pass Rate, Phase 1 COMPLETE)
+- [x] Sprint 1.5: Metrics Tab Real-Time Updates (8/8 tasks COMPLETE ✅ - Production tested)
+- [x] Sprint 1.6: Intelligent Recommendation System (18/18 tasks COMPLETE ✅ - 2026-01-22)
+- [x] Sprint 1.7: Nested RECHECK Foundation (14/14 tasks COMPLETE ✅ - 2026-01-22)
 - [ ] Sprint 2.1: Automated Trainer (20 tasks, 10 days)
-- [ ] Sprint 2.2: Signal Intelligence (32 tasks, 12 days)
+- [ ] Sprint 2.2: Signal Intelligence + Nested RECHECK Execution (37 tasks, 12 days)
 - [ ] Sprint 2.3: ML Generator (15 tasks, 4 days)
 - [ ] Sprint 2.4: Integration (5 tasks, 2 days)
 - [ ] Sprint 3.1: Block Optimization (18 tasks, 5 days)
