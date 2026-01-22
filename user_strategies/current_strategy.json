@@ -99,17 +99,98 @@
     {
       "name": "liquidity_sweep",
       "logic": "AND",
-      "signals": []
-    },
-    {
-      "name": "break_even_stop",
-      "logic": "AND",
-      "signals": []
+      "signals": [
+        {
+          "name": "BEARISH_SWEEP",
+          "logic": "AND"
+        },
+        {
+          "name": "BULLISH_SWEEP",
+          "logic": "AND"
+        },
+        {
+          "name": "ERROR",
+          "logic": "AND"
+        },
+        {
+          "name": "INSUFFICIENT_DATA",
+          "logic": "AND"
+        },
+        {
+          "name": "BULLISH",
+          "logic": "AND"
+        },
+        {
+          "name": "BEARISH",
+          "logic": "AND"
+        },
+        {
+          "name": "NEUTRAL",
+          "logic": "AND"
+        },
+        {
+          "name": "NO_SWEEP",
+          "logic": "AND"
+        }
+      ]
     },
     {
       "name": "atr",
       "logic": "AND",
-      "signals": []
+      "signals": [
+        {
+          "name": "EXTREME",
+          "logic": "AND"
+        },
+        {
+          "name": "VERY_HIGH",
+          "logic": "AND"
+        },
+        {
+          "name": "HIGH",
+          "logic": "AND"
+        },
+        {
+          "name": "NORMAL",
+          "logic": "AND"
+        },
+        {
+          "name": "CALM",
+          "logic": "AND"
+        },
+        {
+          "name": "EXTREME_HIGH",
+          "logic": "AND"
+        },
+        {
+          "name": "EXTREME_LOW",
+          "logic": "AND"
+        },
+        {
+          "name": "VERY_LOW",
+          "logic": "AND"
+        },
+        {
+          "name": "BULLISH",
+          "logic": "AND"
+        },
+        {
+          "name": "BEARISH",
+          "logic": "AND"
+        },
+        {
+          "name": "NEUTRAL",
+          "logic": "AND"
+        },
+        {
+          "name": "ERROR",
+          "logic": "AND"
+        },
+        {
+          "name": "INSUFFICIENT_DATA",
+          "logic": "AND"
+        }
+      ]
     }
   ],
   "version": "1.0.0",
