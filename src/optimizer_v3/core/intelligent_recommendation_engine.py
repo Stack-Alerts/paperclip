@@ -343,10 +343,9 @@ class IntelligentRecommendationEngine:
                 
                 # Check if improves this metric
                 if metric_key in intel.primary_metrics:
-                    # Get improvement estimate
-                    purpose_data = StrategyDeepAnalyzer.PURPOSE_METRICS_MAP.get(intel.purpose, {})
-                    improvements = purpose_data.get('improvements', {})
-                    improvement = improvements.get(metric_key, 0.0)
+                    # Estimate improvement based on block purpose
+                    # Default improvement estimate: 10% for any relevant metric
+                    improvement = 0.10
                     
                     candidates.append({
                         'block_name': block_name,

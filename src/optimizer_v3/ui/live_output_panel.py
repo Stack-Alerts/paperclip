@@ -119,6 +119,7 @@ class MessageCategory(Enum):
     RISK = "RISK"
     SYSTEM = "SYSTEM"
     OPTIMIZER = "OPTIMIZER"
+    RECHECK = "RECHECK"  # New category for RECHECK validation
 
 
 class LiveOutputPanel(QWidget):
@@ -335,7 +336,8 @@ class LiveOutputPanel(QWidget):
             MessageCategory.TRADE: '#8B5CF6',    # Purple/Violet (distinct color)
             MessageCategory.RISK: '#C35252',     # Red (risk management)
             MessageCategory.SYSTEM: '#9AA0A6',   # Gray (system messages)
-            MessageCategory.OPTIMIZER: '#FFA500' # Orange (optimizer)
+            MessageCategory.OPTIMIZER: '#FFA500', # Orange (optimizer)
+            MessageCategory.RECHECK: '#2070FF'   # Blue (recheck validation)
         }
         
         self.category_checkboxes = {}
@@ -463,6 +465,10 @@ class LiveOutputPanel(QWidget):
     
     def _append_colored_message(self, msg_data: Dict) -> None:
         """Append message with color coding - Uses document default font (14pt Courier New)"""
+        # Special formatting for RECHECK messages
+        if msg_data['category'] == MessageCategory.RECHECK:
+            self._append_recheck_message(msg_data)
+            return
         # Get color based on level - UNIQUE colors matching filter checkboxes
         level_color_map = {
             MessageLevel.INFO: '#2070FF',      # Blue
@@ -482,7 +488,8 @@ class LiveOutputPanel(QWidget):
             MessageCategory.TRADE: '#8B5CF6',    # Purple/Violet
             MessageCategory.RISK: '#C35252',     # Red
             MessageCategory.SYSTEM: '#9AA0A6',   # Gray
-            MessageCategory.OPTIMIZER: '#FFA500' # Orange
+            MessageCategory.OPTIMIZER: '#FFA500', # Orange
+            MessageCategory.RECHECK: '#2070FF'   # Blue
         }
         
         level_color = level_color_map.get(msg_data['level'], get_color('text_primary'))
@@ -678,6 +685,38 @@ class LiveOutputPanel(QWidget):
         """
         self.is_running = running
         self._update_title_icon()
+    
+    def _append_recheck_message(self, msg_data: Dict) -> None:
+        """Special formatting for RECHECK validation messages with chain visualization"""
+        timestamp = msg_data['timestamp']
+        level = msg_data['level'].value
+        message = msg_data['message']
+        
+        # Extract chain visualization if present
+        chain_viz = ""
+        if '\n' in message:
+            message_parts = message.split('\n', 1)
+            message = message_parts[0]
+            chain_viz = message_parts[1]
+        
+        # Build HTML with special formatting for RECHECK messages
+        html = (
+            f"<span style='color: {get_color('text_muted')};'>{timestamp}</span> "
+            f"<span style='color: {category_color_map[MessageCategory.RECHECK]}; font-weight: bold;'>"
+            f"[{level}][RECHECK]</span> "
+            f"<span style='color: {get_color('text_primary')};'>{message}</span>"
+        )
+        
+        if chain_viz:
+            html += f"<br><pre style='color: {category_color_map[MessageCategory.RECHECK]}; margin-left: 20px;'>{chain_viz}</pre>"
+        
+        self.output_text.append(html)
+        
+        # Auto-scroll if enabled
+        if self.auto_scroll:
+            cursor = self.output_text.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            self.output_text.setTextCursor(cursor)
     
     def _update_title_icon(self) -> None:
         """Update title icon based on running state"""

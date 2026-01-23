@@ -95,68 +95,6 @@
           "logic": "OR"
         }
       ]
-    },
-    {
-      "name": "market_depth",
-      "logic": "AND",
-      "signals": [
-        {
-          "name": "HIGH_LIQUIDITY",
-          "logic": "AND"
-        },
-        {
-          "name": "NORMAL_LIQUIDITY",
-          "logic": "AND"
-        },
-        {
-          "name": "LOW_LIQUIDITY",
-          "logic": "AND"
-        },
-        {
-          "name": "BULLISH",
-          "logic": "AND"
-        },
-        {
-          "name": "BEARISH",
-          "logic": "AND"
-        },
-        {
-          "name": "NEUTRAL",
-          "logic": "AND"
-        },
-        {
-          "name": "ERROR",
-          "logic": "AND"
-        },
-        {
-          "name": "INSUFFICIENT_DATA",
-          "logic": "AND"
-        }
-      ]
-    },
-    {
-      "name": "bollinger_bands",
-      "logic": "AND",
-      "signals": [
-        {
-          "name": "UPPER_BAND_TOUCH",
-          "logic": "AND"
-        },
-        {
-          "name": "OVERBOUGHT",
-          "logic": "AND"
-        }
-      ]
-    },
-    {
-      "name": "trailing_stop",
-      "logic": "AND",
-      "signals": [
-        {
-          "name": "ACTIVE",
-          "logic": "AND"
-        }
-      ]
     }
   ],
   "version": "1.0.0",

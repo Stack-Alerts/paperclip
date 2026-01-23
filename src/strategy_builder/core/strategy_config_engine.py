@@ -20,6 +20,8 @@ class RecheckConfig:
     """Recheck validation configuration - requires signal to reoccur within bars"""
     enabled: bool = False
     bar_delay: int = 0  # Number of bars within which signal must reoccur
+    parent_signal: Optional[str] = None  # Signal this recheck validates
+    validation_mode: str = "SIGNAL"  # "SIGNAL" or "RECHECK"
 
 
 @dataclass
@@ -29,6 +31,7 @@ class SignalConfig:
     logic: str  # "AND" or "OR"
     timing_constraint: Optional[TimingConstraint] = None
     recheck_config: Optional[RecheckConfig] = None
+    recheck_chain: List[RecheckConfig] = field(default_factory=list)  # For nested rechecks
 
 
 @dataclass
@@ -125,6 +128,44 @@ class ConfigValidators:
                 visited.add(block.name)
                 
         return False
+
+    @staticmethod
+    def validate_recheck_config(signal: SignalConfig) -> List[str]:
+        """
+        Validate RECHECK configuration for a signal.
+        
+        Args:
+            signal: Signal to validate
+            
+        Returns:
+            List of error messages (empty if valid)
+        """
+        errors = []
+        
+        if not signal.recheck_config:
+            return errors
+            
+        # Validate base RECHECK config
+        if signal.recheck_config.enabled:
+            if signal.recheck_config.bar_delay <= 0:
+                errors.append(f"Invalid bar delay {signal.recheck_config.bar_delay} for {signal.name} RECHECK")
+            
+            if signal.recheck_config.validation_mode not in ["SIGNAL", "RECHECK"]:
+                errors.append(f"Invalid validation mode {signal.recheck_config.validation_mode} for {signal.name} RECHECK")
+        
+        # Validate nested RECHECKs
+        if signal.recheck_chain:
+            for idx, nested in enumerate(signal.recheck_chain, 1):
+                if not nested.enabled:
+                    errors.append(f"Nested RECHECK {idx} for {signal.name} must be enabled")
+                    
+                if nested.bar_delay <= 0:
+                    errors.append(f"Invalid bar delay {nested.bar_delay} for nested RECHECK {idx} of {signal.name}")
+                    
+                if nested.validation_mode not in ["SIGNAL", "RECHECK"]:
+                    errors.append(f"Invalid validation mode {nested.validation_mode} for nested RECHECK {idx} of {signal.name}")
+        
+        return errors
 
 
 class StrategyConfigEngine:
@@ -348,15 +389,21 @@ class StrategyConfigEngine:
             if len(block.signals) == 0:
                 errors.append(f"Block {block.name} must have at least one signal")
         
-        # Check timing constraints
+        # Check timing constraints and RECHECK configs
         for block in self.config.blocks:
             for signal in block.signals:
+                # Validate timing constraints
                 if signal.timing_constraint:
                     if not self.validators.validate_timing(signal, block, self.config):
                         errors.append(
                             f"Invalid timing constraint on {block.name}.{signal.name}: "
                             f"reference '{signal.timing_constraint.reference}' not found"
                         )
+                
+                # Validate RECHECK configurations
+                recheck_errors = self.validators.validate_recheck_config(signal)
+                if recheck_errors:
+                    errors.extend([f"{block.name}.{error}" for error in recheck_errors])
         
         # Check circular dependencies
         if self.validators.has_circular_dependencies(self.config):

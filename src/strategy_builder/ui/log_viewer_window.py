@@ -176,7 +176,8 @@ class LogViewerWindow(QDialog):
         self._display_content(0, all_content)
         
         # Create tabs for each log directory type
-        for idx, log_type in enumerate(sorted(self.log_directories), start=1):
+        tab_idx = 1
+        for log_type in sorted(self.log_directories):
             log_widget = self._create_log_panel()
             # Capitalize and format tab name
             tab_name = log_type.replace('_', ' ').title()
@@ -184,29 +185,69 @@ class LogViewerWindow(QDialog):
             
             # Load logs for this type
             type_content = self._load_logs_by_type(log_type)
-            self.tab_data[idx] = {'content': type_content, 'widget': log_widget}
-            self._display_content(idx, type_content)
+            self.tab_data[tab_idx] = {'content': type_content, 'widget': log_widget}
+            self._display_content(tab_idx, type_content)
+            tab_idx += 1
+        
+        # Add tab for AI recommendations log (prefer production, fall back to test)
+        root_log_files = [f for f in self.all_log_files if f.parent == self.logs_base_dir]
+        
+        # Find ai_recommendations.log or test_ai_recommendations.log (prefer production)
+        ai_log = None
+        for log_file in root_log_files:
+            if log_file.name == 'ai_recommendations.log' and log_file.exists():
+                ai_log = log_file
+                break
+        
+        # Fall back to test log if production doesn't exist
+        if not ai_log:
+            for log_file in root_log_files:
+                if log_file.name == 'test_ai_recommendations.log' and log_file.exists():
+                    ai_log = log_file
+                    break
+        
+        # Create single AI Recommendations tab if log exists
+        if ai_log:
+            log_widget = self._create_log_panel()
+            self.tabs.addTab(log_widget, "🤖 AI Recommendations")
+            
+            # Load content
+            with open(ai_log, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+            
+            self.tab_data[tab_idx] = {'content': content, 'widget': log_widget}
+            self._display_content(tab_idx, content)
+            tab_idx += 1
         
         # If specific file was provided, show it in dedicated tab
+        # SKIP if it's ai_recommendations.log (already has its own tab)
         if self.current_log_file and self.current_log_file.exists():
-            specific_widget = self._create_log_panel()
-            # Simplify session filenames: session_20260121_140512.log → Session
-            tab_name = self.current_log_file.name
-            if tab_name.startswith('session_'):
-                tab_name = "Session"
+            # Skip if already handled by AI Recommendations tab
+            if self.current_log_file.name in ['ai_recommendations.log', 'test_ai_recommendations.log']:
+                # Switch to AI Recommendations tab instead
+                for i in range(self.tabs.count()):
+                    if '🤖' in self.tabs.tabText(i) or 'AI' in self.tabs.tabText(i):
+                        self.tabs.setCurrentIndex(i)
+                        break
             else:
-                tab_name = f"📄 {tab_name}"
-            self.tabs.addTab(specific_widget, tab_name)
-            
-            with open(self.current_log_file, 'r', encoding='utf-8', errors='replace') as f:
-                specific_content = f.read()
-            
-            tab_idx = self.tabs.count() - 1
-            self.tab_data[tab_idx] = {'content': specific_content, 'widget': specific_widget}
-            self._display_content(tab_idx, specific_content)
-            
-            # Switch to this tab
-            self.tabs.setCurrentIndex(tab_idx)
+                specific_widget = self._create_log_panel()
+                # Simplify session filenames: session_20260121_140512.log → Session
+                tab_name = self.current_log_file.name
+                if tab_name.startswith('session_'):
+                    tab_name = "Session"
+                else:
+                    tab_name = f"📄 {tab_name}"
+                self.tabs.addTab(specific_widget, tab_name)
+                
+                with open(self.current_log_file, 'r', encoding='utf-8', errors='replace') as f:
+                    specific_content = f.read()
+                
+                tab_idx = self.tabs.count() - 1
+                self.tab_data[tab_idx] = {'content': specific_content, 'widget': specific_widget}
+                self._display_content(tab_idx, specific_content)
+                
+                # Switch to this tab
+                self.tabs.setCurrentIndex(tab_idx)
     
     def _load_all_logs(self) -> str:
         """Load all logs sorted by timestamp"""
@@ -464,6 +505,12 @@ class LogViewerWindow(QDialog):
         """Apply event-based filters to content - WITH CONTEXT"""
         if not content:
             return ""
+        
+        # SPECIAL CASE: AI Recommendations tab (ConfigDebugger text logs)
+        # Show raw content without filtering
+        current_tab_name = self.tabs.tabText(self.tabs.currentIndex()).lower()
+        if 'ai' in current_tab_name and 'recommendation' in current_tab_name:
+            return content  # Show everything unfiltered
         
         lines = content.split('\n')
         filtered = []
