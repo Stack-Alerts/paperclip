@@ -215,48 +215,67 @@ class StrategyAnalyzer:
         for block_idx, block in enumerate(blocks):
             block_name = block.get('name', f'block_{block_idx}')
             
-            # Check for recheck configuration
-            recheck = block.get('recheck')
-            if not recheck:
-                continue
-            
-            # Extract max_bars (how long to keep rechecking)
-            if 'max_bars' in recheck:
-                max_bars = int(recheck['max_bars'])
+            # Process signals for recheck configurations
+            for signal_idx, signal in enumerate(block.get('signals', [])):
+                signal_name = signal.get('name', f'signal_{signal_idx}')
                 
-                param = {
-                    'block': block_name,
-                    'parameter': 'recheck_max_bars',
-                    'type': 'recheck',
-                    'base_value': max_bars,
-                    'current_value': max_bars,
-                    'min': self.default_ranges['recheck']['min_bars'],
-                    'max': self.default_ranges['recheck']['max_bars'],
-                    'step': self.default_ranges['recheck']['step'],
-                    'optimizable': True
-                }
-                
-                recheck_params.append(param)
-                
-                self.logger.debug(
-                    f"Extracted recheck parameter from {block_name}",
-                    parameter='max_bars',
-                    value=max_bars
-                )
-            
-            # Extract enabled flag
-            if 'enabled' in recheck:
-                param = {
-                    'block': block_name,
-                    'parameter': 'recheck_enabled',
-                    'type': 'recheck',
-                    'base_value': bool(recheck['enabled']),
-                    'current_value': bool(recheck['enabled']),
-                    'options': [True, False],
-                    'optimizable': True
-                }
-                
-                recheck_params.append(param)
+                # Process base recheck config
+                recheck_config = signal.get('recheck_config')
+                if recheck_config and recheck_config.get('enabled'):
+                    bar_delay = int(recheck_config.get('bar_delay', 0))
+                    
+                    param = {
+                        'block': block_name,
+                        'signal': signal_name,
+                        'parameter': 'recheck_bar_delay',
+                        'type': 'recheck',
+                        'base_value': bar_delay,
+                        'current_value': bar_delay,
+                        'min': self.default_ranges['recheck']['min_bars'],
+                        'max': self.default_ranges['recheck']['max_bars'],
+                        'step': self.default_ranges['recheck']['step'],
+                        'optimizable': True,
+                        'level': 'base'
+                    }
+                    
+                    recheck_params.append(param)
+                    
+                    self.logger.debug(
+                        f"Extracted base recheck parameter from {block_name}::{signal_name}",
+                        parameter='bar_delay',
+                        value=bar_delay
+                    )
+                    
+                    # Process nested recheck chain
+                    for chain_idx, nested_recheck in enumerate(signal.get('recheck_chain', [])):
+                        if nested_recheck.get('enabled'):
+                            nested_delay = int(nested_recheck.get('bar_delay', 0))
+                            validation_mode = nested_recheck.get('validation_mode', 'SIGNAL')
+                            
+                            param = {
+                                'block': block_name,
+                                'signal': signal_name,
+                                'parameter': f'nested_recheck_{chain_idx}_delay',
+                                'type': 'recheck',
+                                'base_value': nested_delay,
+                                'current_value': nested_delay,
+                                'min': self.default_ranges['recheck']['min_bars'],
+                                'max': self.default_ranges['recheck']['max_bars'],
+                                'step': self.default_ranges['recheck']['step'],
+                                'optimizable': True,
+                                'level': 'nested',
+                                'chain_index': chain_idx,
+                                'validation_mode': validation_mode
+                            }
+                            
+                            recheck_params.append(param)
+                            
+                            self.logger.debug(
+                                f"Extracted nested recheck parameter from {block_name}::{signal_name}",
+                                parameter=f'nested_recheck_{chain_idx}_delay',
+                                value=nested_delay,
+                                validation_mode=validation_mode
+                            )
         
         self.logger.debug(
             f"Extracted {len(recheck_params)} recheck parameters"
