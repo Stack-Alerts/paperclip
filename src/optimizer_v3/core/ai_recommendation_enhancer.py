@@ -255,7 +255,8 @@ class AIRecommendationEnhancer:
             logger.info("OPENROUTER_REQUEST_SENT")
             logger.info(f"Model: {self.model}")
             logger.info(f"Prompt Length: {len(prompt)} characters")
-            logger.info(f"Prompt Preview (first 1000 chars):\n{prompt[:1000]}")
+            logger.info(f"FULL PROMPT (ALL {len(prompt)} CHARACTERS):")
+            logger.info(prompt)  # Log COMPLETE prompt to verify what's sent
             logger.info("-"*80)
             
             request_payload = {
