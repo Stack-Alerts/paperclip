@@ -449,10 +449,12 @@ DO NOT rely on summaries in this section - analyze the actual JSON data provided
 
 ## YOUR TASK
 1. Analyze the complete strategy configuration (SECTION 1 below)
-2. Review all {trades.get('total_trades', 0)} trade executions (SECTION 3 below)
+2. Review all trade executions in SECTION 3 below ({trades.get('total_trades', 0)} trades total)
 3. Assess performance metrics with ratings (SECTION 4 below)
 4. Consider available building blocks for recommendations (SECTION 5 below)
 5. Provide specific, actionable recommendations using JSON response format
+
+**CRITICAL**: The actual number of trades is in SECTION 3's JSON data. Do NOT rely on this summary count - analyze the actual `trades` array in SECTION 3.
 
 ## ANALYTICAL FRAMEWORK
 
