@@ -76,6 +76,7 @@ class TradesPanel(QWidget):
     
     # Signals
     trade_selected = pyqtSignal(dict)  # Emits selected trade data
+    metrics_updated = pyqtSignal(dict)  # Emits real-time metrics to Metrics Display Panel
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -106,9 +107,16 @@ class TradesPanel(QWidget):
         self._init_ui()
         
         # Update timer for metrics
-        self.metrics_timer = QTimer()
+        self.metrics_timer = QTimer(self)  # Set parent to ensure proper cleanup
         self.metrics_timer.timeout.connect(self._update_metrics)
         self.metrics_timer.start(1000)  # Update every second
+    
+    def closeEvent(self, event):
+        """Handle widget close event - stop timer to prevent threading issues"""
+        if hasattr(self, 'metrics_timer') and self.metrics_timer.isActive():
+            self.metrics_timer.stop()
+            self.logger._write_log("🛑 Metrics timer stopped on close", force=True)
+        super().closeEvent(event)
     
     def _console_print(self, message: str):
         """Print to console only if console debugging is enabled"""
@@ -670,8 +678,8 @@ class TradesPanel(QWidget):
             'ulcer_index': ulcer_index
         }
         
-        # Emit signal for Metrics Display Panel to catch
-        self.trade_selected.emit(metrics_dict)  # Reuse existing signal for metrics broadcast
+        # 🔥 EMIT METRICS TO METRICS DISPLAY PANEL (via proper signal)
+        self.metrics_updated.emit(metrics_dict)  # Dedicated signal for metrics updates
     
     def _on_selection_changed(self) -> None:
         """Handle row selection"""

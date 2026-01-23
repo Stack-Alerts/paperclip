@@ -220,8 +220,22 @@ class StrategyPersistence:
                 if signal.recheck_config:
                     signal_data['recheck_config'] = {
                         'enabled': signal.recheck_config.enabled,
-                        'bar_delay': signal.recheck_config.bar_delay
+                        'bar_delay': signal.recheck_config.bar_delay,
+                        'validation_mode': signal.recheck_config.validation_mode,
+                        'parent_signal': signal.recheck_config.parent_signal
                     }
+                    
+                # Add nested recheck chain if present
+                if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
+                    signal_data['recheck_chain'] = []
+                    for nested_recheck in signal.recheck_chain:
+                        nested_data = {
+                            'enabled': nested_recheck.enabled,
+                            'bar_delay': nested_recheck.bar_delay,
+                            'validation_mode': nested_recheck.validation_mode,
+                            'parent_signal': nested_recheck.parent_signal
+                        }
+                        signal_data['recheck_chain'].append(nested_data)
                     
                 block_data['signals'].append(signal_data)
                 
@@ -266,14 +280,29 @@ class StrategyPersistence:
                     rc_data = signal_data['recheck_config']
                     recheck_config = RecheckConfig(
                         enabled=rc_data.get('enabled', False),
-                        bar_delay=rc_data.get('bar_delay', 0)
+                        bar_delay=rc_data.get('bar_delay', 0),
+                        validation_mode=rc_data.get('validation_mode', 'SIGNAL'),
+                        parent_signal=rc_data.get('parent_signal', None)
                     )
+                    
+                # Create nested recheck chain if present
+                recheck_chain = []
+                if signal_data.get('recheck_chain'):
+                    for nested_data in signal_data['recheck_chain']:
+                        nested_recheck = RecheckConfig(
+                            enabled=nested_data.get('enabled', False),
+                            bar_delay=nested_data.get('bar_delay', 0),
+                            validation_mode=nested_data.get('validation_mode', 'SIGNAL'),
+                            parent_signal=nested_data.get('parent_signal', None)
+                        )
+                        recheck_chain.append(nested_recheck)
                     
                 signal = SignalConfig(
                     name=signal_data['name'],
                     logic=signal_data['logic'],
                     timing_constraint=timing_constraint,
-                    recheck_config=recheck_config
+                    recheck_config=recheck_config,
+                    recheck_chain=recheck_chain
                 )
                 
                 block.signals.append(signal)

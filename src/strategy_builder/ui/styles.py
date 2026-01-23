@@ -500,22 +500,6 @@ def get_primary_button_stylesheet(compact=False) -> str:
     """
 
 
-def get_success_button_stylesheet() -> str:
-    """Get stylesheet for success/confirm buttons."""
-    return f"""
-        QPushButton {{
-            background-color: {COLORS['button_success']};
-            color: white;
-            font-weight: bold;
-            padding: 10px 20px;
-            border-radius: 6px;
-        }}
-        QPushButton:hover {{
-            background-color: {COLORS['button_success_hover']};
-        }}
-    """
-
-
 def get_danger_button_stylesheet() -> str:
     """Get stylesheet for danger/delete buttons."""
     return f"""
@@ -525,9 +509,38 @@ def get_danger_button_stylesheet() -> str:
             font-weight: bold;
             padding: 10px 20px;
             border-radius: 6px;
+            min-width: 100px;
         }}
         QPushButton:hover {{
             background-color: {COLORS['button_danger_hover']};
+        }}
+        QPushButton:pressed {{
+            background-color: {COLORS['button_danger']};
+        }}
+    """
+
+
+def get_recheck_remove_button_stylesheet() -> str:
+    """Get stylesheet for RECHECK remove icon button (red, 40x40px)."""
+    return get_recheck_small_icon_button_stylesheet('danger')
+
+
+def get_success_button_stylesheet() -> str:
+    """Get stylesheet for success/confirm buttons."""
+    return f"""
+        QPushButton {{
+            background-color: {COLORS['button_success']};
+            color: white;
+            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 6px;
+            min-width: 100px;
+        }}
+        QPushButton:hover {{
+            background-color: {COLORS['button_success_hover']};
+        }}
+        QPushButton:pressed {{
+            background-color: {COLORS['button_success']};
         }}
     """
 
@@ -820,7 +833,7 @@ def get_recheck_button_stylesheet() -> str:
     """
     return """
         QPushButton {
-            background-color: #3C4756;
+            background-color: #244647;
             color: #B8C5D6;
             border: 1px solid #4A5568;
             border-radius: 4px;
@@ -834,6 +847,133 @@ def get_recheck_button_stylesheet() -> str:
         QPushButton:pressed {
             background-color: #2D3748;
         }
+    """
+
+
+def get_recheck_small_icon_button_stylesheet(button_type='primary') -> str:
+    """
+    Get unified stylesheet for small RECHECK icon buttons (40x40px square).
+    
+    All three buttons (gear, duplicate, remove) use this with different colors.
+    
+    Args:
+        button_type: 'primary' (teal/gear), 'success' (dark teal/duplicate), or 'danger' (red/remove)
+    
+    Returns:
+        Button stylesheet string with consistent sizing and styling
+    """
+    colors_map = {
+        'primary': {
+            'bg': '#244647',
+            'hover': '#1a3334',
+            'pressed': '#0f2021'
+        },
+        'success': {
+            'bg': '#1e5b5f',
+            'hover': '#154447',
+            'pressed': '#0c2c2e'
+        },
+        'danger': {
+            'bg': COLORS['button_danger'],
+            'hover': COLORS['button_danger_hover'],
+            'pressed': '#A63F3F'
+        }
+    }
+    
+    color_set = colors_map.get(button_type, colors_map['primary'])
+    
+    return f"""
+        QPushButton {{
+            background-color: {color_set['bg']};
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0px;
+            font-size: 26px;
+            font-weight: bold;
+            min-width: 40px;
+            max-width: 40px;
+            min-height: 40px;
+            max-height: 40px;
+        }}
+        QPushButton:hover {{
+            background-color: {color_set['hover']};
+        }}
+        QPushButton:pressed {{
+            background-color: {color_set['pressed']};
+        }}
+    """
+
+
+def get_recheck_gear_button_stylesheet() -> str:
+    """Get stylesheet for RECHECK gear icon button (blue, 40x40px)."""
+    return get_recheck_small_icon_button_stylesheet('primary')
+
+
+def get_recheck_duplicate_button_stylesheet() -> str:
+    """Get stylesheet for RECHECK duplicate icon button (green, 40x40px)."""
+    return get_recheck_small_icon_button_stylesheet('success')
+
+
+def get_dialog_stylesheet() -> str:
+    """Get stylesheet for dialog windows."""
+    return f"""
+        QDialog {{
+            background-color: {COLORS['bg_dark']};
+            color: {COLORS['text_primary']};
+        }}
+    """
+
+
+def get_radio_container_stylesheet() -> str:
+    """Get stylesheet for radio button container frame."""
+    return f"""
+        QFrame {{
+            background-color: {COLORS['bg_light']};
+            border: 1px solid {COLORS['border']};
+            border-radius: 6px;
+            padding: 10px;
+        }}
+    """
+
+
+def get_signal_radio_stylesheet() -> str:
+    """Get stylesheet for signal validation radio button."""
+    return f"""
+        QRadioButton {{
+            color: {COLORS['text_primary']};
+            font-weight: bold;
+            padding: 5px;
+        }}
+        QRadioButton::indicator {{
+            width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            border: 2px solid {COLORS['button_success']};
+        }}
+        QRadioButton::indicator:checked {{
+            background-color: {COLORS['button_success']};
+        }}
+    """
+
+
+def get_recheck_radio_stylesheet() -> str:
+    """Get stylesheet for recheck validation radio button."""
+    return f"""
+        QRadioButton {{
+            color: {COLORS['text_primary']};
+            font-weight: bold;
+            padding: 5px;
+        }}
+        QRadioButton::indicator {{
+            width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            border: 2px solid {COLORS['button_primary']};
+        }}
+        QRadioButton::indicator:checked {{
+            background-color: {COLORS['button_primary']};
+        }}
     """
 
 
@@ -907,3 +1047,49 @@ def get_scroll_area_stylesheet() -> str:
             border: 1px solid {COLORS['border']};
         }}
     """
+
+
+def get_input_field_stylesheet() -> str:
+    """
+    Get stylesheet for QLineEdit input fields.
+    
+    NAUTILUS EXPERT: Used for Starting Capital and other numeric inputs
+    
+    Returns:
+        QLineEdit stylesheet with dark theme and focus state
+    """
+    return f"""
+        QLineEdit {{
+            background-color: {COLORS['bg_input']};
+            border: 1px solid {COLORS['border']};
+            border-radius: 6px;
+            padding: 8px;
+            color: {COLORS['text_primary']};
+            font-size: 10pt;
+        }}
+        QLineEdit:focus {{
+            border-color: {COLORS['border_focus']};
+        }}
+        QLineEdit:hover {{
+            border-color: {COLORS['border_focus']};
+        }}
+    """
+
+
+def create_font(size: int = 10, bold: bool = False):
+    """
+    Create a standardized QFont for UI elements.
+    
+    Args:
+        size: Font size in points (default: 10)
+        bold: Whether font should be bold (default: False)
+    
+    Returns:
+        QFont object with specified properties
+    """
+    from PyQt5.QtGui import QFont
+    font = QFont()
+    font.setPointSize(size)
+    if bold:
+        font.setBold(True)
+    return font
