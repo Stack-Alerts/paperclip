@@ -150,6 +150,10 @@ class MetricsDisplayPanel(QWidget):
         self.perf_table.setColumnWidth(4, 50)   # Checkbox column
         self.perf_table.verticalHeader().setVisible(False)
         
+        # CRITICAL: Enable word wrap and auto-resize rows for multiline recommendations
+        self.perf_table.setWordWrap(True)
+        self.perf_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        
         # Populate with metric rows with institutional-grade tooltips
         metrics = [
             ('Total P&L', '$0.00', '-', 
@@ -441,6 +445,10 @@ class MetricsDisplayPanel(QWidget):
         # Column 3 (Recommendation) stretches to fill remaining width
         self.risk_table.setColumnWidth(4, 50)   # Checkbox column
         self.risk_table.verticalHeader().setVisible(False)
+        
+        # CRITICAL: Enable word wrap and auto-resize rows for multiline recommendations
+        self.risk_table.setWordWrap(True)
+        self.risk_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         
         # Populate with risk metrics with institutional-grade tooltips
         risk_metrics = [
