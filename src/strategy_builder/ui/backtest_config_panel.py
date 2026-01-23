@@ -16,13 +16,18 @@ Date: 2026-01-17
 """
 
 from typing import Optional
+from decimal import Decimal, DecimalException
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
     QRadioButton, QButtonGroup, QComboBox, QProgressBar,
-    QPushButton, QGroupBox, QTextEdit, QTabWidget, QCheckBox
+    QPushButton, QGroupBox, QTextEdit, QTabWidget, QCheckBox,
+    QLineEdit
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QColor
+
+# NautilusTrader types for institutional-grade money handling
+from nautilus_trader.model.objects import Money, Currency
 
 # Import centralized styles
 from src.strategy_builder.ui.styles import (
@@ -35,7 +40,10 @@ from src.strategy_builder.ui.styles import (
     get_panel_title_stylesheet,
     get_groupbox_header_stylesheet,
     get_preset_day_button_stylesheet,
-    get_separator_stylesheet
+    get_separator_stylesheet,
+    get_input_field_stylesheet,
+    create_font,
+    get_color
 )
 # Import universal combo box fix
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
@@ -307,18 +315,51 @@ class BacktestConfigPanel(QWidget):
     Backtest Configuration Panel
     
     Provides comprehensive backtest configuration and live execution monitoring.
+    
+    NAUTILUS EXPERT: Institutional-grade backtest execution with:
+    - NautilusTrader Money type for starting capital
+    - Proper validation ($500-$1M for futures with leverage)
+    - Real-time progress monitoring
     """
+    
+    # Signals
+    capital_changed = pyqtSignal(Money)  # Emits when starting capital changes
     
     def __init__(self, orchestrator, parent=None):
         super().__init__(parent)
         self.orchestrator = orchestrator
         self.worker: Optional[BacktestWorker] = None
         
+        # Starting Capital (NautilusTrader Money type)
+        self.starting_capital = Money('10000', Currency.from_str('USD'))  # Default $10,000
+        
         # Storage for custom preset values
         self.custom_values = {}
         self._loading_preset = False  # Flag to prevent auto-switch to Custom during preset load
         
         self._init_ui()
+    
+    def closeEvent(self, event):
+        """Handle widget close - CRITICAL: Stop running thread before destruction"""
+        self._cleanup_thread()
+        super().closeEvent(event)
+    
+    def __del__(self):
+        """Destructor - ensure thread is cleaned up"""
+        self._cleanup_thread()
+    
+    def _cleanup_thread(self):
+        """Cleanup running worker thread to prevent QThread crash"""
+        if self.worker and self.worker.isRunning():
+            # Stop the worker
+            self.worker.stop()
+            # Wait for thread to finish (max 2 seconds)
+            self.worker.wait(2000)
+            # If still running, force terminate
+            if self.worker.isRunning():
+                self.worker.terminate()
+                self.worker.wait()
+            self.worker = None
     
     def _init_ui(self):
         """Initialize the user interface"""
@@ -353,8 +394,9 @@ class BacktestConfigPanel(QWidget):
         self.tab_widget.addTab(self.metrics_panel, "💹 Metrics")
         
         # 🔥 CONNECT TRADES PANEL TO METRICS PANEL (Real-time updates)
-        # When trades panel updates metrics (every second), update metrics display panel
-        self.trades_panel.trade_selected.connect(self.metrics_panel.update_metrics)
+        # 🔥 CRITICAL FIX: Connect trades_panel metrics_updated signal (emitted every second)
+        # to metrics_panel update_metrics() for real-time metric calculations
+        self.trades_panel.metrics_updated.connect(self.metrics_panel.update_metrics)
         
         # Tab 5: Compare (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.compare_view_panel import CompareViewPanel
@@ -1124,12 +1166,82 @@ class BacktestConfigPanel(QWidget):
         return group
     
     def _create_risk_reward_column(self) -> QGroupBox:
-        """Create Risk/Reward column"""
+        """
+        Create Risk/Reward column
+        
+        NAUTILUS EXPERT: Includes institutional-grade Starting Capital input
+        with NautilusTrader Money type validation ($500-$1M for futures)
+        """
         group = QGroupBox("Risk/Reward")
         group.setStyleSheet(get_groupbox_header_stylesheet())
         # No height constraint - let layout manage naturally
         layout = QVBoxLayout()
         layout.setSpacing(12)
+        
+        # Starting Capital WITH QUICK-SET BUTTONS (CRITICAL - Phase 0)
+        capital_layout = QHBoxLayout()
+        capital_layout.setSpacing(8)
+        
+        capital_label = QLabel("💰 Starting Capital:")
+        capital_label.setStyleSheet(get_label_style('muted'))
+        capital_layout.addWidget(capital_label)
+        
+        # Quick preset buttons - COMMON VALUES with correct labels
+        preset_values = [
+            (500, "500"),
+            (1000, "1k"),
+            (2000, "2k"),
+            (5000, "5k"),
+            (10000, "10k"),
+            (25000, "25k"),
+            (50000, "50k")
+        ]
+        for val, label in preset_values:
+            btn = QPushButton(label)
+            btn.setFixedSize(75, 50)
+            btn.setStyleSheet(get_preset_day_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.capital_spin.setValue(v))
+            capital_layout.addWidget(btn)
+        
+        # SpinBox with up/down arrows
+        self.capital_spin = QSpinBox()
+        self.capital_spin.setRange(500, 1000000)
+        self.capital_spin.setValue(int(self.starting_capital.as_decimal()))
+        self.capital_spin.setPrefix("$")
+        self.capital_spin.setGroupSeparatorShown(True)  # Show thousands separator
+        self.capital_spin.setSingleStep(100)
+        self.capital_spin.setFixedWidth(150)
+        self.capital_spin.setStyleSheet(get_spinbox_button_stylesheet())
+        self.capital_spin.valueChanged.connect(self._on_capital_changed_spinbox)
+        self.capital_spin.setToolTip(
+            "Starting Capital Amount (USD)\n\n"
+            "NAUTILUS EXPERT: Uses NautilusTrader Money type\n\n"
+            "Critical for:\n"
+            "• Position sizing calculations\n"
+            "• Risk management (% of capital per trade)\n"
+            "• Metric calculations (return %, drawdown %)\n"
+            "• ML training features\n\n"
+            "Validation (Futures with Leverage):\n"
+            "• Minimum: $500 (small accounts with leverage)\n"
+            "• Maximum: $1,000,000 (institutional size)\n\n"
+            "Examples:\n"
+            "• $500: Micro account (high leverage required)\n"
+            "• $1,000: Small account (10-20x leverage typical)\n"
+            "• $10,000: Standard account (balanced leverage)\n"
+            "• $100,000: Large account (lower leverage needed)\n\n"
+            "Recommended:\n"
+            "• Backtesting: $10,000 default\n"
+            "• Match your actual trading capital for realistic results"
+        )
+        capital_layout.addWidget(self.capital_spin)
+        
+        layout.addLayout(capital_layout)
+        
+        # Separator after Starting Capital (important field)
+        sep_capital = QLabel()
+        sep_capital.setStyleSheet(get_separator_stylesheet())
+        sep_capital.setFixedHeight(1)
+        layout.addWidget(sep_capital)
         
         # Min R:R Ratio WITH QUICK-SET BUTTONS
         rr_layout = QHBoxLayout()
@@ -1810,6 +1922,43 @@ class BacktestConfigPanel(QWidget):
         # Force stylesheet refresh to apply property-based styling
         self.tab_widget.style().unpolish(self.tab_widget.tabBar())
         self.tab_widget.style().polish(self.tab_widget.tabBar())
+    
+    def _on_capital_changed_spinbox(self, value: int):
+        """
+        Handle starting capital spinbox value change
+        
+        NAUTILUS EXPERT: Updates NautilusTrader Money type when value changes
+        """
+        try:
+            usd = Currency.from_str('USD')
+            self.starting_capital = Money(str(value), usd)
+            
+            # Emit signal for other components
+            self.capital_changed.emit(self.starting_capital)
+        except Exception as e:
+            # Silently fail - spinbox already validates range
+            pass
+    
+    def get_starting_capital(self) ->Money:
+        """
+        Get current starting capital (NautilusTrader Money type)
+        
+        Returns:
+            Money: Starting capital in USD
+        """
+        return self.starting_capital
+    
+    def set_starting_capital(self, amount: str):
+        """
+        Set starting capital amount
+        
+        Args:
+            amount: Amount in USD as string or int
+        """
+        try:
+            self.capital_spin.setValue(int(amount))
+        except (ValueError, TypeError):
+            pass
     
     def _calculate_confluence_from_strategy(self):
         """
