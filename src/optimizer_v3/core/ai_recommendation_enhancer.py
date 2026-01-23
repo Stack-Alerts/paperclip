@@ -28,6 +28,9 @@ import requests
 from datetime import datetime
 from dotenv import load_dotenv
 
+# Import ComprehensiveAIRequestBuilder for institutional-grade prompts
+from src.optimizer_v3.core.comprehensive_ai_request_builder import ComprehensiveAIRequestBuilder
+
 # Load environment variables
 load_dotenv()
 
@@ -146,152 +149,75 @@ class AIRecommendationEnhancer:
         analysis_report,
         preliminary_recommendations: List
     ) -> str:
-        """Build comprehensive prompt for AI"""
+        """
+        Build comprehensive prompt using ComprehensiveAIRequestBuilder
         
-        # Extract key metrics
-        total_pnl = backtest_results.get('total_pnl', 0)
-        win_rate = backtest_results.get('win_rate', 0)
-        profit_factor = backtest_results.get('profit_factor', 0)
-        max_dd = backtest_results.get('max_drawdown_pct', 0)
-        num_trades = backtest_results.get('num_trades', 0)
-        avg_win = backtest_results.get('avg_win', 0)
-        avg_loss = backtest_results.get('avg_loss', 0)
+        CRITICAL FIX: Uses institutional-grade builder instead of simple format
+        This ensures AI receives the SAME comprehensive data shown in preview window.
+        """
+        print("🔧 Building institutional-grade AI prompt...")
         
-        # Extract analysis insights
-        trade_freq = analysis_report.trade_frequency
-        root_causes = analysis_report.root_causes
-        gaps = analysis_report.gaps
+        # Initialize builder
+        builder = ComprehensiveAIRequestBuilder()
         
-        # Format root causes
-        root_causes_text = []
-        for metric, analysis in root_causes.items():
-            root_causes_text.append(
-                f"  - {metric}: {analysis.primary_cause.value} "
-                f"(confidence: {analysis.confidence:.0%})\n"
-                f"    Reasoning: {analysis.reasoning}"
-            )
+        # Prepare metrics with ratings for builder
+        metrics_with_ratings = {}
         
-        # Format preliminary recommendations
-        prelim_recs_text = []
-        for i, rec in enumerate(preliminary_recommendations, 1):
-            rec_dict = rec if isinstance(rec, dict) else asdict(rec)
-            prelim_recs_text.append(
-                f"{i}. {rec_dict.get('action_type', 'N/A')}: {rec_dict.get('block_name', 'N/A')}\n"
-                f"   Description: {rec_dict.get('description', 'N/A')}\n"
-                f"   Expected improvement: {rec_dict.get('expected_improvement', 0):.1%}"
-            )
+        # Extract metrics from backtest_results
+        metric_keys = [
+            'total_pnl', 'win_rate', 'profit_factor', 'sharpe_ratio',
+            'max_drawdown_pct', 'num_trades', 'avg_win', 'avg_loss',
+            'largest_win', 'largest_loss', 'risk_reward_ratio', 'recovery_factor',
+            'sortino_ratio', 'calmar_ratio', 'max_consecutive_losses'
+        ]
         
-        prompt = f"""You are an elite quantitative trading strategist with deep expertise in Bitcoin trading systems, institutional risk management, and building block signal analysis.
-
-CURRENT STRATEGY CONFIGURATION:
-================================
-Name: {strategy_config.get('name', 'Unknown')}
-Type: {strategy_config.get('strategy_type', 'Unknown')}
-Blocks: {', '.join([b.get('name', '') for b in strategy_config.get('blocks', [])])}
-Total Signals: {sum(len(b.get('signals', [])) for b in strategy_config.get('blocks', []))}
-
-BACKTEST RESULTS (180 days):
-=============================
-Total P&L: ${total_pnl:.2f}
-Win Rate: {win_rate:.1f}%
-Profit Factor: {profit_factor:.2f}
-Max Drawdown: {max_dd:.1f}%
-Number of Trades: {num_trades}
-Trades/Month: {num_trades / 6:.1f}
-Average Win: ${avg_win:.2f}
-Average Loss: ${abs(avg_loss):.2f}
-Risk/Reward: {avg_win / abs(avg_loss) if avg_loss != 0 else 0:.2f}
-
-OUR DEEP ANALYSIS (DATA-DRIVEN):
-==================================
-
-Trade Frequency Analysis:
-- Current: {trade_freq.current_trades_per_month:.1f} trades/month
-- Assessment: {trade_freq.frequency_assessment}
-- Signal interaction: {trade_freq.signal_frequency_product:.4%} (combined probability)
-- Minimum needed: {trade_freq.minimum_needed_for_validation} trades for validation
-- Overfitting risk: {trade_freq.frequency_risk}
-
-Root Causes Identified:
-{chr(10).join(root_causes_text) if root_causes_text else "  None identified"}
-
-Strategy Gaps:
-- Coverage Score: {gaps.coverage_score:.0%} of key purposes covered
-- Critical Gaps: {', '.join(gaps.critical_gaps) if gaps.critical_gaps else 'None'}
-- Nice-to-have: {', '.join(gaps.nice_to_have_gaps[:2]) if gaps.nice_to_have_gaps else 'None'}
-
-Quality Score: {analysis_report.strategy_quality_score:.1f}/10
-
-Key Issues:
-{chr(10).join(f"  - {issue}" for issue in analysis_report.key_issues[:3])}
-
-Strengths:
-{chr(10).join(f"  - {strength}" for strength in analysis_report.strengths[:3]) if analysis_report.strengths else "  None identified"}
-
-OUR PRELIMINARY RECOMMENDATIONS:
-==================================
-{chr(10).join(prelim_recs_text) if prelim_recs_text else "None generated"}
-
-YOUR EXPERT TASK:
-==================
-Assess our recommendations and provide OPTIMAL configurations with institutional-grade reasoning.
-
-CRITICAL CONSIDERATIONS:
-1. Trade Frequency: Current {trade_freq.current_trades_per_month:.1f}/month
-   - Adding block would MULTIPLY restrictiveness (AND logic)
-   - Consider if RECHECK on existing block might be better
-   
-2. Statistical Validity: Need {trade_freq.minimum_needed_for_validation} trades, have {num_trades}
-   - If trade frequency already low, avoid adding blocks
-   
-3. Alternative Approaches:
-   - RECHECK: Validate signal later (maintains frequency)
-   - TIMING: Add dependency between signals (slight reduction)
-   - PARAMETER: Adjust SL/TP/position size (no frequency impact)
-
-4. Specific Configurations:
-   - Recheck bar_delay: 15-35 bars typical (HOD Strategy: 25 optimal)
-   - Timing max_candles: 10-30 candles typical
-   - Confidence: Base on data analysis + market context
-
-RESPOND IN VALID JSON FORMAT:
-{{
-    "assessment": "Your professional analysis of strategy and our recommendations",
-    "recommendations": [
-        {{
-            "type": "ADD_BLOCK" | "ADD_RECHECK" | "ADD_TIMING" | "ADJUST_PARAM",
-            "primary": true,
-            "block_name": "block_name",
-            "signal_name": "SIGNAL_NAME",
-            "configuration": {{
-                "bar_delay": 25,
-                "validation_mode": "SIGNAL",
-                "max_candles": 20,
-                "reference_signal": "block::SIGNAL",
-                "new_value": 0.02
-            }},
-            "reasoning": "Detailed professional reasoning why this is optimal",
-            "expected_impact": {{
-                "win_rate": "+12%",
-                "trade_frequency": "0% (maintained)",
-                "profit_factor": "+8%"
-            }},
-            "confidence": 0.88,
-            "warnings": ["Any risks or caveats"]
-        }}
-    ],
-    "optimal_order": ["Apply recommendations in this order"],
-    "overall_confidence": 0.85
-}}
-
-IMPORTANT: 
-- Be specific with configurations (exact values)
-- Explain WHY each recommendation is optimal
-- Consider trade frequency impact CRITICALLY
-- Provide confidence based on data + market knowledge
-- Valid JSON only (no markdown formatting)"""
+        for key in metric_keys:
+            if key in backtest_results:
+                value = backtest_results[key]
+                # Get rating from analysis if available
+                rating = self._get_metric_rating(key, value, analysis_report)
+                metrics_with_ratings[key] = {
+                    'value': float(value) if value is not None else 0.0,
+                    'rating': rating,
+                    'category': 'Performance'
+                }
+        
+        # Build complete request using builder
+        request = builder.build_complete_request(
+            strategy_config=strategy_config,
+            backtest_results=backtest_results,
+            metrics_with_ratings=metrics_with_ratings,
+            backtest_config=backtest_results.get('config', {}),
+            analysis_report=analysis_report
+        )
+        
+        # Format as AI prompt (this creates the long institutional prompt)
+        prompt = builder.format_for_ai_prompt(request)
+        
+        print(f"✅ Comprehensive prompt built: {len(prompt):,} characters")
+        print(f"   (Expected: 50,000+ for complete data)")
         
         return prompt
+    
+    def _get_metric_rating(self, metric_key: str, value, analysis_report) -> str:
+        """Get rating for metric based on analysis"""
+        try:
+            val = float(value)
+            
+            if metric_key == 'win_rate':
+                return '✓ Good' if val >= 60 else ('⚠ Fair' if val >= 50 else '✗ Poor')
+            elif metric_key == 'profit_factor':
+                return '✓ Good' if val >= 2.0 else ('⚠ Fair' if val >= 1.5 else '✗ Poor')
+            elif metric_key == 'sharpe_ratio':
+                return '✓ Good' if val >= 2.0 else ('⚠ Fair' if val >= 1.0 else '✗ Poor')
+            elif metric_key == 'max_drawdown_pct':
+                return '✓ Good' if val <= 10 else ('⚠ Fair' if val <= 20 else '✗ Poor')
+            elif metric_key == 'num_trades':
+                return '✓ Good' if val >= 30 else ('⚠ Fair' if val >= 15 else '✗ Poor')
+            else:
+                return '-'
+        except:
+            return '-'
     
     def _query_openrouter(self, prompt: str) -> Dict:
         """
