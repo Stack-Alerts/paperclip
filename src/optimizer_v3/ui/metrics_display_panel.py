@@ -22,9 +22,10 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView, QScrollArea, QTabWidget, QCheckBox
+    QAbstractItemView, QScrollArea, QTabWidget, QCheckBox,
+    QDialog, QProgressDialog
 )
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QThread
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QApplication
 
@@ -39,9 +40,19 @@ from src.strategy_builder.ui.styles import (
     get_color
 )
 
-# Import recommendation engine for intelligent recommendations
-from src.optimizer_v3.core.recommendation_engine import RecommendationEngine, Recommendation
+# Import NEW intelligent recommendation engine (Sprint 1.6 - with AI & status messages)
+from src.optimizer_v3.core.intelligent_recommendation_engine import (
+    IntelligentRecommendationEngine,
+    IntegratedRecommendation
+)
 from src.detectors.building_blocks.registry import BlockRegistry
+
+# Import recommendation worker (Sprint 1.6 - background AI generation)
+from src.optimizer_v3.ui.recommendation_worker import RecommendationWorker
+
+# Import AI request preview window (Sprint 1.6 - preview before sending)
+from src.optimizer_v3.core.ai_request_preview_window import AIRequestPreviewWindow
+from src.optimizer_v3.core.comprehensive_ai_request_builder import ComprehensiveAIRequestBuilder
 
 
 class MetricsDisplayPanel(QWidget):
@@ -64,10 +75,12 @@ class MetricsDisplayPanel(QWidget):
         super().__init__(parent)
         self.current_metrics: Dict = {}
         self.baseline_metrics: Dict = {}
+        self.full_backtest_results: Optional[Dict] = None  # FIXED: Store full results with trade list
         
-        # Intelligent recommendation engine (initialized lazily)
-        self.rec_engine: Optional[RecommendationEngine] = None
-        self.recommendation_cache: Dict[str, Optional[Recommendation]] = {}  # Cache recommendation objects
+        # NEW Intelligent recommendation engine (Sprint 1.6 - with AI & status messages)
+        self.rec_engine: Optional[IntelligentRecommendationEngine] = None
+        self.recommendation_cache: Dict[str, Optional[IntegratedRecommendation]] = {}  # Cache recommendation objects
+        self.batch_recommendations: List[IntegratedRecommendation] = []  # Batch AI recommendations
         
         self._init_ui()
     
@@ -818,18 +831,33 @@ class MetricsDisplayPanel(QWidget):
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         return item
     
-    def update_metrics(self, metrics: Dict) -> None:
+    def update_metrics(self, metrics: Dict, backtest_complete: bool = False, backtest_results: Optional[Dict] = None) -> None:
         """
         Update metrics display.
         
         Args:
-            metrics: Dictionary with performance metrics
+            metrics: Dictionary with performance metrics (summary only)
+            backtest_complete: If True, runs AI recommendations (expensive operation)
+            backtest_results: FULL backtest results with trade list (for AI analysis)
         """
         # SAVE checkbox states BEFORE updating (critical fix for auto-uncheck bug)
         saved_perf_states = self._save_checkbox_states(self.perf_table)
         saved_risk_states = self._save_checkbox_states(self.risk_table)
         
         self.current_metrics = metrics
+        self.full_backtest_results = backtest_results  # FIXED: Save full results
+        
+        # Initialize recommendation engine on first use (but don't run it yet)
+        if self.rec_engine is None:
+            self._initialize_recommendation_engine()
+        
+        # ONLY show AI preview when backtest is COMPLETE
+        # (NOT on every metrics update - preview is the gate before AI)
+        if backtest_complete:
+            print("[UI] Backtest complete - showing AI request preview...")
+            self._show_ai_request_preview()
+        
+        # Update tables with metrics and recommendations
         self._update_performance_table()
         self._update_risk_table()
         
@@ -930,18 +958,24 @@ class MetricsDisplayPanel(QWidget):
                     rating_item.setForeground(QColor(get_color('error')))
                 self.perf_table.setItem(row, 2, rating_item)  # Column 2: Rating
                 
-                # Generate intelligent recommendation
+                # Map batch recommendations to this metric (from cached batch results)
                 rec_obj = None
                 rec_text = ""
                 
-                if self.rec_engine and rating in ['⚠ Fair', '✗ Poor']:
-                    rec_obj = self.rec_engine.generate_recommendation(key, float(value), rating)
-                    if rec_obj:
-                        rec_text = self.rec_engine.format_recommendation_text(rec_obj)
-                        # Cache the recommendation object
-                        self.recommendation_cache[f"perf_{row}"] = rec_obj
-                    else:
-                        # No intelligent recommendation available - use generic
+                if rating in ['⚠ Fair', '✗ Poor']:
+                    # Find recommendation from batch results that targets this metric
+                    for batch_rec in self.batch_recommendations:
+                        if batch_rec.metric_targeted == key or key in str(batch_rec.expected_impact):
+                            rec_obj = batch_rec
+                            if self.rec_engine:
+                                rec_text = self.rec_engine.format_recommendation_text(rec_obj)
+                            else:
+                                rec_text = batch_rec.reasoning[:100] + "..."
+                            self.recommendation_cache[f"perf_{row}"] = rec_obj
+                            break
+                    
+                    if not rec_obj:
+                        # No AI recommendation found - use generic
                         rec_text = self._get_generic_recommendation(key, value, rating)
                         self.recommendation_cache[f"perf_{row}"] = None
                 else:
@@ -1029,18 +1063,24 @@ class MetricsDisplayPanel(QWidget):
                     status_item.setForeground(QColor(get_color('error')))  # RED for Poor/High
                 self.risk_table.setItem(row, 2, status_item)  # Column 2: Status
                 
-                # Generate intelligent recommendation for risk metrics
+                # Map batch recommendations to this risk metric
                 rec_obj = None
                 rec_text = ""
                 
-                if self.rec_engine and status in ['⚠ Monitor', '✗ High', '✗ Poor']:
-                    rec_obj = self.rec_engine.generate_recommendation(key, float(value), status)
-                    if rec_obj:
-                        rec_text = self.rec_engine.format_recommendation_text(rec_obj)
-                        # Cache the recommendation object
-                        self.recommendation_cache[f"risk_{row}"] = rec_obj
-                    else:
-                        # No intelligent recommendation available - use generic
+                if status in ['⚠ Monitor', '✗ High', '✗ Poor']:
+                    # Find recommendation from batch results
+                    for batch_rec in self.batch_recommendations:
+                        if batch_rec.metric_targeted == key or key in str(batch_rec.expected_impact):
+                            rec_obj = batch_rec
+                            if self.rec_engine:
+                                rec_text = self.rec_engine.format_recommendation_text(rec_obj)
+                            else:
+                                rec_text = batch_rec.reasoning[:100] + "..."
+                            self.recommendation_cache[f"risk_{row}"] = rec_obj
+                            break
+                    
+                    if not rec_obj:
+                        # No AI recommendation found - use generic
                         rec_text = self._get_risk_recommendation_generic(key, value, status)
                         self.recommendation_cache[f"risk_{row}"] = None
                 else:
@@ -1318,15 +1358,347 @@ class MetricsDisplayPanel(QWidget):
         except Exception as e:
             print(f"❌ Export failed: {str(e)}")
     
-    def _initialize_recommendation_engine(self) -> None:
-        """Initialize intelligent recommendation engine"""
+    def _generate_batch_recommendations(self) -> None:
+        """
+        Generate batch recommendations using NEW intelligent engine IN BACKGROUND THREAD
+        
+        This is called ONCE when backtest is complete (not on every metric update).
+        Results are cached and mapped to individual table rows.
+        
+        CRITICAL FIX: Runs in background thread to prevent UI freeze.
+        """
+        if not self.rec_engine or not self.current_metrics:
+            return
+        
         try:
-            # Get current strategy configuration
-            strategy_config = self._get_current_strategy_config()
-            self.rec_engine = RecommendationEngine(strategy_config, BlockRegistry)
-            print("✅ Intelligent recommendation engine initialized")
+            # Prepare strategy config (get from orchestrator)
+            strategy_config_obj = self._get_current_strategy_config()
+            if not strategy_config_obj:
+                print("⚠️ No strategy config available - using generic recommendations")
+                self.batch_recommendations = []
+                return
+            
+            # Convert StrategyConfig object to dict format expected by engine
+            strategy_config_dict = self._convert_strategy_config_to_dict(strategy_config_obj)
+            
+            # Prepare metrics dict with ratings for engine
+            metrics_with_ratings = {}
+            metrics_map = ['total_pnl', 'total_return', 'sharpe_ratio', 'win_rate', 'profit_factor',
+                          'max_drawdown', 'total_trades', 'avg_trade_pnl', 'avg_win', 'avg_loss',
+                          'largest_win', 'largest_loss', 'risk_reward_ratio', 'recovery_factor']
+            
+            for metric_key in metrics_map:
+                if metric_key in self.current_metrics:
+                    value = self.current_metrics[metric_key]
+                    rating = self._get_rating(metric_key, value)
+                    metrics_with_ratings[metric_key] = {
+                        'value': float(value),
+                        'rating': rating
+                    }
+            
+            # Create progress dialog (NON-BLOCKING, 2X SIZE)
+            self.progress_dialog = QProgressDialog(
+                "Generating AI recommendations...",
+                None,  # CRITICAL: No cancel button to avoid blocking
+                0,
+                100,
+                self
+            )
+            self.progress_dialog.setWindowTitle("🤖 AI Analysis in Progress")
+            self.progress_dialog.setWindowModality(Qt.WindowModality.NonModal)  # CRITICAL: Non-modal
+            self.progress_dialog.setMinimumDuration(0)  # Show immediately
+            self.progress_dialog.setValue(0)
+            self.progress_dialog.setAutoClose(True)
+            self.progress_dialog.setAutoReset(True)
+            self.progress_dialog.setCancelButton(None)  # CRITICAL: Disable cancel to prevent blocking
+            # FIXED: Make dialog 2x larger
+            self.progress_dialog.setMinimumSize(800, 300)
+            self.progress_dialog.resize(800, 300)
+            
+            # Create background worker (FIXED: Pass full backtest results with trade list)
+            self.rec_worker = RecommendationWorker(
+                engine=self.rec_engine,
+                strategy_config=strategy_config_dict,
+                backtest_results=self.full_backtest_results or self.current_metrics,  # Use full results if available
+                metrics=metrics_with_ratings,
+                lookback_days=180
+            )
+            
+            # Connect signals
+            self.rec_worker.recommendations_ready.connect(self._on_recommendations_ready)
+            self.rec_worker.progress_update.connect(self._on_ai_progress)
+            self.rec_worker.error_occurred.connect(self._on_ai_error)
+            self.progress_dialog.canceled.connect(self.rec_worker.terminate)
+            
+            # Start background generation
+            print("[UI] Starting AI recommendation generation in background thread...")
+            self.rec_worker.start()
+            
         except Exception as e:
-            print(f"⚠️ Failed to initialize recommendation engine: {str(e)}")
+            print(f"⚠️ Failed to start background recommendation generation: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            self.batch_recommendations = []
+    
+    def _on_recommendations_ready(self, recommendations: List[IntegratedRecommendation]) -> None:
+        """
+        Handle completion of background AI recommendation generation.
+        
+        Args:
+            recommendations: List of generated recommendations
+        """
+        # Close progress dialog
+        if hasattr(self, 'progress_dialog'):
+            self.progress_dialog.close()
+        
+        # Store results
+        self.batch_recommendations = recommendations
+        print(f"[UI] ✅ Received {len(recommendations)} AI recommendations")
+        
+        # Update tables to show new recommendations
+        self._update_performance_table()
+        self._update_risk_table()
+        
+        # Update status
+        self.status_label.setText(f"Status: <b>{len(recommendations)} AI recommendations generated</b>")
+    
+    def _on_ai_progress(self, message: str, percentage: int) -> None:
+        """
+        Handle progress updates from AI worker.
+        
+        Args:
+            message: Progress message
+            percentage: Progress percentage (0-100, or -1 for unknown)
+        """
+        if hasattr(self, 'progress_dialog'):
+            self.progress_dialog.setLabelText(message)
+            if percentage >= 0:
+                self.progress_dialog.setValue(percentage)
+    
+    def _on_ai_error(self, error_msg: str) -> None:
+        """
+        Handle  error from AI worker.
+        
+        Args:
+            error_msg: Error message
+        """
+        if hasattr(self, 'progress_dialog'):
+            self.progress_dialog.close()
+        
+        print(f"❌ AI Error: {error_msg}")
+        self.status_label.setText(f"Status: <b>AI generation failed: {error_msg}</b>")
+        self.batch_recommendations = []
+    
+    def _convert_strategy_config_to_dict(self, strategy_config_obj) -> Dict:
+        """
+        Convert StrategyConfig object to dict format with COMPLETE details for AI
+        
+        Extracts ALL parameters including:
+        - Blocks and signals
+        - Timing constraints
+        - Recheck settings
+        - Entry/exit conditions
+        - AI-friendly explanations
+        
+        Args:
+            strategy_config_obj: StrategyConfig object from orchestrator
+        
+        Returns:
+            Dictionary format with complete strategy details
+        """
+        try:
+            # Convert to dict format with COMPLETE details
+            config_dict = {
+                'name': getattr(strategy_config_obj, 'name', 'Unknown Strategy'),
+                'strategy_type': getattr(strategy_config_obj, 'strategy_type', 'LONG_SHORT'),
+                'blocks': [],
+                
+                # TIMING CONSTRAINTS - When strategy runs
+                'timing_constraints': {
+                    'session': getattr(strategy_config_obj, 'session', None),
+                    'start_time': getattr(strategy_config_obj, 'start_time', None),
+                    'end_time': getattr(strategy_config_obj, 'end_time', None),
+                    'timezone': getattr(strategy_config_obj, 'timezone', 'UTC'),
+                    'explanation': 'When the strategy is allowed to enter trades (e.g., "ASIA session" means 00:00-08:00 UTC)'
+                },
+                
+                # RECHECK SETTINGS - How often signals are re-evaluated
+                'recheck_settings': {
+                    'enabled': getattr(strategy_config_obj, 'recheck_enabled', None),
+                    'interval_minutes': getattr(strategy_config_obj, 'recheck_interval', None),
+                    'max_rechecks': getattr(strategy_config_obj, 'max_rechecks', None),
+                    'explanation': 'If enabled, strategy rechecks entry conditions every N minutes before entering (prevents false signals)'
+                },
+                
+                # ENTRY CONDITIONS - How trades are triggered
+                'entry_conditions': {
+                    'require_all_blocks': getattr(strategy_config_obj, 'require_all_blocks', True),
+                    'require_all_signals': getattr(strategy_config_obj, 'require_all_signals', True),
+                    'explanation': 'If require_all_blocks=True, ALL blocks must trigger. If False, ANY block triggers entry.'
+                },
+                
+                # EXIT CONDITIONS - How trades are closed
+                'exit_conditions': {
+                    'use_opposite_signal': getattr(strategy_config_obj, 'use_opposite_signal', False),
+                    'use_time_exit': getattr(strategy_config_obj, 'use_time_exit', False),
+                    'time_exit_hours': getattr(strategy_config_obj, 'time_exit_hours', None),
+                    'explanation': 'Exit on opposite signal (reversal) or time-based exit after N hours'
+                }
+            }
+            
+            # Extract ONLY useful additional attributes (filter out internal metadata)
+            # EXCLUDE internal system state that doesn't help AI understand strategy
+            excluded_attrs = [
+                'name', 'strategy_type', 'blocks', 'session', 'start_time', 'end_time',
+                'timezone', 'recheck_enabled', 'recheck_interval', 'max_rechecks',
+                'require_all_blocks', 'require_all_signals', 'use_opposite_signal',
+                'use_time_exit', 'time_exit_hours',
+                # Internal metadata - confuses AI
+                'description', 'generation_status', 'validation_status', 'required_signals',
+                'created_at', 'modified_at', 'version', 'id', 'uuid'
+            ]
+            
+            # Collect strategy-level parameters (only add if they exist)
+            strategy_params = {}
+            for attr_name in dir(strategy_config_obj):
+                if not attr_name.startswith('_') and not callable(getattr(strategy_config_obj, attr_name)):
+                    if attr_name not in excluded_attrs:
+                        try:
+                            value = getattr(strategy_config_obj, attr_name, None)
+                            # Only include non-None, non-empty values
+                            if value is not None and value != '':
+                                strategy_params[attr_name] = value
+                        except:
+                            pass  # Skip problematic attributes
+            
+            # Only add parameters dict if it has content
+            if strategy_params:
+                config_dict['parameters'] = strategy_params
+            
+            # Extract blocks with ENRICHED metadata from BlockRegistry
+            if hasattr(strategy_config_obj, 'blocks'):
+                registry = BlockRegistry()
+                
+                for block in strategy_config_obj.blocks:
+                    block_name = getattr(block, 'name', '')
+                    
+                    # Get rich metadata from BlockRegistry
+                    registry_block = registry.get_block(block_name)
+                    
+                    block_dict = {
+                        'name': block_name,
+                        'category': '',
+                        'description': '',
+                        'signals': [],
+                        'logic': getattr(block, 'logic', 'AND')
+                    }
+                    
+                    # Enrich from registry metadata (BlockMetadata is a dataclass)
+                    if registry_block:
+                        block_dict['category'] = registry_block.category
+                        # Get description from registry, or generate basic one if empty
+                        if registry_block.description:
+                            block_dict['description'] = registry_block.description
+                        else:
+                            # Generate basic description from block name
+                            block_dict['description'] = f"{block_name.replace('_', ' ').title()} detector"
+                    
+                    # Extract signals with ENRICHED details from registry's signal_tiers
+                    # The Strategy Builder uses signal_tiers dict which contains descriptions
+                    if hasattr(block, 'signals'):
+                        for signal in block.signals:
+                            signal_name = getattr(signal, 'name', '')
+                            
+                            # Start with minimal dict
+                            signal_dict = {
+                                'name': signal_name,
+                                'description': ''
+                            }
+                            
+                            # ENRICHED FROM REGISTRY: Get description from signal_tiers
+                            if registry_block and hasattr(registry_block, 'signal_tiers'):
+                                tier_info = registry_block.signal_tiers.get(signal_name, {})
+                                
+                                # Extract description from tier_info (like BlockRegistryAdapter does)
+                                if 'description' in tier_info:
+                                    signal_dict['description'] = tier_info['description']
+                                else:
+                                    # Generate from signal name if not found
+                                    signal_dict['description'] = signal_name.replace('_', ' ').title()
+                                
+                                # Extract tier-specific parameters (only add if they exist)
+                                tier_params = {}
+                                for key, value in tier_info.items():
+                                    if key not in ['description', 'points', 'base_points', 'formula']:
+                                        tier_params[key] = value
+                                
+                                # Only add parameters dict if it has content
+                                if tier_params:
+                                    signal_dict['parameters'] = tier_params
+                                
+                                # Only add trigger_condition if it exists and is not empty
+                                if 'trigger_condition' in tier_info and tier_info['trigger_condition']:
+                                    signal_dict['trigger_condition'] = tier_info['trigger_condition']
+                            
+                            block_dict['signals'].append(signal_dict)
+                    
+                    # Extract block-level parameters (thresholds, periods, etc.)
+                    # FILTER OUT internal metadata - keep only meaningful parameters
+                    excluded_block_params = ['depends_on', 'indented', 'metadata', 'name', 'category', 'description', 'signals', 'logic']
+                    
+                    block_params = {}
+                    for attr_name in dir(block):
+                        if not attr_name.startswith('_') and not callable(getattr(block, attr_name)):
+                            if attr_name not in excluded_block_params:
+                                try:
+                                    value = getattr(block, attr_name, None)
+                                    # Only include non-None, non-empty values
+                                    if value is not None and value != '':
+                                        block_params[attr_name] = value
+                                except:
+                                    pass  # Skip any problematic attributes
+                    
+                    # Only add parameters dict if it has content
+                    if block_params:
+                        block_dict['parameters'] = block_params
+                    
+                    config_dict['blocks'].append(block_dict)
+            
+            return config_dict
+            
+        except Exception as e:
+            print(f"⚠️ Failed to convert strategy config: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Return minimal valid dict
+            return {
+                'name': 'Unknown Strategy',
+                'strategy_type': 'LONG_SHORT',
+                'blocks': [],
+                'timing_constraints': {},
+                'recheck_settings': {},
+                'entry_conditions': {},
+                'exit_conditions': {},
+                'parameters': {}
+            }
+    
+    def _initialize_recommendation_engine(self) -> None:
+        """Initialize NEW intelligent recommendation engine (Sprint 1.6 with AI)"""
+        try:
+            # Create status callback to capture AI progress messages
+            def ui_status_callback(message: str):
+                # Print to console (could add UI display later)
+                print(f"[AI Engine] {message}")
+            
+            # Initialize NEW engine with status callback
+            self.rec_engine = IntelligentRecommendationEngine(
+                status_callback=ui_status_callback
+            )
+            print("✅ NEW Intelligent Recommendation Engine initialized (with AI)")
+        except Exception as e:
+            print(f"⚠️ Failed to initialize NEW recommendation engine: {str(e)}")
+            import traceback
+            traceback.print_exc()
             self.rec_engine = None
     
     def _get_current_strategy_config(self):
@@ -1342,8 +1714,8 @@ class MetricsDisplayPanel(QWidget):
     
     def _is_intelligent_recommendation(self, rec_text: str) -> bool:
         """Check if recommendation is intelligent (from engine) vs generic"""
-        # Intelligent recommendations start with "Add '"
-        return rec_text.startswith("Add '")
+        # FIXED: AI recommendations contain "AI-ENHANCED:" prefix (not "Add '")
+        return "AI-ENHANCED:" in rec_text or "🤖" in rec_text
     
     def _get_generic_recommendation(self, metric_key: str, value, rating: str) -> str:
         """Generate actionable recommendation text for performance metrics"""
@@ -1692,27 +2064,27 @@ class MetricsDisplayPanel(QWidget):
         if applied_count > 0 and self.auto_retest_check.isChecked():
             self._trigger_retest()
     
-    def _apply_single_recommendation(self, rec: Recommendation) -> bool:
+    def _apply_single_recommendation(self, rec: IntegratedRecommendation) -> bool:
         """
         Apply a single recommendation
         
         Args:
-            rec: Recommendation object
+            rec: IntegratedRecommendation object
         
         Returns:
             True if successfully applied, False otherwise
         """
         try:
-            if rec.action_type == 'ADD_BLOCK':
+            if rec.type == 'ADD_BLOCK':
                 # Add building block to strategy
                 success = self._add_building_block(rec.block_name)
                 if success:
                     print(f"✅ Added building block: {rec.block_name}")
                 return success
                 
-            elif rec.action_type == 'ADJUST_PARAMETER':
+            elif rec.type == 'ADJUST_PARAM':
                 # Modify parameter (SL, TP, position size, etc.)
-                success = self._adjust_parameter(rec.parameter_name, rec.new_value)
+                success = self._adjust_parameter(rec.parameter_name or 'unknown', rec.configuration)
                 if success:
                     print(f"✅ Adjusted {rec.parameter_name}: {rec.new_value}")
                 return success
@@ -1845,3 +2217,305 @@ class MetricsDisplayPanel(QWidget):
                 
         except Exception as e:
             print(f"❌ Auto-retest failed: {str(e)}")
+    
+    def _show_ai_request_preview(self) -> None:
+        """
+        Show AI Request Preview Window (NEW FLOW - Sprint 1.6)
+        
+        Backtest completes → Preview window → User approves → AI request sent
+        
+        This replaces automatic AI generation with user-gated preview.
+        """
+        try:
+            print("[UI] Building comprehensive AI request...")
+            print(f"[DEBUG] full_backtest_results type: {type(self.full_backtest_results)}")
+            if self.full_backtest_results:
+                print(f"[DEBUG] full_backtest_results keys: {self.full_backtest_results.keys()}")
+            
+            # Build comprehensive request using builder
+            request_builder = ComprehensiveAIRequestBuilder()
+            
+            # Get strategy config
+            strategy_config_obj = self._get_current_strategy_config()
+            if not strategy_config_obj:
+                print("⚠️ No strategy config - cannot build AI request")
+                return
+            
+            strategy_config_dict = self._convert_strategy_config_to_dict(strategy_config_obj)
+            print(f"[DEBUG] Strategy config blocks: {len(strategy_config_dict.get('blocks', []))}")
+            
+            # Get backtest config - TRY MULTIPLE SOURCES + BUILD MANUALLY IF NEEDED
+            backtest_config = {}
+            
+            # Source 1: From full_backtest_results
+            if self.full_backtest_results and 'config' in self.full_backtest_results:
+                backtest_config = self.full_backtest_results['config']
+                print(f"[DEBUG] Got backtest config from full_backtest_results: {len(backtest_config)} keys")
+            
+            # Source 2: Try to get from orchestrator's last backtest
+            if not backtest_config:
+                orchestrator = self._get_orchestrator()
+                if orchestrator and hasattr(orchestrator, 'get_backtest_config'):
+                    backtest_config = orchestrator.get_backtest_config()
+                    print(f"[DEBUG] Got backtest config from orchestrator: {len(backtest_config)} keys")
+                elif orchestrator and hasattr(orchestrator, 'last_backtest_config'):
+                    backtest_config = orchestrator.last_backtest_config
+                    print(f"[DEBUG] Got backtest config from orchestrator.last_backtest_config")
+            
+            # Source 3: BUILD MANUALLY from main window components (FALLBACK)
+            if not backtest_config:
+                print("[DEBUG] No backtest config from orchestrator - building manually...")
+                backtest_config = self._build_backtest_config_manually()
+                if backtest_config:
+                    print(f"[DEBUG] Built backtest config manually: {len(backtest_config)} keys")
+            
+            # Get trades - TRY MULTIPLE SOURCES
+            trades = []
+            
+            # Source 1: From full_backtest_results
+            if self.full_backtest_results and 'trades' in self.full_backtest_results:
+                trades = self.full_backtest_results['trades']
+                print(f"[DEBUG] Got {len(trades)} trades from full_backtest_results")
+            
+            # Source 2: From TradesPanel (CRITICAL - this is where trades are actually stored!)
+            if not trades:
+                dialog = self.window()
+                if hasattr(dialog, 'backtest_panel'):
+                    backtest_panel = dialog.backtest_panel
+                    if hasattr(backtest_panel, 'trades_panel'):
+                        trades_panel = backtest_panel.trades_panel
+                        if hasattr(trades_panel, 'get_trades'):
+                            trades = trades_panel.get_trades()
+                            print(f"[DEBUG] Got {len(trades)} trades from TradesPanel.get_trades()")
+            
+            # Source 3: Try orchestrator's last backtest
+            if not trades:
+                orchestrator = self._get_orchestrator()
+                if orchestrator and hasattr(orchestrator, 'get_last_trades'):
+                    trades = orchestrator.get_last_trades()
+                    print(f"[DEBUG] Got {len(trades)} trades from orchestrator.get_last_trades()")
+                elif orchestrator and hasattr(orchestrator, 'last_backtest_trades'):
+                    trades = orchestrator.last_backtest_trades
+                    print(f"[DEBUG] Got {len(trades)} trades from orchestrator.last_backtest_trades")
+            
+            print(f"[DEBUG] Final data: strategy_blocks={len(strategy_config_dict.get('blocks', []))}, backtest_config={len(backtest_config)}, trades={len(trades)}, metrics={len(self.current_metrics)}")
+            
+            # Get available blocks with signals properly extracted
+            # ComprehensiveAIRequestBuilder already imported at top of file (line 51)
+            builder = ComprehensiveAIRequestBuilder()
+            available_blocks = builder._extract_available_blocks()
+            
+            # Create preview window
+            preview_window = AIRequestPreviewWindow(self)
+            
+            # Populate with data
+            preview_window.populate_preview(
+                strategy_config=strategy_config_dict,
+                backtest_config=backtest_config,
+                trades=trades,
+                metrics=self.current_metrics,
+                available_blocks=available_blocks
+            )
+            
+            # Wire "Approve & Send" to actual AI generation
+            preview_window.send_approved.connect(self._on_ai_request_approved)
+            
+            # Show window (modal - blocks until closed)
+            preview_window.show()
+            print("[UI] ✓ AI Request Preview window opened")
+            
+        except Exception as e:
+            print(f"❌ Failed to show AI request preview: {str(e)}")
+            import traceback
+            traceback.print_exc()
+    
+    def _build_backtest_config_manually(self) -> Dict:
+        """
+        Build backtest config by reading ACTUAL RUNTIME VALUES from BacktestConfigPanel UI fields.
+        
+        NAUTILUS EXPERT: NO HARDCODED VALUES - reads directly from UI spinboxes, combos, checkboxes
+        at the moment this method is called. Includes institutional descriptions for AI context.
+        
+        CRITICAL FIX: MetricsDisplayPanel IS INSIDE BacktestConfigDialog, so we access parent directly!
+        
+        Returns:
+            Dictionary with complete backtest configuration and AI-friendly explanations
+        """
+        config = {}
+        
+        try:
+            # ULTIMATE FIX: Search for BacktestConfigPanel in ALL widgets
+            # The widget hierarchy is complex, so we find it by type instead
+            
+            dialog = self.window()
+            print(f"[DEBUG] Our window: {type(dialog).__name__}")
+            
+            # Search all children for BacktestConfigPanel by checking for lookback_spin
+            panel = None
+            for child in dialog.findChildren(QWidget):
+                if hasattr(child, 'lookback_spin') and hasattr(child, 'capital_spin'):
+                    panel = child
+                    print(f"[DEBUG] Found BacktestConfigPanel: {type(panel).__name__}")
+                    break
+            
+            if not panel:
+                print("[DEBUG] Could not find BacktestConfigPanel in widget tree")
+                # Try backup: check if dialog itself is the panel
+                if hasattr(dialog, 'lookback_spin'):
+                    panel = dialog
+                    print("[DEBUG] Dialog itself has config fields")
+                else:
+                    print("[DEBUG] No config UI found")
+                    return config
+            
+            # ===== READ RUNTIME VALUES FROM UI FIELDS =====
+            
+            # Basic Settings
+            config['lookback_days'] = panel.lookback_spin.value()
+            config['training_window'] = panel.training_spin.value()
+            config['testing_window'] = panel.testing_spin.value()
+            config['mode'] = 'Mode 1 (Historical)' if panel.mode1_radio.isChecked() else 'Mode 2 (Live Replay)'
+            config['tpsl_method'] = panel.tpsl_combo.currentText()
+            config['sl_adjustment'] = panel.sl_combo.currentText()
+            
+            # Adaptive SL Settings
+            config['sl_delayed'] = panel.delayed_sl_check.isChecked()
+            config['sl_delay_bars'] = panel.delay_spin.value()
+            config['sl_emergency_pct'] = panel.emergency_spin.value()
+            config['sl_vol_lookback'] = panel.vol_lookback_spin.value()
+            config['sl_vol_multiplier'] = panel.vol_multi_spin.value() / 10.0  # Stored as 12 = 1.2x
+            config['sl_min_pct'] = panel.min_sl_spin.value() / 10.0  # Stored as 7 = 0.7%
+            config['sl_max_pct'] = panel.max_sl_spin.value() / 10.0  # Stored as 20 = 2.0%
+            config['sl_use_structure'] = panel.structure_check.isChecked()
+            
+            # Risk/Reward Settings
+            config['starting_capital'] = panel.capital_spin.value()
+            config['currency'] = 'USD'
+            config['min_risk_reward'] = panel.rr_spin.value() / 10.0  # Stored as 12 = 1.2:1
+            config['risk_per_trade_pct'] = panel.risk_spin.value()
+            config['max_leverage'] = panel.leverage_spin.value()
+            config['confluence_required'] = panel.confluence_spin.value()
+            config['max_bars_held'] = panel.max_bars_spin.value()
+            
+            # Active Preset
+            if panel.conservative_radio.isChecked():
+                config['sl_preset'] = 'Conservative'
+            elif panel.balanced_radio.isChecked():
+                config['sl_preset'] = 'Balanced'
+            elif panel.aggressive_radio.isChecked():
+                config['sl_preset'] = 'Aggressive'
+            else:
+                config['sl_preset'] = 'Custom'
+            
+            # ===== ADD INSTITUTIONAL DESCRIPTIONS FOR AI =====
+            
+            config['explanation'] = (
+                f"BACKTEST CONFIGURATION (Read from UI at runtime)\n\n"
+                f"=== TIMEFRAME ===\n"
+                f"Lookback Period: {config['lookback_days']} days\n"
+                f"  → Total historical data loaded for analysis\n"
+                f"Training Window: {config['training_window']} days\n"
+                f"  → Period for strategy calibration and pattern learning\n"
+                f"Testing Window: {config['testing_window']} days\n"
+                f"  → Out-of-sample validation period\n"
+                f"Mode: {config['mode']}\n"
+                f"  → Historical = fast batch processing | Live Replay = real-time simulation\n\n"
+                
+                f"=== CAPITAL & RISK ===\n"
+                f"Starting Capital: ${config['starting_capital']:,} {config['currency']}\n"
+                f"  → Initial account balance for position sizing\n"
+                f"Risk per Trade: {config['risk_per_trade_pct']}% of capital\n"
+                f"  → ${config['starting_capital'] * config['risk_per_trade_pct'] / 100:.2f} maximum risk per trade\n"
+                f"Leverage: {config['max_leverage']}x\n"
+                f"  → Maximum position size multiplier (higher = more risk)\n"
+                f"Min Risk:Reward: {config['min_risk_reward']:.1f}:1\n"
+                f"  → Minimum profit target vs risk for trade entry\n\n"
+                
+                f"=== ENTRY CONDITIONS ===\n"
+                f"Confluence Required: {config['confluence_required']} points\n"
+                f"  → Minimum signal strength for trade entry (strategy-specific)\n"
+                f"Max Bars Held: {config['max_bars_held']} candles\n"
+                f"  → Auto-exit after this duration to prevent stuck positions\n\n"
+                
+                f"=== TAKE PROFIT / STOP LOSS ===\n"
+                f"TP/SL Method: {config['tpsl_method']}\n"
+                f"  → How initial TP/SL levels are calculated at entry\n"
+                f"  → Fibonacci = retracement levels | Hybrid = Fib + ATR | Fixed = percentage\n"
+                f"SL Adjustment: {config['sl_adjustment']}\n"
+                f"  → How SL behaves after entry\n"
+                f"  → Adaptive v2.0 = dynamic adjustment | Static = fixed at entry\n\n"
+                
+                f"=== ADAPTIVE SL SETTINGS (Preset: {config['sl_preset']}) ===\n"
+                f"Delayed Activation: {'Yes' if config['sl_delayed'] else 'No'}\n"
+                f"  → Prevents immediate stop-outs from entry volatility\n"
+                f"Delay Period: {config['sl_delay_bars']} bars\n"
+                f"  → Wait {config['sl_delay_bars']} candles before activating normal SL\n"
+                f"Emergency SL: {config['sl_emergency_pct']}%\n"
+                f"  → Wide catastrophic protection during delay period\n"
+                f"Volatility Lookback: {config['sl_vol_lookback']} bars\n"
+                f"  → Candles used to measure market volatility (ATR)\n"
+                f"Volatility Multiplier: {config['sl_vol_multiplier']:.1f}x\n"
+                f"  → SL distance = ATR × {config['sl_vol_multiplier']:.1f}\n"
+                f"Min SL Distance: {config['sl_min_pct']:.1f}%\n"
+                f"  → Floor to prevent stops too tight to entry\n"
+                f"Max SL Distance: {config['sl_max_pct']:.1f}%\n"
+                f"  → Ceiling to cap risk per trade\n"
+                f"Market Structure: {'Yes' if config['sl_use_structure'] else 'No'}\n"
+                f"  → Place SL beyond key swing highs/lows vs percentage only\n\n"
+                
+                f"=== INTERPRETATION FOR AI ===\n"
+                f"This configuration uses {config['sl_preset'].lower()} risk management:\n"
+            )
+            
+            # Add preset-specific interpretation
+            if config['sl_preset'] == 'Conservative':
+                config['explanation'] += (
+                    f"  → Wider stops ({config['sl_max_pct']:.1f}% max) for maximum protection\n"
+                    f"  → Higher win rate expected (60-70%)\n"
+                    f"  → Lower trade frequency (quality over quantity)\n"
+                    f"  → Best for volatile markets and risk-averse trading\n"
+                )
+            elif config['sl_preset'] == 'Balanced':
+                config['explanation'] += (
+                    f"  → Balanced stops ({config['sl_max_pct']:.1f}% max) for optimal risk/reward\n"
+                    f"  → Moderate win rate expected (50-60%)\n"
+                    f"  → Moderate trade frequency\n"
+                    f"  → Recommended for most market conditions\n"
+                )
+            elif config['sl_preset'] == 'Aggressive':
+                config['explanation'] += (
+                    f"  → Tighter stops ({config['sl_max_pct']:.1f}% max) for active trading\n"
+                    f"  → Lower win rate acceptable (40-50%)\n"
+                    f"  → Higher trade frequency (more opportunities)\n"
+                    f"  → Best for momentum strategies and active traders\n"
+                )
+            else:
+                config['explanation'] += (
+                    f"  → User-customized stop loss parameters\n"
+                    f"  → Fine-tuned for specific strategy requirements\n"
+                )
+            
+            print(f"[DEBUG] ✅ Read {len(config)} backtest parameters from UI at runtime")
+            return config
+                
+        except Exception as e:
+            print(f"[DEBUG] ❌ Failed to read backtest config from UI: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        
+        return config
+    
+    def _on_ai_request_approved(self, request_data: Dict) -> None:
+        """
+        Handle user approval of AI request from preview window.
+        
+        NOW the actual AI generation happens (after user preview & approval).
+        
+        Args:
+            request_data: Complete request data from preview window
+        """
+        print("[UI] ✅ User approved AI request - starting generation...")
+        
+        # NOW trigger the actual AI recommendation generation
+        # (This was previously automatic, now it's user-gated)
+        self._generate_batch_recommendations()
