@@ -22,17 +22,37 @@ Sprint: 1.6 (Intelligent Recommendations - COMPLETE REBUILD Part 2)
 
 import os
 import json
+import logging
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
+from pathlib import Path
 
 # Import ComprehensiveAIRequestBuilder for institutional-grade prompts
 from src.optimizer_v3.core.comprehensive_ai_request_builder import ComprehensiveAIRequestBuilder
 
 # Load environment variables
 load_dotenv()
+
+# Setup logging
+log_dir = Path("logs")
+log_dir.mkdir(exist_ok=True)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# Create file handler
+fh = logging.FileHandler(log_dir / "ai_recommendations.log")
+fh.setLevel(logging.DEBUG)
+
+# Create formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+
+# Add handler to logger
+if not logger.handlers:
+    logger.addHandler(fh)
 
 
 @dataclass
@@ -230,6 +250,36 @@ class AIRecommendationEnhancer:
             API response dict
         """
         try:
+            # Log the request
+            logger.info("="*80)
+            logger.info("OPENROUTER_REQUEST_SENT")
+            logger.info(f"Model: {self.model}")
+            logger.info(f"Prompt Length: {len(prompt)} characters")
+            logger.info(f"Prompt Preview (first 1000 chars):\n{prompt[:1000]}")
+            logger.info("-"*80)
+            
+            request_payload = {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an elite institutional quantitative strategist specializing in "
+                            "Bitcoin trading systems. You provide specific, actionable recommendations "
+                            "with exact configurations. You understand signal interactions, trade frequency "
+                            "impacts, and institutional risk management. Respond in valid JSON only."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "temperature": 0.3,  # Lower for analytical reasoning
+                "max_tokens": 3000,
+                "response_format": {"type": "json_object"}
+            }
+            
             response = requests.post(
                 self.base_url,
                 headers={
@@ -238,36 +288,40 @@ class AIRecommendationEnhancer:
                     "HTTP-Referer": "https://github.com/btc-engine-v3",
                     "X-Title": "BTC Engine v3 - Strategy Optimizer"
                 },
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are an elite institutional quantitative strategist specializing in "
-                                "Bitcoin trading systems. You provide specific, actionable recommendations "
-                                "with exact configurations. You understand signal interactions, trade frequency "
-                                "impacts, and institutional risk management. Respond in valid JSON only."
-                            )
-                        },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
-                    "temperature": 0.3,  # Lower for analytical reasoning
-                    "max_tokens": 3000,
-                    "response_format": {"type": "json_object"}
-                },
+                json=request_payload,
                 timeout=30
             )
             
             response.raise_for_status()
-            return response.json()
+            response_data = response.json()
+            
+            # Log the response
+            logger.info("="*80)
+            logger.info("OPENROUTER_RESPONSE_RECEIVED")
+            logger.info(f"Status Code: {response.status_code}")
+            
+            # Extract and log response content
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                content = response_data['choices'][0].get('message', {}).get('content', '')
+                logger.info(f"Response Length: {len(content)} characters")
+                logger.info(f"Full Response Content:\n{content}")
+            else:
+                logger.warning("No choices found in response")
+                logger.info(f"Raw Response: {json.dumps(response_data, indent=2)}")
+            
+            # Log usage stats if available
+            if 'usage' in response_data:
+                logger.info(f"Token Usage: {response_data['usage']}")
+            
+            logger.info("="*80)
+            
+            return response_data
             
         except requests.exceptions.Timeout:
+            logger.error("AI API timeout after 30 seconds")
             raise Exception("AI API timeout after 30 seconds")
         except requests.exceptions.RequestException as e:
+            logger.error(f"AI API request failed: {str(e)}")
             raise Exception(f"AI API request failed: {str(e)}")
     
     def _parse_ai_response(
