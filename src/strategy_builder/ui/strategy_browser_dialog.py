@@ -175,8 +175,26 @@ class StrategyBrowserDialog(QMainWindow):
             self.duplicate_btn.setEnabled(False)
             self.duplicate_btn.clicked.connect(self._on_duplicate)
             button_layout.addWidget(self.duplicate_btn)
+            
+            self.export_btn = QPushButton("📥 Export to JSON")
+            self.export_btn.setStyleSheet(get_secondary_button_stylesheet())
+            self.export_btn.setEnabled(False)
+            self.export_btn.clicked.connect(self._on_export)
+            button_layout.addWidget(self.export_btn)
         
         button_layout.addStretch()
+        
+        # Version selector (shows when strategy selected)
+        version_label = QLabel("Version:")
+        version_label.setFont(create_font(10))
+        button_layout.addWidget(version_label)
+        
+        self.version_selector = QComboBox()
+        fix_combobox_white_bars(self.version_selector)
+        self.version_selector.setMinimumWidth(120)
+        self.version_selector.currentIndexChanged.connect(self._on_version_changed)
+        self.version_selector.setEnabled(False)
+        button_layout.addWidget(self.version_selector)
         
         # Right side actions
         self.cancel_btn = QPushButton("Cancel")
