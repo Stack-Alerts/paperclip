@@ -229,19 +229,26 @@ class StrategyDatabaseManager:
         Returns:
             List of all version dicts, ordered by version number (newest first)
         """
-        query = text("""
-            SELECT * FROM strategy_versions 
-            WHERE strategy_id = :strategy_id 
-            ORDER BY version_number DESC
-        """)
-        
-        results = self.session.execute(query, {'strategy_id': strategy_id}).fetchall()
-        
-        # Convert to dicts (JSONB columns already parsed by PostgreSQL)
-        versions = [dict(row._mapping) for row in results]
-        
-        # No json.loads needed - JSONB columns return Python objects directly
-        return versions
+        try:
+            query = text("""
+                SELECT * FROM strategy_versions 
+                WHERE strategy_id = :strategy_id 
+                ORDER BY version_number DESC
+            """)
+            
+            results = self.session.execute(query, {'strategy_id': strategy_id}).fetchall()
+            
+            # Convert to dicts (JSONB columns already parsed by PostgreSQL)
+            versions = [dict(row._mapping) for row in results]
+            
+            # No json.loads needed - JSONB columns return Python objects directly
+            return versions
+            
+        except Exception as e:
+            # Rollback on any error to prevent transaction lock
+            self.session.rollback()
+            self.logger.error(f"Failed to get versions for {strategy_id}: {e}")
+            return []
     
     def get_latest_version(self, strategy_id: str) -> Optional[Dict[str, Any]]:
         """
