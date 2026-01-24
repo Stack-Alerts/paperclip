@@ -29,6 +29,8 @@ from .styles import (
     create_font,
     get_color
 )
+# Import universal combo box fix (EXACTLY like block_search_panel.py)
+from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
 
 
 class StrategyBrowserDialog(QMainWindow):
@@ -110,13 +112,13 @@ class StrategyBrowserDialog(QMainWindow):
         
         self.type_filter = QComboBox()
         self.type_filter.addItems(["All Types", "Reversal", "Continuation", "Breakout", "Range", "Custom"])
-        self.type_filter.setStyleSheet(get_input_field_stylesheet())
+        fix_combobox_white_bars(self.type_filter)  # Comprehensive fix (EXACT pattern from block_search_panel)
         self.type_filter.currentTextChanged.connect(self._apply_filters)
         filter_layout.addWidget(self.type_filter)
         
         self.version_filter = QComboBox()
         self.version_filter.addItems(["Latest Version", "All Versions"])
-        self.version_filter.setStyleSheet(get_input_field_stylesheet())
+        fix_combobox_white_bars(self.version_filter)  # Comprehensive fix (EXACT pattern from block_search_panel)
         self.version_filter.currentTextChanged.connect(self._apply_filters)
         filter_layout.addWidget(self.version_filter)
         
