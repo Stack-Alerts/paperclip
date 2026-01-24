@@ -446,7 +446,20 @@ class BacktestConfigPanel(QWidget):
         # to metrics_panel update_metrics() for real-time metric calculations
         self.trades_panel.metrics_updated.connect(self.metrics_panel.update_metrics)
         
-        # Tab 5: Compare (Optimizer v3 - INTEGRATED)
+        # Tab 5: AI Recommendations (Optimizer v3 - INTEGRATED)
+        # Simple panel that shows AI recommendations with apply buttons
+        from src.optimizer_v3.ui.ai_recommendations_panel import AIRecommendationsPanel
+        self.ai_recommendations_panel = AIRecommendationsPanel()
+        self.tab_widget.addTab(self.ai_recommendations_panel, "🤖 AI Recommendations")
+        
+        # Connect metrics panel to AI recommendations panel
+        # When metrics panel generates recommendations, forward them to AI panel
+        if hasattr(self.metrics_panel, 'recommendations_generated'):
+            self.metrics_panel.recommendations_generated.connect(
+                self.ai_recommendations_panel.display_recommendations
+            )
+        
+        # Tab 6: Compare (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.compare_view_panel import CompareViewPanel
         self.compare_panel = CompareViewPanel()
         self.tab_widget.addTab(self.compare_panel, "🔁 Compare")
