@@ -9,24 +9,24 @@ echo ""
 source venv/bin/activate
 export $(grep -v '^#' .env | xargs)
 
-# Delete corrupt strategies
+# Delete ALL strategies (all are corrupt from before rollback fixes)
 psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}" << 'EOF'
--- Delete corrupt strategy versions first (foreign key)
-DELETE FROM strategy_versions WHERE strategy_id = 'strategy_35a2c8a2';
-DELETE FROM strategy_versions WHERE strategy_id = 'strategy_aa2bb7c5';
-DELETE FROM strategy_versions WHERE strategy_id = 'strategy_86206819';
+-- Delete ALL strategy versions first (foreign key)
+DELETE FROM strategy_versions;
 
--- Delete parent strategies
-DELETE FROM strategies WHERE strategy_id = 'strategy_35a2c8a2';
-DELETE FROM strategies WHERE strategy_id = 'strategy_aa2bb7c5';
-DELETE FROM strategies WHERE strategy_id = 'strategy_86206819';
+-- Delete ALL parent strategies
+DELETE FROM strategies;
 
--- Show remaining strategies
-SELECT strategy_id, name, updated_at FROM strategies ORDER BY updated_at DESC;
+-- Verify empty
+SELECT COUNT(*) as remaining_strategies FROM strategies;
 EOF
 
 echo ""
-echo "✅ Corrupt strategies deleted"
-echo "✅ Database is clean"
+echo "✅ ALL strategies deleted (all were corrupt)"
+echo "✅ Database is now completely clean"
 echo ""
-echo "Now restart Strategy Builder - errors should be gone."
+echo "Next steps:"
+echo "1. Restart Strategy Builder"
+echo "2. Import your strategies from JSON (Tools → Import Strategy from JSON)"
+echo "3. Save them (Ctrl+S)"
+echo "4. No more errors!"
