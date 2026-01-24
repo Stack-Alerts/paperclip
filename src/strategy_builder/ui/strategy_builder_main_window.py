@@ -463,17 +463,36 @@ class StrategyBuilderMainWindow(QMainWindow):
             self.test_completed = False
             self.stepper.reset_all_steps()
             
-            # Create new strategy in orchestrator with loaded data
-            self.orchestrator.create_strategy(version['name'])
+            # Load blocks from database using persistence (SAME AS FILE LOAD)
+            blocks_data = version.get('blocks', [])
             
-            # Update UI panels with database data
+            # Build config dict in EXACT same format as file load
+            config_dict = {
+                'name': version['name'],
+                'description': version.get('description', ''),
+                'blocks': blocks_data
+            }
+            
+            # Use persistence._dict_to_config() - EXACT same as file load
+            try:
+                restored_config = self.orchestrator.persistence._dict_to_config(config_dict)
+                
+                # Assign to config engine (SAME PATTERN as orchestrator.load_strategy)
+                self.orchestrator.config_engine.config = restored_config
+                
+                print(f"Successfully restored {len(restored_config.blocks)} blocks with full config")
+                
+            except Exception as e:
+                print(f"Error loading config from database: {e}")
+                import traceback
+                traceback.print_exc()
+                # Fallback to empty config
+                self.orchestrator.create_strategy(version['name'])
+            
+            # Update UI panels with loaded data
             self.info_panel.set_strategy_name(version['name'])
             if version.get('description'):
                 self.info_panel.set_description(version['description'])
-            
-            # Load blocks (simplified - would need proper implementation)
-            # NOTE: This requires orchestrator support for loading blocks from dict
-            # For now, just update tracking
             
             # Track database IDs
             self.current_strategy_id = strategy_id
@@ -515,21 +534,24 @@ class StrategyBuilderMainWindow(QMainWindow):
             if not self.current_strategy_id:
                 self.current_strategy_id = db.strategy.create_strategy(strategy_name)
             
-            # Build version data from current config
+            # Build version data from current config using persistence (SAME AS FILE SAVE)
             config = self.orchestrator.get_current_config()
+            
+            # Use persistence._config_to_dict() - EXACT same as file save
+            config_dict = self.orchestrator.persistence._config_to_dict(config) if config else {}
             
             version_data = {
                 'strategy_id': self.current_strategy_id,
                 'name': strategy_name,
                 'description': description or '',
-                'blocks': [{'name': b.name, 'signals': [s.name for s in b.signals]} for b in config.blocks] if config and config.blocks else [],
-                'signals': {},  # TODO: Extract from config
-                'parameters': {},  # TODO: Extract from config
-                'entry_conditions': {},  # TODO: Extract from config
-                'exit_conditions': {},  # TODO: Extract from config
-                'risk_management': {},  # TODO: Extract from config  
-                'backtest_config': {},  # TODO: Extract from config
-                'tags': []  # TODO: Extract from UI
+                'blocks': config_dict.get('blocks', []),  # Full config with timings/rechecks
+                'signals': {},  # Reserved
+                'parameters': {},  # Reserved
+                'entry_conditions': {},  # Reserved
+                'exit_conditions': {},  # Reserved
+                'risk_management': {},  # Reserved
+                'backtest_config': {},  # Reserved
+                'tags': []  # Reserved
             }
             
             # Create new version
@@ -571,14 +593,17 @@ class StrategyBuilderMainWindow(QMainWindow):
             db = get_database_manager()
             new_strategy_id = db.strategy.create_strategy(data['name'])
             
-            # Build version data from current config
+            # Build version data from current config (SAME AS FILE SAVE)
             config = self.orchestrator.get_current_config()
+            
+            # Use persistence._config_to_dict() - EXACT same as file save
+            config_dict = self.orchestrator.persistence._config_to_dict(config) if config else {}
             
             version_data = {
                 'strategy_id': new_strategy_id,  # NEW strategy ID
                 'name': data['name'],
                 'description': data.get('description', ''),
-                'blocks': [{'name': b.name, 'signals': [s.name for s in b.signals]} for b in config.blocks] if config and config.blocks else [],
+                'blocks': config_dict.get('blocks', []),  # Full config with timings/rechecks
                 'signals': {},
                 'parameters': {},
                 'entry_conditions': {},
