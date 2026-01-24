@@ -19,7 +19,7 @@ import hashlib
 import json
 import logging
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc
+from sqlalchemy import and_, desc, text
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +68,10 @@ class StrategyDatabaseManager:
         from src.optimizer_v3.database.models import OptimizationRun  # Temp - will create Strategy model
         
         # Insert into strategies table
-        query = """
+        query = text("""
             INSERT INTO strategies (strategy_id, name, created_at, updated_at)
             VALUES (:strategy_id, :name, NOW(), NOW())
-        """
+        """)
         
         self.session.execute(
             query,
@@ -156,7 +156,7 @@ class StrategyDatabaseManager:
         }
         
         # Insert version
-        query = """
+        query = text("""
             INSERT INTO strategy_versions (
                 version_id, strategy_id, version_number, name, description,
                 blocks, signals, parameters, entry_conditions, exit_conditions,
@@ -168,13 +168,13 @@ class StrategyDatabaseManager:
                 :risk_management, :backtest_config, :backtest_results, :metrics,
                 :trades, :equity_curve, :git_commit_hash, :created_by, :notes, :tags, :config_hash
             )
-        """
+        """)
         
         self.session.execute(query, version_data)
         
         # Update parent strategy updated_at
         self.session.execute(
-            "UPDATE strategies SET updated_at = NOW() WHERE strategy_id = :strategy_id",
+            text("UPDATE strategies SET updated_at = NOW() WHERE strategy_id = :strategy_id"),
             {'strategy_id': strategy_data['strategy_id']}
         )
         
@@ -197,27 +197,19 @@ class StrategyDatabaseManager:
         Returns:
             Complete strategy version dict or None if not found
         """
-        query = """
+        query = text("""
             SELECT * FROM strategy_versions WHERE version_id = :version_id
-        """
+        """)
         
         result = self.session.execute(query, {'version_id': version_id}).fetchone()
         
         if not result:
             return None
         
-        # Convert to dict and parse JSON fields
+        # Convert to dict (JSONB columns already parsed by PostgreSQL)
         version = dict(result._mapping)
-        json_fields = [
-            'blocks', 'signals', 'parameters', 'entry_conditions', 'exit_conditions',
-            'risk_management', 'backtest_config', 'backtest_results', 'metrics',
-            'trades', 'equity_curve', 'tags'
-        ]
         
-        for field in json_fields:
-            if version.get(field):
-                version[field] = json.loads(version[field])
-        
+        # No json.loads needed - JSONB columns return Python objects directly
         return version
     
     def get_strategy_versions(self, strategy_id: str) -> List[Dict[str, Any]]:
@@ -230,31 +222,18 @@ class StrategyDatabaseManager:
         Returns:
             List of all version dicts, ordered by version number (newest first)
         """
-        query = """
+        query = text("""
             SELECT * FROM strategy_versions 
             WHERE strategy_id = :strategy_id 
             ORDER BY version_number DESC
-        """
+        """)
         
         results = self.session.execute(query, {'strategy_id': strategy_id}).fetchall()
         
-        versions = []
-        for row in results:
-            version = dict(row._mapping)
-            
-            # Parse JSON fields
-            json_fields = [
-                'blocks', 'signals', 'parameters', 'entry_conditions', 'exit_conditions',
-                'risk_management', 'backtest_config', 'backtest_results', 'metrics',
-                'trades', 'equity_curve', 'tags'
-            ]
-            
-            for field in json_fields:
-                if version.get(field):
-                    version[field] = json.loads(version[field])
-            
-            versions.append(version)
+        # Convert to dicts (JSONB columns already parsed by PostgreSQL)
+        versions = [dict(row._mapping) for row in results]
         
+        # No json.loads needed - JSONB columns return Python objects directly
         return versions
     
     def get_latest_version(self, strategy_id: str) -> Optional[Dict[str, Any]]:
@@ -267,31 +246,22 @@ class StrategyDatabaseManager:
         Returns:
             Latest version dict or None if no versions exist
         """
-        query = """
+        query = text("""
             SELECT * FROM strategy_versions 
             WHERE strategy_id = :strategy_id 
             ORDER BY version_number DESC 
             LIMIT 1
-        """
+        """)
         
         result = self.session.execute(query, {'strategy_id': strategy_id}).fetchone()
         
         if not result:
             return None
         
+        # Convert to dict (JSONB columns already parsed by PostgreSQL)
         version = dict(result._mapping)
         
-        # Parse JSON fields
-        json_fields = [
-            'blocks', 'signals', 'parameters', 'entry_conditions', 'exit_conditions',
-            'risk_management', 'backtest_config', 'backtest_results', 'metrics',
-            'trades', 'equity_curve', 'tags'
-        ]
-        
-        for field in json_fields:
-            if version.get(field):
-                version[field] = json.loads(version[field])
-        
+        # No json.loads needed - JSONB columns return Python objects directly
         return version
     
     def get_strategy_version_by_number(
@@ -309,10 +279,10 @@ class StrategyDatabaseManager:
         Returns:
             Version dict or None if not found
         """
-        query = """
+        query = text("""
             SELECT * FROM strategy_versions 
             WHERE strategy_id = :strategy_id AND version_number = :version_number
-        """
+        """)
         
         result = self.session.execute(
             query,
@@ -322,19 +292,10 @@ class StrategyDatabaseManager:
         if not result:
             return None
         
+        # Convert to dict (JSONB columns already parsed by PostgreSQL)
         version = dict(result._mapping)
         
-        # Parse JSON fields
-        json_fields = [
-            'blocks', 'signals', 'parameters', 'entry_conditions', 'exit_conditions',
-            'risk_management', 'backtest_config', 'backtest_results', 'metrics',
-            'trades', 'equity_curve', 'tags'
-        ]
-        
-        for field in json_fields:
-            if version.get(field):
-                version[field] = json.loads(version[field])
-        
+        # No json.loads needed - JSONB columns return Python objects directly
         return version
     
     def update_strategy_version(
@@ -378,11 +339,11 @@ class StrategyDatabaseManager:
         set_clauses = [f"{field} = :{field}" for field in filtered_updates.keys()]
         set_clause = ", ".join(set_clauses)
         
-        query = f"""
+        query = text(f"""
             UPDATE strategy_versions 
             SET {set_clause}
             WHERE version_id = :version_id
-        """
+        """)
         
         filtered_updates['version_id'] = version_id
         
@@ -410,7 +371,7 @@ class StrategyDatabaseManager:
             True if deleted, False if not found
         """
         # For now, just verify version exists
-        query = "SELECT version_id FROM strategy_versions WHERE version_id = :version_id"
+        query = text("SELECT version_id FROM strategy_versions WHERE version_id = :version_id")
         result = self.session.execute(query, {'version_id': version_id}).fetchone()
         
         if result:
@@ -465,12 +426,12 @@ class StrategyDatabaseManager:
         Returns:
             version_id if duplicate found, None otherwise
         """
-        query = """
+        query = text("""
             SELECT version_id FROM strategy_versions 
             WHERE config_hash = :config_hash 
             ORDER BY created_at DESC 
             LIMIT 1
-        """
+        """)
         
         result = self.session.execute(query, {'config_hash': config_hash}).fetchone()
         
@@ -487,7 +448,7 @@ class StrategyDatabaseManager:
         Returns:
             List of strategy dicts with latest version metadata
         """
-        query = """
+        query = text("""
             SELECT 
                 s.strategy_id,
                 s.name,
@@ -498,7 +459,7 @@ class StrategyDatabaseManager:
             LEFT JOIN strategy_versions sv ON s.strategy_id = sv.strategy_id
             GROUP BY s.strategy_id, s.name, s.created_at, s.updated_at
             ORDER BY s.updated_at DESC
-        """
+        """)
         
         results = self.session.execute(query).fetchall()
         
@@ -514,11 +475,11 @@ class StrategyDatabaseManager:
         Returns:
             Next version number (starts at 1)
         """
-        query = """
+        query = text("""
             SELECT MAX(version_number) as max_version 
             FROM strategy_versions 
             WHERE strategy_id = :strategy_id
-        """
+        """)
         
         result = self.session.execute(query, {'strategy_id': strategy_id}).fetchone()
         

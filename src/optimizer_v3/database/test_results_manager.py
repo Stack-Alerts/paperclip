@@ -18,6 +18,7 @@ from datetime import datetime
 import json
 import logging
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,7 @@ class TestResultsManager:
         }
         
         # Insert test result
-        query = """
+        query = text("""
             INSERT INTO strategy_test_results (
                 result_id, strategy_id, strategy_version_id, test_type, test_config,
                 start_date, end_date, total_return_pct, sharpe_ratio, max_drawdown_pct,
@@ -124,7 +125,7 @@ class TestResultsManager:
                 :win_rate, :profit_factor, :total_trades, :metrics, :trades, :equity_curve,
                 :risk_metrics, :errors, :warnings, :notes
             )
-        """
+        """)
         
         self.session.execute(query, data)
         self.session.commit()
@@ -147,7 +148,7 @@ class TestResultsManager:
         Returns:
             Test result dict or None if not found
         """
-        query = "SELECT * FROM strategy_test_results WHERE result_id = :result_id"
+        query = text("SELECT * FROM strategy_test_results WHERE result_id = :result_id")
         result = self.session.execute(query, {'result_id': result_id}).fetchone()
         
         if not result:
@@ -180,19 +181,19 @@ class TestResultsManager:
         Returns:
             List of test result dicts
         """
-        query = "SELECT * FROM strategy_test_results WHERE strategy_id = :strategy_id"
+        query_str = "SELECT * FROM strategy_test_results WHERE strategy_id = :strategy_id"
         params = {'strategy_id': strategy_id}
         
         if test_type:
-            query += " AND test_type = :test_type"
+            query_str += " AND test_type = :test_type"
             params['test_type'] = test_type
         
-        query += " ORDER BY tested_at DESC"
+        query_str += " ORDER BY tested_at DESC"
         
         if limit:
-            query += f" LIMIT {limit}"
+            query_str += f" LIMIT {limit}"
         
-        results = self.session.execute(query, params).fetchall()
+        results = self.session.execute(text(query_str), params).fetchall()
         
         tests = []
         for row in results:
@@ -218,11 +219,11 @@ class TestResultsManager:
         Returns:
             List of test result dicts
         """
-        query = """
+        query = text("""
             SELECT * FROM strategy_test_results 
             WHERE strategy_version_id = :version_id 
             ORDER BY tested_at DESC
-        """
+        """)
         
         results = self.session.execute(query, {'version_id': version_id}).fetchall()
         
@@ -254,14 +255,14 @@ class TestResultsManager:
         Returns:
             Latest test result dict or None
         """
-        query = """
+        query = text("""
             SELECT * FROM strategy_test_results 
             WHERE strategy_id = :strategy_id 
             AND strategy_version_id = :version_id 
             AND test_type = :test_type
             ORDER BY tested_at DESC 
             LIMIT 1
-        """
+        """)
         
         result = self.session.execute(
             query,
@@ -305,7 +306,7 @@ class TestResultsManager:
         
         placeholders = ', '.join([f':v{i}' for i in range(len(version_ids))])
         
-        query = f"""
+        query = text(f"""
             SELECT 
                 strategy_version_id,
                 AVG(total_return_pct) as avg_return,
@@ -319,7 +320,7 @@ class TestResultsManager:
             AND test_type = :test_type
             AND strategy_version_id IN ({placeholders})
             GROUP BY strategy_version_id
-        """
+        """)
         
         params = {
             'strategy_id': strategy_id,
@@ -460,7 +461,7 @@ class TestResultsManager:
         if metric not in valid_metrics:
             raise ValueError(f"Invalid metric. Must be one of: {', '.join(valid_metrics)}")
         
-        query = f"""
+        query = text(f"""
             SELECT 
                 strategy_version_id,
                 AVG({metric}) as avg_metric,
@@ -472,7 +473,7 @@ class TestResultsManager:
             GROUP BY strategy_version_id
             ORDER BY avg_metric DESC
             LIMIT 1
-        """
+        """)
         
         result = self.session.execute(
             query,
