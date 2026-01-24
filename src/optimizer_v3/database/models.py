@@ -146,7 +146,7 @@ class SignalEvent(Base):
     # Signal metadata
     signal_strength = Column(Float)
     confidence = Column(Float)
-    metadata = Column(JSONB)
+    signal_metadata = Column(JSONB)  # Renamed from 'metadata' (reserved keyword)
     
     # Outcome tracking (filled after trade completes)
     led_to_trade = Column(Boolean, default=False)
