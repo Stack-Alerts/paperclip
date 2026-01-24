@@ -70,6 +70,7 @@ class MetricsDisplayPanel(QWidget):
     
     # Signals
     metrics_updated = pyqtSignal(dict)
+    recommendations_generated = pyqtSignal(list)  # Emits List[Dict] for AI Recommendations Panel
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1469,6 +1470,11 @@ class MetricsDisplayPanel(QWidget):
         
         # Update status
         self.status_label.setText(f"Status: <b>{len(recommendations)} AI recommendations generated</b>")
+        
+        # CRITICAL: Emit signal to AI Recommendations Panel with formatted data
+        formatted_recs = self._format_recommendations_for_ai_panel(recommendations)
+        self.recommendations_generated.emit(formatted_recs)
+        print(f"[UI] ✅ Emitted {len(formatted_recs)} recommendations to AI Recommendations Panel")
     
     def _on_ai_progress(self, message: str, percentage: int) -> None:
         """
@@ -2527,3 +2533,36 @@ class MetricsDisplayPanel(QWidget):
         # NOW trigger the actual AI recommendation generation
         # (This was previously automatic, now it's user-gated)
         self._generate_batch_recommendations()
+    
+    def _format_recommendations_for_ai_panel(self, recommendations: List[IntegratedRecommendation]) -> List[Dict]:
+        """
+        Format IntegratedRecommendation objects to dictionaries for AI Recommendations Panel.
+        
+        Args:
+            recommendations: List of IntegratedRecommendation objects from engine
+        
+        Returns:
+            List of dictionaries compatible with AIRecommendationsPanel
+        """
+        formatted = []
+        
+        for i, rec in enumerate(recommendations):
+            # Convert to dictionary format expected by AI panel
+            rec_dict = {
+                'id': str(i),
+                'type': rec.action_type if hasattr(rec, 'action_type') else rec.type,
+                'block_name': rec.block_name if hasattr(rec, 'block_name') else '',
+                'signal_name': rec.signal_name if hasattr(rec, 'signal_name') else '',
+                'parameter_name': rec.parameter_name if hasattr(rec, 'parameter_name') else '',
+                'configuration': rec.configuration if hasattr(rec, 'configuration') else {},
+                'ai_enhanced': rec.ai_enhanced if hasattr(rec, 'ai_enhanced') else False,
+                'reasoning': rec.reasoning if hasattr(rec, 'reasoning') else '',
+                'expected_impact': rec.expected_impact if hasattr(rec, 'expected_impact') else {},
+                'combined_confidence': rec.combined_confidence if hasattr(rec, 'combined_confidence') else rec.confidence_score if hasattr(rec, 'confidence_score') else 0.0,
+                'root_cause': rec.root_cause if hasattr(rec, 'root_cause') else '',
+                'warnings': rec.warnings if hasattr(rec, 'warnings') else []
+            }
+            
+            formatted.append(rec_dict)
+        
+        return formatted
