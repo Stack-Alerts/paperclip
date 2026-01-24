@@ -570,9 +570,24 @@ class StrategyBuilderMainWindow(QMainWindow):
             
             # Create new version (THIS IS WHERE IT FAILS)
             try:
+                print(f"\n🔍 DEBUG: Attempting to create version...")
+                print(f"   Strategy ID: {version_data['strategy_id']}")
+                print(f"   Name: {version_data['name']}")
+                print(f"   Blocks type: {type(version_data['blocks'])}")
+                print(f"   Blocks length: {len(version_data['blocks']) if isinstance(version_data['blocks'], list) else 'N/A'}")
+                
                 self.current_version_id = db.strategy.create_strategy_version(version_data)
+                
+                print(f"✅ Version created successfully: {self.current_version_id}")
+                
             except Exception as version_error:
                 # VERSION CREATION FAILED
+                print(f"\n❌ VERSION CREATION FAILED!")
+                print(f"   Error: {version_error}")
+                print(f"   Error type: {type(version_error)}")
+                import traceback
+                traceback.print_exc()
+                
                 # Note: create_strategy_version already rolled back
                 
                 # If we created the strategy in this save, delete the orphan
@@ -580,16 +595,18 @@ class StrategyBuilderMainWindow(QMainWindow):
                 if created_strategy:
                     try:
                         from sqlalchemy import text
+                        print(f"   Cleaning up orphaned strategy: {self.current_strategy_id}")
                         # Execute delete in fresh transaction (no intermediate rollback needed)
                         db.strategy.session.execute(
                             text("DELETE FROM strategies WHERE strategy_id = :sid"),
                             {'sid': self.current_strategy_id}
                         )
                         db.strategy.session.commit()
+                        print(f"   ✅ Orphan deleted")
                     except Exception as cleanup_error:
                         # Cleanup failed - log but don't block error reporting
                         db.strategy.session.rollback()
-                        print(f"Failed to cleanup orphaned strategy: {cleanup_error}")
+                        print(f"   ❌ Failed to cleanup orphaned strategy: {cleanup_error}")
                     
                     self.current_strategy_id = None
                 
