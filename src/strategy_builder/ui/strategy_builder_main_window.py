@@ -253,6 +253,13 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         tools_menu.addSeparator()
         
+        import_json_action = QAction(style.standardIcon(QStyle.SP_DialogOpenButton), "&Import Strategy from JSON...", self)
+        import_json_action.setStatusTip("Import strategy from JSON file and save to database")
+        import_json_action.triggered.connect(self._on_import_from_json)
+        tools_menu.addAction(import_json_action)
+        
+        tools_menu.addSeparator()
+        
         # Debug Logger submenu
         debug_menu = tools_menu.addMenu(style.standardIcon(QStyle.SP_FileDialogInfoView), "&Debug Logger")
         
@@ -862,6 +869,83 @@ class StrategyBuilderMainWindow(QMainWindow):
                 "Options: Draft, Unpublished, Published"
             )
             self._update_status("Publish status management coming soon")
+    
+    def _on_import_from_json(self):
+        """Import strategy from JSON file and load into builder."""
+        try:
+            # Get last directory
+            settings = QSettings("BTC_Engine", "StrategyBuilder")
+            last_dir = settings.value("lastDirectory", "")
+            
+            # Show file dialog
+            filename, _ = QFileDialog.getOpenFileName(
+                self,
+                "Import Strategy from JSON",
+                last_dir,
+                "Strategy Files (*.json);;All Files (*)"
+            )
+            
+            if not filename:
+                return  # User cancelled
+            
+            # Load strategy from JSON file
+            result = self.orchestrator.load_strategy(filename)
+            
+            if not result.success:
+                QMessageBox.warning(
+                    self,
+                    "Import Failed",
+                    f"Failed to import strategy from JSON:\n\n{result.message}"
+                )
+                return
+            
+            # Update UI from loaded config
+            config = self.orchestrator.get_current_config()
+            
+            # Set strategy name
+            if config.name:
+                self.info_panel.set_strategy_name(config.name)
+            
+            # Set description if available
+            if hasattr(config, 'description') and config.description:
+                self.info_panel.set_description(config.description)
+            
+            # Clear tracking (new strategy for database)
+            self.current_strategy_id = None
+            self.current_version_id = None
+            self.current_file = None
+            
+            # Mark as modified so user can save to database
+            self.is_modified = True
+            
+            # Refresh all panels
+            self.search_panel.clear_added_blocks()
+            self.blocks_panel.refresh_from_orchestrator()
+            self.info_panel.refresh_from_orchestrator()
+            
+            # Update UI
+            self._update_window_title()
+            
+            # Show success with save reminder
+            QMessageBox.information(
+                self,
+                "Import Successful",
+                f"Strategy imported from JSON file!\n\n"
+                f"File: {filename}\n\n"
+                f"The strategy has been loaded into the builder.\n"
+                f"Press Ctrl+S or click Save to save it to the database."
+            )
+            
+            self._update_status(f"Imported strategy from JSON - Ready to save to database")
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Import Error",
+                f"Error importing strategy from JSON:\n\n{str(e)}"
+            )
+            import traceback
+            traceback.print_exc()
     
     def _on_update_data(self):
         """
