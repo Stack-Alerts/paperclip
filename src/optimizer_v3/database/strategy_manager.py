@@ -155,37 +155,44 @@ class StrategyDatabaseManager:
             'config_hash': config_hash
         }
         
-        # Insert version
-        query = text("""
-            INSERT INTO strategy_versions (
-                version_id, strategy_id, version_number, name, description,
-                blocks, signals, parameters, entry_conditions, exit_conditions,
-                risk_management, backtest_config, backtest_results, metrics,
-                trades, equity_curve, git_commit_hash, created_by, notes, tags, config_hash
-            ) VALUES (
-                :version_id, :strategy_id, :version_number, :name, :description,
-                :blocks, :signals, :parameters, :entry_conditions, :exit_conditions,
-                :risk_management, :backtest_config, :backtest_results, :metrics,
-                :trades, :equity_curve, :git_commit_hash, :created_by, :notes, :tags, :config_hash
+        # Insert version with proper error handling
+        try:
+            query = text("""
+                INSERT INTO strategy_versions (
+                    version_id, strategy_id, version_number, name, description,
+                    blocks, signals, parameters, entry_conditions, exit_conditions,
+                    risk_management, backtest_config, backtest_results, metrics,
+                    trades, equity_curve, git_commit_hash, created_by, notes, tags, config_hash
+                ) VALUES (
+                    :version_id, :strategy_id, :version_number, :name, :description,
+                    :blocks, :signals, :parameters, :entry_conditions, :exit_conditions,
+                    :risk_management, :backtest_config, :backtest_results, :metrics,
+                    :trades, :equity_curve, :git_commit_hash, :created_by, :notes, :tags, :config_hash
+                )
+            """)
+            
+            self.session.execute(query, version_data)
+            
+            # Update parent strategy updated_at
+            self.session.execute(
+                text("UPDATE strategies SET updated_at = NOW() WHERE strategy_id = :strategy_id"),
+                {'strategy_id': strategy_data['strategy_id']}
             )
-        """)
-        
-        self.session.execute(query, version_data)
-        
-        # Update parent strategy updated_at
-        self.session.execute(
-            text("UPDATE strategies SET updated_at = NOW() WHERE strategy_id = :strategy_id"),
-            {'strategy_id': strategy_data['strategy_id']}
-        )
-        
-        self.session.commit()
-        
-        self.logger.info(
-            f"Created strategy version: {version_id} "
-            f"(strategy: {strategy_data['strategy_id']}, version: {version_number})"
-        )
-        
-        return version_id
+            
+            self.session.commit()
+            
+            self.logger.info(
+                f"Created strategy version: {version_id} "
+                f"(strategy: {strategy_data['strategy_id']}, version: {version_number})"
+            )
+            
+            return version_id
+            
+        except Exception as e:
+            # CRITICAL: Rollback on error to prevent transaction lock
+            self.session.rollback()
+            self.logger.error(f"Failed to create strategy version: {e}")
+            raise
     
     def get_strategy_version(self, version_id: str) -> Optional[Dict[str, Any]]:
         """
