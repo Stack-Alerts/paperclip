@@ -10,13 +10,13 @@ Uses institutional-grade DATABASE-FIRST architecture.
 
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLabel, QLineEdit, QComboBox, QWidget, QHeaderView,
     QAbstractItemView
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QFont
 
 from src.optimizer_v3.database import get_database_manager
 from .styles import (
