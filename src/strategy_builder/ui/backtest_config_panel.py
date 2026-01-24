@@ -65,6 +65,51 @@ class BacktestWorker(QThread):
         self.is_paused = False
         self.should_stop = False
         self.output_panel = output_panel  # Store reference to output panel
+        self.timeframe = config.get('timeframe', '15m')  # Default to 15m if not specified
+    
+    def _bars_to_duration(self, num_bars: int) -> str:
+        """
+        Convert bar count to human-readable time duration.
+        
+        Args:
+            num_bars: Number of bars held
+        
+        Returns:
+            Time duration string (e.g., "5m", "1h 30m", "2d 4h")
+        """
+        if num_bars <= 0:
+            return "0m"
+        
+        # Parse timeframe
+        timeframe = self.timeframe
+        if timeframe.endswith('m'):
+            minutes_per_bar = int(timeframe[:-1])
+            total_minutes = num_bars * minutes_per_bar
+        elif timeframe.endswith('h'):
+            hours_per_bar = int(timeframe[:-1])
+            total_minutes = num_bars * hours_per_bar * 60
+        elif timeframe.endswith('d'):
+            days_per_bar = int(timeframe[:-1])
+            total_minutes = num_bars * days_per_bar * 1440
+        else:
+            # Fallback if unknown format
+            return f"{num_bars} bars"
+        
+        # Format as human-readable
+        if total_minutes < 60:
+            return f"{total_minutes}m"
+        elif total_minutes < 1440:  # Less than 1 day
+            hours = total_minutes // 60
+            mins = total_minutes % 60
+            if mins > 0:
+                return f"{hours}h {mins}m"
+            return f"{hours}h"
+        else:  # 1 day or more
+            days = total_minutes // 1440
+            hours = (total_minutes % 1440) // 60
+            if hours > 0:
+                return f"{days}d {hours}h"
+            return f"{days}d"
     
     def run(self):
         """Run backtest in background thread with LIVE message streaming"""
@@ -229,7 +274,10 @@ class BacktestWorker(QThread):
                                 "TRADE"
                             )
                         
-                        # Emit CLOSED trade data
+                        # Emit CLOSED trade data with human-readable duration
+                        num_bars = exit_candle - entry_candle
+                        duration_text = self._bars_to_duration(num_bars)
+                        
                         closed_trade_data = {
                             'id': str(trade_id),
                             'timestamp': entry_timestamp,
@@ -238,7 +286,7 @@ class BacktestWorker(QThread):
                             'size': 0.1,
                             'entry_price': entry_price,
                             'exit_price': exit_price,
-                            'duration': f'{exit_candle - entry_candle} bars',
+                            'duration': duration_text,  # Human-readable time (e.g., "16h 40m")
                             'pnl': pnl,
                             'pnl_pct': pnl_pct,
                             'status': 'CLOSED',
