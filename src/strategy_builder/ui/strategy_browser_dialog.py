@@ -284,8 +284,28 @@ class StrategyBrowserDialog(QMainWindow):
                     break
             self.table.setItem(row, 1, QTableWidgetItem(strategy_type))
             
-            # Version
-            self.table.setItem(row, 2, QTableWidgetItem(f"v{strategy['version_number']}"))
+            # Version - Create dropdown with all versions
+            version_combo = QComboBox()
+            fix_combobox_white_bars(version_combo)
+            
+            # Get all versions for this strategy
+            all_versions = self.db.strategy.get_strategy_versions(strategy['strategy_id'])
+            
+            current_version_index = 0
+            for i, ver in enumerate(all_versions):
+                version_label = f"v{ver['version_number']}"
+                version_combo.addItem(version_label, ver['version_id'])
+                
+                # Mark current version
+                if ver['version_id'] == strategy['version_id']:
+                    current_version_index = i
+            
+            version_combo.setCurrentIndex(current_version_index)
+            version_combo.currentIndexChanged.connect(
+                lambda idx, r=row: self._on_table_version_changed(r, idx)
+            )
+            
+            self.table.setCellWidget(row, 2, version_combo)
             
             # Last Modified
             created_at = strategy['created_at']
@@ -504,6 +524,31 @@ class StrategyBrowserDialog(QMainWindow):
             show_error(self, "Export Failed", "Error", f"Error exporting strategy:\n{e}")
             import traceback
             traceback.print_exc()
+    
+    def _on_table_version_changed(self, row: int, index: int):
+        """Handle version dropdown change in table"""
+        if index < 0:
+            return
+        
+        # Get the combo box from the table
+        version_combo = self.table.cellWidget(row, 2)
+        if not version_combo:
+            return
+        
+        # Get the version_id from combo box
+        version_id = version_combo.itemData(index)
+        
+        if version_id:
+            # Update the selected version_id for this row
+            name_item = self.table.item(row, 0)
+            if name_item:
+                strategy_data = name_item.data(Qt.ItemDataRole.UserRole)
+                strategy_data['version_id'] = version_id
+                name_item.setData(Qt.ItemDataRole.UserRole, strategy_data)
+                
+                # If this row is selected, update the selected_version_id
+                if row == self.table.currentRow():
+                    self.selected_version_id = version_id
     
     def _on_version_changed(self, index: int):
         """Handle version selector change"""
