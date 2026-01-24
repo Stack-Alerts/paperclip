@@ -1203,16 +1203,27 @@ NAUTILUS EXPERT: Part 2/3 COMPLETE - AI-Enhanced Recommendation System
 1. Complete recommendation engine integration
 2. Build application system
 3. Test with real strategies
+4. Database extension (See SPRINT_1_6_1)
 
 **Priority 2 (Important)**:
 4. UI integration
 5. Documentation updates
 6. Test coverage verification
+7. Duplicate detection system
 
 **Priority 3 (Nice-to-have)**:
-7. Performance optimization
-8. Advanced features
-9. Extended examples
+8. Performance optimization
+9. Advanced features
+10. Extended examples
+
+**Database Extension**:
+See SPRINT_1_6_1_AI_RECOMMENDATIONS_DATABASE.md for:
+- Complete database schema extension
+- AI recommendation tracking
+- Strategy version history
+- Test results storage
+- Duplicate detection system
+- "Load Last Test Results" feature
 
 **Success Criteria**:
 - [ ] End-to-end workflow works
@@ -1229,6 +1240,12 @@ NAUTILUS EXPERT: Part 2/3 COMPLETE - AI-Enhanced Recommendation System
 - `src/optimizer_v3/core/block_intelligence_extractor.py` ✅
 - `src/optimizer_v3/core/strategy_deep_analyzer.py` ✅
 - `src/optimizer_v3/core/ai_recommendation_enhancer.py` ✅
+
+**Extension Sprint**:
+- SPRINT_1_6_1_AI_RECOMMENDATIONS_DATABASE.md (Database Extension)
+- New database tables for AI recommendations
+- Strategy version tracking system
+- Test results storage
 
 **Modified Files**:
 - `src/optimizer_v3/core/recommendation_engine.py` (needs update for hybrid integration)
