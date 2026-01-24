@@ -196,21 +196,26 @@ class StrategyBrowserDialog(QMainWindow):
         """Load strategies from database"""
         try:
             self.db = get_database_manager()
-            
+
             # Get all strategies with latest version info
             strategies = self.db.strategy.get_all_strategies()
-            
+
             self.all_strategies = []
-            
+
             for strategy in strategies:
                 # Get latest version details
                 latest = self.db.strategy.get_latest_version(strategy['strategy_id'])
-                
+
                 if latest:
-                    # Get test results count
-                    tests = self.db.test_results.get_version_test_results(latest['version_id'])
-                    test_count = len(tests)
-                    
+                    # Get test results count (handle missing table gracefully)
+                    try:
+                        tests = self.db.test_results.get_version_test_results(latest['version_id'])
+                        test_count = len(tests)
+                    except Exception:
+                        # Table doesn't exist yet or schema mismatch - no tests run yet
+                        tests = []
+                        test_count = 0
+
                     # Get best test result
                     best_perf = "N/A"
                     if tests:
@@ -218,7 +223,7 @@ class StrategyBrowserDialog(QMainWindow):
                         sharpe = best_test.get('sharpe_ratio')
                         if sharpe:
                             best_perf = f"Sharpe: {sharpe:.2f}"
-                    
+
                     self.all_strategies.append({
                         'strategy_id': strategy['strategy_id'],
                         'version_id': latest['version_id'],
@@ -230,11 +235,13 @@ class StrategyBrowserDialog(QMainWindow):
                         'performance': best_perf,
                         'tags': latest.get('tags', [])
                     })
-            
+
             self._populate_table(self.all_strategies)
-            
+
         except Exception as e:
             print(f"Error loading strategies: {e}")
+            import traceback
+            traceback.print_exc()
             self.all_strategies = []
     
     def _populate_table(self, strategies: List[Dict[str, Any]]):
@@ -425,7 +432,11 @@ class StrategyBrowserDialog(QMainWindow):
     def accept(self):
         """Handle accept - emit signal and close"""
         if self.selected_strategy_id and self.selected_version_id:
-            self.strategy_selected.emit(self.selected_strategy_id, self.selected_version_id)
+            # Convert version_id to string (may be UUID from database)
+            self.strategy_selected.emit(
+                str(self.selected_strategy_id), 
+                str(self.selected_version_id)
+            )
         self._save_settings()
         self.close()
     

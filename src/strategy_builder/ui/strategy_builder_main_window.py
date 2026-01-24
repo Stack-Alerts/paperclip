@@ -498,11 +498,55 @@ class StrategyBuilderMainWindow(QMainWindow):
             traceback.print_exc()
     
     def _on_save_strategy(self) -> bool:
-        """Save the current strategy."""
-        if self.current_file:
-            return self._save_to_file(self.current_file)
-        else:
-            return self._on_save_strategy_as()
+        """Save the current strategy to database."""
+        try:
+            # Get strategy data from UI
+            strategy_name = self.info_panel.get_strategy_name()
+            description = self.info_panel.get_description()
+            
+            if not strategy_name or strategy_name.strip() == "":
+                QMessageBox.warning(self, "Save Failed", "Strategy must have a name before saving.")
+                return False
+            
+            # Get database manager
+            db = get_database_manager()
+            
+            # If this is a new strategy (no strategy_id yet), create it
+            if not self.current_strategy_id:
+                self.current_strategy_id = db.strategy.create_strategy(strategy_name)
+            
+            # Build version data from current config
+            config = self.orchestrator.get_current_config()
+            
+            version_data = {
+                'strategy_id': self.current_strategy_id,
+                'name': strategy_name,
+                'description': description or '',
+                'blocks': [{'name': b.name, 'signals': [s.name for s in b.signals]} for b in config.blocks] if config and config.blocks else [],
+                'signals': {},  # TODO: Extract from config
+                'parameters': {},  # TODO: Extract from config
+                'entry_conditions': {},  # TODO: Extract from config
+                'exit_conditions': {},  # TODO: Extract from config
+                'risk_management': {},  # TODO: Extract from config  
+                'backtest_config': {},  # TODO: Extract from config
+                'tags': []  # TODO: Extract from UI
+            }
+            
+            # Create new version
+            self.current_version_id = db.strategy.create_strategy_version(version_data)
+            
+            # Mark as not modified
+            self.is_modified = False
+            self._update_window_title()
+            self._update_status(f"Strategy saved to database: {strategy_name}")
+            
+            return True
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error saving strategy to database:\n\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
     
     def _on_save_strategy_with_feedback(self) -> bool:
         """Save the current strategy with success dialog (for validation dialog)."""
@@ -513,61 +557,61 @@ class StrategyBuilderMainWindow(QMainWindow):
             return self._on_save_strategy_as()
     
     def _on_save_strategy_as(self) -> bool:
-        """Save the strategy with a new filename."""
-        # Get last used directory
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        last_dir = settings.value("lastDirectory", "")
-        
-        # Create custom dialog with larger size and persistence
-        # Pass None as parent so dialog is independent and can be moved freely
-        dialog = QFileDialog(None, "Save Strategy As", last_dir, "Strategy Files (*.json);;All Files (*)")
-        dialog.setFileMode(QFileDialog.AnyFile)
-        dialog.setAcceptMode(QFileDialog.AcceptSave)
-        dialog.setDefaultSuffix("json")
-        
-        # CRITICAL: Use Qt's dialog instead of native dialog (native doesn't respect sizing)
-        dialog.setOptions(QFileDialog.DontUseNativeDialog)
-        
-        # Apply dark theme stylesheet (since parent is None, it doesn't inherit)
-        dialog.setStyleSheet(self.styleSheet())
-        
-        # Auto-generate filename from strategy name
-        strategy_name = self.info_panel.get_strategy_name()
-        if strategy_name:
-            # Convert to valid filename: lowercase, spaces to underscores
-            filename_base = strategy_name.lower().replace(' ', '_')
-            # Remove any invalid characters
-            import re
-            filename_base = re.sub(r'[^\w\-_]', '', filename_base)
-            suggested_filename = f"{filename_base}.json"
-            # Set as default filename
-            dialog.selectFile(suggested_filename)
-        
-        # Set larger default size (1600x1200 - 100% bigger per user request)
-        dialog.resize(1600, 1200)
-        
-        # Restore saved size if available
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        dialog_geometry = settings.value("saveDialog/geometry")
-        if dialog_geometry:
-            dialog.restoreGeometry(dialog_geometry)
-        
-        # Execute dialog
-        if dialog.exec_() != QFileDialog.Accepted:
+        """Save as new strategy (creates new strategy_id in database)."""
+        try:
+            # Show new strategy dialog to get name for new copy
+            dialog = NewStrategyDialog(self)
+            if dialog.exec_() != NewStrategyDialog.Accepted:
+                return False  # User cancelled
+            
+            # Get new strategy data
+            data = dialog.get_strategy_data()
+            
+            # Create NEW strategy (different strategy_id)
+            db = get_database_manager()
+            new_strategy_id = db.strategy.create_strategy(data['name'])
+            
+            # Build version data from current config
+            config = self.orchestrator.get_current_config()
+            
+            version_data = {
+                'strategy_id': new_strategy_id,  # NEW strategy ID
+                'name': data['name'],
+                'description': data.get('description', ''),
+                'blocks': [{'name': b.name, 'signals': [s.name for s in b.signals]} for b in config.blocks] if config and config.blocks else [],
+                'signals': {},
+                'parameters': {},
+                'entry_conditions': {},
+                'exit_conditions': {},
+                'risk_management': {},
+                'backtest_config': {},
+                'tags': []
+            }
+            
+            # Create version for new strategy
+            new_version_id = db.strategy.create_strategy_version(version_data)
+            
+            # Update tracking to new strategy
+            self.current_strategy_id = new_strategy_id
+            self.current_version_id = new_version_id
+            
+            # Update UI with new name
+            self.info_panel.set_strategy_name(data['name'])
+            if data.get('description'):
+                self.info_panel.set_description(data['description'])
+            
+            # Mark as not modified
+            self.is_modified = False
+            self._update_window_title()
+            self._update_status(f"Strategy saved as: {data['name']} (new strategy in database)")
+            
+            return True
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error saving strategy as:\n\n{str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
-        
-        # Save dialog geometry for next time
-        settings.setValue("saveDialog/geometry", dialog.saveGeometry())
-        
-        files = dialog.selectedFiles()
-        if not files:
-            return False
-        
-        filename = files[0]
-        if not filename.endswith('.json'):
-            filename += '.json'
-        
-        return self._save_to_file(filename)
     
     def _save_to_file(self, filename: str, show_success: bool = False) -> bool:
         """
