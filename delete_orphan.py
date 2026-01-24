@@ -15,13 +15,13 @@ from sqlalchemy import text
 
 db = get_database_manager()
 
-# Delete the orphan
-db.strategy.session.execute(
-    text("DELETE FROM strategies WHERE strategy_id = 'strategy_967a7319'")
-)
+# Delete ALL strategies (all are corrupt from old code)
+print("Deleting ALL strategies...")
+db.strategy.session.execute(text("DELETE FROM strategy_versions"))
+db.strategy.session.execute(text("DELETE FROM strategies"))
 db.strategy.session.commit()
 
-print("✅ Deleted orphaned strategy_967a7319")
+print("✅ Deleted ALL strategies (all were saved with old code)")
 
 # Show remaining
 result = db.strategy.session.execute(
