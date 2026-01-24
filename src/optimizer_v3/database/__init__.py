@@ -1,24 +1,68 @@
 """
-Database Infrastructure for Optimizer V3
-Tasks 0.2-0.7: Database Configuration, Connection Pooling, Models, Validation, Manager & Backup
+Optimizer V3 Database Package
+SPRINT 1.6.1 - Phase 1
+
+Complete database layer for strategy versioning, AI recommendations,
+and test results tracking.
+
+Main Components:
+- DatabaseManager: Unified database interface
+- StrategyDatabaseManager: Strategy versioning operations
+- AIRecommendationsManager: AI recommendation tracking
+- TestResultsManager: Test results management
+
+Usage:
+    ```python
+    from src.optimizer_v3.database import get_database_manager
+    
+    # Get database manager from environment
+    db = get_database_manager()
+    
+    # Create strategy
+    strategy_id = db.strategy.create_strategy("My Strategy")
+    
+    # Create version
+    version_id = db.strategy.create_strategy_version({
+        'strategy_id': strategy_id,
+        'name': 'My Strategy',
+        'blocks': [...],
+        'parameters': {...},
+        # ... other config
+    })
+    
+    # Create AI recommendation
+    rec_id = db.ai_recommendations.create_recommendation({
+        'strategy_id': strategy_id,
+        'recommendation_type': 'performance',
+        'title': 'Optimize entry conditions',
+        # ... other details
+    })
+    
+    # Record test result
+    result_id = db.test_results.create_test_result({
+        'strategy_id': strategy_id,
+        'strategy_version_id': version_id,
+        'test_type': 'backtest',
+        # ... metrics and config
+    })
+    
+    # Clean up
+    db.close()
+    ```
 """
 
-from .config import (
-    get_db_config,
-    get_performance_config,
-    get_monitoring_config,
-    get_backup_config,
-    get_db_url,
-    validate_config,
+# Main managers
+from .database_manager import (
+    DatabaseManager,
+    DatabaseManagerFactory,
+    get_database_manager
 )
 
-from .connection_pool import (
-    DatabaseConnectionPool,
-    DatabaseMetrics,
-    get_connection_pool,
-    close_connection_pool,
-)
+from .strategy_manager import StrategyDatabaseManager
+from .ai_recommendations_manager import AIRecommendationsManager
+from .test_results_manager import TestResultsManager
 
+# Models (for type hints and advanced usage)
 from .models import (
     Base,
     OptimizationRun,
@@ -27,87 +71,31 @@ from .models import (
     SignalMetrics,
     TrainingSession,
     SessionState,
-    BacktestResult,
-)
-
-from .init_db import (
-    initialize_database,
-    verify_schema,
-    get_schema_info,
-)
-
-from .nautilus_types import (
-    NautilusTypeConverter,
-    to_quantity,
-    from_quantity,
-    to_price,
-    from_price,
-    to_money,
-    from_money,
-    to_instrument_id,
-    from_instrument_id,
-)
-
-from .validators import (
-    NautilusDataValidator,
-    ValidationError,
-)
-
-from .manager import (
-    DatabaseManager,
-    get_db_manager,
-    close_db_manager,
-)
-
-from .backup import (
-    DatabaseBackup,
-    get_backup_manager,
+    BacktestResult
 )
 
 __all__ = [
-    # Configuration
-    "get_db_config",
-    "get_performance_config",
-    "get_monitoring_config",
-    "get_backup_config",
-    "get_db_url",
-    "validate_config",
-    # Connection Pool
-    "DatabaseConnectionPool",
-    "DatabaseMetrics",
-    "get_connection_pool",
-    "close_connection_pool",
+    # Main interface
+    'DatabaseManager',
+    'DatabaseManagerFactory',
+    'get_database_manager',
+    
+    # Specialized managers
+    'StrategyDatabaseManager',
+    'AIRecommendationsManager',
+    'TestResultsManager',
+    
     # Models
-    "Base",
-    "OptimizationRun",
-    "StrategyVariation",
-    "SignalEvent",
-    "SignalMetrics",
-    "TrainingSession",
-    "SessionState",
-    "BacktestResult",
-    # Database Initialization
-    "initialize_database",
-    "verify_schema",
-    "get_schema_info",
-    # Type Converters
-    "NautilusTypeConverter",
-    "to_quantity",
-    "from_quantity",
-    "to_price",
-    "from_price",
-    "to_money",
-    "from_money",
-    "to_instrument_id",
-    "from_instrument_id",
-    # Validators
-    "NautilusDataValidator",
-    "ValidationError",
-    # Database Manager
-    "DatabaseManager",
-    "get_db_manager",
-    "close_db_manager",
-    # Backup & Restore
-    "DatabaseBackup",
-    "get_backup_manager",
+    'Base',
+    'OptimizationRun',
+    'StrategyVariation',
+    'SignalEvent',
+    'SignalMetrics',
+    'TrainingSession',
+    'SessionState',
+    'BacktestResult',
 ]
+
+__version__ = '1.0.0'
+__author__ = 'BTC Engine v3 Team'
+__description__ = 'Database layer for strategy versioning and tracking'

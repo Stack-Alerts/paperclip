@@ -1,0 +1,281 @@
+"""
+Main Database Manager
+SPRINT 1.6.1 - Phase 1 Day 3
+
+Unified database interface that orchestrates all specialized managers.
+Provides single entry point for all database operations.
+
+Institutional-grade implementation with:
+- Unified session management
+- Transaction coordination
+- Comprehensive error handling
+- Connection pooling
+"""
+
+from typing import Optional
+import logging
+from contextlib import contextmanager
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import NullPool
+
+from .strategy_manager import StrategyDatabaseManager
+from .ai_recommendations_manager import AIRecommendationsManager
+from .test_results_manager import TestResultsManager
+
+logger = logging.getLogger(__name__)
+
+
+class DatabaseManager:
+    """
+    Main database manager providing unified access to all database operations
+    
+    This class orchestrates all specialized managers and provides:
+    - Session management with context managers
+    - Transaction coordination
+    - Connection pooling
+    - Automatic resource cleanup
+    - Unified error handling
+    
+    Usage:
+        ```python
+        db = DatabaseManager(connection_string)
+        
+        # Using context manager (recommended)
+        with db.session_scope() as session:
+            strategy_id = db.strategy.create_strategy("My Strategy")
+            # Session automatically committed/rolled back
+        
+        # Or use manager instances directly
+        db.strategy.create_strategy("Another Strategy")
+        ```
+    """
+    
+    def __init__(
+        self,
+        connection_string: str,
+        echo: bool = False,
+        pool_size: int = 5,
+        max_overflow: int = 10
+    ):
+        """
+        Initialize database manager
+        
+        Args:
+            connection_string: Database connection string (PostgreSQL format)
+            echo: Enable SQL query logging (for debugging)
+            pool_size: Number of connections to maintain in pool
+            max_overflow: Maximum overflow connections beyond pool_size
+        """
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        
+        # Create engine with connection pooling
+        self.engine = create_engine(
+            connection_string,
+            echo=echo,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            pool_pre_ping=True  # Verify connections before using
+        )
+        
+        # Create session factory
+        self.SessionLocal = sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=self.engine
+        )
+        
+        # Create default session for direct usage
+        self._session = self.SessionLocal()
+        
+        # Initialize specialized managers
+        self.strategy = StrategyDatabaseManager(self._session)
+        self.ai_recommendations = AIRecommendationsManager(self._session)
+        self.test_results = TestResultsManager(self._session)
+        
+        self.logger.info("DatabaseManager initialized successfully")
+    
+    @contextmanager
+    def session_scope(self):
+        """
+        Provide a transactional scope for database operations
+        
+        Usage:
+            ```python
+            with db.session_scope() as session:
+                # Use session for operations
+                result = session.execute(query)
+                # Automatically committed on success
+                # Automatically rolled back on exception
+            ```
+        
+        Yields:
+            Session: SQLAlchemy session
+        """
+        session = self.SessionLocal()
+        try:
+            yield session
+            session.commit()
+            self.logger.debug("Session committed successfully")
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Session rollback due to error: {e}")
+            raise
+        finally:
+            session.close()
+            self.logger.debug("Session closed")
+    
+    def get_session(self) -> Session:
+        """
+        Get a new database session
+        
+        Note: Caller is responsible for managing session lifecycle
+        Use session_scope() context manager for automatic management
+        
+        Returns:
+            Session: New SQLAlchemy session
+        """
+        return self.SessionLocal()
+    
+    def close(self):
+        """
+        Close database connections and cleanup resources
+        
+        Should be called when shutting down application
+        """
+        if self._session:
+            self._session.close()
+            self.logger.info("Default session closed")
+        
+        if self.engine:
+            self.engine.dispose()
+            self.logger.info("Database engine disposed")
+    
+    def test_connection(self) -> bool:
+        """
+        Test database connection
+        
+        Returns:
+            bool: True if connection successful, False otherwise
+        """
+        try:
+            with self.session_scope() as session:
+                session.execute("SELECT 1")
+            self.logger.info("Database connection test: SUCCESS")
+            return True
+        except Exception as e:
+            self.logger.error(f"Database connection test: FAILED - {e}")
+            return False
+    
+    def get_connection_info(self) -> dict:
+        """
+        Get database connection information
+        
+        Returns:
+            dict: Connection information (without password)
+        """
+        url = self.engine.url
+        return {
+            'driver': url.drivername,
+            'host': url.host,
+            'port': url.port,
+            'database': url.database,
+            'username': url.username,
+            'pool_size': self.engine.pool.size(),
+            'pool_overflow': self.engine.pool.overflow()
+        }
+
+
+class DatabaseManagerFactory:
+    """
+    Factory for creating DatabaseManager instances with different configurations
+    
+    Provides convenient methods for:
+    - Production database connections
+    - Development database connections
+    - Testing database connections (in-memory)
+    - Custom configurations
+    """
+    
+    @staticmethod
+    def from_env() -> DatabaseManager:
+        """
+        Create DatabaseManager from environment variables
+        
+        Expected environment variables:
+        - POSTGRES_HOST: Database host
+        - POSTGRES_PORT: Database port
+        - POSTGRES_DB: Database name
+        - POSTGRES_USER: Database user
+        - POSTGRES_PASSWORD: Database password
+        
+        Returns:
+            DatabaseManager: Configured database manager instance
+            
+        Raises:
+            EnvironmentError: If required environment variables missing
+        """
+        import os
+        
+        required = ['POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD']
+        missing = [var for var in required if not os.getenv(var)]
+        
+        if missing:
+            raise EnvironmentError(f"Missing required environment variables: {', '.join(missing)}")
+        
+        connection_string = (
+            f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
+            f"@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
+        )
+        
+        return DatabaseManager(connection_string)
+    
+    @staticmethod
+    def from_connection_string(connection_string: str, **kwargs) -> DatabaseManager:
+        """
+        Create DatabaseManager from connection string
+        
+        Args:
+            connection_string: PostgreSQL connection string
+            **kwargs: Additional arguments passed to DatabaseManager
+            
+        Returns:
+            DatabaseManager: Configured database manager instance
+        """
+        return DatabaseManager(connection_string, **kwargs)
+    
+    @staticmethod
+    def for_testing(in_memory: bool = True) -> DatabaseManager:
+        """
+        Create DatabaseManager for testing
+        
+        Args:
+            in_memory: Use in-memory SQLite database (faster for tests)
+            
+        Returns:
+            DatabaseManager: Test database manager instance
+        """
+        if in_memory:
+            connection_string = "sqlite:///:memory:"
+        else:
+            connection_string = "sqlite:///test_database.db"
+        
+        return DatabaseManager(
+            connection_string,
+            echo=False,
+            pool_size=1,
+            max_overflow=0
+        )
+
+
+# Convenience function for quick access
+def get_database_manager() -> DatabaseManager:
+    """
+    Get database manager instance from environment variables
+    
+    Convenience function for quick access in applications
+    
+    Returns:
+        DatabaseManager: Configured database manager
+    """
+    return DatabaseManagerFactory.from_env()
