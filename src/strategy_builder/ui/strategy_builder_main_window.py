@@ -524,7 +524,10 @@ class StrategyBuilderMainWindow(QMainWindow):
             traceback.print_exc()
     
     def _on_save_strategy(self) -> bool:
-        """Save the current strategy to database."""
+        """Save the current strategy to database with proper rollback on failure."""
+        db = None
+        created_strategy = False
+        
         try:
             # Get strategy data from UI
             strategy_name = self.info_panel.get_strategy_name()
@@ -537,9 +540,13 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Get database manager
             db = get_database_manager()
             
+            # CRITICAL: Rollback any previous failed state
+            db.strategy.session.rollback()
+            
             # If this is a new strategy (no strategy_id yet), create it
             if not self.current_strategy_id:
                 self.current_strategy_id = db.strategy.create_strategy(strategy_name)
+                created_strategy = True
             
             # Build version data from current config using persistence (SAME AS FILE SAVE)
             config = self.orchestrator.get_current_config()
@@ -561,8 +568,29 @@ class StrategyBuilderMainWindow(QMainWindow):
                 'tags': []  # Reserved
             }
             
-            # Create new version
-            self.current_version_id = db.strategy.create_strategy_version(version_data)
+            # Create new version (THIS IS WHERE IT FAILS)
+            try:
+                self.current_version_id = db.strategy.create_strategy_version(version_data)
+            except Exception as version_error:
+                # VERSION CREATION FAILED - Rollback everything
+                db.strategy.session.rollback()
+                
+                # If we created the strategy in this save, delete it
+                if created_strategy:
+                    try:
+                        from sqlalchemy import text
+                        db.strategy.session.execute(
+                            text("DELETE FROM strategies WHERE strategy_id = :sid"),
+                            {'sid': self.current_strategy_id}
+                        )
+                        db.strategy.session.commit()
+                    except:
+                        db.strategy.session.rollback()
+                    
+                    self.current_strategy_id = None
+                
+                # Re-raise the error
+                raise version_error
             
             # Mark as not modified
             self.is_modified = False
@@ -572,6 +600,10 @@ class StrategyBuilderMainWindow(QMainWindow):
             return True
             
         except Exception as e:
+            # Rollback on any error
+            if db:
+                db.strategy.session.rollback()
+            
             QMessageBox.critical(self, "Error", f"Error saving strategy to database:\n\n{str(e)}")
             import traceback
             traceback.print_exc()
