@@ -20,7 +20,7 @@ from PyQt5.QtGui import QFont
 
 from src.optimizer_v3.database import get_database_manager
 from .styles import (
-    get_dialog_stylesheet,
+    get_main_stylesheet,
     get_primary_button_stylesheet,
     get_secondary_button_stylesheet,
     get_danger_button_stylesheet,
@@ -70,7 +70,7 @@ class StrategyBrowserDialog(QMainWindow):
         """Initialize user interface"""
         self.setWindowTitle("Strategy Browser" if self.mode == 'open' else "Save Strategy As")
         self.setMinimumSize(900, 600)
-        self.setStyleSheet(get_dialog_stylesheet())
+        self.setStyleSheet(get_main_stylesheet())
         
         # Create central widget
         central_widget = QWidget()
