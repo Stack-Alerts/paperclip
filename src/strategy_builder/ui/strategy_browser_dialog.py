@@ -184,18 +184,6 @@ class StrategyBrowserDialog(QMainWindow):
         
         button_layout.addStretch()
         
-        # Version selector (shows when strategy selected)
-        version_label = QLabel("Version:")
-        version_label.setFont(create_font(10))
-        button_layout.addWidget(version_label)
-        
-        self.version_selector = QComboBox()
-        fix_combobox_white_bars(self.version_selector)
-        self.version_selector.setMinimumWidth(120)
-        self.version_selector.currentIndexChanged.connect(self._on_version_changed)
-        self.version_selector.setEnabled(False)
-        button_layout.addWidget(self.version_selector)
-        
         # Right side actions
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setStyleSheet(get_secondary_button_stylesheet())
@@ -257,9 +245,7 @@ class StrategyBrowserDialog(QMainWindow):
             self._populate_table(self.all_strategies)
 
         except Exception as e:
-            print(f"Error loading strategies: {e}")
-            import traceback
-            traceback.print_exc()
+            self.logger.error(f"Error loading strategies: {e}")
             self.all_strategies = []
     
     def _populate_table(self, strategies: List[Dict[str, Any]]):
