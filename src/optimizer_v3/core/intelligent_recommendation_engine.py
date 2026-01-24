@@ -451,45 +451,77 @@ class IntelligentRecommendationEngine:
         return ""
     
     def format_recommendation_text(self, rec: IntegratedRecommendation) -> str:
-        """Format recommendation for display"""
-        # Header
+        """
+        Format recommendation as DETAILED multi-line text.
+        
+        Returns FULL reasoning, expected impact, and confidence.
+        User needs complete context to make informed decisions.
+        """
+        lines = []
+        
+        # Line 1: Action header
         if rec.ai_enhanced:
             header = "🤖 AI-ENHANCED:"
         else:
             header = "📊 DATA-DRIVEN:"
         
-        # Main text
+        # Build action summary
         if rec.type == 'ADD_BLOCK':
-            text = f"{header} Add '{rec.block_name}' block"
+            lines.append(f"{header} Add '{rec.block_name}' block")
         elif rec.type == 'ADD_RECHECK':
             bar_delay = rec.configuration.get('bar_delay', 25)
-            text = f"{header} Add recheck to '{rec.block_name}::{rec.signal_name}' (validate at bar {bar_delay})"
+            lines.append(f"{header} Add recheck to '{rec.block_name}::{rec.signal_name}' ({bar_delay} bars)")
         elif rec.type == 'ADD_TIMING':
             max_candles = rec.configuration.get('max_candles', 20)
-            text = f"{header} Add timing dependency (within {max_candles} candles)"
+            lines.append(f"{header} Add timing constraint (within {max_candles} candles)")
         elif rec.type == 'ADJUST_PARAM':
             param = rec.parameter_name or 'parameter'
-            text = f"{header} Adjust {param}"
+            new_val = rec.configuration.get('new_value', '?')
+            lines.append(f"{header} Adjust {param} to {new_val}")
         else:
-            text = f"{header} {rec.reasoning[:80]}"
+            lines.append(f"{header} {rec.type}")
         
-        # Add impact
+        # Line 2: Reasoning (WHY) - FULL TEXT, not truncated
+        if rec.reasoning:
+            # Split long reasoning into multiple lines for readability
+            reasoning_text = rec.reasoning.strip()
+            if len(reasoning_text) > 100:
+                # Wrap at ~100 chars per line
+                words = reasoning_text.split()
+                current_line = "   Reason: "
+                for word in words:
+                    if len(current_line) + len(word) + 1 > 100:
+                        lines.append(current_line)
+                        current_line = "           " + word
+                    else:
+                        if current_line.endswith(': ') or current_line.endswith('  '):
+                            current_line += word
+                        else:
+                            current_line += " " + word
+                if current_line.strip():
+                    lines.append(current_line)
+            else:
+                lines.append(f"   Reason: {reasoning_text}")
+        
+        # Line 3: Expected Impact (WHAT WILL IMPROVE)
         if rec.expected_impact:
-            impacts = [f"{k}: {v}" for k, v in list(rec.expected_impact.items())[:2]]
-            text += f"\n   Expected: {', '.join(impacts)}"
+            impacts = [f"{k.replace('_', ' ').title()}: {v}" for k, v in rec.expected_impact.items()]
+            lines.append(f"   Expected: {', '.join(impacts)}")
         
-        # Add confidence
-        text += f"\n   Confidence: {rec.combined_confidence:.0%}"
+        # Line 4: Confidence (HOW CERTAIN)
+        confidence_pct = int(rec.combined_confidence * 100)
+        lines.append(f"   Confidence: {confidence_pct}%")
         
-        # Add root cause if available
+        # Line 5: Root Cause (if available)
         if rec.root_cause:
-            text += f"\n   Root Cause: {rec.root_cause}"
+            lines.append(f"   Root Cause: {rec.root_cause}")
         
-        # Add warnings
+        # Line 6: Warnings (if any)
         if rec.warnings:
-            text += f"\n   ⚠️ {'; '.join(rec.warnings[:2])}"
+            for warning in rec.warnings[:3]:  # Show up to 3 warnings
+                lines.append(f"   ⚠️ {warning}")
         
-        return text
+        return "\n".join(lines)
     
     def get_summary_stats(self) -> Dict:
         """Get summary statistics about engine state"""
