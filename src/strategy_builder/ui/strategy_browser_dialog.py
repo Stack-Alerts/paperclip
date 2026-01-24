@@ -212,38 +212,47 @@ class StrategyBrowserDialog(QMainWindow):
             self.all_strategies = []
 
             for strategy in strategies:
-                # Get latest version details
-                latest = self.db.strategy.get_latest_version(strategy['strategy_id'])
+                try:
+                    # Get latest version details
+                    latest = self.db.strategy.get_latest_version(strategy['strategy_id'])
 
-                if latest:
-                    # Get test results count (handle missing table gracefully)
-                    try:
-                        tests = self.db.test_results.get_version_test_results(latest['version_id'])
-                        test_count = len(tests)
-                    except Exception:
-                        # Table doesn't exist yet or schema mismatch - no tests run yet
-                        tests = []
-                        test_count = 0
+                    if latest:
+                        # Get test results count (handle missing table gracefully)
+                        try:
+                            tests = self.db.test_results.get_version_test_results(latest['version_id'])
+                            test_count = len(tests)
+                        except Exception:
+                            # Table doesn't exist yet or schema mismatch - no tests run yet
+                            tests = []
+                            test_count = 0
 
-                    # Get best test result
-                    best_perf = "N/A"
-                    if tests:
-                        best_test = max(tests, key=lambda t: t.get('sharpe_ratio', 0) or 0)
-                        sharpe = best_test.get('sharpe_ratio')
-                        if sharpe:
-                            best_perf = f"Sharpe: {sharpe:.2f}"
+                        # Get best test result
+                        best_perf = "N/A"
+                        if tests:
+                            best_test = max(tests, key=lambda t: t.get('sharpe_ratio', 0) or 0)
+                            sharpe = best_test.get('sharpe_ratio')
+                            if sharpe:
+                                best_perf = f"Sharpe: {sharpe:.2f}"
 
-                    self.all_strategies.append({
-                        'strategy_id': strategy['strategy_id'],
-                        'version_id': latest['version_id'],
-                        'name': latest['name'],
-                        'description': latest.get('description', ''),
-                        'version_number': latest['version_number'],
-                        'created_at': latest['created_at'],
-                        'test_count': test_count,
-                        'performance': best_perf,
-                        'tags': latest.get('tags', [])
-                    })
+                        self.all_strategies.append({
+                            'strategy_id': strategy['strategy_id'],
+                            'version_id': latest['version_id'],
+                            'name': latest['name'],
+                            'description': latest.get('description', ''),
+                            'version_number': latest['version_number'],
+                            'created_at': latest['created_at'],
+                            'test_count': test_count,
+                            'performance': best_perf,
+                            'tags': latest.get('tags', [])
+                        })
+                    
+                except Exception as e:
+                    # Skip strategies that fail to load (data corruption or missing versions)
+                    # Rollback to clear failed state and continue with next strategy
+                    self.db.strategy.session.rollback()
+                    import logging
+                    logging.error(f"Skipping strategy {strategy.get('strategy_id', 'unknown')}: {e}")
+                    continue
 
             self._populate_table(self.all_strategies)
 
