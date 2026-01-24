@@ -1,0 +1,100 @@
+{
+  "name": "HOD Rejection",
+  "description": "Strategy: New_Strategy",
+  "blocks": [
+    {
+      "name": "hod",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "HOD_REJECTION",
+          "logic": "AND"
+        },
+        {
+          "name": "BELOW_HOD",
+          "logic": "AND",
+          "recheck_config": {
+            "enabled": true,
+            "bar_delay": 5,
+            "validation_mode": "SIGNAL",
+            "parent_signal": null
+          },
+          "recheck_chain": [
+            {
+              "enabled": true,
+              "bar_delay": 5,
+              "validation_mode": "RECHECK",
+              "parent_signal": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stochastic_rsi",
+      "logic": "AND",
+      "signals": [
+        {
+          "name": "BEARISH",
+          "logic": "AND"
+        },
+        {
+          "name": "BEARISH_CROSS",
+          "logic": "OR",
+          "recheck_config": {
+            "enabled": true,
+            "bar_delay": 10,
+            "validation_mode": "SIGNAL",
+            "parent_signal": null
+          },
+          "recheck_chain": [
+            {
+              "enabled": true,
+              "bar_delay": 10,
+              "validation_mode": "RECHECK",
+              "parent_signal": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "macd_signal",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "BEARISH_DIVERGENCE",
+          "logic": "OR"
+        }
+      ]
+    },
+    {
+      "name": "liquidity_sweep",
+      "logic": "OR",
+      "signals": [
+        {
+          "name": "BEARISH_SWEEP",
+          "logic": "OR",
+          "recheck_config": {
+            "enabled": true,
+            "bar_delay": 10,
+            "validation_mode": "SIGNAL",
+            "parent_signal": null
+          },
+          "recheck_chain": [
+            {
+              "enabled": true,
+              "bar_delay": 10,
+              "validation_mode": "RECHECK",
+              "parent_signal": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0",
+  "strategy_type": "Bearish",
+  "validation_status": null,
+  "generation_status": null
+}

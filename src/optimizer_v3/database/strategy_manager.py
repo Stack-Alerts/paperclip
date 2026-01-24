@@ -395,15 +395,15 @@ class StrategyDatabaseManager:
         """
         # Extract core functional elements only
         core_elements = {
-            'blocks': sorted([
+            'blocks': [
                 {
                     'name': block.get('name', ''),
-                    'signals': sorted(block.get('signals', [])),
+                    'signals': block.get('signals', []),  # DON'T SORT - dicts can't be compared
                     'parameters': block.get('parameters', {}),
                     'logic_type': block.get('logic_type', 'AND')
                 }
                 for block in config.get('blocks', [])
-            ], key=lambda x: x['name']),
+            ],  # DON'T SORT - execution order matters
             'parameters': config.get('parameters', {}),
             'entry_conditions': config.get('entry_conditions', {}),
             'exit_conditions': config.get('exit_conditions', {}),
