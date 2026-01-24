@@ -85,7 +85,7 @@ class StrategyBrowserDialog(QMainWindow):
         
         title_label = QLabel("📚 Strategy Browser" if self.mode == 'open' else "💾 Save Strategy As")
         title_label.setFont(create_font(16, bold=True))
-        title_label.setStyleSheet(f"color: {get_color('text_primary')};")
+        title_label.setStyleSheet("color: #095983; font-size: 16pt; font-weight: bold;")
         header_layout.addWidget(title_label)
         
         header_layout.addStretch()
