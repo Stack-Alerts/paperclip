@@ -7,11 +7,11 @@ Replaces file-based new strategy workflow.
 """
 
 from typing import Optional
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLineEdit,
     QPushButton, QLabel, QTextEdit, QWidget
 )
-from PyQt6.QtCore import Qt
+from PyQt5.QtCore import Qt
 
 from src.optimizer_v3.database import get_database_manager
 from .styles import (
