@@ -253,23 +253,30 @@ class StrategyDatabaseManager:
         Returns:
             Latest version dict or None if no versions exist
         """
-        query = text("""
-            SELECT * FROM strategy_versions 
-            WHERE strategy_id = :strategy_id 
-            ORDER BY version_number DESC 
-            LIMIT 1
-        """)
-        
-        result = self.session.execute(query, {'strategy_id': strategy_id}).fetchone()
-        
-        if not result:
+        try:
+            query = text("""
+                SELECT * FROM strategy_versions 
+                WHERE strategy_id = :strategy_id 
+                ORDER BY version_number DESC 
+                LIMIT 1
+            """)
+            
+            result = self.session.execute(query, {'strategy_id': strategy_id}).fetchone()
+            
+            if not result:
+                return None
+            
+            # Convert to dict (JSONB columns already parsed by PostgreSQL)
+            version = dict(result._mapping)
+            
+            # No json.loads needed - JSONB columns return Python objects directly
+            return version
+            
+        except Exception as e:
+            # Rollback on any error to prevent transaction lock
+            self.session.rollback()
+            self.logger.error(f"Failed to get latest version for {strategy_id}: {e}")
             return None
-        
-        # Convert to dict (JSONB columns already parsed by PostgreSQL)
-        version = dict(result._mapping)
-        
-        # No json.loads needed - JSONB columns return Python objects directly
-        return version
     
     def get_strategy_version_by_number(
         self,
@@ -455,22 +462,29 @@ class StrategyDatabaseManager:
         Returns:
             List of strategy dicts with latest version metadata
         """
-        query = text("""
-            SELECT 
-                s.strategy_id,
-                s.name,
-                s.created_at,
-                s.updated_at,
-                MAX(sv.version_number) as latest_version
-            FROM strategies s
-            LEFT JOIN strategy_versions sv ON s.strategy_id = sv.strategy_id
-            GROUP BY s.strategy_id, s.name, s.created_at, s.updated_at
-            ORDER BY s.updated_at DESC
-        """)
-        
-        results = self.session.execute(query).fetchall()
-        
-        return [dict(row._mapping) for row in results]
+        try:
+            query = text("""
+                SELECT 
+                    s.strategy_id,
+                    s.name,
+                    s.created_at,
+                    s.updated_at,
+                    MAX(sv.version_number) as latest_version
+                FROM strategies s
+                LEFT JOIN strategy_versions sv ON s.strategy_id = sv.strategy_id
+                GROUP BY s.strategy_id, s.name, s.created_at, s.updated_at
+                ORDER BY s.updated_at DESC
+            """)
+            
+            results = self.session.execute(query).fetchall()
+            
+            return [dict(row._mapping) for row in results]
+            
+        except Exception as e:
+            # Rollback on any error to prevent transaction lock
+            self.session.rollback()
+            self.logger.error(f"Failed to get all strategies: {e}")
+            return []
     
     def _get_next_version_number(self, strategy_id: str) -> int:
         """
