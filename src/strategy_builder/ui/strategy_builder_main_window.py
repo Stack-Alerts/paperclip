@@ -434,13 +434,17 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_open_strategy(self):
         """Open strategy from database using StrategyBrowserDialog."""
-        # Show strategy browser dialog
-        dialog = StrategyBrowserDialog(mode='open', parent=self)
-        if dialog.exec_() != StrategyBrowserDialog.Accepted:
-            return  # User cancelled
+        # Create and show strategy browser window
+        browser = StrategyBrowserDialog(mode='open', parent=self)
         
-        # Get selected strategy
-        strategy_id, version_id = dialog.get_selected_strategy()
+        # Connect signal for when strategy is selected
+        browser.strategy_selected.connect(self._load_strategy_from_browser)
+        
+        # Show as non-modal window
+        browser.show()
+    
+    def _load_strategy_from_browser(self, strategy_id: str, version_id: str):
+        """Load strategy after selection from browser"""
         if not strategy_id or not version_id:
             QMessageBox.warning(self, "Open Failed", "No strategy selected")
             return

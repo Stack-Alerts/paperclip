@@ -11,11 +11,11 @@ Uses institutional-grade DATABASE-FIRST architecture.
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+    QMainWindow, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLabel, QLineEdit, QComboBox, QWidget, QHeaderView,
     QAbstractItemView
 )
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QSettings
 from PyQt5.QtGui import QFont
 
 from src.optimizer_v3.database import get_database_manager
@@ -31,9 +31,9 @@ from .styles import (
 )
 
 
-class StrategyBrowserDialog(QDialog):
+class StrategyBrowserDialog(QMainWindow):
     """
-    Strategy browser dialog for database-backed strategy management
+    Strategy browser window for database-backed strategy management
     
     Features:
     - Visual table of all strategies with metadata
@@ -63,6 +63,7 @@ class StrategyBrowserDialog(QDialog):
         self.db = None
         
         self._init_ui()
+        self._restore_settings()
         self._load_strategies()
     
     def _init_ui(self):
@@ -71,7 +72,11 @@ class StrategyBrowserDialog(QDialog):
         self.setMinimumSize(900, 600)
         self.setStyleSheet(get_dialog_stylesheet())
         
-        layout = QVBoxLayout(self)
+        # Create central widget
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        layout = QVBoxLayout(central_widget)
         layout.setSpacing(16)
         layout.setContentsMargins(24, 24, 24, 24)
         
@@ -415,8 +420,44 @@ class StrategyBrowserDialog(QDialog):
         """
         return (self.selected_strategy_id, self.selected_version_id)
     
+    def accept(self):
+        """Handle accept - emit signal and close"""
+        if self.selected_strategy_id and self.selected_version_id:
+            self.strategy_selected.emit(self.selected_strategy_id, self.selected_version_id)
+        self._save_settings()
+        self.close()
+    
+    def reject(self):
+        """Handle reject - just close"""
+        self._save_settings()
+        self.close()
+    
+    def _restore_settings(self):
+        """Restore window geometry and state"""
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        
+        # Restore geometry
+        geometry = settings.value("strategyBrowser/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+        else:
+            # Default size if no saved geometry
+            self.resize(1200, 800)
+        
+        # Restore window state
+        window_state = settings.value("strategyBrowser/windowState")
+        if window_state:
+            self.restoreState(window_state)
+    
+    def _save_settings(self):
+        """Save window geometry and state"""
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        settings.setValue("strategyBrowser/geometry", self.saveGeometry())
+        settings.setValue("strategyBrowser/windowState", self.saveState())
+    
     def closeEvent(self, event):
-        """Handle dialog close"""
+        """Handle window close"""
+        self._save_settings()
         if self.db:
             self.db.close()
         super().closeEvent(event)
