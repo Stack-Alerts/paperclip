@@ -59,6 +59,11 @@
 **Status**: ✅ COMPLETE (18/18 tasks, 2026-01-22)  
 **Purpose**: Context-aware recommendations, building block intelligence, one-click improvements
 
+#### **Sprint 1.6.1: AI Recommendations Database** (5-7 days, 15 tasks)
+**File**: `SPRINT_1_6_1_AI_RECOMMENDATIONS_DATABASE.md`  
+**Status**: 📋 Planning  
+**Purpose**: Database extension for AI recommendations, version tracking, duplicate detection
+
 #### **Sprint 1.7: Nested RECHECK Foundation** (1 day, 14 tasks)
 **File**: `SPRINT_1_7_NESTED_RECHECK_FOUNDATION.md`  
 **Status**: ✅ COMPLETE (14/14 tasks, 2026-01-22)  
@@ -138,6 +143,7 @@
 - [x] Sprint 1.4: UI Integration (10/10 tasks COMPLETE ✅ - Zero Hardcoded Styles)
 - [x] Sprint 1.5: Metrics Tab Real-Time Updates (8/8 tasks COMPLETE ✅ - Production tested)
 - [x] Sprint 1.6: Intelligent Recommendation System (18/18 tasks COMPLETE ✅ - 2026-01-22)
+- [ ] Sprint 1.6.1: AI Recommendations Database (0/15 tasks - Planning)
 - [x] Sprint 1.7: Nested RECHECK Foundation (14/14 tasks COMPLETE ✅ - 2026-01-22)
 - [ ] Sprint 2.1: Automated Trainer (20 tasks, 10 days)
 - [ ] Sprint 2.2: Signal Intelligence + Nested RECHECK Execution (37 tasks, 12 days)
