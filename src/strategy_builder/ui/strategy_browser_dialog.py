@@ -202,6 +202,9 @@ class StrategyBrowserDialog(QMainWindow):
         """Load strategies from database"""
         try:
             self.db = get_database_manager()
+            
+            # CRITICAL: Clear any previous failed transaction state
+            self.db.strategy.session.rollback()
 
             # Get all strategies with latest version info
             strategies = self.db.strategy.get_all_strategies()
