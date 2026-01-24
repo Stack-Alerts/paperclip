@@ -438,6 +438,85 @@ class StrategyBrowserDialog(QMainWindow):
             from .alert_dialog import show_error
             show_error(self, "Duplicate Strategy", "Error", f"Failed to duplicate strategy:\n{e}")
     
+    def _on_export(self):
+        """Handle export to JSON button click"""
+        if not self.selected_version_id:
+            return
+        
+        try:
+            from PyQt5.QtWidgets import QFileDialog
+            
+            # Get strategy version
+            version = self.db.strategy.get_strategy_version(self.selected_version_id)
+            
+            if not version:
+                from .alert_dialog import show_error
+                show_error(self, "Export Failed", "Error", "Strategy version not found")
+                return
+            
+            # Get save filename
+            settings = QSettings("BTC_Engine", "StrategyBuilder")
+            last_dir = settings.value("lastDirectory", "")
+            
+            filename, _ = QFileDialog.getSaveFileName(
+                self,
+                "Export Strategy to JSON",
+                f"{last_dir}/{version['name']}.json",
+                "Strategy Files (*.json);;All Files (*)"
+            )
+            
+            if not filename:
+                return  # User cancelled
+            
+            # Prepare export data (convert from persistence format to file format)
+            from src.strategy_builder.integration.strategy_builder_orchestrator import StrategyBuilderOrchestrator
+            
+            # Create temporary orchestrator for export
+            orch = StrategyBuilderOrchestrator()
+            
+            # Build config dict for export
+            export_dict = {
+                'name': version['name'],
+                'description': version.get('description', ''),
+                'blocks': version['blocks']
+            }
+            
+            # Use persistence to convert to full config then back to file format
+            config = orch.persistence._dict_to_config(export_dict)
+            
+            # Now save using orchestrator's save method
+            result = orch.save_strategy(filename)
+            
+            if result.success:
+                from .alert_dialog import show_success
+                show_success(
+                    self,
+                    "Export Successful",
+                    "Success",
+                    f"Strategy exported to:\n{filename}"
+                )
+            else:
+                from .alert_dialog import show_error
+                show_error(self, "Export Failed", "Error", f"Failed to export:\n{result.message}")
+                
+        except Exception as e:
+            from .alert_dialog import show_error
+            show_error(self, "Export Failed", "Error", f"Error exporting strategy:\n{e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_version_changed(self, index: int):
+        """Handle version selector change"""
+        if index < 0:
+            return
+        
+        # Get version_id from combo box data
+        version_id = self.version_selector.itemData(index)
+        
+        if version_id:
+            self.selected_version_id = version_id
+            # Could update table row to show selected version details
+    
     def get_selected_strategy(self) -> tuple[Optional[str], Optional[str]]:
         """
         Get selected strategy and version IDs
