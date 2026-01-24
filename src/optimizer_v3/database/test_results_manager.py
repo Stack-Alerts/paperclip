@@ -1,0 +1,495 @@
+"""
+Test Results Manager
+SPRINT 1.6.1 - Phase 1 Day 2
+
+Manages strategy test results and performance tracking
+for backtests, forward tests, and live trading validation.
+
+Institutional-grade implementation with:
+- Complete test result tracking
+- Performance metrics storage
+- Historical comparison
+- Regression detection
+"""
+
+from typing import Optional, List, Dict, Any
+from uuid import uuid4
+from datetime import datetime
+import json
+import logging
+from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
+
+
+class TestResultsManager:
+    """
+    Database manager for test results tracking and analysis
+    
+    Provides:
+    - Store backtest/forward test results
+    - Query by strategy, version, test type
+    - Compare performance across versions
+    - Detect performance regressions
+    - Track best performing versions
+    """
+    
+    def __init__(self, db_session: Session):
+        """
+        Initialize test results manager
+        
+        Args:
+            db_session: SQLAlchemy session for database operations
+        """
+        self.session = db_session
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+    
+    def create_test_result(self, test_data: Dict[str, Any]) -> str:
+        """
+        Create new test result record
+        
+        Args:
+            test_data: Test result details including:
+                - strategy_id (str): Strategy ID
+                - strategy_version_id (str): Version ID tested
+                - test_type (str): backtest, forward_test, paper_trade, live
+                - test_config (dict): Test configuration
+                - start_date (datetime): Test period start
+                - end_date (datetime): Test period end
+                - metrics (dict): Performance metrics
+                - trades (list, optional): Trade details
+                - equity_curve (list, optional): Equity curve data
+                - risk_metrics (dict, optional): Risk analysis
+                - errors (list, optional): Error log
+                - warnings (list, optional): Warning log
+                - notes (str, optional): Additional notes
+                
+        Returns:
+            result_id: UUID of created test result
+            
+        Raises:
+            ValueError: If required fields missing
+        """
+        # Validate required fields
+        required = ['strategy_id', 'strategy_version_id', 'test_type', 'test_config', 'start_date', 'end_date', 'metrics']
+        missing = [f for f in required if f not in test_data]
+        if missing:
+            raise ValueError(f"Missing required fields: {', '.join(missing)}")
+        
+        # Validate test type
+        valid_types = ['backtest', 'forward_test', 'paper_trade', 'live', 'walk_forward']
+        if test_data['test_type'] not in valid_types:
+            raise ValueError(f"Invalid test_type. Must be one of: {', '.join(valid_types)}")
+        
+        # Generate result ID
+        result_id = str(uuid4())
+        
+        # Extract key metrics
+        metrics = test_data['metrics']
+        
+        # Prepare data
+        data = {
+            'result_id': result_id,
+            'strategy_id': test_data['strategy_id'],
+            'strategy_version_id': test_data['strategy_version_id'],
+            'test_type': test_data['test_type'],
+            'test_config': json.dumps(test_data['test_config']),
+            'start_date': test_data['start_date'],
+            'end_date': test_data['end_date'],
+            'total_return_pct': metrics.get('total_return_pct'),
+            'sharpe_ratio': metrics.get('sharpe_ratio'),
+            'max_drawdown_pct': metrics.get('max_drawdown_pct'),
+            'win_rate': metrics.get('win_rate'),
+            'profit_factor': metrics.get('profit_factor'),
+            'total_trades': metrics.get('total_trades'),
+            'metrics': json.dumps(metrics),
+            'trades': json.dumps(test_data.get('trades')) if test_data.get('trades') else None,
+            'equity_curve': json.dumps(test_data.get('equity_curve')) if test_data.get('equity_curve') else None,
+            'risk_metrics': json.dumps(test_data.get('risk_metrics')) if test_data.get('risk_metrics') else None,
+            'errors': json.dumps(test_data.get('errors')) if test_data.get('errors') else None,
+            'warnings': json.dumps(test_data.get('warnings')) if test_data.get('warnings') else None,
+            'notes': test_data.get('notes')
+        }
+        
+        # Insert test result
+        query = """
+            INSERT INTO strategy_test_results (
+                result_id, strategy_id, strategy_version_id, test_type, test_config,
+                start_date, end_date, total_return_pct, sharpe_ratio, max_drawdown_pct,
+                win_rate, profit_factor, total_trades, metrics, trades, equity_curve,
+                risk_metrics, errors, warnings, notes
+            ) VALUES (
+                :result_id, :strategy_id, :strategy_version_id, :test_type, :test_config,
+                :start_date, :end_date, :total_return_pct, :sharpe_ratio, :max_drawdown_pct,
+                :win_rate, :profit_factor, :total_trades, :metrics, :trades, :equity_curve,
+                :risk_metrics, :errors, :warnings, :notes
+            )
+        """
+        
+        self.session.execute(query, data)
+        self.session.commit()
+        
+        self.logger.info(
+            f"Created test result: {result_id} "
+            f"(strategy: {test_data['strategy_id']}, version: {test_data['strategy_version_id']}, "
+            f"type: {test_data['test_type']})"
+        )
+        
+        return result_id
+    
+    def get_test_result(self, result_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get test result by ID
+        
+        Args:
+            result_id: Result UUID
+            
+        Returns:
+            Test result dict or None if not found
+        """
+        query = "SELECT * FROM strategy_test_results WHERE result_id = :result_id"
+        result = self.session.execute(query, {'result_id': result_id}).fetchone()
+        
+        if not result:
+            return None
+        
+        test = dict(result._mapping)
+        
+        # Parse JSON fields
+        json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'errors', 'warnings']
+        for field in json_fields:
+            if test.get(field):
+                test[field] = json.loads(test[field])
+        
+        return test
+    
+    def get_strategy_test_results(
+        self,
+        strategy_id: str,
+        test_type: Optional[str] = None,
+        limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get test results for a strategy
+        
+        Args:
+            strategy_id: Strategy ID
+            test_type: Optional filter by test type
+            limit: Optional limit number of results
+            
+        Returns:
+            List of test result dicts
+        """
+        query = "SELECT * FROM strategy_test_results WHERE strategy_id = :strategy_id"
+        params = {'strategy_id': strategy_id}
+        
+        if test_type:
+            query += " AND test_type = :test_type"
+            params['test_type'] = test_type
+        
+        query += " ORDER BY tested_at DESC"
+        
+        if limit:
+            query += f" LIMIT {limit}"
+        
+        results = self.session.execute(query, params).fetchall()
+        
+        tests = []
+        for row in results:
+            test = dict(row._mapping)
+            json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'errors', 'warnings']
+            for field in json_fields:
+                if test.get(field):
+                    test[field] = json.loads(test[field])
+            tests.append(test)
+        
+        return tests
+    
+    def get_version_test_results(
+        self,
+        version_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all test results for a specific version
+        
+        Args:
+            version_id: Strategy version ID
+            
+        Returns:
+            List of test result dicts
+        """
+        query = """
+            SELECT * FROM strategy_test_results 
+            WHERE strategy_version_id = :version_id 
+            ORDER BY tested_at DESC
+        """
+        
+        results = self.session.execute(query, {'version_id': version_id}).fetchall()
+        
+        tests = []
+        for row in results:
+            test = dict(row._mapping)
+            json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'errors', 'warnings']
+            for field in json_fields:
+                if test.get(field):
+                    test[field] = json.loads(test[field])
+            tests.append(test)
+        
+        return tests
+    
+    def get_latest_test_result(
+        self,
+        strategy_id: str,
+        version_id: str,
+        test_type: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get most recent test result for strategy version and test type
+        
+        Args:
+            strategy_id: Strategy ID
+            version_id: Version ID
+            test_type: Test type
+            
+        Returns:
+            Latest test result dict or None
+        """
+        query = """
+            SELECT * FROM strategy_test_results 
+            WHERE strategy_id = :strategy_id 
+            AND strategy_version_id = :version_id 
+            AND test_type = :test_type
+            ORDER BY tested_at DESC 
+            LIMIT 1
+        """
+        
+        result = self.session.execute(
+            query,
+            {
+                'strategy_id': strategy_id,
+                'version_id': version_id,
+                'test_type': test_type
+            }
+        ).fetchone()
+        
+        if not result:
+            return None
+        
+        test = dict(result._mapping)
+        json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'errors', 'warnings']
+        for field in json_fields:
+            if test.get(field):
+                test[field] = json.loads(test[field])
+        
+        return test
+    
+    def compare_versions(
+        self,
+        strategy_id: str,
+        version_ids: List[str],
+        test_type: str = 'backtest'
+    ) -> Dict[str, Any]:
+        """
+        Compare performance across multiple versions
+        
+        Args:
+            strategy_id: Strategy ID
+            version_ids: List of version IDs to compare
+            test_type: Test type to use for comparison
+            
+        Returns:
+            Dict with comparison results
+        """
+        if not version_ids:
+            return {'error': 'No version IDs provided'}
+        
+        placeholders = ', '.join([f':v{i}' for i in range(len(version_ids))])
+        
+        query = f"""
+            SELECT 
+                strategy_version_id,
+                AVG(total_return_pct) as avg_return,
+                AVG(sharpe_ratio) as avg_sharpe,
+                AVG(max_drawdown_pct) as avg_drawdown,
+                AVG(win_rate) as avg_win_rate,
+                AVG(profit_factor) as avg_profit_factor,
+                COUNT(*) as test_count
+            FROM strategy_test_results
+            WHERE strategy_id = :strategy_id
+            AND test_type = :test_type
+            AND strategy_version_id IN ({placeholders})
+            GROUP BY strategy_version_id
+        """
+        
+        params = {
+            'strategy_id': strategy_id,
+            'test_type': test_type
+        }
+        for i, vid in enumerate(version_ids):
+            params[f'v{i}'] = vid
+        
+        results = self.session.execute(query, params).fetchall()
+        
+        comparison = {
+            'strategy_id': strategy_id,
+            'test_type': test_type,
+            'versions': []
+        }
+        
+        for row in results:
+            comparison['versions'].append(dict(row._mapping))
+        
+        # Find best version by Sharpe ratio
+        if comparison['versions']:
+            best = max(comparison['versions'], key=lambda x: x['avg_sharpe'] or 0)
+            comparison['best_version'] = best['strategy_version_id']
+            comparison['best_sharpe'] = best['avg_sharpe']
+        
+        return comparison
+    
+    def detect_regression(
+        self,
+        strategy_id: str,
+        new_version_id: str,
+        baseline_version_id: str,
+        test_type: str = 'backtest',
+        threshold_pct: float = 10.0
+    ) -> Dict[str, Any]:
+        """
+        Detect performance regression between versions
+        
+        Args:
+            strategy_id: Strategy ID
+            new_version_id: New version to test
+            baseline_version_id: Baseline version to compare against
+            test_type: Test type to use
+            threshold_pct: Regression threshold percentage
+            
+        Returns:
+            Dict with regression analysis
+        """
+        # Get latest test for each version
+        new_test = self.get_latest_test_result(strategy_id, new_version_id, test_type)
+        baseline_test = self.get_latest_test_result(strategy_id, baseline_version_id, test_type)
+        
+        if not new_test or not baseline_test:
+            return {
+                'error': 'Missing test results for comparison',
+                'new_test_exists': new_test is not None,
+                'baseline_test_exists': baseline_test is not None
+            }
+        
+        # Compare key metrics
+        regression = {
+            'strategy_id': strategy_id,
+            'new_version_id': new_version_id,
+            'baseline_version_id': baseline_version_id,
+            'test_type': test_type,
+            'threshold_pct': threshold_pct,
+            'regressions': [],
+            'improvements': [],
+            'overall_status': 'pass'
+        }
+        
+        metrics_to_compare = [
+            ('total_return_pct', 'higher_is_better'),
+            ('sharpe_ratio', 'higher_is_better'),
+            ('max_drawdown_pct', 'lower_is_better'),
+            ('win_rate', 'higher_is_better'),
+            ('profit_factor', 'higher_is_better')
+        ]
+        
+        for metric, direction in metrics_to_compare:
+            new_val = new_test.get(metric)
+            baseline_val = baseline_test.get(metric)
+            
+            if new_val is None or baseline_val is None or baseline_val == 0:
+                continue
+            
+            change_pct = ((new_val - baseline_val) / abs(baseline_val)) * 100
+            
+            is_regression = (
+                (direction == 'higher_is_better' and change_pct < -threshold_pct) or
+                (direction == 'lower_is_better' and change_pct > threshold_pct)
+            )
+            
+            is_improvement = (
+                (direction == 'higher_is_better' and change_pct > threshold_pct) or
+                (direction == 'lower_is_better' and change_pct < -threshold_pct)
+            )
+            
+            if is_regression:
+                regression['regressions'].append({
+                    'metric': metric,
+                    'baseline_value': baseline_val,
+                    'new_value': new_val,
+                    'change_pct': change_pct
+                })
+                regression['overall_status'] = 'fail'
+            elif is_improvement:
+                regression['improvements'].append({
+                    'metric': metric,
+                    'baseline_value': baseline_val,
+                    'new_value': new_val,
+                    'change_pct': change_pct
+                })
+        
+        return regression
+    
+    def get_best_performing_version(
+        self,
+        strategy_id: str,
+        test_type: str = 'backtest',
+        metric: str = 'sharpe_ratio'
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get best performing version based on metric
+        
+        Args:
+            strategy_id: Strategy ID
+            test_type: Test type to consider
+            metric: Metric to optimize
+            
+        Returns:
+            Best version info dict or None
+        """
+        valid_metrics = [
+            'total_return_pct', 'sharpe_ratio', 'win_rate', 'profit_factor'
+        ]
+        
+        if metric not in valid_metrics:
+            raise ValueError(f"Invalid metric. Must be one of: {', '.join(valid_metrics)}")
+        
+        query = f"""
+            SELECT 
+                strategy_version_id,
+                AVG({metric}) as avg_metric,
+                COUNT(*) as test_count
+            FROM strategy_test_results
+            WHERE strategy_id = :strategy_id
+            AND test_type = :test_type
+            AND {metric} IS NOT NULL
+            GROUP BY strategy_version_id
+            ORDER BY avg_metric DESC
+            LIMIT 1
+        """
+        
+        result = self.session.execute(
+            query,
+            {
+                'strategy_id': strategy_id,
+                'test_type': test_type
+            }
+        ).fetchone()
+        
+        if not result:
+            return None
+        
+        return {
+            'strategy_id': strategy_id,
+            'version_id': result[0],
+            'metric': metric,
+            'metric_value': result[1],
+            'test_count': result[2],
+            'test_type': test_type
+        }
