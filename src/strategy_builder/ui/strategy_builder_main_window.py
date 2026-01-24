@@ -572,24 +572,28 @@ class StrategyBuilderMainWindow(QMainWindow):
             try:
                 self.current_version_id = db.strategy.create_strategy_version(version_data)
             except Exception as version_error:
-                # VERSION CREATION FAILED - Rollback everything
-                db.strategy.session.rollback()
+                # VERSION CREATION FAILED
+                # Note: create_strategy_version already rolled back
                 
-                # If we created the strategy in this save, delete it
+                # If we created the strategy in this save, delete the orphan
+                # Use a FRESH transaction (previous one was rolled back)
                 if created_strategy:
                     try:
                         from sqlalchemy import text
+                        # Execute delete in fresh transaction (no intermediate rollback needed)
                         db.strategy.session.execute(
                             text("DELETE FROM strategies WHERE strategy_id = :sid"),
                             {'sid': self.current_strategy_id}
                         )
                         db.strategy.session.commit()
-                    except:
+                    except Exception as cleanup_error:
+                        # Cleanup failed - log but don't block error reporting
                         db.strategy.session.rollback()
+                        print(f"Failed to cleanup orphaned strategy: {cleanup_error}")
                     
                     self.current_strategy_id = None
                 
-                # Re-raise the error
+                # Re-raise the original error
                 raise version_error
             
             # Mark as not modified
