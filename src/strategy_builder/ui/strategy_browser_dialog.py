@@ -105,22 +105,16 @@ class StrategyBrowserDialog(QMainWindow):
         # Filter row
         filter_layout = QHBoxLayout()
         
-        filter_label = QLabel("Filter:")
+        filter_label = QLabel("Strategy Type:")
         filter_label.setFont(create_font(10))
         filter_label.setStyleSheet(f"color: {get_color('text_secondary')};")
         filter_layout.addWidget(filter_label)
         
         self.type_filter = QComboBox()
-        self.type_filter.addItems(["All Types", "Reversal", "Continuation", "Breakout", "Range", "Custom"])
-        fix_combobox_white_bars(self.type_filter)  # Comprehensive fix (EXACT pattern from block_search_panel)
+        self.type_filter.addItems(["All", "Bullish", "Bearish"])
+        fix_combobox_white_bars(self.type_filter)
         self.type_filter.currentTextChanged.connect(self._apply_filters)
         filter_layout.addWidget(self.type_filter)
-        
-        self.version_filter = QComboBox()
-        self.version_filter.addItems(["Latest Version", "All Versions"])
-        fix_combobox_white_bars(self.version_filter)  # Comprehensive fix (EXACT pattern from block_search_panel)
-        self.version_filter.currentTextChanged.connect(self._apply_filters)
-        filter_layout.addWidget(self.version_filter)
         
         filter_layout.addStretch()
         
@@ -145,14 +139,25 @@ class StrategyBrowserDialog(QMainWindow):
         self.table.verticalHeader().setVisible(False)
         self.table.setAlternatingRowColors(True)
         
-        # Column widths
+        # Column widths - Make columns 2x wider minimum
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # Name
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Type
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Version
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Modified
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Tests
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Performance
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # Name (flexible)
+        header.setMinimumSectionSize(120)  # Minimum width for all columns
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)  # Type
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)  # Version
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)  # Modified
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)  # Tests
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Interactive)  # Performance
+        
+        # Set initial widths (2x wider than before)
+        header.resizeSection(1, 140)  # Type
+        header.resizeSection(2, 120)  # Version
+        header.resizeSection(3, 200)  # Last Modified
+        header.resizeSection(4, 100)  # Tests
+        header.resizeSection(5, 180)  # Performance
+        
+        # Enable sorting (clickable headers with sort indicators)
+        self.table.setSortingEnabled(True)
         
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.table.itemDoubleClicked.connect(self._on_double_click)
@@ -272,13 +277,9 @@ class StrategyBrowserDialog(QMainWindow):
             name_item.setData(Qt.ItemDataRole.UserRole, strategy)
             self.table.setItem(row, 0, name_item)
             
-            # Type (from tags)
-            tags = strategy.get('tags', [])
-            strategy_type = "Custom"
-            for tag in tags:
-                if tag.lower() in ['reversal', 'continuation', 'breakout', 'range']:
-                    strategy_type = tag.capitalize()
-                    break
+            # Type - Show Bullish/Bearish based on strategy name
+            strategy_name = strategy['name'].upper()
+            strategy_type = "Bullish" if "BULLISH" in strategy_name else "Bearish" if "BEARISH" in strategy_name else "Unknown"
             self.table.setItem(row, 1, QTableWidgetItem(strategy_type))
             
             # Version - Create dropdown with all versions
@@ -327,27 +328,49 @@ class StrategyBrowserDialog(QMainWindow):
         self._apply_filters()
     
     def _apply_filters(self):
-        """Apply search and filters"""
+        """Apply search and filters with multi-field search"""
         search_text = self.search_input.text().lower()
         type_filter = self.type_filter.currentText()
-        version_filter = self.version_filter.currentText()
         
         filtered = []
         
         for strategy in self.all_strategies:
-            # Apply search
-            if search_text and search_text not in strategy['name'].lower():
-                if search_text not in strategy.get('description', '').lower():
+            # Multi-field search: name, description, type, date
+            if search_text:
+                # Search in name
+                name_match = search_text in strategy['name'].lower()
+                
+                # Search in description
+                desc_match = search_text in strategy.get('description', '').lower()
+                
+                # Search in strategy type (bullish/bearish)
+                strategy_name = strategy['name'].upper()
+                type_text = "bullish" if "BULLISH" in strategy_name else "bearish" if "BEARISH" in strategy_name else "unknown"
+                type_match = search_text in type_text
+                
+                # Search in date
+                created_at = strategy['created_at']
+                if isinstance(created_at, datetime):
+                    date_str = created_at.strftime("%Y-%m-%d").lower()
+                else:
+                    date_str = str(created_at).lower()
+                date_match = search_text in date_str
+                
+                # Search in blocks (if blocks data available)
+                blocks_match = False
+                # TODO: Could search in blocks data when we have access to it
+                
+                # If no match in any field, skip
+                if not (name_match or desc_match or type_match or date_match or blocks_match):
                     continue
             
-            # Apply type filter
-            if type_filter != "All Types":
-                tags = [t.lower() for t in strategy.get('tags', [])]
-                if type_filter.lower() not in tags:
+            # Apply type filter (Bullish/Bearish)
+            if type_filter != "All":
+                strategy_name = strategy['name'].upper()
+                if type_filter == "Bullish" and "BULLISH" not in strategy_name:
                     continue
-            
-            # Version filter handled during load (showing latest only currently)
-            # Could be extended for showing all versions
+                elif type_filter == "Bearish" and "BEARISH" not in strategy_name:
+                    continue
             
             filtered.append(strategy)
         
