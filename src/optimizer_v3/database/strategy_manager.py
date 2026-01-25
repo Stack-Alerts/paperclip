@@ -387,28 +387,89 @@ class StrategyDatabaseManager:
         
         return updated
     
+    def delete_strategy(self, strategy_id: str) -> bool:
+        """
+        Delete entire strategy and all its versions
+        
+        Args:
+            strategy_id: Strategy ID to delete
+            
+        Returns:
+            True if deleted, False if not found
+        """
+        try:
+            # Check if strategy exists
+            check_query = text("SELECT strategy_id FROM strategies WHERE strategy_id = :strategy_id")
+            result = self.session.execute(check_query, {'strategy_id': strategy_id}).fetchone()
+            
+            if not result:
+                return False
+            
+            # Delete all versions first (foreign key constraint)
+            delete_versions = text("DELETE FROM strategy_versions WHERE strategy_id = :strategy_id")
+            self.session.execute(delete_versions, {'strategy_id': strategy_id})
+            
+            # Delete strategy parent
+            delete_strategy = text("DELETE FROM strategies WHERE strategy_id = :strategy_id")
+            self.session.execute(delete_strategy, {'strategy_id': strategy_id})
+            
+            # Commit transaction
+            self.session.commit()
+            
+            self.logger.info(f"Deleted strategy and all versions: {strategy_id}")
+            return True
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to delete strategy {strategy_id}: {e}")
+            raise
+    
     def delete_strategy_version(self, version_id: str) -> bool:
         """
-        Delete strategy version (soft delete by marking as deleted)
+        Delete a specific strategy version
         
-        Note: Actual deletion not implemented for data integrity
-        This is a placeholder for future soft-delete functionality
+        Note: Cannot delete if it's the only version of a strategy
         
         Args:
             version_id: Version UUID
             
         Returns:
-            True if deleted, False if not found
+            True if deleted, False if not found or is last version
         """
-        # For now, just verify version exists
-        query = text("SELECT version_id FROM strategy_versions WHERE version_id = :version_id")
-        result = self.session.execute(query, {'version_id': version_id}).fetchone()
-        
-        if result:
-            self.logger.warning(f"Delete requested for version {version_id} - not implemented (data integrity)")
+        try:
+            # Get strategy_id for this version
+            query = text("SELECT strategy_id FROM strategy_versions WHERE version_id = :version_id")
+            result = self.session.execute(query, {'version_id': version_id}).fetchone()
+            
+            if not result:
+                return False
+            
+            strategy_id = result[0]
+            
+            # Check how many versions exist
+            count_query = text("SELECT COUNT(*) FROM strategy_versions WHERE strategy_id = :strategy_id")
+            count_result = self.session.execute(count_query, {'strategy_id': strategy_id}).fetchone()
+            version_count = count_result[0]
+            
+            # Don't delete if it's the only version - delete entire strategy instead
+            if version_count <= 1:
+                self.logger.warning(f"Cannot delete last version {version_id} - delete strategy instead")
+                return False
+            
+            # Delete the version
+            delete_query = text("DELETE FROM strategy_versions WHERE version_id = :version_id")
+            self.session.execute(delete_query, {'version_id': version_id})
+            
+            # Commit transaction
+            self.session.commit()
+            
+            self.logger.info(f"Deleted strategy version: {version_id}")
             return True
-        
-        return False
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to delete version {version_id}: {e}")
+            raise
     
     def calculate_config_hash(self, config: Dict[str, Any]) -> str:
         """

@@ -395,21 +395,25 @@ class StrategyBrowserDialog(QMainWindow):
             self,
             "Delete Strategy",
             "Confirm Deletion",
-            "Are you sure you want to delete this strategy?\n\nThis action cannot be undone.",
+            "Are you sure you want to delete this strategy and ALL its versions?\n\n"
+            "This action cannot be undone.",
             icon="warning"
         )
         
         if result == 'yes':
             try:
-                # Delete strategy version (Note: actual deletion not implemented in manager yet)
-                # For now, just mark as deleted or skip
-                # self.db.strategy.delete_strategy_version(self.selected_version_id)
+                # Delete entire strategy and all versions
+                deleted = self.db.strategy.delete_strategy(self.selected_strategy_id)
                 
-                # Reload strategies
-                self._load_strategies()
-                
-                from .alert_dialog import show_success
-                show_success(self, "Delete Strategy", "Success", "Strategy deleted successfully")
+                if deleted:
+                    # Reload strategies to refresh list
+                    self._load_strategies()
+                    
+                    from .alert_dialog import show_success
+                    show_success(self, "Delete Strategy", "Success", "Strategy deleted successfully")
+                else:
+                    from .alert_dialog import show_error
+                    show_error(self, "Delete Strategy", "Error", "Strategy not found")
                 
             except Exception as e:
                 from .alert_dialog import show_error
