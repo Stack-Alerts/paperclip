@@ -332,7 +332,7 @@ class StrategyBrowserDialog(QMainWindow):
                         display_name = latest['name']
                         if blocks_summary:
                             # Color-coded format for readability
-                            # Strategy name: white/default
+                            # Strategy name: light grey (#CCCCCC) - readable on dark background
                             # Block names: cyan (#00BCD4)
                             # Signals: light green (#81C784)
                             # Separators: dim gray (#666666)
@@ -355,7 +355,7 @@ class StrategyBrowserDialog(QMainWindow):
                                     colored_blocks.append(f'<span style="color: #00BCD4;">{block_part}</span>')
                             
                             colored_summary = ' <span style="color: #666666;">|</span> '.join(colored_blocks)
-                            display_name = f'{latest["name"]} <span style="color: #666666;">-</span> {colored_summary}'
+                            display_name = f'<span style="color: #CCCCCC;">{latest["name"]}</span> <span style="color: #666666;">-</span> {colored_summary}'
                         
                         self.all_strategies.append({
                             'strategy_id': strategy['strategy_id'],
