@@ -150,11 +150,11 @@ class StrategyBrowserDialog(QMainWindow):
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Interactive)  # Performance
         
         # Set initial widths (2x wider than before)
-        header.resizeSection(1, 140)  # Type
-        header.resizeSection(2, 120)  # Version
-        header.resizeSection(3, 200)  # Last Modified
-        header.resizeSection(4, 100)  # Tests
-        header.resizeSection(5, 180)  # Performance
+        header.resizeSection(1, 240)  # Type
+        header.resizeSection(2, 240)  # Version
+        header.resizeSection(3, 400)  # Last Modified
+        header.resizeSection(4, 150)  # Tests
+        header.resizeSection(5, 240)  # Performance
         
         # Enable sorting (clickable headers with sort indicators)
         self.table.setSortingEnabled(True)
@@ -239,6 +239,25 @@ class StrategyBrowserDialog(QMainWindow):
                             if sharpe:
                                 best_perf = f"Sharpe: {sharpe:.2f}"
 
+                        # Extract strategy_type from blocks data
+                        strategy_type = "Unknown"
+                        blocks_data = latest.get('blocks', [])
+                        if blocks_data and len(blocks_data) > 0:
+                            # Strategy type is stored at the top level of the first block's parent config
+                            # Or we can check the name for Bullish/Bearish as fallback
+                            pass
+                        
+                        # Fallback: detect from name
+                        name_upper = latest['name'].upper()
+                        if 'BULLISH' in name_upper:
+                            strategy_type = "Bullish"
+                        elif 'BEARISH' in name_upper:
+                            strategy_type = "Bearish"
+                        elif 'HOD' in name_upper or 'HIGH' in name_upper or 'RESISTANCE' in name_upper:
+                            strategy_type = "Bearish"  # HOD rejection is bearish
+                        elif 'LOD' in name_upper or 'LOW' in name_upper or 'SUPPORT' in name_upper:
+                            strategy_type = "Bullish"  # LOD rejection is bullish
+                        
                         self.all_strategies.append({
                             'strategy_id': strategy['strategy_id'],
                             'version_id': latest['version_id'],
@@ -248,7 +267,8 @@ class StrategyBrowserDialog(QMainWindow):
                             'created_at': latest['created_at'],
                             'test_count': test_count,
                             'performance': best_perf,
-                            'tags': latest.get('tags', [])
+                            'tags': latest.get('tags', []),
+                            'strategy_type': strategy_type
                         })
                     
                 except Exception as e:
@@ -277,9 +297,8 @@ class StrategyBrowserDialog(QMainWindow):
             name_item.setData(Qt.ItemDataRole.UserRole, strategy)
             self.table.setItem(row, 0, name_item)
             
-            # Type - Show Bullish/Bearish based on strategy name
-            strategy_name = strategy['name'].upper()
-            strategy_type = "Bullish" if "BULLISH" in strategy_name else "Bearish" if "BEARISH" in strategy_name else "Unknown"
+            # Type - Show Bullish/Bearish from stored strategy_type
+            strategy_type = strategy.get('strategy_type', 'Unknown')
             self.table.setItem(row, 1, QTableWidgetItem(strategy_type))
             
             # Version - Create dropdown with all versions
@@ -344,8 +363,7 @@ class StrategyBrowserDialog(QMainWindow):
                 desc_match = search_text in strategy.get('description', '').lower()
                 
                 # Search in strategy type (bullish/bearish)
-                strategy_name = strategy['name'].upper()
-                type_text = "bullish" if "BULLISH" in strategy_name else "bearish" if "BEARISH" in strategy_name else "unknown"
+                type_text = strategy.get('strategy_type', 'Unknown').lower()
                 type_match = search_text in type_text
                 
                 # Search in date
@@ -366,10 +384,7 @@ class StrategyBrowserDialog(QMainWindow):
             
             # Apply type filter (Bullish/Bearish)
             if type_filter != "All":
-                strategy_name = strategy['name'].upper()
-                if type_filter == "Bullish" and "BULLISH" not in strategy_name:
-                    continue
-                elif type_filter == "Bearish" and "BEARISH" not in strategy_name:
+                if type_filter != strategy.get('strategy_type', 'Unknown'):
                     continue
             
             filtered.append(strategy)
