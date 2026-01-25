@@ -401,9 +401,11 @@ class StrategyBrowserDialog(QMainWindow):
             name_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             self.table.setItem(row, 0, name_item)
             
-            # Type - Show Bullish/Bearish from stored strategy_type
+            # Type - Show Bullish/Bearish from stored strategy_type (centered)
             strategy_type = strategy.get('strategy_type', 'Unknown')
-            self.table.setItem(row, 1, QTableWidgetItem(strategy_type))
+            type_item = QTableWidgetItem(strategy_type)
+            type_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 1, type_item)
             
             # Version - Create dropdown with all versions
             version_combo = QComboBox()
@@ -430,19 +432,25 @@ class StrategyBrowserDialog(QMainWindow):
             
             self.table.setCellWidget(row, 2, version_combo)
             
-            # Last Modified
+            # Last Modified (centered)
             created_at = strategy['created_at']
             if isinstance(created_at, datetime):
                 time_str = created_at.strftime("%Y-%m-%d %H:%M")
             else:
                 time_str = str(created_at)[:16]
-            self.table.setItem(row, 3, QTableWidgetItem(time_str))
+            modified_item = QTableWidgetItem(time_str)
+            modified_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 3, modified_item)
             
-            # Tests
-            self.table.setItem(row, 4, QTableWidgetItem(str(strategy['test_count'])))
+            # Tests (centered)
+            tests_item = QTableWidgetItem(str(strategy['test_count']))
+            tests_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 4, tests_item)
             
-            # Performance
-            self.table.setItem(row, 5, QTableWidgetItem(strategy['performance']))
+            # Performance (centered)
+            perf_item = QTableWidgetItem(strategy['performance'])
+            perf_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 5, perf_item)
         
         self._update_count_label(len(strategies))
     
