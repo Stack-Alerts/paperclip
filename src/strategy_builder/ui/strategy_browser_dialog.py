@@ -281,10 +281,34 @@ class StrategyBrowserDialog(QMainWindow):
                         elif 'LOD' in name_upper or 'LOW' in name_upper or 'SUPPORT' in name_upper:
                             strategy_type = "Bullish"  # LOD rejection is bullish
                         
-                        # Build enriched display name
+                        # Build enriched display name with HTML color coding
                         display_name = latest['name']
                         if blocks_summary:
-                            display_name = f"{latest['name']} - {blocks_summary}"
+                            # Color-coded format for readability
+                            # Strategy name: white/default
+                            # Block names: cyan (#00BCD4)
+                            # Signals: light green (#81C784)
+                            # Separators: dim gray (#666666)
+                            
+                            # Parse blocks_summary and add colors
+                            colored_blocks = []
+                            for block_part in blocks_summary.split(' | '):
+                                if '[' in block_part and ']' in block_part:
+                                    # Has signals
+                                    block_name, signals_part = block_part.split(' [', 1)
+                                    signals = signals_part.rstrip(']')
+                                    colored_blocks.append(
+                                        f'<span style="color: #00BCD4;">{block_name}</span> '
+                                        f'<span style="color: #666666;">[</span>'
+                                        f'<span style="color: #81C784;">{signals}</span>'
+                                        f'<span style="color: #666666;">]</span>'
+                                    )
+                                else:
+                                    # No signals, just block name
+                                    colored_blocks.append(f'<span style="color: #00BCD4;">{block_part}</span>')
+                            
+                            colored_summary = ' <span style="color: #666666;">|</span> '.join(colored_blocks)
+                            display_name = f'{latest["name"]} <span style="color: #666666;">-</span> {colored_summary}'
                         
                         self.all_strategies.append({
                             'strategy_id': strategy['strategy_id'],
@@ -321,10 +345,13 @@ class StrategyBrowserDialog(QMainWindow):
             row = self.table.rowCount()
             self.table.insertRow(row)
             
-            # Name - Use enriched display name with blocks
+            # Name - Use enriched display name with blocks (HTML formatted)
             display_name = strategy.get('display_name', strategy['name'])
-            name_item = QTableWidgetItem(display_name)
+            name_item = QTableWidgetItem()
+            name_item.setData(Qt.ItemDataRole.DisplayRole, display_name) 
             name_item.setData(Qt.ItemDataRole.UserRole, strategy)
+            # Enable HTML/rich text rendering
+            name_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             self.table.setItem(row, 0, name_item)
             
             # Type - Show Bullish/Bearish from stored strategy_type
