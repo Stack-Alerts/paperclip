@@ -250,14 +250,13 @@ class StrategyBrowserDialog(QMainWindow):
                     # Skip strategies that fail to load (data corruption or missing versions)
                     # Rollback to clear failed state and continue with next strategy
                     self.db.strategy.session.rollback()
-                    import logging
-                    logging.error(f"Skipping strategy {strategy.get('strategy_id', 'unknown')}: {e}")
+                    print(f"⚠️ Skipping strategy {strategy.get('strategy_id', 'unknown')}: {e}")
                     continue
 
             self._populate_table(self.all_strategies)
 
         except Exception as e:
-            self.logger.error(f"Error loading strategies: {e}")
+            print(f"❌ Error loading strategies: {e}")
             self.all_strategies = []
     
     def _populate_table(self, strategies: List[Dict[str, Any]]):
