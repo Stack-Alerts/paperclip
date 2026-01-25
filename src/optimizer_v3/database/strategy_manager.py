@@ -204,6 +204,9 @@ class StrategyDatabaseManager:
         Returns:
             Complete strategy version dict or None if not found
         """
+        # CRITICAL: Rollback any previous failed transaction before querying
+        self.session.rollback()
+        
         query = text("""
             SELECT * FROM strategy_versions WHERE version_id = :version_id
         """)
@@ -229,6 +232,9 @@ class StrategyDatabaseManager:
         Returns:
             List of all version dicts, ordered by version number (newest first)
         """
+        # CRITICAL: Rollback any previous failed transaction before querying
+        self.session.rollback()
+        
         try:
             query = text("""
                 SELECT * FROM strategy_versions 
@@ -260,6 +266,9 @@ class StrategyDatabaseManager:
         Returns:
             Latest version dict or None if no versions exist
         """
+        # CRITICAL: Rollback any previous failed transaction before querying
+        self.session.rollback()
+        
         try:
             query = text("""
                 SELECT * FROM strategy_versions 
@@ -469,6 +478,9 @@ class StrategyDatabaseManager:
         Returns:
             List of strategy dicts with latest version metadata
         """
+        # CRITICAL: Rollback any previous failed transaction before querying
+        self.session.rollback()
+        
         try:
             query = text("""
                 SELECT 
