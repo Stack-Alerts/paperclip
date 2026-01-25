@@ -283,7 +283,6 @@ class StrategyBrowserDialog(QMainWindow):
             
             # Version - Create dropdown with all versions
             version_combo = QComboBox()
-            fix_combobox_white_bars(version_combo)
             
             # Get all versions for this strategy
             all_versions = self.db.strategy.get_strategy_versions(strategy['strategy_id'])
@@ -296,6 +295,9 @@ class StrategyBrowserDialog(QMainWindow):
                 # Mark current version
                 if ver['version_id'] == strategy['version_id']:
                     current_version_index = i
+            
+            # CRITICAL: Apply fix AFTER items added (same as filter dropdowns)
+            fix_combobox_white_bars(version_combo)
             
             version_combo.setCurrentIndex(current_version_index)
             version_combo.currentIndexChanged.connect(
