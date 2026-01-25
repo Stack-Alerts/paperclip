@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QLabel, QLineEdit, QComboBox, QWidget, QHeaderView,
     QAbstractItemView, QStyledItemDelegate, QStyleOptionViewItem
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QModelIndex
+from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QModelIndex, QRectF
 from PyQt5.QtGui import QFont, QTextDocument, QAbstractTextDocumentLayout, QPalette
 
 from src.optimizer_v3.database import get_database_manager
@@ -60,7 +60,8 @@ class HTMLDelegate(QStyledItemDelegate):
         painter.translate(options.rect.left(), options.rect.top())
         clip = options.rect.adjusted(0, 0, -options.rect.left(), -options.rect.top())
         doc.setTextWidth(clip.width())
-        doc.drawContents(painter, clip)
+        # Convert QRect to QRectF for drawContents
+        doc.drawContents(painter, QRectF(clip))
         
         painter.restore()
     
