@@ -239,15 +239,38 @@ class StrategyBrowserDialog(QMainWindow):
                             if sharpe:
                                 best_perf = f"Sharpe: {sharpe:.2f}"
 
-                        # Extract strategy_type from blocks data
+                        # Extract strategy_type and blocks summary
                         strategy_type = "Unknown"
+                        blocks_summary = ""
                         blocks_data = latest.get('blocks', [])
-                        if blocks_data and len(blocks_data) > 0:
-                            # Strategy type is stored at the top level of the first block's parent config
-                            # Or we can check the name for Bullish/Bearish as fallback
-                            pass
                         
-                        # Fallback: detect from name
+                        if blocks_data and len(blocks_data) > 0:
+                            # Build blocks summary: block_name [signals]
+                            block_parts = []
+                            for block in blocks_data[:3]:  # Limit to first 3 blocks
+                                block_name = block.get('name', 'unknown')
+                                signals = block.get('signals', [])
+                                
+                                # Get key signal names
+                                signal_names = []
+                                for signal in signals[:2]:  # Max 2 signals per block
+                                    sig_name = signal.get('name', '') if isinstance(signal, dict) else str(signal)
+                                    if sig_name:
+                                        # Clean up signal name (remove common prefixes)
+                                        clean_name = sig_name.replace('_', ' ').title()
+                                        signal_names.append(clean_name)
+                                
+                                if signal_names:
+                                    block_parts.append(f"{block_name} [{', '.join(signal_names)}]")
+                                else:
+                                    block_parts.append(block_name)
+                            
+                            if block_parts:
+                                blocks_summary = " | ".join(block_parts)
+                                if len(blocks_data) > 3:
+                                    blocks_summary += f" + {len(blocks_data) - 3} more"
+                        
+                        # Detect strategy type from name
                         name_upper = latest['name'].upper()
                         if 'BULLISH' in name_upper:
                             strategy_type = "Bullish"
@@ -258,10 +281,16 @@ class StrategyBrowserDialog(QMainWindow):
                         elif 'LOD' in name_upper or 'LOW' in name_upper or 'SUPPORT' in name_upper:
                             strategy_type = "Bullish"  # LOD rejection is bullish
                         
+                        # Build enriched display name
+                        display_name = latest['name']
+                        if blocks_summary:
+                            display_name = f"{latest['name']} - {blocks_summary}"
+                        
                         self.all_strategies.append({
                             'strategy_id': strategy['strategy_id'],
                             'version_id': latest['version_id'],
                             'name': latest['name'],
+                            'display_name': display_name,  # Enriched name with blocks
                             'description': latest.get('description', ''),
                             'version_number': latest['version_number'],
                             'created_at': latest['created_at'],
@@ -292,8 +321,9 @@ class StrategyBrowserDialog(QMainWindow):
             row = self.table.rowCount()
             self.table.insertRow(row)
             
-            # Name
-            name_item = QTableWidgetItem(strategy['name'])
+            # Name - Use enriched display name with blocks
+            display_name = strategy.get('display_name', strategy['name'])
+            name_item = QTableWidgetItem(display_name)
             name_item.setData(Qt.ItemDataRole.UserRole, strategy)
             self.table.setItem(row, 0, name_item)
             
