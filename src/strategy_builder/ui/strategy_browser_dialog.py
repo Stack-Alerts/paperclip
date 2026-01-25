@@ -13,10 +13,10 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QMainWindow, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLabel, QLineEdit, QComboBox, QWidget, QHeaderView,
-    QAbstractItemView
+    QAbstractItemView, QStyledItemDelegate, QStyleOptionViewItem
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QSettings
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QModelIndex
+from PyQt5.QtGui import QFont, QTextDocument, QAbstractTextDocumentLayout, QPalette
 
 from src.optimizer_v3.database import get_database_manager
 from .styles import (
@@ -31,6 +31,49 @@ from .styles import (
 )
 # Import universal combo box fix (EXACTLY like block_search_panel.py)
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
+
+
+class HTMLDelegate(QStyledItemDelegate):
+    """Custom delegate to render HTML in table cells"""
+    
+    def paint(self, painter, option: QStyleOptionViewItem, index: QModelIndex):
+        """Paint HTML content"""
+        options = QStyleOptionViewItem(option)
+        self.initStyleOption(options, index)
+        
+        painter.save()
+        
+        # Create text document for HTML rendering
+        doc = QTextDocument()
+        doc.setHtml(options.text)
+        
+        # Set text color from palette
+        doc.setDefaultStyleSheet("body { color: #FFFFFF; }")
+        
+        # Clear text in options (we'll draw it ourselves)
+        options.text = ""
+        
+        # Draw background and borders
+        options.widget.style().drawControl(options.widget.style().ControlElement.CE_ItemViewItem, options, painter)
+        
+        # Draw HTML text
+        painter.translate(options.rect.left(), options.rect.top())
+        clip = options.rect.adjusted(0, 0, -options.rect.left(), -options.rect.top())
+        doc.setTextWidth(clip.width())
+        doc.drawContents(painter, clip)
+        
+        painter.restore()
+    
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex):
+        """Calculate size hint for HTML content"""
+        options = QStyleOptionViewItem(option)
+        self.initStyleOption(options, index)
+        
+        doc = QTextDocument()
+        doc.setHtml(options.text)
+        doc.setTextWidth(option.rect.width())
+        
+        return doc.size().toSize()
 
 
 class StrategyBrowserDialog(QMainWindow):
@@ -158,6 +201,9 @@ class StrategyBrowserDialog(QMainWindow):
         
         # Enable sorting (clickable headers with sort indicators)
         self.table.setSortingEnabled(True)
+        
+        # Set HTML delegate for name column (column 0) to render rich text
+        self.table.setItemDelegateForColumn(0, HTMLDelegate(self.table))
         
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.table.itemDoubleClicked.connect(self._on_double_click)
