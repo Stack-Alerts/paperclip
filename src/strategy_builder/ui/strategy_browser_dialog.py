@@ -1224,13 +1224,26 @@ class StrategyBrowserDialog(QMainWindow):
             settings = QSettings("BTC_Engine", "StrategyBuilder")
             last_dir = settings.value("lastDirectory", "")
             
-            # Show file dialog
-            filename, _ = QFileDialog.getOpenFileName(
-                self,
-                "Import Strategy from JSON",
-                last_dir,
-                "Strategy Files (*.json);;All Files (*)"
-            )
+            # Create file dialog with 2x size
+            dialog = QFileDialog(self)
+            dialog.setWindowTitle("Import Strategy from JSON")
+            dialog.setNameFilter("Strategy Files (*.json);;All Files (*)")
+            dialog.setDirectory(last_dir)
+            dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+            dialog.setOption(QFileDialog.Option.DontUseNativeDialog, False)
+            
+            # Set 2x larger size (default ~800x600, make it 1600x1200)
+            dialog.resize(1600, 1200)
+            
+            # Show dialog and get result
+            if dialog.exec_() != QFileDialog.Accepted:
+                return  # User cancelled
+            
+            files = dialog.selectedFiles()
+            if not files:
+                return
+            
+            filename = files[0]
             
             if not filename:
                 return  # User cancelled
