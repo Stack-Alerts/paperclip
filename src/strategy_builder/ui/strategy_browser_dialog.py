@@ -393,6 +393,11 @@ class StrategyBrowserDialog(QMainWindow):
             self.export_btn.setEnabled(False)
             self.export_btn.clicked.connect(self._on_export)
             button_layout.addWidget(self.export_btn)
+            
+            self.import_btn = QPushButton("📤 Import from JSON")
+            self.import_btn.setStyleSheet(get_secondary_button_stylesheet())
+            self.import_btn.clicked.connect(self._on_import)
+            button_layout.addWidget(self.import_btn)
         
         button_layout.addStretch()
         
@@ -1073,22 +1078,90 @@ class StrategyBrowserDialog(QMainWindow):
                 show_error(self, "Delete Strategy", "Error", f"Failed to delete strategy:\n{e}")
     
     def _on_duplicate(self):
-        """Handle duplicate button click"""
+        """Handle duplicate button with modal choice: new version or new strategy"""
         if not self.selected_version_id:
             return
         
         try:
             # Get current version
             version = self.db.strategy.get_strategy_version(self.selected_version_id)
+            if not version:
+                return
             
-            if version:
-                # Create new strategy with duplicated data
-                new_strategy_id = self.db.strategy.create_strategy(f"{version['name']} (Copy)")
-                
-                # Create new version with same config
+            # Show choice modal using QuestionDialog pattern from alert_dialog
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QRadioButton, QLineEdit, QDialogButtonBox, QButtonGroup
+            
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Duplicate Strategy")
+            dialog.setStyleSheet(get_main_stylesheet())
+            dialog.setMinimumWidth(400)
+            
+            layout = QVBoxLayout(dialog)
+            layout.setSpacing(16)
+            layout.setContentsMargins(20, 20, 20, 20)
+            
+            # Title
+            title = QLabel("How would you like to duplicate this strategy?")
+            title.setFont(create_font(12, bold=True))
+            title.setStyleSheet(f"color: {get_color('text_primary')};")
+            layout.addWidget(title)
+            
+            # Options
+            button_group = QButtonGroup(dialog)
+            
+            option1 = QRadioButton("Duplicate as new version of existing strategy")
+            option1.setFont(create_font(10))
+            option1.setStyleSheet(f"color: {get_color('text_secondary')};")
+            option1.setChecked(True)
+            button_group.addButton(option1, 1)
+            layout.addWidget(option1)
+            
+            option2 = QRadioButton("Duplicate as new strategy")
+            option2.setFont(create_font(10))
+            option2.setStyleSheet(f"color: {get_color('text_secondary')};")
+            button_group.addButton(option2, 2)
+            layout.addWidget(option2)
+            
+            # New strategy name input (only shown if option 2 selected)
+            name_label = QLabel("New Strategy Name:")
+            name_label.setFont(create_font(10))
+            name_label.setStyleSheet(f"color: {get_color('text_secondary')};")
+            name_label.setVisible(False)
+            layout.addWidget(name_label)
+            
+            name_input = QLineEdit()
+            name_input.setText(f"{version['name']} (Copy)")
+            name_input.setStyleSheet(get_input_field_stylesheet())
+            name_input.setVisible(False)
+            layout.addWidget(name_input)
+            
+            # Show/hide name input based on selection
+            def on_option_changed():
+                show_input = option2.isChecked()
+                name_label.setVisible(show_input)
+                name_input.setVisible(show_input)
+            
+            option1.toggled.connect(on_option_changed)
+            option2.toggled.connect(on_option_changed)
+            
+            # Buttons
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.button(QDialogButtonBox.Ok).setStyleSheet(get_primary_button_stylesheet())
+            buttons.button(QDialogButtonBox.Cancel).setStyleSheet(get_secondary_button_stylesheet())
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+            
+            # Show modal
+            if dialog.exec_() != QDialog.Accepted:
+                return  # User cancelled
+            
+            # Execute based on choice
+            if option1.isChecked():
+                # Duplicate as new version of SAME strategy
                 version_data = {
-                    'strategy_id': new_strategy_id,
-                    'name': f"{version['name']} (Copy)",
+                    'strategy_id': self.selected_strategy_id,  # SAME strategy
+                    'name': version['name'],  # Keep same name
                     'description': version.get('description', ''),
                     'blocks': version['blocks'],
                     'signals': version['signals'],
@@ -1102,15 +1175,117 @@ class StrategyBrowserDialog(QMainWindow):
                 
                 self.db.strategy.create_strategy_version(version_data)
                 
-                # Reload strategies
-                self._load_strategies()
+                from .alert_dialog import show_success
+                show_success(self, "Duplicate Strategy", "Success", 
+                           f"New version created for strategy: {version['name']}")
+            else:
+                # Duplicate as NEW strategy
+                new_name = name_input.text().strip()
+                if not new_name:
+                    from .alert_dialog import show_error
+                    show_error(self, "Duplicate Strategy", "Error", "Strategy name cannot be empty")
+                    return
+                
+                new_strategy_id = self.db.strategy.create_strategy(new_name)
+                
+                version_data = {
+                    'strategy_id': new_strategy_id,  # NEW strategy
+                    'name': new_name,
+                    'description': version.get('description', ''),
+                    'blocks': version['blocks'],
+                    'signals': version['signals'],
+                    'parameters': version['parameters'],
+                    'entry_conditions': version['entry_conditions'],
+                    'exit_conditions': version['exit_conditions'],
+                    'risk_management': version['risk_management'],
+                    'backtest_config': version['backtest_config'],
+                    'tags': version.get('tags', [])
+                }
+                
+                self.db.strategy.create_strategy_version(version_data)
                 
                 from .alert_dialog import show_success
-                show_success(self, "Duplicate Strategy", "Success", "Strategy duplicated successfully")
-                
+                show_success(self, "Duplicate Strategy", "Success", 
+                           f"New strategy created: {new_name}")
+            
+            # Reload strategies
+            self._load_strategies()
+            
         except Exception as e:
             from .alert_dialog import show_error
             show_error(self, "Duplicate Strategy", "Error", f"Failed to duplicate strategy:\n{e}")
+    
+    def _on_import(self):
+        """Handle import from JSON - reuse main window code"""
+        try:
+            from PyQt5.QtWidgets import QFileDialog
+            
+            # Get last directory
+            settings = QSettings("BTC_Engine", "StrategyBuilder")
+            last_dir = settings.value("lastDirectory", "")
+            
+            # Show file dialog
+            filename, _ = QFileDialog.getOpenFileName(
+                self,
+                "Import Strategy from JSON",
+                last_dir,
+                "Strategy Files (*.json);;All Files (*)"
+            )
+            
+            if not filename:
+                return  # User cancelled
+            
+            # Load and save to database (same logic as main window)
+            from src.strategy_builder.integration.strategy_builder_orchestrator import StrategyBuilderOrchestrator
+            
+            orch = StrategyBuilderOrchestrator()
+            result = orch.load_strategy(filename)
+            
+            if not result.success:
+                from .alert_dialog import show_error
+                show_error(self, "Import Failed", "Error", 
+                         f"Failed to import strategy:\n{result.message}")
+                return
+            
+            # Get config from orchestrator
+            config = orch.get_current_config()
+            
+            # Create new strategy in database
+            strategy_id = self.db.strategy.create_strategy(config.name)
+            
+            # Convert config to dict for database
+            config_dict = orch.persistence._config_to_dict(config)
+            
+            # Save as new version
+            version_data = {
+                'strategy_id': strategy_id,
+                'name': config.name,
+                'description': getattr(config, 'description', ''),
+                'blocks': config_dict.get('blocks', []),
+                'signals': {},
+                'parameters': {},
+                'entry_conditions': {},
+                'exit_conditions': {},
+                'risk_management': {},
+                'backtest_config': {},
+                'tags': []
+            }
+            
+            self.db.strategy.create_strategy_version(version_data)
+            
+            # Reload strategies
+            self._load_strategies()
+            
+            from .alert_dialog import show_success
+            show_success(self, "Import Successful", "Success", 
+                       f"Strategy imported from JSON:\n{filename}\n\nSaved to database as: {config.name}")
+            
+        except Exception as e:
+            from .alert_dialog import show_error
+            show_error(self, "Import Error", "Error", 
+                     f"Error importing strategy:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
     
     def _on_export(self):
         """Handle export to JSON button click"""
