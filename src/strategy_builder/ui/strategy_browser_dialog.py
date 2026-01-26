@@ -885,24 +885,20 @@ class StrategyBrowserDialog(QMainWindow):
         Handle resize events to:
         1. Enforce max height constraint on details panel
         2. Recalculate stretch factors for smart resizing
+        3. STOP resizing when all text fits with padding
         """
         super().resizeEvent(event)
         
         if hasattr(self, 'details_frame') and self.details_frame.isVisible():
-            # Recalculate max height based on new window size
+            # First recalculate stretches to know if text fits
+            self._recalculate_details_stretches()
+            
+            # Calculate max height (content-fit or 50% window)
             max_height = self._calculate_max_details_height()
             
-            # Update max height if needed
-            current_height = self.details_frame.height()
-            if current_height > max_height:
-                # Approaching or exceeding max - constrain it
-                self.details_frame.setMaximumHeight(max_height)
-            else:
-                # Below max - allow growth up to max
-                self.details_frame.setMaximumHeight(max_height)
-            
-            # Recalculate stretch factors for smart resizing
-            self._recalculate_details_stretches()
+            # STRICT ENFORCEMENT: Always set max height
+            # This prevents panel from growing beyond content-fit
+            self.details_frame.setMaximumHeight(max_height)
     
     def _on_selection_changed(self):
         """Handle table selection change"""
