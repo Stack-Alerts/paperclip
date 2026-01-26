@@ -348,7 +348,7 @@ class StrategyBrowserDialog(QMainWindow):
                 image: url(none);
             }}
             QSplitter::handle:vertical:hover {{
-                background-color: {get_color('primary')};
+                background-color: #095983;
             }}
         """)
         
@@ -359,10 +359,10 @@ class StrategyBrowserDialog(QMainWindow):
             handle_layout.setContentsMargins(0, 0, 0, 0)
             handle_layout.setSpacing(0)
             
-            # Add centered drag icon (⋮⋮ or ⸬)
+            # Add centered drag icon (⋮⋮⋮) - muted color
             drag_icon = QLabel("⋮⋮⋮")
             drag_icon.setFont(create_font(10, bold=True))
-            drag_icon.setStyleSheet(f"color: {get_color('text_tertiary')}; background: transparent;")
+            drag_icon.setStyleSheet("color: #4A4F58; background: transparent;")  # Muted gray
             drag_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
             handle_layout.addWidget(drag_icon)
         
