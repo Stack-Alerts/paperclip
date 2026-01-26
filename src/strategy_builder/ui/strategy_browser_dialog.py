@@ -215,12 +215,12 @@ class StrategyBrowserDialog(QMainWindow):
         # Strategy Details Panel (250px, 3-column grid, institutional-grade)
         self.details_frame = QFrame()
         self.details_frame.setFixedHeight(250)
-        # Use styles.py colors - match main window theme
+        # Match GroupBox styling from styles.py (#1E2128 background)
         self.details_frame.setStyleSheet(f"""
             QFrame {{
-                background-color: {get_color('background')};
+                background-color: {get_color('bg_medium')};
                 border: 1px solid {get_color('border')};
-                border-radius: 6px;
+                border-radius: 8px;
             }}
         """)
         self.details_frame.setVisible(False)  # Hidden until selection
