@@ -426,7 +426,10 @@ class StrategyDatabaseManager:
     
     def delete_strategy_version(self, version_id: str) -> bool:
         """
-        Delete a specific strategy version
+        Delete a specific strategy version and renumber remaining versions
+        
+        After deletion, remaining versions are renumbered sequentially:
+        Example: v4, v3, v2, v1 -> delete v3 -> v3, v2, v1 (v4 becomes v3)
         
         Note: Cannot delete if it's the only version of a strategy
         
@@ -460,10 +463,31 @@ class StrategyDatabaseManager:
             delete_query = text("DELETE FROM strategy_versions WHERE version_id = :version_id")
             self.session.execute(delete_query, {'version_id': version_id})
             
+            # Renumber remaining versions sequentially (v1, v2, v3, ...)
+            # Get all remaining versions ordered by version_number
+            renumber_query = text("""
+                SELECT version_id, version_number 
+                FROM strategy_versions 
+                WHERE strategy_id = :strategy_id 
+                ORDER BY version_number ASC
+            """)
+            remaining_versions = self.session.execute(renumber_query, {'strategy_id': strategy_id}).fetchall()
+            
+            # Renumber sequentially starting from 1
+            for new_number, (vid, old_number) in enumerate(remaining_versions, start=1):
+                if old_number != new_number:
+                    update_query = text("""
+                        UPDATE strategy_versions 
+                        SET version_number = :new_number 
+                        WHERE version_id = :version_id
+                    """)
+                    self.session.execute(update_query, {'new_number': new_number, 'version_id': vid})
+                    self.logger.debug(f"Renumbered version {vid}: v{old_number} -> v{new_number}")
+            
             # Commit transaction
             self.session.commit()
             
-            self.logger.info(f"Deleted strategy version: {version_id}")
+            self.logger.info(f"Deleted strategy version {version_id} and renumbered {len(remaining_versions)} remaining versions")
             return True
             
         except Exception as e:
