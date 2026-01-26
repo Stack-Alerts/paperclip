@@ -32,6 +32,8 @@ from .styles import (
 )
 # Import universal combo box fix (EXACTLY like block_search_panel.py)
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
+# Import content measurement for smart resizing
+from .content_measurement import ContentMeasurement
 
 
 class HTMLDelegate(QStyledItemDelegate):
@@ -752,11 +754,150 @@ class StrategyBrowserDialog(QMainWindow):
             # Show the panel
             self.details_frame.setVisible(True)
             
+            # Trigger smart resize calculation after content is set
+            self._recalculate_details_stretches()
+            
         except Exception as e:
             print(f"Error populating details: {e}")
             import traceback
             traceback.print_exc()
             self.details_frame.setVisible(False)
+    
+    def _recalculate_details_stretches(self):
+        """
+        SMART CONTENT-AWARE RESIZING
+        Dynamically adjust row stretches based on content overflow
+        
+        Algorithm:
+        1. Measure overflow in each row's labels
+        2. If ANY label has overflow: Give that row more stretch
+        3. If NO label has overflow: Equal stretch (all fit)
+        4. Apply new stretch factors
+        """
+        if not self.details_frame.isVisible():
+            return
+        
+        # Get the details layout
+        details_layout = self.details_frame.layout()
+        if not isinstance(details_layout, QGridLayout):
+            return
+        
+        # Map row index to labels (excluding row 0 which is titles)
+        row_labels = {
+            1: [self.detail_labels.get('name'), self.detail_labels.get('blocks'), 
+                self.detail_labels.get('tests')],
+            2: [self.detail_labels.get('description'), self.detail_labels.get('blocks'),  
+                self.detail_labels.get('performance')],
+            3: [self.detail_labels.get('meta'), self.detail_labels.get('signals'), 
+                self.detail_labels.get('status')]
+        }
+        
+        # Calculate overflow for each row
+        row_overflows = {}
+        for row_idx, labels in row_labels.items():
+            max_overflow = 0
+            for label in labels:
+                if label and label.isVisible():
+                    overflow = ContentMeasurement.calculate_overflow_pixels(label)
+                    max_overflow = max(max_overflow, overflow)
+            row_overflows[row_idx] = max_overflow
+        
+        # Determine stretch factors
+        total_overflow = sum(row_overflows.values())
+        
+        if total_overflow == 0:
+            # All text fits - equal stretch (minimal)
+            details_layout.setRowStretch(1, 1)
+            details_layout.setRowStretch(2, 1)
+            details_layout.setRowStretch(3, 1)
+        else:
+            # Distribute stretch based on overflow
+            # Rows with more overflow get more stretch
+            for row_idx, overflow in row_overflows.items():
+                if overflow > 0:
+                    # Proportional to overflow amount
+                    # 50px overflow = 1 unit stretch
+                    stretch = max(1, int(overflow / 50))
+                else:
+                    # Fits - minimum stretch (stay small)
+                    stretch = 0
+                
+                details_layout.setRowStretch(row_idx, stretch)
+    
+    def _calculate_max_details_height(self) -> int:
+        """
+        Calculate maximum allowed height for details panel
+        
+        Returns min of:
+        1. 50% of window height
+        2. Content-fit height (height when all text fits perfectly)
+        """
+        # Option 1: 50% of window
+        window_height = self.height()
+        fifty_percent = window_height // 2
+        
+        # Option 2: Content-fit (all content visible with no overflow)
+        content_fit = self._calculate_content_fit_height()
+        
+        # Use the smaller of the two
+        return min(fifty_percent, content_fit)
+    
+    def _calculate_content_fit_height(self) -> int:
+        """
+        Calculate height needed for all content to fit perfectly
+        
+        Measures all labels and sums required heights + margins
+        """
+        if not self.details_frame.isVisible():
+            return 450  # Minimum
+        
+        total_height = 0
+        
+        # Measure each label's ideal height
+        for label in self.detail_labels.values():
+            if label and label.isVisible():
+                content_height = ContentMeasurement.get_content_height(label)
+                total_height += content_height
+        
+        # Add grid layout spacing and margins
+        details_layout = self.details_frame.layout()
+        if isinstance(details_layout, QGridLayout):
+            # Add spacing between rows (4 rows including title row)
+            total_height += details_layout.spacing() * 4
+            
+            # Add content margins
+            margins = details_layout.contentsMargins()
+            total_height += margins.top() + margins.bottom()
+        
+        # Add frame border and padding
+        total_height += 20  # Extra padding for border/frame
+        
+        # Enforce minimum
+        return max(450, total_height)
+    
+    def resizeEvent(self, event):
+        """
+        Handle resize events to:
+        1. Enforce max height constraint on details panel
+        2. Recalculate stretch factors for smart resizing
+        """
+        super().resizeEvent(event)
+        
+        if hasattr(self, 'details_frame') and self.details_frame.isVisible():
+            # Recalculate max height based on new window size
+            max_height = self._calculate_max_details_height()
+            
+            # Update max height if needed
+            current_height = self.details_frame.height()
+            if current_height > max_height:
+                # Approaching or exceeding max - constrain it
+                self.details_frame.setMaximumHeight(max_height)
+            else:
+                # Below max - allow growth up to max
+                self.details_frame.setMaximumHeight(max_height)
+            
+            # Recalculate stretch factors for smart resizing
+            self._recalculate_details_stretches()
     
     def _on_selection_changed(self):
         """Handle table selection change"""
