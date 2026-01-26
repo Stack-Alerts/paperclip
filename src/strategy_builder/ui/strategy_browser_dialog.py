@@ -656,6 +656,16 @@ class StrategyBrowserDialog(QMainWindow):
                 signal_line = f'<span style="color: {logic_color};">{signal_counter}. {signal_name} [AND]</span>'
                 html_lines.append(signal_line)
                 
+                # TIME CONSTRAINT (if exists)
+                if signal.get('timing_constraint'):
+                    timing = signal['timing_constraint']
+                    ref_signal = timing.get('reference_signal', 'previous signal')
+                    max_candles = timing.get('max_candles', 'N/A')
+                    time_line = f'<span style="color: #FFA500; margin-left: 20px;">└── TIME CONSTRAINT</span>'
+                    html_lines.append(time_line)
+                    time_detail = f'<span style="color: #FFA500; margin-left: 40px;">└── Within {max_candles} candles of {ref_signal}</span>'
+                    html_lines.append(time_detail)
+                
                 # RECHECK (if exists)
                 if signal.get('recheck_config'):
                     recheck_cfg = signal['recheck_config']
