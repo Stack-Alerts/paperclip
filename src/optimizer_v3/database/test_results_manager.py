@@ -115,12 +115,12 @@ class TestResultsManager:
         # Insert test result
         query = text("""
             INSERT INTO strategy_test_results (
-                result_id, strategy_id, strategy_version_id, test_type, test_config,
+                result_id, strategy_id, version_id, test_type, test_config,
                 start_date, end_date, total_return_pct, sharpe_ratio, max_drawdown_pct,
                 win_rate, profit_factor, total_trades, metrics, trades, equity_curve,
                 risk_metrics, errors, warnings, notes
             ) VALUES (
-                :result_id, :strategy_id, :strategy_version_id, :test_type, :test_config,
+                :result_id, :strategy_id, :version_id, :test_type, :test_config,
                 :start_date, :end_date, :total_return_pct, :sharpe_ratio, :max_drawdown_pct,
                 :win_rate, :profit_factor, :total_trades, :metrics, :trades, :equity_curve,
                 :risk_metrics, :errors, :warnings, :notes
@@ -221,7 +221,7 @@ class TestResultsManager:
         """
         query = text("""
             SELECT * FROM strategy_test_results 
-            WHERE strategy_version_id = :version_id 
+            WHERE version_id = :version_id 
             ORDER BY tested_at DESC
         """)
         
@@ -258,7 +258,7 @@ class TestResultsManager:
         query = text("""
             SELECT * FROM strategy_test_results 
             WHERE strategy_id = :strategy_id 
-            AND strategy_version_id = :version_id 
+            AND version_id = :version_id 
             AND test_type = :test_type
             ORDER BY tested_at DESC 
             LIMIT 1
@@ -308,7 +308,7 @@ class TestResultsManager:
         
         query = text(f"""
             SELECT 
-                strategy_version_id,
+                version_id,
                 AVG(total_return_pct) as avg_return,
                 AVG(sharpe_ratio) as avg_sharpe,
                 AVG(max_drawdown_pct) as avg_drawdown,
@@ -318,8 +318,8 @@ class TestResultsManager:
             FROM strategy_test_results
             WHERE strategy_id = :strategy_id
             AND test_type = :test_type
-            AND strategy_version_id IN ({placeholders})
-            GROUP BY strategy_version_id
+            AND version_id IN ({placeholders})
+            GROUP BY version_id
         """)
         
         params = {
@@ -343,7 +343,7 @@ class TestResultsManager:
         # Find best version by Sharpe ratio
         if comparison['versions']:
             best = max(comparison['versions'], key=lambda x: x['avg_sharpe'] or 0)
-            comparison['best_version'] = best['strategy_version_id']
+            comparison['best_version'] = best['version_id']
             comparison['best_sharpe'] = best['avg_sharpe']
         
         return comparison
@@ -463,14 +463,14 @@ class TestResultsManager:
         
         query = text(f"""
             SELECT 
-                strategy_version_id,
+                version_id,
                 AVG({metric}) as avg_metric,
                 COUNT(*) as test_count
             FROM strategy_test_results
             WHERE strategy_id = :strategy_id
             AND test_type = :test_type
             AND {metric} IS NOT NULL
-            GROUP BY strategy_version_id
+            GROUP BY version_id
             ORDER BY avg_metric DESC
             LIMIT 1
         """)
