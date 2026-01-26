@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
     QMainWindow, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLabel, QLineEdit, QComboBox, QWidget, QHeaderView,
     QAbstractItemView, QStyledItemDelegate, QStyleOptionViewItem, QGridLayout,
-    QFrame, QScrollArea
+    QFrame, QScrollArea, QSplitter
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QModelIndex, QRectF
 from PyQt5.QtGui import QFont, QTextDocument, QAbstractTextDocumentLayout, QPalette
@@ -210,11 +210,9 @@ class StrategyBrowserDialog(QMainWindow):
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.table.itemDoubleClicked.connect(self._on_double_click)
         
-        layout.addWidget(self.table)
-        
-        # Strategy Details Panel (450px, 3-column grid, institutional-grade)
+        # Strategy Details Panel (resizable via splitter, 3-column grid, institutional-grade)
         self.details_frame = QFrame()
-        self.details_frame.setFixedHeight(450)
+        self.details_frame.setMinimumHeight(150)  # Minimum height for dragging
         # Match GroupBox styling from styles.py (#1E2128 background)
         self.details_frame.setStyleSheet(f"""
             QFrame {{
@@ -308,7 +306,18 @@ class StrategyBrowserDialog(QMainWindow):
         details_layout.setRowStretch(2, 2)
         details_layout.setRowStretch(3, 1)
         
-        layout.addWidget(self.details_frame)
+        # Create vertical splitter for table + details (resizable like main window)
+        content_splitter = QSplitter(Qt.Orientation.Vertical)
+        content_splitter.addWidget(self.table)
+        content_splitter.addWidget(self.details_frame)
+        
+        # Set initial sizes (60% table, 40% details) - total window ~800px
+        content_splitter.setSizes([480, 320])
+        
+        # Store splitter for settings save/restore
+        self.content_splitter = content_splitter
+        
+        layout.addWidget(content_splitter)
         
         # Action buttons
         button_layout = QHBoxLayout()
@@ -998,12 +1007,19 @@ class StrategyBrowserDialog(QMainWindow):
         window_state = settings.value("strategyBrowser/windowState")
         if window_state:
             self.restoreState(window_state)
+        
+        # Restore splitter sizes (table vs details panel)
+        splitter_sizes = settings.value("strategyBrowser/splitterSizes")
+        if splitter_sizes:
+            self.content_splitter.restoreState(splitter_sizes)
     
     def _save_settings(self):
         """Save window geometry and state"""
         settings = QSettings("BTC_Engine", "StrategyBuilder")
         settings.setValue("strategyBrowser/geometry", self.saveGeometry())
         settings.setValue("strategyBrowser/windowState", self.saveState())
+        # Save splitter sizes (user's preferred table/details ratio)
+        settings.setValue("strategyBrowser/splitterSizes", self.content_splitter.saveState())
     
     def closeEvent(self, event):
         """Handle window close"""
