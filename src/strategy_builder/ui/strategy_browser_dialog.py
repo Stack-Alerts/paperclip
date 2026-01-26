@@ -212,79 +212,98 @@ class StrategyBrowserDialog(QMainWindow):
         
         layout.addWidget(self.table)
         
-        # Strategy Details Panel (250px, 3-column grid for institutional-grade UX)
+        # Strategy Details Panel (250px, 3-column grid, institutional-grade)
         self.details_frame = QFrame()
         self.details_frame.setFixedHeight(250)
+        # Use styles.py colors - match main window theme
         self.details_frame.setStyleSheet(f"""
             QFrame {{
-                background-color: {get_color('secondary')};
+                background-color: {get_color('background')};
                 border: 1px solid {get_color('border')};
-                border-radius: 4px;
-                padding: 16px;
+                border-radius: 6px;
             }}
         """)
         self.details_frame.setVisible(False)  # Hidden until selection
         
         details_layout = QGridLayout(self.details_frame)
-        details_layout.setSpacing(16)
-        details_layout.setContentsMargins(16, 16, 16, 16)
+        details_layout.setSpacing(20)
+        details_layout.setContentsMargins(20, 16, 20, 16)
         
-        # Create labels for details (will be populated on selection)
+        # Create labels with proper styling
         self.detail_labels = {}
         
         # Column 1: Strategy Info
-        col1_title = QLabel("📊 Strategy Information")
-        col1_title.setFont(create_font(11, bold=True))
-        col1_title.setStyleSheet(f"color: {get_color('primary')};")
+        col1_title = QLabel("📊 STRATEGY INFORMATION")
+        col1_title.setFont(create_font(10, bold=True))
+        col1_title.setStyleSheet(f"color: {get_color('primary')}; padding-bottom: 8px;")
         details_layout.addWidget(col1_title, 0, 0)
         
-        self.detail_labels['name'] = QLabel()
-        self.detail_labels['name'].setFont(create_font(10, bold=True))
+        self.detail_labels['name'] = QLabel("Select a strategy to view details")
+        self.detail_labels['name'].setFont(create_font(10))
+        self.detail_labels['name'].setStyleSheet(f"color: {get_color('text_primary')}; padding: 4px 0px;")
         self.detail_labels['name'].setWordWrap(True)
-        details_layout.addWidget(self.detail_labels['name'], 1, 0)
+        details_layout.addWidget(self.detail_labels['name'], 1, 0, 1, 1)
         
-        self.detail_labels['description'] = QLabel()
+        self.detail_labels['description'] = QLabel("Description will appear here")
+        self.detail_labels['description'].setFont(create_font(9))
+        self.detail_labels['description'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 0px;")
         self.detail_labels['description'].setWordWrap(True)
-        self.detail_labels['description'].setMaximumHeight(40)
-        details_layout.addWidget(self.detail_labels['description'], 2, 0)
+        details_layout.addWidget(self.detail_labels['description'], 2, 0, 1, 1)
         
-        self.detail_labels['meta'] = QLabel()
-        details_layout.addWidget(self.detail_labels['meta'], 3, 0)
+        self.detail_labels['meta'] = QLabel("No metadata")
+        self.detail_labels['meta'].setFont(create_font(9))
+        self.detail_labels['meta'].setStyleSheet(f"color: {get_color('text_tertiary')}; padding: 4px 0px;")
+        details_layout.addWidget(self.detail_labels['meta'], 3, 0, 1, 1)
         
         # Column 2: Configuration
-        col2_title = QLabel("⚙️ Configuration")
-        col2_title.setFont(create_font(11, bold=True))
-        col2_title.setStyleSheet(f"color: {get_color('primary')};")
+        col2_title = QLabel("⚙️ CONFIGURATION")
+        col2_title.setFont(create_font(10, bold=True))
+        col2_title.setStyleSheet(f"color: {get_color('primary')}; padding-bottom: 8px;")
         details_layout.addWidget(col2_title, 0, 1)
         
-        self.detail_labels['blocks'] = QLabel()
+        self.detail_labels['blocks'] = QLabel("No blocks configured")
+        self.detail_labels['blocks'].setFont(create_font(9))
+        self.detail_labels['blocks'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 0px;")
         self.detail_labels['blocks'].setWordWrap(True)
         details_layout.addWidget(self.detail_labels['blocks'], 1, 1, 2, 1)
         
-        self.detail_labels['signals'] = QLabel()
+        self.detail_labels['signals'] = QLabel("No signals configured")
+        self.detail_labels['signals'].setFont(create_font(9))
+        self.detail_labels['signals'].setStyleSheet(f"color: {get_color('text_tertiary')}; padding: 4px 0px;")
         self.detail_labels['signals'].setWordWrap(True)
-        details_layout.addWidget(self.detail_labels['signals'], 3, 1)
+        details_layout.addWidget(self.detail_labels['signals'], 3, 1, 1, 1)
         
         # Column 3: Performance & Metrics
-        col3_title = QLabel("📈 Performance & Metrics")
-        col3_title.setFont(create_font(11, bold=True))
-        col3_title.setStyleSheet(f"color: {get_color('primary')};")
+        col3_title = QLabel("📈 PERFORMANCE")
+        col3_title.setFont(create_font(10, bold=True))
+        col3_title.setStyleSheet(f"color: {get_color('primary')}; padding-bottom: 8px;")
         details_layout.addWidget(col3_title, 0, 2)
         
-        self.detail_labels['tests'] = QLabel()
-        details_layout.addWidget(self.detail_labels['tests'], 1, 2)
+        self.detail_labels['tests'] = QLabel("No tests run")
+        self.detail_labels['tests'].setFont(create_font(9))
+        self.detail_labels['tests'].setStyleSheet(f"color: {get_color('text_tertiary')}; padding: 4px 0px;")
+        details_layout.addWidget(self.detail_labels['tests'], 1, 2, 1, 1)
         
-        self.detail_labels['performance'] = QLabel()
+        self.detail_labels['performance'] = QLabel("Run backtest to see metrics")
+        self.detail_labels['performance'].setFont(create_font(9))
+        self.detail_labels['performance'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 0px;")
         self.detail_labels['performance'].setWordWrap(True)
-        details_layout.addWidget(self.detail_labels['performance'], 2, 2)
+        details_layout.addWidget(self.detail_labels['performance'], 2, 2, 1, 1)
         
-        self.detail_labels['status'] = QLabel()
-        details_layout.addWidget(self.detail_labels['status'], 3, 2)
+        self.detail_labels['status'] = QLabel("Status: Unknown")
+        self.detail_labels['status'].setFont(create_font(9))
+        self.detail_labels['status'].setStyleSheet(f"color: {get_color('text_tertiary')}; padding: 4px 0px;")
+        details_layout.addWidget(self.detail_labels['status'], 3, 2, 1, 1)
         
-        # Set column stretches
+        # Set column stretches for equal width
         details_layout.setColumnStretch(0, 1)
         details_layout.setColumnStretch(1, 1)
         details_layout.setColumnStretch(2, 1)
+        
+        # Set row stretches for better spacing
+        details_layout.setRowStretch(1, 2)
+        details_layout.setRowStretch(2, 2)
+        details_layout.setRowStretch(3, 1)
         
         layout.addWidget(self.details_frame)
         
