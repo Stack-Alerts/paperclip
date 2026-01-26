@@ -640,8 +640,13 @@ class StrategyBrowserDialog(QMainWindow):
             else:
                 date_str = str(created)[:16]
             
-            tags = ', '.join(version.get('tags', [])) if version.get('tags') else 'None'
-            meta_text = f"<b>Version:</b> v{version['version_number']}<br><b>Created:</b> {date_str}<br><b>Tags:</b> {tags}"
+            # Only show tags if they exist
+            tags = version.get('tags', [])
+            if tags:
+                tags_str = ', '.join(tags)
+                meta_text = f"<b>Version:</b> v{version['version_number']}<br><b>Created:</b> {date_str}<br><b>Tags:</b> {tags_str}"
+            else:
+                meta_text = f"<b>Version:</b> v{version['version_number']}<br><b>Created:</b> {date_str}"
             self.detail_labels['meta'].setText(meta_text)
             
             # Column 2: Configuration
