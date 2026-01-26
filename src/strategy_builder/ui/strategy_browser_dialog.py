@@ -13,7 +13,8 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QMainWindow, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLabel, QLineEdit, QComboBox, QWidget, QHeaderView,
-    QAbstractItemView, QStyledItemDelegate, QStyleOptionViewItem
+    QAbstractItemView, QStyledItemDelegate, QStyleOptionViewItem, QGridLayout,
+    QFrame, QScrollArea
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QModelIndex, QRectF
 from PyQt5.QtGui import QFont, QTextDocument, QAbstractTextDocumentLayout, QPalette
@@ -210,6 +211,82 @@ class StrategyBrowserDialog(QMainWindow):
         self.table.itemDoubleClicked.connect(self._on_double_click)
         
         layout.addWidget(self.table)
+        
+        # Strategy Details Panel (250px, 3-column grid for institutional-grade UX)
+        self.details_frame = QFrame()
+        self.details_frame.setFixedHeight(250)
+        self.details_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {get_color('secondary')};
+                border: 1px solid {get_color('border')};
+                border-radius: 4px;
+                padding: 16px;
+            }}
+        """)
+        self.details_frame.setVisible(False)  # Hidden until selection
+        
+        details_layout = QGridLayout(self.details_frame)
+        details_layout.setSpacing(16)
+        details_layout.setContentsMargins(16, 16, 16, 16)
+        
+        # Create labels for details (will be populated on selection)
+        self.detail_labels = {}
+        
+        # Column 1: Strategy Info
+        col1_title = QLabel("📊 Strategy Information")
+        col1_title.setFont(create_font(11, bold=True))
+        col1_title.setStyleSheet(f"color: {get_color('primary')};")
+        details_layout.addWidget(col1_title, 0, 0)
+        
+        self.detail_labels['name'] = QLabel()
+        self.detail_labels['name'].setFont(create_font(10, bold=True))
+        self.detail_labels['name'].setWordWrap(True)
+        details_layout.addWidget(self.detail_labels['name'], 1, 0)
+        
+        self.detail_labels['description'] = QLabel()
+        self.detail_labels['description'].setWordWrap(True)
+        self.detail_labels['description'].setMaximumHeight(40)
+        details_layout.addWidget(self.detail_labels['description'], 2, 0)
+        
+        self.detail_labels['meta'] = QLabel()
+        details_layout.addWidget(self.detail_labels['meta'], 3, 0)
+        
+        # Column 2: Configuration
+        col2_title = QLabel("⚙️ Configuration")
+        col2_title.setFont(create_font(11, bold=True))
+        col2_title.setStyleSheet(f"color: {get_color('primary')};")
+        details_layout.addWidget(col2_title, 0, 1)
+        
+        self.detail_labels['blocks'] = QLabel()
+        self.detail_labels['blocks'].setWordWrap(True)
+        details_layout.addWidget(self.detail_labels['blocks'], 1, 1, 2, 1)
+        
+        self.detail_labels['signals'] = QLabel()
+        self.detail_labels['signals'].setWordWrap(True)
+        details_layout.addWidget(self.detail_labels['signals'], 3, 1)
+        
+        # Column 3: Performance & Metrics
+        col3_title = QLabel("📈 Performance & Metrics")
+        col3_title.setFont(create_font(11, bold=True))
+        col3_title.setStyleSheet(f"color: {get_color('primary')};")
+        details_layout.addWidget(col3_title, 0, 2)
+        
+        self.detail_labels['tests'] = QLabel()
+        details_layout.addWidget(self.detail_labels['tests'], 1, 2)
+        
+        self.detail_labels['performance'] = QLabel()
+        self.detail_labels['performance'].setWordWrap(True)
+        details_layout.addWidget(self.detail_labels['performance'], 2, 2)
+        
+        self.detail_labels['status'] = QLabel()
+        details_layout.addWidget(self.detail_labels['status'], 3, 2)
+        
+        # Set column stretches
+        details_layout.setColumnStretch(0, 1)
+        details_layout.setColumnStretch(1, 1)
+        details_layout.setColumnStretch(2, 1)
+        
+        layout.addWidget(self.details_frame)
         
         # Action buttons
         button_layout = QHBoxLayout()
@@ -507,6 +584,99 @@ class StrategyBrowserDialog(QMainWindow):
         """Update strategy count label"""
         self.count_label.setText(f"{count} strateg{'y' if count == 1 else 'ies'}")
     
+    def _populate_details_panel(self, version_id: str):
+        """Populate details panel with strategy information from database"""
+        try:
+            # Get full version data from database
+            version = self.db.strategy.get_strategy_version(version_id)
+            if not version:
+                return
+            
+            # Column 1: Strategy Info
+            type_badge = f"{'🟢' if version.get('strategy_type') == 'Bullish' else '🔴'} {version.get('strategy_type', 'Unknown')}"
+            self.detail_labels['name'].setText(f"{version['name']} ({type_badge})")
+            
+            desc = version.get('description', 'No description')
+            self.detail_labels['description'].setText(desc if desc else 'No description')
+            
+            created = version['created_at']
+            if isinstance(created, datetime):
+                date_str = created.strftime("%Y-%m-%d %H:%M")
+            else:
+                date_str = str(created)[:16]
+            
+            tags = ', '.join(version.get('tags', [])) if version.get('tags') else 'None'
+            meta_text = f"<b>Version:</b> v{version['version_number']}<br><b>Created:</b> {date_str}<br><b>Tags:</b> {tags}"
+            self.detail_labels['meta'].setText(meta_text)
+            
+            # Column 2: Configuration
+            blocks = version.get('blocks', [])
+            block_count = len(blocks)
+            block_names = [b.get('name', 'unknown') for b in blocks[:5]]
+            block_text = f"<b>{block_count} Building Blocks:</b><br>"
+            block_text += "<br>".join([f"• {name}" for name in block_names])
+            if block_count > 5:
+                block_text += f"<br>• ... and {block_count - 5} more"
+            self.detail_labels['blocks'].setText(block_text)
+            
+            # Signals summary
+            entry_sigs = version.get('entry_conditions', {})
+            exit_sigs = version.get('exit_conditions', {})
+            risk_mgmt = version.get('risk_management', {})
+            
+            sig_text = f"<b>Entry:</b> {len(entry_sigs) if isinstance(entry_sigs, dict) else 0} conditions<br>"
+            sig_text += f"<b>Exit:</b> {len(exit_sigs) if isinstance(exit_sigs, dict) else 0} conditions<br>"
+            sig_text += f"<b>Risk:</b> SL/TP configured" if risk_mgmt else "<b>Risk:</b> Not set"
+            self.detail_labels['signals'].setText(sig_text)
+            
+            # Column 3: Performance & Metrics
+            try:
+                tests = self.db.test_results.get_version_test_results(version_id)
+                test_count = len(tests)
+                
+                if tests:
+                    best = max(tests, key=lambda t: t.get('sharpe_ratio', 0) or 0)
+                    sharpe = best.get('sharpe_ratio', 0)
+                    win_rate = best.get('win_rate', 0)
+                    total_trades = best.get('total_trades', 0)
+                    
+                    test_text = f"<b>Total Tests:</b> {test_count}<br>"
+                    test_text += f"<b>Status:</b> {'✅ Tested' if test_count > 0 else '⚠️ Untested'}"
+                    self.detail_labels['tests'].setText(test_text)
+                    
+                    perf_text = f"<b>Best Performance:</b><br>"
+                    perf_text += f"• Sharpe: {sharpe:.2f}<br>"
+                    perf_text += f"• Win Rate: {win_rate:.1f}%<br>"
+                    perf_text += f"• Total Trades: {total_trades}"
+                    self.detail_labels['performance'].setText(perf_text)
+                    
+                    # Status badge
+                    if sharpe > 1.5:
+                        status = "🟢 Excellent"
+                    elif sharpe > 1.0:
+                        status = "🟡 Good"
+                    elif sharpe > 0.5:
+                        status = "🟠 Fair"
+                    else:
+                        status = "🔴 Poor"
+                    self.detail_labels['status'].setText(f"<b>Status:</b> {status}")
+                else:
+                    self.detail_labels['tests'].setText(f"<b>Total Tests:</b> 0<br><b>Status:</b> ⚠️ Untested")
+                    self.detail_labels['performance'].setText("<b>No test results</b><br>Run backtests to see performance")
+                    self.detail_labels['status'].setText("<b>Status:</b> 🔵 Ready to Test")
+                    
+            except Exception:
+                self.detail_labels['tests'].setText("<b>Tests:</b> N/A")
+                self.detail_labels['performance'].setText("<b>No data available</b>")
+                self.detail_labels['status'].setText("<b>Status:</b> Unknown")
+            
+            # Show the panel
+            self.details_frame.setVisible(True)
+            
+        except Exception as e:
+            print(f"Error populating details: {e}")
+            self.details_frame.setVisible(False)
+    
     def _on_selection_changed(self):
         """Handle table selection change"""
         selected = self.table.selectedItems()
@@ -519,17 +689,23 @@ class StrategyBrowserDialog(QMainWindow):
             self.selected_strategy_id = strategy_data['strategy_id']
             self.selected_version_id = strategy_data['version_id']
             
+            # Populate details panel with selected strategy
+            self._populate_details_panel(self.selected_version_id)
+            
             self.open_btn.setEnabled(True)
             if self.mode == 'open':
                 self.delete_btn.setEnabled(True)
                 self.duplicate_btn.setEnabled(True)
+                self.export_btn.setEnabled(True)
         else:
             self.selected_strategy_id = None
             self.selected_version_id = None
+            self.details_frame.setVisible(False)
             self.open_btn.setEnabled(False)
             if self.mode == 'open':
                 self.delete_btn.setEnabled(False)
                 self.duplicate_btn.setEnabled(False)
+                self.export_btn.setEnabled(False)
     
     def _on_double_click(self, item: QTableWidgetItem):
         """Handle double-click on table item"""
