@@ -212,7 +212,8 @@ class StrategyBrowserDialog(QMainWindow):
         
         # Strategy Details Panel (resizable via splitter, 3-column grid, institutional-grade)
         self.details_frame = QFrame()
-        self.details_frame.setMinimumHeight(150)  # Minimum height for dragging
+        self.details_frame.setMinimumHeight(450)  # Minimum height (user requirement)
+        self.details_frame.setMaximumHeight(16777215)  # Will be constrained by splitter
         # Match GroupBox styling from styles.py (#1E2128 background)
         self.details_frame.setStyleSheet(f"""
             QFrame {{
