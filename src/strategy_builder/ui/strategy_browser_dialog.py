@@ -625,6 +625,59 @@ class StrategyBrowserDialog(QMainWindow):
         """Update strategy count label"""
         self.count_label.setText(f"{count} strateg{'y' if count == 1 else 'ies'}")
     
+    def _build_signal_hierarchy_html(self, blocks: List[Dict]) -> str:
+        """
+        Build hierarchical signal display HTML matching Window 1 format
+        
+        Args:
+            blocks: List of block dictionaries from database
+            
+        Returns:
+            HTML string with hierarchical signal display
+        """
+        if not blocks:
+            return "No signals configured"
+        
+        html_lines = []
+        html_lines.append("<b>Signals:</b><br>")
+        
+        signal_counter = 1
+        for block in blocks:
+            signals = block.get('signals', [])
+            if not signals:
+                continue
+            
+            for signal in signals:
+                signal_name = signal.get('name', 'Unknown')
+                signal_logic = signal.get('logic', 'AND')
+                
+                # Signal line with AND/OR badge
+                logic_color = "#4ADE80" if signal_logic == "AND" else "#60A5FA"
+                signal_line = f'<span style="color: {logic_color};">{signal_counter}. {signal_name} [AND]</span>'
+                html_lines.append(signal_line)
+                
+                # RECHECK (if exists)
+                if signal.get('recheck_config'):
+                    recheck_cfg = signal['recheck_config']
+                    if recheck_cfg.get('enabled'):
+                        bar_delay = recheck_cfg.get('bar_delay', 0)
+                        recheck_line = f'<span style="color: #4ADE80; margin-left: 20px;">└── RECHECK ({bar_delay} bars)</span>'
+                        html_lines.append(recheck_line)
+                        
+                        # Nested RECHECKs (if exist)
+                        if signal.get('recheck_chain'):
+                            for nested in signal['recheck_chain']:
+                                if nested.get('enabled'):
+                                    nested_delay = nested.get('bar_delay', 0)
+                                    validation_mode = nested.get('validation_mode', 'SIGNAL')
+                                    target = "of RECHECK" if validation_mode == "RECHECK" else "of Signal"
+                                    nested_line = f'<span style="color: #60A5FA; margin-left: 40px;">└── RECHECK {target} ({nested_delay} bars)</span>'
+                                    html_lines.append(nested_line)
+                
+                signal_counter += 1
+        
+        return "<br>".join(html_lines)
+    
     def _populate_details_panel(self, version_id: str):
         """Populate details panel with strategy information from database"""
         try:
@@ -689,12 +742,9 @@ class StrategyBrowserDialog(QMainWindow):
                             total_entry_signals += 1
                             total_exit_signals += 1
             
-            block_names = [b.get('name', 'unknown') for b in blocks[:5]]
-            block_text = f"<b>{block_count} Building Blocks:</b><br>"
-            block_text += "<br>".join([f"• {name}" for name in block_names])
-            if block_count > 5:
-                block_text += f"<br>• ... and {block_count - 5} more"
-            self.detail_labels['blocks'].setText(block_text)
+            # Use hierarchical signal display (matching Window 1 format)
+            signal_hierarchy_html = self._build_signal_hierarchy_html(blocks)
+            self.detail_labels['blocks'].setText(signal_hierarchy_html)
             
             # Signals summary with actual counts
             risk_mgmt = version.get('risk_management', {})
