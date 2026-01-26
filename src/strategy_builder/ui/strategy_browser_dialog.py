@@ -250,6 +250,7 @@ class StrategyBrowserDialog(QMainWindow):
         self.detail_labels['description'].setFont(create_font(9))
         self.detail_labels['description'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 0px;")
         self.detail_labels['description'].setWordWrap(True)
+        self.detail_labels['description'].setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         details_layout.addWidget(self.detail_labels['description'], 2, 0, 1, 1)
         
         self.detail_labels['meta'] = QLabel("No metadata")
@@ -303,6 +304,7 @@ class StrategyBrowserDialog(QMainWindow):
         self.detail_labels['performance'].setFont(create_font(9))
         self.detail_labels['performance'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 0px;")
         self.detail_labels['performance'].setWordWrap(True)
+        self.detail_labels['performance'].setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         details_layout.addWidget(self.detail_labels['performance'], 2, 2, 1, 1)
         
         self.detail_labels['status'] = QLabel("Status: Unknown")
