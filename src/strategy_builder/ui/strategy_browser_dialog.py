@@ -337,6 +337,35 @@ class StrategyBrowserDialog(QMainWindow):
         content_splitter.setStretchFactor(0, 1)  # Table gets priority for extra space
         content_splitter.setStretchFactor(1, 0)  # Details stays at set size
         
+        # Add visual drag indicator to splitter handle
+        content_splitter.setHandleWidth(8)  # Wider handle for better visibility
+        content_splitter.setStyleSheet(f"""
+            QSplitter::handle:vertical {{
+                background-color: {get_color('border')};
+                height: 8px;
+                margin: 0px;
+                padding: 0px;
+                image: url(none);
+            }}
+            QSplitter::handle:vertical:hover {{
+                background-color: {get_color('primary')};
+            }}
+        """)
+        
+        # Add drag indicator icon to handle
+        handle = content_splitter.handle(1)
+        if handle:
+            handle_layout = QHBoxLayout(handle)
+            handle_layout.setContentsMargins(0, 0, 0, 0)
+            handle_layout.setSpacing(0)
+            
+            # Add centered drag icon (⋮⋮ or ⸬)
+            drag_icon = QLabel("⋮⋮⋮")
+            drag_icon.setFont(create_font(10, bold=True))
+            drag_icon.setStyleSheet(f"color: {get_color('text_tertiary')}; background: transparent;")
+            drag_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            handle_layout.addWidget(drag_icon)
+        
         # Store splitter for settings save/restore
         self.content_splitter = content_splitter
         
