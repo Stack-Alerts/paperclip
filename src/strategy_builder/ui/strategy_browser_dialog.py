@@ -212,9 +212,9 @@ class StrategyBrowserDialog(QMainWindow):
         
         layout.addWidget(self.table)
         
-        # Strategy Details Panel (350px, 3-column grid, institutional-grade)
+        # Strategy Details Panel (450px, 3-column grid, institutional-grade)
         self.details_frame = QFrame()
-        self.details_frame.setFixedHeight(350)
+        self.details_frame.setFixedHeight(450)
         # Match GroupBox styling from styles.py (#1E2128 background)
         self.details_frame.setStyleSheet(f"""
             QFrame {{
@@ -614,8 +614,21 @@ class StrategyBrowserDialog(QMainWindow):
             if not version:
                 return
             
+            # Detect strategy type from version name
+            name_upper = version['name'].upper()
+            if 'BULLISH' in name_upper:
+                strategy_type = "Bullish"
+            elif 'BEARISH' in name_upper:
+                strategy_type = "Bearish"
+            elif 'HOD' in name_upper or 'HIGH' in name_upper or 'RESISTANCE' in name_upper:
+                strategy_type = "Bearish"  # HOD rejection is bearish
+            elif 'LOD' in name_upper or 'LOW' in name_upper or 'SUPPORT' in name_upper:
+                strategy_type = "Bullish"  # LOD rejection is bullish
+            else:
+                strategy_type = "Unknown"
+            
             # Column 1: Strategy Info
-            type_badge = f"{'🟢' if version.get('strategy_type') == 'Bullish' else '🔴'} {version.get('strategy_type', 'Unknown')}"
+            type_badge = f"{'🟢' if strategy_type == 'Bullish' else '🔴'} {strategy_type}"
             self.detail_labels['name'].setText(f"{version['name']} ({type_badge})")
             
             desc = version.get('description', 'No description')
@@ -634,6 +647,24 @@ class StrategyBrowserDialog(QMainWindow):
             # Column 2: Configuration
             blocks = version.get('blocks', [])
             block_count = len(blocks)
+            
+            # Count actual signals by looking inside blocks
+            total_entry_signals = 0
+            total_exit_signals = 0
+            
+            for block in blocks:
+                signals = block.get('signals', [])
+                for signal in signals:
+                    if isinstance(signal, dict):
+                        position = signal.get('position', 'entry')
+                        if position == 'entry':
+                            total_entry_signals += 1
+                        elif position == 'exit':
+                            total_exit_signals += 1
+                        elif position == 'both':
+                            total_entry_signals += 1
+                            total_exit_signals += 1
+            
             block_names = [b.get('name', 'unknown') for b in blocks[:5]]
             block_text = f"<b>{block_count} Building Blocks:</b><br>"
             block_text += "<br>".join([f"• {name}" for name in block_names])
@@ -641,13 +672,11 @@ class StrategyBrowserDialog(QMainWindow):
                 block_text += f"<br>• ... and {block_count - 5} more"
             self.detail_labels['blocks'].setText(block_text)
             
-            # Signals summary
-            entry_sigs = version.get('entry_conditions', {})
-            exit_sigs = version.get('exit_conditions', {})
+            # Signals summary with actual counts
             risk_mgmt = version.get('risk_management', {})
             
-            sig_text = f"<b>Entry:</b> {len(entry_sigs) if isinstance(entry_sigs, dict) else 0} conditions<br>"
-            sig_text += f"<b>Exit:</b> {len(exit_sigs) if isinstance(exit_sigs, dict) else 0} conditions<br>"
+            sig_text = f"<b>Entry:</b> {total_entry_signals} signal{'s' if total_entry_signals != 1 else ''}<br>"
+            sig_text += f"<b>Exit:</b> {total_exit_signals} signal{'s' if total_exit_signals != 1 else ''}<br>"
             sig_text += f"<b>Risk:</b> SL/TP configured" if risk_mgmt else "<b>Risk:</b> Not set"
             self.detail_labels['signals'].setText(sig_text)
             
@@ -657,46 +686,54 @@ class StrategyBrowserDialog(QMainWindow):
                 test_count = len(tests)
                 
                 if tests:
+                    # Get best test by Sharpe
                     best = max(tests, key=lambda t: t.get('sharpe_ratio', 0) or 0)
                     sharpe = best.get('sharpe_ratio', 0)
                     win_rate = best.get('win_rate', 0)
                     total_trades = best.get('total_trades', 0)
                     
-                    test_text = f"<b>Total Tests:</b> {test_count}<br>"
-                    test_text += f"<b>Status:</b> {'✅ Tested' if test_count > 0 else '⚠️ Untested'}"
+                    # Calculate wins and losses
+                    wins = int(total_trades * win_rate / 100) if total_trades > 0 else 0
+                    losses = total_trades - wins
+                    
+                    # Show trade breakdown
+                    test_text = f"<b>Trades:</b> {total_trades}<br>"
+                    test_text += f"<b>Win:</b> {wins} | <b>Loss:</b> {losses}"
                     self.detail_labels['tests'].setText(test_text)
                     
                     perf_text = f"<b>Best Performance:</b><br>"
                     perf_text += f"• Sharpe: {sharpe:.2f}<br>"
-                    perf_text += f"• Win Rate: {win_rate:.1f}%<br>"
-                    perf_text += f"• Total Trades: {total_trades}"
+                    perf_text += f"• Win Rate: {win_rate:.1f}%"
                     self.detail_labels['performance'].setText(perf_text)
                     
-                    # Status badge
+                    # Quality badge based on Sharpe
                     if sharpe > 1.5:
-                        status = "🟢 Excellent"
+                        quality = "🟢 Excellent"
                     elif sharpe > 1.0:
-                        status = "🟡 Good"
+                        quality = "🟡 Good"
                     elif sharpe > 0.5:
-                        status = "🟠 Fair"
+                        quality = "🟠 Fair"
                     else:
-                        status = "🔴 Poor"
-                    self.detail_labels['status'].setText(f"<b>Status:</b> {status}")
+                        quality = "🔴 Poor"
+                    self.detail_labels['status'].setText(f"<b>Quality:</b> {quality}")
                 else:
-                    self.detail_labels['tests'].setText(f"<b>Total Tests:</b> 0<br><b>Status:</b> ⚠️ Untested")
-                    self.detail_labels['performance'].setText("<b>No test results</b><br>Run backtests to see performance")
-                    self.detail_labels['status'].setText("<b>Status:</b> 🔵 Ready to Test")
+                    self.detail_labels['tests'].setText(f"<b>Tests Run:</b> 0<br>⚠️ No backtest data")
+                    self.detail_labels['performance'].setText("<b>Run backtest to see:</b><br>• Sharpe Ratio<br>• Win Rate<br>• Trade Stats")
+                    self.detail_labels['status'].setText("<b>Quality:</b> 🔵 Untested")
                     
-            except Exception:
-                self.detail_labels['tests'].setText("<b>Tests:</b> N/A")
-                self.detail_labels['performance'].setText("<b>No data available</b>")
-                self.detail_labels['status'].setText("<b>Status:</b> Unknown")
+            except Exception as e:
+                print(f"Error loading test results: {e}")
+                self.detail_labels['tests'].setText(f"<b>Tests:</b> Error loading")
+                self.detail_labels['performance'].setText("<b>Database error</b><br>Check logs for details")
+                self.detail_labels['status'].setText("<b>Quality:</b> ⚠️ Error")
             
             # Show the panel
             self.details_frame.setVisible(True)
             
         except Exception as e:
             print(f"Error populating details: {e}")
+            import traceback
+            traceback.print_exc()
             self.details_frame.setVisible(False)
     
     def _on_selection_changed(self):
@@ -897,9 +934,11 @@ class StrategyBrowserDialog(QMainWindow):
                 strategy_data['version_id'] = version_id
                 name_item.setData(Qt.ItemDataRole.UserRole, strategy_data)
                 
-                # If this row is selected, update the selected_version_id
+                # If this row is selected, update the selected_version_id AND refresh panel
                 if row == self.table.currentRow():
                     self.selected_version_id = version_id
+                    # Refresh details panel with new version
+                    self._populate_details_panel(version_id)
     
     def _on_version_changed(self, index: int):
         """Handle version selector change"""
