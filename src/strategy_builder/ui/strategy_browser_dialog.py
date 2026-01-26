@@ -148,7 +148,7 @@ class StrategyBrowserDialog(QMainWindow):
         header_layout.addWidget(self.search_input)
         
         layout.addLayout(header_layout)
-        
+  
         # Filter row
         filter_layout = QHBoxLayout()
         
@@ -672,9 +672,9 @@ class StrategyBrowserDialog(QMainWindow):
                     timing = signal['timing_constraint']
                     ref_signal = timing.get('reference_signal', 'previous signal')
                     max_candles = timing.get('max_candles', 'N/A')
-                    time_line = f'<span style="color: #FFA500; margin-left: 20px;">└── TIME CONSTRAINT</span>'
+                    time_line = f'<span style="color: #FFA500;">&nbsp;&nbsp;&nbsp;&nbsp;└── TIME CONSTRAINT</span>'
                     html_lines.append(time_line)
-                    time_detail = f'<span style="color: #FFA500; margin-left: 40px;">└── Within {max_candles} candles of {ref_signal}</span>'
+                    time_detail = f'<span style="color: #FFA500;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── Within {max_candles} candles of {ref_signal}</span>'
                     html_lines.append(time_detail)
                 
                 # RECHECK (if exists)
@@ -682,7 +682,7 @@ class StrategyBrowserDialog(QMainWindow):
                     recheck_cfg = signal['recheck_config']
                     if recheck_cfg.get('enabled'):
                         bar_delay = recheck_cfg.get('bar_delay', 0)
-                        recheck_line = f'<span style="color: #4ADE80; margin-left: 20px;">└── RECHECK ({bar_delay} bars)</span>'
+                        recheck_line = f'<span style="color: #4ADE80;">&nbsp;&nbsp;&nbsp;&nbsp;└── RECHECK ({bar_delay} bars)</span>'
                         html_lines.append(recheck_line)
                         
                         # Nested RECHECKs (if exist)
@@ -692,7 +692,7 @@ class StrategyBrowserDialog(QMainWindow):
                                     nested_delay = nested.get('bar_delay', 0)
                                     validation_mode = nested.get('validation_mode', 'SIGNAL')
                                     target = "of RECHECK" if validation_mode == "RECHECK" else "of Signal"
-                                    nested_line = f'<span style="color: #60A5FA; margin-left: 40px;">└── RECHECK {target} ({nested_delay} bars)</span>'
+                                    nested_line = f'<span style="color: #60A5FA;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── RECHECK {target} ({nested_delay} bars)</span>'
                                     html_lines.append(nested_line)
                 
                 signal_counter += 1
