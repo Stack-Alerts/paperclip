@@ -264,11 +264,22 @@ class StrategyBrowserDialog(QMainWindow):
         col2_title.setStyleSheet("color: #095983; padding-bottom: 8px;")
         details_layout.addWidget(col2_title, 0, 1)
         
+        # Configuration signals - wrap in scroll area for overflow
+        blocks_scroll = QScrollArea()
+        blocks_scroll.setWidgetResizable(True)
+        blocks_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        blocks_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        blocks_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        blocks_scroll.setStyleSheet(f"background-color: transparent; border: none;")
+        
         self.detail_labels['blocks'] = QLabel("No blocks configured")
         self.detail_labels['blocks'].setFont(create_font(9))
         self.detail_labels['blocks'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 0px;")
         self.detail_labels['blocks'].setWordWrap(True)
-        details_layout.addWidget(self.detail_labels['blocks'], 1, 1, 2, 1)
+        self.detail_labels['blocks'].setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        
+        blocks_scroll.setWidget(self.detail_labels['blocks'])
+        details_layout.addWidget(blocks_scroll, 1, 1, 2, 1)
         
         self.detail_labels['signals'] = QLabel("No signals configured")
         self.detail_labels['signals'].setFont(create_font(9))
