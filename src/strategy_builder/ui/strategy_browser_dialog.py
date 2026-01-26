@@ -783,11 +783,10 @@ class StrategyBrowserDialog(QMainWindow):
             return
         
         # Map row index to labels (excluding row 0 which is titles)
+        # NOTE: Exclude 'blocks' label since it spans rows 1-2 (would cause both to resize)
         row_labels = {
-            1: [self.detail_labels.get('name'), self.detail_labels.get('blocks'), 
-                self.detail_labels.get('tests')],
-            2: [self.detail_labels.get('description'), self.detail_labels.get('blocks'),  
-                self.detail_labels.get('performance')],
+            1: [self.detail_labels.get('name'), self.detail_labels.get('tests')],
+            2: [self.detail_labels.get('description'), self.detail_labels.get('performance')],
             3: [self.detail_labels.get('meta'), self.detail_labels.get('signals'), 
                 self.detail_labels.get('status')]
         }
