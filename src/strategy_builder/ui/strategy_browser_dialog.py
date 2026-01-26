@@ -792,13 +792,19 @@ class StrategyBrowserDialog(QMainWindow):
         }
         
         # Calculate overflow for each row
+        # PADDING TOLERANCE: 10px (5px top + 5px bottom)
+        # Text is considered "fitting" if overflow <= 10px
+        PADDING_TOLERANCE = 10
+        
         row_overflows = {}
         for row_idx, labels in row_labels.items():
             max_overflow = 0
             for label in labels:
                 if label and label.isVisible():
                     overflow = ContentMeasurement.calculate_overflow_pixels(label)
-                    max_overflow = max(max_overflow, overflow)
+                    # Apply padding tolerance - text within 10px is considered "fitting"
+                    if overflow > PADDING_TOLERANCE:
+                        max_overflow = max(max_overflow, overflow - PADDING_TOLERANCE)
             row_overflows[row_idx] = max_overflow
         
         # Determine stretch factors
