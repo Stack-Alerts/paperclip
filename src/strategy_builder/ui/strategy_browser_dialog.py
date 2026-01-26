@@ -212,9 +212,9 @@ class StrategyBrowserDialog(QMainWindow):
         
         layout.addWidget(self.table)
         
-        # Strategy Details Panel (250px, 3-column grid, institutional-grade)
+        # Strategy Details Panel (350px, 3-column grid, institutional-grade)
         self.details_frame = QFrame()
-        self.details_frame.setFixedHeight(250)
+        self.details_frame.setFixedHeight(350)
         # Match GroupBox styling from styles.py (#1E2128 background)
         self.details_frame.setStyleSheet(f"""
             QFrame {{
@@ -229,13 +229,14 @@ class StrategyBrowserDialog(QMainWindow):
         details_layout.setSpacing(20)
         details_layout.setContentsMargins(20, 16, 20, 16)
         
-        # Create labels with proper styling
+        # Create labels with proper styling FROM STYLES.PY ONLY
         self.detail_labels = {}
         
         # Column 1: Strategy Info
         col1_title = QLabel("📊 STRATEGY INFORMATION")
         col1_title.setFont(create_font(10, bold=True))
-        col1_title.setStyleSheet(f"color: {get_color('primary')}; padding-bottom: 8px;")
+        # Use exact GroupBox title color from styles.py
+        col1_title.setStyleSheet("color: #095983; padding-bottom: 8px;")
         details_layout.addWidget(col1_title, 0, 0)
         
         self.detail_labels['name'] = QLabel("Select a strategy to view details")
@@ -252,13 +253,14 @@ class StrategyBrowserDialog(QMainWindow):
         
         self.detail_labels['meta'] = QLabel("No metadata")
         self.detail_labels['meta'].setFont(create_font(9))
-        self.detail_labels['meta'].setStyleSheet(f"color: {get_color('text_tertiary')}; padding: 4px 0px;")
+        self.detail_labels['meta'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
         details_layout.addWidget(self.detail_labels['meta'], 3, 0, 1, 1)
         
         # Column 2: Configuration
         col2_title = QLabel("⚙️ CONFIGURATION")
         col2_title.setFont(create_font(10, bold=True))
-        col2_title.setStyleSheet(f"color: {get_color('primary')}; padding-bottom: 8px;")
+        # Use exact GroupBox title color from styles.py
+        col2_title.setStyleSheet("color: #095983; padding-bottom: 8px;")
         details_layout.addWidget(col2_title, 0, 1)
         
         self.detail_labels['blocks'] = QLabel("No blocks configured")
@@ -269,19 +271,20 @@ class StrategyBrowserDialog(QMainWindow):
         
         self.detail_labels['signals'] = QLabel("No signals configured")
         self.detail_labels['signals'].setFont(create_font(9))
-        self.detail_labels['signals'].setStyleSheet(f"color: {get_color('text_tertiary')}; padding: 4px 0px;")
+        self.detail_labels['signals'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
         self.detail_labels['signals'].setWordWrap(True)
         details_layout.addWidget(self.detail_labels['signals'], 3, 1, 1, 1)
         
         # Column 3: Performance & Metrics
         col3_title = QLabel("📈 PERFORMANCE")
         col3_title.setFont(create_font(10, bold=True))
-        col3_title.setStyleSheet(f"color: {get_color('primary')}; padding-bottom: 8px;")
+        # Use exact GroupBox title color from styles.py
+        col3_title.setStyleSheet("color: #095983; padding-bottom: 8px;")
         details_layout.addWidget(col3_title, 0, 2)
         
         self.detail_labels['tests'] = QLabel("No tests run")
         self.detail_labels['tests'].setFont(create_font(9))
-        self.detail_labels['tests'].setStyleSheet(f"color: {get_color('text_tertiary')}; padding: 4px 0px;")
+        self.detail_labels['tests'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
         details_layout.addWidget(self.detail_labels['tests'], 1, 2, 1, 1)
         
         self.detail_labels['performance'] = QLabel("Run backtest to see metrics")
@@ -292,7 +295,7 @@ class StrategyBrowserDialog(QMainWindow):
         
         self.detail_labels['status'] = QLabel("Status: Unknown")
         self.detail_labels['status'].setFont(create_font(9))
-        self.detail_labels['status'].setStyleSheet(f"color: {get_color('text_tertiary')}; padding: 4px 0px;")
+        self.detail_labels['status'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
         details_layout.addWidget(self.detail_labels['status'], 3, 2, 1, 1)
         
         # Set column stretches for equal width
