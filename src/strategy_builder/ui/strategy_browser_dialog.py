@@ -1042,40 +1042,135 @@ class StrategyBrowserDialog(QMainWindow):
         self.accept()
     
     def _on_delete(self):
-        """Handle delete button click"""
+        """Handle delete button with modal choice: entire strategy or specific version"""
         if not self.selected_strategy_id:
             return
         
-        # Show confirmation dialog
-        from .alert_dialog import ask_question
-        
-        result = ask_question(
-            self,
-            "Delete Strategy",
-            "Confirm Deletion",
-            "Are you sure you want to delete this strategy and ALL its versions?\n\n"
-            "This action cannot be undone.",
-            icon="warning"
-        )
-        
-        if result == 'yes':
-            try:
-                # Delete entire strategy and all versions
+        try:
+            # Get current version for display
+            version = self.db.strategy.get_strategy_version(self.selected_version_id)
+            if not version:
+                return
+            
+            # Get all versions to show in dropdown
+            all_versions = self.db.strategy.get_strategy_versions(self.selected_strategy_id)
+            
+            # Show choice modal
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QRadioButton, QComboBox, QDialogButtonBox, QButtonGroup
+            
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Delete Strategy")
+            dialog.setStyleSheet(get_main_stylesheet())
+            dialog.setMinimumWidth(450)
+            
+            layout = QVBoxLayout(dialog)
+            layout.setSpacing(16)
+            layout.setContentsMargins(20, 20, 20, 20)
+            
+            # Title
+            title = QLabel("What would you like to delete?")
+            title.setFont(create_font(12, bold=True))
+            title.setStyleSheet(f"color: {get_color('text_primary')};")
+            layout.addWidget(title)
+            
+            # Warning message
+            warning = QLabel("⚠️ This action cannot be undone!")
+            warning.setFont(create_font(10))
+            warning.setStyleSheet(f"color: #FFA500; padding: 8px 0px;")
+            layout.addWidget(warning)
+            
+            # Options
+            button_group = QButtonGroup(dialog)
+            
+            version_count = len(all_versions)
+            option1 = QRadioButton(f"Delete entire strategy (all {version_count} version{'s' if version_count != 1 else ''})")
+            option1.setFont(create_font(10))
+            option1.setStyleSheet(f"color: {get_color('text_secondary')};")
+            option1.setChecked(True)
+            button_group.addButton(option1, 1)
+            layout.addWidget(option1)
+            
+            option2 = QRadioButton("Delete specific version only")
+            option2.setFont(create_font(10))
+            option2.setStyleSheet(f"color: {get_color('text_secondary')};")
+            button_group.addButton(option2, 2)
+            layout.addWidget(option2)
+            
+            # Version selector (only shown if option 2 selected)
+            version_label = QLabel("Select version to delete:")
+            version_label.setFont(create_font(10))
+            version_label.setStyleSheet(f"color: {get_color('text_secondary')};")
+            version_label.setVisible(False)
+            layout.addWidget(version_label)
+            
+            version_combo = QComboBox()
+            for ver in all_versions:
+                version_combo.addItem(f"v{ver['version_number']} - {ver['created_at']}", ver['version_id'])
+            # Set current version as default
+            current_index = next((i for i, v in enumerate(all_versions) if v['version_id'] == self.selected_version_id), 0)
+            version_combo.setCurrentIndex(current_index)
+            version_combo.setStyleSheet(get_input_field_stylesheet())
+            version_combo.setVisible(False)
+            layout.addWidget(version_combo)
+            
+            # Show/hide version selector based on selection
+            def on_option_changed():
+                show_selector = option2.isChecked()
+                version_label.setVisible(show_selector)
+                version_combo.setVisible(show_selector)
+            
+            option1.toggled.connect(on_option_changed)
+            option2.toggled.connect(on_option_changed)
+            
+            # Buttons
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.button(QDialogButtonBox.Ok).setText("Delete")
+            buttons.button(QDialogButtonBox.Ok).setStyleSheet(get_danger_button_stylesheet())
+            buttons.button(QDialogButtonBox.Cancel).setStyleSheet(get_secondary_button_stylesheet())
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+            
+            # Show modal
+            if dialog.exec_() != QDialog.Accepted:
+                return  # User cancelled
+            
+            # Execute based on choice
+            if option1.isChecked():
+                # Delete entire strategy (all versions)
                 deleted = self.db.strategy.delete_strategy(self.selected_strategy_id)
                 
                 if deleted:
-                    # Reload strategies to refresh list
-                    self._load_strategies()
-                    
                     from .alert_dialog import show_success
-                    show_success(self, "Delete Strategy", "Success", "Strategy deleted successfully")
+                    show_success(self, "Delete Strategy", "Success", 
+                               f"Strategy '{version['name']}' and all {version_count} version{'s' if version_count != 1 else ''} deleted")
                 else:
                     from .alert_dialog import show_error
                     show_error(self, "Delete Strategy", "Error", "Strategy not found")
+            else:
+                # Delete specific version only
+                selected_version_id = version_combo.currentData()
+                deleted_version = self.db.strategy.get_strategy_version(selected_version_id)
                 
-            except Exception as e:
-                from .alert_dialog import show_error
-                show_error(self, "Delete Strategy", "Error", f"Failed to delete strategy:\n{e}")
+                if deleted_version:
+                    # Delete the version
+                    self.db.strategy.delete_strategy_version(selected_version_id)
+                    
+                    from .alert_dialog import show_success
+                    show_success(self, "Delete Version", "Success", 
+                               f"Version v{deleted_version['version_number']} deleted successfully")
+                else:
+                    from .alert_dialog import show_error
+                    show_error(self, "Delete Version", "Error", "Version not found")
+            
+            # Reload strategies
+            self._load_strategies()
+            
+        except Exception as e:
+            from .alert_dialog import show_error
+            show_error(self, "Delete Error", "Error", f"Failed to delete:\n{e}")
+            import traceback
+            traceback.print_exc()
     
     def _on_duplicate(self):
         """Handle duplicate button with modal choice: new version or new strategy"""
