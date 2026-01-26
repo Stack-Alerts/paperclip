@@ -315,6 +315,13 @@ class StrategyBrowserDialog(QMainWindow):
         # Set initial sizes (60% table, 40% details) - total window ~800px
         content_splitter.setSizes([480, 320])
         
+        # CRITICAL: Prevent panel from being collapsed/disappearing
+        # Index 0 = table (min 200px), Index 1 = details (min 450px)
+        content_splitter.setCollapsible(0, False)  # Table cannot collapse
+        content_splitter.setCollapsible(1, False)  # Details cannot collapse
+        content_splitter.setStretchFactor(0, 1)  # Table gets priority for extra space
+        content_splitter.setStretchFactor(1, 0)  # Details stays at set size
+        
         # Store splitter for settings save/restore
         self.content_splitter = content_splitter
         
