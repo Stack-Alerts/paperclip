@@ -188,7 +188,7 @@ class TestResultsManager:
             query_str += " AND test_type = :test_type"
             params['test_type'] = test_type
         
-        query_str += " ORDER BY tested_at DESC"
+        query_str += " ORDER BY created_at DESC"
         
         if limit:
             query_str += f" LIMIT {limit}"
@@ -222,7 +222,7 @@ class TestResultsManager:
         query = text("""
             SELECT * FROM strategy_test_results 
             WHERE version_id = :version_id 
-            ORDER BY tested_at DESC
+            ORDER BY created_at DESC
         """)
         
         results = self.session.execute(query, {'version_id': version_id}).fetchall()
@@ -260,7 +260,7 @@ class TestResultsManager:
             WHERE strategy_id = :strategy_id 
             AND version_id = :version_id 
             AND test_type = :test_type
-            ORDER BY tested_at DESC 
+            ORDER BY created_at DESC 
             LIMIT 1
         """)
         
