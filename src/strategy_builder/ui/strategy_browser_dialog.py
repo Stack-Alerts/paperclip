@@ -1086,21 +1086,20 @@ class StrategyBrowserDialog(QMainWindow):
             option1 = QRadioButton(f"Delete entire strategy (all {version_count} version{'s' if version_count != 1 else ''})")
             option1.setFont(create_font(10))
             option1.setStyleSheet(f"color: {get_color('text_secondary')};")
-            option1.setChecked(True)
             button_group.addButton(option1, 1)
             layout.addWidget(option1)
             
             option2 = QRadioButton("Delete specific version only")
             option2.setFont(create_font(10))
             option2.setStyleSheet(f"color: {get_color('text_secondary')};")
+            option2.setChecked(True)  # Default to specific version
             button_group.addButton(option2, 2)
             layout.addWidget(option2)
             
-            # Version selector (only shown if option 2 selected)
+            # Version selector (visible by default since option 2 is default)
             version_label = QLabel("Select version to delete:")
             version_label.setFont(create_font(10))
             version_label.setStyleSheet(f"color: {get_color('text_secondary')};")
-            version_label.setVisible(False)
             layout.addWidget(version_label)
             
             version_combo = QComboBox()
@@ -1110,7 +1109,6 @@ class StrategyBrowserDialog(QMainWindow):
             current_index = next((i for i, v in enumerate(all_versions) if v['version_id'] == self.selected_version_id), 0)
             version_combo.setCurrentIndex(current_index)
             version_combo.setStyleSheet(get_input_field_stylesheet())
-            version_combo.setVisible(False)
             layout.addWidget(version_combo)
             
             # Show/hide version selector based on selection
