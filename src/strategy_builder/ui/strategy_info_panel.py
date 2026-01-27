@@ -59,6 +59,7 @@ class StrategyInfoPanel(QWidget):
         self.required_signals_label: Optional[QLabel] = None
         self.optional_signals_label: Optional[QLabel] = None
         self.rechecked_signals_label: Optional[QLabel] = None
+        self.exit_conditions_label: Optional[QLabel] = None  # Sprint 1.8 Task 1.8.51
         self.time_constraint_label: Optional[QLabel] = None
         
         self._init_ui()
@@ -216,6 +217,26 @@ class StrategyInfoPanel(QWidget):
         self.rechecked_signals_label.setFont(rechecked_signals_font)
         self.rechecked_signals_label.setStyleSheet(f"color: {get_color('warning')};")
         meta_layout.addWidget(self.rechecked_signals_label)
+        
+        # Sprint 1.8 Task 1.8.51: Exit Conditions count
+        # Separator
+        sep5 = QLabel("|")
+        sep5.setStyleSheet(f"color: {get_color('text_muted')}; font-weight: bold;")
+        meta_layout.addWidget(sep5)
+        
+        # Exit Conditions label
+        exit_cond_label = QLabel("Exit Conditions:")
+        exit_cond_label.setStyleSheet(get_label_style('muted'))
+        exit_cond_label.setToolTip("Number of exit conditions configured")
+        meta_layout.addWidget(exit_cond_label)
+        
+        self.exit_conditions_label = QLabel("0")
+        exit_conditions_font = QFont()
+        exit_conditions_font.setBold(True)
+        exit_conditions_font.setPointSize(10)
+        self.exit_conditions_label.setFont(exit_conditions_font)
+        self.exit_conditions_label.setStyleSheet(f"color: {get_color('error')};")  # Red for exits
+        meta_layout.addWidget(self.exit_conditions_label)
         
         # Separator
         sep4 = QLabel("|")
@@ -570,11 +591,45 @@ class StrategyInfoPanel(QWidget):
             else:
                 self.time_constraint_label.setText("No")
                 self.time_constraint_label.setStyleSheet(f"color: {get_color('text_disabled')};")
+            
+            # Sprint 1.8 Task 1.8.53: Call exit conditions count update
+            self._update_exit_conditions_count()
                 
         except Exception as e:
             # Gracefully handle errors
             self.optional_signals_label.setText("0")
             self.time_constraint_label.setText("No")
+    
+    def _update_exit_conditions_count(self):
+        """Count exit conditions across all levels - Sprint 1.8 Task 1.8.52"""
+        try:
+            config = self.orchestrator.get_current_config()
+            count = 0
+            
+            if config:
+                # Strategy-level exits
+                if hasattr(config, 'exit_conditions') and config.exit_conditions:
+                    count += len(config.exit_conditions)
+                
+                # Block-level exits
+                if hasattr(config, 'blocks'):
+                    for block in config.blocks:
+                        if hasattr(block, 'exit_conditions') and block.exit_conditions:
+                            count += len(block.exit_conditions)
+                        
+                        # Signal-level exits
+                        if hasattr(block, 'signals'):
+                            for signal in block.signals:
+                                if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                                    count += len(signal.exit_conditions)
+            
+            self.exit_conditions_label.setText(str(count))
+            if count > 0:
+                self.exit_conditions_label.setStyleSheet(f"color: {get_color('error')}; font-weight: bold;")
+            else:
+                self.exit_conditions_label.setStyleSheet(f"color: {get_color('text_disabled')};")
+        except Exception:
+            self.exit_conditions_label.setText("0")
     
     def create_strategy_in_orchestrator(self) -> bool:
         """
