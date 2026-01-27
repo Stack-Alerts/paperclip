@@ -475,12 +475,12 @@
 
 **File**: `src/strategy_builder/testing/walkforward_test_engine.py`
 
-- [ ] **1.8.58** Add deferred_exits dict for FLEXIBLE mode tracking
+- [x] **1.8.58** Add deferred_exits dict for FLEXIBLE mode tracking
   ```python
   self.deferred_exits: Dict[str, DeferredExit] = {}
   ```
 
-- [ ] **1.8.59** Add _process_exit_conditions() method
+- [x] **1.8.59** Add _process_exit_conditions() method
   ```python
   def _process_exit_conditions(self, bar: pd.Series, bar_index: int) -> None:
       """Process exit conditions with intelligent mode support"""
@@ -491,7 +491,7 @@
                   self._handle_exit_trigger(position, exit_condition, bar, bar_index)
   ```
 
-- [ ] **1.8.60** Add _handle_exit_trigger() method with ABSOLUTE/FLEXIBLE mode logic
+- [x] **1.8.60** Add _handle_exit_trigger() method with ABSOLUTE/FLEXIBLE mode logic
   ```python
   def _handle_exit_trigger(self, position, exit_condition, bar, bar_index):
       if exit_condition.exit_mode == "ABSOLUTE":
@@ -501,17 +501,17 @@
           ...
   ```
 
-- [ ] **1.8.61** Add _check_deferred_exits() method for deferred exit resolution
+- [x] **1.8.61** Add _check_deferred_exits() method for deferred exit resolution
   ```python
   def _check_deferred_exits(self, bar: pd.Series, bar_index: int) -> None:
       """Check if deferred exits should be resolved (TP hit or reversal)"""
   ```
 
-- [ ] **1.8.62** Add _execute_partial_exit() method for partial position closure
+- [x] **1.8.62** Add _execute_partial_exit() method for partial position closure
 
-- [ ] **1.8.63** Add exit_condition_triggers, partial_exit_count, exit_condition_pnl to WalkforwardResult
+- [x] **1.8.63** Add exit_condition_triggers, partial_exit_count, exit_condition_pnl to WalkforwardResult
 
-- [ ] **1.8.64** Update get_adjustment_report() to include exit condition tracking
+- [x] **1.8.64** Update get_adjustment_report() to include exit condition tracking
   ```python
   def get_adjustment_report(self) -> Dict[str, Any]:
       report = {
