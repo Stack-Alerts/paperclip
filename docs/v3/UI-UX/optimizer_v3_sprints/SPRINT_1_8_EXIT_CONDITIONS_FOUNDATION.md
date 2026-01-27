@@ -164,11 +164,17 @@
 
 ### PHASE 3: DATABASE SCHEMA (Day 2)
 
+> **NOTE**: Sprint 1.6.1 now includes ORM Model Classes. Sprint 1.8 database tasks should:
+> 1. Use existing `StrategyVersion.exit_conditions` column (already in 1.6.1 ORM)
+> 2. Add new columns using ORM model updates (not raw SQL)
+> 3. Generate Alembic migrations from ORM changes
+
 **File**: `src/optimizer_v3/database/models.py`
 
-- [ ] **1.8.17** Add exit_conditions JSONB column to StrategyVersion model
+- [ ] **1.8.17** Verify exit_conditions JSONB column exists in StrategyVersion model
   ```python
-  exit_conditions = Column(JSONB, nullable=False, default=[])
+  # Already in Sprint 1.6.1 ORM:
+  exit_conditions = Column(JSONB, nullable=False)  # ✓ EXISTS
   ```
 
 - [ ] **1.8.18** Add exit_condition_results JSONB column to StrategyTestResult model

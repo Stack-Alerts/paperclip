@@ -323,6 +323,286 @@ CREATE TABLE strategy_test_results (
 ```sql
 -- AI Recommendations
 CREATE INDEX idx_ai_recommendations_strategy ON ai_recommendations(strategy_id);
+```
+
+---
+
+## 🏗️ ORM MODEL CLASSES (INSTITUTIONAL REQUIREMENT)
+
+### **CRITICAL: Add SQLAlchemy ORM Classes**
+
+**WHY ORM IS REQUIRED (Not Optional):**
+1. **Type Safety**: Real money is at risk - column types validated at Python level
+2. **IDE Autocomplete**: `strategy.exit_conditions` vs `row['exit_conditions']`
+3. **Refactoring Safety**: Rename column → IDE finds all usages
+4. **Relationship Management**: Foreign keys enforced in Python code
+5. **Query Building**: `session.query(Strategy).filter_by()` vs raw SQL
+6. **Migration Validation**: Alembic auto-generates migrations from model changes
+7. **Test Mocking**: Easy to mock model objects in unit tests
+
+### **ORM Model Definitions**
+
+**File**: `src/optimizer_v3/database/models.py`
+
+```python
+# Add to existing models.py AFTER existing models
+
+class Strategy(Base):
+    """
+    Parent strategy table (Sprint 1.6.1)
+    Links all versions, recommendations, and test results
+    """
+    __tablename__ = 'strategies'
+    
+    strategy_id = Column(String, primary_key=True)
+    name = Column(String(255), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    versions = relationship("StrategyVersion", back_populates="strategy", cascade="all, delete-orphan")
+    recommendations = relationship("AIRecommendation", back_populates="strategy", cascade="all, delete-orphan")
+    test_results = relationship("StrategyTestResult", back_populates="strategy", cascade="all, delete-orphan")
+    
+    __table_args__ = (
+        Index('idx_strategies_name', 'name'),
+        Index('idx_strategies_created_at', 'created_at'),
+    )
+
+
+class StrategyVersion(Base):
+    """
+    Versioned strategy configurations (Sprint 1.6.1)
+    Complete strategy definition with full history
+    """
+    __tablename__ = 'strategy_versions'
+    
+    # Primary identification
+    version_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    strategy_id = Column(String, ForeignKey('strategies.strategy_id', ondelete='CASCADE'), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    
+    # Strategy metadata
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    
+    # Complete strategy definition (JSONB for flexibility)
+    blocks = Column(JSONB, nullable=False)
+    signals = Column(JSONB, nullable=False)
+    parameters = Column(JSONB, nullable=False)
+    entry_conditions = Column(JSONB, nullable=False)
+    exit_conditions = Column(JSONB, nullable=False)  # Used by Sprint 1.8
+    risk_management = Column(JSONB, nullable=False)
+    
+    # Backtest configuration and results
+    backtest_config = Column(JSONB, nullable=False)
+    backtest_results = Column(JSONB)
+    metrics = Column(JSONB)
+    trades = Column(JSONB)
+    equity_curve = Column(JSONB)
+    
+    # Version control and tracking
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
+    git_commit_hash = Column(String(40))
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    created_by = Column(String(100))
+    notes = Column(Text)
+    tags = Column(JSONB)
+    
+    # Duplicate detection
+    config_hash = Column(String(64), index=True)
+    
+    # Relationships
+    strategy = relationship("Strategy", back_populates="versions")
+    block_versions = relationship("StrategyBlockVersion", back_populates="version", cascade="all, delete-orphan")
+    recommendations = relationship("AIRecommendation", back_populates="version", cascade="all, delete-orphan")
+    test_results = relationship("StrategyTestResult", back_populates="version", cascade="all, delete-orphan")
+    
+    __table_args__ = (
+        UniqueConstraint('strategy_id', 'version_number', name='uq_strategy_version'),
+        Index('idx_strategy_versions_strategy', 'strategy_id'),
+        Index('idx_strategy_versions_timestamp', 'timestamp'),
+        Index('idx_strategy_versions_hash', 'config_hash'),
+    )
+
+
+class StrategyBlockVersion(Base):
+    """
+    Block-level version tracking (Sprint 1.6.1)
+    Tracks individual building blocks within strategy versions
+    """
+    __tablename__ = 'strategy_block_versions'
+    
+    block_version_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    version_id = Column(UUID(as_uuid=True), ForeignKey('strategy_versions.version_id', ondelete='CASCADE'), nullable=False)
+    block_name = Column(String(255), nullable=False)
+    block_type = Column(String(100), nullable=False)
+    signals = Column(JSONB, nullable=False)
+    parameters = Column(JSONB, nullable=False)
+    logic_type = Column(String(20), nullable=False)  # AND/OR
+    sequence_number = Column(Integer)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Relationships
+    version = relationship("StrategyVersion", back_populates="block_versions")
+    
+    __table_args__ = (
+        Index('idx_block_versions_version', 'version_id'),
+        Index('idx_block_versions_name', 'block_name'),
+    )
+
+
+class AIRecommendation(Base):
+    """
+    AI recommendation tracking (Sprint 1.6.1)
+    Stores AI-generated recommendations with full metadata
+    """
+    __tablename__ = 'ai_recommendations'
+    
+    recommendation_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    strategy_id = Column(String, ForeignKey('strategies.strategy_id', ondelete='CASCADE'), nullable=False)
+    version_id = Column(UUID(as_uuid=True), ForeignKey('strategy_versions.version_id', ondelete='CASCADE'), nullable=False)
+    strategy_version = Column(String(50), nullable=False)  # Display version string
+    
+    # Recommendation details
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
+    recommendation_type = Column(String(50), nullable=False)  # ADD_BLOCK, ADJUST_PARAMETER, etc.
+    block_name = Column(String(255))
+    signal_name = Column(String(255))
+    parameter_name = Column(String(255))
+    configuration = Column(JSONB)
+    reasoning = Column(Text, nullable=False)
+    expected_impact = Column(JSONB)
+    combined_confidence = Column(Float)
+    root_cause = Column(Text)
+    warnings = Column(JSONB)
+    
+    # AI metadata
+    ai_enhanced = Column(Boolean, default=False)
+    
+    # Application tracking
+    applied = Column(Boolean, default=False)
+    applied_at = Column(DateTime)
+    applied_version_id = Column(UUID(as_uuid=True))  # Version where applied
+    applied_by = Column(String(100))
+    metrics_before = Column(JSONB)
+    metrics_after = Column(JSONB)
+    
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Relationships
+    strategy = relationship("Strategy", back_populates="recommendations")
+    version = relationship("StrategyVersion", back_populates="recommendations")
+    
+    __table_args__ = (
+        Index('idx_ai_recommendations_strategy', 'strategy_id'),
+        Index('idx_ai_recommendations_version', 'version_id'),
+        Index('idx_ai_recommendations_timestamp', 'timestamp'),
+        Index('idx_ai_recommendations_type', 'recommendation_type'),
+        Index('idx_ai_recommendations_applied', 'applied'),
+    )
+
+
+class StrategyTestResult(Base):
+    """
+    Strategy test results history (Sprint 1.6.1)
+    Stores complete backtest/forward test results
+    """
+    __tablename__ = 'strategy_test_results'
+    
+    result_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    strategy_id = Column(String, ForeignKey('strategies.strategy_id', ondelete='CASCADE'), nullable=False)
+    version_id = Column(UUID(as_uuid=True), ForeignKey('strategy_versions.version_id', ondelete='CASCADE'), nullable=False)
+    
+    # Test details
+    test_type = Column(String(50), nullable=False)  # BACKTEST, LIVE_REPLAY, FORWARD_TEST
+    metrics = Column(JSONB, nullable=False)
+    trades = Column(JSONB)
+    equity_curve = Column(JSONB)
+    ai_recommendations = Column(JSONB)  # Linked recommendations
+    
+    # Timestamps
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Relationships
+    strategy = relationship("Strategy", back_populates="test_results")
+    version = relationship("StrategyVersion", back_populates="test_results")
+    
+    __table_args__ = (
+        Index('idx_test_results_strategy', 'strategy_id'),
+        Index('idx_test_results_version', 'version_id'),
+        Index('idx_test_results_timestamp', 'timestamp'),
+        Index('idx_test_results_test_type', 'test_type'),
+    )
+```
+
+### **Manager Refactoring to Use ORM**
+
+**File**: `src/optimizer_v3/database/strategy_manager.py`
+
+```python
+# BEFORE (Raw SQL):
+def create_strategy(self, name: str) -> str:
+    query = text("""
+        INSERT INTO strategies (strategy_id, name, created_at, updated_at)
+        VALUES (:strategy_id, :name, NOW(), NOW())
+    """)
+    self.session.execute(query, {'strategy_id': strategy_id, 'name': name})
+
+# AFTER (ORM):
+def create_strategy(self, name: str) -> str:
+    strategy = Strategy(
+        strategy_id=f"strategy_{uuid4().hex[:8]}",
+        name=name.strip()
+    )
+    self.session.add(strategy)
+    self.session.commit()
+    return strategy.strategy_id
+
+# BEFORE (Raw SQL):
+def get_strategy_version(self, version_id: str) -> Optional[Dict[str, Any]]:
+    query = text("SELECT * FROM strategy_versions WHERE version_id = :version_id")
+    result = self.session.execute(query, {'version_id': version_id}).fetchone()
+    return dict(result._mapping) if result else None
+
+# AFTER (ORM):
+def get_strategy_version(self, version_id: str) -> Optional[StrategyVersion]:
+    return self.session.query(StrategyVersion).filter(
+        StrategyVersion.version_id == version_id
+    ).first()
+```
+
+### **ORM Implementation Tasks**
+
+| Task | File | Description | Priority |
+|------|------|-------------|----------|
+| 1.6.1.ORM.1 | `models.py` | Add Strategy ORM class | HIGH |
+| 1.6.1.ORM.2 | `models.py` | Add StrategyVersion ORM class | HIGH |
+| 1.6.1.ORM.3 | `models.py` | Add StrategyBlockVersion ORM class | HIGH |
+| 1.6.1.ORM.4 | `models.py` | Add AIRecommendation ORM class | HIGH |
+| 1.6.1.ORM.5 | `models.py` | Add StrategyTestResult ORM class | HIGH |
+| 1.6.1.ORM.6 | `strategy_manager.py` | Refactor create_strategy() to ORM | MEDIUM |
+| 1.6.1.ORM.7 | `strategy_manager.py` | Refactor create_strategy_version() to ORM | MEDIUM |
+| 1.6.1.ORM.8 | `strategy_manager.py` | Refactor get_strategy_version() to ORM | MEDIUM |
+| 1.6.1.ORM.9 | `strategy_manager.py` | Refactor get_all_strategies() to ORM | MEDIUM |
+| 1.6.1.ORM.10 | `ai_recommendations_manager.py` | Refactor to use ORM + text() | MEDIUM |
+| 1.6.1.ORM.11 | `test_results_manager.py` | Refactor to use ORM | MEDIUM |
+| 1.6.1.ORM.12 | `tests/database/` | Add ORM unit tests | HIGH |
+
+**Estimated Time**: 11 hours (1.5 days)
+
+---
+
+## 🏗️ DATABASE SCHEMA EXTENSION (SQL - Reference Only)
+
+The SQL below is for REFERENCE. The actual schema should be managed via:
+1. ORM Model Classes (above) as source of truth
+2. Alembic migration auto-generated from ORM changes
+
+```sql
+-- AI Recommendations
+CREATE INDEX idx_ai_recommendations_strategy ON ai_recommendations(strategy_id);
 CREATE INDEX idx_ai_recommendations_version ON ai_recommendations(strategy_id, strategy_version);
 CREATE INDEX idx_ai_recommendations_timestamp ON ai_recommendations(timestamp);
 CREATE INDEX idx_ai_recommendations_type ON ai_recommendations(recommendation_type);
