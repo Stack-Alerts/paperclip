@@ -171,29 +171,29 @@
 
 **File**: `src/optimizer_v3/database/models.py`
 
-- [ ] **1.8.17** Verify exit_conditions JSONB column exists in StrategyVersion model
+- [x] **1.8.17** Verify exit_conditions JSONB column exists in StrategyVersion model
   ```python
   # Already in Sprint 1.6.1 ORM:
   exit_conditions = Column(JSONB, nullable=False)  # ✓ EXISTS
   ```
 
-- [ ] **1.8.18** Add exit_condition_results JSONB column to StrategyTestResult model
+- [x] **1.8.18** Add exit_condition_results JSONB column to StrategyTestResult model
   ```python
   exit_condition_results = Column(JSONB, nullable=True)
   ```
 
-- [ ] **1.8.19** Add "exit_condition" to SignalEvent.signal_type enum values
+- [x] **1.8.19** Add "exit_condition" to SignalEvent.signal_type enum values
 
-- [ ] **1.8.20** Add exit_condition_triggers field to StrategyVariation model
+- [x] **1.8.20** Add exit_condition_triggers field to StrategyVariation model
   ```python
   exit_condition_triggers = Column(Integer, default=0)
   ```
 
-- [ ] **1.8.21** Add exit_condition_results to BacktestResult statistics JSONB schema
+- [x] **1.8.21** Add exit_condition_results to BacktestResult statistics JSONB schema
 
 **File**: `alembic/versions/[new]_add_exit_conditions.py`
 
-- [ ] **1.8.22** Create database migration script for exit_conditions columns
+- [x] **1.8.22** Create database migration script for exit_conditions columns
   ```python
   def upgrade():
       op.add_column('strategy_versions', sa.Column('exit_conditions', JSONB, nullable=False, server_default='[]'))
@@ -201,7 +201,7 @@
       op.add_column('strategy_variations', sa.Column('exit_condition_triggers', sa.Integer, default=0))
   ```
 
-- [ ] **1.8.23** Run migration: `alembic upgrade head`
+- [x] **1.8.23** Run migration: `alembic upgrade head`
 
 **File**: `src/optimizer_v3/database/strategy_manager.py`
 

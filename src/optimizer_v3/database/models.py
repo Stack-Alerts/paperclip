@@ -108,6 +108,9 @@ class StrategyVariation(Base):
     cvar_95 = Column(Float)
     calmar_ratio = Column(Float)
     
+    # Exit condition statistics (Sprint 1.8 Task 1.8.20)
+    exit_condition_triggers = Column(Integer, default=0)
+    
     # Ranking score (composite metric for sorting)
     ranking_score = Column(Float, index=True)
     
@@ -135,7 +138,7 @@ class SignalEvent(Base):
     # Event details
     timestamp = Column(DateTime, nullable=False, index=True)
     signal_name = Column(String(255), nullable=False, index=True)
-    signal_type = Column(String(50), nullable=False)  # entry, exit, filter
+    signal_type = Column(String(50), nullable=False)  # entry, exit, filter, exit_condition (Sprint 1.8 Task 1.8.19)
     signal_direction = Column(String(20))  # long, short, neutral
     
     # Market context
@@ -645,6 +648,7 @@ class StrategyTestResult(Base):
     trades = Column(JSONB)
     equity_curve = Column(JSONB)
     ai_recommendations = Column(JSONB)  # Linked recommendations
+    exit_condition_results = Column(JSONB)  # Sprint 1.8 Task 1.8.18 - Exit condition trigger details
     
     # Timestamps
     timestamp = Column(DateTime, nullable=False, server_default=func.now())
