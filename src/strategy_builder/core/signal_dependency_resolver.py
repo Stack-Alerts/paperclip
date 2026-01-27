@@ -45,6 +45,27 @@ class SignalNode:
 
 
 @dataclass
+class ExitConditionNode:
+    """
+    Node for exit condition in dependency graph
+    Sprint 1.8 Task 1.8.39
+    
+    Exit conditions should NOT cause circular dependency errors
+    when they reference entry signals (exits naturally depend on entries)
+    """
+    signal_name: str
+    exit_mode: str  # "ABSOLUTE" or "FLEXIBLE"
+    binding_level: str  # "STRATEGY", "BLOCK", "SIGNAL"
+    timing_constraint: Optional[TimingConstraint] = None
+    is_exit: bool = True  # Distinguishes from entry signals
+    
+    @property
+    def full_name(self) -> str:
+        """Get full name (EXIT:signal_name)"""
+        return f"EXIT:{self.signal_name}"
+
+
+@dataclass
 class DependencyGraph:
     """Graph structure for signal dependencies"""
     nodes: List[SignalNode] = field(default_factory=list)

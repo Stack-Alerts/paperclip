@@ -311,7 +311,7 @@
 
 **File**: `src/strategy_builder/core/signal_dependency_resolver.py`
 
-- [ ] **1.8.39** Add ExitConditionNode dataclass for exit dependency tracking
+- [x] **1.8.39** Add ExitConditionNode dataclass for exit dependency tracking
   ```python
   @dataclass
   class ExitConditionNode:
@@ -323,7 +323,7 @@
       is_exit: bool = True  # Distinguishes from entry signals
   ```
 
-- [ ] **1.8.40** Update build_graph() to include exit condition nodes
+- [x] **1.8.40** Update build_graph() to include exit condition nodes
   ```python
   # Add exit conditions as separate nodes
   for exit_cond in config.exit_conditions:
@@ -336,13 +336,13 @@
       graph.add_exit_node(node)
   ```
 
-- [ ] **1.8.41** Update has_circular_dependency() to handle exit condition nodes
+- [x] **1.8.41** Update has_circular_dependency() to handle exit condition nodes
   ```python
   # Exit conditions should NOT cause circular dependency errors
   # when they reference entry signals (exits naturally depend on entries)
   ```
 
-- [ ] **1.8.42** Update should_reset_strategy() to exclude exit condition timing violations
+- [x] **1.8.42** Update should_reset_strategy() to exclude exit condition timing violations
   ```python
   # Exit condition timing violations should NOT trigger strategy reset
   # Only entry signal timing violations cause reset
