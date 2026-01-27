@@ -26,6 +26,7 @@ from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
 )
 from src.strategy_builder.ui.timing_constraint_dialog import TimingConstraintDialog
+from src.strategy_builder.ui.exit_condition_dialog import ExitConditionDialog
 # Import centralized styles
 from src.strategy_builder.ui.styles import (
     get_label_style, get_logic_badge_style, get_primary_button_stylesheet,
@@ -34,7 +35,7 @@ from src.strategy_builder.ui.styles import (
     get_recheck_duplicate_button_stylesheet, get_recheck_remove_button_stylesheet,
     get_spinbox_button_stylesheet, get_success_button_stylesheet, get_color,
     get_dialog_stylesheet, get_radio_container_stylesheet, get_signal_radio_stylesheet,
-    get_recheck_radio_stylesheet, get_exit_tree_item_style
+    get_recheck_radio_stylesheet, get_exit_tree_item_style, get_exit_button_stylesheet
 )
 
 
@@ -690,6 +691,43 @@ class StrategyBlocksPanel(QWidget):
         group_box.setLayout(group_layout)
         layout.addWidget(group_box)
         
+        # Sprint 1.8 Task 1.8.49: Strategy-level Exit Conditions Section
+        self.strategy_exit_section = QGroupBox("🔴 STRATEGY EXIT CONDITIONS")
+        exit_section_font = QFont()
+        exit_section_font.setPointSize(12)
+        exit_section_font.setBold(True)
+        self.strategy_exit_section.setFont(exit_section_font)
+        self.strategy_exit_section.setCheckable(True)
+        self.strategy_exit_section.setChecked(False)  # Collapsed by default
+        
+        exit_section_layout = QVBoxLayout()
+        exit_section_layout.setSpacing(10)
+        exit_section_layout.setContentsMargins(15, 20, 15, 15)
+        
+        # Info text
+        exit_info = QLabel("Configure exit conditions that apply to ALL positions from this strategy")
+        exit_info.setStyleSheet(get_label_style('error') + " font-size: 9pt; font-style: italic;")
+        exit_section_layout.addWidget(exit_info)
+        
+        # Add Exit Condition button
+        add_exit_btn = QPushButton("➕ Add Strategy Exit Condition")
+        add_exit_btn.setMinimumHeight(40)
+        add_exit_btn.setStyleSheet(get_exit_button_stylesheet())
+        add_exit_btn.setToolTip("Add exit condition that applies to all positions")
+        add_exit_btn.clicked.connect(self._on_add_strategy_exit)
+        exit_section_layout.addWidget(add_exit_btn)
+        
+        # Container for exit conditions list
+        self.strategy_exits_container = QWidget()
+        self.strategy_exits_layout = QVBoxLayout()
+        self.strategy_exits_layout.setSpacing(5)
+        self.strategy_exits_layout.setContentsMargins(0, 10, 0, 0)
+        self.strategy_exits_container.setLayout(self.strategy_exits_layout)
+        exit_section_layout.addWidget(self.strategy_exits_container)
+        
+        self.strategy_exit_section.setLayout(exit_section_layout)
+        layout.addWidget(self.strategy_exit_section)
+        
         self.setLayout(layout)
     
     def _refresh_blocks(self):
@@ -782,6 +820,9 @@ class StrategyBlocksPanel(QWidget):
             # Add to layout (insert before stretch)
             self.blocks_layout.insertWidget(self.blocks_layout.count() - 1, block_item)
             self.block_items.append(block_item)
+        
+        # Sprint 1.8 Task 1.8.49: Refresh strategy-level exits
+        self._refresh_strategy_exits()
     
     def _clear_blocks(self):
         """Clear all block items from the display."""
@@ -1230,3 +1271,124 @@ class StrategyBlocksPanel(QWidget):
     def get_block_names(self) -> List[str]:
         """Get list of configured block names in order."""
         return [item.block_name for item in self.block_items]
+    
+    def _on_add_strategy_exit(self):
+        """Handle Add Strategy Exit Condition button click - Sprint 1.8 Task 1.8.49"""
+        try:
+            # Show exit condition dialog
+            dialog = ExitConditionDialog(parent=self)
+            
+            if dialog.exec_() == QDialog.Accepted:
+                # Get configuration from dialog
+                config = dialog.get_config()
+                
+                # Validate that a signal was selected
+                if not config or not config.get('signal_name'):
+                    print("No signal selected for exit condition")
+                    return
+                
+                # Add to orchestrator at STRATEGY binding level
+                result = self.orchestrator.add_exit_condition(
+                    signal_name=config['signal_name'],
+                    percentage=config.get('percentage', 50) / 100.0,  # Convert from % to 0.0-1.0
+                    binding_level='STRATEGY',
+                    exit_mode=config.get('exit_mode', 'ABSOLUTE'),
+                    tp_proximity_threshold=config.get('tp_proximity_threshold', 2.0),
+                    reversal_trigger=config.get('reversal_trigger', 0.5)
+                )
+                
+                if result.success:
+                    print(f"Strategy exit condition added: {config['signal_name']}")
+                    # Refresh display
+                    self._refresh_strategy_exits()
+                    self.blocks_changed.emit()
+                else:
+                    print(f"Failed to add exit condition: {result.message}")
+        
+        except Exception as e:
+            print(f"Error adding strategy exit condition: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _refresh_strategy_exits(self):
+        """Refresh the strategy-level exit conditions display - Sprint 1.8 Task 1.8.49"""
+        try:
+            # Clear existing exit items
+            while self.strategy_exits_layout.count():
+                item = self.strategy_exits_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+            
+            # Get current config
+            config = self.orchestrator.get_current_config()
+            if not config or not hasattr(config, 'exit_conditions') or not config.exit_conditions:
+                # No strategy-level exits
+                no_exits_label = QLabel("No strategy-level exit conditions configured")
+                no_exits_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt; font-style: italic;")
+                no_exits_label.setAlignment(Qt.AlignCenter)
+                self.strategy_exits_layout.addWidget(no_exits_label)
+                return
+            
+            # Display each exit condition
+            for exit_cond in config.exit_conditions:
+                # Create row widget for this exit
+                exit_row = QWidget()
+                exit_row_layout = QHBoxLayout()
+                exit_row_layout.setSpacing(10)
+                exit_row_layout.setContentsMargins(10, 5, 10, 5)
+                
+                # Exit info label
+                pct_display = int(exit_cond.percentage * 100)
+                exit_text = f"🔴 {exit_cond.signal_name} ({pct_display}%) - {exit_cond.exit_mode} mode"
+                exit_label = QLabel(exit_text)
+                exit_label.setStyleSheet(get_exit_tree_item_style() + " font-size: 10pt;")
+                exit_label.setToolTip(
+                    f"Signal: {exit_cond.signal_name}\n"
+                    f"Percentage: {pct_display}%\n"
+                    f"Mode: {exit_cond.exit_mode}\n"
+                    f"Binding: {exit_cond.binding_level}"
+                )
+                exit_row_layout.addWidget(exit_label, stretch=1)
+                
+                # Remove button
+                remove_btn = QPushButton("✕")
+                remove_btn.setMaximumWidth(30)
+                remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
+                remove_btn.setToolTip("Remove this exit condition")
+                remove_btn.clicked.connect(
+                    lambda checked, sig=exit_cond.signal_name: self._on_remove_strategy_exit(sig)
+                )
+                exit_row_layout.addWidget(remove_btn)
+                
+                exit_row.setLayout(exit_row_layout)
+                exit_row.setStyleSheet(
+                    f"background-color: {get_color('bg_light')}; "
+                    f"border: 1px solid {get_color('error')}; "
+                    f"border-radius: 4px; padding: 5px;"
+                )
+                self.strategy_exits_layout.addWidget(exit_row)
+        
+        except Exception as e:
+            print(f"Error refreshing strategy exits: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_remove_strategy_exit(self, signal_name: str):
+        """Handle removal of strategy-level exit condition - Sprint 1.8 Task 1.8.49"""
+        try:
+            result = self.orchestrator.remove_exit_condition(
+                signal_name=signal_name,
+                binding_level='STRATEGY'
+            )
+            
+            if result.success:
+                print(f"Strategy exit condition removed: {signal_name}")
+                self._refresh_strategy_exits()
+                self.blocks_changed.emit()
+            else:
+                print(f"Failed to remove exit condition: {result.message}")
+        
+        except Exception as e:
+            print(f"Error removing strategy exit: {e}")
+            import traceback
+            traceback.print_exc()

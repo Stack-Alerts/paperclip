@@ -406,7 +406,7 @@
 
 - [x] **1.8.48** Add exit condition tree items display (🔴 EXIT: signal_name (50%))
 
-- [ ] **1.8.49** Add strategy-level exit conditions section at bottom of blocks panel
+- [x] **1.8.49** Add strategy-level exit conditions section at bottom of blocks panel
   - Collapsible section: "🔴 STRATEGY EXIT CONDITIONS"
   - "Add Exit Condition" button
   - Exit removal buttons [✕]
