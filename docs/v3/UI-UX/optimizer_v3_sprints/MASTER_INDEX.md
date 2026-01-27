@@ -1,9 +1,9 @@
 # OPTIMIZER V3 - MASTER IMPLEMENTATION PLAN INDEX
 **Institutional-Grade Development Roadmap - Sprint File Structure**
 
-**Date**: 2026-01-19  
+**Date**: 2026-01-27  
 **Status**: 📋 100% COMPLETE - READY FOR IMPLEMENTATION  
-**Total Tasks**: 210 across 62 days  
+**Total Tasks**: 312 across 72 days  
 **File Structure**: Multi-file sprint architecture
 
 ---
@@ -68,6 +68,11 @@
 **File**: `SPRINT_1_7_NESTED_RECHECK_FOUNDATION.md`  
 **Status**: ✅ COMPLETE (14/14 tasks, 2026-01-22)  
 **Purpose**: UI, data structures, persistence for nested RECHECK validation. Execution layer in Sprint 2.2.
+
+#### **Sprint 1.8: Exit Conditions Foundation** (9-10 days, 102 tasks)
+**File**: `SPRINT_1_8_EXIT_CONDITIONS_FOUNDATION.md`  
+**Status**: 📋 Ready for Implementation  
+**Purpose**: Separate exit conditions from TP/SL, "Add as Exit" button (red), percentage-based exits with ABSOLUTE/FLEXIBLE modes, three binding levels (STRATEGY/BLOCK/SIGNAL), nested RECHECK for exits, full backtest integration
 
 ---
 
@@ -145,6 +150,7 @@
 - [x] Sprint 1.6: Intelligent Recommendation System (18/18 tasks COMPLETE ✅ - 2026-01-22)
 - [ ] Sprint 1.6.1: AI Recommendations Database (0/15 tasks - Planning)
 - [x] Sprint 1.7: Nested RECHECK Foundation (14/14 tasks COMPLETE ✅ - 2026-01-22)
+- [ ] Sprint 1.8: Exit Conditions Foundation (0/102 tasks - Ready for Implementation)
 - [ ] Sprint 2.1: Automated Trainer (20 tasks, 10 days)
 - [ ] Sprint 2.2: Signal Intelligence + Nested RECHECK Execution (37 tasks, 12 days)
 - [ ] Sprint 2.3: ML Generator (15 tasks, 4 days)
@@ -156,7 +162,7 @@
 - [ ] Sprint 4.2: Documentation (7 tasks, 2 days)
 - [ ] Sprint 4.3: Production (5 tasks, 1 day)
 
-**Total**: 210 tasks, 62 days
+**Total**: 312 tasks, 72 days
 
 ---
 
@@ -249,8 +255,8 @@
 - Phase sign-off obtained
 
 **Project Complete When**:
-- All 16 sprints complete
-- All 210 tasks checked off
+- All 17 sprints complete
+- All 312 tasks checked off
 - Production deployment successful
 - Final sign-off obtained
 
