@@ -2,9 +2,14 @@
 **Event Recording, Metrics Calculation, Performance Dashboard**
 
 **Duration**: 12 days  
-**Tasks**: 32  
-**Dependencies**: Sprint 2.1 complete  
+**Tasks**: 37  
+**Dependencies**: Sprint 2.1 complete, **Sprint 1.8 Exit Conditions**  
 **Status**: ☐ Not Started
+
+**CRITICAL UPDATE (Sprint 1.8 Impact)**: This sprint MUST include Exit Condition tracking.
+Sprint 1.8 introduces Exit Conditions with three binding levels (STRATEGY/BLOCK/SIGNAL),
+two exit modes (ABSOLUTE/FLEXIBLE), and percentage-based partial exits. All signal
+intelligence systems MUST track exit condition events alongside entry signals.
 
 **Design Reference**: `docs/v3/UI-UX/OPTIMIZER_V3_SIGNAL_INTELLIGENCE.md` (COMPLETE DOCUMENT)  
 **Testing Reference**: `docs/v3/UI-UX/OPTIMIZER_V3_TESTING_FRAMEWORK.md` → Data Validation
@@ -63,6 +68,13 @@
 - [ ] 2.2.21 Tests (95% coverage)
 - [ ] 2.2.22 Sprint sign-off
 - [ ] 2.2.23-2.2.32 Extended analytics (10 tasks)
+
+**🚨 EXIT CONDITION INTEGRATION (Sprint 1.8 Dependency)**:
+- [ ] 2.2.33 Exit Condition Event Tracking
+- [ ] 2.2.34 Exit Condition Effectiveness Metrics
+- [ ] 2.2.35 Exit Condition Dashboard Section
+- [ ] 2.2.36 Exit Condition Correlation Analysis
+- [ ] 2.2.37 Exit Condition Recommendations
 
 ---
 
@@ -1444,11 +1456,346 @@ class AutomatedRecommendationsEngine:
 
 ---
 
+## 🚨 EXIT CONDITION INTEGRATION (Sprint 1.8 Dependency)
+
+**CRITICAL**: Sprint 1.8 introduces Exit Conditions which MUST be tracked by the Signal Intelligence system.
+Without these tasks, exit conditions will not be analyzed, creating a gap in signal intelligence.
+
+### **Task 2.2.33: Exit Condition Event Tracking**
+**Duration**: 4 hours  
+**Dependencies**: 2.2.1, Sprint 1.8 complete
+
+**Purpose**: Extend NautilusSignalEvent to track exit condition events
+
+**Implementation**:
+```python
+from enum import Enum
+
+class SignalEventType(Enum):
+    """Type of signal event"""
+    ENTRY = "entry"           # Entry signal (Add as AND/OR)
+    EXIT_CONDITION = "exit_condition"  # Exit condition signal (Add as Exit)
+
+@dataclass
+class NautilusSignalEvent:
+    """UPDATED: Record of signal occurrence with Exit Condition support"""
+    signal_name: str
+    block_name: str
+    timestamp: datetime
+    instrument_id: InstrumentId
+    price_at_signal: Price
+    fired: bool
+    
+    # NEW: Signal event type (entry vs exit condition)
+    event_type: SignalEventType = SignalEventType.ENTRY
+    
+    # NEW: Exit condition specific fields
+    exit_mode: Optional[str] = None  # "ABSOLUTE" or "FLEXIBLE"
+    exit_percentage: Optional[Decimal] = None  # 0.0-1.0
+    binding_level: Optional[str] = None  # "STRATEGY", "BLOCK", "SIGNAL"
+    was_deferred: bool = False  # FLEXIBLE mode deferral
+    deferral_resolved_by: Optional[str] = None  # "TP1", "TP2", "reversal", etc.
+    
+    # ... existing fields ...
+```
+
+**Database Update**:
+```sql
+ALTER TABLE signal_events ADD COLUMN event_type VARCHAR(20) DEFAULT 'entry';
+ALTER TABLE signal_events ADD COLUMN exit_mode VARCHAR(20);
+ALTER TABLE signal_events ADD COLUMN exit_percentage DECIMAL(5,4);
+ALTER TABLE signal_events ADD COLUMN binding_level VARCHAR(20);
+ALTER TABLE signal_events ADD COLUMN was_deferred BOOLEAN DEFAULT false;
+ALTER TABLE signal_events ADD COLUMN deferral_resolved_by VARCHAR(50);
+```
+
+**Acceptance Criteria**:
+- [ ] SignalEventType enum added
+- [ ] NautilusSignalEvent extended with exit condition fields
+- [ ] Database schema updated for exit condition tracking
+- [ ] Both entry and exit events recorded properly
+- [ ] Exit mode (ABSOLUTE/FLEXIBLE) tracked
+- [ ] Binding level (STRATEGY/BLOCK/SIGNAL) tracked
+
+**Sign-off**: ☐ Developer ☐ Lead ☐ NautilusTrader Expert
+
+---
+
+### **Task 2.2.34: Exit Condition Effectiveness Metrics**
+**Duration**: 4 hours  
+**Dependencies**: 2.2.33
+
+**Purpose**: Calculate effectiveness metrics for exit conditions
+
+**Implementation**:
+```python
+@dataclass
+class ExitConditionMetrics:
+    """Metrics specific to exit condition effectiveness"""
+    exit_condition_name: str
+    binding_level: str  # STRATEGY, BLOCK, SIGNAL
+    exit_mode: str  # ABSOLUTE, FLEXIBLE
+    
+    # Occurrence metrics
+    total_triggers: int
+    trigger_rate: Decimal  # How often exit condition fires
+    
+    # Performance metrics
+    avg_exit_price_vs_entry: Decimal  # % gain/loss at exit
+    avg_exit_price_vs_tp1: Decimal  # How close to TP1
+    exits_better_than_sl: int  # Count of exits better than SL
+    exits_worse_than_tp1: int  # Count of exits worse than TP1
+    
+    # FLEXIBLE mode specific
+    deferred_count: int
+    deferral_to_tp_rate: Decimal  # % of deferrals that hit TP
+    deferral_to_reversal_rate: Decimal  # % that triggered reversal
+    avg_deferral_duration: int  # bars
+    
+    # PnL impact
+    total_pnl_contribution: Money
+    avg_pnl_per_exit: Money
+    pnl_vs_holding_to_tp: Money  # Comparison: exit vs waiting for TP
+    
+    # Recommendations
+    suggested_percentage_adjustment: Optional[Decimal] = None
+    suggested_mode_change: Optional[str] = None
+    
+    def calculate_effectiveness_score(self) -> Decimal:
+        """Calculate exit condition effectiveness 0-100"""
+        # Score based on:
+        # 1. Better than SL rate (30%)
+        # 2. PnL contribution (30%)
+        # 3. Deferral resolution rate for FLEXIBLE (20%)
+        # 4. Optimal timing (20%)
+        ...
+```
+
+**Acceptance Criteria**:
+- [ ] ExitConditionMetrics dataclass created
+- [ ] Calculates trigger rate
+- [ ] Compares exit price to entry/TP/SL
+- [ ] Tracks FLEXIBLE mode deferral stats
+- [ ] Calculates PnL contribution
+- [ ] Provides improvement suggestions
+
+**Sign-off**: ☐ Developer ☐ Lead
+
+---
+
+### **Task 2.2.35: Exit Condition Dashboard Section**
+**Duration**: 3 hours  
+**Dependencies**: 2.2.34
+
+**Purpose**: Add exit condition analysis section to Signal Intelligence Dashboard
+
+**Implementation**:
+```python
+class ExitConditionDashboardSection(QWidget):
+    """Dashboard section for exit condition analysis"""
+    
+    def __init__(self):
+        super().__init__()
+        self.setup_ui()
+    
+    def setup_ui(self):
+        layout = QVBoxLayout()
+        
+        # Section header with red theme (EXIT_BUTTON_STYLE from styles.py)
+        header = QLabel("🔴 EXIT CONDITION ANALYSIS")
+        header.setStyleSheet(EXIT_SECTION_HEADER_STYLE)
+        layout.addWidget(header)
+        
+        # Exit condition metrics table
+        self.exit_table = QTableWidget()
+        self.exit_table.setColumnCount(8)
+        self.exit_table.setHorizontalHeaderLabels([
+            'Exit Condition', 'Binding Level', 'Mode', 'Triggers',
+            'Avg Exit vs Entry', 'Better than SL', 'PnL Contribution', 'Score'
+        ])
+        layout.addWidget(self.exit_table)
+        
+        # FLEXIBLE vs ABSOLUTE comparison chart
+        self.mode_comparison_chart = PlotlyChart()
+        layout.addWidget(self.mode_comparison_chart)
+        
+        # Deferral resolution pie chart (for FLEXIBLE mode)
+        self.deferral_chart = PlotlyChart()
+        layout.addWidget(self.deferral_chart)
+        
+        self.setLayout(layout)
+    
+    def update_metrics(self, exit_metrics: List[ExitConditionMetrics]):
+        """Refresh dashboard with exit condition data"""
+        self._update_table(exit_metrics)
+        self._update_mode_comparison(exit_metrics)
+        self._update_deferral_chart(exit_metrics)
+```
+
+**Acceptance Criteria**:
+- [ ] Exit condition section added to dashboard
+- [ ] Uses red theme from styles.py
+- [ ] Shows all exit condition metrics
+- [ ] FLEXIBLE vs ABSOLUTE comparison chart
+- [ ] Deferral resolution visualization
+
+**Sign-off**: ☐ Developer ☐ Lead ☐ UI Designer
+
+---
+
+### **Task 2.2.36: Exit Condition Correlation Analysis**
+**Duration**: 3 hours  
+**Dependencies**: 2.2.35
+
+**Purpose**: Analyze correlations between exit conditions and entry signals
+
+**Implementation**:
+```python
+class ExitConditionCorrelationAnalyzer:
+    """Analyze exit condition correlations"""
+    
+    def analyze_exit_entry_correlation(self, strategy_id: str) -> Dict:
+        """Analyze correlation between exit conditions and entry signals"""
+        
+        results = {
+            'exit_entry_correlations': {},  # Exit condition → Entry signal correlations
+            'best_exit_per_entry': {},  # Recommend best exit for each entry signal
+            'exit_timing_analysis': {},  # When exits fire relative to entries
+        }
+        
+        # For each exit condition
+        for exit_cond in self.db.get_exit_conditions(strategy_id):
+            entry_correlations = {}
+            
+            for entry_signal in self.db.get_entry_signals(strategy_id):
+                # Calculate: How effective is this exit when triggered by this entry?
+                trades = self.db.get_trades_by_entry_and_exit(
+                    entry_signal=entry_signal,
+                    exit_condition=exit_cond.signal_name
+                )
+                
+                if trades:
+                    corr = {
+                        'pnl_when_paired': sum(t.pnl for t in trades),
+                        'win_rate_when_paired': len([t for t in trades if t.pnl > 0]) / len(trades),
+                        'avg_exit_timing': sum(t.bars_to_exit for t in trades) / len(trades)
+                    }
+                    entry_correlations[entry_signal] = corr
+            
+            results['exit_entry_correlations'][exit_cond.signal_name] = entry_correlations
+        
+        return results
+    
+    def recommend_exit_conditions(self, entry_signal: str) -> List[str]:
+        """Recommend best exit conditions for a given entry signal"""
+        correlations = self.db.get_exit_correlations_for_entry(entry_signal)
+        
+        # Rank by effectiveness
+        ranked = sorted(
+            correlations.items(),
+            key=lambda x: x[1]['win_rate_when_paired'] * x[1]['pnl_when_paired'],
+            reverse=True
+        )
+        
+        return [exit_name for exit_name, _ in ranked[:3]]
+```
+
+**Acceptance Criteria**:
+- [ ] Exit-to-entry correlation calculated
+- [ ] Best exit recommended per entry signal
+- [ ] Exit timing analysis included
+- [ ] Integrated with existing correlation matrix
+
+**Sign-off**: ☐ Developer ☐ Lead
+
+---
+
+### **Task 2.2.37: Exit Condition Recommendations**
+**Duration**: 2 hours  
+**Dependencies**: 2.2.36
+
+**Purpose**: Generate AI recommendations for exit condition improvements
+
+**Implementation**:
+```python
+class ExitConditionRecommendationsEngine:
+    """Generate exit condition improvement recommendations"""
+    
+    def generate_exit_recommendations(self, strategy_id: str) -> List[Recommendation]:
+        """Analyze exit conditions and recommend improvements"""
+        
+        recommendations = []
+        exit_metrics = self.db.get_exit_condition_metrics(strategy_id)
+        
+        for metric in exit_metrics:
+            # Check if exit percentage is suboptimal
+            if metric.exits_worse_than_tp1 > metric.exits_better_than_sl:
+                recommendations.append(Recommendation(
+                    type=RecommendationType.ADJUST_EXIT_CONDITION,
+                    signal=metric.exit_condition_name,
+                    reason=f'Exit triggering too early. {metric.exits_worse_than_tp1} exits below TP1.',
+                    priority='HIGH',
+                    config={'new_percentage': metric.suggested_percentage_adjustment}
+                ))
+            
+            # Check FLEXIBLE mode effectiveness
+            if metric.exit_mode == 'FLEXIBLE':
+                deferral_success = metric.deferral_to_tp_rate
+                if deferral_success < Decimal('0.3'):
+                    recommendations.append(Recommendation(
+                        type=RecommendationType.ADJUST_EXIT_CONDITION,
+                        signal=metric.exit_condition_name,
+                        reason=f'FLEXIBLE mode deferral success rate too low ({deferral_success:.1%}). Consider ABSOLUTE mode.',
+                        priority='MEDIUM',
+                        config={'mode_change': 'ABSOLUTE'}
+                    ))
+            
+            # Check ABSOLUTE mode - could benefit from FLEXIBLE
+            if metric.exit_mode == 'ABSOLUTE':
+                # If many exits happen close to TP, suggest FLEXIBLE
+                close_to_tp_rate = metric.total_triggers > 0 and (
+                    metric.exits_worse_than_tp1 / metric.total_triggers > 0.5
+                )
+                if close_to_tp_rate:
+                    recommendations.append(Recommendation(
+                        type=RecommendationType.ADJUST_EXIT_CONDITION,
+                        signal=metric.exit_condition_name,
+                        reason=f'Many exits close to TP. FLEXIBLE mode could improve results.',
+                        priority='MEDIUM',
+                        config={'mode_change': 'FLEXIBLE'}
+                    ))
+            
+            # Check for underperforming exit conditions
+            if metric.calculate_effectiveness_score() < Decimal('40'):
+                recommendations.append(Recommendation(
+                    type=RecommendationType.REMOVE,
+                    signal=metric.exit_condition_name,
+                    reason=f'Exit condition effectiveness score ({metric.calculate_effectiveness_score():.1f}) below threshold.',
+                    priority='HIGH',
+                    estimated_impact=metric.total_pnl_contribution.as_decimal()
+                ))
+        
+        return recommendations
+```
+
+**Acceptance Criteria**:
+- [ ] Generates percentage adjustment recommendations
+- [ ] Suggests ABSOLUTE ↔ FLEXIBLE mode changes
+- [ ] Identifies underperforming exit conditions
+- [ ] Integrates with existing recommendations engine
+- [ ] Uses ADJUST_EXIT_CONDITION type from Sprint 1.8
+
+**Sign-off**: ☐ Developer ☐ Lead
+
+---
+
 ## 🎯 SPRINT SIGN-OFF
 
 **Complete When**:
-- [ ] All 32 tasks done
-- [ ] All signals tracked
+- [ ] All 37 tasks done (32 original + 5 exit condition tasks)
+- [ ] All signals tracked (entry AND exit conditions)
+- [ ] Exit condition dashboard section functional
+- [ ] Exit condition recommendations generated
 - [ ] Dashboard functional
 - [ ] 100% coverage
 
