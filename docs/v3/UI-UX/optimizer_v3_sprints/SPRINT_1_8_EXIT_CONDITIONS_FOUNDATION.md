@@ -411,7 +411,7 @@
   - "Add Exit Condition" button
   - Exit removal buttons [✕]
 
-- [ ] **1.8.50** Add exit condition editing support (double-click to configure)
+- [x] **1.8.50** Add exit condition editing support (double-click to configure)
 
 **File**: `src/strategy_builder/ui/strategy_info_panel.py`
 

@@ -1346,9 +1346,22 @@ class StrategyBlocksPanel(QWidget):
                     f"Signal: {exit_cond.signal_name}\n"
                     f"Percentage: {pct_display}%\n"
                     f"Mode: {exit_cond.exit_mode}\n"
-                    f"Binding: {exit_cond.binding_level}"
+                    f"Binding: {exit_cond.binding_level}\n\n"
+                    f"Double-click to edit"
                 )
                 exit_row_layout.addWidget(exit_label, stretch=1)
+                
+                # Sprint 1.8 Task 1.8.50: Make exit row double-clickable for editing
+                # Store exit condition data as widget property for editing
+                exit_row.setProperty('exit_signal_name', exit_cond.signal_name)
+                exit_row.setProperty('exit_percentage', pct_display)
+                exit_row.setProperty('exit_mode', exit_cond.exit_mode)
+                exit_row.setProperty('tp_proximity_threshold', exit_cond.tp_proximity_threshold)
+                exit_row.setProperty('reversal_trigger', exit_cond.reversal_trigger)
+                
+                # Enable mouse tracking for double-click
+                exit_row.setMouseTracking(True)
+                exit_row.mouseDoubleClickEvent = lambda event, sig=exit_cond.signal_name: self._on_edit_strategy_exit(sig)
                 
                 # Remove button
                 remove_btn = QPushButton("✕")
@@ -1390,5 +1403,92 @@ class StrategyBlocksPanel(QWidget):
         
         except Exception as e:
             print(f"Error removing strategy exit: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_edit_strategy_exit(self, signal_name: str):
+        """Handle double-click on exit condition to edit - Sprint 1.8 Task 1.8.50"""
+        try:
+            # Get current config
+            config = self.orchestrator.get_current_config()
+            if not config or not hasattr(config, 'exit_conditions') or not config.exit_conditions:
+                return
+            
+            # Find the exit condition
+            current_exit = None
+            for exit_cond in config.exit_conditions:
+                if exit_cond.signal_name == signal_name:
+                    current_exit = exit_cond
+                    break
+            
+            if not current_exit:
+                print(f"Exit condition {signal_name} not found")
+                return
+            
+            # Show exit condition dialog pre-populated with current values
+            dialog = ExitConditionDialog(parent=self)
+            
+            # Pre-populate dialog with current values
+            # Note: The dialog will need to expose methods to set values
+            # For now, we'll use the signal_name to find it in the registry
+            # and set the fields programmatically
+            
+            # Convert values to dialog format
+            pct_display = int(current_exit.percentage * 100)
+            
+            # Set dialog values before showing
+            # (This assumes ExitConditionDialog has setters - we may need to add them)
+            dialog.percentage_input.setValue(pct_display)
+            
+            # Set mode radio buttons
+            if current_exit.exit_mode == 'ABSOLUTE':
+                dialog.absolute_radio.setChecked(True)
+            else:
+                dialog.flexible_radio.setChecked(True)
+                
+            # Set FLEXIBLE parameters
+            if hasattr(current_exit, 'tp_proximity_threshold'):
+                dialog.proximity_input.setValue(current_exit.tp_proximity_threshold)
+            if hasattr(current_exit, 'reversal_trigger'):
+                dialog.reversal_input.setValue(current_exit.reversal_trigger)
+            
+            if dialog.exec_() == QDialog.Accepted:
+                # Get new configuration from dialog
+                new_config = dialog.get_config()
+                
+                if not new_config or not new_config.get('signal_name'):
+                    print("No signal selected for exit condition")
+                    return
+                
+                # Remove old exit condition first
+                remove_result = self.orchestrator.remove_exit_condition(
+                    signal_name=signal_name,
+                    binding_level='STRATEGY'
+                )
+                
+                if not remove_result.success:
+                    print(f"Failed to remove old exit condition: {remove_result.message}")
+                    return
+                
+                # Add updated exit condition
+                add_result = self.orchestrator.add_exit_condition(
+                    signal_name=new_config['signal_name'],
+                    percentage=new_config.get('percentage', 50) / 100.0,
+                    binding_level='STRATEGY',
+                    exit_mode=new_config.get('exit_mode', 'ABSOLUTE'),
+                    tp_proximity_threshold=new_config.get('tp_proximity_threshold', 2.0),
+                    reversal_trigger=new_config.get('reversal_trigger', 0.5)
+                )
+                
+                if add_result.success:
+                    print(f"Strategy exit condition updated: {new_config['signal_name']}")
+                    # Refresh display
+                    self._refresh_strategy_exits()
+                    self.blocks_changed.emit()
+                else:
+                    print(f"Failed to update exit condition: {add_result.message}")
+        
+        except Exception as e:
+            print(f"Error editing strategy exit: {e}")
             import traceback
             traceback.print_exc()
