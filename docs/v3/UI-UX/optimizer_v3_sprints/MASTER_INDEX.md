@@ -3,7 +3,7 @@
 
 **Date**: 2026-01-27  
 **Status**: 📋 100% COMPLETE - READY FOR IMPLEMENTATION  
-**Total Tasks**: 312 across 72 days  
+**Total Tasks**: 317 across 72 days  
 **File Structure**: Multi-file sprint architecture
 
 ---
@@ -83,10 +83,10 @@
 **Status**: ☐ Not Started  
 **Purpose**: Window 4, forward analysis, training database
 
-#### **Sprint 2.2: Signal Intelligence** (12 days, 32 tasks)
+#### **Sprint 2.2: Signal Intelligence** (12 days, 37 tasks)
 **File**: `SPRINT_2_2_SIGNAL_INTELLIGENCE.md`  
 **Status**: ☐ Not Started  
-**Purpose**: Event recording, metrics, dashboard
+**Purpose**: Event recording, metrics, dashboard, **Exit Condition tracking (Sprint 1.8 dependency)**
 
 #### **Sprint 2.3: ML Strategy Generator** (4 days, 15 tasks)
 **File**: `SPRINT_2_3_ML_GENERATOR.md`  
@@ -162,7 +162,7 @@
 - [ ] Sprint 4.2: Documentation (7 tasks, 2 days)
 - [ ] Sprint 4.3: Production (5 tasks, 1 day)
 
-**Total**: 312 tasks, 72 days
+**Total**: 317 tasks, 72 days
 
 ---
 
@@ -256,7 +256,7 @@
 
 **Project Complete When**:
 - All 17 sprints complete
-- All 312 tasks checked off
+- All 317 tasks checked off
 - Production deployment successful
 - Final sign-off obtained
 
