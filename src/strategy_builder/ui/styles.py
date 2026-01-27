@@ -1093,3 +1093,91 @@ def create_font(size: int = 10, bold: bool = False):
     if bold:
         font.setBold(True)
     return font
+
+
+# =============================================================================
+# EXIT CONDITION STYLES (Sprint 1.8 - Phase 6)
+# =============================================================================
+
+def get_exit_button_stylesheet() -> str:
+    """
+    Get stylesheet for "Add as Exit" button (red theme).
+    Sprint 1.8 Task 1.8.43
+    
+    Returns:
+        Button stylesheet string with red/danger theme
+    """
+    return f"""
+        QPushButton {{
+            background-color: {COLORS['button_danger']};
+            color: white;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 6px;
+            min-width: 120px;
+        }}
+        QPushButton:hover {{
+            background-color: {COLORS['button_danger_hover']};
+        }}
+        QPushButton:pressed {{
+            background-color: #8B3333;
+        }}
+        QPushButton:disabled {{
+            background-color: #555555;
+            color: #888888;
+        }}
+    """
+
+
+def get_exit_dialog_stylesheet() -> str:
+    """
+    Get stylesheet for Exit Condition Dialog.
+    Sprint 1.8 Task 1.8.44
+    
+    Returns:
+        Dialog stylesheet string with dark theme and exit condition styling
+    """
+    return f"""
+        QDialog {{
+            background-color: {COLORS['bg_dark']};
+            color: {COLORS['text_primary']};
+        }}
+        QLabel {{
+            color: {COLORS['text_primary']};
+            background: transparent;
+        }}
+        QGroupBox {{
+            background-color: {COLORS['bg_medium']};
+            border: 1px solid {COLORS['border']};
+            border-radius: 8px;
+            margin-top: 20px;
+            padding-top: 35px;
+            color: {COLORS['text_primary']};
+            font-weight: bold;
+        }}
+        QGroupBox::title {{
+            subcontrol-origin: margin;
+            left: 12px;
+            padding: 0 5px;
+            color: {COLORS['error']};
+            font-size: 11pt;
+            font-weight: bold;
+        }}
+    """
+
+
+def get_exit_tree_item_style() -> str:
+    """
+    Get stylesheet for exit condition tree items.
+    Sprint 1.8 Task 1.8.45
+    
+    Returns:
+        CSS style string for exit condition tree items (red theme, bold)
+    """
+    return f"color: {COLORS['error']}; font-weight: 600;"
+
+
+# Backward compatibility constants (can be used directly)
+EXIT_BUTTON_STYLE = get_exit_button_stylesheet()
+EXIT_DIALOG_STYLE = get_exit_dialog_stylesheet()
+EXIT_TREE_ITEM_STYLE = get_exit_tree_item_style()

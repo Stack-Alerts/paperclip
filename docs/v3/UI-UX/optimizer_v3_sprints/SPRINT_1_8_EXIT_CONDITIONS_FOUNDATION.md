@@ -356,7 +356,7 @@
 
 **File**: `src/strategy_builder/ui/styles.py`
 
-- [ ] **1.8.43** Add EXIT_BUTTON_STYLE constant (red theme)
+- [x] **1.8.43** Add EXIT_BUTTON_STYLE constant (red theme)
   ```python
   EXIT_BUTTON_STYLE = f"""
       QPushButton {{
@@ -372,9 +372,9 @@
   """
   ```
 
-- [ ] **1.8.44** Add EXIT_DIALOG_STYLE constant
+- [x] **1.8.44** Add EXIT_DIALOG_STYLE constant
 
-- [ ] **1.8.45** Add EXIT_TREE_ITEM_STYLE constant
+- [x] **1.8.45** Add EXIT_TREE_ITEM_STYLE constant
   ```python
   EXIT_TREE_ITEM_STYLE = f"color: {COLORS['error']}; font-weight: 600;"
   ```
