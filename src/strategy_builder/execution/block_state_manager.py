@@ -22,6 +22,18 @@ class SignalState:
 
 
 @dataclass
+class ExitSignalState:
+    """State of an exit condition signal - Sprint 1.8 Task 1.8.54"""
+    exit_signal_name: str
+    position_id: str
+    fired: bool = False
+    candle_index: Optional[int] = None
+    timestamp: Optional[Any] = None
+    exit_percentage: float = 0.0
+    exit_mode: str = "ABSOLUTE"  # "ABSOLUTE" or "FLEXIBLE"
+
+
+@dataclass
 class BlockExecutionState:
     """Execution state of a block"""
     block_name: str
@@ -64,6 +76,9 @@ class BlockStateManager:
         
         # Track timing windows
         self.timing_windows: Dict[str, Dict[str, Any]] = {}
+        
+        # Sprint 1.8 Task 1.8.55: Track exit condition state per position
+        self.exit_signal_states: Dict[str, ExitSignalState] = {}
         
     def _initialize_signal_states(self):
         """Initialize all signal states to unfired"""
@@ -254,6 +269,61 @@ class BlockStateManager:
                 for sig in and_signals
             )
             
+    def exit_signal_fired(
+        self,
+        exit_signal_name: str,
+        position_id: str,
+        candle_index: int,
+        exit_percentage: float,
+        exit_mode: str = "ABSOLUTE"
+    ):
+        """
+        Record that an exit signal has fired - Sprint 1.8 Task 1.8.56
+        
+        Args:
+            exit_signal_name: Name of the exit signal
+            position_id: ID of the position
+            candle_index: Candle index when exit signal fired
+            exit_percentage: Percentage of position to exit (0.0-1.0)
+            exit_mode: "ABSOLUTE" or "FLEXIBLE"
+        """
+        key = f"{position_id}::{exit_signal_name}"
+        
+        self.exit_signal_states[key] = ExitSignalState(
+            exit_signal_name=exit_signal_name,
+            position_id=position_id,
+            fired=True,
+            candle_index=candle_index,
+            exit_percentage=exit_percentage,
+            exit_mode=exit_mode
+        )
+    
+    def is_exit_condition_met(
+        self,
+        exit_signal_name: str,
+        position_id: str
+    ) -> bool:
+        """
+        Check if exit condition should execute - Sprint 1.8 Task 1.8.57
+        
+        Args:
+            exit_signal_name: Name of the exit signal
+            position_id: ID of the position
+            
+        Returns:
+            True if exit condition met and should execute
+        """
+        key = f"{position_id}::{exit_signal_name}"
+        
+        if key not in self.exit_signal_states:
+            return False
+        
+        exit_state = self.exit_signal_states[key]
+        
+        # Exit condition met if signal has fired
+        # NOTE: FLEXIBLE mode deferred exit logic handled in walkforward engine
+        return exit_state.fired
+    
     def reset(self):
         """Reset all signal states and timing windows"""
         # Reset all signal states
@@ -264,6 +334,9 @@ class BlockStateManager:
             
         # Clear timing windows
         self.timing_windows.clear()
+        
+        # Sprint 1.8: Clear exit signal states
+        self.exit_signal_states.clear()
         
     def get_execution_state(self) -> StrategyExecutionState:
         """
