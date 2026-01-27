@@ -415,7 +415,7 @@
 
 **File**: `src/strategy_builder/ui/strategy_info_panel.py`
 
-- [ ] **1.8.51** Add Exit Conditions count to metadata row
+- [x] **1.8.51** Add Exit Conditions count to metadata row
   ```python
   # Add separator after rechecked_signals_label
   sep5 = QLabel("|")
@@ -437,7 +437,7 @@
   meta_layout.addWidget(self.exit_conditions_label)
   ```
 
-- [ ] **1.8.52** Add _update_exit_conditions_count() method
+- [x] **1.8.52** Add _update_exit_conditions_count() method
   ```python
   def _update_exit_conditions_count(self):
       """Count exit conditions across all levels"""
@@ -457,7 +457,7 @@
           self.exit_conditions_label.setText("0")
   ```
 
-- [ ] **1.8.53** Call _update_exit_conditions_count() in refresh_from_orchestrator() and _update_metadata_row()
+- [x] **1.8.53** Call _update_exit_conditions_count() in refresh_from_orchestrator() and _update_metadata_row()
 
 ---
 
