@@ -116,7 +116,7 @@
 
 **File**: `src/strategy_builder/persistence/strategy_persistence.py`
 
-- [ ] **1.8.8** Add _exit_condition_to_dict() serialization method
+- [x] **1.8.8** Add _exit_condition_to_dict() serialization method
   ```python
   def _exit_condition_to_dict(self, exit_condition: ExitCondition) -> dict:
       return {
@@ -131,7 +131,7 @@
       }
   ```
 
-- [ ] **1.8.9** Add _dict_to_exit_condition() deserialization method
+- [x] **1.8.9** Add _dict_to_exit_condition() deserialization method
   ```python
   def _dict_to_exit_condition(self, data: dict) -> ExitCondition:
       return ExitCondition(
@@ -146,19 +146,19 @@
       )
   ```
 
-- [ ] **1.8.10** Update _config_to_dict() to include strategy-level exit_conditions
+- [x] **1.8.10** Update _config_to_dict() to include strategy-level exit_conditions
 
-- [ ] **1.8.11** Update _config_to_dict() block loop to include block-level exit_conditions
+- [x] **1.8.11** Update _config_to_dict() block loop to include block-level exit_conditions
 
-- [ ] **1.8.12** Update _config_to_dict() signal loop to include signal-level exit_conditions
+- [x] **1.8.12** Update _config_to_dict() signal loop to include signal-level exit_conditions
 
-- [ ] **1.8.13** Update _dict_to_config() to parse strategy-level exit_conditions
+- [x] **1.8.13** Update _dict_to_config() to parse strategy-level exit_conditions
 
-- [ ] **1.8.14** Update _dict_to_config() block parsing to include block-level exit_conditions
+- [x] **1.8.14** Update _dict_to_config() block parsing to include block-level exit_conditions
 
-- [ ] **1.8.15** Update _dict_to_config() signal parsing to include signal-level exit_conditions
+- [x] **1.8.15** Update _dict_to_config() signal parsing to include signal-level exit_conditions
 
-- [ ] **1.8.16** Unit test: Verify exit condition serialization round-trip
+- [x] **1.8.16** Unit test: Verify exit condition serialization round-trip
 
 ---
 
