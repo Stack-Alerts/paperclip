@@ -17,7 +17,8 @@ from src.strategy_builder.core.strategy_config_engine import (
     BlockConfig,
     SignalConfig,
     TimingConstraint,
-    RecheckConfig
+    RecheckConfig,
+    ExitCondition
 )
 
 
@@ -179,6 +180,97 @@ class StrategyPersistence:
         else:
             # Default to JSON
             return PersistenceFormat.JSON
+    
+    def _exit_condition_to_dict(self, exit_condition: ExitCondition) -> dict:
+        """
+        Convert ExitCondition to dictionary
+        
+        Args:
+            exit_condition: Exit condition to serialize
+            
+        Returns:
+            Dictionary representation
+        """
+        data = {
+            'signal_name': exit_condition.signal_name,
+            'percentage': exit_condition.percentage,
+            'exit_mode': exit_condition.exit_mode,
+            'tp_proximity_threshold': exit_condition.tp_proximity_threshold,
+            'reversal_trigger': exit_condition.reversal_trigger,
+            'binding_level': exit_condition.binding_level
+        }
+        
+        # Add recheck config if present
+        if exit_condition.recheck_config:
+            data['recheck_config'] = {
+                'enabled': exit_condition.recheck_config.enabled,
+                'bar_delay': exit_condition.recheck_config.bar_delay,
+                'validation_mode': exit_condition.recheck_config.validation_mode,
+                'parent_signal': exit_condition.recheck_config.parent_signal
+            }
+        
+        # Add nested recheck chain if present
+        if exit_condition.recheck_chain:
+            data['recheck_chain'] = []
+            for nested_recheck in exit_condition.recheck_chain:
+                nested_data = {
+                    'enabled': nested_recheck.enabled,
+                    'bar_delay': nested_recheck.bar_delay,
+                    'validation_mode': nested_recheck.validation_mode,
+                    'parent_signal': nested_recheck.parent_signal
+                }
+                data['recheck_chain'].append(nested_data)
+        
+        # Add parent_signal if present
+        if exit_condition.parent_signal:
+            data['parent_signal'] = exit_condition.parent_signal
+        
+        return data
+    
+    def _dict_to_exit_condition(self, data: dict) -> ExitCondition:
+        """
+        Convert dictionary to ExitCondition
+        
+        Args:
+            data: Dictionary data
+            
+        Returns:
+            Exit condition
+        """
+        # Create recheck config if present
+        recheck_config = None
+        if data.get('recheck_config'):
+            rc_data = data['recheck_config']
+            recheck_config = RecheckConfig(
+                enabled=rc_data.get('enabled', False),
+                bar_delay=rc_data.get('bar_delay', 0),
+                validation_mode=rc_data.get('validation_mode', 'SIGNAL'),
+                parent_signal=rc_data.get('parent_signal', None)
+            )
+        
+        # Create nested recheck chain if present
+        recheck_chain = []
+        if data.get('recheck_chain'):
+            for nested_data in data['recheck_chain']:
+                nested_recheck = RecheckConfig(
+                    enabled=nested_data.get('enabled', False),
+                    bar_delay=nested_data.get('bar_delay', 0),
+                    validation_mode=nested_data.get('validation_mode', 'SIGNAL'),
+                    parent_signal=nested_data.get('parent_signal', None)
+                )
+                recheck_chain.append(nested_recheck)
+        
+        return ExitCondition(
+            signal_name=data['signal_name'],
+            percentage=data.get('percentage', 0.5),
+            exit_mode=data.get('exit_mode', 'ABSOLUTE'),
+            tp_proximity_threshold=data.get('tp_proximity_threshold', 2.0),
+            reversal_trigger=data.get('reversal_trigger', 0.5),
+            recheck_config=recheck_config,
+            recheck_chain=recheck_chain,
+            parent_signal=data.get('parent_signal', None),
+            binding_level=data.get('binding_level', 'STRATEGY')
+        )
             
     def _config_to_dict(self, config: StrategyConfig) -> dict:
         """
@@ -196,12 +288,26 @@ class StrategyPersistence:
             'blocks': []
         }
         
+        # Add strategy-level exit conditions
+        if hasattr(config, 'exit_conditions') and config.exit_conditions:
+            data['exit_conditions'] = [
+                self._exit_condition_to_dict(exit_cond)
+                for exit_cond in config.exit_conditions
+            ]
+        
         for block in config.blocks:
             block_data = {
                 'name': block.name,
                 'logic': block.logic,
                 'signals': []
             }
+            
+            # Add block-level exit conditions
+            if hasattr(block, 'exit_conditions') and block.exit_conditions:
+                block_data['exit_conditions'] = [
+                    self._exit_condition_to_dict(exit_cond)
+                    for exit_cond in block.exit_conditions
+                ]
             
             for signal in block.signals:
                 signal_data = {
@@ -236,6 +342,13 @@ class StrategyPersistence:
                             'parent_signal': nested_recheck.parent_signal
                         }
                         signal_data['recheck_chain'].append(nested_data)
+                
+                # Add signal-level exit conditions
+                if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                    signal_data['exit_conditions'] = [
+                        self._exit_condition_to_dict(exit_cond)
+                        for exit_cond in signal.exit_conditions
+                    ]
                     
                 block_data['signals'].append(signal_data)
                 
@@ -257,12 +370,26 @@ class StrategyPersistence:
         config.name = data.get('name', '')
         config.description = data.get('description', '')
         
+        # Parse strategy-level exit conditions
+        if data.get('exit_conditions'):
+            config.exit_conditions = [
+                self._dict_to_exit_condition(exit_data)
+                for exit_data in data['exit_conditions']
+            ]
+        
         for block_data in data.get('blocks', []):
             block = BlockConfig(
                 name=block_data['name'],
                 logic=block_data['logic'],
                 signals=[]
             )
+            
+            # Parse block-level exit conditions
+            if block_data.get('exit_conditions'):
+                block.exit_conditions = [
+                    self._dict_to_exit_condition(exit_data)
+                    for exit_data in block_data['exit_conditions']
+                ]
             
             for signal_data in block_data.get('signals', []):
                 # Create timing constraint if present (check for both key existence and non-None value)
@@ -304,6 +431,13 @@ class StrategyPersistence:
                     recheck_config=recheck_config,
                     recheck_chain=recheck_chain
                 )
+                
+                # Parse signal-level exit conditions
+                if signal_data.get('exit_conditions'):
+                    signal.exit_conditions = [
+                        self._dict_to_exit_condition(exit_data)
+                        for exit_data in signal_data['exit_conditions']
+                    ]
                 
                 block.signals.append(signal)
                 

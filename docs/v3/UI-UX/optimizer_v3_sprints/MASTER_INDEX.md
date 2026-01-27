@@ -71,7 +71,7 @@
 
 #### **Sprint 1.8: Exit Conditions Foundation** (9-10 days, 102 tasks)
 **File**: `SPRINT_1_8_EXIT_CONDITIONS_FOUNDATION.md`  
-**Status**: 🟡 In Progress (Phase 1/10 COMPLETE: 7/102 tasks)  
+**Status**: 🟡 In Progress (Phase 2/10 COMPLETE: 16/102 tasks)  
 **Purpose**: Separate exit conditions from TP/SL, "Add as Exit" button (red), percentage-based exits with ABSOLUTE/FLEXIBLE modes, three binding levels (STRATEGY/BLOCK/SIGNAL), nested RECHECK for exits, full backtest integration
 
 ---
@@ -150,7 +150,7 @@
 - [x] Sprint 1.6: Intelligent Recommendation System (18/18 tasks COMPLETE ✅ - 2026-01-22)
 - [ ] Sprint 1.6.1: AI Recommendations Database (0/15 tasks - Planning)
 - [x] Sprint 1.7: Nested RECHECK Foundation (14/14 tasks COMPLETE ✅ - 2026-01-22)
-- [ ] Sprint 1.8: Exit Conditions Foundation (7/102 tasks - Phase 1 COMPLETE ✅)
+- [ ] Sprint 1.8: Exit Conditions Foundation (16/102 tasks - Phase 1-2 COMPLETE ✅)
 - [ ] Sprint 2.1: Automated Trainer (20 tasks, 10 days)
 - [ ] Sprint 2.2: Signal Intelligence + Nested RECHECK Execution (37 tasks, 12 days)
 - [ ] Sprint 2.3: ML Generator (15 tasks, 4 days)
@@ -228,7 +228,7 @@
 - `.clinerules` - UI_STYLING_PROTOCOL (mandatory for all UI tasks)
 - All styles from `src/strategy_builder/ui/styles.py`
 - Zero hardcoded styles anywhere
-- 95% test coverage minimum
+- 100% test coverage
 - All NautilusTrader types validated
 - All parameters properly typed
 - All money values use Money type
@@ -244,7 +244,7 @@
 
 **Sprint Complete When**:
 - All tasks checked off
-- All tests passing (95%+ coverage)
+- All tests passing (100% coverage)
 - Code reviewed by lead
 - Sprint sign-off obtained
 
