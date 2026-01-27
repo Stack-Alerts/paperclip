@@ -71,7 +71,13 @@ from .models import (
     SignalMetrics,
     TrainingSession,
     SessionState,
-    BacktestResult
+    BacktestResult,
+    # Sprint 1.6.1 ORM Models
+    Strategy,
+    StrategyVersion,
+    StrategyBlockVersion,
+    AIRecommendation,
+    StrategyTestResult,
 )
 
 __all__ = [
@@ -85,7 +91,7 @@ __all__ = [
     'AIRecommendationsManager',
     'TestResultsManager',
     
-    # Models
+    # Models (original)
     'Base',
     'OptimizationRun',
     'StrategyVariation',
@@ -94,6 +100,13 @@ __all__ = [
     'TrainingSession',
     'SessionState',
     'BacktestResult',
+    
+    # Sprint 1.6.1 ORM Models
+    'Strategy',
+    'StrategyVersion',
+    'StrategyBlockVersion',
+    'AIRecommendation',
+    'StrategyTestResult',
 ]
 
 __version__ = '1.0.0'
