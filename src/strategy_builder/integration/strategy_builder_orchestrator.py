@@ -1153,6 +1153,397 @@ class StrategyBuilderOrchestrator:
             print(f"❌ Version save failed: {str(e)}")
             return False
         
+    def add_exit_condition(
+        self,
+        signal_name: str,
+        percentage: float,
+        binding_level: str = "STRATEGY",
+        block_name: Optional[str] = None,
+        parent_signal_name: Optional[str] = None,
+        exit_mode: str = "ABSOLUTE",
+        tp_proximity_threshold: float = 2.0,
+        reversal_trigger: float = 0.5
+    ) -> WorkflowResult:
+        """
+        Add exit condition at specified binding level
+        Sprint 1.8 Task 1.8.30
+        
+        Args:
+            signal_name: Name of signal that triggers exit
+            percentage: Exit percentage (0.0-1.0)
+            binding_level: "STRATEGY", "BLOCK", or "SIGNAL"
+            block_name: Required if binding_level is "BLOCK" or "SIGNAL"
+            parent_signal_name: Required if binding_level is "SIGNAL"
+            exit_mode: "ABSOLUTE" or "FLEXIBLE"
+            tp_proximity_threshold: For FLEXIBLE mode (percentage)
+            reversal_trigger: For FLEXIBLE mode (percentage)
+            
+        Returns:
+            WorkflowResult
+        """
+        try:
+            from src.strategy_builder.core.strategy_config_engine import ExitCondition
+            
+            # Validate inputs
+            if percentage <= 0 or percentage > 1.0:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_SIGNAL,
+                    message="Invalid percentage",
+                    errors=["Percentage must be between 0 and 1.0"]
+                )
+            
+            if exit_mode not in ["ABSOLUTE", "FLEXIBLE"]:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_SIGNAL,
+                    message="Invalid exit mode",
+                    errors=["Exit mode must be 'ABSOLUTE' or 'FLEXIBLE'"]
+                )
+            
+            if binding_level not in ["STRATEGY", "BLOCK", "SIGNAL"]:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_SIGNAL,
+                    message="Invalid binding level",
+                    errors=["Binding level must be 'STRATEGY', 'BLOCK', or 'SIGNAL'"]
+                )
+            
+            # Create exit condition
+            exit_condition = ExitCondition(
+                signal_name=signal_name,
+                percentage=percentage,
+                exit_mode=exit_mode,
+                tp_proximity_threshold=tp_proximity_threshold,
+                reversal_trigger=reversal_trigger,
+                binding_level=binding_level
+            )
+            
+            # Add at appropriate level
+            if binding_level == "STRATEGY":
+                self.config_engine.config.exit_conditions.append(exit_condition)
+                message = f"Added strategy-level exit condition: {signal_name} ({percentage*100:.0f}%)"
+                
+            elif binding_level == "BLOCK":
+                if not block_name:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message="block_name required for BLOCK binding level",
+                        errors=["block_name is required"]
+                    )
+                
+                # Find block
+                block_found = False
+                for block in self.config_engine.config.blocks:
+                    if block.name == block_name:
+                        block.exit_conditions.append(exit_condition)
+                        block_found = True
+                        break
+                
+                if not block_found:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message=f"Block '{block_name}' not found",
+                        errors=[f"Block '{block_name}' does not exist"]
+                    )
+                
+                message = f"Added block-level exit condition to '{block_name}': {signal_name} ({percentage*100:.0f}%)"
+                
+            else:  # SIGNAL level
+                if not block_name or not parent_signal_name:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message="block_name and parent_signal_name required for SIGNAL binding level",
+                        errors=["block_name and parent_signal_name are required"]
+                    )
+                
+                # Find block and signal
+                signal_found = False
+                for block in self.config_engine.config.blocks:
+                    if block.name == block_name:
+                        for signal in block.signals:
+                            if signal.name == parent_signal_name:
+                                signal.exit_conditions.append(exit_condition)
+                                signal_found = True
+                                break
+                        break
+                
+                if not signal_found:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message=f"Signal '{parent_signal_name}' not found in block '{block_name}'",
+                        errors=[f"Signal '{parent_signal_name}' does not exist"]
+                    )
+                
+                message = f"Added signal-level exit condition to '{block_name}::{parent_signal_name}': {signal_name} ({percentage*100:.0f}%)"
+            
+            return WorkflowResult(
+                success=True,
+                step=WorkflowStep.ADD_SIGNAL,
+                message=message,
+                strategy_config=self.config_engine.config
+            )
+            
+        except Exception as e:
+            return WorkflowResult(
+                success=False,
+                step=WorkflowStep.ADD_SIGNAL,
+                message="Failed to add exit condition",
+                errors=[str(e)]
+            )
+    
+    def remove_exit_condition(
+        self,
+        signal_name: str,
+        binding_level: str = "STRATEGY",
+        block_name: Optional[str] = None,
+        parent_signal_name: Optional[str] = None
+    ) -> WorkflowResult:
+        """
+        Remove exit condition
+        Sprint 1.8 Task 1.8.31
+        
+        Args:
+            signal_name: Name of signal that triggers exit
+            binding_level: "STRATEGY", "BLOCK", or "SIGNAL"
+            block_name: Required if binding_level is "BLOCK" or "SIGNAL"
+            parent_signal_name: Required if binding_level is "SIGNAL"
+            
+        Returns:
+            WorkflowResult
+        """
+        try:
+            # Remove at appropriate level
+            if binding_level == "STRATEGY":
+                initial_count = len(self.config_engine.config.exit_conditions)
+                self.config_engine.config.exit_conditions = [
+                    ec for ec in self.config_engine.config.exit_conditions
+                    if ec.signal_name != signal_name
+                ]
+                
+                if len(self.config_engine.config.exit_conditions) == initial_count:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message=f"Exit condition '{signal_name}' not found at strategy level",
+                        errors=["Exit condition does not exist"]
+                    )
+                
+                message = f"Removed strategy-level exit condition: {signal_name}"
+                
+            elif binding_level == "BLOCK":
+                if not block_name:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message="block_name required for BLOCK binding level",
+                        errors=["block_name is required"]
+                    )
+                
+                # Find block
+                block_found = False
+                removed = False
+                for block in self.config_engine.config.blocks:
+                    if block.name == block_name:
+                        block_found = True
+                        initial_count = len(block.exit_conditions)
+                        block.exit_conditions = [
+                            ec for ec in block.exit_conditions
+                            if ec.signal_name != signal_name
+                        ]
+                        removed = len(block.exit_conditions) < initial_count
+                        break
+                
+                if not block_found:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message=f"Block '{block_name}' not found",
+                        errors=[f"Block '{block_name}' does not exist"]
+                    )
+                
+                if not removed:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message=f"Exit condition '{signal_name}' not found in block '{block_name}'",
+                        errors=["Exit condition does not exist"]
+                    )
+                
+                message = f"Removed block-level exit condition from '{block_name}': {signal_name}"
+                
+            else:  # SIGNAL level
+                if not block_name or not parent_signal_name:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message="block_name and parent_signal_name required for SIGNAL binding level",
+                        errors=["block_name and parent_signal_name are required"]
+                    )
+                
+                # Find block and signal
+                signal_found = False
+                removed = False
+                for block in self.config_engine.config.blocks:
+                    if block.name == block_name:
+                        for signal in block.signals:
+                            if signal.name == parent_signal_name:
+                                signal_found = True
+                                initial_count = len(signal.exit_conditions)
+                                signal.exit_conditions = [
+                                    ec for ec in signal.exit_conditions
+                                    if ec.signal_name != signal_name
+                                ]
+                                removed = len(signal.exit_conditions) < initial_count
+                                break
+                        break
+                
+                if not signal_found:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message=f"Signal '{parent_signal_name}' not found in block '{block_name}'",
+                        errors=[f"Signal '{parent_signal_name}' does not exist"]
+                    )
+                
+                if not removed:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message=f"Exit condition '{signal_name}' not found",
+                        errors=["Exit condition does not exist"]
+                    )
+                
+                message = f"Removed signal-level exit condition from '{block_name}::{parent_signal_name}': {signal_name}"
+            
+            return WorkflowResult(
+                success=True,
+                step=WorkflowStep.ADD_SIGNAL,
+                message=message,
+                strategy_config=self.config_engine.config
+            )
+            
+        except Exception as e:
+            return WorkflowResult(
+                success=False,
+                step=WorkflowStep.ADD_SIGNAL,
+                message="Failed to remove exit condition",
+                errors=[str(e)]
+            )
+    
+    def configure_exit_condition(
+        self,
+        signal_name: str,
+        binding_level: str = "STRATEGY",
+        block_name: Optional[str] = None,
+        parent_signal_name: Optional[str] = None,
+        **kwargs
+    ) -> WorkflowResult:
+        """
+        Update exit condition settings
+        Sprint 1.8 Task 1.8.32
+        
+        Args:
+            signal_name: Name of signal that triggers exit
+            binding_level: "STRATEGY", "BLOCK", or "SIGNAL"
+            block_name: Required if binding_level is "BLOCK" or "SIGNAL"
+            parent_signal_name: Required if binding_level is "SIGNAL"
+            **kwargs: Settings to update (percentage, exit_mode, tp_proximity_threshold, reversal_trigger)
+            
+        Returns:
+            WorkflowResult
+        """
+        try:
+            # Find and update exit condition
+            exit_condition = None
+            
+            if binding_level == "STRATEGY":
+                for ec in self.config_engine.config.exit_conditions:
+                    if ec.signal_name == signal_name:
+                        exit_condition = ec
+                        break
+                        
+            elif binding_level == "BLOCK":
+                if not block_name:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message="block_name required",
+                        errors=["block_name is required"]
+                    )
+                
+                for block in self.config_engine.config.blocks:
+                    if block.name == block_name:
+                        for ec in block.exit_conditions:
+                            if ec.signal_name == signal_name:
+                                exit_condition = ec
+                                break
+                        break
+                        
+            else:  # SIGNAL level
+                if not block_name or not parent_signal_name:
+                    return WorkflowResult(
+                        success=False,
+                        step=WorkflowStep.ADD_SIGNAL,
+                        message="block_name and parent_signal_name required",
+                        errors=["block_name and parent_signal_name are required"]
+                    )
+                
+                for block in self.config_engine.config.blocks:
+                    if block.name == block_name:
+                        for signal in block.signals:
+                            if signal.name == parent_signal_name:
+                                for ec in signal.exit_conditions:
+                                    if ec.signal_name == signal_name:
+                                        exit_condition = ec
+                                        break
+                                break
+                        break
+            
+            if not exit_condition:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_SIGNAL,
+                    message=f"Exit condition '{signal_name}' not found",
+                    errors=["Exit condition does not exist"]
+                )
+            
+            # Update settings
+            updates = []
+            for key, value in kwargs.items():
+                if hasattr(exit_condition, key):
+                    setattr(exit_condition, key, value)
+                    updates.append(f"{key}={value}")
+            
+            if not updates:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.ADD_SIGNAL,
+                    message="No valid settings to update",
+                    errors=["No valid settings provided"]
+                )
+            
+            message = f"Updated exit condition '{signal_name}': {', '.join(updates)}"
+            
+            return WorkflowResult(
+                success=True,
+                step=WorkflowStep.ADD_SIGNAL,
+                message=message,
+                strategy_config=self.config_engine.config
+            )
+            
+        except Exception as e:
+            return WorkflowResult(
+                success=False,
+                step=WorkflowStep.ADD_SIGNAL,
+                message="Failed to configure exit condition",
+                errors=[str(e)]
+            )
+    
     def reset(self):
         """Reset orchestrator state"""
         self.config_engine = StrategyConfigEngine(self.registry)
