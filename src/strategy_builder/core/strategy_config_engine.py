@@ -25,6 +25,32 @@ class RecheckConfig:
 
 
 @dataclass
+class ExitCondition:
+    """Exit condition with intelligent mode support"""
+    signal_name: str
+    percentage: float = 0.5  # 0.0 to 1.0
+    exit_mode: str = "ABSOLUTE"  # "ABSOLUTE" or "FLEXIBLE"
+    tp_proximity_threshold: float = 2.0
+    reversal_trigger: float = 0.5
+    recheck_config: Optional[RecheckConfig] = None
+    recheck_chain: List[RecheckConfig] = field(default_factory=list)
+    parent_signal: Optional[str] = None
+    binding_level: str = "STRATEGY"  # "STRATEGY", "BLOCK", "SIGNAL"
+
+
+@dataclass
+class DeferredExit:
+    """Tracks deferred exit condition waiting for resolution"""
+    exit_condition: ExitCondition
+    position_id: str
+    trigger_bar: int
+    trigger_price: float
+    nearest_tp: float
+    nearest_tp_name: str
+    peak_price_toward_tp: float
+
+
+@dataclass
 class SignalConfig:
     """Configuration for a single signal within a block"""
     name: str
@@ -32,6 +58,7 @@ class SignalConfig:
     timing_constraint: Optional[TimingConstraint] = None
     recheck_config: Optional[RecheckConfig] = None
     recheck_chain: List[RecheckConfig] = field(default_factory=list)  # For nested rechecks
+    exit_conditions: List[ExitCondition] = field(default_factory=list)
 
 
 @dataclass
@@ -43,6 +70,7 @@ class BlockConfig:
     metadata: Optional[Dict[str, Any]] = None
     indented: bool = False
     depends_on: Optional['BlockConfig'] = None
+    exit_conditions: List[ExitCondition] = field(default_factory=list)
 
 
 @dataclass
@@ -60,6 +88,7 @@ class StrategyConfig:
     required_signals: int = 0
     name: str = ""
     description: str = ""
+    exit_conditions: List[ExitCondition] = field(default_factory=list)
     
     def get_block(self, name: str) -> Optional[BlockConfig]:
         """Get block by name"""
@@ -164,6 +193,73 @@ class ConfigValidators:
                     
                 if nested.validation_mode not in ["SIGNAL", "RECHECK"]:
                     errors.append(f"Invalid validation mode {nested.validation_mode} for nested RECHECK {idx} of {signal.name}")
+        
+        return errors
+
+    @staticmethod
+    def validate_exit_conditions(config: StrategyConfig) -> List[str]:
+        """
+        Validate all exit conditions across strategy.
+        
+        Args:
+            config: Strategy configuration to validate
+            
+        Returns:
+            List of error messages (empty if valid)
+        """
+        errors = []
+        
+        # Validate strategy-level exits total <= 100%
+        strategy_total = sum(exit_cond.percentage for exit_cond in config.exit_conditions)
+        if strategy_total > 1.0:
+            errors.append(f"Strategy-level exit conditions total {strategy_total*100:.1f}% exceeds 100%")
+        
+        # Validate block-level exits total <= 100%
+        for block in config.blocks:
+            block_total = sum(exit_cond.percentage for exit_cond in block.exit_conditions)
+            if block_total > 1.0:
+                errors.append(f"Block '{block.name}' exit conditions total {block_total*100:.1f}% exceeds 100%")
+            
+            # Validate signal-level exits total <= 100%
+            for signal in block.signals:
+                signal_total = sum(exit_cond.percentage for exit_cond in signal.exit_conditions)
+                if signal_total > 1.0:
+                    errors.append(f"Signal '{block.name}.{signal.name}' exit conditions total {signal_total*100:.1f}% exceeds 100%")
+                
+                # Validate each percentage in range (0, 1.0]
+                for exit_cond in signal.exit_conditions:
+                    if exit_cond.percentage <= 0 or exit_cond.percentage > 1.0:
+                        errors.append(f"Exit condition '{exit_cond.signal_name}' has invalid percentage {exit_cond.percentage*100:.1f}% (must be 0-100%)")
+                    
+                    # Validate exit mode
+                    if exit_cond.exit_mode not in ["ABSOLUTE", "FLEXIBLE"]:
+                        errors.append(f"Exit condition '{exit_cond.signal_name}' has invalid exit_mode '{exit_cond.exit_mode}' (must be ABSOLUTE or FLEXIBLE)")
+                    
+                    # Validate binding level
+                    if exit_cond.binding_level not in ["STRATEGY", "BLOCK", "SIGNAL"]:
+                        errors.append(f"Exit condition '{exit_cond.signal_name}' has invalid binding_level '{exit_cond.binding_level}'")
+        
+        # Validate each exit condition percentage in strategy-level and block-level
+        for exit_cond in config.exit_conditions:
+            if exit_cond.percentage <= 0 or exit_cond.percentage > 1.0:
+                errors.append(f"Strategy exit condition '{exit_cond.signal_name}' has invalid percentage {exit_cond.percentage*100:.1f}%")
+            
+            if exit_cond.exit_mode not in ["ABSOLUTE", "FLEXIBLE"]:
+                errors.append(f"Strategy exit condition '{exit_cond.signal_name}' has invalid exit_mode '{exit_cond.exit_mode}'")
+            
+            if exit_cond.binding_level not in ["STRATEGY", "BLOCK", "SIGNAL"]:
+                errors.append(f"Strategy exit condition '{exit_cond.signal_name}' has invalid binding_level '{exit_cond.binding_level}'")
+        
+        for block in config.blocks:
+            for exit_cond in block.exit_conditions:
+                if exit_cond.percentage <= 0 or exit_cond.percentage > 1.0:
+                    errors.append(f"Block '{block.name}' exit condition '{exit_cond.signal_name}' has invalid percentage {exit_cond.percentage*100:.1f}%")
+                
+                if exit_cond.exit_mode not in ["ABSOLUTE", "FLEXIBLE"]:
+                    errors.append(f"Block '{block.name}' exit condition '{exit_cond.signal_name}' has invalid exit_mode '{exit_cond.exit_mode}'")
+                
+                if exit_cond.binding_level not in ["STRATEGY", "BLOCK", "SIGNAL"]:
+                    errors.append(f"Block '{block.name}' exit condition '{exit_cond.signal_name}' has invalid binding_level '{exit_cond.binding_level}'")
         
         return errors
 

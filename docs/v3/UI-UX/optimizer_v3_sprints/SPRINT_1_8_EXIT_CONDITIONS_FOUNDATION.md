@@ -40,7 +40,7 @@
 
 **File**: `src/strategy_builder/core/strategy_config_engine.py`
 
-- [ ] **1.8.1** Create ExitCondition dataclass
+- [x] **1.8.1** Create ExitCondition dataclass
   ```python
   @dataclass
   class ExitCondition:
@@ -56,7 +56,7 @@
       binding_level: str = "STRATEGY"  # "STRATEGY", "BLOCK", "SIGNAL"
   ```
 
-- [ ] **1.8.2** Add exit_conditions field to SignalConfig
+- [x] **1.8.2** Add exit_conditions field to SignalConfig
   ```python
   @dataclass
   class SignalConfig:
@@ -64,7 +64,7 @@
       exit_conditions: List[ExitCondition] = field(default_factory=list)
   ```
 
-- [ ] **1.8.3** Add exit_conditions field to BlockConfig
+- [x] **1.8.3** Add exit_conditions field to BlockConfig
   ```python
   @dataclass
   class BlockConfig:
@@ -72,7 +72,7 @@
       exit_conditions: List[ExitCondition] = field(default_factory=list)
   ```
 
-- [ ] **1.8.4** Add exit_conditions field to StrategyConfig
+- [x] **1.8.4** Add exit_conditions field to StrategyConfig
   ```python
   @dataclass
   class StrategyConfig:
@@ -80,7 +80,7 @@
       exit_conditions: List[ExitCondition] = field(default_factory=list)
   ```
 
-- [ ] **1.8.5** Add DeferredExit dataclass for FLEXIBLE mode runtime tracking
+- [x] **1.8.5** Add DeferredExit dataclass for FLEXIBLE mode runtime tracking
   ```python
   @dataclass
   class DeferredExit:
@@ -94,7 +94,7 @@
       peak_price_toward_tp: float
   ```
 
-- [ ] **1.8.6** Add validate_exit_conditions() to ConfigValidators class
+- [x] **1.8.6** Add validate_exit_conditions() to ConfigValidators class
   ```python
   @staticmethod
   def validate_exit_conditions(config: StrategyConfig) -> List[str]:
@@ -108,7 +108,7 @@
       return errors
   ```
 
-- [ ] **1.8.7** Unit test: Verify ExitCondition dataclass creation and validation
+- [x] **1.8.7** Unit test: Verify ExitCondition dataclass creation and validation
 
 ---
 
