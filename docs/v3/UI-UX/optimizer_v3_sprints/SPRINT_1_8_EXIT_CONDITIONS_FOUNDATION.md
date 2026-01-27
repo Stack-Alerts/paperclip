@@ -397,7 +397,7 @@
 
 **File**: `src/strategy_builder/ui/block_search_panel.py`
 
-- [ ] **1.8.47** Add "Add as Exit" red button next to AND/OR buttons
+- [x] **1.8.47** Add "Add as Exit" red button next to AND/OR buttons
   - Use EXIT_BUTTON_STYLE from styles.py
   - Add signal_added_as_exit PyQt signal
   - Connect to ExitConditionDialog

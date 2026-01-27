@@ -29,8 +29,12 @@ from src.strategy_builder.core.registry_interface import BlockInfo, SearchFilter
 # Import centralized styles
 from src.strategy_builder.ui.styles import (
     get_label_style, get_expand_button_style, get_add_button_style,
-    get_checkbox_style, get_success_button_stylesheet, get_color
+    get_checkbox_style, get_success_button_stylesheet, get_color,
+    get_exit_button_stylesheet
 )
+
+# Import exit condition dialog
+from src.strategy_builder.ui.exit_condition_dialog import ExitConditionDialog
 
 # Import institutional logger
 try:
@@ -64,6 +68,9 @@ class BlockListItem(QWidget):
     
     # NEW SIGNAL: Emits block_name, list of selected signal names, and logic type ("AND" or "OR")
     block_with_signals_selected = pyqtSignal(str, list, str)
+    
+    # EXIT SIGNAL: Emits signal_name when added as exit condition
+    signal_added_as_exit = pyqtSignal(str)
     
     def __init__(self, block_info: BlockInfo, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -260,6 +267,14 @@ class BlockListItem(QWidget):
         self.or_button.clicked.connect(lambda: self._add_with_logic("OR"))
         buttons_layout.addWidget(self.or_button)
         
+        # Add as Exit button (Sprint 1.8 - Task 1.8.47)
+        self.exit_button = QPushButton("🔴 Add as Exit")
+        self.exit_button.setMinimumHeight(40)
+        self.exit_button.setStyleSheet(get_exit_button_stylesheet())
+        self.exit_button.clicked.connect(self._add_as_exit)
+        self.exit_button.setToolTip("Add selected signal as exit condition with percentage-based partial exit")
+        buttons_layout.addWidget(self.exit_button)
+        
         buttons_container.setLayout(buttons_layout)
         signals_layout.addWidget(buttons_container)
         
@@ -378,6 +393,78 @@ class BlockListItem(QWidget):
         
         # Don't collapse - allow adding more signals
         # User can collapse manually if desired
+    
+    def _add_as_exit(self):
+        """
+        Handle adding selected signal as exit condition.
+        Sprint 1.8 Task 1.8.47
+        
+        Opens ExitConditionDialog for configuring the exit condition.
+        Only allows selecting ONE signal for exit conditions.
+        """
+        # Collect selected signals (only ONE allowed for exits)
+        selected_signals = []
+        for signal_name, checkbox in self.signal_checkboxes.items():
+            if checkbox.isChecked() and signal_name not in self.added_signals:
+                selected_signals.append(signal_name)
+        
+        # Validate exactly one signal selected
+        if len(selected_signals) == 0:
+            if LOGGER_AVAILABLE and logger:
+                logger.warning(LogComponent.SEARCH_PANEL, 
+                             f"No signal selected for exit condition")
+            print("\n⚠️  Please select ONE signal to add as exit condition\n")
+            return
+        
+        if len(selected_signals) > 1:
+            if LOGGER_AVAILABLE and logger:
+                logger.warning(LogComponent.SEARCH_PANEL, 
+                             f"Multiple signals selected for exit - only one allowed")
+            print("\n⚠️  Exit conditions support ONE signal at a time. Please select only one signal.\n")
+            return
+        
+        signal_name = selected_signals[0]
+        
+        # Open ExitConditionDialog
+        dialog = ExitConditionDialog(
+            signal_name=signal_name,
+            parent=self
+        )
+        
+        if dialog.exec_():
+            # User accepted - emit signal with signal name
+            self.signal_added_as_exit.emit(signal_name)
+            
+            # Mark signal as added
+            self.added_signals.add(signal_name)
+            checkbox = self.signal_checkboxes[signal_name]
+            checkbox.setChecked(False)
+            checkbox.setEnabled(False)
+            
+            # Update styling to show as added
+            checkbox.setStyleSheet("""
+                QCheckBox {
+                    color: #666666;
+                    font-size: 10pt;
+                    padding: 4px;
+                    text-decoration: line-through;
+                }
+                QCheckBox::indicator {
+                    width: 18px;
+                    height: 18px;
+                    border: 2px solid #3C4149;
+                    border-radius: 4px;
+                    background-color: #3C4149;
+                }
+            """)
+            
+            if LOGGER_AVAILABLE and logger:
+                logger.info(LogComponent.SEARCH_PANEL,
+                           f"Signal added as exit condition",
+                           {
+                               'signal': signal_name,
+                               'block': self.block_info.name
+                           })
     
     # NOTE: disable_add_button() and enable_add_button() methods removed
     # The old "Add to Strategy" button no longer exists
@@ -645,6 +732,9 @@ class BlockSearchPanel(QWidget):
                         # NEW: Connect to signal with AND/OR logic
                         block_item.block_with_signals_selected.connect(self._on_block_with_signals_selected)
                         
+                        # Sprint 1.8 Task 1.8.47: Connect exit signal
+                        block_item.signal_added_as_exit.connect(self._on_signal_added_as_exit)
+                        
                         # Store reference
                         self.block_items[block_name] = block_item
                         
@@ -791,6 +881,31 @@ class BlockSearchPanel(QWidget):
             print(f"\n❌ FAILED: {block_name}")
             print(f"❌ Error: {result.message}")
             print(f"❌ Details: {result.errors}\n")
+    
+    def _on_signal_added_as_exit(self, signal_name: str):
+        """
+        Handle when signal is added as exit condition.
+        Sprint 1.8 Task 1.8.47
+        
+        NOTE: This is a stub for Task 1.8.47. Full integration with orchestrator
+        and exit condition storage will be implemented in later tasks (1.8.48+).
+        
+        Args:
+            signal_name: Name of the signal added as exit condition
+        """
+        if LOGGER_AVAILABLE and logger:
+            logger.info(LogComponent.SEARCH_PANEL,
+                       f"Signal added as exit condition",
+                       {
+                           'signal': signal_name
+                       })
+        
+        print(f"\n🔴 EXIT CONDITION ADDED: {signal_name}")
+        print(f"🔴 Dialog configuration saved")
+        print(f"🔴 Exit condition will be integrated in Task 1.8.48+\n")
+        
+        # TODO: Task 1.8.48+ - Integrate with orchestrator to actually add exit condition
+        # For now this is just a stub showing the signal was added through the dialog
     
     def mark_block_as_added(self, block_name: str):
         """
