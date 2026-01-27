@@ -1,8 +1,8 @@
 # SPRINT 1.6.1: DATABASE-FIRST MIGRATION - IMPLEMENTATION CHECKLIST
 **Institutional-Grade Systematic Migration Process**
 
-**Date**: 2026-01-24  
-**Status**: Ready for Implementation  
+**Date**: 2026-01-24 (Updated: 2026-01-27)  
+**Status**: ✅ IMPLEMENTATION COMPLETE  
 **Risk Level**: HIGH - Requires meticulous execution  
 **Rollback Plan**: Documented at each stage
 
@@ -644,9 +644,9 @@ class NewStrategyDialog(QDialog):
 
 ### **STAGE 2.2: Replace File Operations in Main Window** ⏱️ 4 hours
 
-#### Task 2.2.1: Update StrategyBuilderMainWindow - New Strategy
-- [ ] **File**: `src/strategy_builder/ui/strategy_builder_main_window.py`
-- [ ] **Action**: Replace "New" functionality
+#### Task 2.2.1: Update StrategyBuilderMainWindow - New Strategy ✅ COMPLETE
+- [x] **File**: `src/strategy_builder/ui/strategy_builder_main_window.py`
+- [x] **Action**: Replace "New" functionality - Uses database with NewStrategyDialog
 
 **OLD CODE** (Comment out, don't delete):
 ```python
@@ -703,9 +703,9 @@ def _new_strategy(self):
 
 ---
 
-#### Task 2.2.2: Update StrategyBuilderMainWindow - Open Strategy
-- [ ] **File**: `src/strategy_builder/ui/strategy_builder_main_window.py`
-- [ ] **Action**: Replace "Open" functionality
+#### Task 2.2.2: Update StrategyBuilderMainWindow - Open Strategy ✅ COMPLETE
+- [x] **File**: `src/strategy_builder/ui/strategy_builder_main_window.py`
+- [x] **Action**: Replace "Open" functionality - Uses StrategyBrowserDialog
 
 **OLD CODE** (Comment out):
 ```python
