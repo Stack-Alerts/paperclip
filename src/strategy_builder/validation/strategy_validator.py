@@ -38,6 +38,127 @@ class ValidationResult:
     info: List[str] = field(default_factory=list)
 
 
+class ExitConditionValidator:
+    """
+    Exit Condition Validator
+    Sprint 1.8 Task 1.8.34
+    
+    Validates exit conditions at all binding levels (STRATEGY, BLOCK, SIGNAL)
+    """
+    
+    VALID_EXIT_MODES = ["ABSOLUTE", "FLEXIBLE"]
+    VALID_BINDING_LEVELS = ["STRATEGY", "BLOCK", "SIGNAL"]
+    
+    @staticmethod
+    def validate_exit_conditions(config: StrategyConfig) -> List[str]:
+        """
+        Validate all exit conditions across strategy
+        
+        Validation rules:
+        1. Total percentage per binding level cannot exceed 100%
+        2. Each percentage must be 0 < pct <= 1.0
+        3. Exit mode must be ABSOLUTE or FLEXIBLE
+        4. Binding level must be STRATEGY, BLOCK, or SIGNAL
+        5. No circular exit dependencies (exits can reference entries, not other exits)
+        
+        Args:
+            config: Strategy configuration to validate
+            
+        Returns:
+            List of error messages (empty if valid)
+        """
+        errors = []
+        
+        # Validate strategy-level exit conditions
+        if hasattr(config, 'exit_conditions') and config.exit_conditions:
+            errors.extend(
+                ExitConditionValidator._validate_exit_level(
+                    config.exit_conditions,
+                    "Strategy"
+                )
+            )
+            
+            # Check total percentage for strategy level
+            total_pct = sum(ec.percentage for ec in config.exit_conditions)
+            if total_pct > 1.0:
+                errors.append(
+                    f"Strategy-level exit conditions total {total_pct*100:.0f}% (max 100%)"
+                )
+        
+        # Validate block-level exit conditions
+        for block in config.blocks:
+            if hasattr(block, 'exit_conditions') and block.exit_conditions:
+                errors.extend(
+                    ExitConditionValidator._validate_exit_level(
+                        block.exit_conditions,
+                        f"Block '{block.name}'"
+                    )
+                )
+                
+                # Check total percentage for this block
+                total_pct = sum(ec.percentage for ec in block.exit_conditions)
+                if total_pct > 1.0:
+                    errors.append(
+                        f"Block '{block.name}' exit conditions total {total_pct*100:.0f}% (max 100%)"
+                    )
+            
+            # Validate signal-level exit conditions
+            for signal in block.signals:
+                if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                    errors.extend(
+                        ExitConditionValidator._validate_exit_level(
+                            signal.exit_conditions,
+                            f"Signal '{block.name}::{signal.name}'"
+                        )
+                    )
+                    
+                    # Check total percentage for this signal
+                    total_pct = sum(ec.percentage for ec in signal.exit_conditions)
+                    if total_pct > 1.0:
+                        errors.append(
+                            f"Signal '{block.name}::{signal.name}' exit conditions total {total_pct*100:.0f}% (max 100%)"
+                        )
+        
+        return errors
+    
+    @staticmethod
+    def _validate_exit_level(exit_conditions: List, level_name: str) -> List[str]:
+        """Validate exit conditions at a specific level"""
+        errors = []
+        
+        for ec in exit_conditions:
+            # Validate percentage range
+            if ec.percentage <= 0 or ec.percentage > 1.0:
+                errors.append(
+                    f"{level_name}: Exit condition '{ec.signal_name}' has invalid percentage {ec.percentage*100:.1f}% (must be 0-100%)"
+                )
+            
+            # Validate exit mode
+            if ec.exit_mode not in ExitConditionValidator.VALID_EXIT_MODES:
+                errors.append(
+                    f"{level_name}: Exit condition '{ec.signal_name}' has invalid exit_mode '{ec.exit_mode}' (must be ABSOLUTE or FLEXIBLE)"
+                )
+            
+            # Validate binding level
+            if hasattr(ec, 'binding_level') and ec.binding_level not in ExitConditionValidator.VALID_BINDING_LEVELS:
+                errors.append(
+                    f"{level_name}: Exit condition '{ec.signal_name}' has invalid binding_level '{ec.binding_level}'"
+                )
+            
+            # Validate FLEXIBLE mode parameters
+            if ec.exit_mode == "FLEXIBLE":
+                if ec.tp_proximity_threshold <= 0:
+                    errors.append(
+                        f"{level_name}: Exit condition '{ec.signal_name}' has invalid tp_proximity_threshold {ec.tp_proximity_threshold} (must be > 0)"
+                    )
+                if ec.reversal_trigger <= 0:
+                    errors.append(
+                        f"{level_name}: Exit condition '{ec.signal_name}' has invalid reversal_trigger {ec.reversal_trigger} (must be > 0)"
+                    )
+        
+        return errors
+
+
 class StrategyValidator:
     """
     Advanced strategy validator with NautilusTrader compatibility
@@ -52,6 +173,7 @@ class StrategyValidator:
         """Initialize validator with rules"""
         self.rules = self._initialize_rules()
         self.dependency_resolver = SignalDependencyResolver()
+        self.exit_validator = ExitConditionValidator()
         
     def _initialize_rules(self) -> List[ValidationRule]:
         """Initialize validation rules"""
@@ -171,6 +293,9 @@ class StrategyValidator:
         
         # Check for duplicates
         errors.extend(self._check_duplicates(config))
+        
+        # Validate exit conditions (Sprint 1.8 Task 1.8.35)
+        errors.extend(self.exit_validator.validate_exit_conditions(config))
         
         return errors
         

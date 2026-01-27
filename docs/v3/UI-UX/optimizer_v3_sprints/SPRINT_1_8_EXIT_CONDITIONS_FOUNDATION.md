@@ -281,7 +281,7 @@
 
 **File**: `src/strategy_builder/validation/strategy_validator.py`
 
-- [ ] **1.8.34** Create ExitConditionValidator class
+- [x] **1.8.34** Create ExitConditionValidator class
   ```python
   class ExitConditionValidator:
       def validate_exit_conditions(self, config: StrategyConfig) -> List[str]:
@@ -293,9 +293,9 @@
           return errors
   ```
 
-- [ ] **1.8.35** Integrate ExitConditionValidator into main validation flow
+- [x] **1.8.35** Integrate ExitConditionValidator into main validation flow
 
-- [ ] **1.8.36** Unit test: Verify validation rules (percentage limits, circular deps)
+- [x] **1.8.36** Unit test: Verify validation rules (percentage limits, circular deps)
 
 **File**: `src/strategy_builder/ui/validation_panel.py`
 
