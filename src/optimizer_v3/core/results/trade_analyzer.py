@@ -62,6 +62,9 @@ class TradeAnalyzer:
         # Pattern analysis
         patterns = self.identify_patterns(trades)
         
+        # Sprint 1.8 Task 1.8.66: Exit condition performance analysis
+        exit_condition_analysis = self._analyze_exit_condition_performance(trades)
+        
         # Optimization recommendations
         recommendations = self.get_optimization_recommendations(trades)
         
@@ -69,6 +72,7 @@ class TradeAnalyzer:
             'performance_analysis': performance,
             'quality_metrics': quality,
             'identified_patterns': patterns,
+            'exit_condition_analysis': exit_condition_analysis,  # Sprint 1.8 Task 1.8.66
             'optimization_recommendations': recommendations,
             'sample_size': len(trades),
             'sample_sufficient': len(trades) >= self.config['min_sample_size']
@@ -697,6 +701,162 @@ class TradeAnalyzer:
         recommendations.sort(key=lambda x: priority_order.get(x['priority'], 999))
         
         return recommendations
+    
+    # ==================== Sprint 1.8 Task 1.8.65: Exit Condition Analysis ====================
+    
+    def _analyze_exit_condition_performance(self, trades: List[Dict]) -> Dict:
+        """
+        Analyze exit condition trigger performance - Sprint 1.8 Task 1.8.65
+        
+        Args:
+            trades: List of trade dictionaries
+            
+        Returns:
+            Dictionary with exit condition performance metrics
+        """
+        # Track exit condition triggers
+        exit_condition_trades = []
+        tp_only_trades = []
+        exits_by_condition = defaultdict(lambda: {
+            'count': 0,
+            'total_pnl': Decimal('0'),
+            'avg_exit_price': Decimal('0'),
+            'avg_percentage': Decimal('0')
+        })
+        
+        total_exit_pnl = Decimal('0')
+        exit_vs_tp_better = 0
+        exit_vs_tp_worse = 0
+        
+        for trade in trades:
+            exit_type = trade.get('exit_type', 'TP1')
+            
+            # Check if this trade used exit condition
+            if exit_type.startswith('EXIT_'):
+                exit_condition_trades.append(trade)
+                
+                # Get exit condition details
+                exit_condition_name = trade.get('exit_condition_name', 'Unknown')
+                exit_percentage = trade.get('partial_exit_percentage', Decimal('0'))
+                exit_price = trade.get('exit_price', Price('0'))
+                
+                # Track by condition name
+                exits_by_condition[exit_condition_name]['count'] += 1
+                exits_by_condition[exit_condition_name]['total_pnl'] += self._money_to_decimal(
+                    self._get_trade_pnl(trade)
+                )
+                exits_by_condition[exit_condition_name]['avg_percentage'] += Decimal(str(exit_percentage))
+                
+                # Calculate exit condition PnL
+                pnl = self._money_to_decimal(self._get_trade_pnl(trade))
+                total_exit_pnl += pnl
+                
+                # Compare to TP price if available
+                nearest_tp_price = trade.get('nearest_tp_price', None)
+                if nearest_tp_price and isinstance(exit_price, Price):
+                    exit_price_decimal = Decimal(str(exit_price.as_decimal()))
+                    tp_price_decimal = Decimal(str(nearest_tp_price))
+                    
+                    # For LONG: Exit > TP = better, Exit < TP = worse
+                    # For SHORT: Exit < TP = better, Exit > TP = worse
+                    position_side = trade.get('position_side', 'LONG')
+                    
+                    if position_side == 'LONG':
+                        if exit_price_decimal >= tp_price_decimal:
+                            exit_vs_tp_better += 1
+                        else:
+                            exit_vs_tp_worse += 1
+                    else:  # SHORT
+                        if exit_price_decimal <= tp_price_decimal:
+                            exit_vs_tp_better += 1
+                        else:
+                            exit_vs_tp_worse += 1
+            else:
+                # TP/SL only trades
+                tp_only_trades.append(trade)
+        
+        # Calculate averages
+        for condition_stats in exits_by_condition.values():
+            if condition_stats['count'] > 0:
+                condition_stats['avg_pnl'] = Money(
+                    str(condition_stats['total_pnl'] / Decimal(condition_stats['count'])),
+                    'USD'
+                )
+                condition_stats['avg_percentage'] /= Decimal(condition_stats['count'])
+                condition_stats['total_pnl'] = Money(str(condition_stats['total_pnl']), 'USD')
+        
+        # Find best and worst performing exit conditions
+        best_exit = None
+        worst_exit = None
+        
+        if exits_by_condition:
+            sorted_exits = sorted(
+                exits_by_condition.items(),
+                key=lambda x: self._money_to_decimal(x[1].get('avg_pnl', Money('0', 'USD'))),
+                reverse=True
+            )
+            
+            if sorted_exits:
+                best_exit = {
+                    'name': sorted_exits[0][0],
+                    'avg_pnl': sorted_exits[0][1].get('avg_pnl', Money('0', 'USD')),
+                    'count': sorted_exits[0][1]['count']
+                }
+                
+            if len(sorted_exits) > 1:
+                worst_exit = {
+                    'name': sorted_exits[-1][0],
+                    'avg_pnl': sorted_exits[-1][1].get('avg_pnl', Money('0', 'USD')),
+                    'count': sorted_exits[-1][1]['count']
+                }
+        
+        # Calculate exit vs TP comparison percentage
+        total_comparisons = exit_vs_tp_better + exit_vs_tp_worse
+        exit_vs_tp_win_rate = (
+            Decimal(exit_vs_tp_better) / Decimal(total_comparisons)
+            if total_comparisons > 0 else Decimal('0')
+        )
+        
+        # Calculate average exit price vs average TP price
+        avg_exit_price_vs_tp = Decimal('0')
+        if exit_condition_trades:
+            exit_prices = []
+            tp_prices = []
+            
+            for trade in exit_condition_trades:
+                exit_price = trade.get('exit_price', None)
+                nearest_tp = trade.get('nearest_tp_price', None)
+                
+                if exit_price and nearest_tp:
+                    exit_prices.append(Decimal(str(exit_price)))
+                    tp_prices.append(Decimal(str(nearest_tp)))
+            
+            if exit_prices and tp_prices:
+                avg_exit = sum(exit_prices) / Decimal(len(exit_prices))
+                avg_tp = sum(tp_prices) / Decimal(len(tp_prices))
+                
+                if avg_tp != Decimal('0'):
+                    avg_exit_price_vs_tp = ((avg_exit - avg_tp) / avg_tp) * Decimal('100')
+        
+        return {
+            'total_exit_condition_triggers': len(exit_condition_trades),
+            'exit_condition_pnl': Money(str(total_exit_pnl), 'USD'),
+            'exit_condition_vs_tp_comparison': {
+                'better_than_tp': exit_vs_tp_better,
+                'worse_than_tp': exit_vs_tp_worse,
+                'win_rate': exit_vs_tp_win_rate,
+                'total_comparisons': total_comparisons
+            },
+            'avg_exit_price_vs_tp_pct': avg_exit_price_vs_tp,
+            'exits_by_condition': dict(exits_by_condition),
+            'best_performing_exit': best_exit,
+            'worst_performing_exit': worst_exit,
+            'tp_only_trades': len(tp_only_trades),
+            'partial_exit_percentage': (
+                Decimal(len(exit_condition_trades)) / Decimal(len(trades)) * Decimal('100')
+                if trades else Decimal('0')
+            )
+        }
     
     # ==================== Helper Methods ====================
     
