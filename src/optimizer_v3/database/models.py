@@ -335,3 +335,331 @@ class BacktestResult(Base):
         Index('idx_backtest_results_run_variation', 'run_id', 'variation_id'),
         Index('idx_backtest_results_dates', 'start_time', 'end_time'),
     )
+
+
+# ==============================================================================
+# SPRINT 1.6.1 ORM MODELS - Strategy Versioning & AI Recommendations
+# ==============================================================================
+
+from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy.orm import relationship
+
+
+class Strategy(Base):
+    """
+    Sprint 1.6.1 Task 1.6.1.ORM.1
+    Parent strategy table linking all versions, recommendations, and test results.
+    
+    Institutional-grade implementation with:
+    - Cascade deletes for all child records
+    - Proper indexing for query performance
+    - Timestamp tracking for audit trail
+    """
+    __tablename__ = 'strategies'
+    
+    # Primary identification
+    strategy_id = Column(String(255), primary_key=True)
+    name = Column(String(255), nullable=False)
+    
+    # Timestamps for audit trail
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships with cascade deletes
+    versions = relationship(
+        "StrategyVersion",
+        back_populates="strategy",
+        cascade="all, delete-orphan",
+        order_by="StrategyVersion.version_number"
+    )
+    recommendations = relationship(
+        "AIRecommendation",
+        back_populates="strategy",
+        cascade="all, delete-orphan"
+    )
+    test_results = relationship(
+        "StrategyTestResult",
+        back_populates="strategy",
+        cascade="all, delete-orphan"
+    )
+    
+    __table_args__ = (
+        Index('idx_strategies_name', 'name'),
+        Index('idx_strategies_created_at', 'created_at'),
+    )
+    
+    def __repr__(self):
+        return f"<Strategy(strategy_id='{self.strategy_id}', name='{self.name}')>"
+
+
+class StrategyVersion(Base):
+    """
+    Sprint 1.6.1 Task 1.6.1.ORM.2
+    Versioned strategy configurations with complete strategy definition.
+    
+    Stores:
+    - Complete strategy configuration in JSONB columns
+    - Backtest results and metrics
+    - Version control metadata (git hash, notes, tags)
+    - Config hash for duplicate detection
+    
+    Used by:
+    - Sprint 1.8 Exit Conditions (exit_conditions JSONB)
+    - Sprint 2.2 Signal Intelligence (signals JSONB)
+    """
+    __tablename__ = 'strategy_versions'
+    
+    # Primary identification
+    version_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    strategy_id = Column(
+        String(255),
+        ForeignKey('strategies.strategy_id', ondelete='CASCADE'),
+        nullable=False
+    )
+    version_number = Column(Integer, nullable=False)
+    
+    # Strategy metadata
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    
+    # Complete strategy definition (JSONB for flexibility)
+    blocks = Column(JSONB, nullable=False, default=list)
+    signals = Column(JSONB, nullable=False, default=dict)
+    parameters = Column(JSONB, nullable=False, default=dict)
+    entry_conditions = Column(JSONB, nullable=False, default=dict)
+    exit_conditions = Column(JSONB, nullable=False, default=list)  # Sprint 1.8
+    risk_management = Column(JSONB, nullable=False, default=dict)
+    
+    # Backtest configuration and results
+    backtest_config = Column(JSONB, nullable=False, default=dict)
+    backtest_results = Column(JSONB)
+    metrics = Column(JSONB)
+    trades = Column(JSONB)
+    equity_curve = Column(JSONB)
+    
+    # Version control and tracking
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
+    git_commit_hash = Column(String(40))
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    created_by = Column(String(100))
+    notes = Column(Text)
+    tags = Column(JSONB, default=list)
+    
+    # Duplicate detection
+    config_hash = Column(String(64), index=True)
+    
+    # Relationships
+    strategy = relationship("Strategy", back_populates="versions")
+    block_versions = relationship(
+        "StrategyBlockVersion",
+        back_populates="version",
+        cascade="all, delete-orphan"
+    )
+    recommendations = relationship(
+        "AIRecommendation",
+        back_populates="version",
+        cascade="all, delete-orphan",
+        foreign_keys="AIRecommendation.strategy_version_id"
+    )
+    test_results = relationship(
+        "StrategyTestResult",
+        back_populates="version",
+        cascade="all, delete-orphan"
+    )
+    
+    __table_args__ = (
+        UniqueConstraint('strategy_id', 'version_number', name='uq_strategy_version'),
+        Index('idx_strategy_versions_strategy', 'strategy_id'),
+        Index('idx_strategy_versions_timestamp', 'timestamp'),
+        Index('idx_strategy_versions_hash', 'config_hash'),
+    )
+    
+    def __repr__(self):
+        return f"<StrategyVersion(version_id='{self.version_id}', name='{self.name}', v{self.version_number})>"
+
+
+class StrategyBlockVersion(Base):
+    """
+    Sprint 1.6.1 Task 1.6.1.ORM.3
+    Block-level version tracking for granular change history.
+    
+    Tracks individual building blocks within strategy versions:
+    - Block name and type
+    - Signals and parameters
+    - Logic type (AND/OR)
+    - Sequence number for ordering
+    """
+    __tablename__ = 'strategy_block_versions'
+    
+    block_version_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    version_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey('strategy_versions.version_id', ondelete='CASCADE'),
+        nullable=False
+    )
+    
+    # Block identification
+    block_name = Column(String(255), nullable=False)
+    block_type = Column(String(100), nullable=False)
+    
+    # Block configuration
+    signals = Column(JSONB, nullable=False, default=list)
+    parameters = Column(JSONB, nullable=False, default=dict)
+    logic_type = Column(String(20), nullable=False, default='AND')  # AND/OR
+    sequence_number = Column(Integer)
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Relationships
+    version = relationship("StrategyVersion", back_populates="block_versions")
+    
+    __table_args__ = (
+        Index('idx_block_versions_version', 'version_id'),
+        Index('idx_block_versions_name', 'block_name'),
+    )
+    
+    def __repr__(self):
+        return f"<StrategyBlockVersion(block_name='{self.block_name}', type='{self.block_type}')>"
+
+
+class AIRecommendation(Base):
+    """
+    Sprint 1.6.1 Task 1.6.1.ORM.4
+    AI recommendation tracking with full metadata.
+    
+    Stores:
+    - Recommendation details (type, config, reasoning)
+    - Confidence scores
+    - Application tracking (applied, metrics before/after)
+    - Link to strategy version
+    """
+    __tablename__ = 'ai_recommendations'
+    
+    recommendation_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    strategy_id = Column(
+        String(255),
+        ForeignKey('strategies.strategy_id', ondelete='CASCADE'),
+        nullable=False
+    )
+    strategy_version_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey('strategy_versions.version_id', ondelete='CASCADE'),
+        nullable=True  # May be null for strategy-level recommendations
+    )
+    strategy_version = Column(String(50))  # Display version string 'v1', 'v2', etc.
+    
+    # Recommendation details
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
+    recommendation_type = Column(String(50), nullable=False)  # ADD_BLOCK, ADJUST_PARAMETER, etc.
+    title = Column(String(500))
+    block_name = Column(String(255))
+    signal_name = Column(String(255))
+    parameter_name = Column(String(255))
+    configuration = Column(JSONB)
+    description = Column(Text)
+    reasoning = Column(Text, nullable=False)
+    rationale = Column(Text)
+    suggested_changes = Column(JSONB)
+    expected_impact = Column(JSONB)
+    combined_confidence = Column(Float)
+    root_cause = Column(Text)
+    warnings = Column(JSONB)
+    
+    # AI metadata
+    ai_enhanced = Column(Boolean, default=False)
+    priority = Column(Integer)
+    
+    # Application tracking
+    applied = Column(Boolean, default=False)
+    applied_at = Column(DateTime)
+    applied_version_id = Column(UUID(as_uuid=True))  # Version where applied
+    applied_by = Column(String(100))
+    metrics_before = Column(JSONB)
+    metrics_after = Column(JSONB)
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Relationships
+    strategy = relationship("Strategy", back_populates="recommendations")
+    version = relationship(
+        "StrategyVersion",
+        back_populates="recommendations",
+        foreign_keys=[strategy_version_id]
+    )
+    
+    __table_args__ = (
+        Index('idx_ai_recommendations_strategy', 'strategy_id'),
+        Index('idx_ai_recommendations_version', 'strategy_version_id'),
+        Index('idx_ai_recommendations_timestamp', 'timestamp'),
+        Index('idx_ai_recommendations_type', 'recommendation_type'),
+        Index('idx_ai_recommendations_applied', 'applied'),
+    )
+    
+    def __repr__(self):
+        return f"<AIRecommendation(type='{self.recommendation_type}', applied={self.applied})>"
+
+
+class StrategyTestResult(Base):
+    """
+    Sprint 1.6.1 Task 1.6.1.ORM.5
+    Strategy test results history with complete metrics.
+    
+    Stores:
+    - Test type (backtest, forward_test, paper_trade, live)
+    - Complete metrics and trade history
+    - Equity curve data
+    - AI recommendations linked to results
+    """
+    __tablename__ = 'strategy_test_results'
+    
+    result_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    strategy_id = Column(
+        String(255),
+        ForeignKey('strategies.strategy_id', ondelete='CASCADE'),
+        nullable=False
+    )
+    version_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey('strategy_versions.version_id', ondelete='CASCADE'),
+        nullable=False
+    )
+    
+    # Test configuration
+    test_type = Column(String(50), nullable=False)  # backtest, forward_test, paper_trade, live
+    test_config = Column(JSONB, nullable=False, default=dict)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+    
+    # Performance metrics
+    total_return_pct = Column(Float)
+    sharpe_ratio = Column(Float)
+    max_drawdown_pct = Column(Float)
+    win_rate = Column(Float)
+    profit_factor = Column(Float)
+    total_trades = Column(Integer)
+    
+    # Complete results
+    metrics = Column(JSONB, nullable=False, default=dict)
+    trades = Column(JSONB)
+    equity_curve = Column(JSONB)
+    ai_recommendations = Column(JSONB)  # Linked recommendations
+    
+    # Timestamps
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Relationships
+    strategy = relationship("Strategy", back_populates="test_results")
+    version = relationship("StrategyVersion", back_populates="test_results")
+    
+    __table_args__ = (
+        Index('idx_test_results_strategy', 'strategy_id'),
+        Index('idx_test_results_version', 'version_id'),
+        Index('idx_test_results_timestamp', 'timestamp'),
+        Index('idx_test_results_test_type', 'test_type'),
+    )
+    
+    def __repr__(self):
+        return f"<StrategyTestResult(type='{self.test_type}', sharpe={self.sharpe_ratio})>"
