@@ -404,7 +404,7 @@
 
 **File**: `src/strategy_builder/ui/strategy_blocks_panel.py`
 
-- [ ] **1.8.48** Add exit condition tree items display (🔴 EXIT: signal_name (50%))
+- [x] **1.8.48** Add exit condition tree items display (🔴 EXIT: signal_name (50%))
 
 - [ ] **1.8.49** Add strategy-level exit conditions section at bottom of blocks panel
   - Collapsible section: "🔴 STRATEGY EXIT CONDITIONS"

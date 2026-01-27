@@ -34,7 +34,7 @@ from src.strategy_builder.ui.styles import (
     get_recheck_duplicate_button_stylesheet, get_recheck_remove_button_stylesheet,
     get_spinbox_button_stylesheet, get_success_button_stylesheet, get_color,
     get_dialog_stylesheet, get_radio_container_stylesheet, get_signal_radio_stylesheet,
-    get_recheck_radio_stylesheet
+    get_recheck_radio_stylesheet, get_exit_tree_item_style
 )
 
 
@@ -348,6 +348,47 @@ class BlockConfigItem(QWidget):
                                     nested_row_layout.addWidget(nested_label, stretch=1)
                                     
                                     signals_layout.addLayout(nested_row_layout)
+                
+                # Level 4: Exit Conditions (Sprint 1.8 Task 1.8.48) - after RECHECK chains
+                if signal.get('exit_conditions'):
+                    for exit_cond in signal['exit_conditions']:
+                        exit_signal_name = exit_cond.get('signal_name', 'Unknown')
+                        exit_percentage = exit_cond.get('percentage', 0.5)
+                        exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
+                        
+                        # Determine indentation based on whether timing constraint and recheck exist
+                        if signal.get('recheck_config') and signal['recheck_config'].get('enabled'):
+                            # Has RECHECK - indent further
+                            if timing_constraint:
+                                exit_indent = "               "
+                            else:
+                                exit_indent = "          "
+                        elif timing_constraint:
+                            # Has timing constraint but no RECHECK
+                            exit_indent = "          "
+                        else:
+                            # No timing constraint or RECHECK
+                            exit_indent = "     "
+                        
+                        # Format percentage for display (0.5 -> 50%)
+                        pct_display = int(exit_percentage * 100)
+                        
+                        # Create exit condition row
+                        exit_row_layout = QHBoxLayout()
+                        exit_row_layout.setSpacing(8)
+                        
+                        exit_text = f"{exit_indent}└── 🔴 EXIT: {exit_signal_name} ({pct_display}%)"
+                        exit_label = QLabel(exit_text)
+                        exit_label.setStyleSheet(get_exit_tree_item_style())
+                        exit_label.setToolTip(
+                            f"Exit Condition\n"
+                            f"Signal: {exit_signal_name}\n"
+                            f"Percentage: {pct_display}%\n"
+                            f"Mode: {exit_mode}"
+                        )
+                        exit_row_layout.addWidget(exit_label, stretch=1)
+                        
+                        signals_layout.addLayout(exit_row_layout)
             
             signals_widget.setLayout(signals_layout)
             layout.addWidget(signals_widget)
@@ -707,6 +748,17 @@ class StrategyBlocksPanel(QWidget):
                             'enabled': nested.enabled,
                             'bar_delay': nested.bar_delay,
                             'validation_mode': nested.validation_mode
+                        })
+                
+                # Sprint 1.8 Task 1.8.48: Add exit conditions data if present
+                if hasattr(signal_config, 'exit_conditions') and signal_config.exit_conditions:
+                    signal_dict['exit_conditions'] = []
+                    for exit_cond in signal_config.exit_conditions:
+                        signal_dict['exit_conditions'].append({
+                            'signal_name': exit_cond.signal_name,
+                            'percentage': exit_cond.percentage,
+                            'exit_mode': exit_cond.exit_mode,
+                            'binding_level': exit_cond.binding_level
                         })
                 
                 block_info['signals'].append(signal_dict)
