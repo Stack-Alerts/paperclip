@@ -574,12 +574,12 @@
 
 **File**: `src/optimizer_v3/core/results/recheck_metrics.py`
 
-- [ ] **1.8.69** Add exit_condition_recheck_results tracking
+- [x] **1.8.69** Add exit_condition_recheck_results tracking
   ```python
   self.exit_condition_recheck_results: List[Dict] = []
   ```
 
-- [ ] **1.8.70** Add add_exit_condition_recheck_result() method
+- [x] **1.8.70** Add add_exit_condition_recheck_result() method
   ```python
   def add_exit_condition_recheck_result(
       self,
@@ -591,7 +591,7 @@
       """Track exit condition recheck validation results"""
   ```
 
-- [ ] **1.8.71** Update calculate_metrics() to include exit condition recheck stats
+- [x] **1.8.71** Update calculate_metrics() to include exit condition recheck stats
 
 **File**: `src/optimizer_v3/ui/trades_panel.py`
 
