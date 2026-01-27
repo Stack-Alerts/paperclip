@@ -186,7 +186,7 @@ class CSVExporter:
     # ==================== Column Definitions ====================
     
     def _get_default_summary_columns(self) -> List[str]:
-        """Get default columns for summary export"""
+        """Get default columns for summary export - Sprint 1.8 Task 1.8.67"""
         return [
             'rank',
             'config_id',
@@ -200,11 +200,15 @@ class CSVExporter:
             'total_trades',
             'total_pnl',
             'annualized_return',
-            'capital_efficiency'
+            'capital_efficiency',
+            # Sprint 1.8 Task 1.8.67: Exit condition columns
+            'exit_condition_triggers',
+            'exit_condition_pnl',
+            'partial_exit_count'
         ]
     
     def _get_default_trade_columns(self) -> List[str]:
-        """Get default columns for trade export"""
+        """Get default columns for trade export - Sprint 1.8 Task 1.8.68"""
         columns = [
             'trade_id',
             'entry_time',
@@ -216,7 +220,11 @@ class CSVExporter:
             'pnl',
             'return_pct',
             'duration_hours',
-            'win_loss'
+            'win_loss',
+            # Sprint 1.8 Task 1.8.68: Exit condition columns
+            'exit_type',  # TP1/TP2/TP3/SL/EXIT_CONDITION
+            'exit_condition_name',  # if applicable
+            'partial_exit_percentage'  # if partial exit
         ]
         
         if self.config['include_timestamps']:
@@ -335,6 +343,14 @@ class CSVExporter:
             elif col == 'exit_timestamp':
                 exit_time = trade.get('exit_time', '')
                 row[col] = exit_time.timestamp() if isinstance(exit_time, datetime) else ''
+            # Sprint 1.8 Task 1.8.68: Exit condition columns
+            elif col == 'exit_type':
+                row[col] = trade.get('exit_type', 'TP1')  # TP1/TP2/TP3/SL/EXIT_CONDITION
+            elif col == 'exit_condition_name':
+                row[col] = trade.get('exit_condition_name', '')  # Only if exit_type = EXIT_CONDITION
+            elif col == 'partial_exit_percentage':
+                exit_pct = trade.get('partial_exit_percentage', '')
+                row[col] = self._format_value(exit_pct) if exit_pct else ''
             else:
                 row[col] = trade.get(col, '')
         

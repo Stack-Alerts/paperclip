@@ -556,7 +556,7 @@
 
 **File**: `src/optimizer_v3/core/results/csv_exporter.py`
 
-- [ ] **1.8.67** Add exit condition columns to _get_default_summary_columns()
+- [x] **1.8.67** Add exit condition columns to _get_default_summary_columns()
   ```python
   # Add to list:
   'exit_condition_triggers',
@@ -564,7 +564,7 @@
   'partial_exit_count'
   ```
 
-- [ ] **1.8.68** Add exit condition columns to _get_default_trade_columns()
+- [x] **1.8.68** Add exit condition columns to _get_default_trade_columns()
   ```python
   # Add to list:
   'exit_type',  # TP1/TP2/TP3/SL/EXIT_CONDITION
