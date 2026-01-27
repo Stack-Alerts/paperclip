@@ -157,6 +157,15 @@ class ValidationPanel(QWidget):
         )
         results_layout.addWidget(self.strict_section)
         
+        # Exit Condition Validation Section (Sprint 1.8 Task 1.8.38)
+        self.exit_section = self._create_validation_section(
+            "🔴 Exit Condition Validation",
+            "#EF4444",  # Red
+            []
+        )
+        self.exit_section.setVisible(False)  # Only show when exit conditions present
+        results_layout.addWidget(self.exit_section)
+        
         # Warnings Section (initially hidden)
         self.warnings_section = self._create_validation_section(
             "⚠️ Warnings",
@@ -407,8 +416,37 @@ class ValidationPanel(QWidget):
                         "No circular dependencies"
                     ])
                 
+                # Exit condition validation errors (Sprint 1.8 Task 1.8.37)
+                exit_errors = [e for e in errors_list if 'exit' in e.lower()]
+                if exit_errors:
+                    self._update_section(self.exit_section, "❌ Exit Condition Validation", "#EF4444", exit_errors)
+                    self.exit_section.setVisible(True)
+                else:
+                    # Check if strategy has exit conditions
+                    config = self.orchestrator.get_current_config()
+                    has_exits = False
+                    if hasattr(config, 'exit_conditions') and config.exit_conditions:
+                        has_exits = True
+                    if not has_exits:
+                        for block in config.blocks:
+                            if hasattr(block, 'exit_conditions') and block.exit_conditions:
+                                has_exits = True
+                                break
+                            for signal in block.signals:
+                                if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                                    has_exits = True
+                                    break
+                    
+                    if has_exits:
+                        self._update_section(self.exit_section, "✅ Exit Condition Validation", "#4ADE80", [
+                            "All exit conditions valid"
+                        ])
+                        self.exit_section.setVisible(True)
+                    else:
+                        self.exit_section.setVisible(False)
+                
                 # Show all errors if they don't fit categories
-                uncategorized = [e for e in errors_list if e not in basic_errors + standard_errors + strict_errors]
+                uncategorized = [e for e in errors_list if e not in basic_errors + standard_errors + strict_errors + exit_errors]
                 if uncategorized:
                     self._update_section(self.basic_section, "❌ Validation Errors", "#EF4444", 
                                        basic_errors + uncategorized)

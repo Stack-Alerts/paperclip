@@ -299,7 +299,7 @@
 
 **File**: `src/strategy_builder/ui/validation_panel.py`
 
-- [ ] **1.8.37** Add exit condition validation error category in _update_validation_display()
+- [x] **1.8.37** Add exit condition validation error category in _update_validation_display()
   ```python
   # Add "exit" keyword detection for categorizing exit validation errors
   exit_errors = [e for e in errors_list if 'exit' in e.lower()]
@@ -307,7 +307,7 @@
       self._update_section(self.exit_section, "❌ Exit Condition Validation", "#EF4444", exit_errors)
   ```
 
-- [ ] **1.8.38** Add exit validation section widget (🔴 Exit Conditions: VALID/INVALID)
+- [x] **1.8.38** Add exit validation section widget (🔴 Exit Conditions: VALID/INVALID)
 
 **File**: `src/strategy_builder/core/signal_dependency_resolver.py`
 
