@@ -16,10 +16,6 @@ from src.strategy_builder.core.strategy_config_engine import (
     TimingConstraint
 )
 from src.strategy_builder.core.signal_dependency_resolver import SignalDependencyResolver
-from src.strategy_builder.core.nautilus_code_generator import (
-    NautilusCodeGenerator,
-    GeneratedCode
-)
 from src.strategy_builder.testing.walkforward_test_engine import (
     WalkforwardTestEngine,
     WalkforwardConfig,
@@ -101,7 +97,6 @@ class WorkflowResult:
     errors: List[str] = field(default_factory=list)
     validation_errors: List[str] = field(default_factory=list)
     strategy_config: Optional[StrategyConfig] = None
-    generated_code: Optional[GeneratedCode] = None
     test_result: Optional[WalkforwardResult] = None
     data: Optional[Any] = None
 
@@ -129,7 +124,6 @@ class StrategyBuilderOrchestrator:
         self.registry_interface = RegistryInterface(registry)
         self.config_engine = StrategyConfigEngine(registry)
         self.dependency_resolver = SignalDependencyResolver()
-        self.code_generator = NautilusCodeGenerator()
         self.test_engine = WalkforwardTestEngine()
         self.persistence = StrategyPersistence()
         
@@ -425,41 +419,6 @@ class StrategyBuilderOrchestrator:
                 success=False,
                 step=WorkflowStep.VALIDATE_DEPENDENCIES,
                 message="Dependency validation error",
-                errors=[str(e)]
-            )
-            
-    def generate_code(self) -> WorkflowResult:
-        """
-        Generate NautilusTrader code for the strategy
-        
-        Returns:
-            WorkflowResult with generated code
-        """
-        try:
-            # Validate first
-            validation = self.validate_strategy()
-            if not validation.success:
-                return WorkflowResult(
-                    success=False,
-                    step=WorkflowStep.GENERATE_CODE,
-                    message="Cannot generate code - validation failed",
-                    validation_errors=validation.validation_errors
-                )
-                
-            # Generate code
-            generated_code = self.code_generator.generate(self.config_engine.config)
-            
-            return WorkflowResult(
-                success=True,
-                step=WorkflowStep.GENERATE_CODE,
-                message="Code generated successfully",
-                generated_code=generated_code
-            )
-        except Exception as e:
-            return WorkflowResult(
-                success=False,
-                step=WorkflowStep.GENERATE_CODE,
-                message="Code generation error",
                 errors=[str(e)]
             )
             

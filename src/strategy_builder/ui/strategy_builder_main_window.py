@@ -239,11 +239,6 @@ class StrategyBuilderMainWindow(QMainWindow):
         validate_action.triggered.connect(self._on_validate)
         tools_menu.addAction(validate_action)
         
-        generate_action = QAction(style.standardIcon(QStyle.SP_FileDialogDetailedView), "&Generate Code", self)
-        generate_action.setStatusTip("Generate NautilusTrader code from strategy")
-        generate_action.triggered.connect(self._on_generate_code)
-        tools_menu.addAction(generate_action)
-        
         tools_menu.addSeparator()
         
         update_data_action = QAction(style.standardIcon(QStyle.SP_BrowserReload), "&Update Data...", self)
@@ -824,28 +819,6 @@ class StrategyBuilderMainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Error opening backtest dialog: {str(e)}")
             self._update_status("Backtest configuration failed to open")
     
-    def _on_generate_code(self):
-        """Generate NautilusTrader code from strategy."""
-        try:
-            result = self.orchestrator.generate_code()
-            
-            if result.success:
-                # Show success message
-                QMessageBox.information(
-                    self,
-                    "Code Generated",
-                    f"Code generated successfully!\n\nSaved to: {result.data.get('file_path', 'Unknown')}"
-                )
-                self._update_status("Code generated successfully")
-            else:
-                QMessageBox.warning(
-                    self,
-                    "Generation Failed",
-                    f"Code generation failed:\n\n{result.message}"
-                )
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error generating code: {str(e)}")
-    
     def _on_step_clicked(self, step: int):
         """
         Handle stepper ribbon step click with workflow enforcement.
@@ -873,7 +846,6 @@ class StrategyBuilderMainWindow(QMainWindow):
             
             # Connect dialog signals to main window actions (with visual feedback)
             dialog.validation_panel.save_requested.connect(lambda: self._on_save_strategy_with_feedback())
-            dialog.validation_panel.generate_requested.connect(self._on_generate_code)
             dialog.validation_panel.run_test_requested.connect(self._on_run_backtest)
             
             # Show modal dialog
