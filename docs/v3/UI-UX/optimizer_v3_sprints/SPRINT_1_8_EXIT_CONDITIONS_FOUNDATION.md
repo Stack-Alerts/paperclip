@@ -385,7 +385,7 @@
 
 **File**: `src/strategy_builder/ui/exit_condition_dialog.py` (CREATE NEW)
 
-- [ ] **1.8.46** Create ExitConditionDialog class with:
+- [x] **1.8.46** Create ExitConditionDialog class with:
   - Percentage input (QSpinBox 1-100%)
   - Exit mode radio buttons (ABSOLUTE/FLEXIBLE)
   - TP proximity threshold input (for FLEXIBLE mode)
