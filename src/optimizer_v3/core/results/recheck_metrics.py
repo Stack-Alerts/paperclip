@@ -48,6 +48,9 @@ class RecheckMetricsCalculator:
             'with_recheck': {'wins': 0, 'losses': 0, 'total': 0},
             'without_recheck': {'wins': 0, 'losses': 0, 'total': 0}
         }
+        
+        # Sprint 1.8 Task 1.8.69: Exit condition RECHECK results tracking
+        self.exit_condition_recheck_results: List[Dict[str, Any]] = []
     
     def add_chain_result(
         self,
@@ -118,6 +121,32 @@ class RecheckMetricsCalculator:
         else:
             self.trade_impact[category]['losses'] += 1
     
+    def add_exit_condition_recheck_result(
+        self,
+        exit_condition_name: str,
+        recheck_passed: bool,
+        recheck_bar_count: int,
+        exit_executed: bool
+    ) -> None:
+        """
+        Track exit condition recheck validation results - Sprint 1.8 Task 1.8.70
+        
+        Args:
+            exit_condition_name: Name of the exit condition signal
+            recheck_passed: Whether RECHECK validation passed
+            recheck_bar_count: Number of bars waited for recheck
+            exit_executed: Whether exit was actually executed after recheck
+        """
+        result = {
+            'exit_condition_name': exit_condition_name,
+            'recheck_passed': recheck_passed,
+            'recheck_bar_count': recheck_bar_count,
+            'exit_executed': exit_executed,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        self.exit_condition_recheck_results.append(result)
+    
     def calculate_metrics(self) -> Dict[str, Any]:
         """
         Calculate comprehensive metrics.
@@ -182,6 +211,9 @@ class RecheckMetricsCalculator:
             if without_recheck['total'] > 0 else 0
         )
         
+        # Sprint 1.8 Task 1.8.71: Exit condition RECHECK statistics
+        exit_recheck_stats = self._calculate_exit_recheck_stats()
+        
         return {
             'timestamp': datetime.now().isoformat(),
             'chain_metrics': {
@@ -210,7 +242,80 @@ class RecheckMetricsCalculator:
                     'winrate': float(without_recheck_winrate)
                 },
                 'winrate_difference': float(with_recheck_winrate - without_recheck_winrate)
+            },
+            'exit_condition_recheck': exit_recheck_stats  # Sprint 1.8 Task 1.8.71
+        }
+    
+    def _calculate_exit_recheck_stats(self) -> Dict[str, Any]:
+        """
+        Calculate exit condition RECHECK statistics - Sprint 1.8 Task 1.8.71
+        
+        Returns:
+            Dictionary with exit condition RECHECK metrics
+        """
+        if not self.exit_condition_recheck_results:
+            return {
+                'total_attempts': 0,
+                'passed': 0,
+                'failed': 0,
+                'pass_rate': 0.0,
+                'executed_after_pass': 0,
+                'execution_rate': 0.0,
+                'avg_bar_count': 0.0,
+                'by_condition': {}
             }
+        
+        total_attempts = len(self.exit_condition_recheck_results)
+        passed = sum(1 for r in self.exit_condition_recheck_results if r['recheck_passed'])
+        failed = total_attempts - passed
+        
+        executed_after_pass = sum(
+            1 for r in self.exit_condition_recheck_results
+            if r['recheck_passed'] and r['exit_executed']
+        )
+        
+        # Calculate average bar count
+        bar_counts = [r['recheck_bar_count'] for r in self.exit_condition_recheck_results]
+        avg_bar_count = np.mean(bar_counts) if bar_counts else 0.0
+        
+        # Per-condition breakdown
+        by_condition = {}
+        for result in self.exit_condition_recheck_results:
+            condition_name = result['exit_condition_name']
+            
+            if condition_name not in by_condition:
+                by_condition[condition_name] = {
+                    'attempts': 0,
+                    'passed': 0,
+                    'executed': 0
+                }
+            
+            by_condition[condition_name]['attempts'] += 1
+            if result['recheck_passed']:
+                by_condition[condition_name]['passed'] += 1
+            if result['exit_executed']:
+                by_condition[condition_name]['executed'] += 1
+        
+        # Calculate per-condition rates
+        for condition_name, stats in by_condition.items():
+            stats['pass_rate'] = (
+                stats['passed'] / stats['attempts']
+                if stats['attempts'] > 0 else 0.0
+            )
+            stats['execution_rate'] = (
+                stats['executed'] / stats['attempts']
+                if stats['attempts'] > 0 else 0.0
+            )
+        
+        return {
+            'total_attempts': total_attempts,
+            'passed': passed,
+            'failed': failed,
+            'pass_rate': float(passed / total_attempts) if total_attempts > 0 else 0.0,
+            'executed_after_pass': executed_after_pass,
+            'execution_rate': float(executed_after_pass / passed) if passed > 0 else 0.0,
+            'avg_bar_count': float(avg_bar_count),
+            'by_condition': by_condition
         }
     
     def generate_report(self, include_raw_data: bool = False) -> str:
