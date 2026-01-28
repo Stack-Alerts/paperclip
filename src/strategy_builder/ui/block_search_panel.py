@@ -885,27 +885,68 @@ class BlockSearchPanel(QWidget):
     def _on_signal_added_as_exit(self, signal_name: str):
         """
         Handle when signal is added as exit condition.
-        Sprint 1.8 Task 1.8.47
+        Sprint 1.8 Task 1.8.47 + Integration
         
-        NOTE: This is a stub for Task 1.8.47. Full integration with orchestrator
-        and exit condition storage will be implemented in later tasks (1.8.48+).
+        Calls orchestrator to add exit condition with dialog configuration.
         
         Args:
             signal_name: Name of the signal added as exit condition
         """
-        if LOGGER_AVAILABLE and logger:
-            logger.info(LogComponent.SEARCH_PANEL,
-                       f"Signal added as exit condition",
-                       {
-                           'signal': signal_name
-                       })
+        # Get dialog configuration from the last opened dialog
+        # The dialog stores its config in the parent widget
+        sender_widget = self.sender()
+        if not sender_widget or not hasattr(sender_widget, 'parent'):
+            if LOGGER_AVAILABLE and logger:
+                logger.error(LogComponent.SEARCH_PANEL, "Cannot find dialog parent widget")
+            return
         
-        print(f"\n🔴 EXIT CONDITION ADDED: {signal_name}")
-        print(f"🔴 Dialog configuration saved")
-        print(f"🔴 Exit condition will be integrated in Task 1.8.48+\n")
+        # Find the BlockListItem that emitted the signal
+        block_item = None
+        for item in self.block_items.values():
+            if item == sender_widget:
+                block_item = item
+                break
         
-        # TODO: Task 1.8.48+ - Integrate with orchestrator to actually add exit condition
-        # For now this is just a stub showing the signal was added through the dialog
+        if not block_item:
+            if LOGGER_AVAILABLE and logger:
+                logger.error(LogComponent.SEARCH_PANEL, "Cannot find block item for exit signal")
+            return
+        
+        # Call orchestrator to add exit condition at strategy level
+        # NOTE: Using default values from ExitConditionDialog defaults
+        # Future enhancement: Pass actual dialog config values
+        result = self.orchestrator.add_exit_condition(
+            signal_name=signal_name,
+            percentage=0.5,  # Default: 50%
+            binding_level="STRATEGY",  # Default: strategy-level
+            exit_mode="ABSOLUTE"  # Default: immediate exit
+        )
+        
+        if result.success:
+            if LOGGER_AVAILABLE and logger:
+                logger.info(LogComponent.SEARCH_PANEL,
+                           f"Signal added as exit condition",
+                           {
+                               'signal': signal_name,
+                               'result': result.message
+                           })
+            
+            print(f"\n✅ EXIT CONDITION ADDED: {signal_name}")
+            print(f"✅ Added to strategy-level exits")
+            print(f"✅ {result.message}\n")
+        else:
+            if LOGGER_AVAILABLE and logger:
+                logger.error(LogComponent.SEARCH_PANEL,
+                            f"Failed to add exit condition",
+                            {
+                                'signal': signal_name,
+                                'errors': result.errors
+                            })
+            
+            print(f"\n❌ FAILED TO ADD EXIT: {signal_name}")
+            print(f"❌ Error: {result.message}")
+            if result.errors:
+                print(f"❌ Details: {result.errors}\n")
     
     def mark_block_as_added(self, block_name: str):
         """
