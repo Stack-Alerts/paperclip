@@ -1351,23 +1351,31 @@ class StrategyBlocksPanel(QWidget):
                 exit_row.setProperty('tp_proximity_threshold', exit_cond.tp_proximity_threshold)
                 exit_row.setProperty('reversal_trigger', exit_cond.reversal_trigger)
                 
-                # Config/Edit button
-                config_btn = QPushButton("⚙️")
+                # Config/Edit button - same style as recheck gear button
+                config_btn = QPushButton("⚙")
+                config_btn.setMinimumWidth(30)
                 config_btn.setMaximumWidth(30)
-                config_btn.setStyleSheet(get_primary_button_stylesheet())
+                config_btn.setMinimumHeight(30)
+                config_btn.setMaximumHeight(30)
+                config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                 config_btn.setToolTip("Configure exit condition")
+                # Use lambda without checked parameter to avoid binding issues
                 config_btn.clicked.connect(
-                    lambda checked, sig=exit_cond.signal_name: self._on_edit_strategy_exit(sig)
+                    lambda sig=exit_cond.signal_name: self._on_edit_strategy_exit(sig)
                 )
                 exit_row_layout.addWidget(config_btn)
                 
-                # Remove button
+                # Remove button - same size as config button
                 remove_btn = QPushButton("✕")
+                remove_btn.setMinimumWidth(30)
                 remove_btn.setMaximumWidth(30)
+                remove_btn.setMinimumHeight(30)
+                remove_btn.setMaximumHeight(30)
                 remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                 remove_btn.setToolTip("Remove this exit condition")
+                # Use lambda without checked parameter to avoid binding issues
                 remove_btn.clicked.connect(
-                    lambda checked, sig=exit_cond.signal_name: self._on_remove_strategy_exit(sig)
+                    lambda sig=exit_cond.signal_name: self._on_remove_strategy_exit(sig)
                 )
                 exit_row_layout.addWidget(remove_btn)
                 
