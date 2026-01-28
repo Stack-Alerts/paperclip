@@ -923,7 +923,7 @@ class MetricsDisplayPanel(QWidget):
         if self.rec_engine is None:
             self._initialize_recommendation_engine()
         
-        # Update each row with actual data
+        # Update each row with actual data - Sprint 1.8 Task 1.8.74: Added exit metrics
         metrics_map = {
             0: ('total_pnl', lambda x: f"${float(x):,.2f}"),
             1: ('total_return', lambda x: f"{float(x):.2f}%"),
@@ -939,6 +939,10 @@ class MetricsDisplayPanel(QWidget):
             11: ('largest_loss', lambda x: f"${float(x):,.2f}"),
             12: ('risk_reward_ratio', lambda x: f"{float(x):.2f}"),
             13: ('recovery_factor', lambda x: f"{float(x):.2f}"),
+            # Sprint 1.8 Task 1.8.74: Exit condition metrics (if available)
+            14: ('exit_condition_triggers', lambda x: str(int(x))),
+            15: ('exit_condition_pnl', lambda x: f"${float(x):,.2f}"),
+            16: ('partial_exit_count', lambda x: str(int(x))),
         }
         
         for row, (key, formatter) in metrics_map.items():
@@ -1337,6 +1341,29 @@ class MetricsDisplayPanel(QWidget):
                     return '⚠ Fair'
                 else:
                     return '✗ Poor'
+            # Sprint 1.8 Task 1.8.75: Exit condition metric ratings
+            elif metric_key == 'exit_condition_triggers':
+                # Number of times exit conditions triggered
+                val_int = int(val)
+                if val_int > 0:
+                    return '✓ Good'  # Exit conditions being used
+                else:
+                    return '-'  # No exit conditions or none triggered
+            elif metric_key == 'exit_condition_pnl':
+                # P&L from exit condition exits (can be positive or negative)
+                if val > 0:
+                    return '✓ Good'  # Exits adding to profit
+                elif val < 0:
+                    return '✗ Poor'  # Exits losing money
+                else:
+                    return '-'  # No exit condition P&L
+            elif metric_key == 'partial_exit_count':
+                # Number of partial exits executed
+                val_int = int(val)
+                if val_int > 0:
+                    return '✓ Good'  # Partial exits being used
+                else:
+                    return '-'  # No partial exits
             else:
                 return '-'
         except:
