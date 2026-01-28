@@ -316,6 +316,7 @@ COLORS = {
     'text_muted': '#9AA0A6',
     'text_label': '#A0AEC0',
     'orange': '#a25c51',
+    'aqua': '#51a292',
     
     # Status colors
     'success': '#10B981',
@@ -676,7 +677,8 @@ def get_status_label_style(status='default') -> str:
         'warning': COLORS['warning'],  # #FFA500
         'info': COLORS['info'],        # #2070FF
         'default': COLORS['text_muted'],
-        'orange': COLORS['orange']  
+        'orange': COLORS['orange'],  #a25c51
+        'aqua': COLORS['aqua'],      #51a292
     }
     return f"color: {colors.get(status, colors['default'])}; font-weight: bold;"
 
@@ -1220,7 +1222,7 @@ def get_exit_tree_item_style() -> str:
     Returns:
         CSS style string for exit condition tree items (red theme, bold)
     """
-    return f"color: {COLORS['orange']}; font-weight: 100;"
+    return f"color: {COLORS['aqua']}; font-weight: 100;"
 
 
 # Backward compatibility constants (can be used directly)
