@@ -45,7 +45,8 @@ class ExitConditionDialog(QDialog):
         existing_exit_mode: str = "ABSOLUTE",
         existing_tp_proximity: float = 2.0,
         existing_reversal: float = 0.5,
-        parent=None
+        parent=None,
+        orchestrator=None
     ):
         """
         Initialize exit condition dialog.
@@ -57,12 +58,14 @@ class ExitConditionDialog(QDialog):
             existing_tp_proximity: Existing TP proximity threshold
             existing_reversal: Existing reversal trigger
             parent: Parent widget
+            orchestrator: StrategyBuilderOrchestrator instance (optional, will find via parent if not provided)
         """
         super().__init__(parent)
         
         self.signal_name = signal_name  # May be None - signal selector mode
         self.signal_selector_mode = (signal_name is None)
         self.exit_mode = existing_exit_mode
+        self.orchestrator = orchestrator  # Store orchestrator reference
         
         # Convert percentage from 0.0-1.0 to 1-100 for display
         if existing_percentage is not None:
@@ -85,9 +88,17 @@ class ExitConditionDialog(QDialog):
         
         self._init_ui()
         self._connect_signals()
-        self._load_available_signals()
+    
+    def showEvent(self, event):
+        """Override showEvent to load signals after dialog is added to widget tree."""
+        super().showEvent(event)
+        # Load signals on first show (after dialog is in widget tree)
+        if self.signal_selector_mode and self.signal_selector and self.signal_selector.count() == 0:
+            print("DEBUG: showEvent - Loading available signals now that dialog is shown")
+            self._load_available_signals()
     
     def _init_ui(self):
+
         """Initialize the user interface."""
         self.setWindowTitle(f"Configure Exit Condition: {self.signal_name}")
         self.setStyleSheet(get_exit_dialog_stylesheet())
@@ -403,8 +414,8 @@ class ExitConditionDialog(QDialog):
         self.block_selector.clear()
         
         try:
-            # Find StrategyBlocksPanel by traversing widget tree
-            orchestrator = self._find_orchestrator()
+            # Use stored orchestrator or find in widget tree
+            orchestrator = self.orchestrator or self._find_orchestrator()
             if not orchestrator:
                 print("DEBUG: Could not find orchestrator")
                 self.block_selector.addItem("No blocks available")
@@ -434,8 +445,8 @@ class ExitConditionDialog(QDialog):
         self.signal_binding_selector.clear()
         
         try:
-            # Find orchestrator by traversing widget tree
-            orchestrator = self._find_orchestrator()
+            # Use stored orchestrator or find in widget tree
+            orchestrator = self.orchestrator or self._find_orchestrator()
             if not orchestrator:
                 print("DEBUG: Could not find orchestrator for signal selector")
                 self.signal_binding_selector.addItem("No signals available")
@@ -474,8 +485,8 @@ class ExitConditionDialog(QDialog):
             return
         
         try:
-            # Use _find_orchestrator() to properly traverse the widget tree
-            orchestrator = self._find_orchestrator()
+            # Use stored orchestrator or traverse widget tree
+            orchestrator = self.orchestrator or self._find_orchestrator()
             
             if not orchestrator:
                 print("Warning: Cannot access orchestrator - not found in widget tree")
