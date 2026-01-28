@@ -1392,7 +1392,7 @@ class StrategyBlocksPanel(QWidget):
             import traceback
             traceback.print_exc()
     
-    def _on_remove_strategy_exit(self, signal_name: str):
+    def _on_remove_strategy_exit(self, signal_name: str, checked: bool = False):
         """Handle removal of strategy-level exit condition - Sprint 1.8 Task 1.8.49"""
         try:
             result = self.orchestrator.remove_exit_condition(
@@ -1412,7 +1412,7 @@ class StrategyBlocksPanel(QWidget):
             import traceback
             traceback.print_exc()
     
-    def _on_edit_strategy_exit(self, signal_name: str):
+    def _on_edit_strategy_exit(self, signal_name: str, checked: bool = False):
         """Handle double-click on exit condition to edit - Sprint 1.8 Task 1.8.50"""
         try:
             # Get current config
