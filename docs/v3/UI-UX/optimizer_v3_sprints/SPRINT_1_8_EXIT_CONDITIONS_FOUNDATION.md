@@ -595,12 +595,12 @@
 
 **File**: `src/optimizer_v3/ui/trades_panel.py`
 
-- [ ] **1.8.72** Add exit condition columns to trades table
+- [x] **1.8.72** Add exit condition columns to trades table
   - Add 'Exit Type' column (TP1/TP2/TP3/SL/EXIT_CONDITION)
   - Add 'Exit Condition' column (condition name if applicable)
   - Add 'Partial %' column (exit percentage if partial)
 
-- [ ] **1.8.73** Update add_trade() and _update_table() to display exit condition data
+- [x] **1.8.73** Update add_trade() and _update_table() to display exit condition data
 
 **File**: `src/optimizer_v3/ui/metrics_display_panel.py`
 
