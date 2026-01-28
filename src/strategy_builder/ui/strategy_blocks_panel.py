@@ -1364,6 +1364,7 @@ class StrategyBlocksPanel(QWidget):
                 config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                 config_btn.setToolTip("Configure exit condition")
                 # Use functools.partial - proper PyQt5 pattern
+                print(f"DEBUG: Connecting config button for signal: {current_signal_name}")
                 config_btn.clicked.connect(partial(self._on_edit_strategy_exit, current_signal_name))
                 exit_row_layout.addWidget(config_btn)
                 
@@ -1376,6 +1377,7 @@ class StrategyBlocksPanel(QWidget):
                 remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                 remove_btn.setToolTip("Remove this exit condition")
                 # Use functools.partial - proper PyQt5 pattern
+                print(f"DEBUG: Connecting remove button for signal: {current_signal_name}")
                 remove_btn.clicked.connect(partial(self._on_remove_strategy_exit, current_signal_name))
                 exit_row_layout.addWidget(remove_btn)
                 
@@ -1394,6 +1396,11 @@ class StrategyBlocksPanel(QWidget):
     
     def _on_remove_strategy_exit(self, signal_name: str, checked: bool = False):
         """Handle removal of strategy-level exit condition - Sprint 1.8 Task 1.8.49"""
+        print(f"\n{'='*80}")
+        print(f"DEBUG: _on_remove_strategy_exit CALLED")
+        print(f"  signal_name: {signal_name}")
+        print(f"  checked: {checked}")
+        print(f"{'='*80}\n")
         try:
             result = self.orchestrator.remove_exit_condition(
                 signal_name=signal_name,
@@ -1414,6 +1421,11 @@ class StrategyBlocksPanel(QWidget):
     
     def _on_edit_strategy_exit(self, signal_name: str, checked: bool = False):
         """Handle double-click on exit condition to edit - Sprint 1.8 Task 1.8.50"""
+        print(f"\n{'='*80}")
+        print(f"DEBUG: _on_edit_strategy_exit CALLED")
+        print(f"  signal_name: {signal_name}")
+        print(f"  checked: {checked}")
+        print(f"{'='*80}\n")
         try:
             # Get current config
             config = self.orchestrator.get_current_config()
