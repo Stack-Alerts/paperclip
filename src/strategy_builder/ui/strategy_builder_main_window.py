@@ -557,7 +557,7 @@ class StrategyBuilderMainWindow(QMainWindow):
                 'signals': {},  # Reserved
                 'parameters': {},  # Reserved
                 'entry_conditions': {},  # Reserved
-                'exit_conditions': {},  # Reserved
+                'exit_conditions': config_dict.get('exit_conditions', []),  # Sprint 1.8: Get from config
                 'risk_management': {},  # Reserved
                 'backtest_config': {},  # Reserved
                 'tags': []  # Reserved
