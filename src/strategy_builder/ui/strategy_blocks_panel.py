@@ -1425,32 +1425,15 @@ class StrategyBlocksPanel(QWidget):
                 print(f"Exit condition {signal_name} not found")
                 return
             
-            # Show exit condition dialog pre-populated with current values
-            dialog = ExitConditionDialog(parent=self)
-            
-            # Pre-populate dialog with current values
-            # Note: The dialog will need to expose methods to set values
-            # For now, we'll use the signal_name to find it in the registry
-            # and set the fields programmatically
-            
-            # Convert values to dialog format
-            pct_display = int(current_exit.percentage * 100)
-            
-            # Set dialog values before showing
-            # (This assumes ExitConditionDialog has setters - we may need to add them)
-            dialog.percentage_input.setValue(pct_display)
-            
-            # Set mode radio buttons
-            if current_exit.exit_mode == 'ABSOLUTE':
-                dialog.absolute_radio.setChecked(True)
-            else:
-                dialog.flexible_radio.setChecked(True)
-                
-            # Set FLEXIBLE parameters
-            if hasattr(current_exit, 'tp_proximity_threshold'):
-                dialog.proximity_input.setValue(current_exit.tp_proximity_threshold)
-            if hasattr(current_exit, 'reversal_trigger'):
-                dialog.reversal_input.setValue(current_exit.reversal_trigger)
+            # Show exit condition dialog pre-populated with current values (BUG FIX)
+            dialog = ExitConditionDialog(
+                signal_name=signal_name,
+                existing_percentage=current_exit.percentage,
+                existing_exit_mode=current_exit.exit_mode,
+                existing_tp_proximity=current_exit.tp_proximity_threshold,
+                existing_reversal=current_exit.reversal_trigger,
+                parent=self
+            )
             
             if dialog.exec_() == QDialog.Accepted:
                 # Get new configuration from dialog

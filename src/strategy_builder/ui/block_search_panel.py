@@ -69,8 +69,8 @@ class BlockListItem(QWidget):
     # NEW SIGNAL: Emits block_name, list of selected signal names, and logic type ("AND" or "OR")
     block_with_signals_selected = pyqtSignal(str, list, str)
     
-    # EXIT SIGNAL: Emits signal_name when added as exit condition
-    signal_added_as_exit = pyqtSignal(str)
+    # EXIT SIGNAL: Emits signal_name and dialog_config when added as exit condition
+    signal_added_as_exit = pyqtSignal(str, dict)
     
     def __init__(self, block_info: BlockInfo, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -432,8 +432,11 @@ class BlockListItem(QWidget):
         )
         
         if dialog.exec_():
-            # User accepted - emit signal with signal name
-            self.signal_added_as_exit.emit(signal_name)
+            # User accepted - GET DIALOG CONFIG (BUG FIX)
+            dialog_config = dialog.get_config()
+            
+            # Emit signal with signal name AND config
+            self.signal_added_as_exit.emit(signal_name, dialog_config)
             
             # Mark signal as added
             self.added_signals.add(signal_name)
@@ -882,44 +885,32 @@ class BlockSearchPanel(QWidget):
             print(f"❌ Error: {result.message}")
             print(f"❌ Details: {result.errors}\n")
     
-    def _on_signal_added_as_exit(self, signal_name: str):
+    def _on_signal_added_as_exit(self, signal_name: str, dialog_config: dict):
         """
         Handle when signal is added as exit condition.
-        Sprint 1.8 Task 1.8.47 + Integration
+        Sprint 1.8 Task 1.8.47 + Integration - BUG FIX
         
-        Calls orchestrator to add exit condition with dialog configuration.
+        Calls orchestrator to add exit condition with USER'S dialog configuration.
         
         Args:
             signal_name: Name of the signal added as exit condition
+            dialog_config: Configuration from ExitConditionDialog.get_config()
         """
-        # Get dialog configuration from the last opened dialog
-        # The dialog stores its config in the parent widget
-        sender_widget = self.sender()
-        if not sender_widget or not hasattr(sender_widget, 'parent'):
+        # Validate config
+        if not dialog_config or not dialog_config.get('signal_name'):
             if LOGGER_AVAILABLE and logger:
-                logger.error(LogComponent.SEARCH_PANEL, "Cannot find dialog parent widget")
+                logger.error(LogComponent.SEARCH_PANEL, "Invalid dialog configuration")
+            print("\n❌ FAILED: Invalid exit condition configuration\n")
             return
         
-        # Find the BlockListItem that emitted the signal
-        block_item = None
-        for item in self.block_items.values():
-            if item == sender_widget:
-                block_item = item
-                break
-        
-        if not block_item:
-            if LOGGER_AVAILABLE and logger:
-                logger.error(LogComponent.SEARCH_PANEL, "Cannot find block item for exit signal")
-            return
-        
-        # Call orchestrator to add exit condition at strategy level
-        # NOTE: Using default values from ExitConditionDialog defaults
-        # Future enhancement: Pass actual dialog config values
+        # Call orchestrator with USER'S actual configuration values
         result = self.orchestrator.add_exit_condition(
-            signal_name=signal_name,
-            percentage=0.5,  # Default: 50%
-            binding_level="STRATEGY",  # Default: strategy-level
-            exit_mode="ABSOLUTE"  # Default: immediate exit
+            signal_name=dialog_config['signal_name'],
+            percentage=dialog_config.get('percentage', 0.5),  # Use dialog value
+            binding_level=dialog_config.get('binding_level', 'STRATEGY'),  # Use dialog value
+            exit_mode=dialog_config.get('exit_mode', 'ABSOLUTE'),  # Use dialog value
+            tp_proximity_threshold=dialog_config.get('tp_proximity_threshold', 2.0),
+            reversal_trigger=dialog_config.get('reversal_trigger', 0.5)
         )
         
         if result.success:
