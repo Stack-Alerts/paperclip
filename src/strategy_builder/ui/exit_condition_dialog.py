@@ -46,7 +46,8 @@ class ExitConditionDialog(QDialog):
         existing_tp_proximity: float = 2.0,
         existing_reversal: float = 0.5,
         parent=None,
-        orchestrator=None
+        orchestrator=None,
+        is_duplicate: bool = False
     ):
         """
         Initialize exit condition dialog.
@@ -59,6 +60,7 @@ class ExitConditionDialog(QDialog):
             existing_reversal: Existing reversal trigger
             parent: Parent widget
             orchestrator: StrategyBuilderOrchestrator instance (optional, will find via parent if not provided)
+            is_duplicate: True if opened from duplicate button, False for config button
         """
         super().__init__(parent)
         
@@ -66,6 +68,7 @@ class ExitConditionDialog(QDialog):
         self.signal_selector_mode = (signal_name is None)
         self.exit_mode = existing_exit_mode
         self.orchestrator = orchestrator  # Store orchestrator reference
+        self.is_duplicate = is_duplicate  # Track if this is duplicate operation
         
         # Convert percentage from 0.0-1.0 to 1-100 for display
         if existing_percentage is not None:
@@ -98,9 +101,13 @@ class ExitConditionDialog(QDialog):
             self._load_available_signals()
     
     def _init_ui(self):
-
         """Initialize the user interface."""
-        self.setWindowTitle(f"Configure Exit Condition: {self.signal_name}")
+        # Set window title based on mode
+        if self.is_duplicate:
+            self.setWindowTitle(f"Duplicate Exit Condition: {self.signal_name}")
+        else:
+            self.setWindowTitle(f"Configure Exit Condition: {self.signal_name}")
+        
         self.setStyleSheet(get_exit_dialog_stylesheet())
         self.setMinimumWidth(500)
         
@@ -108,11 +115,14 @@ class ExitConditionDialog(QDialog):
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # Title
+        # Title - show mode in label as well
         if self.signal_selector_mode:
             title_label = QLabel("🔴 Configure Strategy Exit Condition")
         else:
-            title_label = QLabel(f"🔴 EXIT: {self.signal_name}")
+            if self.is_duplicate:
+                title_label = QLabel(f"🔴 Duplicate EXIT: {self.signal_name}")
+            else:
+                title_label = QLabel(f"🔴 Configure EXIT: {self.signal_name}")
         title_font = create_font(size=13, bold=True)
         title_label.setFont(title_font)
         title_label.setStyleSheet(f"color: {get_color('error')};")
