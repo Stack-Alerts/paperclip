@@ -71,7 +71,7 @@
 
 #### **Sprint 1.8: Exit Conditions Foundation** (9-10 days, 102 tasks)
 **File**: `SPRINT_1_8_EXIT_CONDITIONS_FOUNDATION.md`  
-**Status**: 🟡 In Progress (Phase 8 partial: 67/102 tasks)  
+**Status**: ✅ COMPLETE (102/102 tasks, 2026-01-28)  
 **Purpose**: Separate exit conditions from TP/SL, "Add as Exit" button (red), percentage-based exits with ABSOLUTE/FLEXIBLE modes, three binding levels (STRATEGY/BLOCK/SIGNAL), nested RECHECK for exits, full backtest integration
 
 ---
