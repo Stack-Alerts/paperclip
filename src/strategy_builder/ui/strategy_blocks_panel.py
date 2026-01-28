@@ -1322,47 +1322,30 @@ class StrategyBlocksPanel(QWidget):
                 self.strategy_exits_layout.addWidget(no_exits_label)
                 return
             
-            # Display each exit condition
+            # Display each exit condition - COPY RECHECK PATTERN EXACTLY
             for exit_cond in config.exit_conditions:
                 # Capture signal_name at loop iteration to avoid closure issues
                 current_signal_name = exit_cond.signal_name
                 
-                # Create row widget for this exit
-                exit_row = QWidget()
+                # Create exit row layout - NO QWidget wrapper, just like RECHECK
                 exit_row_layout = QHBoxLayout()
-                exit_row_layout.setSpacing(10)
-                exit_row_layout.setContentsMargins(10, 5, 10, 5)
+                exit_row_layout.setSpacing(8)
                 
                 # Exit info label
                 pct_display = int(exit_cond.percentage * 100)
                 exit_text = f"🔴 {current_signal_name} ({pct_display}%) - {exit_cond.exit_mode} mode"
                 exit_label = QLabel(exit_text)
-                exit_label.setStyleSheet(get_exit_tree_item_style() + " font-size: 10pt;")
+                exit_label.setStyleSheet(get_exit_tree_item_style() + " font-size: 9pt; font-weight: bold;")
                 exit_label.setToolTip(
                     f"Signal: {current_signal_name}\n"
                     f"Percentage: {pct_display}%\n"
                     f"Mode: {exit_cond.exit_mode}\n"
-                    f"Binding: {exit_cond.binding_level}\n\n"
-                    f"Double-click to edit"
+                    f"Binding: {exit_cond.binding_level}"
                 )
-                # CRITICAL FIX: Make label transparent to mouse events so buttons receive them
-                exit_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
                 exit_row_layout.addWidget(exit_label, stretch=1)
-                
-                # Sprint 1.8 Task 1.8.50: Make exit row double-clickable for editing
-                # Store exit condition data as widget property for editing
-                exit_row.setProperty('exit_signal_name', current_signal_name)
-                exit_row.setProperty('exit_percentage', pct_display)
-                exit_row.setProperty('exit_mode', exit_cond.exit_mode)
-                exit_row.setProperty('tp_proximity_threshold', exit_cond.tp_proximity_threshold)
-                exit_row.setProperty('reversal_trigger', exit_cond.reversal_trigger)
                 
                 # Config/Edit button - same style as recheck gear button
                 config_btn = QPushButton("⚙")
-                config_btn.setMinimumWidth(30)
-                config_btn.setMaximumWidth(30)
-                config_btn.setMinimumHeight(30)
-                config_btn.setMaximumHeight(30)
                 config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                 config_btn.setToolTip("Configure exit condition")
                 # Use functools.partial - proper PyQt5 pattern
@@ -1370,12 +1353,8 @@ class StrategyBlocksPanel(QWidget):
                 config_btn.clicked.connect(partial(self._on_edit_strategy_exit, current_signal_name))
                 exit_row_layout.addWidget(config_btn)
                 
-                # Remove button - same size as config button
+                # Remove button - same style and size as recheck remove button
                 remove_btn = QPushButton("✕")
-                remove_btn.setMinimumWidth(30)
-                remove_btn.setMaximumWidth(30)
-                remove_btn.setMinimumHeight(30)
-                remove_btn.setMaximumHeight(30)
                 remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                 remove_btn.setToolTip("Remove this exit condition")
                 # Use functools.partial - proper PyQt5 pattern
@@ -1383,13 +1362,8 @@ class StrategyBlocksPanel(QWidget):
                 remove_btn.clicked.connect(partial(self._on_remove_strategy_exit, current_signal_name))
                 exit_row_layout.addWidget(remove_btn)
                 
-                exit_row.setLayout(exit_row_layout)
-                exit_row.setStyleSheet(
-                    f"background-color: {get_color('bg_light')}; "
-                    f"border: 1px solid {get_color('error')}; "
-                    f"border-radius: 4px; padding: 5px;"
-                )
-                self.strategy_exits_layout.addWidget(exit_row)
+                # Add layout directly to parent - NO QWidget wrapper
+                self.strategy_exits_layout.addLayout(exit_row_layout)
         
         except Exception as e:
             print(f"Error refreshing strategy exits: {e}")
