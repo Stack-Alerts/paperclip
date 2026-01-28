@@ -520,7 +520,10 @@ class BacktestProgressPanel(QWidget):
             'Current TP3',
             'Current SL',
             'Win Rate',
-            'Profit Factor'
+            'Profit Factor',
+            'Exit Triggers',  # Sprint 1.8 Task 1.8.76
+            'Exit P&L',       # Sprint 1.8 Task 1.8.76
+            'Partial Exits'   # Sprint 1.8 Task 1.8.76
         ]
         self.results_table.setRowCount(len(metrics))
         for i, metric in enumerate(metrics):
@@ -544,6 +547,10 @@ class BacktestProgressPanel(QWidget):
         self._update_metric(5, f"{results.get('current_sl', 0.0):.2f}")
         self._update_metric(6, f"{results.get('win_rate', 0.0):.2%}")
         self._update_metric(7, f"{results.get('profit_factor', 0.0):.2f}")
+        # Sprint 1.8 Task 1.8.76: Exit condition metrics
+        self._update_metric(8, str(results.get('exit_condition_triggers', 0)))
+        self._update_metric(9, f"${results.get('exit_condition_pnl', 0.0):,.2f}")
+        self._update_metric(10, str(results.get('partial_exit_count', 0)))
     
     def _update_metric(self, row: int, value: str, column: int = 1):
         """Update a specific metric in the results table"""

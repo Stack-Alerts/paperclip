@@ -613,7 +613,7 @@
 
 **File**: `src/optimizer_v3/ui/backtest_panels.py`
 
-- [ ] **1.8.76** Update BacktestProgressPanel.update_results() to display exit condition results
+- [x] **1.8.76** Update BacktestProgressPanel.update_results() to display exit condition results
 
 **File**: `src/optimizer_v3/ui/live_output_panel.py`
 
