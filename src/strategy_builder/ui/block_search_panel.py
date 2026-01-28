@@ -268,7 +268,7 @@ class BlockListItem(QWidget):
         buttons_layout.addWidget(self.or_button)
         
         # Add as Exit button (Sprint 1.8 - Task 1.8.47)
-        self.exit_button = QPushButton("🔴 Add as Exit")
+        self.exit_button = QPushButton("➕ Add as Exit")
         self.exit_button.setMinimumHeight(40)
         self.exit_button.setStyleSheet(get_exit_button_stylesheet())
         self.exit_button.clicked.connect(self._add_as_exit)
