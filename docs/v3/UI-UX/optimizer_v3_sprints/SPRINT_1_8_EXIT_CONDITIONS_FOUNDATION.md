@@ -205,19 +205,19 @@
 
 **File**: `src/optimizer_v3/database/strategy_manager.py`
 
-- [ ] **1.8.24** Update save_strategy() to include exit_conditions
+- [x] **1.8.24** Update save_strategy() to include exit_conditions (Already in Sprint 1.6.1)
 
-- [ ] **1.8.25** Update load_strategy() to parse exit_conditions
+- [x] **1.8.25** Update load_strategy() to parse exit_conditions (Already in Sprint 1.6.1)
 
-- [ ] **1.8.26** Unit test: Verify database exit condition persistence
+- [x] **1.8.26** Unit test: Verify database exit condition persistence
 
 **File**: `src/optimizer_v3/database/test_results_manager.py`
 
-- [ ] **1.8.27** Update save_test_result() to include exit_condition_results
+- [x] **1.8.27** Update save_test_result() to include exit_condition_results
 
-- [ ] **1.8.28** Update load_test_result() to parse exit_condition_results
+- [x] **1.8.28** Update load_test_result() to parse exit_condition_results
 
-- [ ] **1.8.29** Add get_exit_condition_statistics() method for aggregate stats
+- [x] **1.8.29** Add get_exit_condition_statistics() method for aggregate stats
   ```python
   def get_exit_condition_statistics(self, strategy_id: str) -> Dict:
       """Get aggregate exit condition statistics for a strategy"""
