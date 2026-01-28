@@ -15,6 +15,7 @@ Date: 2026-01-16
 """
 
 from typing import Optional, List, Tuple
+from functools import partial
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QScrollArea, QFrame, QDialog, QScroller
@@ -1362,10 +1363,8 @@ class StrategyBlocksPanel(QWidget):
                 config_btn.setMaximumHeight(30)
                 config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                 config_btn.setToolTip("Configure exit condition")
-                # CRITICAL: Use current_signal_name as default parameter to capture value
-                config_btn.clicked.connect(
-                    lambda checked=False, sig=current_signal_name: self._on_edit_strategy_exit(sig)
-                )
+                # Use functools.partial - proper PyQt5 pattern
+                config_btn.clicked.connect(partial(self._on_edit_strategy_exit, current_signal_name))
                 exit_row_layout.addWidget(config_btn)
                 
                 # Remove button - same size as config button
@@ -1376,10 +1375,8 @@ class StrategyBlocksPanel(QWidget):
                 remove_btn.setMaximumHeight(30)
                 remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                 remove_btn.setToolTip("Remove this exit condition")
-                # CRITICAL: Use current_signal_name as default parameter to capture value
-                remove_btn.clicked.connect(
-                    lambda checked=False, sig=current_signal_name: self._on_remove_strategy_exit(sig)
-                )
+                # Use functools.partial - proper PyQt5 pattern
+                remove_btn.clicked.connect(partial(self._on_remove_strategy_exit, current_signal_name))
                 exit_row_layout.addWidget(remove_btn)
                 
                 exit_row.setLayout(exit_row_layout)
