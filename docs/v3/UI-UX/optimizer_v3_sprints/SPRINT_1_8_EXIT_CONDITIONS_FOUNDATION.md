@@ -628,7 +628,7 @@
 
 **File**: `src/strategy_builder/ui/backtest_config_panel.py`
 
-- [ ] **1.8.79** Update BacktestWorker.trade_data_emit signal to include exit condition fields
+- [x] **1.8.79** Update BacktestWorker.trade_data_emit signal to include exit condition fields
   ```python
   trade_data = {
       # ... existing fields ...
@@ -638,14 +638,14 @@
   }
   ```
 
-- [ ] **1.8.80** Add exit_conditions_triggered counter to progress tracking
+- [x] **1.8.80** Add exit_conditions_triggered counter to progress tracking
   ```python
   # Add to progress stats line:
   exit_conditions_widget = QLabel("Exit Conditions: <b>0</b>")
   self.exit_conditions_label = exit_conditions_widget
   ```
 
-- [ ] **1.8.81** Update _populate_tabs_with_results() to include exit condition metrics
+- [x] **1.8.81** Update _populate_tabs_with_results() to include exit condition metrics
   ```python
   metrics_data = {
       # ... existing metrics ...
@@ -655,7 +655,7 @@
   }
   ```
 
-- [ ] **1.8.82** Add exit condition adjustment tracking to results display
+- [x] **1.8.82** Add exit condition adjustment tracking to results display
   ```python
   # Update adjustments display:
   breakdown = f"(TP1: {tp1}, TP2: {tp2}, TP3: {tp3}, SL: {sl}, EXIT: {exit_count})"

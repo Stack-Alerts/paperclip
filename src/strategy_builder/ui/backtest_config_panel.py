@@ -233,7 +233,11 @@ class BacktestWorker(QThread):
                             'pnl': 0.0,
                             'pnl_pct': 0.0,
                             'status': 'OPEN',
-                            'notes': f'Demo trade #{trade_id} - OPEN'
+                            'notes': f'Demo trade #{trade_id} - OPEN',
+                            # Sprint 1.8 Task 1.8.79: Exit condition fields
+                            'exit_type': None,  # Will be set on close (TP1/TP2/TP3/SL/EXIT_CONDITION)
+                            'exit_condition_name': None,  # Exit condition signal name if applicable
+                            'partial_exit_percentage': None  # Exit percentage if partial
                         }
                         self.trade_data_emit.emit(open_trade_data)
                         
