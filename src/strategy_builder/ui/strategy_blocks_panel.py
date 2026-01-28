@@ -705,19 +705,11 @@ class StrategyBlocksPanel(QWidget):
         exit_section_layout.setContentsMargins(15, 20, 15, 15)
         
         # Info text
-        exit_info = QLabel("Configure exit conditions that apply to ALL positions from this strategy")
-        exit_info.setStyleSheet(get_label_style('error') + " font-size: 9pt; font-style: italic;")
+        exit_info = QLabel("Exit conditions added via the red 'Add as Exit' button in the search panel")
+        exit_info.setStyleSheet(get_label_style('muted') + " font-size: 9pt; font-style: italic;")
         exit_section_layout.addWidget(exit_info)
         
-        # Add Exit Condition button
-        add_exit_btn = QPushButton("➕ Add Strategy Exit Condition")
-        add_exit_btn.setMinimumHeight(40)
-        add_exit_btn.setStyleSheet(get_exit_button_stylesheet())
-        add_exit_btn.setToolTip("Add exit condition that applies to all positions")
-        add_exit_btn.clicked.connect(self._on_add_strategy_exit)
-        exit_section_layout.addWidget(add_exit_btn)
-        
-        # Container for exit conditions list
+        # Container for exit conditions list (no add button - use red button in search panel)
         self.strategy_exits_container = QWidget()
         self.strategy_exits_layout = QVBoxLayout()
         self.strategy_exits_layout.setSpacing(5)
@@ -1359,9 +1351,15 @@ class StrategyBlocksPanel(QWidget):
                 exit_row.setProperty('tp_proximity_threshold', exit_cond.tp_proximity_threshold)
                 exit_row.setProperty('reversal_trigger', exit_cond.reversal_trigger)
                 
-                # Enable mouse tracking for double-click
-                exit_row.setMouseTracking(True)
-                exit_row.mouseDoubleClickEvent = lambda event, sig=exit_cond.signal_name: self._on_edit_strategy_exit(sig)
+                # Config/Edit button
+                config_btn = QPushButton("⚙️")
+                config_btn.setMaximumWidth(30)
+                config_btn.setStyleSheet(get_primary_button_stylesheet())
+                config_btn.setToolTip("Configure exit condition")
+                config_btn.clicked.connect(
+                    lambda checked, sig=exit_cond.signal_name: self._on_edit_strategy_exit(sig)
+                )
+                exit_row_layout.addWidget(config_btn)
                 
                 # Remove button
                 remove_btn = QPushButton("✕")
