@@ -701,34 +701,34 @@
 
 **File**: `tests/strategy_builder/test_exit_conditions.py` (CREATE NEW)
 
-- [ ] **1.8.87** Unit tests for ExitCondition dataclass creation
-- [ ] **1.8.88** Unit tests for ExitCondition validation (percentage limits)
+- [x] **1.8.87** Unit tests for ExitCondition dataclass creation
+- [x] **1.8.88** Unit tests for ExitCondition validation (percentage limits)
 
 **File**: `tests/strategy_builder/test_exit_persistence.py` (CREATE NEW)
 
-- [ ] **1.8.89** Unit tests for exit condition serialization
-- [ ] **1.8.90** Unit tests for exit condition deserialization
+- [x] **1.8.89** Unit tests for exit condition serialization
+- [x] **1.8.90** Unit tests for exit condition deserialization
 
 **File**: `tests/strategy_builder/test_exit_orchestrator.py` (CREATE NEW)
 
-- [ ] **1.8.91** Unit tests for add_exit_condition()
-- [ ] **1.8.92** Unit tests for remove_exit_condition()
-- [ ] **1.8.93** Unit tests for configure_exit_condition()
+- [x] **1.8.91** Unit tests for add_exit_condition()
+- [x] **1.8.92** Unit tests for remove_exit_condition()
+- [x] **1.8.93** Unit tests for configure_exit_condition()
 
 **File**: `tests/strategy_builder/test_exit_validation.py` (CREATE NEW)
 
-- [ ] **1.8.94** Unit tests for percentage validation rules
-- [ ] **1.8.95** Unit tests for circular dependency detection
+- [x] **1.8.94** Unit tests for percentage validation rules
+- [x] **1.8.95** Unit tests for circular dependency detection
 
 **File**: `tests/integration/test_exit_workflow.py` (CREATE NEW)
 
-- [ ] **1.8.96** Integration test: Complete exit condition workflow (add → save → load → execute)
-- [ ] **1.8.97** Integration test: ABSOLUTE mode execution
+- [x] **1.8.96** Integration test: Complete exit condition workflow (add → save → load → execute)
+- [x] **1.8.97** Integration test: ABSOLUTE mode execution
 
 **File**: `tests/integration/test_exit_flexible_mode.py` (CREATE NEW)
 
-- [ ] **1.8.98** Integration test: FLEXIBLE mode TP proximity deferral
-- [ ] **1.8.99** Integration test: FLEXIBLE mode reversal trigger
+- [x] **1.8.98** Integration test: FLEXIBLE mode TP proximity deferral
+- [x] **1.8.99** Integration test: FLEXIBLE mode reversal trigger
 
 ---
 
