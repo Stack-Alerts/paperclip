@@ -604,12 +604,12 @@
 
 **File**: `src/optimizer_v3/ui/metrics_display_panel.py`
 
-- [ ] **1.8.74** Add exit condition metrics to _update_performance_table()
+- [x] **1.8.74** Add exit condition metrics to _update_performance_table()
   - exit_condition_triggers
   - exit_condition_pnl
   - partial_exit_count
 
-- [ ] **1.8.75** Add exit condition ratings in _get_rating() method
+- [x] **1.8.75** Add exit condition ratings in _get_rating() method
 
 **File**: `src/optimizer_v3/ui/backtest_panels.py`
 
