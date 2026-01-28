@@ -354,7 +354,7 @@ class BlockConfigItem(QWidget):
                 # Level 4: Exit Conditions (Sprint 1.8 Task 1.8.48) - after RECHECK chains
                 if signal.get('exit_conditions'):
                     for exit_cond in signal['exit_conditions']:
-                        exit_signal_name = exit_cond.get('signal_name', 'Unknown')
+                        current_exit_signal_name = exit_cond.get('signal_name', 'Unknown')
                         exit_percentage = exit_cond.get('percentage', 0.5)
                         exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
                         
@@ -379,16 +379,47 @@ class BlockConfigItem(QWidget):
                         exit_row_layout = QHBoxLayout()
                         exit_row_layout.setSpacing(8)
                         
-                        exit_text = f"{exit_indent}└── 🔴 EXIT: {exit_signal_name} ({pct_display}%)"
+                        exit_text = f"{exit_indent}└── 🔴 EXIT: {current_exit_signal_name} ({pct_display}%)"
                         exit_label = QLabel(exit_text)
-                        exit_label.setStyleSheet(get_exit_tree_item_style())
+                        exit_label.setStyleSheet(get_exit_tree_item_style() + " font-size: 9pt;")
                         exit_label.setToolTip(
-                            f"Exit Condition\n"
-                            f"Signal: {exit_signal_name}\n"
+                            f"Signal-Level Exit Condition\n"
+                            f"Signal: {current_exit_signal_name}\n"
                             f"Percentage: {pct_display}%\n"
-                            f"Mode: {exit_mode}"
+                            f"Mode: {exit_mode}\n"
+                            f"Binding: SIGNAL"
                         )
                         exit_row_layout.addWidget(exit_label, stretch=1)
+                        
+                        # Config button - same style as other exits
+                        exit_config_btn = QPushButton("⚙")
+                        exit_config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
+                        exit_config_btn.setToolTip("Configure signal exit condition")
+                        exit_config_btn.clicked.connect(
+                            lambda checked, bname=self.block_name, sname=signal_name, esig=current_exit_signal_name:
+                                self._on_signal_exit_config_clicked(bname, sname, esig)
+                        )
+                        exit_row_layout.addWidget(exit_config_btn)
+                        
+                        # Duplicate button - add another exit to this signal
+                        exit_duplicate_btn = QPushButton("⎘")
+                        exit_duplicate_btn.setStyleSheet(get_recheck_duplicate_button_stylesheet())
+                        exit_duplicate_btn.setToolTip("Add another exit condition to this signal")
+                        exit_duplicate_btn.clicked.connect(
+                            lambda checked, bname=self.block_name, sname=signal_name:
+                                self._on_signal_exit_duplicate_clicked(bname, sname)
+                        )
+                        exit_row_layout.addWidget(exit_duplicate_btn)
+                        
+                        # Remove button - remove this exit
+                        exit_remove_btn = QPushButton("✕")
+                        exit_remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
+                        exit_remove_btn.setToolTip("Remove this signal exit condition")
+                        exit_remove_btn.clicked.connect(
+                            lambda checked, bname=self.block_name, sname=signal_name, esig=current_exit_signal_name:
+                                self._on_signal_exit_remove_clicked(bname, sname, esig)
+                        )
+                        exit_row_layout.addWidget(exit_remove_btn)
                         
                         signals_layout.addLayout(exit_row_layout)
             
@@ -679,6 +710,24 @@ class BlockConfigItem(QWidget):
         panel = self._find_strategy_blocks_panel()
         if panel and hasattr(panel, '_on_duplicate_block_exit'):
             panel._on_duplicate_block_exit(block_name)
+    
+    def _on_signal_exit_config_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
+        """Handle config button for signal-level exit - forward to panel."""
+        panel = self._find_strategy_blocks_panel()
+        if panel and hasattr(panel, '_on_signal_exit_config_clicked'):
+            panel._on_signal_exit_config_clicked(block_name, signal_name, exit_signal_name)
+    
+    def _on_signal_exit_duplicate_clicked(self, block_name: str, signal_name: str):
+        """Handle duplicate button for signal-level exit - forward to panel."""
+        panel = self._find_strategy_blocks_panel()
+        if panel and hasattr(panel, '_on_signal_exit_duplicate_clicked'):
+            panel._on_signal_exit_duplicate_clicked(block_name, signal_name)
+    
+    def _on_signal_exit_remove_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
+        """Handle remove button for signal-level exit - forward to panel."""
+        panel = self._find_strategy_blocks_panel()
+        if panel and hasattr(panel, '_on_signal_exit_remove_clicked'):
+            panel._on_signal_exit_remove_clicked(block_name, signal_name, exit_signal_name)
     
     def _find_strategy_blocks_panel(self):
         """Find the StrategyBlocksPanel by traversing up the widget tree."""
@@ -1740,5 +1789,145 @@ class StrategyBlocksPanel(QWidget):
         
         except Exception as e:
             print(f"Error removing block exit: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_signal_exit_config_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
+        """Handle config button for signal-level exit condition."""
+        print(f"DEBUG: _on_signal_exit_config_clicked called for block '{block_name}', signal '{signal_name}', exit '{exit_signal_name}'")
+        try:
+            # Get current config to find the exit
+            config = self.orchestrator.get_current_config()
+            if not config:
+                return
+            
+            # Find the signal and its exit condition
+            current_exit = None
+            for block in config.blocks:
+                if block.name == block_name:
+                    for signal in block.signals:
+                        if signal.name == signal_name:
+                            if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                                for exit_cond in signal.exit_conditions:
+                                    if exit_cond.signal_name == exit_signal_name:
+                                        current_exit = exit_cond
+                                        break
+                            break
+                    break
+            
+            if not current_exit:
+                print(f"Signal exit condition {exit_signal_name} not found in signal {block_name}::{signal_name}")
+                return
+            
+            # Show exit condition dialog pre-populated
+            dialog = ExitConditionDialog(
+                signal_name=exit_signal_name,
+                existing_percentage=current_exit.percentage,
+                existing_exit_mode=current_exit.exit_mode,
+                existing_tp_proximity=current_exit.tp_proximity_threshold,
+                existing_reversal=current_exit.reversal_trigger,
+                parent=self
+            )
+            
+            if dialog.exec_() == QDialog.Accepted:
+                new_config = dialog.get_config()
+                
+                if not new_config or not new_config.get('signal_name'):
+                    print("No signal selected for exit condition")
+                    return
+                
+                # Remove old
+                remove_result = self.orchestrator.remove_exit_condition(
+                    signal_name=exit_signal_name,
+                    binding_level='SIGNAL',
+                    block_name=block_name,
+                    parent_signal_name=signal_name
+                )
+                
+                if not remove_result.success:
+                    print(f"Failed to remove old signal exit: {remove_result.message}")
+                    return
+                
+                # Add updated
+                add_result = self.orchestrator.add_exit_condition(
+                    signal_name=new_config['signal_name'],
+                    percentage=new_config.get('percentage', 50) / 100.0,
+                    binding_level='SIGNAL',
+                    block_name=block_name,
+                    parent_signal_name=signal_name,
+                    exit_mode=new_config.get('exit_mode', 'ABSOLUTE'),
+                    tp_proximity_threshold=new_config.get('tp_proximity_threshold', 2.0),
+                    reversal_trigger=new_config.get('reversal_trigger', 0.5)
+                )
+                
+                if add_result.success:
+                    print(f"Signal exit updated: {block_name}::{signal_name} -> {new_config['signal_name']}")
+                    self._refresh_blocks()
+                    self.blocks_changed.emit()
+                else:
+                    print(f"Failed to update signal exit: {add_result.message}")
+        
+        except Exception as e:
+            print(f"Error editing signal exit: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_signal_exit_duplicate_clicked(self, block_name: str, signal_name: str):
+        """Handle duplicate button for signal-level exit - add another exit to this signal."""
+        print(f"DEBUG: _on_signal_exit_duplicate_clicked called for block '{block_name}', signal '{signal_name}'")
+        try:
+            dialog = ExitConditionDialog(parent=self)
+            
+            if dialog.exec_() == QDialog.Accepted:
+                config = dialog.get_config()
+                
+                if not config or not config.get('signal_name'):
+                    print("No signal selected for exit condition")
+                    return
+                
+                # Add to orchestrator at SIGNAL binding level
+                result = self.orchestrator.add_exit_condition(
+                    signal_name=config['signal_name'],
+                    percentage=config.get('percentage', 50) / 100.0,
+                    binding_level='SIGNAL',
+                    block_name=block_name,
+                    parent_signal_name=signal_name,
+                    exit_mode=config.get('exit_mode', 'ABSOLUTE'),
+                    tp_proximity_threshold=config.get('tp_proximity_threshold', 2.0),
+                    reversal_trigger=config.get('reversal_trigger', 0.5)
+                )
+                
+                if result.success:
+                    print(f"Signal exit added: {block_name}::{signal_name} -> {config['signal_name']}")
+                    self._refresh_blocks()
+                    self.blocks_changed.emit()
+                else:
+                    print(f"Failed to add signal exit: {result.message}")
+        
+        except Exception as e:
+            print(f"Error adding signal exit: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_signal_exit_remove_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
+        """Handle remove button for signal-level exit condition."""
+        print(f"DEBUG: _on_signal_exit_remove_clicked called for block '{block_name}', signal '{signal_name}', exit '{exit_signal_name}'")
+        try:
+            result = self.orchestrator.remove_exit_condition(
+                signal_name=exit_signal_name,
+                binding_level='SIGNAL',
+                block_name=block_name,
+                parent_signal_name=signal_name
+            )
+            
+            if result.success:
+                print(f"Signal exit removed: {block_name}::{signal_name} -> {exit_signal_name}")
+                self._refresh_blocks()
+                self.blocks_changed.emit()
+            else:
+                print(f"Failed to remove signal exit: {result.message}")
+        
+        except Exception as e:
+            print(f"Error removing signal exit: {e}")
             import traceback
             traceback.print_exc()
