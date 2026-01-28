@@ -459,6 +459,42 @@ class ExitConditionDialog(QDialog):
             self.exit_mode = "FLEXIBLE"
             self.flexible_params_group.setEnabled(True)
     
+    def _on_recheck_changed(self, state):
+        """
+        Handle RECHECK checkbox state change - prompt for bar delay.
+        Issue 4 Fix: Immediately prompt for bar delay when checkbox is checked.
+        """
+        from PyQt5.QtWidgets import QInputDialog
+        
+        if state == Qt.Checked:
+            # Show input dialog for bar delay
+            bar_delay, ok = QInputDialog.getInt(
+                self,
+                "Configure RECHECK Validation",
+                "Enter number of bars within which exit signal must reoccur for validation:",
+                value=self.recheck_bar_delay,  # Current value
+                min=1,
+                max=500,
+                step=1
+            )
+            
+            if ok and bar_delay > 0:
+                # User confirmed - store the value
+                self.recheck_bar_delay = bar_delay
+                self.recheck_enabled = True
+                print(f"DEBUG: RECHECK enabled with bar_delay={bar_delay}")
+            else:
+                # User canceled - uncheck the checkbox
+                self.recheck_checkbox.blockSignals(True)
+                self.recheck_checkbox.setChecked(False)
+                self.recheck_checkbox.blockSignals(False)
+                self.recheck_enabled = False
+                print("DEBUG: RECHECK canceled - checkbox unchecked")
+        else:
+            # Checkbox unchecked
+            self.recheck_enabled = False
+            print("DEBUG: RECHECK disabled")
+    
     def _on_binding_level_changed(self):
         """Handle binding level radio button changes - show/hide selectors."""
         # Show/hide appropriate selectors
@@ -638,7 +674,8 @@ class ExitConditionDialog(QDialog):
             'binding_level': binding_level,
             'tp_proximity_threshold': float(self.tp_proximity_spin.value()),
             'reversal_trigger': self.reversal_spin.value() / 10.0,  # Convert to 0.0-1.0
-            'recheck_enabled': self.recheck_checkbox.isChecked()
+            'recheck_enabled': self.recheck_checkbox.isChecked(),
+            'recheck_bar_delay': self.recheck_bar_delay if self.recheck_checkbox.isChecked() else None
         }
         
         # Add block_name and parent_signal_name if applicable
