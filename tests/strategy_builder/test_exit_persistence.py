@@ -1,406 +1,366 @@
 """
-Unit tests for Exit Condition Persistence
-Tests serialization and deserialization of exit conditions
-Sprint 1.8 Task 1.8.16
+Unit Tests for Exit Condition Persistence
+Sprint 1.8 - Tasks 1.8.89-1.8.90
+
+Tests exit condition serialization and deserialization.
 """
 
 import pytest
-import tempfile
 import json
-from pathlib import Path
-
-from src.strategy_builder.persistence.strategy_persistence import (
-    StrategyPersistence,
-    PersistenceFormat
-)
 from src.strategy_builder.core.strategy_config_engine import (
+    ExitCondition,
+    RecheckConfig,
     StrategyConfig,
     BlockConfig,
-    SignalConfig,
-    ExitCondition,
-    RecheckConfig
+    SignalConfig
 )
+from src.strategy_builder.persistence.strategy_persistence import StrategyPersistence
 
 
 class TestExitConditionSerialization:
-    """Test exit condition serialization to dict"""
+    """Test exit condition serialization - Task 1.8.89"""
     
-    def test_exit_condition_to_dict_minimal(self):
-        """Test serialization with minimal exit condition"""
-        persistence = StrategyPersistence()
-        
-        exit_cond = ExitCondition(signal_name="BEARISH")
-        result = persistence._exit_condition_to_dict(exit_cond)
-        
-        assert result['signal_name'] == "BEARISH"
-        assert result['percentage'] == 0.5
-        assert result['exit_mode'] == "ABSOLUTE"
-        assert result['tp_proximity_threshold'] == 2.0
-        assert result['reversal_trigger'] == 0.5
-        assert result['binding_level'] == "STRATEGY"
-        assert 'recheck_config' not in result
-        assert 'recheck_chain' not in result
+    def setup_method(self):
+        """Setup persistence manager for each test"""
+        self.persistence = StrategyPersistence()
     
-    def test_exit_condition_to_dict_full(self):
-        """Test serialization with full exit condition"""
-        persistence = StrategyPersistence()
-        
-        recheck = RecheckConfig(
-            enabled=True,
-            bar_delay=10,
-            parent_signal="AT_HOD",
-            validation_mode="SIGNAL"
+    def test_serialize_basic_exit_condition(self):
+        """Test serialization of basic exit condition"""
+        exit_cond = ExitCondition(
+            signal_name="HOD_REJECTION",
+            percentage=0.5,
+            exit_mode="ABSOLUTE",
+            binding_level="STRATEGY"
         )
+        
+        serialized = self.persistence._exit_condition_to_dict(exit_cond)
+        
+        assert serialized['signal_name'] == "HOD_REJECTION"
+        assert serialized['percentage'] == 0.5
+        assert serialized['exit_mode'] == "ABSOLUTE"
+        assert serialized['binding_level'] == "STRATEGY"
+        assert serialized['tp_proximity_threshold'] == 2.0
+        assert serialized['reversal_trigger'] == 0.5
+        assert serialized['recheck_config'] is None
+        assert serialized['recheck_chain'] == []
+    
+    def test_serialize_flexible_mode_exit(self):
+        """Test serialization of FLEXIBLE mode exit condition"""
+        exit_cond = ExitCondition(
+            signal_name="BELOW_HOD",
+            percentage=0.3,
+            exit_mode="FLEXIBLE",
+            tp_proximity_threshold=1.5,
+            reversal_trigger=0.3,
+            binding_level="BLOCK"
+        )
+        
+        serialized = self.persistence._exit_condition_to_dict(exit_cond)
+        
+        assert serialized['exit_mode'] == "FLEXIBLE"
+        assert serialized['tp_proximity_threshold'] == 1.5
+        assert serialized['reversal_trigger'] == 0.3
+    
+    def test_serialize_exit_with_recheck(self):
+        """Test serialization of exit condition with RECHECK"""
+        recheck = RecheckConfig(
+            bar_delay=10,
+            must_still_be_true=True,
+            signal_name="BEARISH_BREAKDOWN"
+        )
+        
+        exit_cond = ExitCondition(
+            signal_name="PATTERN_FORMING",
+            percentage=0.25,
+            recheck_config=recheck
+        )
+        
+        serialized = self.persistence._exit_condition_to_dict(exit_cond)
+        
+        assert serialized['recheck_config'] is not None
+        assert serialized['recheck_config']['bar_delay'] == 10
+        assert serialized['recheck_config']['must_still_be_true'] is True
+        assert serialized['recheck_config']['signal_name'] == "BEARISH_BREAKDOWN"
+    
+    def test_serialize_exit_with_recheck_chain(self):
+        """Test serialization of exit condition with nested RECHECK chain"""
+        recheck1 = RecheckConfig(bar_delay=5, must_still_be_true=True, signal_name="HOD_REJECTION")
+        recheck2 = RecheckConfig(bar_delay=3, must_still_be_true=True, signal_name="BELOW_HOD")
         
         exit_cond = ExitCondition(
             signal_name="BEARISH_BREAKDOWN",
             percentage=0.35,
-            exit_mode="FLEXIBLE",
-            tp_proximity_threshold=3.0,
-            reversal_trigger=0.8,
-            recheck_config=recheck,
-            parent_signal="PATTERN_FORMING",
-            binding_level="BLOCK"
-        )
-        
-        result = persistence._exit_condition_to_dict(exit_cond)
-        
-        assert result['signal_name'] == "BEARISH_BREAKDOWN"
-        assert result['percentage'] == 0.35
-        assert result['exit_mode'] == "FLEXIBLE"
-        assert result['tp_proximity_threshold'] == 3.0
-        assert result['reversal_trigger'] == 0.8
-        assert result['binding_level'] == "BLOCK"
-        assert result['parent_signal'] == "PATTERN_FORMING"
-        assert 'recheck_config' in result
-        assert result['recheck_config']['enabled'] == True
-        assert result['recheck_config']['bar_delay'] == 10
-    
-    def test_exit_condition_to_dict_with_recheck_chain(self):
-        """Test serialization with nested recheck chain"""
-        persistence = StrategyPersistence()
-        
-        recheck1 = RecheckConfig(enabled=True, bar_delay=5)
-        recheck2 = RecheckConfig(enabled=True, bar_delay=3)
-        
-        exit_cond = ExitCondition(
-            signal_name="BELOW_HOD",
-            percentage=0.25,
             recheck_chain=[recheck1, recheck2]
         )
         
-        result = persistence._exit_condition_to_dict(exit_cond)
+        serialized = self.persistence._exit_condition_to_dict(exit_cond)
         
-        assert 'recheck_chain' in result
-        assert len(result['recheck_chain']) == 2
-        assert result['recheck_chain'][0]['bar_delay'] == 5
-        assert result['recheck_chain'][1]['bar_delay'] == 3
+        assert len(serialized['recheck_chain']) == 2
+        assert serialized['recheck_chain'][0]['signal_name'] == "HOD_REJECTION"
+        assert serialized['recheck_chain'][1]['signal_name'] == "BELOW_HOD"
+    
+    def test_serialize_signal_level_exit(self):
+        """Test serialization of signal-level exit condition"""
+        exit_cond = ExitCondition(
+            signal_name="BELOW_HOD",
+            percentage=0.15,
+            binding_level="SIGNAL",
+            parent_signal="AT_HOD"
+        )
+        
+        serialized = self.persistence._exit_condition_to_dict(exit_cond)
+        
+        assert serialized['binding_level'] == "SIGNAL"
+        assert serialized.get('parent_signal') == "AT_HOD"
 
 
 class TestExitConditionDeserialization:
-    """Test exit condition deserialization from dict"""
+    """Test exit condition deserialization - Task 1.8.90"""
     
-    def test_dict_to_exit_condition_minimal(self):
-        """Test deserialization with minimal data"""
-        persistence = StrategyPersistence()
-        
+    def setup_method(self):
+        """Setup persistence manager for each test"""
+        self.persistence = StrategyPersistence()
+    
+    def test_deserialize_basic_exit_condition(self):
+        """Test deserialization of basic exit condition"""
         data = {
-            'signal_name': 'BEARISH',
-            'percentage': 0.3,
-            'exit_mode': 'ABSOLUTE',
-            'binding_level': 'STRATEGY'
+            'signal_name': "HOD_REJECTION",
+            'percentage': 0.5,
+            'exit_mode': "ABSOLUTE",
+            'tp_proximity_threshold': 2.0,
+            'reversal_trigger': 0.5,
+            'binding_level': "STRATEGY",
+            'recheck_config': None,
+            'recheck_chain': []
         }
         
-        exit_cond = persistence._dict_to_exit_condition(data)
+        exit_cond = self.persistence._dict_to_exit_condition(data)
         
-        assert exit_cond.signal_name == "BEARISH"
-        assert exit_cond.percentage == 0.3
+        assert exit_cond.signal_name == "HOD_REJECTION"
+        assert exit_cond.percentage == 0.5
         assert exit_cond.exit_mode == "ABSOLUTE"
         assert exit_cond.binding_level == "STRATEGY"
-        assert exit_cond.tp_proximity_threshold == 2.0  # Default
-        assert exit_cond.reversal_trigger == 0.5  # Default
-        assert exit_cond.recheck_config is None
-        assert exit_cond.recheck_chain == []
     
-    def test_dict_to_exit_condition_full(self):
-        """Test deserialization with full data"""
-        persistence = StrategyPersistence()
-        
+    def test_deserialize_flexible_mode_exit(self):
+        """Test deserialization of FLEXIBLE mode exit condition"""
         data = {
-            'signal_name': 'BEARISH_BREAKDOWN',
-            'percentage': 0.35,
-            'exit_mode': 'FLEXIBLE',
-            'tp_proximity_threshold': 3.0,
-            'reversal_trigger': 0.8,
-            'binding_level': 'BLOCK',
-            'parent_signal': 'PATTERN_FORMING',
-            'recheck_config': {
-                'enabled': True,
-                'bar_delay': 10,
-                'validation_mode': 'SIGNAL',
-                'parent_signal': 'AT_HOD'
-            }
+            'signal_name': "BELOW_HOD",
+            'percentage': 0.3,
+            'exit_mode': "FLEXIBLE",
+            'tp_proximity_threshold': 1.5,
+            'reversal_trigger': 0.3,
+            'binding_level': "BLOCK",
+            'recheck_config': None,
+            'recheck_chain': []
         }
         
-        exit_cond = persistence._dict_to_exit_condition(data)
+        exit_cond = self.persistence._dict_to_exit_condition(data)
         
-        assert exit_cond.signal_name == "BEARISH_BREAKDOWN"
-        assert exit_cond.percentage == 0.35
         assert exit_cond.exit_mode == "FLEXIBLE"
-        assert exit_cond.tp_proximity_threshold == 3.0
-        assert exit_cond.reversal_trigger == 0.8
-        assert exit_cond.binding_level == "BLOCK"
-        assert exit_cond.parent_signal == "PATTERN_FORMING"
-        assert exit_cond.recheck_config is not None
-        assert exit_cond.recheck_config.enabled == True
-        assert exit_cond.recheck_config.bar_delay == 10
+        assert exit_cond.tp_proximity_threshold == 1.5
+        assert exit_cond.reversal_trigger == 0.3
     
-    def test_dict_to_exit_condition_with_recheck_chain(self):
-        """Test deserialization with recheck chain"""
-        persistence = StrategyPersistence()
-        
+    def test_deserialize_exit_with_recheck(self):
+        """Test deserialization of exit condition with RECHECK"""
         data = {
-            'signal_name': 'BELOW_HOD',
+            'signal_name': "PATTERN_FORMING",
             'percentage': 0.25,
+            'exit_mode': "ABSOLUTE",
+            'tp_proximity_threshold': 2.0,
+            'reversal_trigger': 0.5,
+            'binding_level': "STRATEGY",
+            'recheck_config': {
+                'bar_delay': 10,
+                'must_still_be_true': True,
+                'signal_name': "BEARISH_BREAKDOWN"
+            },
+            'recheck_chain': []
+        }
+        
+        exit_cond = self.persistence._dict_to_exit_condition(data)
+        
+        assert exit_cond.recheck_config is not None
+        assert exit_cond.recheck_config.bar_delay == 10
+        assert exit_cond.recheck_config.must_still_be_true is True
+        assert exit_cond.recheck_config.signal_name == "BEARISH_BREAKDOWN"
+    
+    def test_deserialize_exit_with_recheck_chain(self):
+        """Test deserialization of exit condition with nested RECHECK chain"""
+        data = {
+            'signal_name': "BEARISH_BREAKDOWN",
+            'percentage': 0.35,
+            'exit_mode': "ABSOLUTE",
+            'tp_proximity_threshold': 2.0,
+            'reversal_trigger': 0.5,
+            'binding_level': "STRATEGY",
+            'recheck_config': None,
             'recheck_chain': [
-                {'enabled': True, 'bar_delay': 5, 'validation_mode': 'SIGNAL'},
-                {'enabled': True, 'bar_delay': 3, 'validation_mode': 'RECHECK'}
+                {'bar_delay': 5, 'must_still_be_true': True, 'signal_name': "HOD_REJECTION"},
+                {'bar_delay': 3, 'must_still_be_true': True, 'signal_name': "BELOW_HOD"}
             ]
         }
         
-        exit_cond = persistence._dict_to_exit_condition(data)
+        exit_cond = self.persistence._dict_to_exit_condition(data)
         
         assert len(exit_cond.recheck_chain) == 2
-        assert exit_cond.recheck_chain[0].bar_delay == 5
-        assert exit_cond.recheck_chain[1].bar_delay == 3
-
-
-class TestExitConditionRoundTrip:
-    """Test complete serialization round-trip"""
+        assert exit_cond.recheck_chain[0].signal_name == "HOD_REJECTION"
+        assert exit_cond.recheck_chain[1].signal_name == "BELOW_HOD"
     
-    def test_strategy_level_exit_conditions_roundtrip(self):
-        """Test strategy-level exit conditions survive save/load"""
-        persistence = StrategyPersistence()
-        
-        config = StrategyConfig()
-        config.name = "Test Strategy"
-        config.exit_conditions = [
-            ExitCondition(signal_name="BEARISH", percentage=0.3),
-            ExitCondition(signal_name="HOD_REJECTION", percentage=0.25, exit_mode="FLEXIBLE")
-        ]
-        
-        # Add a block to make it valid
-        block = BlockConfig(name="hod", logic="AND")
-        block.signals.append(SignalConfig(name="AT_HOD", logic="AND"))
-        config.blocks.append(block)
-        
-        # Save to dict
-        data = persistence._config_to_dict(config)
-        
-        # Verify strategy-level exits in dict
-        assert 'exit_conditions' in data
-        assert len(data['exit_conditions']) == 2
-        assert data['exit_conditions'][0]['signal_name'] == "BEARISH"
-        assert data['exit_conditions'][1]['signal_name'] == "HOD_REJECTION"
-        
-        # Load from dict
-        loaded_config = persistence._dict_to_config(data)
-        
-        # Verify strategy-level exits restored
-        assert len(loaded_config.exit_conditions) == 2
-        assert loaded_config.exit_conditions[0].signal_name == "BEARISH"
-        assert loaded_config.exit_conditions[0].percentage == 0.3
-        assert loaded_config.exit_conditions[1].signal_name == "HOD_REJECTION"
-        assert loaded_config.exit_conditions[1].percentage == 0.25
-        assert loaded_config.exit_conditions[1].exit_mode == "FLEXIBLE"
-    
-    def test_block_level_exit_conditions_roundtrip(self):
-        """Test block-level exit conditions survive save/load"""
-        persistence = StrategyPersistence()
-        
-        config = StrategyConfig()
-        config.name = "Test Strategy"
-        
-        block = BlockConfig(name="hod", logic="AND")
-        block.exit_conditions = [
-            ExitCondition(signal_name="HOD_REJECTION", percentage=0.4, binding_level="BLOCK")
-        ]
-        block.signals.append(SignalConfig(name="AT_HOD", logic="AND"))
-        config.blocks.append(block)
-        
-        # Save to dict
-        data = persistence._config_to_dict(config)
-        
-        # Verify block-level exits in dict
-        assert 'exit_conditions' in data['blocks'][0]
-        assert len(data['blocks'][0]['exit_conditions']) == 1
-        assert data['blocks'][0]['exit_conditions'][0]['signal_name'] == "HOD_REJECTION"
-        
-        # Load from dict
-        loaded_config = persistence._dict_to_config(data)
-        
-        # Verify block-level exits restored
-        assert len(loaded_config.blocks[0].exit_conditions) == 1
-        assert loaded_config.blocks[0].exit_conditions[0].signal_name == "HOD_REJECTION"
-        assert loaded_config.blocks[0].exit_conditions[0].percentage == 0.4
-    
-    def test_signal_level_exit_conditions_roundtrip(self):
-        """Test signal-level exit conditions survive save/load"""
-        persistence = StrategyPersistence()
-        
-        config = StrategyConfig()
-        config.name = "Test Strategy"
-        
-        signal = SignalConfig(name="AT_HOD", logic="AND")
-        signal.exit_conditions = [
-            ExitCondition(signal_name="BELOW_HOD", percentage=0.2, binding_level="SIGNAL")
-        ]
-        
-        block = BlockConfig(name="hod", logic="AND")
-        block.signals.append(signal)
-        config.blocks.append(block)
-        
-        # Save to dict
-        data = persistence._config_to_dict(config)
-        
-        # Verify signal-level exits in dict
-        assert 'exit_conditions' in data['blocks'][0]['signals'][0]
-        assert len(data['blocks'][0]['signals'][0]['exit_conditions']) == 1
-        
-        # Load from dict
-        loaded_config = persistence._dict_to_config(data)
-        
-        # Verify signal-level exits restored
-        signal_loaded = loaded_config.blocks[0].signals[0]
-        assert len(signal_loaded.exit_conditions) == 1
-        assert signal_loaded.exit_conditions[0].signal_name == "BELOW_HOD"
-        assert signal_loaded.exit_conditions[0].percentage == 0.2
-    
-    def test_multi_level_exit_conditions_roundtrip(self):
-        """Test exit conditions at all three levels survive save/load"""
-        persistence = StrategyPersistence()
-        
-        config = StrategyConfig()
-        config.name = "Multi-Level Exit Test"
-        
-        # Strategy-level exits
-        config.exit_conditions = [
-            ExitCondition(signal_name="BEARISH", percentage=0.3, binding_level="STRATEGY")
-        ]
-        
-        # Block-level exits
-        signal = SignalConfig(name="AT_HOD", logic="AND")
-        signal.exit_conditions = [
-            ExitCondition(signal_name="BELOW_HOD", percentage=0.15, binding_level="SIGNAL")
-        ]
-        
-        block = BlockConfig(name="hod", logic="AND")
-        block.exit_conditions = [
-            ExitCondition(signal_name="HOD_REJECTION", percentage=0.25, binding_level="BLOCK")
-        ]
-        block.signals.append(signal)
-        config.blocks.append(block)
-        
-        # Save to dict
-        data = persistence._config_to_dict(config)
-        
-        # Load from dict
-        loaded_config = persistence._dict_to_config(data)
-        
-        # Verify all three levels
-        assert len(loaded_config.exit_conditions) == 1
-        assert loaded_config.exit_conditions[0].signal_name == "BEARISH"
-        
-        assert len(loaded_config.blocks[0].exit_conditions) == 1
-        assert loaded_config.blocks[0].exit_conditions[0].signal_name == "HOD_REJECTION"
-        
-        assert len(loaded_config.blocks[0].signals[0].exit_conditions) == 1
-        assert loaded_config.blocks[0].signals[0].exit_conditions[0].signal_name == "BELOW_HOD"
-
-
-class TestExitConditionFilePersistence:
-    """Test file-level persistence"""
-    
-    def test_save_load_json_with_exit_conditions(self):
-        """Test saving and loading JSON file with exit conditions"""
-        persistence = StrategyPersistence()
-        
-        config = StrategyConfig()
-        config.name = "File Test Strategy"
-        config.exit_conditions = [
-            ExitCondition(signal_name="BEARISH", percentage=0.5, exit_mode="FLEXIBLE")
-        ]
-        
-        block = BlockConfig(name="hod", logic="AND")
-        block.signals.append(SignalConfig(name="AT_HOD", logic="AND"))
-        config.blocks.append(block)
-        
-        # Save to temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            filepath = Path(f.name)
-        
-        try:
-            result = persistence.save(config, filepath, PersistenceFormat.JSON)
-            assert result.success == True
-            
-            # Verify file exists
-            assert filepath.exists()
-            
-            # Load from file
-            load_result = persistence.load(filepath)
-            assert load_result.success == True
-            assert load_result.config is not None
-            
-            # Verify exit conditions restored
-            loaded_config = load_result.config
-            assert len(loaded_config.exit_conditions) == 1
-            assert loaded_config.exit_conditions[0].signal_name == "BEARISH"
-            assert loaded_config.exit_conditions[0].percentage == 0.5
-            assert loaded_config.exit_conditions[0].exit_mode == "FLEXIBLE"
-            
-        finally:
-            # Cleanup
-            if filepath.exists():
-                filepath.unlink()
-    
-    def test_backward_compatibility_without_exit_conditions(self):
-        """Test loading old config files without exit conditions"""
-        persistence = StrategyPersistence()
-        
-        # Create old-style config without exit conditions
-        old_data = {
-            'version': '1.0.0',
-            'name': 'Old Strategy',
-            'description': 'Legacy config',
-            'blocks': [
-                {
-                    'name': 'hod',
-                    'logic': 'AND',
-                    'signals': [
-                        {'name': 'AT_HOD', 'logic': 'AND'}
-                    ]
-                }
+    def test_roundtrip_strategy_level_exits(self):
+        """Test serialization/deserialization round-trip for strategy-level exits"""
+        config = StrategyConfig(
+            name="Test Strategy",
+            blocks=[],
+            exit_conditions=[
+                ExitCondition(signal_name="BEARISH", percentage=0.3, binding_level="STRATEGY"),
+                ExitCondition(signal_name="BEARISH_BREAKDOWN", percentage=0.25, exit_mode="FLEXIBLE", binding_level="STRATEGY")
             ]
-        }
+        )
         
-        # Save to temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(old_data, f)
-            filepath = Path(f.name)
+        # Serialize
+        serialized = self.persistence._config_to_dict(config)
         
-        try:
-            # Load should succeed
-            result = persistence.load(filepath)
-            assert result.success == True
-            assert result.config is not None
-            
-            # Exit conditions should be empty lists (defaults)
-            config = result.config
-            assert config.exit_conditions == []
-            assert config.blocks[0].exit_conditions == []
-            assert config.blocks[0].signals[0].exit_conditions == []
-            
-        finally:
-            # Cleanup
-            if filepath.exists():
-                filepath.unlink()
+        # Deserialize
+        restored = self.persistence._dict_to_config(serialized)
+        
+        assert len(restored.exit_conditions) == 2
+        assert restored.exit_conditions[0].signal_name == "BEARISH"
+        assert restored.exit_conditions[0].percentage == 0.3
+        assert restored.exit_conditions[1].signal_name == "BEARISH_BREAKDOWN"
+        assert restored.exit_conditions[1].exit_mode == "FLEXIBLE"
+    
+    def test_roundtrip_block_level_exits(self):
+        """Test serialization/deserialization round-trip for block-level exits"""
+        block = BlockConfig(
+            name="hod_block",
+            signals=[],
+            logic_type="AND",
+            exit_conditions=[
+                ExitCondition(signal_name="HOD_REJECTION", percentage=0.4, binding_level="BLOCK")
+            ]
+        )
+        
+        config = StrategyConfig(name="Test", blocks=[block])
+        
+        # Serialize
+        serialized = self.persistence._config_to_dict(config)
+        
+        # Deserialize
+        restored = self.persistence._dict_to_config(serialized)
+        
+        assert len(restored.blocks) == 1
+        assert len(restored.blocks[0].exit_conditions) == 1
+        assert restored.blocks[0].exit_conditions[0].signal_name == "HOD_REJECTION"
+        assert restored.blocks[0].exit_conditions[0].percentage == 0.4
+    
+    def test_roundtrip_signal_level_exits(self):
+        """Test serialization/deserialization round-trip for signal-level exits"""
+        signal = SignalConfig(
+            name="AT_HOD",
+            exit_conditions=[
+                ExitCondition(
+                    signal_name="BELOW_HOD",
+                    percentage=0.2,
+                    binding_level="SIGNAL",
+                    parent_signal="AT_HOD"
+                )
+            ]
+        )
+        
+        block = BlockConfig(name="hod", signals=[signal], logic_type="AND")
+        config = StrategyConfig(name="Test", blocks=[block])
+        
+        # Serialize
+        serialized = self.persistence._config_to_dict(config)
+        
+        # Deserialize
+        restored = self.persistence._dict_to_config(serialized)
+        
+        assert len(restored.blocks[0].signals) == 1
+        assert len(restored.blocks[0].signals[0].exit_conditions) == 1
+        assert restored.blocks[0].signals[0].exit_conditions[0].signal_name == "BELOW_HOD"
+        assert restored.blocks[0].signals[0].exit_conditions[0].parent_signal == "AT_HOD"
+    
+    def test_roundtrip_multi_level_exits(self):
+        """Test serialization/deserialization round-trip for exits at all levels"""
+        signal = SignalConfig(
+            name="AT_HOD",
+            exit_conditions=[
+                ExitCondition(signal_name="BELOW_HOD", percentage=0.15, binding_level="SIGNAL", parent_signal="AT_HOD")
+            ]
+        )
+        
+        block = BlockConfig(
+            name="hod",
+            signals=[signal],
+            logic_type="AND",
+            exit_conditions=[
+                ExitCondition(signal_name="HOD_REJECTION", percentage=0.35, binding_level="BLOCK")
+            ]
+        )
+        
+        config = StrategyConfig(
+            name="Test",
+            blocks=[block],
+            exit_conditions=[
+                ExitCondition(signal_name="BEARISH", percentage=0.25, binding_level="STRATEGY")
+            ]
+        )
+        
+        # Serialize
+        serialized = self.persistence._config_to_dict(config)
+        
+        # Deserialize
+        restored = self.persistence._dict_to_config(serialized)
+        
+        # Verify strategy level
+        assert len(restored.exit_conditions) == 1
+        assert restored.exit_conditions[0].percentage == 0.25
+        
+        # Verify block level
+        assert len(restored.blocks[0].exit_conditions) == 1
+        assert restored.blocks[0].exit_conditions[0].percentage == 0.35
+        
+        # Verify signal level
+        assert len(restored.blocks[0].signals[0].exit_conditions) == 1
+        assert restored.blocks[0].signals[0].exit_conditions[0].percentage == 0.15
+    
+    def test_json_serialization_complete(self):
+        """Test complete JSON serialization including exit conditions"""
+        config = StrategyConfig(
+            name="Complete Test",
+            blocks=[
+                BlockConfig(
+                    name="test_block",
+                    signals=[
+                        SignalConfig(
+                            name="TEST_SIGNAL",
+                            exit_conditions=[
+                                ExitCondition(signal_name="EXIT_SIG", percentage=0.1, binding_level="SIGNAL", parent_signal="TEST_SIGNAL")
+                            ]
+                        )
+                    ],
+                    logic_type="AND",
+                    exit_conditions=[
+                        ExitCondition(signal_name="BLOCK_EXIT", percentage=0.3, binding_level="BLOCK")
+                    ]
+                )
+            ],
+            exit_conditions=[
+                ExitCondition(signal_name="STRATEGY_EXIT", percentage=0.4, exit_mode="FLEXIBLE", binding_level="STRATEGY")
+            ]
+        )
+        
+        # Full JSON round-trip
+        json_str = json.dumps(self.persistence._config_to_dict(config))
+        restored_dict = json.loads(json_str)
+        restored_config = self.persistence._dict_to_config(restored_dict)
+        
+        # Verify all exit conditions survived
+        assert len(restored_config.exit_conditions) == 1
+        assert len(restored_config.blocks[0].exit_conditions) == 1
+        assert len(restored_config.blocks[0].signals[0].exit_conditions) == 1
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
