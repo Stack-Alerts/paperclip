@@ -93,6 +93,7 @@ class ExitConditionDialog(QDialog):
         self.tp_proximity_threshold = existing_tp_proximity
         self.reversal_trigger = existing_reversal
         self.recheck_enabled = False
+        self.recheck_bar_delay = 25  # Default bar delay for RECHECK
         
         # UI components
         self.signal_selector: Optional[QComboBox] = None
@@ -428,6 +429,9 @@ class ExitConditionDialog(QDialog):
         self.strategy_radio.toggled.connect(self._on_binding_level_changed)
         self.block_radio.toggled.connect(self._on_binding_level_changed)
         self.signal_radio.toggled.connect(self._on_binding_level_changed)
+        
+        # Issue 4: Connect RECHECK checkbox to prompt for bar delay
+        self.recheck_checkbox.stateChanged.connect(self._on_recheck_changed)
     
     def _find_orchestrator(self):
         """

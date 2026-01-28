@@ -1145,6 +1145,8 @@ def get_exit_dialog_stylesheet() -> str:
         QDialog {{
             background-color: {COLORS['bg_dark']};
             color: {COLORS['text_primary']};
+            min-width: 800px;
+            max-width: 800px;
         }}
         QLabel {{
             color: {COLORS['text_primary']};
