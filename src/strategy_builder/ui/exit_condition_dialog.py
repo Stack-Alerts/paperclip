@@ -127,6 +127,56 @@ class ExitConditionDialog(QDialog):
             signal_group.setLayout(signal_layout)
             layout.addWidget(signal_group)
         
+        # Binding Level section (Sprint 1.8 - Task 1.8.49)
+        binding_group = QGroupBox("Exit Binding Level")
+        binding_layout = QVBoxLayout()
+        
+        # Create button group for binding level
+        self.binding_button_group = QButtonGroup()
+        
+        # STRATEGY binding
+        self.strategy_radio = QRadioButton("STRATEGY - Apply to all positions")
+        self.strategy_radio.setStyleSheet(get_radio_button_style('error'))
+        self.strategy_radio.setToolTip("Exit condition applies to ALL positions from this strategy")
+        self.strategy_radio.setChecked(True)  # Default
+        self.binding_button_group.addButton(self.strategy_radio)
+        binding_layout.addWidget(self.strategy_radio)
+        
+        strategy_desc = QLabel("    └─ Global exit for entire strategy")
+        strategy_desc.setStyleSheet(get_label_style('muted'))
+        strategy_desc_font = create_font(size=9)
+        strategy_desc.setFont(strategy_desc_font)
+        binding_layout.addWidget(strategy_desc)
+        
+        # BLOCK binding
+        self.block_radio = QRadioButton("BLOCK - Apply to specific block positions")
+        self.block_radio.setStyleSheet(get_radio_button_style('warning'))
+        self.block_radio.setToolTip("Exit condition applies only to positions from selected block")
+        self.binding_button_group.addButton(self.block_radio)
+        binding_layout.addWidget(self.block_radio)
+        
+        block_desc = QLabel("    └─ Exit only for positions from specific block")
+        block_desc.setStyleSheet(get_label_style('muted'))
+        block_desc_font = create_font(size=9)
+        block_desc.setFont(block_desc_font)
+        binding_layout.addWidget(block_desc)
+        
+        # SIGNAL binding
+        self.signal_radio = QRadioButton("SIGNAL - Apply to specific signal positions")
+        self.signal_radio.setStyleSheet(get_radio_button_style('info'))
+        self.signal_radio.setToolTip("Exit condition applies only to positions from selected signal")
+        self.binding_button_group.addButton(self.signal_radio)
+        binding_layout.addWidget(self.signal_radio)
+        
+        signal_desc = QLabel("    └─ Granular exit for specific signal only")
+        signal_desc.setStyleSheet(get_label_style('muted'))
+        signal_desc_font = create_font(size=9)
+        signal_desc.setFont(signal_desc_font)
+        binding_layout.addWidget(signal_desc)
+        
+        binding_group.setLayout(binding_layout)
+        layout.addWidget(binding_group)
+        
         # Percentage section
         percentage_group = QGroupBox("Exit Percentage")
         percentage_layout = QVBoxLayout()
@@ -339,10 +389,18 @@ class ExitConditionDialog(QDialog):
             if selected_signal and selected_signal not in ["No signals available", "Error loading signals"]:
                 self.signal_name = selected_signal
         
+        # Get binding level from radio buttons
+        binding_level = "STRATEGY"  # Default
+        if hasattr(self, 'block_radio') and self.block_radio.isChecked():
+            binding_level = "BLOCK"
+        elif hasattr(self, 'signal_radio') and self.signal_radio.isChecked():
+            binding_level = "SIGNAL"
+        
         return {
             'signal_name': self.signal_name,
             'percentage': self.percentage_spin.value() / 100.0,  # Convert to 0.0-1.0
             'exit_mode': self.exit_mode,
+            'binding_level': binding_level,
             'tp_proximity_threshold': float(self.tp_proximity_spin.value()),
             'reversal_trigger': self.reversal_spin.value() / 10.0,  # Convert to 0.0-1.0
             'recheck_enabled': self.recheck_checkbox.isChecked()
