@@ -736,15 +736,15 @@
 
 **File**: `src/strategy_builder/ui/strategy_browser_dialog.py`
 
-- [ ] **1.8.100** Add exit conditions to strategy preview
+- [x] **1.8.100** Add exit conditions to strategy preview
 
 **File**: `src/strategy_builder/ui/content_measurement.py`
 
-- [ ] **1.8.101** Add exit condition row height estimation
+- [x] **1.8.101** Add exit condition row height estimation
 
 **File**: Documentation
 
-- [ ] **1.8.102** Update user documentation with exit conditions usage
+- [x] **1.8.102** Update user documentation with exit conditions usage
   - Add EXIT_CONDITIONS.md user guide
   - Add tooltips to all exit condition UI elements
 
