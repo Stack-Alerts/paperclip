@@ -315,6 +315,7 @@ COLORS = {
     'secondary': '#BDC1C6',  # Alias for text_secondary (message categories, labels)
     'text_muted': '#9AA0A6',
     'text_label': '#A0AEC0',
+    'orange': '#a25c51',
     
     # Status colors
     'success': '#10B981',
@@ -674,7 +675,8 @@ def get_status_label_style(status='default') -> str:
         'error': COLORS['error'],      # #C35252
         'warning': COLORS['warning'],  # #FFA500
         'info': COLORS['info'],        # #2070FF
-        'default': COLORS['text_muted']
+        'default': COLORS['text_muted'],
+        'orange': COLORS['orange']  
     }
     return f"color: {colors.get(status, colors['default'])}; font-weight: bold;"
 
@@ -1163,6 +1165,50 @@ def get_exit_dialog_stylesheet() -> str:
             font-size: 11pt;
             font-weight: bold;
         }}
+        QComboBox {{
+            background-color: {COLORS['bg_input']};
+            border: 1px solid {COLORS['border']};
+            border-radius: 6px;
+            padding: 6px 10px;
+            color: {COLORS['text_primary']};
+        }}
+        QComboBox:hover {{
+            border-color: {COLORS['border_focus']};
+        }}
+        QComboBox::drop-down {{
+            border: none;
+            background: transparent;
+        }}
+        QComboBox QAbstractItemView {{
+            background-color: {COLORS['bg_input']};
+            border: none;
+            selection-background-color: {COLORS['border_focus']};
+            alternate-background-color: {COLORS['bg_input']};
+            color: {COLORS['text_primary']};
+            outline: none;
+            show-decoration-selected: 0;
+            gridline-color: {COLORS['bg_input']};
+            spacing: 0px;
+        }}
+        QComboBox QAbstractItemView::item {{
+            background-color: {COLORS['bg_input']};
+            color: {COLORS['text_primary']};
+            padding: 6px 8px;
+            margin: 0px;
+            border: none;
+            spacing: 0px;
+        }}
+        QComboBox QAbstractItemView::item:selected {{
+            background-color: {COLORS['border_focus']};
+            color: #FFFFFF;
+            border: 0px solid transparent;
+            margin: 0px;
+        }}
+        QComboBox QAbstractItemView::item:hover {{
+            background-color: {COLORS['button_secondary']};
+            border: 0px solid transparent;
+            margin: 0px;
+        }}
     """
 
 
@@ -1174,7 +1220,7 @@ def get_exit_tree_item_style() -> str:
     Returns:
         CSS style string for exit condition tree items (red theme, bold)
     """
-    return f"color: {COLORS['error']}; font-weight: 600;"
+    return f"color: {COLORS['orange']}; font-weight: 100;"
 
 
 # Backward compatibility constants (can be used directly)

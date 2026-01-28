@@ -395,6 +395,81 @@ class BlockConfigItem(QWidget):
             signals_widget.setLayout(signals_layout)
             layout.addWidget(signals_widget)
         
+        # Block-level exit conditions (Sprint 1.8 - display exits bound to this block)
+        if hasattr(self.block_info, 'exit_conditions') or (isinstance(self.block_info, dict) and 'exit_conditions' in self.block_info):
+            # Get exit conditions for this block
+            exit_conditions = self.block_info.get('exit_conditions', []) if isinstance(self.block_info, dict) else getattr(self.block_info, 'exit_conditions', [])
+            
+            if exit_conditions:
+                # Create frame for block-level exits
+                block_exits_widget = QFrame()
+                block_exits_widget.setFrameShape(QFrame.StyledPanel)
+                from src.strategy_builder.ui.styles import get_color
+                block_exits_widget.setStyleSheet(
+                    f"background-color: {get_color('bg_light')}; "
+                    f"border: 1px solid {get_color('border')}; "
+                    f"border-radius: 6px; padding: 5px;"
+                )
+                
+                block_exits_layout = QVBoxLayout()
+                block_exits_layout.setContentsMargins(10, 5, 10, 5)
+                
+                # Header
+                exits_header = QLabel("Block-Level Exit Conditions:")
+                exits_header.setStyleSheet(get_label_style('error') + " font-weight: bold;")
+                block_exits_layout.addWidget(exits_header)
+                
+                # Display each exit
+                for exit_cond in exit_conditions:
+                    current_exit_signal_name = exit_cond.get('signal_name', 'Unknown')
+                    exit_percentage = exit_cond.get('percentage', 0.5)
+                    exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
+                    
+                    pct_display = int(exit_percentage * 100)
+                    
+                    # Create exit row
+                    exit_row_layout = QHBoxLayout()
+                    exit_row_layout.setSpacing(8)
+                    
+                    exit_text = f"🔴  {current_exit_signal_name} ({pct_display}%) - {exit_mode} mode"
+                    exit_label = QLabel(exit_text)
+                    exit_label.setStyleSheet(get_exit_tree_item_style() + " font-size: 9pt; font-weight: bold;")
+                    exit_label.setToolTip(
+                        f"Block-Level Exit Condition\n"
+                        f"Signal: {current_exit_signal_name}\n"
+                        f"Percentage: {pct_display}%\n"
+                        f"Mode: {exit_mode}\n"
+                        f"Binding: BLOCK"
+                    )
+                    exit_row_layout.addWidget(exit_label, stretch=1)
+                    
+                    # Config/Edit button - same style as strategy exit buttons
+                    config_btn = QPushButton("⚙")
+                    config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
+                    config_btn.setToolTip("Configure block exit condition")
+                    # Use lambda to call panel method with captured variables
+                    config_btn.clicked.connect(
+                        lambda checked, bname=self.block_name, sname=current_exit_signal_name: 
+                            self._on_block_exit_config_clicked(bname, sname)
+                    )
+                    exit_row_layout.addWidget(config_btn)
+                    
+                    # Remove button - same style as strategy exit buttons
+                    remove_btn = QPushButton("✕")
+                    remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
+                    remove_btn.setToolTip("Remove this block exit condition")
+                    # Use lambda to call panel method with captured variables
+                    remove_btn.clicked.connect(
+                        lambda checked, bname=self.block_name, sname=current_exit_signal_name:
+                            self._on_block_exit_remove_clicked(bname, sname)
+                    )
+                    exit_row_layout.addWidget(remove_btn)
+                    
+                    block_exits_layout.addLayout(exit_row_layout)
+                
+                block_exits_widget.setLayout(block_exits_layout)
+                layout.addWidget(block_exits_widget)
+        
         # Styling - dark theme
         from src.strategy_builder.ui.styles import get_color
         self.setStyleSheet(f"""
@@ -577,6 +652,18 @@ class BlockConfigItem(QWidget):
         if panel and hasattr(panel, '_on_signal_recheck_removed'):
             panel._on_signal_recheck_removed(self.block_name, signal_name)
     
+    def _on_block_exit_config_clicked(self, block_name: str, signal_name: str):
+        """Handle config button for block-level exit - forward to panel."""
+        panel = self._find_strategy_blocks_panel()
+        if panel and hasattr(panel, '_on_edit_block_exit'):
+            panel._on_edit_block_exit(block_name, signal_name)
+    
+    def _on_block_exit_remove_clicked(self, block_name: str, signal_name: str):
+        """Handle remove button for block-level exit - forward to panel."""
+        panel = self._find_strategy_blocks_panel()
+        if panel and hasattr(panel, '_on_remove_block_exit'):
+            panel._on_remove_block_exit(block_name, signal_name)
+    
     def _find_strategy_blocks_panel(self):
         """Find the StrategyBlocksPanel by traversing up the widget tree."""
         widget = self.parent()
@@ -693,20 +780,20 @@ class StrategyBlocksPanel(QWidget):
         layout.addWidget(group_box)
         
         # Sprint 1.8 Task 1.8.49: Strategy-level Exit Conditions Section
-        self.strategy_exit_section = QGroupBox("🔴 STRATEGY EXIT CONDITIONS")
+        self.strategy_exit_section = QGroupBox("🔴 Strategy Exit Conditions")
         exit_section_font = QFont()
         exit_section_font.setPointSize(12)
         exit_section_font.setBold(True)
         self.strategy_exit_section.setFont(exit_section_font)
         self.strategy_exit_section.setCheckable(True)
-        self.strategy_exit_section.setChecked(False)  # Collapsed by default
+        self.strategy_exit_section.setChecked(True)  # EXPANDED by default - so buttons are visible!
         
         exit_section_layout = QVBoxLayout()
         exit_section_layout.setSpacing(10)
         exit_section_layout.setContentsMargins(15, 20, 15, 15)
         
         # Info text
-        exit_info = QLabel("Exit conditions added via the red 'Add as Exit' button in the search panel")
+        exit_info = QLabel("Strategy level exit conditions apply to the entire strategy and can trigger over any other signal or block specific exit condition.")
         exit_info.setStyleSheet(get_label_style('muted') + " font-size: 9pt; font-style: italic;")
         exit_section_layout.addWidget(exit_info)
         
@@ -745,8 +832,20 @@ class StrategyBlocksPanel(QWidget):
             block_info = {
                 'name': block_config.name,
                 'logic': block_config.logic,
-                'signals': []
+                'signals': [],
+                'exit_conditions': []  # Initialize block-level exits list
             }
+            
+            # Add block-level exit conditions if present
+            if hasattr(block_config, 'exit_conditions') and block_config.exit_conditions:
+                for exit_cond in block_config.exit_conditions:
+                    block_info['exit_conditions'].append({
+                        'signal_name': exit_cond.signal_name,
+                        'percentage': exit_cond.percentage,
+                        'exit_mode': exit_cond.exit_mode,
+                        'binding_level': exit_cond.binding_level
+                    })
+                print(f"DEBUG: Block '{block_config.name}' has {len(block_info['exit_conditions'])} block-level exits")
             
             # Add signal info with timing constraints and recheck config
             for signal_config in block_config.signals:
@@ -825,6 +924,24 @@ class StrategyBlocksPanel(QWidget):
             block_item.deleteLater()
         
         self.block_items.clear()
+    
+    def _clear_layout(self, layout):
+        """
+        Recursively clear a layout by removing all widgets and sub-layouts.
+        
+        Args:
+            layout: QLayout to clear
+        """
+        if layout is not None:
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
+                else:
+                    sub_layout = item.layout()
+                    if sub_layout is not None:
+                        self._clear_layout(sub_layout)
     
     def _get_block_level_references(self, block_name: str) -> List[Tuple[str, str]]:
         """
@@ -1306,11 +1423,14 @@ class StrategyBlocksPanel(QWidget):
     def _refresh_strategy_exits(self):
         """Refresh the strategy-level exit conditions display - Sprint 1.8 Task 1.8.49"""
         try:
-            # Clear existing exit items
+            # Clear existing exit items - handle both widgets AND layouts
             while self.strategy_exits_layout.count():
                 item = self.strategy_exits_layout.takeAt(0)
                 if item.widget():
                     item.widget().deleteLater()
+                elif item.layout():
+                    # Clear layouts recursively
+                    self._clear_layout(item.layout())
             
             # Get current config
             config = self.orchestrator.get_current_config()
@@ -1467,5 +1587,34 @@ class StrategyBlocksPanel(QWidget):
         
         except Exception as e:
             print(f"Error editing strategy exit: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_edit_block_exit(self, block_name: str, signal_name: str):
+        """Handle config button for block-level exit condition."""
+        print(f"DEBUG: _on_edit_block_exit called for block '{block_name}', signal '{signal_name}'")
+        # TODO: Implement block-level exit editing using orchestrator
+        # Similar to strategy exit editing but with binding_level='BLOCK' and block_name parameter
+        print("Block-level exit editing not yet implemented in orchestrator")
+    
+    def _on_remove_block_exit(self, block_name: str, signal_name: str):
+        """Handle remove button for block-level exit condition."""
+        print(f"DEBUG: _on_remove_block_exit called for block '{block_name}', signal '{signal_name}'")
+        try:
+            result = self.orchestrator.remove_exit_condition(
+                signal_name=signal_name,
+                binding_level='BLOCK',
+                block_name=block_name
+            )
+            
+            if result.success:
+                print(f"Block exit condition removed: {block_name} -> {signal_name}")
+                self._refresh_blocks()
+                self.blocks_changed.emit()
+            else:
+                print(f"Failed to remove block exit condition: {result.message}")
+        
+        except Exception as e:
+            print(f"Error removing block exit: {e}")
             import traceback
             traceback.print_exc()

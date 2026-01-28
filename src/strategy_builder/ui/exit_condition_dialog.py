@@ -360,6 +360,23 @@ class ExitConditionDialog(QDialog):
         self.block_radio.toggled.connect(self._on_binding_level_changed)
         self.signal_radio.toggled.connect(self._on_binding_level_changed)
     
+    def _find_orchestrator(self):
+        """
+        Find orchestrator by traversing widget tree to find StrategyBlocksPanel.
+        
+        Returns:
+            StrategyBuilderOrchestrator or None
+        """
+        widget = self.parent()
+        while widget is not None:
+            if hasattr(widget, 'orchestrator'):
+                print(f"DEBUG: Found orchestrator on {type(widget).__name__}")
+                return widget.orchestrator
+            widget = widget.parent()
+        
+        print("DEBUG: No orchestrator found in widget tree")
+        return None
+    
     def _on_mode_changed(self, checked):
         """Handle exit mode radio button changes."""
         if self.absolute_radio.isChecked():
@@ -386,23 +403,30 @@ class ExitConditionDialog(QDialog):
         self.block_selector.clear()
         
         try:
-            parent = self.parent()
-            if not parent or not hasattr(parent, 'orchestrator'):
+            # Find StrategyBlocksPanel by traversing widget tree
+            orchestrator = self._find_orchestrator()
+            if not orchestrator:
+                print("DEBUG: Could not find orchestrator")
                 self.block_selector.addItem("No blocks available")
                 return
             
-            orchestrator = parent.orchestrator
             config = orchestrator.get_current_config()
             
             if not config or not config.blocks:
+                print("DEBUG: No blocks in config")
                 self.block_selector.addItem("No blocks in strategy")
                 return
             
+            # Successfully found blocks
+            print(f"DEBUG: Found {len(config.blocks)} blocks in strategy")
             for block in config.blocks:
                 self.block_selector.addItem(block.name)
+                print(f"  - Added block: {block.name}")
         
         except Exception as e:
             print(f"Error populating block selector: {e}")
+            import traceback
+            traceback.print_exc()
             self.block_selector.addItem("Error loading blocks")
     
     def _populate_signal_selector(self):
@@ -410,30 +434,37 @@ class ExitConditionDialog(QDialog):
         self.signal_binding_selector.clear()
         
         try:
-            parent = self.parent()
-            if not parent or not hasattr(parent, 'orchestrator'):
+            # Find orchestrator by traversing widget tree
+            orchestrator = self._find_orchestrator()
+            if not orchestrator:
+                print("DEBUG: Could not find orchestrator for signal selector")
                 self.signal_binding_selector.addItem("No signals available")
                 return
             
-            orchestrator = parent.orchestrator
             config = orchestrator.get_current_config()
             
             if not config or not config.blocks:
+                print("DEBUG: No blocks in config for signal selector")
                 self.signal_binding_selector.addItem("No blocks in strategy")
                 return
             
             # Collect all signals from all blocks
+            print(f"DEBUG: Populating signal selector with signals from {len(config.blocks)} blocks")
             for block in config.blocks:
                 for signal in block.signals:
                     # Format: "block_name::signal_name"
                     display_text = f"{block.name} → {signal.name}"
                     self.signal_binding_selector.addItem(display_text, f"{block.name}::{signal.name}")
+                    print(f"  - Added signal: {block.name} → {signal.name}")
             
             if self.signal_binding_selector.count() == 0:
+                print("DEBUG: No signals found in any block")
                 self.signal_binding_selector.addItem("No signals in strategy")
         
         except Exception as e:
             print(f"Error populating signal selector: {e}")
+            import traceback
+            traceback.print_exc()
             self.signal_binding_selector.addItem("Error loading signals")
     
     def _load_available_signals(self):
