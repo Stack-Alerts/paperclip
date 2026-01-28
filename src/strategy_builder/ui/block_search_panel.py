@@ -904,13 +904,16 @@ class BlockSearchPanel(QWidget):
             return
         
         # Call orchestrator with USER'S actual configuration values
+        # Include block_name and parent_signal_name for BLOCK/SIGNAL binding levels
         result = self.orchestrator.add_exit_condition(
             signal_name=dialog_config['signal_name'],
             percentage=dialog_config.get('percentage', 0.5),  # Use dialog value
             binding_level=dialog_config.get('binding_level', 'STRATEGY'),  # Use dialog value
             exit_mode=dialog_config.get('exit_mode', 'ABSOLUTE'),  # Use dialog value
             tp_proximity_threshold=dialog_config.get('tp_proximity_threshold', 2.0),
-            reversal_trigger=dialog_config.get('reversal_trigger', 0.5)
+            reversal_trigger=dialog_config.get('reversal_trigger', 0.5),
+            block_name=dialog_config.get('block_name'),  # For BLOCK/SIGNAL binding
+            parent_signal_name=dialog_config.get('parent_signal_name')  # For SIGNAL binding
         )
         
         if result.success:
