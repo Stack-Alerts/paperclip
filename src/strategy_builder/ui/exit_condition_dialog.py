@@ -145,9 +145,6 @@ class ExitConditionDialog(QDialog):
         else:
             # STRATEGY - already checked by default
             pass
-        
-        # Issue 2: Force window to show at minimum width
-        self.resize(750, self.height())
     
     def _init_ui(self):
         """Initialize the user interface."""
@@ -158,7 +155,9 @@ class ExitConditionDialog(QDialog):
             self.setWindowTitle(f"Configure Exit Condition: {self.signal_name}")
         
         self.setStyleSheet(get_exit_dialog_stylesheet())
-        self.setMinimumWidth(700)
+        # Issue 2 Fix: Set both minimum and fixed width to ensure proper sizing
+        self.setMinimumWidth(800)
+        self.setFixedWidth(800)
         
         layout = QVBoxLayout()
         layout.setSpacing(15)
