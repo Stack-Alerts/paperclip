@@ -1333,7 +1333,7 @@ class StrategyBlocksPanel(QWidget):
                 exit_row_layout.setSpacing(10)
                 exit_row_layout.setContentsMargins(10, 5, 10, 5)
                 
-                # Exit info label - CRITICAL FIX: Don't let it expand over buttons!
+                # Exit info label
                 pct_display = int(exit_cond.percentage * 100)
                 exit_text = f"🔴 {current_signal_name} ({pct_display}%) - {exit_cond.exit_mode} mode"
                 exit_label = QLabel(exit_text)
@@ -1345,11 +1345,9 @@ class StrategyBlocksPanel(QWidget):
                     f"Binding: {exit_cond.binding_level}\n\n"
                     f"Double-click to edit"
                 )
-                # CRITICAL: Set size policy to prevent expansion over buttons
-                from PyQt5.QtWidgets import QSizePolicy
-                exit_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-                exit_label.setMaximumWidth(800)  # Prevent label from covering buttons
-                exit_row_layout.addWidget(exit_label)
+                # CRITICAL FIX: Make label transparent to mouse events so buttons receive them
+                exit_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+                exit_row_layout.addWidget(exit_label, stretch=1)
                 
                 # Sprint 1.8 Task 1.8.50: Make exit row double-clickable for editing
                 # Store exit condition data as widget property for editing
@@ -1367,7 +1365,6 @@ class StrategyBlocksPanel(QWidget):
                 config_btn.setMaximumHeight(30)
                 config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                 config_btn.setToolTip("Configure exit condition")
-                config_btn.raise_()  # Ensure button is on top of all other widgets
                 # Use functools.partial - proper PyQt5 pattern
                 print(f"DEBUG: Connecting config button for signal: {current_signal_name}")
                 config_btn.clicked.connect(partial(self._on_edit_strategy_exit, current_signal_name))
@@ -1381,7 +1378,6 @@ class StrategyBlocksPanel(QWidget):
                 remove_btn.setMaximumHeight(30)
                 remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                 remove_btn.setToolTip("Remove this exit condition")
-                remove_btn.raise_()  # Ensure button is on top of all other widgets
                 # Use functools.partial - proper PyQt5 pattern
                 print(f"DEBUG: Connecting remove button for signal: {current_signal_name}")
                 remove_btn.clicked.connect(partial(self._on_remove_strategy_exit, current_signal_name))
