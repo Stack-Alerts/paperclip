@@ -663,7 +663,7 @@
 
 **File**: `src/optimizer_v3/ui/compare_view_panel.py`
 
-- [ ] **1.8.83** Add exit condition metrics to _create_metrics_section()
+- [x] **1.8.83** Add exit condition metrics to _create_metrics_section()
   ```python
   # Add to metric_keys list:
   ('exit_condition_triggers', 'Exit Triggers', lambda x: str(int(x))),
@@ -671,14 +671,14 @@
   ('partial_exit_count', 'Partial Exits', lambda x: str(int(x))),
   ```
 
-- [ ] **1.8.84** Add exit condition columns to _export_comparison()
+- [x] **1.8.84** Add exit condition columns to _export_comparison()
   ```python
   # Add exit_condition_triggers, exit_condition_pnl, partial_exit_count to export
   ```
 
 **File**: `src/optimizer_v3/ui/ai_recommendations_panel.py`
 
-- [ ] **1.8.85** Add ADD_EXIT_CONDITION type to _format_action_summary()
+- [x] **1.8.85** Add ADD_EXIT_CONDITION type to _format_action_summary()
   ```python
   elif rec_type == 'ADD_EXIT_CONDITION':
       signal_name = self.recommendation.get('signal_name', '')
@@ -687,7 +687,7 @@
       return f"Add exit condition: '{signal_name}' at {percentage}% ({exit_mode} mode)"
   ```
 
-- [ ] **1.8.86** Add ADJUST_EXIT_CONDITION type to _format_action_summary()
+- [x] **1.8.86** Add ADJUST_EXIT_CONDITION type to _format_action_summary()
   ```python
   elif rec_type == 'ADJUST_EXIT_CONDITION':
       signal_name = self.recommendation.get('signal_name', '')

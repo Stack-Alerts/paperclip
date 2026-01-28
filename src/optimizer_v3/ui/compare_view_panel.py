@@ -171,6 +171,10 @@ class ConfigPanel(QScrollArea):
                 ('total_pnl', 'Total P&L', lambda x: f"${float(x):,.2f}"),
                 ('max_drawdown', 'Max Drawdown', lambda x: f"${float(x):,.2f}"),
                 ('total_trades', 'Total Trades', lambda x: str(int(x))),
+                # Sprint 1.8 Task 1.8.83: Exit condition metrics
+                ('exit_condition_triggers', 'Exit Triggers', lambda x: str(int(x))),
+                ('exit_condition_pnl', 'Exit P&L', lambda x: f"${float(x):,.2f}"),
+                ('partial_exit_count', 'Partial Exits', lambda x: str(int(x))),
             ]
             
             for key, label, formatter in metric_keys:
@@ -372,7 +376,9 @@ class CompareViewPanel(QWidget):
                 # Write metrics
                 metric_keys = [
                     'sharpe_ratio', 'win_rate', 'profit_factor',
-                    'total_pnl', 'max_drawdown', 'total_trades'
+                    'total_pnl', 'max_drawdown', 'total_trades',
+                    # Sprint 1.8 Task 1.8.84: Exit condition metrics
+                    'exit_condition_triggers', 'exit_condition_pnl', 'partial_exit_count'
                 ]
                 
                 for key in metric_keys:

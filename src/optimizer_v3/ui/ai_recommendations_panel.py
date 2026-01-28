@@ -207,6 +207,14 @@ class RecommendationCard(QFrame):
         elif rec_type == 'ADJUST_PARAM':
             new_value = config.get('new_value', '?')
             return f"Adjust {param_name} to {new_value}"
+        # Sprint 1.8 Tasks 1.8.85-1.8.86: Exit condition recommendations
+        elif rec_type == 'ADD_EXIT_CONDITION':
+            percentage = config.get('percentage', 50)
+            exit_mode = config.get('exit_mode', 'ABSOLUTE')
+            return f"Add exit condition: '{signal_name}' at {percentage}% ({exit_mode} mode)"
+        elif rec_type == 'ADJUST_EXIT_CONDITION':
+            new_percentage = config.get('new_percentage', '?')
+            return f"Adjust exit condition '{signal_name}' to {new_percentage}%"
         else:
             return f"{rec_type}"
 
