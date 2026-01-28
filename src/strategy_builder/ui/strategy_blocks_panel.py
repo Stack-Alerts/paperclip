@@ -406,8 +406,8 @@ class BlockConfigItem(QWidget):
                         exit_duplicate_btn.setStyleSheet(get_recheck_duplicate_button_stylesheet())
                         exit_duplicate_btn.setToolTip("Add another exit condition to this signal")
                         exit_duplicate_btn.clicked.connect(
-                            lambda checked, bname=self.block_name, sname=signal_name:
-                                self._on_signal_exit_duplicate_clicked(bname, sname)
+                            lambda checked, bname=self.block_name, sname=signal_name, esig=current_exit_signal_name:
+                                self._on_signal_exit_duplicate_clicked(bname, sname, esig)
                         )
                         exit_row_layout.addWidget(exit_duplicate_btn)
                         
@@ -490,8 +490,8 @@ class BlockConfigItem(QWidget):
                     duplicate_btn.setStyleSheet(get_recheck_duplicate_button_stylesheet())
                     duplicate_btn.setToolTip("Add another exit condition to this block")
                     duplicate_btn.clicked.connect(
-                        lambda checked, bname=self.block_name:
-                            self._on_duplicate_block_exit_clicked(bname)
+                        lambda checked, bname=self.block_name, esig=current_exit_signal_name:
+                            self._on_duplicate_block_exit_clicked(bname, esig)
                     )
                     exit_row_layout.addWidget(duplicate_btn)
                     
@@ -705,11 +705,11 @@ class BlockConfigItem(QWidget):
         if panel and hasattr(panel, '_on_remove_block_exit'):
             panel._on_remove_block_exit(block_name, signal_name)
     
-    def _on_duplicate_block_exit_clicked(self, block_name: str):
+    def _on_duplicate_block_exit_clicked(self, block_name: str, exit_signal_name: str):
         """Handle duplicate button for block-level exit - forward to panel."""
         panel = self._find_strategy_blocks_panel()
         if panel and hasattr(panel, '_on_duplicate_block_exit'):
-            panel._on_duplicate_block_exit(block_name)
+            panel._on_duplicate_block_exit(block_name, exit_signal_name)
     
     def _on_signal_exit_config_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
         """Handle config button for signal-level exit - forward to panel."""
@@ -717,11 +717,11 @@ class BlockConfigItem(QWidget):
         if panel and hasattr(panel, '_on_signal_exit_config_clicked'):
             panel._on_signal_exit_config_clicked(block_name, signal_name, exit_signal_name)
     
-    def _on_signal_exit_duplicate_clicked(self, block_name: str, signal_name: str):
-        """Handle duplicate button for signal-level exit - forward to panel."""
+    def _on_signal_exit_duplicate_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
+        """Handle duplicate button for signal-level exit - forward to panel with signal name."""
         panel = self._find_strategy_blocks_panel()
         if panel and hasattr(panel, '_on_signal_exit_duplicate_clicked'):
-            panel._on_signal_exit_duplicate_clicked(block_name, signal_name)
+            panel._on_signal_exit_duplicate_clicked(block_name, signal_name, exit_signal_name)
     
     def _on_signal_exit_remove_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
         """Handle remove button for signal-level exit - forward to panel."""
@@ -1731,12 +1731,12 @@ class StrategyBlocksPanel(QWidget):
             import traceback
             traceback.print_exc()
     
-    def _on_duplicate_block_exit(self, block_name: str):
-        """Handle duplicate button - add another exit to this block."""
-        print(f"DEBUG: _on_duplicate_block_exit called for block '{block_name}'")
+    def _on_duplicate_block_exit(self, block_name: str, exit_signal_name: str):
+        """Handle duplicate button - add another exit to this block with same signal pre-populated."""
+        print(f"DEBUG: _on_duplicate_block_exit called for block '{block_name}', exit_signal '{exit_signal_name}'")
         try:
-            # Show exit condition dialog to add a new exit to this block (no pre-population - user selects signal)
-            dialog = ExitConditionDialog(parent=self)
+            # Show exit condition dialog pre-populated with the current exit's signal (ready to duplicate)
+            dialog = ExitConditionDialog(signal_name=exit_signal_name, parent=self, orchestrator=self.orchestrator)
             
             if dialog.exec_() == QDialog.Accepted:
                 # Get configuration from dialog
@@ -1872,11 +1872,12 @@ class StrategyBlocksPanel(QWidget):
             import traceback
             traceback.print_exc()
     
-    def _on_signal_exit_duplicate_clicked(self, block_name: str, signal_name: str):
-        """Handle duplicate button for signal-level exit - add another exit to this signal."""
-        print(f"DEBUG: _on_signal_exit_duplicate_clicked called for block '{block_name}', signal '{signal_name}'")
+    def _on_signal_exit_duplicate_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
+        """Handle duplicate button for signal-level exit - add another exit to this signal with same signal pre-populated."""
+        print(f"DEBUG: _on_signal_exit_duplicate_clicked called for block '{block_name}', signal '{signal_name}', exit_signal '{exit_signal_name}'")
         try:
-            dialog = ExitConditionDialog(parent=self)
+            # Show exit condition dialog pre-populated with the current exit's signal (ready to duplicate)
+            dialog = ExitConditionDialog(signal_name=exit_signal_name, parent=self, orchestrator=self.orchestrator)
             
             if dialog.exec_() == QDialog.Accepted:
                 config = dialog.get_config()
