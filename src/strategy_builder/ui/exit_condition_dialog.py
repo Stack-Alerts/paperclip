@@ -15,7 +15,7 @@ Date: 2026-01-27
 from typing import Optional
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QSpinBox, QRadioButton, QGroupBox, QCheckBox, QButtonGroup
+    QSpinBox, QRadioButton, QGroupBox, QCheckBox, QButtonGroup, QComboBox
 )
 from PyQt5.QtCore import Qt
 
@@ -40,7 +40,7 @@ class ExitConditionDialog(QDialog):
     
     def __init__(
         self,
-        signal_name: str,
+        signal_name: Optional[str] = None,
         existing_percentage: Optional[float] = None,
         existing_exit_mode: str = "ABSOLUTE",
         existing_tp_proximity: float = 2.0,
@@ -51,7 +51,7 @@ class ExitConditionDialog(QDialog):
         Initialize exit condition dialog.
         
         Args:
-            signal_name: Name of exit signal
+            signal_name: Name of exit signal (None = show signal selector)
             existing_percentage: Existing percentage (0.0-1.0) if editing
             existing_exit_mode: Existing mode ("ABSOLUTE" or "FLEXIBLE")
             existing_tp_proximity: Existing TP proximity threshold
@@ -60,7 +60,8 @@ class ExitConditionDialog(QDialog):
         """
         super().__init__(parent)
         
-        self.signal_name = signal_name
+        self.signal_name = signal_name  # May be None - signal selector mode
+        self.signal_selector_mode = (signal_name is None)
         self.exit_mode = existing_exit_mode
         
         # Convert percentage from 0.0-1.0 to 1-100 for display
@@ -74,6 +75,7 @@ class ExitConditionDialog(QDialog):
         self.recheck_enabled = False
         
         # UI components
+        self.signal_selector: Optional[QComboBox] = None
         self.percentage_spin: Optional[QSpinBox] = None
         self.absolute_radio: Optional[QRadioButton] = None
         self.flexible_radio: Optional[QRadioButton] = None
@@ -83,6 +85,7 @@ class ExitConditionDialog(QDialog):
         
         self._init_ui()
         self._connect_signals()
+        self._load_available_signals()
     
     def _init_ui(self):
         """Initialize the user interface."""
@@ -95,11 +98,34 @@ class ExitConditionDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         
         # Title
-        title_label = QLabel(f"🔴 EXIT: {self.signal_name}")
+        if self.signal_selector_mode:
+            title_label = QLabel("🔴 Configure Strategy Exit Condition")
+        else:
+            title_label = QLabel(f"🔴 EXIT: {self.signal_name}")
         title_font = create_font(size=13, bold=True)
         title_label.setFont(title_font)
         title_label.setStyleSheet(f"color: {get_color('error')};")
         layout.addWidget(title_label)
+        
+        # Signal selector (only if signal_name not provided)
+        if self.signal_selector_mode:
+            signal_group = QGroupBox("Select Exit Signal")
+            signal_layout = QVBoxLayout()
+            
+            signal_row = QHBoxLayout()
+            signal_label = QLabel("Signal:")
+            signal_label.setStyleSheet(get_label_style('default'))
+            signal_label.setToolTip("Choose which signal will trigger the exit condition")
+            signal_row.addWidget(signal_label)
+            
+            self.signal_selector = QComboBox()
+            self.signal_selector.setMinimumWidth(300)
+            self.signal_selector.setToolTip("Select an exit signal from the building blocks registry")
+            signal_row.addWidget(self.signal_selector, stretch=1)
+            
+            signal_layout.addLayout(signal_row)
+            signal_group.setLayout(signal_layout)
+            layout.addWidget(signal_group)
         
         # Percentage section
         percentage_group = QGroupBox("Exit Percentage")
@@ -260,6 +286,46 @@ class ExitConditionDialog(QDialog):
             self.exit_mode = "FLEXIBLE"
             self.flexible_params_group.setEnabled(True)
     
+    def _load_available_signals(self):
+        """Load available signals from registry (only in selector mode)."""
+        if not self.signal_selector_mode or not self.signal_selector:
+            return
+        
+        try:
+            # Get parent to access orchestrator
+            parent = self.parent()
+            if not parent or not hasattr(parent, 'orchestrator'):
+                print("Warning: Cannot access orchestrator from dialog parent")
+                return
+            
+            orchestrator = parent.orchestrator
+            
+            # Get all blocks from registry
+            search_results = orchestrator.search_blocks("")  # Empty = all blocks
+            
+            # Collect all signals
+            signals_set = set()
+            for result in search_results:
+                block_info = orchestrator.registry_interface.get_block(result.block_name)
+                if block_info and block_info.signals:
+                    for signal in block_info.signals:
+                        # Only add if ui_visible is not explicitly False
+                        if getattr(signal, 'ui_visible', True) is not False:
+                            signals_set.add(signal.name)
+            
+            # Sort and populate combo box
+            for signal_name in sorted(signals_set):
+                self.signal_selector.addItem(signal_name)
+            
+            if self.signal_selector.count() == 0:
+                self.signal_selector.addItem("No signals available")
+                self.signal_selector.setEnabled(False)
+            
+        except Exception as e:
+            print(f"Error loading signals: {e}")
+            self.signal_selector.addItem("Error loading signals")
+            self.signal_selector.setEnabled(False)
+    
     def get_config(self) -> dict:
         """
         Get exit condition configuration from dialog.
@@ -267,6 +333,12 @@ class ExitConditionDialog(QDialog):
         Returns:
             Dictionary with exit condition settings
         """
+        # Get signal name from selector if in selector mode
+        if self.signal_selector_mode and self.signal_selector:
+            selected_signal = self.signal_selector.currentText()
+            if selected_signal and selected_signal not in ["No signals available", "Error loading signals"]:
+                self.signal_name = selected_signal
+        
         return {
             'signal_name': self.signal_name,
             'percentage': self.percentage_spin.value() / 100.0,  # Convert to 0.0-1.0
