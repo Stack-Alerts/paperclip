@@ -718,6 +718,36 @@ class LiveOutputPanel(QWidget):
             cursor.movePosition(QTextCursor.MoveOperation.End)
             self.output_text.setTextCursor(cursor)
     
+    def _append_exit_condition_message(self, msg_data: Dict) -> None:
+        """
+        Special formatting for EXIT CONDITION trigger messages (red theme).
+        Sprint 1.8 Task 1.8.77-1.8.78
+        
+        Args:
+            msg_data: Message data dict with timestamp, level, category, message
+        """
+        timestamp = msg_data['timestamp']
+        level = msg_data['level'].value
+        message = msg_data['message']
+        
+        # Red theme for exit conditions (matches error/stop loss color)
+        exit_color = '#C35252'  # Red - matches STOP_LOSS and RISK categories
+        
+        # Build HTML with special formatting for EXIT CONDITION messages
+        html = (
+            f"<span style='color: {get_color('text_muted')};'>{timestamp}</span> "
+            f"<span style='color: {exit_color}; font-weight: bold;'>[{level}][EXIT_CONDITION]</span> "
+            f"<span style='color: {get_color('text_primary')};'>{message}</span>"
+        )
+        
+        self.output_text.append(html)
+        
+        # Auto-scroll if enabled
+        if self.auto_scroll:
+            cursor = self.output_text.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            self.output_text.setTextCursor(cursor)
+    
     def _update_title_icon(self) -> None:
         """Update title icon based on running state"""
         icon = "▶" if self.is_running else "●"  # Play symbol when running, circle when stopped

@@ -617,14 +617,14 @@
 
 **File**: `src/optimizer_v3/ui/live_output_panel.py`
 
-- [ ] **1.8.77** Add _append_exit_condition_message() method for exit condition triggers
+- [x] **1.8.77** Add _append_exit_condition_message() method for exit condition triggers
   ```python
   def _append_exit_condition_message(self, msg_data: Dict) -> None:
       """Format and append exit condition trigger message"""
       # Format: [EXIT_CONDITION] signal_name triggered at price (exit_mode)
   ```
 
-- [ ] **1.8.78** Add exit condition message styling (red theme)
+- [x] **1.8.78** Add exit condition message styling (red theme)
 
 **File**: `src/strategy_builder/ui/backtest_config_panel.py`
 
