@@ -161,6 +161,20 @@ class ExitConditionDialog(QDialog):
         block_desc.setFont(block_desc_font)
         binding_layout.addWidget(block_desc)
         
+        # Block selector dropdown (shown only when BLOCK is selected)
+        self.block_selector_row = QHBoxLayout()
+        block_selector_label = QLabel("        Select Block:")
+        block_selector_label.setStyleSheet(get_label_style('default'))
+        self.block_selector_row.addWidget(block_selector_label)
+        
+        self.block_selector = QComboBox()
+        self.block_selector.setToolTip("Choose which block to bind this exit condition to")
+        self.block_selector_row.addWidget(self.block_selector, stretch=1)
+        self.block_selector_widget = QWidget()
+        self.block_selector_widget.setLayout(self.block_selector_row)
+        self.block_selector_widget.setVisible(False)  # Hidden by default
+        binding_layout.addWidget(self.block_selector_widget)
+        
         # SIGNAL binding
         self.signal_radio = QRadioButton("SIGNAL - Apply to specific signal positions")
         self.signal_radio.setStyleSheet(get_radio_button_style('info'))
@@ -173,6 +187,20 @@ class ExitConditionDialog(QDialog):
         signal_desc_font = create_font(size=9)
         signal_desc.setFont(signal_desc_font)
         binding_layout.addWidget(signal_desc)
+        
+        # Signal selector dropdown (shown only when SIGNAL is selected)
+        self.signal_selector_row = QHBoxLayout()
+        signal_selector_label = QLabel("        Select Signal:")
+        signal_selector_label.setStyleSheet(get_label_style('default'))
+        self.signal_selector_row.addWidget(signal_selector_label)
+        
+        self.signal_binding_selector = QComboBox()
+        self.signal_binding_selector.setToolTip("Choose which signal to bind this exit condition to")
+        self.signal_selector_row.addWidget(self.signal_binding_selector, stretch=1)
+        self.signal_selector_widget = QWidget()
+        self.signal_selector_widget.setLayout(self.signal_selector_row)
+        self.signal_selector_widget.setVisible(False)  # Hidden by default
+        binding_layout.addWidget(self.signal_selector_widget)
         
         binding_group.setLayout(binding_layout)
         layout.addWidget(binding_group)
@@ -326,6 +354,11 @@ class ExitConditionDialog(QDialog):
         """Connect UI signals to handlers."""
         self.absolute_radio.toggled.connect(self._on_mode_changed)
         self.flexible_radio.toggled.connect(self._on_mode_changed)
+        
+        # Connect binding level radio buttons
+        self.strategy_radio.toggled.connect(self._on_binding_level_changed)
+        self.block_radio.toggled.connect(self._on_binding_level_changed)
+        self.signal_radio.toggled.connect(self._on_binding_level_changed)
     
     def _on_mode_changed(self, checked):
         """Handle exit mode radio button changes."""
@@ -335,6 +368,73 @@ class ExitConditionDialog(QDialog):
         else:
             self.exit_mode = "FLEXIBLE"
             self.flexible_params_group.setEnabled(True)
+    
+    def _on_binding_level_changed(self):
+        """Handle binding level radio button changes - show/hide selectors."""
+        # Show/hide appropriate selectors
+        self.block_selector_widget.setVisible(self.block_radio.isChecked())
+        self.signal_selector_widget.setVisible(self.signal_radio.isChecked())
+        
+        # Populate selectors when shown
+        if self.block_radio.isChecked():
+            self._populate_block_selector()
+        elif self.signal_radio.isChecked():
+            self._populate_signal_selector()
+    
+    def _populate_block_selector(self):
+        """Populate block selector with blocks from current strategy config."""
+        self.block_selector.clear()
+        
+        try:
+            parent = self.parent()
+            if not parent or not hasattr(parent, 'orchestrator'):
+                self.block_selector.addItem("No blocks available")
+                return
+            
+            orchestrator = parent.orchestrator
+            config = orchestrator.get_current_config()
+            
+            if not config or not config.blocks:
+                self.block_selector.addItem("No blocks in strategy")
+                return
+            
+            for block in config.blocks:
+                self.block_selector.addItem(block.name)
+        
+        except Exception as e:
+            print(f"Error populating block selector: {e}")
+            self.block_selector.addItem("Error loading blocks")
+    
+    def _populate_signal_selector(self):
+        """Populate signal selector with signals from current strategy config."""
+        self.signal_binding_selector.clear()
+        
+        try:
+            parent = self.parent()
+            if not parent or not hasattr(parent, 'orchestrator'):
+                self.signal_binding_selector.addItem("No signals available")
+                return
+            
+            orchestrator = parent.orchestrator
+            config = orchestrator.get_current_config()
+            
+            if not config or not config.blocks:
+                self.signal_binding_selector.addItem("No blocks in strategy")
+                return
+            
+            # Collect all signals from all blocks
+            for block in config.blocks:
+                for signal in block.signals:
+                    # Format: "block_name::signal_name"
+                    display_text = f"{block.name} → {signal.name}"
+                    self.signal_binding_selector.addItem(display_text, f"{block.name}::{signal.name}")
+            
+            if self.signal_binding_selector.count() == 0:
+                self.signal_binding_selector.addItem("No signals in strategy")
+        
+        except Exception as e:
+            print(f"Error populating signal selector: {e}")
+            self.signal_binding_selector.addItem("Error loading signals")
     
     def _load_available_signals(self):
         """Load available signals from registry (only in selector mode)."""
@@ -381,7 +481,7 @@ class ExitConditionDialog(QDialog):
         Get exit condition configuration from dialog.
         
         Returns:
-            Dictionary with exit condition settings
+            Dictionary with exit condition settings including block_name and parent_signal_name
         """
         # Get signal name from selector if in selector mode
         if self.signal_selector_mode and self.signal_selector:
@@ -391,12 +491,25 @@ class ExitConditionDialog(QDialog):
         
         # Get binding level from radio buttons
         binding_level = "STRATEGY"  # Default
+        block_name = None
+        parent_signal_name = None
+        
         if hasattr(self, 'block_radio') and self.block_radio.isChecked():
             binding_level = "BLOCK"
+            # Get selected block
+            if self.block_selector.currentText() and self.block_selector.currentText() not in ["No blocks available", "No blocks in strategy", "Error loading blocks"]:
+                block_name = self.block_selector.currentText()
+        
         elif hasattr(self, 'signal_radio') and self.signal_radio.isChecked():
             binding_level = "SIGNAL"
+            # Get selected signal (stored as "block_name::signal_name" in itemData)
+            current_data = self.signal_binding_selector.currentData()
+            if current_data and "::" in current_data:
+                parts = current_data.split("::")
+                block_name = parts[0]
+                parent_signal_name = parts[1]
         
-        return {
+        config = {
             'signal_name': self.signal_name,
             'percentage': self.percentage_spin.value() / 100.0,  # Convert to 0.0-1.0
             'exit_mode': self.exit_mode,
@@ -405,3 +518,11 @@ class ExitConditionDialog(QDialog):
             'reversal_trigger': self.reversal_spin.value() / 10.0,  # Convert to 0.0-1.0
             'recheck_enabled': self.recheck_checkbox.isChecked()
         }
+        
+        # Add block_name and parent_signal_name if applicable
+        if block_name:
+            config['block_name'] = block_name
+        if parent_signal_name:
+            config['parent_signal_name'] = parent_signal_name
+        
+        return config
