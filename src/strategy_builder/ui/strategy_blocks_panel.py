@@ -1736,7 +1736,12 @@ class StrategyBlocksPanel(QWidget):
         print(f"DEBUG: _on_duplicate_block_exit called for block '{block_name}', exit_signal '{exit_signal_name}'")
         try:
             # Show exit condition dialog pre-populated with the current exit's signal (ready to duplicate)
-            dialog = ExitConditionDialog(signal_name=exit_signal_name, parent=self, orchestrator=self.orchestrator)
+            dialog = ExitConditionDialog(
+                signal_name=exit_signal_name,
+                parent=self,
+                orchestrator=self.orchestrator,
+                is_duplicate=True
+            )
             
             if dialog.exec_() == QDialog.Accepted:
                 # Get configuration from dialog
@@ -1877,7 +1882,12 @@ class StrategyBlocksPanel(QWidget):
         print(f"DEBUG: _on_signal_exit_duplicate_clicked called for block '{block_name}', signal '{signal_name}', exit_signal '{exit_signal_name}'")
         try:
             # Show exit condition dialog pre-populated with the current exit's signal (ready to duplicate)
-            dialog = ExitConditionDialog(signal_name=exit_signal_name, parent=self, orchestrator=self.orchestrator)
+            dialog = ExitConditionDialog(
+                signal_name=exit_signal_name,
+                parent=self,
+                orchestrator=self.orchestrator,
+                is_duplicate=True
+            )
             
             if dialog.exec_() == QDialog.Accepted:
                 config = dialog.get_config()
