@@ -131,27 +131,29 @@ class StrategyDatabaseManager:
         version_id = str(uuid4())
         
         # Prepare version data
+        # CRITICAL: PostgreSQL JSONB columns expect Python objects (dict/list), NOT json.dumps() strings
+        # SQLAlchemy ORM handles JSONB serialization automatically
         version_data = {
             'version_id': version_id,
             'strategy_id': strategy_data['strategy_id'],
             'version_number': version_number,
             'name': strategy_data['name'],
             'description': strategy_data.get('description', ''),
-            'blocks': json.dumps(strategy_data['blocks']),
-            'signals': json.dumps(strategy_data['signals']),
-            'parameters': json.dumps(strategy_data['parameters']),
-            'entry_conditions': json.dumps(strategy_data['entry_conditions']),
-            'exit_conditions': json.dumps(strategy_data['exit_conditions']),
-            'risk_management': json.dumps(strategy_data['risk_management']),
-            'backtest_config': json.dumps(strategy_data['backtest_config']),
-            'backtest_results': json.dumps(strategy_data.get('backtest_results')) if strategy_data.get('backtest_results') else None,
-            'metrics': json.dumps(strategy_data.get('metrics')) if strategy_data.get('metrics') else None,
-            'trades': json.dumps(strategy_data.get('trades')) if strategy_data.get('trades') else None,
-            'equity_curve': json.dumps(strategy_data.get('equity_curve')) if strategy_data.get('equity_curve') else None,
+            'blocks': strategy_data['blocks'],  # Let ORM handle JSONB serialization
+            'signals': strategy_data['signals'],
+            'parameters': strategy_data['parameters'],
+            'entry_conditions': strategy_data['entry_conditions'],
+            'exit_conditions': strategy_data['exit_conditions'],
+            'risk_management': strategy_data['risk_management'],
+            'backtest_config': strategy_data['backtest_config'],
+            'backtest_results': strategy_data.get('backtest_results'),
+            'metrics': strategy_data.get('metrics'),
+            'trades': strategy_data.get('trades'),
+            'equity_curve': strategy_data.get('equity_curve'),
             'git_commit_hash': strategy_data.get('git_commit_hash'),
             'created_by': strategy_data.get('created_by'),
             'notes': strategy_data.get('notes'),
-            'tags': json.dumps(strategy_data.get('tags', [])),
+            'tags': strategy_data.get('tags', []),
             'config_hash': config_hash
         }
         
