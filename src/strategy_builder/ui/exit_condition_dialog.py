@@ -15,7 +15,7 @@ Date: 2026-01-27
 from typing import Optional
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QSpinBox, QRadioButton, QGroupBox, QCheckBox, QButtonGroup, QComboBox
+    QSpinBox, QRadioButton, QGroupBox, QCheckBox, QButtonGroup, QComboBox, QWidget
 )
 from PyQt5.QtCore import Qt
 
