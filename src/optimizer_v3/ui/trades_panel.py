@@ -202,12 +202,13 @@ class TradesPanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 15, 10, 10)
         
-        # Create table
+        # Create table - Sprint 1.8 Task 1.8.72: Added exit condition columns
         self.table = QTableWidget()
-        self.table.setColumnCount(12)
+        self.table.setColumnCount(15)  # 12 original + 3 exit condition columns
         self.table.setHorizontalHeaderLabels([
             'ID', 'Time', 'Symbol', 'Side', 'Size', 'Entry', 
-            'Exit', 'Duration', 'P&L', 'P&L %', 'Status', 'Notes'
+            'Exit', 'Duration', 'P&L', 'P&L %', 'Status',
+            'Exit Type', 'Exit Condition', 'Partial %', 'Notes'  # Sprint 1.8: Exit columns
         ])
         
         # Table styling - using helper function from styles.py (ZERO hardcoded styles)
@@ -223,15 +224,15 @@ class TradesPanel(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.verticalHeader().setVisible(False)
         
-        # Set column widths - ID fixed, Notes fixed, all others stretch equally
-        # ID=115px (fixed +35px total from original 80px), Notes=500px (fixed), 10 standard columns stretch to fill window
-        # ID, Time, Symbol, Side, Size, Entry, Exit, Duration, P&L, P&L %, Status, Notes
-        column_widths = [115, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 500]
+        # Set column widths - Sprint 1.8 Task 1.8.72: Updated for exit columns
+        # ID=115px (fixed), Notes=500px (fixed), Exit Type/Condition/Partial%=120px each, others stretch
+        # Columns: ID, Time, Symbol, Side, Size, Entry, Exit, Duration, P&L, P&L%, Status, Exit Type, Exit Condition, Partial%, Notes
+        column_widths = [115, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 500]
         for i, width in enumerate(column_widths):
             self.table.setColumnWidth(i, width)
         
-        # Set stretch on all standard columns (1-10) to fill window equally
-        # ID (0) and Notes (11) stay fixed
+        # Set stretch on standard columns (1-10) to fill window equally
+        # ID (0), Exit Type (11), Exit Condition (12), Partial% (13), and Notes (14) stay fixed
         for i in range(1, 11):  # Columns 1-10 (Time through Status)
             self.table.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
         
@@ -490,9 +491,37 @@ class TradesPanel(QWidget):
                 status_item.setForeground(QColor(get_color('success')))
             self.table.setItem(row, 10, status_item)
             
+            # Sprint 1.8 Task 1.8.73: Exit condition columns
+            # Exit Type (TP1/TP2/TP3/SL/EXIT_CONDITION)
+            exit_type = trade.get('exit_type', '-')
+            exit_type_item = self._create_item(exit_type)
+            if exit_type == 'EXIT_CONDITION':
+                exit_type_item.setForeground(QColor(get_color('error')))  # Red for exit conditions
+            elif exit_type in ['TP1', 'TP2', 'TP3']:
+                exit_type_item.setForeground(QColor(get_color('success')))  # Green for TPs
+            elif exit_type == 'SL':
+                exit_type_item.setForeground(QColor(get_color('error')))  # Red for SL
+            self.table.setItem(row, 11, exit_type_item)
+            
+            # Exit Condition Name (only if exit_type = EXIT_CONDITION)
+            exit_condition_name = trade.get('exit_condition_name', '-')
+            exit_condition_item = self._create_item(exit_condition_name)
+            if exit_condition_name != '-':
+                exit_condition_item.setForeground(QColor(get_color('error')))  # Red for exit condition names
+            self.table.setItem(row, 12, exit_condition_item)
+            
+            # Partial Exit Percentage (if partial exit was used)
+            partial_pct = trade.get('partial_exit_percentage', '')
+            if partial_pct:
+                partial_item = self._create_item(f"{float(partial_pct):.1f}%")
+                partial_item.setForeground(QColor(get_color('warning')))  # Orange for partial exits
+                self.table.setItem(row, 13, partial_item)
+            else:
+                self.table.setItem(row, 13, self._create_item('-'))
+            
             # Notes
             notes = trade.get('notes', '')
-            self.table.setItem(row, 11, self._create_item(str(notes)))
+            self.table.setItem(row, 14, self._create_item(str(notes)))
         
         # Re-enable sorting and apply default sort (ID ascending for chronological order)
         if was_sorting_enabled:
