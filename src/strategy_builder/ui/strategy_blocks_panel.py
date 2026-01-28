@@ -1323,6 +1323,9 @@ class StrategyBlocksPanel(QWidget):
             
             # Display each exit condition
             for exit_cond in config.exit_conditions:
+                # Capture signal_name at loop iteration to avoid closure issues
+                current_signal_name = exit_cond.signal_name
+                
                 # Create row widget for this exit
                 exit_row = QWidget()
                 exit_row_layout = QHBoxLayout()
@@ -1331,11 +1334,11 @@ class StrategyBlocksPanel(QWidget):
                 
                 # Exit info label
                 pct_display = int(exit_cond.percentage * 100)
-                exit_text = f"🔴 {exit_cond.signal_name} ({pct_display}%) - {exit_cond.exit_mode} mode"
+                exit_text = f"🔴 {current_signal_name} ({pct_display}%) - {exit_cond.exit_mode} mode"
                 exit_label = QLabel(exit_text)
                 exit_label.setStyleSheet(get_exit_tree_item_style() + " font-size: 10pt;")
                 exit_label.setToolTip(
-                    f"Signal: {exit_cond.signal_name}\n"
+                    f"Signal: {current_signal_name}\n"
                     f"Percentage: {pct_display}%\n"
                     f"Mode: {exit_cond.exit_mode}\n"
                     f"Binding: {exit_cond.binding_level}\n\n"
@@ -1345,7 +1348,7 @@ class StrategyBlocksPanel(QWidget):
                 
                 # Sprint 1.8 Task 1.8.50: Make exit row double-clickable for editing
                 # Store exit condition data as widget property for editing
-                exit_row.setProperty('exit_signal_name', exit_cond.signal_name)
+                exit_row.setProperty('exit_signal_name', current_signal_name)
                 exit_row.setProperty('exit_percentage', pct_display)
                 exit_row.setProperty('exit_mode', exit_cond.exit_mode)
                 exit_row.setProperty('tp_proximity_threshold', exit_cond.tp_proximity_threshold)
@@ -1359,9 +1362,9 @@ class StrategyBlocksPanel(QWidget):
                 config_btn.setMaximumHeight(30)
                 config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                 config_btn.setToolTip("Configure exit condition")
-                # Use lambda without checked parameter to avoid binding issues
+                # CRITICAL: Use current_signal_name as default parameter to capture value
                 config_btn.clicked.connect(
-                    lambda sig=exit_cond.signal_name: self._on_edit_strategy_exit(sig)
+                    lambda checked=False, sig=current_signal_name: self._on_edit_strategy_exit(sig)
                 )
                 exit_row_layout.addWidget(config_btn)
                 
@@ -1373,9 +1376,9 @@ class StrategyBlocksPanel(QWidget):
                 remove_btn.setMaximumHeight(30)
                 remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                 remove_btn.setToolTip("Remove this exit condition")
-                # Use lambda without checked parameter to avoid binding issues
+                # CRITICAL: Use current_signal_name as default parameter to capture value
                 remove_btn.clicked.connect(
-                    lambda sig=exit_cond.signal_name: self._on_remove_strategy_exit(sig)
+                    lambda checked=False, sig=current_signal_name: self._on_remove_strategy_exit(sig)
                 )
                 exit_row_layout.addWidget(remove_btn)
                 
