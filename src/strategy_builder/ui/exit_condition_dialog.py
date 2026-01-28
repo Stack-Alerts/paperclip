@@ -110,6 +110,19 @@ class ExitConditionDialog(QDialog):
     def showEvent(self, event):
         """Override showEvent to load signals after dialog is added to widget tree."""
         super().showEvent(event)
+        
+        # Issue 2: Force window size to 800px width AFTER it's shown
+        from PyQt5.QtCore import QTimer
+        if not hasattr(self, '_size_set'):
+            self._size_set = True
+            # Use QTimer to set size after event loop processes the show
+            QTimer.singleShot(0, lambda: self.setGeometry(
+                self.geometry().x(),
+                self.geometry().y(),
+                800,
+                self.geometry().height()
+            ))
+        
         # Load signals on first show (after dialog is in widget tree)
         if self.signal_selector_mode and self.signal_selector and self.signal_selector.count() == 0:
             print("DEBUG: showEvent - Loading available signals now that dialog is shown")
