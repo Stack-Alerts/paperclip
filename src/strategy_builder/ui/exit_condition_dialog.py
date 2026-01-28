@@ -47,7 +47,10 @@ class ExitConditionDialog(QDialog):
         existing_reversal: float = 0.5,
         parent=None,
         orchestrator=None,
-        is_duplicate: bool = False
+        is_duplicate: bool = False,
+        binding_level: str = "STRATEGY",
+        block_name: Optional[str] = None,
+        parent_signal_name: Optional[str] = None
     ):
         """
         Initialize exit condition dialog.
@@ -61,14 +64,25 @@ class ExitConditionDialog(QDialog):
             parent: Parent widget
             orchestrator: StrategyBuilderOrchestrator instance (optional, will find via parent if not provided)
             is_duplicate: True if opened from duplicate button, False for config button
+            binding_level: Initial binding level to pre-select ("STRATEGY", "BLOCK", "SIGNAL")
+            block_name: Block name if binding to block/signal
+            parent_signal_name: Parent signal name if binding to signal
         """
         super().__init__(parent)
+        
+        # Issue 3: Make window draggable (non-modal)
+        self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint)
         
         self.signal_name = signal_name  # May be None - signal selector mode
         self.signal_selector_mode = (signal_name is None)
         self.exit_mode = existing_exit_mode
         self.orchestrator = orchestrator  # Store orchestrator reference
         self.is_duplicate = is_duplicate  # Track if this is duplicate operation
+        
+        # Issue 1: Store binding context for auto-selection
+        self.initial_binding_level = binding_level
+        self.initial_block_name = block_name
+        self.initial_parent_signal_name = parent_signal_name
         
         # Convert percentage from 0.0-1.0 to 1-100 for display
         if existing_percentage is not None:
@@ -99,6 +113,41 @@ class ExitConditionDialog(QDialog):
         if self.signal_selector_mode and self.signal_selector and self.signal_selector.count() == 0:
             print("DEBUG: showEvent - Loading available signals now that dialog is shown")
             self._load_available_signals()
+        
+        # Issue 1: Auto-select binding level based on duplication source
+        if hasattr(self, '_binding_level_set'):
+            return  # Already set, don't do it again
+        
+        self._binding_level_set = True
+        print(f"DEBUG: Auto-selecting binding level: {self.initial_binding_level}")
+        
+        if self.initial_binding_level == "BLOCK":
+            self.block_radio.setChecked(True)
+            # Pre-select the block if provided
+            if self.initial_block_name:
+                self._populate_block_selector()
+                # Find and select the block
+                for i in range(self.block_selector.count()):
+                    if self.block_selector.itemText(i) == self.initial_block_name:
+                        self.block_selector.setCurrentIndex(i)
+                        break
+        elif self.initial_binding_level == "SIGNAL":
+            self.signal_radio.setChecked(True)
+            # Pre-select the signal if provided
+            if self.initial_block_name and self.initial_parent_signal_name:
+                self._populate_signal_selector()
+                # Find and select the signal
+                target_data = f"{self.initial_block_name}::{self.initial_parent_signal_name}"
+                for i in range(self.signal_binding_selector.count()):
+                    if self.signal_binding_selector.itemData(i) == target_data:
+                        self.signal_binding_selector.setCurrentIndex(i)
+                        break
+        else:
+            # STRATEGY - already checked by default
+            pass
+        
+        # Issue 2: Force window to show at minimum width
+        self.resize(750, self.height())
     
     def _init_ui(self):
         """Initialize the user interface."""
@@ -109,7 +158,7 @@ class ExitConditionDialog(QDialog):
             self.setWindowTitle(f"Configure Exit Condition: {self.signal_name}")
         
         self.setStyleSheet(get_exit_dialog_stylesheet())
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(700)
         
         layout = QVBoxLayout()
         layout.setSpacing(15)
@@ -140,7 +189,7 @@ class ExitConditionDialog(QDialog):
             signal_row.addWidget(signal_label)
             
             self.signal_selector = QComboBox()
-            self.signal_selector.setMinimumWidth(300)
+            self.signal_selector.setMinimumWidth(700)
             self.signal_selector.setToolTip("Select an exit signal from the building blocks registry")
             signal_row.addWidget(self.signal_selector, stretch=1)
             

@@ -1736,11 +1736,14 @@ class StrategyBlocksPanel(QWidget):
         print(f"DEBUG: _on_duplicate_block_exit called for block '{block_name}', exit_signal '{exit_signal_name}'")
         try:
             # Show exit condition dialog pre-populated with the current exit's signal (ready to duplicate)
+            # Issue 1 Fix: Pass binding context so dialog auto-selects BLOCK binding level
             dialog = ExitConditionDialog(
                 signal_name=exit_signal_name,
                 parent=self,
                 orchestrator=self.orchestrator,
-                is_duplicate=True
+                is_duplicate=True,
+                binding_level="BLOCK",
+                block_name=block_name
             )
             
             if dialog.exec_() == QDialog.Accepted:
@@ -1882,11 +1885,15 @@ class StrategyBlocksPanel(QWidget):
         print(f"DEBUG: _on_signal_exit_duplicate_clicked called for block '{block_name}', signal '{signal_name}', exit_signal '{exit_signal_name}'")
         try:
             # Show exit condition dialog pre-populated with the current exit's signal (ready to duplicate)
+            # Issue 1 Fix: Pass binding context so dialog auto-selects SIGNAL binding level
             dialog = ExitConditionDialog(
                 signal_name=exit_signal_name,
                 parent=self,
                 orchestrator=self.orchestrator,
-                is_duplicate=True
+                is_duplicate=True,
+                binding_level="SIGNAL",
+                block_name=block_name,
+                parent_signal_name=signal_name
             )
             
             if dialog.exec_() == QDialog.Accepted:
