@@ -467,12 +467,14 @@ class StrategyBuilderMainWindow(QMainWindow):
             
             # Load blocks from database using persistence (SAME AS FILE LOAD)
             blocks_data = version.get('blocks', [])
+            exit_conditions_data = version.get('exit_conditions', [])  # Sprint 1.8: Load exit conditions
             
             # Build config dict in EXACT same format as file load
             config_dict = {
                 'name': version['name'],
                 'description': version.get('description', ''),
-                'blocks': blocks_data
+                'blocks': blocks_data,
+                'exit_conditions': exit_conditions_data  # Sprint 1.8: Include exit conditions
             }
             
             # Use persistence._dict_to_config() - EXACT same as file load
