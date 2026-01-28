@@ -1735,7 +1735,7 @@ class StrategyBlocksPanel(QWidget):
         """Handle duplicate button - add another exit to this block."""
         print(f"DEBUG: _on_duplicate_block_exit called for block '{block_name}'")
         try:
-            # Show exit condition dialog to add a new exit to this block
+            # Show exit condition dialog to add a new exit to this block (no pre-population - user selects signal)
             dialog = ExitConditionDialog(parent=self)
             
             if dialog.exec_() == QDialog.Accepted:
