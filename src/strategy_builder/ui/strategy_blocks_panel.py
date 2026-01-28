@@ -433,7 +433,7 @@ class BlockConfigItem(QWidget):
                     
                     exit_text = f"🔴  {current_exit_signal_name} ({pct_display}%) - {exit_mode} mode"
                     exit_label = QLabel(exit_text)
-                    exit_label.setStyleSheet(get_exit_tree_item_style() + " font-size: 9pt; font-weight: bold;")
+                    exit_label.setStyleSheet(get_exit_tree_item_style() + " font-size: 9pt;")  # Removed bold
                     exit_label.setToolTip(
                         f"Block-Level Exit Condition\n"
                         f"Signal: {current_exit_signal_name}\n"
@@ -453,6 +453,16 @@ class BlockConfigItem(QWidget):
                             self._on_block_exit_config_clicked(bname, sname)
                     )
                     exit_row_layout.addWidget(config_btn)
+                    
+                    # Duplicate button - add another exit to this block
+                    duplicate_btn = QPushButton("⎘")
+                    duplicate_btn.setStyleSheet(get_recheck_duplicate_button_stylesheet())
+                    duplicate_btn.setToolTip("Add another exit condition to this block")
+                    duplicate_btn.clicked.connect(
+                        lambda checked, bname=self.block_name:
+                            self._on_duplicate_block_exit_clicked(bname)
+                    )
+                    exit_row_layout.addWidget(duplicate_btn)
                     
                     # Remove button - same style as strategy exit buttons
                     remove_btn = QPushButton("✕")
@@ -663,6 +673,12 @@ class BlockConfigItem(QWidget):
         panel = self._find_strategy_blocks_panel()
         if panel and hasattr(panel, '_on_remove_block_exit'):
             panel._on_remove_block_exit(block_name, signal_name)
+    
+    def _on_duplicate_block_exit_clicked(self, block_name: str):
+        """Handle duplicate button for block-level exit - forward to panel."""
+        panel = self._find_strategy_blocks_panel()
+        if panel and hasattr(panel, '_on_duplicate_block_exit'):
+            panel._on_duplicate_block_exit(block_name)
     
     def _find_strategy_blocks_panel(self):
         """Find the StrategyBlocksPanel by traversing up the widget tree."""
@@ -1591,11 +1607,119 @@ class StrategyBlocksPanel(QWidget):
             traceback.print_exc()
     
     def _on_edit_block_exit(self, block_name: str, signal_name: str):
-        """Handle config button for block-level exit condition."""
+        """Handle config button for block-level exit condition - show exit dialog."""
         print(f"DEBUG: _on_edit_block_exit called for block '{block_name}', signal '{signal_name}'")
-        # TODO: Implement block-level exit editing using orchestrator
-        # Similar to strategy exit editing but with binding_level='BLOCK' and block_name parameter
-        print("Block-level exit editing not yet implemented in orchestrator")
+        try:
+            # Get current config to find the exit
+            config = self.orchestrator.get_current_config()
+            if not config:
+                return
+            
+            # Find the block and its exit condition
+            current_exit = None
+            for block in config.blocks:
+                if block.name == block_name:
+                    if hasattr(block, 'exit_conditions') and block.exit_conditions:
+                        for exit_cond in block.exit_conditions:
+                            if exit_cond.signal_name == signal_name:
+                                current_exit = exit_cond
+                                break
+                    break
+            
+            if not current_exit:
+                print(f"Block exit condition {signal_name} not found in block {block_name}")
+                return
+            
+            # Show exit condition dialog pre-populated with current values
+            dialog = ExitConditionDialog(
+                signal_name=signal_name,
+                existing_percentage=current_exit.percentage,
+                existing_exit_mode=current_exit.exit_mode,
+                existing_tp_proximity=current_exit.tp_proximity_threshold,
+                existing_reversal=current_exit.reversal_trigger,
+                parent=self
+            )
+            
+            if dialog.exec_() == QDialog.Accepted:
+                # Get new configuration
+                new_config = dialog.get_config()
+                
+                if not new_config or not new_config.get('signal_name'):
+                    print("No signal selected for exit condition")
+                    return
+                
+                # Remove old exit condition first
+                remove_result = self.orchestrator.remove_exit_condition(
+                    signal_name=signal_name,
+                    binding_level='BLOCK',
+                    block_name=block_name
+                )
+                
+                if not remove_result.success:
+                    print(f"Failed to remove old block exit condition: {remove_result.message}")
+                    return
+                
+                # Add updated exit condition
+                add_result = self.orchestrator.add_exit_condition(
+                    signal_name=new_config['signal_name'],
+                    percentage=new_config.get('percentage', 50) / 100.0,
+                    binding_level='BLOCK',
+                    block_name=block_name,
+                    exit_mode=new_config.get('exit_mode', 'ABSOLUTE'),
+                    tp_proximity_threshold=new_config.get('tp_proximity_threshold', 2.0),
+                    reversal_trigger=new_config.get('reversal_trigger', 0.5)
+                )
+                
+                if add_result.success:
+                    print(f"Block exit condition updated: {block_name} -> {new_config['signal_name']}")
+                    self._refresh_blocks()
+                    self.blocks_changed.emit()
+                else:
+                    print(f"Failed to update block exit condition: {add_result.message}")
+        
+        except Exception as e:
+            print(f"Error editing block exit: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_duplicate_block_exit(self, block_name: str):
+        """Handle duplicate button - add another exit to this block."""
+        print(f"DEBUG: _on_duplicate_block_exit called for block '{block_name}'")
+        try:
+            # Show exit condition dialog to add a new exit to this block
+            dialog = ExitConditionDialog(parent=self)
+            
+            if dialog.exec_() == QDialog.Accepted:
+                # Get configuration from dialog
+                config = dialog.get_config()
+                
+                # Validate that a signal was selected
+                if not config or not config.get('signal_name'):
+                    print("No signal selected for exit condition")
+                    return
+                
+                # Add to orchestrator at BLOCK binding level
+                result = self.orchestrator.add_exit_condition(
+                    signal_name=config['signal_name'],
+                    percentage=config.get('percentage', 50) / 100.0,
+                    binding_level='BLOCK',
+                    block_name=block_name,
+                    exit_mode=config.get('exit_mode', 'ABSOLUTE'),
+                    tp_proximity_threshold=config.get('tp_proximity_threshold', 2.0),
+                    reversal_trigger=config.get('reversal_trigger', 0.5)
+                )
+                
+                if result.success:
+                    print(f"Block exit condition added: {block_name} -> {config['signal_name']}")
+                    self._refresh_blocks()
+                    self.blocks_changed.emit()
+                else:
+                    print(f"Failed to add block exit condition: {result.message}")
+        
+        except Exception as e:
+            print(f"Error adding block exit condition: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _on_remove_block_exit(self, block_name: str, signal_name: str):
         """Handle remove button for block-level exit condition."""
