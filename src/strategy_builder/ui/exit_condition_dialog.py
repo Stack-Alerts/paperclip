@@ -470,40 +470,58 @@ class ExitConditionDialog(QDialog):
     def _load_available_signals(self):
         """Load available signals from registry (only in selector mode)."""
         if not self.signal_selector_mode or not self.signal_selector:
+            print("DEBUG: Not in signal selector mode or no signal selector widget")
             return
         
         try:
-            # Get parent to access orchestrator
-            parent = self.parent()
-            if not parent or not hasattr(parent, 'orchestrator'):
-                print("Warning: Cannot access orchestrator from dialog parent")
+            # Use _find_orchestrator() to properly traverse the widget tree
+            orchestrator = self._find_orchestrator()
+            
+            if not orchestrator:
+                print("Warning: Cannot access orchestrator - not found in widget tree")
+                self.signal_selector.addItem("No orchestrator available")
+                self.signal_selector.setEnabled(False)
                 return
             
-            orchestrator = parent.orchestrator
+            print(f"DEBUG: Successfully found orchestrator: {type(orchestrator).__name__}")
             
             # Get all blocks from registry
             search_results = orchestrator.search_blocks("")  # Empty = all blocks
+            print(f"DEBUG: Found {len(search_results)} blocks in registry")
             
-            # Collect all signals
+            # Collect all signals marked for exit conditions
             signals_set = set()
             for result in search_results:
                 block_info = orchestrator.registry_interface.get_block(result.block_name)
                 if block_info and block_info.signals:
                     for signal in block_info.signals:
-                        # Only add if ui_visible is not explicitly False
-                        if getattr(signal, 'ui_visible', True) is not False:
+                        # Only include signals that are visible in UI and marked as exit signals
+                        ui_visible = getattr(signal, 'ui_visible', True)
+                        is_exit_signal = getattr(signal, 'is_exit_signal', False)
+                        
+                        # Include if: ui_visible is True AND (is_exit_signal OR no is_exit_signal attribute)
+                        # This ensures backward compatibility with blocks that don't have is_exit_signal yet
+                        if ui_visible and (is_exit_signal or not hasattr(signal, 'is_exit_signal')):
                             signals_set.add(signal.name)
+                            print(f"  - Added signal: {signal.name} (is_exit={is_exit_signal})")
+            
+            print(f"DEBUG: Total unique signals collected: {len(signals_set)}")
             
             # Sort and populate combo box
             for signal_name in sorted(signals_set):
                 self.signal_selector.addItem(signal_name)
             
             if self.signal_selector.count() == 0:
+                print("WARNING: No signals found in registry")
                 self.signal_selector.addItem("No signals available")
                 self.signal_selector.setEnabled(False)
+            else:
+                print(f"SUCCESS: Populated signal selector with {self.signal_selector.count()} signals")
             
         except Exception as e:
-            print(f"Error loading signals: {e}")
+            print(f"ERROR loading signals: {e}")
+            import traceback
+            traceback.print_exc()
             self.signal_selector.addItem("Error loading signals")
             self.signal_selector.setEnabled(False)
     
