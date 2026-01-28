@@ -925,6 +925,9 @@ class BlockSearchPanel(QWidget):
             print(f"\n✅ EXIT CONDITION ADDED: {signal_name}")
             print(f"✅ Added to strategy-level exits")
             print(f"✅ {result.message}\n")
+            
+            # CRITICAL: Emit signal to refresh blocks panel UI
+            self.block_selected.emit("EXIT_CONDITION_ADDED")
         else:
             if LOGGER_AVAILABLE and logger:
                 logger.error(LogComponent.SEARCH_PANEL,
