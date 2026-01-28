@@ -61,6 +61,7 @@ class TestResultsManager:
                 - trades (list, optional): Trade details
                 - equity_curve (list, optional): Equity curve data
                 - risk_metrics (dict, optional): Risk analysis
+                - exit_condition_results (dict, optional): Exit condition statistics (Sprint 1.8)
                 - errors (list, optional): Error log
                 - warnings (list, optional): Warning log
                 - notes (str, optional): Additional notes
@@ -107,6 +108,7 @@ class TestResultsManager:
             'trades': json.dumps(test_data.get('trades')) if test_data.get('trades') else None,
             'equity_curve': json.dumps(test_data.get('equity_curve')) if test_data.get('equity_curve') else None,
             'risk_metrics': json.dumps(test_data.get('risk_metrics')) if test_data.get('risk_metrics') else None,
+            'exit_condition_results': json.dumps(test_data.get('exit_condition_results')) if test_data.get('exit_condition_results') else None,
             'errors': json.dumps(test_data.get('errors')) if test_data.get('errors') else None,
             'warnings': json.dumps(test_data.get('warnings')) if test_data.get('warnings') else None,
             'notes': test_data.get('notes')
@@ -118,12 +120,12 @@ class TestResultsManager:
                 result_id, strategy_id, version_id, test_type, test_config,
                 start_date, end_date, total_return_pct, sharpe_ratio, max_drawdown_pct,
                 win_rate, profit_factor, total_trades, metrics, trades, equity_curve,
-                risk_metrics, errors, warnings, notes
+                risk_metrics, exit_condition_results, errors, warnings, notes
             ) VALUES (
                 :result_id, :strategy_id, :version_id, :test_type, :test_config,
                 :start_date, :end_date, :total_return_pct, :sharpe_ratio, :max_drawdown_pct,
                 :win_rate, :profit_factor, :total_trades, :metrics, :trades, :equity_curve,
-                :risk_metrics, :errors, :warnings, :notes
+                :risk_metrics, :exit_condition_results, :errors, :warnings, :notes
             )
         """)
         
@@ -157,7 +159,7 @@ class TestResultsManager:
         test = dict(result._mapping)
         
         # Parse JSON fields
-        json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'errors', 'warnings']
+        json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'exit_condition_results', 'errors', 'warnings']
         for field in json_fields:
             if test.get(field):
                 test[field] = json.loads(test[field])
@@ -198,7 +200,7 @@ class TestResultsManager:
         tests = []
         for row in results:
             test = dict(row._mapping)
-            json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'errors', 'warnings']
+            json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'exit_condition_results', 'errors', 'warnings']
             for field in json_fields:
                 if test.get(field):
                     test[field] = json.loads(test[field])
@@ -493,4 +495,100 @@ class TestResultsManager:
             'metric_value': result[1],
             'test_count': result[2],
             'test_type': test_type
+        }
+    
+    def get_exit_condition_statistics(self, strategy_id: str) -> Dict[str, Any]:
+        """
+        Get aggregate exit condition statistics for a strategy
+        
+        Sprint 1.8 Task 1.8.29: Aggregate exit condition performance across all test results
+        
+        Args:
+            strategy_id: Strategy ID
+            
+        Returns:
+            Dict with exit condition statistics:
+                - total_triggers: Total exit condition triggers across all tests
+                - trigger_by_condition: Dict mapping condition names to trigger counts
+                - avg_exit_percentage: Average exit percentage
+                - pnl_by_condition: Dict mapping condition names to total P&L
+                - best_performing_exit: Exit condition with highest P&L
+                - worst_performing_exit: Exit condition with lowest P&L
+        """
+        # Get all test results for this strategy
+        tests = self.get_strategy_test_results(strategy_id)
+        
+        if not tests:
+            return {
+                'total_triggers': 0,
+                'trigger_by_condition': {},
+                'avg_exit_percentage': 0.0,
+                'pnl_by_condition': {},
+                'best_performing_exit': None,
+                'worst_performing_exit': None,
+                'test_count': 0
+            }
+        
+        # Aggregate statistics
+        total_triggers = 0
+        trigger_by_condition = {}
+        pnl_by_condition = {}
+        exit_percentage_sum = 0
+        exit_percentage_count = 0
+        
+        for test in tests:
+            exit_results = test.get('exit_condition_results')
+            if not exit_results:
+                continue
+            
+            # Aggregate triggers
+            test_triggers = exit_results.get('total_triggers', 0)
+            total_triggers += test_triggers
+            
+            # Aggregate by condition name
+            by_condition = exit_results.get('by_condition_name', {})
+            for cond_name, cond_data in by_condition.items():
+                if cond_name not in trigger_by_condition:
+                    trigger_by_condition[cond_name] = 0
+                    pnl_by_condition[cond_name] = 0.0
+                
+                trigger_by_condition[cond_name] += cond_data.get('triggers', 0)
+                pnl_by_condition[cond_name] += cond_data.get('pnl', 0.0)
+            
+            # Aggregate avg percentages
+            partial_exits = exit_results.get('partial_exits', 0)
+            if partial_exits > 0:
+                exit_percentage_count += partial_exits
+                # Approximate from partial_exit_count and total triggers
+                if test_triggers > 0:
+                    exit_percentage_sum += (partial_exits / test_triggers) * 50  # Estimate
+        
+        # Calculate averages
+        avg_exit_percentage = (
+            exit_percentage_sum / exit_percentage_count 
+            if exit_percentage_count > 0 else 0.0
+        )
+        
+        # Find best/worst performing exits
+        best_exit = None
+        worst_exit = None
+        
+        if pnl_by_condition:
+            best_exit = max(pnl_by_condition.items(), key=lambda x: x[1])
+            worst_exit = min(pnl_by_condition.items(), key=lambda x: x[1])
+        
+        return {
+            'total_triggers': total_triggers,
+            'trigger_by_condition': trigger_by_condition,
+            'avg_exit_percentage': round(avg_exit_percentage, 2),
+            'pnl_by_condition': pnl_by_condition,
+            'best_performing_exit': {
+                'condition_name': best_exit[0],
+                'total_pnl': best_exit[1]
+            } if best_exit else None,
+            'worst_performing_exit': {
+                'condition_name': worst_exit[0],
+                'total_pnl': worst_exit[1]
+            } if worst_exit else None,
+            'test_count': len(tests)
         }
