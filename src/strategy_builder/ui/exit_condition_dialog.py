@@ -15,7 +15,7 @@ Date: 2026-01-27
 from typing import Optional
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QSpinBox, QRadioButton, QGroupBox, QCheckBox, QButtonGroup, QComboBox, QWidget
+    QSpinBox, QDoubleSpinBox, QRadioButton, QGroupBox, QCheckBox, QButtonGroup, QComboBox, QWidget
 )
 from PyQt5.QtCore import Qt
 
@@ -325,6 +325,19 @@ class ExitConditionDialog(QDialog):
         percentage_row.addStretch()
         
         percentage_layout.addLayout(percentage_row)
+        
+        # Quick preset buttons for percentage
+        preset_row = QHBoxLayout()
+        preset_row.addWidget(QLabel("     Quick:"))
+        for pct in [10, 25, 50, 75, 100]:
+            btn = QPushButton(f"{pct}%")
+            btn.setFixedWidth(60)
+            btn.setStyleSheet(get_primary_button_stylesheet())
+            btn.clicked.connect(lambda checked, p=pct: self.percentage_spin.setValue(p))
+            preset_row.addWidget(btn)
+        preset_row.addStretch()
+        percentage_layout.addLayout(preset_row)
+        
         percentage_group.setLayout(percentage_layout)
         layout.addWidget(percentage_group)
         
@@ -381,15 +394,29 @@ class ExitConditionDialog(QDialog):
         proximity_label.setToolTip("Distance from TP to consider 'close to TP' (percentage)")
         proximity_row.addWidget(proximity_label)
         
-        self.tp_proximity_spin = QSpinBox()
-        self.tp_proximity_spin.setRange(1, 10)
-        self.tp_proximity_spin.setValue(int(self.tp_proximity_threshold))
+        self.tp_proximity_spin = QDoubleSpinBox()
+        self.tp_proximity_spin.setRange(0.25, 10.0)
+        self.tp_proximity_spin.setDecimals(2)
+        self.tp_proximity_spin.setSingleStep(0.25)
+        self.tp_proximity_spin.setValue(self.tp_proximity_threshold)
         self.tp_proximity_spin.setSuffix("%")
         self.tp_proximity_spin.setToolTip("If price is within this % of TP, consider deferring exit")
         proximity_row.addWidget(self.tp_proximity_spin)
         proximity_row.addStretch()
         
         flexible_params_layout.addLayout(proximity_row)
+        
+        # Quick preset buttons for TP Proximity
+        tp_preset_row = QHBoxLayout()
+        tp_preset_row.addWidget(QLabel("     Quick:"))
+        for val in [0.25, 0.5, 1.0, 1.5, 2.0]:
+            btn = QPushButton(f"{val}%")
+            btn.setFixedWidth(60)
+            btn.setStyleSheet(get_primary_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.tp_proximity_spin.setValue(v))
+            tp_preset_row.addWidget(btn)
+        tp_preset_row.addStretch()
+        flexible_params_layout.addLayout(tp_preset_row)
         
         # Reversal Trigger
         reversal_row = QHBoxLayout()
@@ -407,6 +434,18 @@ class ExitConditionDialog(QDialog):
         reversal_row.addStretch()
         
         flexible_params_layout.addLayout(reversal_row)
+        
+        # Quick preset buttons for Reversal Trigger
+        rev_preset_row = QHBoxLayout()
+        rev_preset_row.addWidget(QLabel("     Quick:"))
+        for val in [1, 2, 3, 4, 5]:
+            btn = QPushButton(f"{val}%")
+            btn.setFixedWidth(60)
+            btn.setStyleSheet(get_primary_button_stylesheet())
+            btn.clicked.connect(lambda checked, v=val: self.reversal_spin.setValue(v))
+            rev_preset_row.addWidget(btn)
+        rev_preset_row.addStretch()
+        flexible_params_layout.addLayout(rev_preset_row)
         
         self.flexible_params_group.setLayout(flexible_params_layout)
         layout.addWidget(self.flexible_params_group)
