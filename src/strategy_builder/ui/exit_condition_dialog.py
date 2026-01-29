@@ -313,13 +313,15 @@ class ExitConditionDialog(QDialog):
         # Quick preset buttons inline
         for pct in [10, 25, 50, 75, 100]:
             btn = QPushButton(f"{pct}%")
-            btn.setFixedSize(50, 32)
+            btn.setFixedSize(80, 32)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
                     color: #999999;
                     border: none;
                     border-radius: 6px;
+                    padding: 2px 4px;
+                    text-align: center;
                 }
                 QPushButton:hover {
                     background-color: #1a3334;
@@ -329,7 +331,7 @@ class ExitConditionDialog(QDialog):
                 }
             """)
             # Set font AFTER stylesheet to prevent override
-            btn_font = create_font(size=10)
+            btn_font = create_font(size=12)
             btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, p=pct: self.percentage_spin.setValue(p))
             percentage_row.addWidget(btn)
@@ -405,13 +407,15 @@ class ExitConditionDialog(QDialog):
         # Quick preset buttons inline
         for val in [0.25, 0.5, 1.0, 1.5, 2.0]:
             btn = QPushButton(f"{val}%")
-            btn.setFixedSize(60, 32)
+            btn.setFixedSize(100, 32)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
                     color: #999999;
                     border: none;
                     border-radius: 6px;
+                    padding: 2px 4px;
+                    text-align: center;
                 }
                 QPushButton:hover {
                     background-color: #1a3334;
@@ -421,7 +425,7 @@ class ExitConditionDialog(QDialog):
                 }
             """)
             # Set font AFTER stylesheet to prevent override
-            btn_font = create_font(size=10)
+            btn_font = create_font(size=12)
             btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, v=val: self.tp_proximity_spin.setValue(v))
             proximity_row.addWidget(btn)
@@ -446,13 +450,15 @@ class ExitConditionDialog(QDialog):
         # Quick preset buttons inline
         for val in [1, 2, 3, 4, 5]:
             btn = QPushButton(f"{val}%")
-            btn.setFixedSize(50, 32)
+            btn.setFixedSize(80, 32)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
                     color: #999999;
                     border: none;
                     border-radius: 6px;
+                    padding: 2px 4px;
+                    text-align: center;
                 }
                 QPushButton:hover {
                     background-color: #1a3334;
@@ -462,7 +468,7 @@ class ExitConditionDialog(QDialog):
                 }
             """)
             # Set font AFTER stylesheet to prevent override
-            btn_font = create_font(size=10)
+            btn_font = create_font(size=12)
             btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, v=val: self.reversal_spin.setValue(v))
             reversal_row.addWidget(btn)
