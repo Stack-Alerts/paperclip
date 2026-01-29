@@ -159,11 +159,11 @@ class ExitConditionDialog(QDialog):
     
     def _init_ui(self):
         """Initialize the user interface."""
-        # Set window title based on mode
+        # Set window title based on mode - without signal name (gets cut off)
         if self.is_duplicate:
-            self.setWindowTitle(f"Duplicate Exit Condition: {self.signal_name}")
+            self.setWindowTitle("Duplicate Exit Condition")
         else:
-            self.setWindowTitle(f"Configure Exit Condition: {self.signal_name}")
+            self.setWindowTitle("Configure Exit Condition")
         
         self.setStyleSheet(get_exit_dialog_stylesheet())
         # Allow dialog to expand as needed
