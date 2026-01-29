@@ -1165,7 +1165,7 @@ def get_exit_dialog_stylesheet() -> str:
             subcontrol-origin: margin;
             left: 12px;
             padding: 0 5px;
-            color: {COLORS['error']};
+            color: #095983;
             font-size: 11pt;
             font-weight: bold;
         }}
