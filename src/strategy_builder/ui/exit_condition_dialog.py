@@ -315,7 +315,7 @@ class ExitConditionDialog(QDialog):
             btn = QPushButton(f"{pct}%")
             btn.setFixedSize(50, 24)
             # Set font explicitly with QFont
-            btn_font = create_font(size=11)
+            btn_font = create_font(size=14)
             btn.setFont(btn_font)
             btn.setStyleSheet("""
                 QPushButton {
@@ -407,7 +407,7 @@ class ExitConditionDialog(QDialog):
             btn = QPushButton(f"{val}%")
             btn.setFixedSize(60, 24)
             # Set font explicitly with QFont
-            btn_font = create_font(size=11)
+            btn_font = create_font(size=14)
             btn.setFont(btn_font)
             btn.setStyleSheet("""
                 QPushButton {
@@ -448,7 +448,7 @@ class ExitConditionDialog(QDialog):
             btn = QPushButton(f"{val}%")
             btn.setFixedSize(50, 24)
             # Set font explicitly with QFont
-            btn_font = create_font(size=11)
+            btn_font = create_font(size=14)
             btn.setFont(btn_font)
             btn.setStyleSheet("""
                 QPushButton {
