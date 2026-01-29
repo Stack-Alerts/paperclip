@@ -422,6 +422,55 @@ class BlockConfigItem(QWidget):
                         exit_row_layout.addWidget(exit_remove_btn)
                         
                         signals_layout.addLayout(exit_row_layout)
+                        
+                        # Level 5: RECHECK for Exit Condition (if exists)
+                        if exit_cond.get('recheck_config'):
+                            recheck_cfg = exit_cond['recheck_config']
+                            if recheck_cfg.get('enabled'):
+                                bar_delay = recheck_cfg.get('bar_delay', 0)
+                                
+                                # Determine RECHECK indentation (deeper than exit)
+                                if signal.get('recheck_config') and signal['recheck_config'].get('enabled'):
+                                    if timing_constraint:
+                                        recheck_indent = "                    "
+                                    else:
+                                        recheck_indent = "               "
+                                elif timing_constraint:
+                                    recheck_indent = "               "
+                                else:
+                                    recheck_indent = "          "
+                                
+                                # Create RECHECK row with buttons
+                                recheck_row_layout = QHBoxLayout()
+                                recheck_row_layout.setSpacing(8)
+                                
+                                recheck_text = f"{recheck_indent}└── RECHECK ({bar_delay} bars)"
+                                recheck_label = QLabel(recheck_text)
+                                recheck_label.setStyleSheet(get_label_style('success') + " font-size: 9pt; font-weight: bold;")
+                                recheck_label.setToolTip(f"Exit signal must reoccur within {bar_delay} bars for validation")
+                                recheck_row_layout.addWidget(recheck_label, stretch=1)
+                                
+                                # Gear icon button for RECHECK configuration
+                                recheck_gear_btn = QPushButton("⚙")
+                                recheck_gear_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
+                                recheck_gear_btn.setToolTip("Configure RECHECK validation for this exit")
+                                recheck_gear_btn.clicked.connect(
+                                    lambda checked, bname=self.block_name, sname=signal_name, esig=current_exit_signal_name:
+                                        self._on_exit_recheck_config_clicked(bname, sname, esig)
+                                )
+                                recheck_row_layout.addWidget(recheck_gear_btn)
+                                
+                                # Remove recheck button
+                                recheck_remove_btn = QPushButton("✕")
+                                recheck_remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
+                                recheck_remove_btn.setToolTip("Remove RECHECK validation from this exit")
+                                recheck_remove_btn.clicked.connect(
+                                    lambda checked, bname=self.block_name, sname=signal_name, esig=current_exit_signal_name:
+                                        self._on_exit_recheck_remove_clicked(bname, sname, esig)
+                                )
+                                recheck_row_layout.addWidget(recheck_remove_btn)
+                                
+                                signals_layout.addLayout(recheck_row_layout)
             
             signals_widget.setLayout(signals_layout)
             layout.addWidget(signals_widget)
@@ -729,6 +778,53 @@ class BlockConfigItem(QWidget):
         if panel and hasattr(panel, '_on_signal_exit_remove_clicked'):
             panel._on_signal_exit_remove_clicked(block_name, signal_name, exit_signal_name)
     
+    def _on_exit_recheck_config_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
+        """Handle config button for exit condition RECHECK - show dialog to update bar delay."""
+        from PyQt5.QtWidgets import QInputDialog
+        
+        # Get current config
+        config = self.orchestrator.get_current_config()
+        if not config:
+            return
+        
+        # Find current exit and its RECHECK config
+        current_delay = 25  # Default value
+        for block in config.blocks:
+            if block.name == block_name:
+                for signal in block.signals:
+                    if signal.name == signal_name:
+                        if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                            for exit_cond in signal.exit_conditions:
+                                if exit_cond.signal_name == exit_signal_name:
+                                    if exit_cond.recheck_config:
+                                        current_delay = exit_cond.recheck_config.bar_delay
+                                    break
+                        break
+                break
+        
+        # Show input dialog for bar delay
+        bar_delay, ok = QInputDialog.getInt(
+            self,
+            "Configure Exit RECHECK Validation",
+            f"Exit Signal: {exit_signal_name}\n\nEnter number of bars within which exit signal must reoccur for validation:",
+            value=current_delay,
+            min=1,
+            max=500,
+            step=1
+        )
+        
+        if ok and bar_delay > 0:
+            # Update via panel method
+            panel = self._find_strategy_blocks_panel()
+            if panel and hasattr(panel, '_on_exit_recheck_configured'):
+                panel._on_exit_recheck_configured(block_name, signal_name, exit_signal_name, bar_delay)
+    
+    def _on_exit_recheck_remove_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
+        """Handle remove button for exit condition RECHECK."""
+        panel = self._find_strategy_blocks_panel()
+        if panel and hasattr(panel, '_on_exit_recheck_removed'):
+            panel._on_exit_recheck_removed(block_name, signal_name, exit_signal_name)
+    
     def _find_strategy_blocks_panel(self):
         """Find the StrategyBlocksPanel by traversing up the widget tree."""
         widget = self.parent()
@@ -945,16 +1041,25 @@ class StrategyBlocksPanel(QWidget):
                             'validation_mode': nested.validation_mode
                         })
                 
-                # Sprint 1.8 Task 1.8.48: Add exit conditions data if present
+                # Sprint 1.8 Task 1.8.48: Add exit conditions data if present (with RECHECK support)
                 if hasattr(signal_config, 'exit_conditions') and signal_config.exit_conditions:
                     signal_dict['exit_conditions'] = []
                     for exit_cond in signal_config.exit_conditions:
-                        signal_dict['exit_conditions'].append({
+                        exit_dict = {
                             'signal_name': exit_cond.signal_name,
                             'percentage': exit_cond.percentage,
                             'exit_mode': exit_cond.exit_mode,
                             'binding_level': exit_cond.binding_level
-                        })
+                        }
+                        
+                        # Add RECHECK config if present on the exit condition
+                        if exit_cond.recheck_config:
+                            exit_dict['recheck_config'] = {
+                                'enabled': exit_cond.recheck_config.enabled,
+                                'bar_delay': exit_cond.recheck_config.bar_delay
+                            }
+                        
+                        signal_dict['exit_conditions'].append(exit_dict)
                 
                 block_info['signals'].append(signal_dict)
             
@@ -1828,14 +1933,22 @@ class StrategyBlocksPanel(QWidget):
                 return
             
             # Show exit condition dialog pre-populated (CRITICAL: Include RECHECK values)
+            # CRITICAL FIX: ExitCondition has recheck_config (RecheckConfig object), not separate fields
+            existing_recheck_enabled = False
+            existing_recheck_bar_delay = 25
+            if current_exit.recheck_config:
+                existing_recheck_enabled = current_exit.recheck_config.enabled
+                existing_recheck_bar_delay = current_exit.recheck_config.bar_delay
+                print(f"DEBUG: Loading RECHECK from exit: enabled={existing_recheck_enabled}, bar_delay={existing_recheck_bar_delay}")
+            
             dialog = ExitConditionDialog(
                 signal_name=exit_signal_name,
                 existing_percentage=current_exit.percentage,
                 existing_exit_mode=current_exit.exit_mode,
                 existing_tp_proximity=current_exit.tp_proximity_threshold,
                 existing_reversal=current_exit.reversal_trigger,
-                existing_recheck_enabled=getattr(current_exit, 'recheck_enabled', False),
-                existing_recheck_bar_delay=getattr(current_exit, 'recheck_bar_delay', 25),
+                existing_recheck_enabled=existing_recheck_enabled,
+                existing_recheck_bar_delay=existing_recheck_bar_delay,
                 parent=self
             )
             
@@ -1955,5 +2068,73 @@ class StrategyBlocksPanel(QWidget):
         
         except Exception as e:
             print(f"Error removing signal exit: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_exit_recheck_configured(self, block_name: str, signal_name: str, exit_signal_name: str, bar_delay: int):
+        """Handle RECHECK configuration for an exit condition."""
+        print(f"DEBUG: _on_exit_recheck_configured called: block='{block_name}', signal='{signal_name}', exit='{exit_signal_name}', bars={bar_delay}")
+        try:
+            # Get current config
+            config = self.orchestrator.get_current_config()
+            if not config:
+                print("No configuration available")
+                return
+            
+            # Find and update the exit condition
+            from src.strategy_builder.core.strategy_config_engine import RecheckConfig
+            
+            for block in config.blocks:
+                if block.name == block_name:
+                    for signal in block.signals:
+                        if signal.name == signal_name:
+                            if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                                for exit_cond in signal.exit_conditions:
+                                    if exit_cond.signal_name == exit_signal_name:
+                                        # Set RECHECK config for this exit
+                                        exit_cond.recheck_config = RecheckConfig(enabled=True, bar_delay=bar_delay)
+                                        print(f"RECHECK configured for exit {exit_signal_name} - {bar_delay} bars")
+                                        
+                                        # Refresh display
+                                        self._refresh_blocks()
+                                        self.blocks_changed.emit()
+                                        return
+            
+            print(f"Exit condition {exit_signal_name} not found in {block_name}::{signal_name}")
+        except Exception as e:
+            print(f"Error configuring exit RECHECK: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_exit_recheck_removed(self, block_name: str, signal_name: str, exit_signal_name: str):
+        """Handle removal of RECHECK from an exit condition."""
+        print(f"DEBUG: _on_exit_recheck_removed called: block='{block_name}', signal='{signal_name}', exit='{exit_signal_name}'")
+        try:
+            # Get current config
+            config = self.orchestrator.get_current_config()
+            if not config:
+                print("No configuration available")
+                return
+            
+            # Find and update the exit condition
+            for block in config.blocks:
+                if block.name == block_name:
+                    for signal in block.signals:
+                        if signal.name == signal_name:
+                            if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                                for exit_cond in signal.exit_conditions:
+                                    if exit_cond.signal_name == exit_signal_name:
+                                        # Remove RECHECK config
+                                        exit_cond.recheck_config = None
+                                        print(f"RECHECK removed from exit {exit_signal_name}")
+                                        
+                                        # Refresh display
+                                        self._refresh_blocks()
+                                        self.blocks_changed.emit()
+                                        return
+            
+            print(f"Exit condition {exit_signal_name} not found in {block_name}::{signal_name}")
+        except Exception as e:
+            print(f"Error removing exit RECHECK: {e}")
             import traceback
             traceback.print_exc()
