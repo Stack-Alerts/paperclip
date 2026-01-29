@@ -18,6 +18,7 @@ from datetime import datetime
 import json
 import logging
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class AIRecommendationsManager:
     
     def create_recommendation(self, recommendation_data: Dict[str, Any]) -> str:
         """
-        Create new AI recommendation
+        Create new AI recommendation using ORM
         
         Args:
             recommendation_data: Recommendation details including:
@@ -64,11 +65,17 @@ class AIRecommendationsManager:
                 - analysis_data (dict, optional): Supporting analysis
                 
         Returns:
-            recommendation_id: UUID of created recommendation
+            recommendation_id: UUID string of created recommendation
             
         Raises:
-            ValueError: If required fields missing
+            ValueError: If required fields missing or invalid
+            
+        Real Money Impact: HIGH - Creates AI recommendations for trading strategies
+        
+        ORM Refactored: Sprint 1.6.1 Task 2.1.7
         """
+        from src.optimizer_v3.database.models import AIRecommendation
+        
         # Validate required fields
         required = ['strategy_id', 'recommendation_type', 'title', 'description', 'rationale', 'suggested_changes']
         missing = [f for f in required if f not in recommendation_data]
@@ -80,74 +87,103 @@ class AIRecommendationsManager:
         if recommendation_data['recommendation_type'] not in valid_types:
             raise ValueError(f"Invalid type. Must be one of: {', '.join(valid_types)}")
         
-        # Generate recommendation ID
-        rec_id = str(uuid4())
-        
-        # Prepare data
-        data = {
-            'recommendation_id': rec_id,
-            'strategy_id': recommendation_data['strategy_id'],
-            'strategy_version_id': recommendation_data.get('strategy_version_id'),
-            'recommendation_type': recommendation_data['recommendation_type'],
-            'title': recommendation_data['title'],
-            'description': recommendation_data['description'],
-            'rationale': recommendation_data['rationale'],
-            'suggested_changes': json.dumps(recommendation_data['suggested_changes']),
-            'expected_impact': json.dumps(recommendation_data.get('expected_impact', {})),
-            'confidence_score': recommendation_data.get('confidence_score', 0.5),
-            'priority': recommendation_data.get('priority', 'medium'),
-            'model_version': recommendation_data.get('model_version'),
-            'analysis_data': json.dumps(recommendation_data.get('analysis_data')) if recommendation_data.get('analysis_data') else None
-        }
-        
-        # Insert recommendation
-        query = """
-            INSERT INTO ai_recommendations (
-                recommendation_id, strategy_id, strategy_version_id, recommendation_type,
-                title, description, rationale, suggested_changes, expected_impact,
-                confidence_score, priority, model_version, analysis_data
-            ) VALUES (
-                :recommendation_id, :strategy_id, :strategy_version_id, :recommendation_type,
-                :title, :description, :rationale, :suggested_changes, :expected_impact,
-                :confidence_score, :priority, :model_version, :analysis_data
-            )
-        """
-        
-        self.session.execute(query, data)
-        self.session.commit()
-        
-        self.logger.info(
-            f"Created AI recommendation: {rec_id} "
-            f"(strategy: {recommendation_data['strategy_id']}, type: {recommendation_data['recommendation_type']})"
+        # Create ORM object - SQLAlchemy handles JSONB automatically
+        recommendation = AIRecommendation(
+            strategy_id=recommendation_data['strategy_id'],
+            strategy_version_id=recommendation_data.get('strategy_version_id'),
+            recommendation_type=recommendation_data['recommendation_type'],
+            title=recommendation_data['title'],
+            description=recommendation_data['description'],
+            rationale=recommendation_data['rationale'],
+            # JSONB fields - pass Python dicts directly
+            suggested_changes=recommendation_data['suggested_changes'],
+            expected_impact=recommendation_data.get('expected_impact', {}),
+            analysis_data=recommendation_data.get('analysis_data'),
+            # Other fields
+            confidence_score=recommendation_data.get('confidence_score', 0.5),
+            priority=recommendation_data.get('priority', 'medium'),
+            model_version=recommendation_data.get('model_version')
+            # recommendation_id, created_at handled by defaults
         )
         
-        return rec_id
+        try:
+            self.session.add(recommendation)
+            self.session.commit()
+            
+            # Get UUID as string
+            rec_id = str(recommendation.recommendation_id)
+            
+            self.logger.info(
+                f"Created AI recommendation: {rec_id} "
+                f"(strategy: {recommendation_data['strategy_id']}, type: {recommendation_data['recommendation_type']})"
+            )
+            
+            return rec_id
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to create recommendation: {e}")
+            raise
     
     def get_recommendation(self, recommendation_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get recommendation by ID
+        Get recommendation by ID using ORM
         
         Args:
-            recommendation_id: Recommendation UUID
+            recommendation_id: Recommendation UUID string
             
         Returns:
             Recommendation dict or None if not found
+            JSONB fields automatically deserialized to Python objects
+            
+        Real Money Impact: MEDIUM - Retrieves AI recommendation data
+        
+        ORM Refactored: Sprint 1.6.1 Task 2.1.1
         """
-        query = "SELECT * FROM ai_recommendations WHERE recommendation_id = :rec_id"
-        result = self.session.execute(query, {'rec_id': recommendation_id}).fetchone()
+        # Import AIRecommendation ORM model
+        from src.optimizer_v3.database.models import AIRecommendation
         
-        if not result:
+        try:
+            # Query using ORM
+            recommendation = self.session.query(AIRecommendation).filter_by(
+                recommendation_id=recommendation_id
+            ).first()
+            
+            if not recommendation:
+                return None
+            
+            # Convert ORM object to dict
+            # JSONB fields are automatically deserialized by SQLAlchemy
+            rec_dict = {
+                'recommendation_id': str(recommendation.recommendation_id),
+                'strategy_id': recommendation.strategy_id,
+                'strategy_version_id': str(recommendation.strategy_version_id) if recommendation.strategy_version_id else None,
+                'recommendation_type': recommendation.recommendation_type,
+                'title': recommendation.title,
+                'description': recommendation.description,
+                'rationale': recommendation.rationale,
+                # JSONB fields - already Python objects
+                'suggested_changes': recommendation.suggested_changes,
+                'expected_impact': recommendation.expected_impact,
+                'analysis_data': recommendation.analysis_data,
+                'actual_impact': recommendation.actual_impact,
+                # Other fields
+                'confidence_score': recommendation.confidence_score,
+                'priority': recommendation.priority,
+                'model_version': recommendation.model_version,
+                'applied': recommendation.applied,
+                'applied_version_id': str(recommendation.applied_version_id) if recommendation.applied_version_id else None,
+                'applied_at': recommendation.applied_at,
+                'applied_by': recommendation.applied_by,
+                'created_at': recommendation.created_at
+            }
+            
+            return rec_dict
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to get recommendation {recommendation_id}: {e}")
             return None
-        
-        rec = dict(result._mapping)
-        
-        # Parse JSON fields
-        json_fields = ['suggested_changes', 'expected_impact', 'analysis_data', 'actual_impact']
-        for field in json_fields:
-            if rec.get(field):
-                rec[field] = json.loads(rec[field])
-        
-        return rec
     
     def get_strategy_recommendations(
         self,
@@ -156,7 +192,7 @@ class AIRecommendationsManager:
         pending_only: bool = False
     ) -> List[Dict[str, Any]]:
         """
-        Get all recommendations for a strategy
+        Get all recommendations for a strategy using ORM
         
         Args:
             strategy_id: Strategy ID
@@ -164,29 +200,61 @@ class AIRecommendationsManager:
             pending_only: Only return pending recommendations
             
         Returns:
-            List of recommendation dicts
+            List of recommendation dicts with JSONB auto-deserialized
+            
+        Real Money Impact: MEDIUM - Lists AI recommendations for strategy
+        
+        ORM Refactored: Sprint 1.6.1 Task 2.1.2
         """
-        query = "SELECT * FROM ai_recommendations WHERE strategy_id = :strategy_id"
+        from src.optimizer_v3.database.models import AIRecommendation
         
-        if applied_only:
-            query += " AND applied = TRUE"
-        elif pending_only:
-            query += " AND applied = FALSE"
-        
-        query += " ORDER BY created_at DESC"
-        
-        results = self.session.execute(query, {'strategy_id': strategy_id}).fetchall()
-        
-        recommendations = []
-        for row in results:
-            rec = dict(row._mapping)
-            json_fields = ['suggested_changes', 'expected_impact', 'analysis_data', 'actual_impact']
-            for field in json_fields:
-                if rec.get(field):
-                    rec[field] = json.loads(rec[field])
-            recommendations.append(rec)
-        
-        return recommendations
+        try:
+            # Build ORM query with filters
+            query = self.session.query(AIRecommendation).filter_by(
+                strategy_id=strategy_id
+            )
+            
+            if applied_only:
+                query = query.filter(AIRecommendation.applied == True)
+            elif pending_only:
+                query = query.filter(AIRecommendation.applied == False)
+            
+            query = query.order_by(AIRecommendation.created_at.desc())
+            
+            recommendations = query.all()
+            
+            # Convert to list of dicts
+            result_list = []
+            for rec in recommendations:
+                rec_dict = {
+                    'recommendation_id': str(rec.recommendation_id),
+                    'strategy_id': rec.strategy_id,
+                    'strategy_version_id': str(rec.strategy_version_id) if rec.strategy_version_id else None,
+                    'recommendation_type': rec.recommendation_type,
+                    'title': rec.title,
+                    'description': rec.description,
+                    'rationale': rec.rationale,
+                    'suggested_changes': rec.suggested_changes,
+                    'expected_impact': rec.expected_impact,
+                    'analysis_data': rec.analysis_data,
+                    'actual_impact': rec.actual_impact,
+                    'confidence_score': rec.confidence_score,
+                    'priority': rec.priority,
+                    'model_version': rec.model_version,
+                    'applied': rec.applied,
+                    'applied_version_id': str(rec.applied_version_id) if rec.applied_version_id else None,
+                    'applied_at': rec.applied_at,
+                    'applied_by': rec.applied_by,
+                    'created_at': rec.created_at
+                }
+                result_list.append(rec_dict)
+            
+            return result_list
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to get recommendations for strategy {strategy_id}: {e}")
+            return []
     
     def mark_applied(
         self,
@@ -195,7 +263,7 @@ class AIRecommendationsManager:
         applied_by: Optional[str] = None
     ) -> bool:
         """
-        Mark recommendation as applied to a version
+        Mark recommendation as applied to a version using ORM
         
         Args:
             recommendation_id: Recommendation UUID
@@ -204,32 +272,34 @@ class AIRecommendationsManager:
             
         Returns:
             True if updated, False if not found
+            
+        ORM Refactored: Sprint 1.6.1 Task 2.1.5
         """
-        query = """
-            UPDATE ai_recommendations 
-            SET applied = TRUE,
-                applied_version_id = :version_id,
-                applied_at = NOW(),
-                applied_by = :applied_by
-            WHERE recommendation_id = :rec_id
-        """
+        from src.optimizer_v3.database.models import AIRecommendation
         
-        result = self.session.execute(
-            query,
-            {
-                'rec_id': recommendation_id,
-                'version_id': applied_version_id,
-                'applied_by': applied_by
-            }
-        )
-        
-        self.session.commit()
-        
-        updated = result.rowcount > 0
-        if updated:
+        try:
+            recommendation = self.session.query(AIRecommendation).filter_by(
+                recommendation_id=recommendation_id
+            ).first()
+            
+            if not recommendation:
+                return False
+            
+            # Update using ORM
+            recommendation.applied = True
+            recommendation.applied_version_id = applied_version_id
+            recommendation.applied_at = datetime.utcnow()
+            recommendation.applied_by = applied_by
+            
+            self.session.commit()
+            
             self.logger.info(f"Marked recommendation {recommendation_id} as applied to {applied_version_id}")
-        
-        return updated
+            return True
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to mark recommendation {recommendation_id} as applied: {e}")
+            return False
     
     def record_impact(
         self,
@@ -237,134 +307,178 @@ class AIRecommendationsManager:
         actual_impact: Dict[str, Any]
     ) -> bool:
         """
-        Record actual impact after recommendation application
+        Record actual impact after recommendation application using ORM
         
         Args:
             recommendation_id: Recommendation UUID
-            actual_impact: Actual measured impact data
+            actual_impact: Actual measured impact data (Python dict)
             
         Returns:
             True if updated, False if not found
+            
+        ORM Refactored: Sprint 1.6.1 Task 2.1.6
         """
-        query = """
-            UPDATE ai_recommendations 
-            SET actual_impact = :impact
-            WHERE recommendation_id = :rec_id
-        """
+        from src.optimizer_v3.database.models import AIRecommendation
         
-        result = self.session.execute(
-            query,
-            {
-                'rec_id': recommendation_id,
-                'impact': json.dumps(actual_impact)
-            }
-        )
-        
-        self.session.commit()
-        
-        updated = result.rowcount > 0
-        if updated:
+        try:
+            recommendation = self.session.query(AIRecommendation).filter_by(
+                recommendation_id=recommendation_id
+            ).first()
+            
+            if not recommendation:
+                return False
+            
+            # Update JSONB field - SQLAlchemy handles serialization
+            recommendation.actual_impact = actual_impact
+            
+            self.session.commit()
+            
             self.logger.info(f"Recorded impact for recommendation {recommendation_id}")
-        
-        return updated
+            return True
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to record impact for {recommendation_id}: {e}")
+            return False
     
     def get_recommendations_by_type(
         self,
         recommendation_type: str
     ) -> List[Dict[str, Any]]:
         """
-        Get all recommendations of specific type
+        Get all recommendations of specific type using ORM
         
         Args:
             recommendation_type: Type to filter by
             
         Returns:
-            List of recommendation dicts
+            List of recommendation dicts with JSONB auto-deserialized
+            
+        ORM Refactored: Sprint 1.6.1 Task 2.1.3
         """
-        query = """
-            SELECT * FROM ai_recommendations 
-            WHERE recommendation_type = :type 
-            ORDER BY created_at DESC
-        """
+        from src.optimizer_v3.database.models import AIRecommendation
         
-        results = self.session.execute(query, {'type': recommendation_type}).fetchall()
-        
-        recommendations = []
-        for row in results:
-            rec = dict(row._mapping)
-            json_fields = ['suggested_changes', 'expected_impact', 'analysis_data', 'actual_impact']
-            for field in json_fields:
-                if rec.get(field):
-                    rec[field] = json.loads(rec[field])
-            recommendations.append(rec)
-        
-        return recommendations
+        try:
+            recommendations = self.session.query(AIRecommendation).filter_by(
+                recommendation_type=recommendation_type
+            ).order_by(AIRecommendation.created_at.desc()).all()
+            
+            return [self._recommendation_to_dict(rec) for rec in recommendations]
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to get recommendations by type {recommendation_type}: {e}")
+            return []
+    
+    def _recommendation_to_dict(self, rec) -> Dict[str, Any]:
+        """Helper to convert ORM object to dict"""
+        return {
+            'recommendation_id': str(rec.recommendation_id),
+            'strategy_id': rec.strategy_id,
+            'strategy_version_id': str(rec.strategy_version_id) if rec.strategy_version_id else None,
+            'recommendation_type': rec.recommendation_type,
+            'title': rec.title,
+            'description': rec.description,
+            'rationale': rec.rationale,
+            'suggested_changes': rec.suggested_changes,
+            'expected_impact': rec.expected_impact,
+            'analysis_data': rec.analysis_data,
+            'actual_impact': rec.actual_impact,
+            'confidence_score': rec.confidence_score,
+            'priority': rec.priority,
+            'model_version': rec.model_version,
+            'applied': rec.applied,
+            'applied_version_id': str(rec.applied_version_id) if rec.applied_version_id else None,
+            'applied_at': rec.applied_at,
+            'applied_by': rec.applied_by,
+            'created_at': rec.created_at
+        }
     
     def get_high_confidence_pending(
         self,
         min_confidence: float = 0.7
     ) -> List[Dict[str, Any]]:
         """
-        Get pending recommendations with high confidence scores
+        Get pending recommendations with high confidence scores using ORM
         
         Args:
             min_confidence: Minimum confidence threshold (0.0-1.0)
             
         Returns:
             List of high-confidence pending recommendations
+            
+        ORM Refactored: Sprint 1.6.1 Task 2.1.4
         """
-        query = """
-            SELECT * FROM ai_recommendations 
-            WHERE applied = FALSE 
-            AND confidence_score >= :min_conf
-            ORDER BY confidence_score DESC, created_at DESC
-        """
+        from src.optimizer_v3.database.models import AIRecommendation
         
-        results = self.session.execute(query, {'min_conf': min_confidence}).fetchall()
-        
-        recommendations = []
-        for row in results:
-            rec = dict(row._mapping)
-            json_fields = ['suggested_changes', 'expected_impact', 'analysis_data', 'actual_impact']
-            for field in json_fields:
-                if rec.get(field):
-                    rec[field] = json.loads(rec[field])
-            recommendations.append(rec)
-        
-        return recommendations
+        try:
+            recommendations = self.session.query(AIRecommendation).filter(
+                AIRecommendation.applied == False,
+                AIRecommendation.confidence_score >= min_confidence
+            ).order_by(
+                AIRecommendation.confidence_score.desc(),
+                AIRecommendation.created_at.desc()
+            ).all()
+            
+            return [self._recommendation_to_dict(rec) for rec in recommendations]
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to get high confidence recommendations: {e}")
+            return []
     
     def get_effectiveness_stats(self) -> Dict[str, Any]:
         """
-        Get statistics on recommendation effectiveness
+        Get statistics on recommendation effectiveness using ORM
         
         Returns:
-            Dict with effectiveness metrics
+            Dict with effectiveness metrics including:
+            - total_recommendations
+            - total_applied
+            - total_measured
+            - avg_confidence
+            - avg_applied_confidence
+            - application_rate
+            
+        ORM Refactored: Sprint 1.6.1 Task 2.1.8
         """
-        query = """
-            SELECT 
-                COUNT(*) as total_recommendations,
-                COUNT(CASE WHEN applied = TRUE THEN 1 END) as total_applied,
-                COUNT(CASE WHEN actual_impact IS NOT NULL THEN 1 END) as total_measured,
-                AVG(confidence_score) as avg_confidence,
-                AVG(CASE WHEN applied = TRUE THEN confidence_score END) as avg_applied_confidence
-            FROM ai_recommendations
-        """
+        from src.optimizer_v3.database.models import AIRecommendation
+        from sqlalchemy import func, case
         
-        result = self.session.execute(query).fetchone()
-        
-        if result:
-            stats = dict(result._mapping)
+        try:
+            # Build ORM aggregation query
+            result = self.session.query(
+                func.count(AIRecommendation.recommendation_id).label('total_recommendations'),
+                func.count(case((AIRecommendation.applied == True, 1))).label('total_applied'),
+                func.count(case((AIRecommendation.actual_impact != None, 1))).label('total_measured'),
+                func.avg(AIRecommendation.confidence_score).label('avg_confidence'),
+                func.avg(case((AIRecommendation.applied == True, AIRecommendation.confidence_score))).label('avg_applied_confidence')
+            ).one()
+            
+            stats = {
+                'total_recommendations': result.total_recommendations or 0,
+                'total_applied': result.total_applied or 0,
+                'total_measured': result.total_measured or 0,
+                'avg_confidence': float(result.avg_confidence) if result.avg_confidence else 0.0,
+                'avg_applied_confidence': float(result.avg_applied_confidence) if result.avg_applied_confidence else 0.0
+            }
+            
+            # Calculate application rate
             stats['application_rate'] = (
                 stats['total_applied'] / stats['total_recommendations'] 
                 if stats['total_recommendations'] > 0 else 0.0
             )
+            
             return stats
-        
-        return {
-            'total_recommendations': 0,
-            'total_applied': 0,
-            'total_measured': 0,
-            'avg_confidence': 0.0,
-            'avg_applied_confidence': 0.0,
-            'application_rate': 0.0
-        }
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to get effectiveness stats: {e}")
+            return {
+                'total_recommendations': 0,
+                'total_applied': 0,
+                'total_measured': 0,
+                'avg_confidence': 0.0,
+                'avg_applied_confidence': 0.0,
+                'application_rate': 0.0
+            }

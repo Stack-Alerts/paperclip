@@ -61,8 +61,9 @@
 
 #### **Sprint 1.6.1: AI Recommendations Database** (5-7 days, 15 tasks)
 **File**: `SPRINT_1_6_1_AI_RECOMMENDATIONS_DATABASE.md`  
-**Status**: 📋 Planning  
-**Purpose**: Database extension for AI recommendations, version tracking, duplicate detection
+**Status**: ✅ COMPLETE (15/15 tasks, 2026-01-29, 4 hours)  
+**Purpose**: Database extension for AI recommendations, version tracking, duplicate detection  
+**Completed**: Migration executed, ORM refactoring complete, 90 tests passing (49 Test Results + 41 previous)
 
 #### **Sprint 1.7: Nested RECHECK Foundation** (1 day, 14 tasks)
 **File**: `SPRINT_1_7_NESTED_RECHECK_FOUNDATION.md`  
@@ -73,6 +74,11 @@
 **File**: `SPRINT_1_8_EXIT_CONDITIONS_FOUNDATION.md`  
 **Status**: ✅ COMPLETE (102/102 tasks, 2026-01-28)  
 **Purpose**: Separate exit conditions from TP/SL, "Add as Exit" button (red), percentage-based exits with ABSOLUTE/FLEXIBLE modes, three binding levels (STRATEGY/BLOCK/SIGNAL), nested RECHECK for exits, full backtest integration
+
+#### **Sprint 1.9: Institutional-Grade Validation Framework** (5-8 hours, 30 tasks)
+**File**: `SPRINT_1_9_VALIDATION_FRAMEWORK.md`  
+**Status**: 📋 DESIGN SPECIFICATION  
+**Purpose**: Comprehensive strategy validation with 59 rules across 8 categories, RECHECK cycle detection, exit percentage validation, direction mismatch detection, timing conflict detection, dead code detection, one-click fixes
 
 ---
 
@@ -148,9 +154,10 @@
 - [x] Sprint 1.4: UI Integration (10/10 tasks COMPLETE ✅ - Zero Hardcoded Styles)
 - [x] Sprint 1.5: Metrics Tab Real-Time Updates (8/8 tasks COMPLETE ✅ - Production tested)
 - [x] Sprint 1.6: Intelligent Recommendation System (18/18 tasks COMPLETE ✅ - 2026-01-22)
-- [ ] Sprint 1.6.1: AI Recommendations Database (0/15 tasks - Planning)
+- [x] Sprint 1.6.1: AI Recommendations Database (15/15 tasks COMPLETE ✅ - 2026-01-29)
 - [x] Sprint 1.7: Nested RECHECK Foundation (14/14 tasks COMPLETE ✅ - 2026-01-22)
 - [x] Sprint 1.8: Exit Conditions Foundation (102/102 tasks COMPLETE ✅ - 2026-01-28)
+- [ ] Sprint 1.9: Institutional-Grade Validation Framework (30 tasks, 5-8 hours - Design Specification)
 - [ ] Sprint 2.1: Automated Trainer (20 tasks, 10 days)
 - [ ] Sprint 2.2: Signal Intelligence + Nested RECHECK Execution (37 tasks, 12 days)
 - [ ] Sprint 2.3: ML Generator (15 tasks, 4 days)

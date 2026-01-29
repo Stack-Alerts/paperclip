@@ -47,47 +47,57 @@ class StrategyDatabaseManager:
     
     def create_strategy(self, name: str) -> str:
         """
-        Create new strategy parent record
+        Create new strategy parent record using ORM
         
         Args:
-            name: Strategy name
+            name: Strategy name (will be stripped of whitespace)
             
         Returns:
             strategy_id: Unique strategy identifier (strategy_XXXXXXXX format)
             
         Raises:
-            ValueError: If name is empty or invalid
+            ValueError: If name is empty after stripping
+            IntegrityError: If strategy with this ID already exists (extremely rare)
+            
+        Real Money Impact: HIGH - Creates parent record for trading strategy
+        
+        ORM Refactored: Sprint 1.6.1 Task 1.1
         """
-        if not name or not name.strip():
+        # Import Strategy ORM model
+        from src.optimizer_v3.database.models import Strategy
+        
+        # Validation
+        name_clean = name.strip() if name else ''
+        if not name_clean:
             raise ValueError("Strategy name cannot be empty")
         
         # Generate unique strategy ID
         strategy_id = f"strategy_{uuid4().hex[:8]}"
         
-        # Create parent strategy record
-        from src.optimizer_v3.database.models import OptimizationRun  # Temp - will create Strategy model
-        
-        # Insert into strategies table
-        query = text("""
-            INSERT INTO strategies (strategy_id, name, created_at, updated_at)
-            VALUES (:strategy_id, :name, NOW(), NOW())
-        """)
-        
-        self.session.execute(
-            query,
-            {
-                'strategy_id': strategy_id,
-                'name': name.strip()
-            }
+        # Create ORM object
+        strategy = Strategy(
+            strategy_id=strategy_id,
+            name=name_clean
+            # created_at, updated_at handled by server defaults
         )
-        self.session.commit()
         
-        self.logger.info(f"Created strategy: {strategy_id} - {name}")
-        return strategy_id
+        # Add to session and commit
+        try:
+            self.session.add(strategy)
+            self.session.commit()
+            
+            self.logger.info(f"Created strategy: {strategy_id} - {name_clean}")
+            return strategy_id
+            
+        except Exception as e:
+            # Rollback on error to prevent transaction lock
+            self.session.rollback()
+            self.logger.error(f"Failed to create strategy '{name_clean}': {e}")
+            raise
     
     def create_strategy_version(self, strategy_data: Dict[str, Any]) -> str:
         """
-        Create new strategy version with complete configuration
+        Create new strategy version with complete configuration using ORM
         
         Args:
             strategy_data: Complete strategy configuration including:
@@ -101,16 +111,28 @@ class StrategyDatabaseManager:
                 - exit_conditions (dict): Exit logic
                 - risk_management (dict): Risk management settings
                 - backtest_config (dict): Backtest configuration
+                - backtest_results (dict, optional): Backtest results
+                - metrics (dict, optional): Performance metrics
+                - trades (list, optional): Trade list
+                -equity_curve (list, optional): Equity curve data
                 - tags (list, optional): Tags for organization
                 - notes (str, optional): Version notes
                 - created_by (str, optional): User who created version
+                - git_commit_hash (str, optional): Git commit hash
                 
         Returns:
-            version_id: UUID of created version
+            version_id: UUID string of created version
             
         Raises:
             ValueError: If required fields missing or invalid
+            
+        Real Money Impact: CRITICAL - Stores complete trading strategy configuration
+        
+        ORM Refactored: Sprint 1.6.1 Task 1.2
         """
+        # Import StrategyVersion ORM model
+        from src.optimizer_v3.database.models import StrategyVersion, Strategy
+        
         # Validate required fields
         required_fields = [
             'strategy_id', 'name', 'blocks', 'signals', 'parameters',
@@ -127,61 +149,53 @@ class StrategyDatabaseManager:
         # Get next version number for this strategy
         version_number = self._get_next_version_number(strategy_data['strategy_id'])
         
-        # Generate version ID
-        version_id = str(uuid4())
+        # Create ORM object
+        # CRITICAL: SQLAlchemy automatically handles JSON serialization for JSONB columns
+        # No need for json.dumps() - just pass Python dicts/lists directly
+        strategy_version = StrategyVersion(
+            strategy_id=strategy_data['strategy_id'],
+            version_number=version_number,
+            name=strategy_data['name'],
+            description=strategy_data.get('description', ''),
+            # Required JSONB fields - SQLAlchemy handles serialization
+            blocks=strategy_data['blocks'],
+            signals=strategy_data['signals'],
+            parameters=strategy_data['parameters'],
+            entry_conditions=strategy_data['entry_conditions'],
+            exit_conditions=strategy_data['exit_conditions'],
+            risk_management=strategy_data['risk_management'],
+            backtest_config=strategy_data['backtest_config'],
+            # Optional JSONB fields
+            backtest_results=strategy_data.get('backtest_results'),
+            metrics=strategy_data.get('metrics'),
+            trades=strategy_data.get('trades'),
+            equity_curve=strategy_data.get('equity_curve'),
+            # Metadata fields
+            git_commit_hash=strategy_data.get('git_commit_hash'),
+            created_by=strategy_data.get('created_by'),
+            notes=strategy_data.get('notes'),
+            tags=strategy_data.get('tags', []),
+            config_hash=config_hash
+            # version_id, timestamp, created_at handled by defaults
+        )
         
-        # Prepare version data
-        # CRITICAL: Using text() for raw SQL requires json.dumps() for JSONB columns
-        # The data is already properly serialized by StrategyPersistence._config_to_dict()
-        version_data = {
-            'version_id': version_id,
-            'strategy_id': strategy_data['strategy_id'],
-            'version_number': version_number,
-            'name': strategy_data['name'],
-            'description': strategy_data.get('description', ''),
-            'blocks': json.dumps(strategy_data['blocks']) if strategy_data.get('blocks') else '[]',
-            'signals': json.dumps(strategy_data['signals']) if strategy_data.get('signals') else '{}',
-            'parameters': json.dumps(strategy_data['parameters']) if strategy_data.get('parameters') else '{}',
-            'entry_conditions': json.dumps(strategy_data['entry_conditions']) if strategy_data.get('entry_conditions') else '{}',
-            'exit_conditions': json.dumps(strategy_data['exit_conditions']) if strategy_data.get('exit_conditions') else '[]',
-            'risk_management': json.dumps(strategy_data['risk_management']) if strategy_data.get('risk_management') else '{}',
-            'backtest_config': json.dumps(strategy_data['backtest_config']) if strategy_data.get('backtest_config') else '{}',
-            'backtest_results': json.dumps(strategy_data.get('backtest_results')) if strategy_data.get('backtest_results') else None,
-            'metrics': json.dumps(strategy_data.get('metrics')) if strategy_data.get('metrics') else None,
-            'trades': json.dumps(strategy_data.get('trades')) if strategy_data.get('trades') else None,
-            'equity_curve': json.dumps(strategy_data.get('equity_curve')) if strategy_data.get('equity_curve') else None,
-            'git_commit_hash': strategy_data.get('git_commit_hash'),
-            'created_by': strategy_data.get('created_by'),
-            'notes': strategy_data.get('notes'),
-            'tags': json.dumps(strategy_data.get('tags', [])),
-            'config_hash': config_hash
-        }
-        
-        # Insert version with proper error handling
+        # Add to session and commit
         try:
-            query = text("""
-                INSERT INTO strategy_versions (
-                    version_id, strategy_id, version_number, name, description,
-                    blocks, signals, parameters, entry_conditions, exit_conditions,
-                    risk_management, backtest_config, backtest_results, metrics,
-                    trades, equity_curve, git_commit_hash, created_by, notes, tags, config_hash
-                ) VALUES (
-                    :version_id, :strategy_id, :version_number, :name, :description,
-                    :blocks, :signals, :parameters, :entry_conditions, :exit_conditions,
-                    :risk_management, :backtest_config, :backtest_results, :metrics,
-                    :trades, :equity_curve, :git_commit_hash, :created_by, :notes, :tags, :config_hash
-                )
-            """)
+            self.session.add(strategy_version)
             
-            self.session.execute(query, version_data)
+            # Update parent strategy updated_at timestamp
+            parent_strategy = self.session.query(Strategy).filter_by(
+                strategy_id=strategy_data['strategy_id']
+            ).first()
             
-            # Update parent strategy updated_at
-            self.session.execute(
-                text("UPDATE strategies SET updated_at = NOW() WHERE strategy_id = :strategy_id"),
-                {'strategy_id': strategy_data['strategy_id']}
-            )
+            if parent_strategy:
+                # Trigger updated_at by setting a field (onupdate will handle timestamp)
+                parent_strategy.updated_at = datetime.utcnow()
             
             self.session.commit()
+            
+            # Get version_id as string (UUID object converted to string)
+            version_id = str(strategy_version.version_id)
             
             self.logger.info(
                 f"Created strategy version: {version_id} "
@@ -198,31 +212,69 @@ class StrategyDatabaseManager:
     
     def get_strategy_version(self, version_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get complete strategy version by version ID
+        Get complete strategy version by version ID using ORM
         
         Args:
-            version_id: Version UUID
+            version_id: Version UUID string
             
         Returns:
             Complete strategy version dict or None if not found
+            Dict includes all fields with JSONB data as Python objects
+            
+        Real Money Impact: HIGH - Retrieves complete trading strategy configuration
+        
+        ORM Refactored: Sprint 1.6.1 Task 1.3
         """
-        # CRITICAL: Rollback any previous failed transaction before querying
-        self.session.rollback()
+        # Import StrategyVersion ORM model
+        from src.optimizer_v3.database.models import StrategyVersion
         
-        query = text("""
-            SELECT * FROM strategy_versions WHERE version_id = :version_id
-        """)
-        
-        result = self.session.execute(query, {'version_id': version_id}).fetchone()
-        
-        if not result:
+        try:
+            # Query using ORM
+            version = self.session.query(StrategyVersion).filter_by(
+                version_id=version_id
+            ).first()
+            
+            if not version:
+                return None
+            
+            # Convert ORM object to dict for backwards compatibility
+            # JSONB fields are automatically deserialized to Python objects by SQLAlchemy
+            version_dict = {
+                'version_id': str(version.version_id),  # UUID to string
+                'strategy_id': version.strategy_id,
+                'version_number': version.version_number,
+                'name': version.name,
+                'description': version.description,
+                # JSONB fields - already Python objects
+                'blocks': version.blocks,
+                'signals': version.signals,
+                'parameters': version.parameters,
+                'entry_conditions': version.entry_conditions,
+                'exit_conditions': version.exit_conditions,
+                'risk_management': version.risk_management,
+                'backtest_config': version.backtest_config,
+                # Optional JSONB fields
+                'backtest_results': version.backtest_results,
+                'metrics': version.metrics,
+                'trades': version.trades,
+                'equity_curve': version.equity_curve,
+                # Metadata
+                'timestamp': version.timestamp,
+                'git_commit_hash': version.git_commit_hash,
+                'created_at': version.created_at,
+                'created_by': version.created_by,
+                'notes': version.notes,
+                'tags': version.tags,
+                'config_hash': version.config_hash
+            }
+            
+            return version_dict
+            
+        except Exception as e:
+            # Rollback on error to prevent transaction lock
+            self.session.rollback()
+            self.logger.error(f"Failed to get strategy version {version_id}: {e}")
             return None
-        
-        # Convert to dict (JSONB columns already parsed by PostgreSQL)
-        version = dict(result._mapping)
-        
-        # No json.loads needed - JSONB columns return Python objects directly
-        return version
     
     def get_strategy_versions(self, strategy_id: str) -> List[Dict[str, Any]]:
         """
@@ -560,34 +612,56 @@ class StrategyDatabaseManager:
     
     def get_all_strategies(self) -> List[Dict[str, Any]]:
         """
-        Get all strategies with their latest version info
+        Get all strategies with their latest version info using ORM
         
         Returns:
             List of strategy dicts with latest version metadata
+            Each dict contains: strategy_id, name, created_at, updated_at, latest_version
+            
+        Real Money Impact: MEDIUM - Lists all trading strategies
+        
+        ORM Refactored: Sprint 1.6.1 Task 1.4
         """
-        # CRITICAL: Rollback any previous failed transaction before querying
-        self.session.rollback()
+        # Import ORM models and SQLAlchemy functions
+        from src.optimizer_v3.database.models import Strategy, StrategyVersion
+        from sqlalchemy import func
         
         try:
-            query = text("""
-                SELECT 
-                    s.strategy_id,
-                    s.name,
-                    s.created_at,
-                    s.updated_at,
-                    MAX(sv.version_number) as latest_version
-                FROM strategies s
-                LEFT JOIN strategy_versions sv ON s.strategy_id = sv.strategy_id
-                GROUP BY s.strategy_id, s.name, s.created_at, s.updated_at
-                ORDER BY s.updated_at DESC
-            """)
+            # ORM query with LEFT JOIN and aggregation
+            results = self.session.query(
+                Strategy.strategy_id,
+                Strategy.name,
+                Strategy.created_at,
+                Strategy.updated_at,
+                func.max(StrategyVersion.version_number).label('latest_version')
+            ).outerjoin(
+                StrategyVersion,
+                Strategy.strategy_id == StrategyVersion.strategy_id
+            ).group_by(
+                Strategy.strategy_id,
+                Strategy.name,
+                Strategy.created_at,
+                Strategy.updated_at
+            ).order_by(
+                Strategy.updated_at.desc()
+            ).all()
             
-            results = self.session.execute(query).fetchall()
+            # Convert to list of dicts for backwards compatibility
+            strategies = []
+            for row in results:
+                strategy_dict = {
+                    'strategy_id': row.strategy_id,
+                    'name': row.name,
+                    'created_at': row.created_at,
+                    'updated_at': row.updated_at,
+                    'latest_version': row.latest_version  # Will be None if no versions
+                }
+                strategies.append(strategy_dict)
             
-            return [dict(row._mapping) for row in results]
+            return strategies
             
         except Exception as e:
-            # Rollback on any error to prevent transaction lock
+            # Rollback on error to prevent transaction lock
             self.session.rollback()
             self.logger.error(f"Failed to get all strategies: {e}")
             return []
