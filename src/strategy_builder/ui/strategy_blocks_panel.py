@@ -581,7 +581,7 @@ class BlockConfigItem(QWidget):
             self,
             "Configure Recheck Validation",
             f"Signal: {signal_name}\n\nEnter number of bars within which signal must reoccur for validation:",
-            value=25,  # Default value
+            value=3,  # Default value
             min=1,
             max=500,
             step=1
@@ -1935,7 +1935,7 @@ class StrategyBlocksPanel(QWidget):
             # Show exit condition dialog pre-populated (CRITICAL: Include RECHECK values)
             # CRITICAL FIX: ExitCondition has recheck_config (RecheckConfig object), not separate fields
             existing_recheck_enabled = False
-            existing_recheck_bar_delay = 25
+            existing_recheck_bar_delay = 3
             if current_exit.recheck_config:
                 existing_recheck_enabled = current_exit.recheck_config.enabled
                 existing_recheck_bar_delay = current_exit.recheck_config.bar_delay

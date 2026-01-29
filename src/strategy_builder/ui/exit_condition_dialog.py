@@ -505,7 +505,7 @@ class ExitConditionDialog(QDialog):
         self.recheck_delay_row.addWidget(self.recheck_delay_spin)
         
         # Quick preset buttons inline
-        for val in [1, 2, 3, 4, 5]:
+        for val in [1, 2, 3, 4, 5, 6, 7, 8]:
             btn = QPushButton(str(val))
             btn.setFixedSize(50, 32)
             btn.setStyleSheet("""
