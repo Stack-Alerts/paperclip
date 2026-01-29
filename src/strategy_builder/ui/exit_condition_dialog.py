@@ -173,17 +173,17 @@ class ExitConditionDialog(QDialog):
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # Title - show mode in label as well
+        # Title - show mode in label as well (use consistent blue/teal color)
         if self.signal_selector_mode:
-            title_label = QLabel("🔴 Configure Strategy Exit Condition")
+            title_label = QLabel("⚙ Configure Strategy Exit Condition")
         else:
             if self.is_duplicate:
-                title_label = QLabel(f"🔴 Duplicate EXIT: {self.signal_name}")
+                title_label = QLabel(f"⚙ Duplicate EXIT: {self.signal_name}")
             else:
-                title_label = QLabel(f"🔴 Configure EXIT: {self.signal_name}")
+                title_label = QLabel(f"⚙ Configure EXIT: {self.signal_name}")
         title_font = create_font(size=13, bold=True)
         title_label.setFont(title_font)
-        title_label.setStyleSheet(f"color: {get_color('error')};")
+        title_label.setStyleSheet("color: #095983;")  # Match main UI blue/teal
         layout.addWidget(title_label)
         
         # Signal selector (only if signal_name not provided)
