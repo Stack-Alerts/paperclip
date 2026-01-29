@@ -198,7 +198,7 @@ class ExitConditionDialog(QDialog):
             signal_row.addWidget(signal_label)
             
             self.signal_selector = QComboBox()
-            self.signal_selector.setMinimumWidth(700)
+            self.signal_selector.setMinimumWidth(900)
             self.signal_selector.setToolTip("Select an exit signal from the building blocks registry")
             signal_row.addWidget(self.signal_selector, stretch=1)
             
@@ -314,9 +314,6 @@ class ExitConditionDialog(QDialog):
         for pct in [10, 25, 50, 75, 100]:
             btn = QPushButton(f"{pct}%")
             btn.setFixedSize(50, 24)
-            # Set font explicitly with QFont
-            btn_font = create_font(size=14)
-            btn.setFont(btn_font)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
@@ -331,6 +328,9 @@ class ExitConditionDialog(QDialog):
                     background-color: #0f2021;
                 }
             """)
+            # Set font AFTER stylesheet to prevent override
+            btn_font = create_font(size=14)
+            btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, p=pct: self.percentage_spin.setValue(p))
             percentage_row.addWidget(btn)
         
@@ -406,9 +406,6 @@ class ExitConditionDialog(QDialog):
         for val in [0.25, 0.5, 1.0, 1.5, 2.0]:
             btn = QPushButton(f"{val}%")
             btn.setFixedSize(60, 24)
-            # Set font explicitly with QFont
-            btn_font = create_font(size=14)
-            btn.setFont(btn_font)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
@@ -423,6 +420,9 @@ class ExitConditionDialog(QDialog):
                     background-color: #0f2021;
                 }
             """)
+            # Set font AFTER stylesheet to prevent override
+            btn_font = create_font(size=14)
+            btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, v=val: self.tp_proximity_spin.setValue(v))
             proximity_row.addWidget(btn)
         
@@ -447,9 +447,6 @@ class ExitConditionDialog(QDialog):
         for val in [1, 2, 3, 4, 5]:
             btn = QPushButton(f"{val}%")
             btn.setFixedSize(50, 24)
-            # Set font explicitly with QFont
-            btn_font = create_font(size=14)
-            btn.setFont(btn_font)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
@@ -464,6 +461,9 @@ class ExitConditionDialog(QDialog):
                     background-color: #0f2021;
                 }
             """)
+            # Set font AFTER stylesheet to prevent override
+            btn_font = create_font(size=14)
+            btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, v=val: self.reversal_spin.setValue(v))
             reversal_row.addWidget(btn)
         
