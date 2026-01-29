@@ -329,7 +329,7 @@ class ExitConditionDialog(QDialog):
                 }
             """)
             # Set font AFTER stylesheet to prevent override
-            btn_font = create_font(size=14)
+            btn_font = create_font(size=10)
             btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, p=pct: self.percentage_spin.setValue(p))
             percentage_row.addWidget(btn)
@@ -421,7 +421,7 @@ class ExitConditionDialog(QDialog):
                 }
             """)
             # Set font AFTER stylesheet to prevent override
-            btn_font = create_font(size=14)
+            btn_font = create_font(size=10)
             btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, v=val: self.tp_proximity_spin.setValue(v))
             proximity_row.addWidget(btn)
@@ -462,7 +462,7 @@ class ExitConditionDialog(QDialog):
                 }
             """)
             # Set font AFTER stylesheet to prevent override
-            btn_font = create_font(size=14)
+            btn_font = create_font(size=10)
             btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, v=val: self.reversal_spin.setValue(v))
             reversal_row.addWidget(btn)

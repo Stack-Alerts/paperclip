@@ -1083,17 +1083,17 @@ def get_input_field_stylesheet() -> str:
 def create_font(size: int = 10, bold: bool = False):
     """
     Create a standardized QFont for UI elements.
-    
+
     Args:
         size: Font size in points (default: 10)
         bold: Whether font should be bold (default: False)
-    
+
     Returns:
         QFont object with specified properties
     """
     from PyQt5.QtGui import QFont
-    font = QFont()
-    font.setPointSize(size)
+    # CRITICAL: Must specify font family, otherwise Qt uses tiny default
+    font = QFont("Segoe UI, Arial, sans-serif", size)
     if bold:
         font.setBold(True)
     return font
