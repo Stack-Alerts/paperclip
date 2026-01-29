@@ -503,6 +503,33 @@ class ExitConditionDialog(QDialog):
         self.recheck_delay_spin.setValue(self.recheck_bar_delay)
         self.recheck_delay_spin.setToolTip("Number of bars for RECHECK validation")
         self.recheck_delay_row.addWidget(self.recheck_delay_spin)
+        
+        # Quick preset buttons inline
+        for val in [1, 2, 3, 4, 5]:
+            btn = QPushButton(str(val))
+            btn.setFixedSize(50, 32)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #244647;
+                    color: #999999;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 2px 4px;
+                    text-align: center;
+                }
+                QPushButton:hover {
+                    background-color: #1a3334;
+                }
+                QPushButton:pressed {
+                    background-color: #0f2021;
+                }
+            """)
+            # Set font AFTER stylesheet to prevent override
+            btn_font = create_font(size=8)
+            btn.setFont(btn_font)
+            btn.clicked.connect(lambda checked, v=val: self.recheck_delay_spin.setValue(v))
+            self.recheck_delay_row.addWidget(btn)
+        
         self.recheck_delay_row.addStretch()
         
         self.recheck_delay_widget = QWidget()
