@@ -22,7 +22,7 @@ from PyQt5.QtCore import Qt
 from src.strategy_builder.ui.styles import (
     get_exit_dialog_stylesheet, get_color, get_primary_button_stylesheet,
     get_secondary_button_stylesheet, get_label_style, get_radio_button_style,
-    get_checkbox_style, create_font
+    get_checkbox_style, create_font, get_recheck_gear_button_stylesheet
 )
 
 
@@ -331,8 +331,8 @@ class ExitConditionDialog(QDialog):
         preset_row.addWidget(QLabel("     Quick:"))
         for pct in [10, 25, 50, 75, 100]:
             btn = QPushButton(f"{pct}%")
-            btn.setFixedWidth(60)
-            btn.setStyleSheet(get_primary_button_stylesheet())
+            btn.setFixedSize(35, 24)
+            btn.setStyleSheet(get_recheck_gear_button_stylesheet())
             btn.clicked.connect(lambda checked, p=pct: self.percentage_spin.setValue(p))
             preset_row.addWidget(btn)
         preset_row.addStretch()
@@ -411,8 +411,8 @@ class ExitConditionDialog(QDialog):
         tp_preset_row.addWidget(QLabel("     Quick:"))
         for val in [0.25, 0.5, 1.0, 1.5, 2.0]:
             btn = QPushButton(f"{val}%")
-            btn.setFixedWidth(60)
-            btn.setStyleSheet(get_primary_button_stylesheet())
+            btn.setFixedSize(45, 24)
+            btn.setStyleSheet(get_recheck_gear_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.tp_proximity_spin.setValue(v))
             tp_preset_row.addWidget(btn)
         tp_preset_row.addStretch()
@@ -440,8 +440,8 @@ class ExitConditionDialog(QDialog):
         rev_preset_row.addWidget(QLabel("     Quick:"))
         for val in [1, 2, 3, 4, 5]:
             btn = QPushButton(f"{val}%")
-            btn.setFixedWidth(60)
-            btn.setStyleSheet(get_primary_button_stylesheet())
+            btn.setFixedSize(30, 24)
+            btn.setStyleSheet(get_recheck_gear_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.reversal_spin.setValue(v))
             rev_preset_row.addWidget(btn)
         rev_preset_row.addStretch()
