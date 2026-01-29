@@ -452,10 +452,12 @@ class ExitConditionDialog(QDialog):
         self.absolute_radio.toggled.connect(self._on_mode_changed)
         self.flexible_radio.toggled.connect(self._on_mode_changed)
         
-        # Connect binding level radio buttons
-        self.strategy_radio.toggled.connect(self._on_binding_level_changed)
-        self.block_radio.toggled.connect(self._on_binding_level_changed)
-        self.signal_radio.toggled.connect(self._on_binding_level_changed)
+        # Connect binding level radio buttons ONLY if not in edit mode
+        # In edit mode, binding section is hidden and widgets are deleted by Qt
+        if not self.is_edit_mode:
+            self.strategy_radio.toggled.connect(self._on_binding_level_changed)
+            self.block_radio.toggled.connect(self._on_binding_level_changed)
+            self.signal_radio.toggled.connect(self._on_binding_level_changed)
         
         # Issue 4: Connect RECHECK checkbox to prompt for bar delay
         self.recheck_checkbox.stateChanged.connect(self._on_recheck_changed)
