@@ -79,6 +79,11 @@ class ExitConditionDialog(QDialog):
         self.orchestrator = orchestrator  # Store orchestrator reference
         self.is_duplicate = is_duplicate  # Track if this is duplicate operation
         
+        # Determine if this is EDIT mode (config button) vs ADD mode (duplicate button)
+        # EDIT: signal_name provided + not duplicate = configuring existing exit
+        # ADD: is_duplicate=True OR signal_name=None = adding new exit
+        self.is_edit_mode = (signal_name is not None and not is_duplicate)
+        
         # Issue 1: Store binding context for auto-selection
         self.initial_binding_level = binding_level
         self.initial_block_name = block_name
@@ -211,6 +216,7 @@ class ExitConditionDialog(QDialog):
             layout.addWidget(signal_group)
         
         # Binding Level section (Sprint 1.8 - Task 1.8.49)
+        # Binding section - only show when ADDING or DUPLICATING (not when EDITING)
         binding_group = QGroupBox("Exit Binding Level")
         binding_layout = QVBoxLayout()
         
@@ -286,7 +292,15 @@ class ExitConditionDialog(QDialog):
         binding_layout.addWidget(self.signal_selector_widget)
         
         binding_group.setLayout(binding_layout)
-        layout.addWidget(binding_group)
+        
+        # CRITICAL FIX: Hide binding section when editing existing exit (config button)
+        # Binding cannot be changed after creation - would break strategy structure
+        if self.is_edit_mode:
+            binding_group.setVisible(False)
+            print(f"DEBUG: EDIT MODE - Hiding binding section, preserving: {self.initial_binding_level}")
+        else:
+            layout.addWidget(binding_group)
+            print(f"DEBUG: ADD MODE - Showing binding section")
         
         # Percentage section
         percentage_group = QGroupBox("Exit Percentage")
@@ -660,25 +674,33 @@ class ExitConditionDialog(QDialog):
             if selected_signal and selected_signal not in ["No signals available", "Error loading signals"]:
                 self.signal_name = selected_signal
         
-        # Get binding level from radio buttons
-        binding_level = "STRATEGY"  # Default
-        block_name = None
-        parent_signal_name = None
-        
-        if hasattr(self, 'block_radio') and self.block_radio.isChecked():
-            binding_level = "BLOCK"
-            # Get selected block
-            if self.block_selector.currentText() and self.block_selector.currentText() not in ["No blocks available", "No blocks in strategy", "Error loading blocks"]:
-                block_name = self.block_selector.currentText()
-        
-        elif hasattr(self, 'signal_radio') and self.signal_radio.isChecked():
-            binding_level = "SIGNAL"
-            # Get selected signal (stored as "block_name::signal_name" in itemData)
-            current_data = self.signal_binding_selector.currentData()
-            if current_data and "::" in current_data:
-                parts = current_data.split("::")
-                block_name = parts[0]
-                parent_signal_name = parts[1]
+        # CRITICAL FIX: If editing existing exit, preserve original binding (binding section was hidden)
+        if self.is_edit_mode:
+            # Use the original binding that was passed when dialog was opened
+            binding_level = self.initial_binding_level
+            block_name = self.initial_block_name
+            parent_signal_name = self.initial_parent_signal_name
+            print(f"DEBUG: EDIT MODE - Preserving original binding: {binding_level}, block={block_name}, signal={parent_signal_name}")
+        else:
+            # ADD MODE: Get binding from radio buttons (user can choose)
+            binding_level = "STRATEGY"  # Default
+            block_name = None
+            parent_signal_name = None
+            
+            if hasattr(self, 'block_radio') and self.block_radio.isChecked():
+                binding_level = "BLOCK"
+                # Get selected block
+                if self.block_selector.currentText() and self.block_selector.currentText() not in ["No blocks available", "No blocks in strategy", "Error loading blocks"]:
+                    block_name = self.block_selector.currentText()
+            
+            elif hasattr(self, 'signal_radio') and self.signal_radio.isChecked():
+                binding_level = "SIGNAL"
+                # Get selected signal (stored as "block_name::signal_name" in itemData)
+                current_data = self.signal_binding_selector.currentData()
+                if current_data and "::" in current_data:
+                    parts = current_data.split("::")
+                    block_name = parts[0]
+                    parent_signal_name = parts[1]
         
         config = {
             'signal_name': self.signal_name,
