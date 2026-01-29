@@ -331,7 +331,7 @@ class ExitConditionDialog(QDialog):
                 }
             """)
             # Set font AFTER stylesheet to prevent override
-            btn_font = create_font(size=12)
+            btn_font = create_font(size=8)
             btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, p=pct: self.percentage_spin.setValue(p))
             percentage_row.addWidget(btn)
@@ -425,7 +425,7 @@ class ExitConditionDialog(QDialog):
                 }
             """)
             # Set font AFTER stylesheet to prevent override
-            btn_font = create_font(size=12)
+            btn_font = create_font(size=8)
             btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, v=val: self.tp_proximity_spin.setValue(v))
             proximity_row.addWidget(btn)
@@ -468,7 +468,7 @@ class ExitConditionDialog(QDialog):
                 }
             """)
             # Set font AFTER stylesheet to prevent override
-            btn_font = create_font(size=12)
+            btn_font = create_font(size=8)
             btn.setFont(btn_font)
             btn.clicked.connect(lambda checked, v=val: self.reversal_spin.setValue(v))
             reversal_row.addWidget(btn)
@@ -491,11 +491,24 @@ class ExitConditionDialog(QDialog):
         self.recheck_checkbox.setToolTip("Require signal to be true again after delay before executing exit")
         recheck_layout.addWidget(self.recheck_checkbox)
         
-        recheck_note = QLabel("    └─ Configure RECHECK settings after adding exit condition")
-        recheck_note.setStyleSheet(get_label_style('muted'))
-        recheck_note_font = create_font(size=9)
-        recheck_note.setFont(recheck_note_font)
-        recheck_layout.addWidget(recheck_note)
+        # RECHECK bar delay input (visible when checked)
+        self.recheck_delay_row = QHBoxLayout()
+        recheck_delay_label = QLabel("    Bar Delay:")
+        recheck_delay_label.setStyleSheet(get_label_style('default'))
+        recheck_delay_label.setToolTip("Number of bars within which exit signal must reoccur")
+        self.recheck_delay_row.addWidget(recheck_delay_label)
+        
+        self.recheck_delay_spin = QSpinBox()
+        self.recheck_delay_spin.setRange(1, 500)
+        self.recheck_delay_spin.setValue(self.recheck_bar_delay)
+        self.recheck_delay_spin.setToolTip("Number of bars for RECHECK validation")
+        self.recheck_delay_row.addWidget(self.recheck_delay_spin)
+        self.recheck_delay_row.addStretch()
+        
+        self.recheck_delay_widget = QWidget()
+        self.recheck_delay_widget.setLayout(self.recheck_delay_row)
+        self.recheck_delay_widget.setVisible(self.recheck_enabled)  # Show only if RECHECK enabled
+        recheck_layout.addWidget(self.recheck_delay_widget)
         
         recheck_group.setLayout(recheck_layout)
         layout.addWidget(recheck_group)
@@ -509,7 +522,11 @@ class ExitConditionDialog(QDialog):
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
         
-        ok_button = QPushButton("Add Exit Condition")
+        # Button text depends on mode
+        if self.is_edit_mode:
+            ok_button = QPushButton("Update Exit Condition")
+        else:
+            ok_button = QPushButton("Add Exit Condition")
         ok_button.setStyleSheet(get_primary_button_stylesheet())
         ok_button.clicked.connect(self.accept)
         ok_button.setDefault(True)
@@ -570,39 +587,18 @@ class ExitConditionDialog(QDialog):
     
     def _on_recheck_changed(self, state):
         """
-        Handle RECHECK checkbox state change - prompt for bar delay.
-        Issue 4 Fix: Immediately prompt for bar delay when checkbox is checked.
+        Handle RECHECK checkbox state change - show/hide bar delay spinbox.
         """
-        from PyQt5.QtWidgets import QInputDialog
-        
         if state == Qt.Checked:
-            # Show input dialog for bar delay
-            bar_delay, ok = QInputDialog.getInt(
-                self,
-                "Configure RECHECK Validation",
-                "Enter number of bars within which exit signal must reoccur for validation:",
-                value=self.recheck_bar_delay,  # Current value
-                min=1,
-                max=500,
-                step=1
-            )
-            
-            if ok and bar_delay > 0:
-                # User confirmed - store the value
-                self.recheck_bar_delay = bar_delay
-                self.recheck_enabled = True
-                print(f"DEBUG: RECHECK enabled with bar_delay={bar_delay}")
-            else:
-                # User canceled - uncheck the checkbox
-                self.recheck_checkbox.blockSignals(True)
-                self.recheck_checkbox.setChecked(False)
-                self.recheck_checkbox.blockSignals(False)
-                self.recheck_enabled = False
-                print("DEBUG: RECHECK canceled - checkbox unchecked")
+            # Show bar delay spinbox
+            self.recheck_delay_widget.setVisible(True)
+            self.recheck_enabled = True
+            print(f"DEBUG: RECHECK enabled, showing bar delay spinbox (value={self.recheck_delay_spin.value()})")
         else:
-            # Checkbox unchecked
+            # Hide bar delay spinbox
+            self.recheck_delay_widget.setVisible(False)
             self.recheck_enabled = False
-            print("DEBUG: RECHECK disabled")
+            print("DEBUG: RECHECK disabled, hiding bar delay spinbox")
     
     def _on_binding_level_changed(self):
         """Handle binding level radio button changes - show/hide selectors."""
@@ -792,7 +788,7 @@ class ExitConditionDialog(QDialog):
             'tp_proximity_threshold': float(self.tp_proximity_spin.value()),
             'reversal_trigger': self.reversal_spin.value() / 10.0,  # Convert to 0.0-1.0
             'recheck_enabled': self.recheck_checkbox.isChecked(),
-            'recheck_bar_delay': self.recheck_bar_delay if self.recheck_checkbox.isChecked() else None
+            'recheck_bar_delay': self.recheck_delay_spin.value() if self.recheck_checkbox.isChecked() else None
         }
         
         # Add block_name and parent_signal_name if applicable
