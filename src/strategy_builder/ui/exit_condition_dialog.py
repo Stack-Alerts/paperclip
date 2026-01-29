@@ -120,18 +120,6 @@ class ExitConditionDialog(QDialog):
         """Override showEvent to load signals after dialog is added to widget tree."""
         super().showEvent(event)
         
-        # Issue 2: Force window size to 800px width AFTER it's shown
-        from PyQt5.QtCore import QTimer
-        if not hasattr(self, '_size_set'):
-            self._size_set = True
-            # Use QTimer to set size after event loop processes the show
-            QTimer.singleShot(0, lambda: self.setGeometry(
-                self.geometry().x(),
-                self.geometry().y(),
-                800,
-                self.geometry().height()
-            ))
-        
         # Load signals on first show (after dialog is in widget tree)
         if self.signal_selector_mode and self.signal_selector and self.signal_selector.count() == 0:
             print("DEBUG: showEvent - Loading available signals now that dialog is shown")
@@ -178,9 +166,8 @@ class ExitConditionDialog(QDialog):
             self.setWindowTitle(f"Configure Exit Condition: {self.signal_name}")
         
         self.setStyleSheet(get_exit_dialog_stylesheet())
-        # Issue 2 Fix: Set both minimum and fixed width to ensure proper sizing
-        self.setMinimumWidth(800)
-        self.setFixedWidth(800)
+        # Allow dialog to expand as needed
+        self.setMinimumWidth(1200)
         
         layout = QVBoxLayout()
         layout.setSpacing(15)
@@ -322,21 +309,17 @@ class ExitConditionDialog(QDialog):
         self.percentage_spin.setSuffix("%")
         self.percentage_spin.setToolTip("How much of the position to exit (1-100%)")
         percentage_row.addWidget(self.percentage_spin)
-        percentage_row.addStretch()
         
-        percentage_layout.addLayout(percentage_row)
-        
-        # Quick preset buttons for percentage
-        preset_row = QHBoxLayout()
-        preset_row.addWidget(QLabel("     Quick:"))
+        # Quick preset buttons inline
         for pct in [10, 25, 50, 75, 100]:
             btn = QPushButton(f"{pct}%")
             btn.setFixedSize(35, 24)
             btn.setStyleSheet(get_recheck_gear_button_stylesheet())
             btn.clicked.connect(lambda checked, p=pct: self.percentage_spin.setValue(p))
-            preset_row.addWidget(btn)
-        preset_row.addStretch()
-        percentage_layout.addLayout(preset_row)
+            percentage_row.addWidget(btn)
+        
+        percentage_row.addStretch()
+        percentage_layout.addLayout(percentage_row)
         
         percentage_group.setLayout(percentage_layout)
         layout.addWidget(percentage_group)
@@ -402,21 +385,17 @@ class ExitConditionDialog(QDialog):
         self.tp_proximity_spin.setSuffix("%")
         self.tp_proximity_spin.setToolTip("If price is within this % of TP, consider deferring exit")
         proximity_row.addWidget(self.tp_proximity_spin)
-        proximity_row.addStretch()
         
-        flexible_params_layout.addLayout(proximity_row)
-        
-        # Quick preset buttons for TP Proximity
-        tp_preset_row = QHBoxLayout()
-        tp_preset_row.addWidget(QLabel("     Quick:"))
+        # Quick preset buttons inline
         for val in [0.25, 0.5, 1.0, 1.5, 2.0]:
             btn = QPushButton(f"{val}%")
             btn.setFixedSize(45, 24)
             btn.setStyleSheet(get_recheck_gear_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.tp_proximity_spin.setValue(v))
-            tp_preset_row.addWidget(btn)
-        tp_preset_row.addStretch()
-        flexible_params_layout.addLayout(tp_preset_row)
+            proximity_row.addWidget(btn)
+        
+        proximity_row.addStretch()
+        flexible_params_layout.addLayout(proximity_row)
         
         # Reversal Trigger
         reversal_row = QHBoxLayout()
@@ -431,21 +410,17 @@ class ExitConditionDialog(QDialog):
         self.reversal_spin.setSuffix("%")
         self.reversal_spin.setToolTip("If price pulls back this % from peak, execute deferred exit")
         reversal_row.addWidget(self.reversal_spin)
-        reversal_row.addStretch()
         
-        flexible_params_layout.addLayout(reversal_row)
-        
-        # Quick preset buttons for Reversal Trigger
-        rev_preset_row = QHBoxLayout()
-        rev_preset_row.addWidget(QLabel("     Quick:"))
+        # Quick preset buttons inline
         for val in [1, 2, 3, 4, 5]:
             btn = QPushButton(f"{val}%")
             btn.setFixedSize(30, 24)
             btn.setStyleSheet(get_recheck_gear_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.reversal_spin.setValue(v))
-            rev_preset_row.addWidget(btn)
-        rev_preset_row.addStretch()
-        flexible_params_layout.addLayout(rev_preset_row)
+            reversal_row.addWidget(btn)
+        
+        reversal_row.addStretch()
+        flexible_params_layout.addLayout(reversal_row)
         
         self.flexible_params_group.setLayout(flexible_params_layout)
         layout.addWidget(self.flexible_params_group)
