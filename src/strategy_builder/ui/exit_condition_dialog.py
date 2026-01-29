@@ -314,15 +314,13 @@ class ExitConditionDialog(QDialog):
         for pct in [10, 25, 50, 75, 100]:
             btn = QPushButton(f"{pct}%")
             btn.setFixedSize(50, 24)
-            btn_font = create_font(size=9)
-            btn.setFont(btn_font)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
                     color: #999999;
                     border: none;
                     border-radius: 6px;
-                    font-size: 9pt;
+                    font-size: 11pt;
                 }
                 QPushButton:hover {
                     background-color: #1a3334;
@@ -406,15 +404,13 @@ class ExitConditionDialog(QDialog):
         for val in [0.25, 0.5, 1.0, 1.5, 2.0]:
             btn = QPushButton(f"{val}%")
             btn.setFixedSize(60, 24)
-            btn_font = create_font(size=9)
-            btn.setFont(btn_font)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
                     color: #999999;
                     border: none;
                     border-radius: 6px;
-                    font-size: 9pt;
+                    font-size: 11pt;
                 }
                 QPushButton:hover {
                     background-color: #1a3334;
@@ -447,15 +443,13 @@ class ExitConditionDialog(QDialog):
         for val in [1, 2, 3, 4, 5]:
             btn = QPushButton(f"{val}%")
             btn.setFixedSize(50, 24)
-            btn_font = create_font(size=9)
-            btn.setFont(btn_font)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
                     color: #999999;
                     border: none;
                     border-radius: 6px;
-                    font-size: 9pt;
+                    font-size: 11pt;
                 }
                 QPushButton:hover {
                     background-color: #1a3334;
