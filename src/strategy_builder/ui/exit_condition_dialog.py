@@ -81,10 +81,10 @@ class ExitConditionDialog(QDialog):
         self.orchestrator = orchestrator  # Store orchestrator reference
         self.is_duplicate = is_duplicate  # Track if this is duplicate operation
         
-        # Determine if this is EDIT mode (config button) vs ADD mode (duplicate button)
-        # EDIT: signal_name provided + not duplicate = configuring existing exit
-        # ADD: is_duplicate=True OR signal_name=None = adding new exit
-        self.is_edit_mode = (signal_name is not None and not is_duplicate)
+        # Determine if this is EDIT mode (config button) vs ADD mode (duplicate/red button)
+        # EDIT: existing_percentage provided (editing existing exit with saved percentage)
+        # ADD: existing_percentage is None (adding new exit, even if signal pre-selected)
+        self.is_edit_mode = (existing_percentage is not None)
         
         # Issue 1: Store binding context for auto-selection
         self.initial_binding_level = binding_level
