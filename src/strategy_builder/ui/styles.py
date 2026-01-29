@@ -1165,7 +1165,7 @@ def get_exit_dialog_stylesheet() -> str:
             subcontrol-origin: margin;
             left: 12px;
             padding: 0 5px;
-            color: #095983;
+            color: {COLORS['text_muted']};
             font-size: 11pt;
             font-weight: bold;
         }}
