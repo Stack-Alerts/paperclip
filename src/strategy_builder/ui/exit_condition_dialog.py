@@ -313,8 +313,10 @@ class ExitConditionDialog(QDialog):
         # Quick preset buttons inline
         for pct in [10, 25, 50, 75, 100]:
             btn = QPushButton(f"{pct}%")
-            btn.setFixedSize(35, 24)
-            btn.setStyleSheet(get_recheck_gear_button_stylesheet())
+            btn.setFixedSize(50, 24)
+            btn_font = create_font(size=9)
+            btn.setFont(btn_font)
+            btn.setStyleSheet(get_recheck_gear_button_stylesheet() + "color: #999999;")
             btn.clicked.connect(lambda checked, p=pct: self.percentage_spin.setValue(p))
             percentage_row.addWidget(btn)
         
@@ -389,8 +391,10 @@ class ExitConditionDialog(QDialog):
         # Quick preset buttons inline
         for val in [0.25, 0.5, 1.0, 1.5, 2.0]:
             btn = QPushButton(f"{val}%")
-            btn.setFixedSize(45, 24)
-            btn.setStyleSheet(get_recheck_gear_button_stylesheet())
+            btn.setFixedSize(60, 24)
+            btn_font = create_font(size=9)
+            btn.setFont(btn_font)
+            btn.setStyleSheet(get_recheck_gear_button_stylesheet() + "color: #999999;")
             btn.clicked.connect(lambda checked, v=val: self.tp_proximity_spin.setValue(v))
             proximity_row.addWidget(btn)
         
@@ -414,8 +418,10 @@ class ExitConditionDialog(QDialog):
         # Quick preset buttons inline
         for val in [1, 2, 3, 4, 5]:
             btn = QPushButton(f"{val}%")
-            btn.setFixedSize(30, 24)
-            btn.setStyleSheet(get_recheck_gear_button_stylesheet())
+            btn.setFixedSize(50, 24)
+            btn_font = create_font(size=9)
+            btn.setFont(btn_font)
+            btn.setStyleSheet(get_recheck_gear_button_stylesheet() + "color: #999999;")
             btn.clicked.connect(lambda checked, v=val: self.reversal_spin.setValue(v))
             reversal_row.addWidget(btn)
         
