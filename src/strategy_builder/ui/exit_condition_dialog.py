@@ -168,7 +168,7 @@ class ExitConditionDialog(QMainWindow):
         
         self.setStyleSheet(get_exit_dialog_stylesheet())
         # Allow dialog to expand as needed
-        self.setMinimumWidth(1200)
+        self.setMinimumWidth(900)
         
         layout = QVBoxLayout()
         layout.setSpacing(15)
