@@ -1859,9 +1859,10 @@ class StrategyBlocksPanel(QWidget):
                     return
                 
                 # Add updated with RECHECK values
+                # CRITICAL FIX: Dialog already returns percentage as 0.0-1.0, don't divide again!
                 add_result = self.orchestrator.add_exit_condition(
                     signal_name=new_config['signal_name'],
-                    percentage=new_config.get('percentage', 50) / 100.0,
+                    percentage=new_config.get('percentage', 0.5),  # Already 0.0-1.0 from dialog
                     binding_level='SIGNAL',
                     block_name=block_name,
                     parent_signal_name=signal_name,
@@ -1871,6 +1872,9 @@ class StrategyBlocksPanel(QWidget):
                     recheck_enabled=new_config.get('recheck_enabled', False),
                     recheck_bar_delay=new_config.get('recheck_bar_delay')
                 )
+                
+                # DEBUG: Log what we're saving
+                print(f"DEBUG: Saving exit with percentage={new_config.get('percentage')}, recheck_enabled={new_config.get('recheck_enabled')}, recheck_bar_delay={new_config.get('recheck_bar_delay')}")
                 
                 if add_result.success:
                     print(f"Signal exit updated: {block_name}::{signal_name} -> {new_config['signal_name']}")
