@@ -316,7 +316,21 @@ class ExitConditionDialog(QDialog):
             btn.setFixedSize(50, 24)
             btn_font = create_font(size=9)
             btn.setFont(btn_font)
-            btn.setStyleSheet(get_recheck_gear_button_stylesheet() + "color: #999999;")
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #244647;
+                    color: #999999;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 9pt;
+                }
+                QPushButton:hover {
+                    background-color: #1a3334;
+                }
+                QPushButton:pressed {
+                    background-color: #0f2021;
+                }
+            """)
             btn.clicked.connect(lambda checked, p=pct: self.percentage_spin.setValue(p))
             percentage_row.addWidget(btn)
         
@@ -394,7 +408,21 @@ class ExitConditionDialog(QDialog):
             btn.setFixedSize(60, 24)
             btn_font = create_font(size=9)
             btn.setFont(btn_font)
-            btn.setStyleSheet(get_recheck_gear_button_stylesheet() + "color: #999999;")
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #244647;
+                    color: #999999;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 9pt;
+                }
+                QPushButton:hover {
+                    background-color: #1a3334;
+                }
+                QPushButton:pressed {
+                    background-color: #0f2021;
+                }
+            """)
             btn.clicked.connect(lambda checked, v=val: self.tp_proximity_spin.setValue(v))
             proximity_row.addWidget(btn)
         
@@ -421,7 +449,21 @@ class ExitConditionDialog(QDialog):
             btn.setFixedSize(50, 24)
             btn_font = create_font(size=9)
             btn.setFont(btn_font)
-            btn.setStyleSheet(get_recheck_gear_button_stylesheet() + "color: #999999;")
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #244647;
+                    color: #999999;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 9pt;
+                }
+                QPushButton:hover {
+                    background-color: #1a3334;
+                }
+                QPushButton:pressed {
+                    background-color: #0f2021;
+                }
+            """)
             btn.clicked.connect(lambda checked, v=val: self.reversal_spin.setValue(v))
             reversal_row.addWidget(btn)
         
