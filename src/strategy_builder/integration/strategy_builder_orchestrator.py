@@ -1162,18 +1162,25 @@ class StrategyBuilderOrchestrator:
         parent_signal_name: Optional[str] = None,
         exit_mode: str = "ABSOLUTE",
         tp_proximity_threshold: float = 2.0,
-        reversal_trigger: float = 0.5
+        reversal_trigger: float = 0.5,
+        recheck_enabled: bool = False,
+        recheck_bar_delay: Optional[int] = None
     ) -> WorkflowResult:
         """
         Add exit condition at specified binding level
         Sprint 1.8 Task 1.8.30
-        
+
         Args:
             signal_name: Name of signal that triggers exit
             percentage: Exit percentage (0.0-1.0)
             binding_level: "STRATEGY", "BLOCK", or "SIGNAL"
             block_name: Required if binding_level is "BLOCK" or "SIGNAL"
             parent_signal_name: Required if binding_level is "SIGNAL"
+            exit_mode: Exit mode ("ABSOLUTE" or "FLEXIBLE")
+            tp_proximity_threshold: TP proximity threshold for FLEXIBLE mode
+            reversal_trigger: Reversal trigger for FLEXIBLE mode
+            recheck_enabled: Enable RECHECK validation
+            recheck_bar_delay: Number of bars for RECHECK validation
             exit_mode: "ABSOLUTE" or "FLEXIBLE"
             tp_proximity_threshold: For FLEXIBLE mode (percentage)
             reversal_trigger: For FLEXIBLE mode (percentage)
@@ -1182,7 +1189,7 @@ class StrategyBuilderOrchestrator:
             WorkflowResult
         """
         try:
-            from src.strategy_builder.core.strategy_config_engine import ExitCondition
+            from src.strategy_builder.core.strategy_config_engine import ExitCondition, RecheckConfig
             
             # Validate inputs
             if percentage <= 0 or percentage > 1.0:
@@ -1209,14 +1216,23 @@ class StrategyBuilderOrchestrator:
                     errors=["Binding level must be 'STRATEGY', 'BLOCK', or 'SIGNAL'"]
                 )
             
-            # Create exit condition
+            # Create RECHECK config if enabled
+            recheck_config = None
+            if recheck_enabled and recheck_bar_delay:
+                recheck_config = RecheckConfig(
+                    enabled=True,
+                    bar_delay=recheck_bar_delay
+                )
+            
+            # Create exit condition with RECHECK support
             exit_condition = ExitCondition(
                 signal_name=signal_name,
                 percentage=percentage,
                 exit_mode=exit_mode,
                 tp_proximity_threshold=tp_proximity_threshold,
                 reversal_trigger=reversal_trigger,
-                binding_level=binding_level
+                binding_level=binding_level,
+                recheck_config=recheck_config
             )
             
             # Add at appropriate level
