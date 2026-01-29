@@ -1,4 +1,4 @@
-# INSTITUTIONAL GRADE VALIDATION FRAMEWORK
+  # INSTITUTIONAL GRADE VALIDATION FRAMEWORK
 ## Strategy Builder v3 - Post Sprint 1.8
 
 **Date**: 2026-01-29  
@@ -233,6 +233,135 @@ Exit Condition:
 
 ---
 
+### Gap 11: Strategy Direction Mismatch (NEW - CRITICAL)
+**Risk**: WRONG DIRECTION - Strategy Loses Money  
+**Example**:
+```
+Strategy: "HOD Rejection"
+Direction: BULLISH  ← WRONG!
+Entry Signals:
+  - HOD_REJECTION (bearish)
+  - BELOW_HOD (bearish)
+  - BEARISH (bearish)
+  - BEARISH_CROSS (bearish)
+  - BEARISH_DIVERGENCE (bearish)
+  - BEARISH_SWEEP (bearish)
+
+Entry Signal Analysis: 6 bearish, 0 bullish = 100% bearish
+Strategy direction should be: BEARISH ❌
+```
+
+**Exception - Exit Signals**:
+```
+Exit conditions CAN BE OPPOSITE direction:
+Strategy: "HOD Rejection" (BEARISH)
+  Entry: HOD_REJECTION, BEARISH signals
+  Exit: LOD_BULLISH ✓ (valid - exit at reversal)
+  Exit: AT_LOD ✓ (valid - exit at support)
+  Exit: LOD_BOUNCE ✓ (valid - exit at bounce)
+```
+
+**Current Validation**: ❌ NOT DETECTED  
+**Required**:
+- Analyze signal names for direction keywords (BULLISH/BEARISH, HOD/LOD, etc.)
+- Calculate entry signal direction ratio
+- Flag if strategy direction doesn't match majority (>70%) entry signals
+- **EXCLUDE exit signals from direction analysis** (can be opposite)
+- Provide one-click "Switch Direction" button in validation report
+- Show detailed breakdown: X bullish entry signals, Y bearish entry signals
+
+**Direction Detection Keywords**:
+```python
+BEARISH_KEYWORDS = [
+    'bearish', 'hod', 'rejection', 'short', 'sell', 'down',
+    'resistance', 'reversal_down', 'cross_down', 'below'
+]
+
+BULLISH_KEYWORDS = [
+    'bullish', 'lod', 'bounce', 'long', 'buy', 'up',
+    'support', 'reversal_up', 'cross_up', 'above'
+]
+```
+
+---
+
+### Gap 12: Timing Constraint vs RECHECK Conflicts (NEW - CRITICAL)
+**Risk**: SIGNAL NEVER TRIGGERS - Impossible Timing Window  
+**Example 1 - Signal Level**:
+```
+Signal: HOD_REJECTION
+  Timing Constraint: "Within 15 candles of BELOW_HOD"
+  RECHECK: 25 bars
+
+ISSUE: Signal must occur within 15 bars, but RECHECK waits 25 bars!
+Timeline:
+  Bar 0: BELOW_HOD triggers
+  Bar 15: Timing window CLOSES (max 15 candles)
+  Bar 25: RECHECK validates ← TOO LATE! Window already closed!
+
+Result: Signal NEVER triggers ❌
+```
+
+**Example 2 - Block Level**:
+```
+Block A: First signal triggers at Bar 0
+Block B:
+  Timing: "Within 20 candles of Block A"
+  Signal C: RECHECK (30 bars)
+
+ISSUE: Block B must trigger within 20 bars of Block A,
+but Signal C's RECHECK takes 30 bars!
+
+Timeline:
+  Bar 0: Block A triggers
+  Bar 20: Block B timing window CLOSES
+  Bar 30: Signal C RECHECK completes ← TOO LATE!
+
+Result: Block B NEVER completes ❌
+```
+
+**Example 3 - Exit Condition**:
+```
+Exit Condition: VWAP_CROSS_DOWN
+  Timing: "Within 10 bars of entry"
+  RECHECK: 15 bars
+
+ISSUE: Exit must trigger within 10 bars of entry,
+but RECHECK waits 15 bars!
+
+Timeline:
+  Bar 0: Entry signal triggers (position opened)
+  Bar 10: Exit timing window CLOSES
+  Bar 15: Exit RECHECK validates ← TOO LATE!
+
+Result: Exit NEVER triggers, position never closes ❌
+```
+
+**Mathematical Analysis**:
+```
+For signal/exit to trigger successfully:
+  timing_constraint.max_candles >= recheck_config.bar_delay
+
+If: timing_constraint.max_candles < recheck_config.bar_delay
+Then: IMPOSSIBLE - signal waits longer than window allows
+
+SEVERITY:
+  difference = bar_delay - max_candles
+  if difference > 0: ERROR (will never trigger)
+  if difference == 0: WARNING (edge case, might trigger rarely)
+  if bar_delay <= max_candles * 0.8: INFO (safe, good buffer)
+```
+
+**Current Validation**: ❌ NOT DETECTED  
+**Required**:
+- Compare timing_constraint.max_candles with recheck_config.bar_delay
+- Apply to signal-level, block-level, and exit-level timing
+- Calculate timing windows for nested RECHECKs (cumulative)
+- Flag ERROR if RECHECK exceeds timing window
+- Flag WARNING if RECHECK is too close to window (< 20% buffer)
+- Provide detailed timeline visualization in validation report
+
+
 ## INSTITUTIONAL-GRADE VALIDATION RULES
 
 ### Severity Levels
@@ -286,6 +415,11 @@ class ValidationSeverity(Enum):
 31. **NEW**: No circular timing dependencies
 32. **NEW**: Cross-block timing references are forward-only
 33. **NEW**: Timing constraint reference format valid (block::signal or signal)
+34. **NEW**: RECHECK bar_delay <= timing constraint max_candles
+35. **NEW**: RECHECK bar_delay <= timing constraint max_candles * 0.8 (WARNING - buffer recommended)
+36. **NEW**: Nested RECHECK cumulative delay <= timing constraint max_candles
+37. **NEW**: Exit condition RECHECK <= exit timing window
+38. **NEW**: Block-level timing compatible with signal RECHECKs
 
 #### CATEGORY E: LOGIC FLOW VALIDATION (WARNING)
 34. **NEW**: No dead code (unreachable signals)
@@ -308,6 +442,13 @@ class ValidationSeverity(Enum):
 47. ✅ Signal names are valid Python identifiers
 48. **NEW**: Exit signal names are valid Python identifiers
 49. **NEW**: No special characters in binding references
+
+#### CATEGORY H: STRATEGY DIRECTION VALIDATION (CRITICAL)
+50. **NEW**: Strategy direction matches majority (>70%) of entry signals
+51. **NEW**: Entry signal direction analysis (exclude exits)
+52. **NEW**: Direction mismatch warning with suggested direction
+53. **NEW**: One-click "Switch Direction" button in validation UI
+54. **NEW**: Detailed breakdown: X bullish entry signals, Y bearish entry signals
 
 ---
 
@@ -534,6 +675,442 @@ def calculate_cumulative_exit_percentages(config: StrategyConfig) -> Dict[str, f
     return cumulative
 ```
 
+### Strategy Direction Detection and Validation
+```python
+def validate_strategy_direction(config: StrategyConfig) -> Optional[ValidationIssue]:
+    """
+    Analyze entry signals to detect strategy direction mismatch.
+    
+    CRITICAL: Exit signals are EXCLUDED from direction analysis
+    (exits can be opposite direction - e.g., bearish strategy exits at LOD bounce)
+    
+    Returns:
+        ValidationIssue if direction mismatch detected, None otherwise
+    """
+    
+    # Direction detection keywords
+    BEARISH_KEYWORDS = [
+        'bearish', 'hod', 'rejection', 'short', 'sell', 'down',
+        'resistance', 'reversal_down', 'cross_down', 'below'
+    ]
+    
+    BULLISH_KEYWORDS = [
+        'bullish', 'lod', 'bounce', 'long', 'buy', 'up',
+        'support', 'reversal_up', 'cross_up', 'above'
+    ]
+    
+    # Collect all ENTRY signals (exclude exits)
+    entry_signals = []
+    for block in config.blocks:
+        for signal in block.signals:
+            entry_signals.append(signal.name.lower())
+    
+    # Count directional signals
+    bearish_count = 0
+    bullish_count = 0
+    neutral_count = 0
+    
+    bearish_signals = []
+    bullish_signals = []
+    
+    for signal_name in entry_signals:
+        is_bearish = any(keyword in signal_name for keyword in BEARISH_KEYWORDS)
+        is_bullish = any(keyword in signal_name for keyword in BULLISH_KEYWORDS)
+        
+        if is_bearish and not is_bullish:
+            bearish_count += 1
+            bearish_signals.append(signal_name)
+        elif is_bullish and not is_bearish:
+            bullish_count += 1
+            bullish_signals.append(signal_name)
+        else:
+            neutral_count += 1
+    
+    total_directional = bearish_count + bullish_count
+    
+    if total_directional == 0:
+        # No directional signals detected - can't determine
+        return None
+    
+    # Calculate percentages
+    bearish_pct = (bearish_count / total_directional) * 100
+    bullish_pct = (bullish_count / total_directional) * 100
+    
+    # Determine actual direction from strategy config
+    strategy_direction = config.direction.upper() if hasattr(config, 'direction') else None
+    
+    # Determine suggested direction (>70% threshold)
+    suggested_direction = None
+    if bearish_pct > 70:
+        suggested_direction = "BEARISH"
+    elif bullish_pct > 70:
+        suggested_direction = "BULLISH"
+    
+    # Check for mismatch
+    if suggested_direction and strategy_direction and strategy_direction != suggested_direction:
+        # MISMATCH DETECTED!
+        return ValidationIssue(
+            severity=ValidationSeverity.CRITICAL,
+            category="Strategy Direction",
+            rule_id="H50",
+            rule_name="Strategy direction matches majority entry signals",
+            message=f"Strategy direction is '{strategy_direction}' but {bearish_pct:.0f}% of entry signals are bearish and {bullish_pct:.0f}% are bullish",
+            location="Strategy Configuration",
+            suggestion=f"Change strategy direction to '{suggested_direction}' or review signal selection",
+            affected_components={
+                'current_direction': strategy_direction,
+                'suggested_direction': suggested_direction,
+                'bearish_signals': bearish_signals,
+                'bullish_signals': bullish_signals,
+                'bearish_count': bearish_count,
+                'bullish_count': bullish_count,
+                'bearish_percentage': bearish_pct,
+                'bullish_percentage': bullish_pct,
+                'can_auto_fix': True  # Flag for "Switch Direction" button
+            }
+        )
+    
+    return None
+```
+
+### Timing Constraint vs RECHECK Conflict Detection
+```python
+def validate_timing_recheck_conflicts(config: StrategyConfig) -> List[ValidationIssue]:
+    """
+    Detect timing constraint vs RECHECK conflicts at all levels.
+    
+    Validates:
+    - Signal-level: timing constraint vs signal RECHECK
+    - Block-level: block timing vs signal RECHECKs
+    - Exit-level: exit timing vs exit RECHECK
+    
+    Returns:
+        List of ValidationIssues for all detected conflicts
+    """
+    issues = []
+    
+    # VALIDATION 1: Signal-level timing vs RECHECK conflict
+    for block in config.blocks:
+        for signal in block.signals:
+            if not signal.timing_constraint:
+                continue
+            
+            max_candles = signal.timing_constraint.max_candles
+            signal_id = f"{block.name}::{signal.name}"
+            
+            # Check signal's own RECHECK
+            if signal.recheck_config and signal.recheck_config.enabled:
+                bar_delay = signal.recheck_config.bar_delay
+                difference = bar_delay - max_candles
+                
+                if difference > 0:
+                    # CRITICAL: RECHECK exceeds timing window
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        category="Timing Conflict",
+                        rule_id="D34",
+                        rule_name="RECHECK bar_delay <= timing constraint max_candles",
+                        message=f"Signal '{signal_id}' RECHECK ({bar_delay} bars) exceeds timing window ({max_candles} bars)",
+                        location=f"Block: {block.name}, Signal: {signal.name}",
+                        suggestion=f"Reduce RECHECK bar_delay to {max_candles} or increase timing constraint to {bar_delay}",
+                        affected_components={
+                            'signal': signal.name,
+                            'block': block.name,
+                            'timing_window': max_candles,
+                            'recheck_delay': bar_delay,
+                            'difference': difference,
+                            'timeline': [
+                                f"Bar 0: Reference signal triggers",
+                                f"Bar {max_candles}: Timing window CLOSES",
+                                f"Bar {bar_delay}: RECHECK validates ← TOO LATE!"
+                            ]
+                        }
+                    ))
+                elif bar_delay > max_candles * 0.8:
+                    # WARNING: RECHECK too close to timing window edge
+                    buffer = max_candles - bar_delay
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.WARNING,
+                        category="Timing  Conflict",
+                        rule_id="D35",
+                        rule_name="RECHECK bar_delay <= timing constraint * 0.8",
+                        message=f"Signal '{signal_id}' RECHECK ({bar_delay} bars) close to timing window ({max_candles} bars) with only {buffer} bar buffer",
+                        location=f"Block: {block.name}, Signal: {signal.name}",
+                        suggestion=f"Recommend RECHECK bar_delay <= {int(max_candles * 0.8)} bars for safety buffer"
+                    ))
+            
+            # Check nested RECHECKs (cumulative delay)
+            if signal.recheck_chain:
+                cumulative_delay = signal.recheck_config.bar_delay if signal.recheck_config else 0
+                
+                for nested in signal.recheck_chain:
+                    cumulative_delay += nested.bar_delay
+                
+                difference = cumulative_delay - max_candles
+                
+                if difference > 0:
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        category="Timing Conflict",
+                        rule_id="D36",
+                        rule_name="Nested RECHECK cumulative delay <= timing constraint",
+                        message=f"Signal '{signal_id}' cumulative RECHECK delay ({cumulative_delay} bars) exceeds timing window ({max_candles} bars)",
+                        location=f"Block: {block.name}, Signal: {signal.name}",
+                        suggestion=f"Reduce cumulative RECHECK delays to {max_candles} or increase timing constraint"
+                    ))
+    
+    # VALIDATION 2: Block-level timing vs signal RECHECKs
+    for block_idx, block in enumerate(config.blocks):
+        # Check if block has timing constraint
+        if hasattr(block, 'timing_constraint') and block.timing_constraint:
+            block_max_candles = block.timing_constraint.max_candles
+            
+            # Find maximum RECHECK delay in this block
+            max_signal_delay = 0
+            slowest_signal = None
+            
+            for signal in block.signals:
+                signal_delay = 0
+                
+                if signal.recheck_config and signal.recheck_config.enabled:
+                    signal_delay = signal.recheck_config.bar_delay
+                    
+                    # Add nested RECHECKs
+                    for nested in signal.recheck_chain:
+                        signal_delay += nested.bar_delay
+                
+                if signal_delay > max_signal_delay:
+                    max_signal_delay = signal_delay
+                    slowest_signal = signal.name
+            
+            if max_signal_delay > block_max_candles:
+                difference = max_signal_delay - block_max_candles
+                
+                issues.append(ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    category="Timing Conflict",
+                    rule_id="D38",
+                    rule_name="Block-level timing compatible with signal RECHECKs",
+                    message=f"Block '{block.name}' has timing window ({block_max_candles} bars) but signal '{slowest_signal}' RECHECK takes {max_signal_delay} bars",
+                    location=f"Block: {block.name}",
+                    suggestion=f"Reduce '{slowest_signal}' RECHECK to {block_max_candles} bars or increase block timing window",
+                    affected_components={
+                        'block': block.name,
+                        'block_timing_window': block_max_candles,
+                        'slowest_signal': slowest_signal,
+                        'signal_delay': max_signal_delay,
+                        'difference': difference
+                    }
+                ))
+    
+    # VALIDATION 3: Exit condition timing vs RECHECK
+    for exit_cond in config.exit_conditions:
+        if hasattr(exit_cond, 'timing_constraint') and exit_cond.timing_constraint:
+            max_candles = exit_cond.timing_constraint.max_candles
+            
+            if hasattr(exit_cond, 'recheck_config') and exit_cond.recheck_config:
+                if exit_cond.recheck_config.enabled:
+                    bar_delay = exit_cond.recheck_config.bar_delay
+                    difference = bar_delay - max_candles
+                    
+                    if difference > 0:
+                        issues.append(ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            category="Timing Conflict",
+                            rule_id="D37",
+                            rule_name="Exit condition RECHECK <= exit timing window",
+                            message=f"Exit '{exit_cond.signal_name}' RECHECK ({bar_delay} bars) exceeds exit timing window ({max_candles} bars)",
+                            location="Exit Conditions",
+                            suggestion=f"Reduce exit RECHECK to {max_candles} bars or remove timing constraint",
+                            affected_components={
+                                'exit_signal': exit_cond.signal_name,
+                                'timing_window': max_candles,
+                                'recheck_delay': bar_delay,
+                                'difference': difference,
+                                'timeline': [
+                                    "Bar 0: Entry signal triggers (position opened)",
+                                    f"Bar {max_candles}: Exit timing window CLOSES",
+                                    f"Bar {bar_delay}: Exit RECHECK validates ← TOO LATE!"
+                                ]
+                            }
+                        ))
+    
+    # Check block-level exits
+    for block in config.blocks:
+        for exit_cond in block.exit_conditions:
+            if hasattr(exit_cond, 'timing_constraint') and exit_cond.timing_constraint:
+                max_candles = exit_cond.timing_constraint.max_candles
+                
+                if hasattr(exit_cond, 'recheck_config') and exit_cond.recheck_config:
+                    if exit_cond.recheck_config.enabled:
+                        bar_delay = exit_cond.recheck_config.bar_delay
+                        difference = bar_delay - max_candles
+                        
+                        if difference > 0:
+                            issues.append(ValidationIssue(
+                                severity=ValidationSeverity.ERROR,
+                                category="Timing Conflict",
+                                rule_id="D37",
+                                rule_name="Exit condition RECHECK <= exit timing window",
+                                message=f"Block '{block.name}' exit '{exit_cond.signal_name}' RECHECK ({bar_delay} bars) exceeds timing window ({max_candles} bars)",
+                                location=f"Block: {block.name} Exit Conditions",
+                                suggestion=f"Reduce exit RECHECK to {max_candles} bars"
+                            ))
+    
+    return issues
+```
+
+### Validation UI - "Switch Direction" Button
+```python
+def render_direction_mismatch_issue(issue: ValidationIssue, parent: QWidget):
+    """
+    Render direction mismatch issue with one-click fix button.
+    
+    UI Layout:
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ ⚠️  CRITICAL: Strategy Direction Mismatch                       │
+    │                                                                  │
+    │ Strategy direction is 'BULLISH' but 100% of entry signals       │
+    │ are bearish.                                                     │
+    │                                                                  │
+    │ Entry Signal Analysis:                                           │
+    │   • Bearish: 6 signals (100%)                                   │
+    │     - HOD_REJECTION, BELOW_HOD, BEARISH, BEARISH_CROSS,         │
+    │       BEARISH_DIVERGENCE, BEARISH_SWEEP                         │
+    │   • Bullish: 0 signals (0%)                                     │
+    │                                                                  │
+    │ Suggested Direction: BEARISH                                    │
+    │                                                                  │
+    │ [🔄 Switch to BEARISH]  [Ignore]                                │
+    └─────────────────────────────────────────────────────────────────┘
+    """
+    
+    issue_widget = QWidget()
+    layout = QVBoxLayout()
+    
+    # Header with severity icon
+    header_layout = QHBoxLayout()
+    severity_icon = QLabel("⚠️")
+    severity_icon.setStyleSheet("font-size: 24px;")
+    header_layout.addWidget(severity_icon)
+    
+    header_text = QLabel(f"{issue.severity.name}: {issue.message}")
+    header_text.setWordWrap(True)
+    header_text.setStyleSheet(f"color: {get_color('error')}; font-weight: bold; font-size: 12pt;")
+    header_layout.addWidget(header_text, stretch=1)
+    layout.addLayout(header_layout)
+    
+    # Signal breakdown
+    affected = issue.affected_components
+    breakdown_text = f"""
+    <b>Entry Signal Analysis:</b><br>
+    • Bearish: {affected['bearish_count']} signals ({affected['bearish_percentage']:.0f}%)<br>
+    &nbsp;&nbsp;{', '.join(affected['bearish_signals'])}<br>
+    • Bullish: {affected['bullish_count']} signals ({affected['bullish_percentage']:.0f}%)<br>
+    &nbsp;&nbsp;{', '.join(affected['bullish_signals']) if affected['bullish_signals'] else 'None'}<br>
+    <br>
+    <b>Current Direction:</b> {affected['current_direction']}<br>
+    <b>Suggested Direction:</b> <span style='color:{get_color('success')}'>{affected['suggested_direction']}</span>
+    """
+    
+    breakdown_label = QLabel(breakdown_text)
+    breakdown_label.setWordWrap(True)
+    breakdown_label.setStyleSheet("padding: 10px; background-color: #2D3748; border-radius: 4px;")
+    layout.addWidget(breakdown_label)
+    
+    # Action buttons
+    if affected.get('can_auto_fix'):
+        button_layout = QHBoxLayout()
+        
+        # Switch Direction button (one-click fix)
+        switch_button = QPushButton(f"🔄 Switch to {affected['suggested_direction']}")
+        switch_button.setMinimumHeight(40)
+        switch_button.setStyleSheet("""
+            QPushButton {
+                background-color: #00D9FF;
+                color: #0F1419;
+                font-weight: bold;
+                border: none;
+                border-radius: 6px;
+                padding: 10px 20px;
+                font-size: 11pt;
+            }
+            QPushButton:hover {
+                background-color: #0A7EA4;
+            }
+        """)
+        switch_button.clicked.connect(
+            lambda: auto_fix_strategy_direction(
+                config, 
+                affected['suggested_direction']
+            )
+        )
+        button_layout.addWidget(switch_button)
+        
+        # Ignore button
+        ignore_button = QPushButton("Ignore")
+        ignore_button.setMinimumHeight(40)
+        ignore_button.setStyleSheet("""
+            QPushButton {
+                background-color: #6C757D;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 10px 20px;
+                font-size: 11pt;
+            }
+            QPushButton:hover {
+                background-color: #5A6268;
+            }
+        """)
+        ignore_button.clicked.connect(lambda: issue_widget.hide())
+        button_layout.addWidget(ignore_button)
+        
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+    
+    issue_widget.setLayout(layout)
+    return issue_widget
+
+
+def auto_fix_strategy_direction(config: StrategyConfig, new_direction: str):
+    """
+    One-click fix: Update strategy direction.
+    
+    Args:
+        config: Strategy configuration to update
+        new_direction: New direction ("BULLISH" or "BEARISH")
+    """
+    old_direction = config.direction if hasattr(config, 'direction') else None
+    
+    # Update config
+    config.direction = new_direction
+    
+    # Save to database
+    orchestrator.update_strategy_direction(config.name, new_direction)
+    
+    # Log the change
+    if LOGGER_AVAILABLE and logger:
+        logger.info(LogComponent.VALIDATION,
+                   f"Auto-fixed strategy direction",
+                   {
+                       'strategy': config.name,
+                       'old_direction': old_direction,
+                       'new_direction': new_direction
+                   })
+    
+    # Show success message
+    success_msg = QMessageBox()
+    success_msg.setIcon(QMessageBox.Information)
+    success_msg.setText(f"Strategy direction updated to {new_direction}")
+    success_msg.setInformativeText(f"The strategy '{config.name}' direction has been changed from {old_direction} to {new_direction}.")
+    success_msg.setWindowTitle("Direction Updated")
+    success_msg.exec_()
+    
+    # Refresh validation
+    parent_validator.validate_strategy()
+```
+
 ---
 
 ## IMPLEMENTATION ROADMAP
@@ -570,12 +1147,16 @@ def calculate_cumulative_exit_percentages(config: StrategyConfig) -> Dict[str, f
 
 ## SUCCESS CRITERIA
 
-✅ All 49 validation rules implemented  
+✅ All 59 validation rules implemented  
 ✅ RECHECK circular dependencies detected  
 ✅ Exit percentage conflicts detected  
 ✅ Dead code detected  
+✅ Strategy direction mismatch detected  
+✅ Timing constraint vs RECHECK conflicts detected  
 ✅ Configuration browser shows exit conditions  
 ✅ Validation report shows severity levels  
+✅ One-click "Switch Direction" button functional  
+✅ Timeline visualization for timing conflicts  
 ✅ All tests passing  
 ✅ Documentation complete  
 
@@ -585,18 +1166,23 @@ def calculate_cumulative_exit_percentages(config: StrategyConfig) -> Dict[str, f
 
 The current validation system is **TOO SIMPLISTIC** for the complexity introduced in Sprint 1.8. This institutional-grade framework provides:
 
-1. **10 NEW validation categories** addressing critical gaps
-2. **49 total validation rules** (up from 7)
-3. **4 severity levels** for proper issue prioritization
-4. **Comprehensive detection** of circular dependencies, conflicts, and dead code
-5. **Enhanced UI** showing exit conditions in configuration browser
+1. **12 NEW validation gaps** addressed (including direction mismatch and timing conflicts)
+2. **8 validation categories** with comprehensive coverage
+3. **59 total validation rules** (up from 7 - 8.4x increase)
+4. **4 severity levels** for proper issue prioritization
+5. **Comprehensive detection** of circular dependencies, conflicts, dead code, direction mismatches, and timing impossibilities
+6. **Enhanced UI** showing exit conditions in configuration browser
+7. **One-click fixes** for direction mismatches with detailed analysis
+8. **Timeline visualization** for timing conflict debugging
 
 **RISK MITIGATION**: These validations prevent:
-- Strategy deadlocks (circular RECHECKss)
+- Strategy deadlocks (circular RECHECKs)
 - Over-exiting positions (> 100%)
 - Runtime errors (missing exit signals)
 - Dead code (never executes)
 - Excessive complexity (performance issues)
+- **Wrong direction trading (losing money on every trade!)**
+- **Signals that never trigger (timing window < RECHECK delay)**
 
 **PRODUCTION STATUS**: This framework is **REQUIRED** before any strategy with Sprint 1.8 features can safely trade live.
 
