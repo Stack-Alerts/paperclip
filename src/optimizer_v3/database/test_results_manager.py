@@ -47,7 +47,7 @@ class TestResultsManager:
     
     def create_test_result(self, test_data: Dict[str, Any]) -> str:
         """
-        Create new test result record
+        Create new test result record using ORM
         
         Args:
             test_data: Test result details including:
@@ -67,11 +67,17 @@ class TestResultsManager:
                 - notes (str, optional): Additional notes
                 
         Returns:
-            result_id: UUID of created test result
+            result_id: UUID string of created test result
             
         Raises:
-            ValueError: If required fields missing
+            ValueError: If required fields missing or invalid
+            
+        Real Money Impact: HIGH - WRITES backtest/live test results to database
+        
+        ORM Refactored: Sprint 1.6.1 Task 3.1.5
         """
+        from src.optimizer_v3.database.models import StrategyTestResult
+        
         # Validate required fields
         required = ['strategy_id', 'strategy_version_id', 'test_type', 'test_config', 'start_date', 'end_date', 'metrics']
         missing = [f for f in required if f not in test_data]
@@ -83,88 +89,121 @@ class TestResultsManager:
         if test_data['test_type'] not in valid_types:
             raise ValueError(f"Invalid test_type. Must be one of: {', '.join(valid_types)}")
         
-        # Generate result ID
-        result_id = str(uuid4())
-        
-        # Extract key metrics
-        metrics = test_data['metrics']
-        
-        # Prepare data
-        data = {
-            'result_id': result_id,
-            'strategy_id': test_data['strategy_id'],
-            'strategy_version_id': test_data['strategy_version_id'],
-            'test_type': test_data['test_type'],
-            'test_config': json.dumps(test_data['test_config']),
-            'start_date': test_data['start_date'],
-            'end_date': test_data['end_date'],
-            'total_return_pct': metrics.get('total_return_pct'),
-            'sharpe_ratio': metrics.get('sharpe_ratio'),
-            'max_drawdown_pct': metrics.get('max_drawdown_pct'),
-            'win_rate': metrics.get('win_rate'),
-            'profit_factor': metrics.get('profit_factor'),
-            'total_trades': metrics.get('total_trades'),
-            'metrics': json.dumps(metrics),
-            'trades': json.dumps(test_data.get('trades')) if test_data.get('trades') else None,
-            'equity_curve': json.dumps(test_data.get('equity_curve')) if test_data.get('equity_curve') else None,
-            'risk_metrics': json.dumps(test_data.get('risk_metrics')) if test_data.get('risk_metrics') else None,
-            'exit_condition_results': json.dumps(test_data.get('exit_condition_results')) if test_data.get('exit_condition_results') else None,
-            'errors': json.dumps(test_data.get('errors')) if test_data.get('errors') else None,
-            'warnings': json.dumps(test_data.get('warnings')) if test_data.get('warnings') else None,
-            'notes': test_data.get('notes')
-        }
-        
-        # Insert test result
-        query = text("""
-            INSERT INTO strategy_test_results (
-                result_id, strategy_id, version_id, test_type, test_config,
-                start_date, end_date, total_return_pct, sharpe_ratio, max_drawdown_pct,
-                win_rate, profit_factor, total_trades, metrics, trades, equity_curve,
-                risk_metrics, exit_condition_results, errors, warnings, notes
-            ) VALUES (
-                :result_id, :strategy_id, :version_id, :test_type, :test_config,
-                :start_date, :end_date, :total_return_pct, :sharpe_ratio, :max_drawdown_pct,
-                :win_rate, :profit_factor, :total_trades, :metrics, :trades, :equity_curve,
-                :risk_metrics, :exit_condition_results, :errors, :warnings, :notes
+        try:
+            # Extract key metrics
+            metrics = test_data['metrics']
+            
+            # Create ORM object
+            # Note: ORM handles JSONB serialization automatically - no json.dumps() needed!
+            test_result = StrategyTestResult(
+                strategy_id=test_data['strategy_id'],
+                version_id=test_data['strategy_version_id'],  # Input uses 'strategy_version_id', DB uses 'version_id'
+                test_type=test_data['test_type'],
+                # JSONB fields - pass Python objects directly
+                test_config=test_data['test_config'],
+                metrics=metrics,
+                trades=test_data.get('trades'),
+                equity_curve=test_data.get('equity_curve'),
+                risk_metrics=test_data.get('risk_metrics'),
+                ai_recommendations=test_data.get('ai_recommendations'),
+                exit_condition_results=test_data.get('exit_condition_results'),
+                errors=test_data.get('errors'),
+                warnings=test_data.get('warnings'),
+                # Date fields
+                start_date=test_data['start_date'],
+                end_date=test_data['end_date'],
+                # Metric fields (extracted from metrics dict)
+                total_return_pct=metrics.get('total_return_pct'),
+                sharpe_ratio=metrics.get('sharpe_ratio'),
+                max_drawdown_pct=metrics.get('max_drawdown_pct'),
+                win_rate=metrics.get('win_rate'),
+                profit_factor=metrics.get('profit_factor'),
+                total_trades=metrics.get('total_trades'),
+                # Other fields
+                notes=test_data.get('notes')
             )
-        """)
-        
-        self.session.execute(query, data)
-        self.session.commit()
-        
-        self.logger.info(
-            f"Created test result: {result_id} "
-            f"(strategy: {test_data['strategy_id']}, version: {test_data['strategy_version_id']}, "
-            f"type: {test_data['test_type']})"
-        )
-        
-        return result_id
+            
+            # Add to session and commit
+            self.session.add(test_result)
+            self.session.commit()
+            
+            # Get the generated result_id
+            result_id_str = str(test_result.result_id)
+            
+            self.logger.info(
+                f"Created test result: {result_id_str} "
+                f"(strategy: {test_data['strategy_id']}, version: {test_data['strategy_version_id']}, "
+                f"type: {test_data['test_type']})"
+            )
+            
+            return result_id_str
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to create test result: {e}")
+            raise
     
     def get_test_result(self, result_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get test result by ID
+        Get test result by ID using ORM
         
         Args:
-            result_id: Result UUID
+            result_id: Result UUID string
             
         Returns:
             Test result dict or None if not found
+            JSONB fields automatically deserialized to Python objects
+            
+        Real Money Impact: MEDIUM - Retrieves backtest/live test results
+        
+        ORM Refactored: Sprint 1.6.1 Task 3.1.1
         """
-        query = text("SELECT * FROM strategy_test_results WHERE result_id = :result_id")
-        result = self.session.execute(query, {'result_id': result_id}).fetchone()
+        from src.optimizer_v3.database.models import StrategyTestResult
         
-        if not result:
+        try:
+            # Query using ORM
+            test_result = self.session.query(StrategyTestResult).filter_by(
+                result_id=result_id
+            ).first()
+            
+            if not test_result:
+                return None
+            
+            # Convert ORM object to dict
+            # JSONB fields are automatically deserialized by SQLAlchemy
+            result_dict = {
+                'result_id': str(test_result.result_id),
+                'strategy_id': test_result.strategy_id,
+                'version_id': str(test_result.version_id),
+                'test_type': test_result.test_type,
+                # JSONB fields - already Python objects
+                'test_config': test_result.test_config,
+                'metrics': test_result.metrics,
+                'trades': test_result.trades,
+                'equity_curve': test_result.equity_curve,
+                'ai_recommendations': test_result.ai_recommendations,
+                'exit_condition_results': test_result.exit_condition_results,
+                # Date fields
+                'start_date': test_result.start_date,
+                'end_date': test_result.end_date,
+                # Metric fields
+                'total_return_pct': test_result.total_return_pct,
+                'sharpe_ratio': test_result.sharpe_ratio,
+                'max_drawdown_pct': test_result.max_drawdown_pct,
+                'win_rate': test_result.win_rate,
+                'profit_factor': test_result.profit_factor,
+                'total_trades': test_result.total_trades,
+                # Timestamps
+                'timestamp': test_result.timestamp,
+                'created_at': test_result.created_at
+            }
+            
+            return result_dict
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to get test result {result_id}: {e}")
             return None
-        
-        test = dict(result._mapping)
-        
-        # Parse JSON fields
-        json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'exit_condition_results', 'errors', 'warnings']
-        for field in json_fields:
-            if test.get(field):
-                test[field] = json.loads(test[field])
-        
-        return test
     
     def get_strategy_test_results(
         self,
@@ -173,7 +212,7 @@ class TestResultsManager:
         limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
-        Get test results for a strategy
+        Get test results for a strategy using ORM
         
         Args:
             strategy_id: Strategy ID
@@ -182,63 +221,145 @@ class TestResultsManager:
             
         Returns:
             List of test result dicts
+            JSONB fields automatically deserialized
+            
+        Real Money Impact: MEDIUM - Retrieves historical test results
+        
+        ORM Refactored: Sprint 1.6.1 Task 3.1.2
         """
-        query_str = "SELECT * FROM strategy_test_results WHERE strategy_id = :strategy_id"
-        params = {'strategy_id': strategy_id}
+        from src.optimizer_v3.database.models import StrategyTestResult
         
-        if test_type:
-            query_str += " AND test_type = :test_type"
-            params['test_type'] = test_type
-        
-        query_str += " ORDER BY created_at DESC"
-        
-        if limit:
-            query_str += f" LIMIT {limit}"
-        
-        results = self.session.execute(text(query_str), params).fetchall()
-        
-        tests = []
-        for row in results:
-            test = dict(row._mapping)
-            json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'exit_condition_results', 'errors', 'warnings']
-            for field in json_fields:
-                if test.get(field):
-                    test[field] = json.loads(test[field])
-            tests.append(test)
-        
-        return tests
+        try:
+            # Build ORM query
+            query = self.session.query(StrategyTestResult).filter_by(
+                strategy_id=strategy_id
+            )
+            
+            # Optional filter by test type
+            if test_type:
+                query = query.filter_by(test_type=test_type)
+            
+            # Order by created_at descending
+            query = query.order_by(StrategyTestResult.created_at.desc())
+            
+            # Optional limit
+            if limit:
+                query = query.limit(limit)
+            
+            # Execute query
+            results = query.all()
+            
+            # Convert ORM objects to dicts
+            tests = []
+            for test_result in results:
+                test_dict = {
+                    'result_id': str(test_result.result_id),
+                    'strategy_id': test_result.strategy_id,
+                    'version_id': str(test_result.version_id),
+                    'test_type': test_result.test_type,
+                    # JSONB fields - already Python objects
+                    'test_config': test_result.test_config,
+                    'metrics': test_result.metrics,
+                    'trades': test_result.trades,
+                    'equity_curve': test_result.equity_curve,
+                    'risk_metrics': test_result.risk_metrics,
+                    'ai_recommendations': test_result.ai_recommendations,
+                    'exit_condition_results': test_result.exit_condition_results,
+                    'errors': test_result.errors,
+                    'warnings': test_result.warnings,
+                    # Date fields
+                    'start_date': test_result.start_date,
+                    'end_date': test_result.end_date,
+                    # Metric fields
+                    'total_return_pct': test_result.total_return_pct,
+                    'sharpe_ratio': test_result.sharpe_ratio,
+                    'max_drawdown_pct': test_result.max_drawdown_pct,
+                    'win_rate': test_result.win_rate,
+                    'profit_factor': test_result.profit_factor,
+                    'total_trades': test_result.total_trades,
+                    # Other fields
+                    'notes': test_result.notes,
+                    # Timestamps
+                    'timestamp': test_result.timestamp,
+                    'created_at': test_result.created_at
+                }
+                tests.append(test_dict)
+            
+            return tests
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to get test results for strategy {strategy_id}: {e}")
+            return []
     
     def get_version_test_results(
         self,
         version_id: str
     ) -> List[Dict[str, Any]]:
         """
-        Get all test results for a specific version
+        Get all test results for a specific version using ORM
         
         Args:
             version_id: Strategy version ID
             
         Returns:
             List of test result dicts
+            JSONB fields automatically deserialized
+            
+        Real Money Impact: MEDIUM - Retrieves version-specific test results
+        
+        ORM Refactored: Sprint 1.6.1 Task 3.1.3
         """
-        query = text("""
-            SELECT * FROM strategy_test_results 
-            WHERE version_id = :version_id 
-            ORDER BY created_at DESC
-        """)
+        from src.optimizer_v3.database.models import StrategyTestResult
         
-        results = self.session.execute(query, {'version_id': version_id}).fetchall()
-        
-        tests = []
-        for row in results:
-            test = dict(row._mapping)
-            json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'errors', 'warnings']
-            for field in json_fields:
-                if test.get(field):
-                    test[field] = json.loads(test[field])
-            tests.append(test)
-        
-        return tests
+        try:
+            # Query using ORM
+            results = self.session.query(StrategyTestResult).filter_by(
+                version_id=version_id
+            ).order_by(StrategyTestResult.created_at.desc()).all()
+            
+            # Convert ORM objects to dicts
+            tests = []
+            for test_result in results:
+                test_dict = {
+                    'result_id': str(test_result.result_id),
+                    'strategy_id': test_result.strategy_id,
+                    'version_id': str(test_result.version_id),
+                    'test_type': test_result.test_type,
+                    # JSONB fields - already Python objects
+                    'test_config': test_result.test_config,
+                    'metrics': test_result.metrics,
+                    'trades': test_result.trades,
+                    'equity_curve': test_result.equity_curve,
+                    'risk_metrics': test_result.risk_metrics,
+                    'ai_recommendations': test_result.ai_recommendations,
+                    'exit_condition_results': test_result.exit_condition_results,
+                    'errors': test_result.errors,
+                    'warnings': test_result.warnings,
+                    # Date fields
+                    'start_date': test_result.start_date,
+                    'end_date': test_result.end_date,
+                    # Metric fields
+                    'total_return_pct': test_result.total_return_pct,
+                    'sharpe_ratio': test_result.sharpe_ratio,
+                    'max_drawdown_pct': test_result.max_drawdown_pct,
+                    'win_rate': test_result.win_rate,
+                    'profit_factor': test_result.profit_factor,
+                    'total_trades': test_result.total_trades,
+                    # Other fields
+                    'notes': test_result.notes,
+                    # Timestamps
+                    'timestamp': test_result.timestamp,
+                    'created_at': test_result.created_at
+                }
+                tests.append(test_dict)
+            
+            return tests
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to get test results for version {version_id}: {e}")
+            return []
     
     def get_latest_test_result(
         self,
@@ -247,7 +368,7 @@ class TestResultsManager:
         test_type: str
     ) -> Optional[Dict[str, Any]]:
         """
-        Get most recent test result for strategy version and test type
+        Get most recent test result for strategy version and test type using ORM
         
         Args:
             strategy_id: Strategy ID
@@ -256,35 +377,67 @@ class TestResultsManager:
             
         Returns:
             Latest test result dict or None
+            JSONB fields automatically deserialized
+            
+        Real Money Impact: MEDIUM - Retrieves latest test result
+        
+        ORM Refactored: Sprint 1.6.1 Task 3.1.4
         """
-        query = text("""
-            SELECT * FROM strategy_test_results 
-            WHERE strategy_id = :strategy_id 
-            AND version_id = :version_id 
-            AND test_type = :test_type
-            ORDER BY created_at DESC 
-            LIMIT 1
-        """)
+        from src.optimizer_v3.database.models import StrategyTestResult
         
-        result = self.session.execute(
-            query,
-            {
-                'strategy_id': strategy_id,
-                'version_id': version_id,
-                'test_type': test_type
+        try:
+            # Query using ORM - filter by all 3 parameters
+            test_result = self.session.query(StrategyTestResult).filter_by(
+                strategy_id=strategy_id,
+                version_id=version_id,
+                test_type=test_type
+            ).order_by(StrategyTestResult.created_at.desc()).first()
+            
+            if not test_result:
+                return None
+            
+            # Convert ORM object to dict
+            result_dict = {
+                'result_id': str(test_result.result_id),
+                'strategy_id': test_result.strategy_id,
+                'version_id': str(test_result.version_id),
+                'test_type': test_result.test_type,
+                # JSONB fields - already Python objects
+                'test_config': test_result.test_config,
+                'metrics': test_result.metrics,
+                'trades': test_result.trades,
+                'equity_curve': test_result.equity_curve,
+                'risk_metrics': test_result.risk_metrics,
+                'ai_recommendations': test_result.ai_recommendations,
+                'exit_condition_results': test_result.exit_condition_results,
+                'errors': test_result.errors,
+                'warnings': test_result.warnings,
+                # Date fields
+                'start_date': test_result.start_date,
+                'end_date': test_result.end_date,
+                # Metric fields
+                'total_return_pct': test_result.total_return_pct,
+                'sharpe_ratio': test_result.sharpe_ratio,
+                'max_drawdown_pct': test_result.max_drawdown_pct,
+                'win_rate': test_result.win_rate,
+                'profit_factor': test_result.profit_factor,
+                'total_trades': test_result.total_trades,
+                # Other fields
+                'notes': test_result.notes,
+                # Timestamps
+                'timestamp': test_result.timestamp,
+                'created_at': test_result.created_at
             }
-        ).fetchone()
-        
-        if not result:
+            
+            return result_dict
+            
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(
+                f"Failed to get latest test result for strategy={strategy_id}, "
+                f"version={version_id}, type={test_type}: {e}"
+            )
             return None
-        
-        test = dict(result._mapping)
-        json_fields = ['test_config', 'metrics', 'trades', 'equity_curve', 'risk_metrics', 'errors', 'warnings']
-        for field in json_fields:
-            if test.get(field):
-                test[field] = json.loads(test[field])
-        
-        return test
     
     def compare_versions(
         self,

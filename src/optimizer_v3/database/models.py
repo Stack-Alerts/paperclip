@@ -647,9 +647,15 @@ class StrategyTestResult(Base):
     metrics = Column(JSONB, nullable=False, default=dict)
     trades = Column(JSONB)
     equity_curve = Column(JSONB)
+    risk_metrics = Column(JSONB)  # Sprint 1.6.1 - Risk metrics (VaR, CVaR, etc.)
     ai_recommendations = Column(JSONB)  # Linked recommendations
     exit_condition_results = Column(JSONB)  # Sprint 1.8 Task 1.8.18 - Exit condition trigger details
     
+    # Execution tracking
+    errors = Column(JSONB)  # Sprint 1.6.1 - Error log during test execution
+    warnings = Column(JSONB)  # Sprint 1.6.1 - Warning log during test execution
+    notes = Column(Text)  # Sprint 1.6.1 - Additional notes about test
+
     # Timestamps
     timestamp = Column(DateTime, nullable=False, server_default=func.now())
     created_at = Column(DateTime, nullable=False, server_default=func.now())

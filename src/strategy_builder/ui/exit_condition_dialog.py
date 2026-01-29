@@ -312,7 +312,7 @@ class ExitConditionDialog(QMainWindow):
         percentage_row.addWidget(self.percentage_spin)
         
         # Quick preset buttons inline
-        for pct in [10, 25, 50, 75, 100]:
+        for pct in [10, 15, 20,25, 50, 75, 100]:
             btn = QPushButton(f"{pct}%")
             btn.setFixedSize(80, 32)
             btn.setStyleSheet("""
@@ -449,7 +449,7 @@ class ExitConditionDialog(QMainWindow):
         reversal_row.addWidget(self.reversal_spin)
         
         # Quick preset buttons inline
-        for val in [1, 2, 3, 4, 5]:
+        for val in [1, 2, 3, 4, 5, 6, 7, 8]:
             btn = QPushButton(f"{val}%")
             btn.setFixedSize(80, 32)
             btn.setStyleSheet("""
@@ -506,7 +506,7 @@ class ExitConditionDialog(QMainWindow):
         self.recheck_delay_row.addWidget(self.recheck_delay_spin)
         
         # Quick preset buttons inline
-        for val in [1, 2, 3, 4, 5, 6, 7, 8]:
+        for val in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]:
             btn = QPushButton(str(val))
             btn.setFixedSize(50, 32)
             btn.setStyleSheet("""
