@@ -1827,13 +1827,15 @@ class StrategyBlocksPanel(QWidget):
                 print(f"Signal exit condition {exit_signal_name} not found in signal {block_name}::{signal_name}")
                 return
             
-            # Show exit condition dialog pre-populated
+            # Show exit condition dialog pre-populated (CRITICAL: Include RECHECK values)
             dialog = ExitConditionDialog(
                 signal_name=exit_signal_name,
                 existing_percentage=current_exit.percentage,
                 existing_exit_mode=current_exit.exit_mode,
                 existing_tp_proximity=current_exit.tp_proximity_threshold,
                 existing_reversal=current_exit.reversal_trigger,
+                existing_recheck_enabled=getattr(current_exit, 'recheck_enabled', False),
+                existing_recheck_bar_delay=getattr(current_exit, 'recheck_bar_delay', 25),
                 parent=self
             )
             
@@ -1856,7 +1858,7 @@ class StrategyBlocksPanel(QWidget):
                     print(f"Failed to remove old signal exit: {remove_result.message}")
                     return
                 
-                # Add updated
+                # Add updated with RECHECK values
                 add_result = self.orchestrator.add_exit_condition(
                     signal_name=new_config['signal_name'],
                     percentage=new_config.get('percentage', 50) / 100.0,
@@ -1865,7 +1867,9 @@ class StrategyBlocksPanel(QWidget):
                     parent_signal_name=signal_name,
                     exit_mode=new_config.get('exit_mode', 'ABSOLUTE'),
                     tp_proximity_threshold=new_config.get('tp_proximity_threshold', 2.0),
-                    reversal_trigger=new_config.get('reversal_trigger', 0.5)
+                    reversal_trigger=new_config.get('reversal_trigger', 0.5),
+                    recheck_enabled=new_config.get('recheck_enabled', False),
+                    recheck_bar_delay=new_config.get('recheck_bar_delay')
                 )
                 
                 if add_result.success:

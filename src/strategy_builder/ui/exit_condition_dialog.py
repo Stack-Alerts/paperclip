@@ -45,6 +45,8 @@ class ExitConditionDialog(QDialog):
         existing_exit_mode: str = "ABSOLUTE",
         existing_tp_proximity: float = 2.0,
         existing_reversal: float = 0.5,
+        existing_recheck_enabled: bool = False,
+        existing_recheck_bar_delay: int = 3,
         parent=None,
         orchestrator=None,
         is_duplicate: bool = False,
@@ -97,8 +99,10 @@ class ExitConditionDialog(QDialog):
         
         self.tp_proximity_threshold = existing_tp_proximity
         self.reversal_trigger = existing_reversal
-        self.recheck_enabled = False
-        self.recheck_bar_delay = 25  # Default bar delay for RECHECK
+        # Initialize RECHECK from existing values
+        self.recheck_enabled = existing_recheck_enabled
+        self.recheck_bar_delay = existing_recheck_bar_delay
+        print(f"DEBUG: Initialized RECHECK: enabled={self.recheck_enabled}, bar_delay={self.recheck_bar_delay}")
         
         # UI components
         self.signal_selector: Optional[QComboBox] = None
@@ -446,6 +450,14 @@ class ExitConditionDialog(QDialog):
         layout.addLayout(button_layout)
         
         self.setLayout(layout)
+        
+        # CRITICAL: Set checkbox state AFTER layout but BEFORE connecting signals
+        # This prevents triggering the prompt dialog when loading existing RECHECK state
+        if self.recheck_enabled:
+            self.recheck_checkbox.blockSignals(True)
+            self.recheck_checkbox.setChecked(True)
+            self.recheck_checkbox.blockSignals(False)
+            print(f"DEBUG: Loaded existing RECHECK state: checked={True}, bar_delay={self.recheck_bar_delay}")
     
     def _connect_signals(self):
         """Connect UI signals to handlers."""
