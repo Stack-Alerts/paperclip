@@ -14,7 +14,7 @@ Date: 2026-01-27
 
 from typing import Optional
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QSpinBox, QDoubleSpinBox, QRadioButton, QGroupBox, QCheckBox, QButtonGroup, QComboBox, QWidget
 )
 from PyQt5.QtCore import Qt
@@ -26,9 +26,9 @@ from src.strategy_builder.ui.styles import (
 )
 
 
-class ExitConditionDialog(QDialog):
+class ExitConditionDialog(QMainWindow):
     """
-    Dialog for configuring exit conditions.
+    Window for configuring exit conditions.
     
     Features:
     - Percentage input (1-100%)
@@ -36,6 +36,7 @@ class ExitConditionDialog(QDialog):
     - FLEXIBLE mode parameters
     - RECHECK enable checkbox
     - Tooltips for all fields
+    - Fully resizable window
     """
     
     def __init__(
@@ -561,7 +562,13 @@ class ExitConditionDialog(QDialog):
         
         layout.addLayout(button_layout)
         
-        self.setLayout(layout)
+        # QMainWindow requires central widget with layout
+        central_widget = QWidget()
+        central_widget.setLayout(layout)
+        self.setCentralWidget(central_widget)
+        
+        # Track accepted state for exec-like behavior
+        self._accepted = False
         
         # CRITICAL: Set checkbox state AFTER layout but BEFORE connecting signals
         # This prevents triggering the prompt dialog when loading existing RECHECK state
@@ -825,3 +832,31 @@ class ExitConditionDialog(QDialog):
             config['parent_signal_name'] = parent_signal_name
         
         return config
+    
+    def accept(self):
+        """Accept the dialog - mark as accepted and close."""
+        self._accepted = True
+        self.close()
+    
+    def reject(self):
+        """Reject the dialog - mark as rejected and close."""
+        self._accepted = False
+        self.close()
+    
+    def exec_(self):
+        """
+        Execute the window modally (QDialog compatibility).
+        
+        Returns:
+            1 if accepted, 0 if rejected
+        """
+        from PyQt5.QtWidgets import QDialog
+        self.setWindowModality(Qt.ApplicationModal)
+        self.show()
+        
+        # Block until window is closed
+        from PyQt5.QtWidgets import QApplication
+        while self.isVisible():
+            QApplication.processEvents()
+        
+        return QDialog.Accepted if self._accepted else QDialog.Rejected
