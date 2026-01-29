@@ -313,7 +313,7 @@ class ExitConditionDialog(QDialog):
         # Quick preset buttons inline
         for pct in [10, 25, 50, 75, 100]:
             btn = QPushButton(f"{pct}%")
-            btn.setFixedSize(50, 24)
+            btn.setFixedSize(50, 32)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
@@ -405,7 +405,7 @@ class ExitConditionDialog(QDialog):
         # Quick preset buttons inline
         for val in [0.25, 0.5, 1.0, 1.5, 2.0]:
             btn = QPushButton(f"{val}%")
-            btn.setFixedSize(60, 24)
+            btn.setFixedSize(60, 32)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
@@ -446,7 +446,7 @@ class ExitConditionDialog(QDialog):
         # Quick preset buttons inline
         for val in [1, 2, 3, 4, 5]:
             btn = QPushButton(f"{val}%")
-            btn.setFixedSize(50, 24)
+            btn.setFixedSize(50, 32)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #244647;
