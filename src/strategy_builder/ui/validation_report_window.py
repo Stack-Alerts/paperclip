@@ -206,9 +206,9 @@ class ValidationReportWindow(QDialog):
         metrics_tab = self._create_metrics_tab()
         tabs.addTab(metrics_tab, "📈 Metrics & Analysis")
         
-        # Set Issues tab as default  if there are issues
-        if not self.report.is_valid:
-            tabs.setCurrentIndex(1)
+        # Summary tab is ALWAYS default (tab index 0)
+        # User requested: Summary tab should be default regardless of validation status
+        tabs.setCurrentIndex(0)
         
         return tabs
     
@@ -468,60 +468,66 @@ class ValidationReportWindow(QDialog):
         return widget
     
     def _create_metrics_tab(self) -> QWidget:
-        """Create metrics and analysis tab"""
+        """Create metrics and analysis tab - Matching Summary tab style"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setSpacing(16)
-        layout.setContentsMargins(16,  16, 16, 16)
+        layout.setContentsMargins(16, 16, 16, 16)
         
         # Exit strategy analysis
         exit_group = QGroupBox("Exit Strategy Analysis")
+        exit_group.setFont(create_font(12, bold=True))  # Match Summary tab group box font
         exit_layout = QVBoxLayout()
         
         exit_info = self._get_exit_strategy_info()
         exit_text = QTextEdit()
         exit_text.setReadOnly(True)
-        exit_text.setMaximumHeight(150)
-        exit_text.setPlainText(exit_info)
-        exit_text.setFont(create_font(10))
+        exit_text.setMinimumHeight(150)  # Changed from maxHeight to minHeight
+        # No maxHeight - let it expand to show all content
+        exit_text.setPlainText(exit_info)  
+        exit_text.setFont(create_font(11))  # Match Summary tab font (was 10)
         
-        exit_layout.addWidget(exit_text)
+        exit_layout.addWidget(exit_text, 1)  # Stretch factor 1 - can expand
         exit_group.setLayout(exit_layout)
         layout.addWidget(exit_group)
         
         # Timing analysis
         if self.report.timing_conflicts:
             timing_group = QGroupBox("Timing Conflict Analysis")
+            timing_group.setFont(create_font(12, bold=True))  # Match Summary tab
             timing_layout = QVBoxLayout()
             
             timing_text = QTextEdit()
             timing_text.setReadOnly(True)
-            timing_text.setMaximumHeight(200)
-            timing_text.setFont(create_font(10))
+            timing_text.setMinimumHeight(150)  # Changed from maxHeight to minHeight
+            # No maxHeight - let it expand to show all content
+            timing_text.setFont(create_font(11))  # Match Summary tab font (was 10)
             
             conflicts_info = self._get_timing_conflicts_info()
             timing_text.setPlainText(conflicts_info)
             
-            timing_layout.addWidget(timing_text)
+            timing_layout.addWidget(timing_text, 1)  # Stretch factor 1 - can expand
             timing_group.setLayout(timing_layout)
             layout.addWidget(timing_group)
         
         # Direction analysis
         direction_group = QGroupBox("Signal Direction Analysis")
+        direction_group.setFont(create_font(12, bold=True))  # Match Summary tab
         direction_layout = QVBoxLayout()
         
         direction_info = self._get_direction_info()
         direction_text = QTextEdit()
         direction_text.setReadOnly(True)
-        direction_text.setMaximumHeight(120)
+        direction_text.setMinimumHeight(120)  # Changed from maxHeight to minHeight
+        # No maxHeight - let it expand to show all content
         direction_text.setPlainText(direction_info)
-        direction_text.setFont(create_font(10))
+        direction_text.setFont(create_font(11))  # Match Summary tab font (was 10)
         
-        direction_layout.addWidget(direction_text)
+        direction_layout.addWidget(direction_text, 1)  # Stretch factor 1 - can expand
         direction_group.setLayout(direction_layout)
         layout.addWidget(direction_group)
         
-        layout.addStretch()
+        # NO addStretch() - let panels expand to fill space
         
         return widget
     
