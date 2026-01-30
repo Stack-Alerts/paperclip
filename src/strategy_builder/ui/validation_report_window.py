@@ -103,10 +103,10 @@ class ValidationReportWindow(QDialog):
         layout.setSpacing(12)  # More padding between title and info
         layout.setContentsMargins(0, 0, 0, 16)  # Extra padding at bottom before status banner
         
-        # Title matching main window style (primary color)
+        # Title matching main window style (info color - blue)
         title = QLabel("💼 Validation Report")
         title.setFont(create_font(18, bold=True))
-        title.setStyleSheet(f"color: {COLORS['primary']}; background: transparent;")
+        title.setStyleSheet(f"color: {COLORS['info']}; background: transparent;")
         layout.addWidget(title)
         
         # Strategy info with version
