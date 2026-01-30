@@ -295,13 +295,24 @@ class ValidationReportWindow(QDialog):
         
         layout.addLayout(top_row)
         
-        # Complexity summary
+        # Complexity summary - FIXED FONT SIZE TO MATCH OTHER BOXES
         complexity = self.report.complexity_metrics.get('complexity_score', 0)
         complexity_group = QGroupBox("Strategy Complexity")
+        complexity_group.setFont(create_font(12, bold=True))  # Match other group boxes
         complexity_layout = QVBoxLayout()
         
-        complexity_label = QLabel(f"Complexity Score: {complexity}/100")
-        complexity_label.setFont(create_font(12, bold=True))
+        # Create row layout matching other boxes
+        complexity_row = QWidget()
+        complexity_row_layout = QHBoxLayout(complexity_row)
+        complexity_row_layout.setContentsMargins(0, 4, 0, 4)
+        
+        complexity_label = QLabel("Complexity Score:")
+        complexity_label.setFont(create_font(11))  # Match other labels
+        complexity_label.setMinimumWidth(150)
+        complexity_row_layout.addWidget(complexity_label)
+        
+        complexity_value = QLabel(f"{complexity}/100")
+        complexity_value.setFont(create_font(11, bold=True))  # Match other values
         
         if complexity < 30:
             rating = "Simple - Excellent for reliability"
@@ -313,14 +324,30 @@ class ValidationReportWindow(QDialog):
             rating = "Complex - Review for optimization opportunities"
             color = COLORS['warning']
         
+        complexity_value.setStyleSheet(f"color: {color};")
+        complexity_row_layout.addWidget(complexity_value)
+        complexity_row_layout.addStretch()
+        
+        complexity_layout.addWidget(complexity_row)
+        
+        # Add rating on second row
+        rating_row = QWidget()
+        rating_row_layout = QHBoxLayout(rating_row)
+        rating_row_layout.setContentsMargins(0, 4, 0, 4)
+        
         rating_label = QLabel(rating)
         rating_label.setFont(create_font(11))
         rating_label.setStyleSheet(f"color: {color};")
+        rating_row_layout.addWidget(rating_label)
+        rating_row_layout.addStretch()
         
-        complexity_layout.addWidget(complexity_label)
-        complexity_layout.addWidget(rating_label)
+        complexity_layout.addWidget(rating_row)
         complexity_group.setLayout(complexity_layout)
         layout.addWidget(complexity_group)
+        
+        # NEW: Strategy Flow Visualization - Institutional Grade
+        flow_group = self._create_strategy_flow_panel()
+        layout.addWidget(flow_group)
         
         layout.addStretch()
         
@@ -713,6 +740,135 @@ class ValidationReportWindow(QDialog):
             info += "✓ Signal direction matches strategy type."
         
         return info
+    
+    def _create_strategy_flow_panel(self) -> QGroupBox:
+        """
+        Create institutional-grade Strategy Flow visualization panel
+        
+        Presents the strategy execution flow in simple, user-friendly language
+        with visual hierarchy showing signal flow, timing, and RECHECKs
+        """
+        flow_group = QGroupBox("📋 Strategy Execution Flow")
+        flow_group.setFont(create_font(12, bold=True))
+        flow_layout = QVBoxLayout()
+        
+        # Create monospace text area for flow visualization
+        flow_text = QTextEdit()
+        flow_text.setReadOnly(True)
+        flow_text.setMaximumHeight(300)
+        flow_text.setFont(QFont("Courier New", 10))  # Monospace for alignment
+        flow_text.setStyleSheet(f"color: {COLORS['text']}; background-color: {COLORS['bg_input']};")
+        
+        # Generate flow visualization
+        flow_content = self._generate_strategy_flow()
+        flow_text.setPlainText(flow_content)
+        
+        flow_layout.addWidget(flow_text)
+        flow_group.setLayout(flow_layout)
+        
+        return flow_group
+    
+    def _generate_strategy_flow(self) -> str:
+        """
+        Generate institutional-grade strategy flow visualization
+        
+        Shows:
+        - Entry signal flow with timing windows
+        - RECHECK validation chains
+        - Exit conditions
+        
+        Format:
+        🎯 ENTRY: Signal triggers
+           └── Timing: Within X candles of reference
+           └── RECHECK: Validation at Y bars
+                └── RECHECK: Second validation at Z bars
+        🚪 EXIT: Condition triggers (close X% of position)
+        """
+        if not hasattr(self.config, 'blocks') or not self.config.blocks:
+            return "No strategy flow available - strategy has no building blocks."
+        
+        lines = []
+        lines.append("=" * 80)
+        lines.append("STRATEGY EXECUTION FLOW - HOW YOUR STRATEGY WORKS")
+        lines.append("=" * 80)
+        lines.append("")
+        
+        # Process each block
+        for block_idx, block in enumerate(self.config.blocks, 1):
+            block_logic = getattr(block, 'logic', 'AND')
+            logic_text = "ALL required" if block_logic == "AND" else "ANY one sufficient"
+            
+            lines.append(f"📦 BLOCK {block_idx}: {block.name.upper()} ({logic_text})")
+            lines.append("")
+            
+            if not hasattr(block, 'signals') or not block.signals:
+                lines.append("   (No signals configured)")
+                lines.append("")
+                continue
+            
+            # Process each signal in block
+            for sig_idx, signal in enumerate(block.signals, 1):
+                # Check if it's an exit signal
+                is_exit = False
+                if hasattr(signal, 'is_exit_signal') and signal.is_exit_signal:
+                    is_exit = True
+                elif hasattr(signal, 'exit_for') and signal.exit_for and len(signal.exit_for) > 0:
+                    is_exit = True
+                
+                if is_exit:
+                    lines.append(f"   🚪 EXIT SIGNAL: {signal.name}")
+                else:
+                    lines.append(f"   🎯 ENTRY SIGNAL: {signal.name}")
+                
+                # Check for timing constraints
+                if hasattr(signal, 'timing_constraint') and signal.timing_constraint:
+                    timing = signal.timing_constraint
+                    ref = getattr(timing, 'reference', 'previous signal')
+                    window = getattr(timing, 'max_candles', 0)
+                    if window > 0:
+                        lines.append(f"      └── ⏱️  Timing: Must trigger within {window} candles of '{ref}'")
+                
+                # Check for RECHECK configurations
+                if hasattr(signal, 'recheck_config') and signal.recheck_config:
+                    if hasattr(signal.recheck_config, 'enabled') and signal.recheck_config.enabled:
+                        delay = getattr(signal.recheck_config, 'bar_delay', 0)
+                        parent = getattr(signal.recheck_config, 'parent_signal', signal.name)
+                        
+                        lines.append(f"      └── 🔄 RECHECK: Validate '{parent}' after {delay} bars")
+                        lines.append(f"          ├── If found: Signal VALID ✓")
+                        lines.append(f"          └── If not found: Signal RESET ✗")
+                        
+                        # Check for nested RECHECK chain
+                        if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
+                            for recheck_idx, recheck in enumerate(signal.recheck_chain, 1):
+                                recheck_delay = getattr(recheck, 'bar_delay', 0)
+                                recheck_parent = getattr(recheck, 'parent_signal', signal.name)
+                                indent = "             " + ("   " * recheck_idx)
+                                lines.append(f"{indent}└── 🔄 RECHECK #{recheck_idx+1}: Validate '{recheck_parent}' after {recheck_delay} bars")
+                
+                lines.append("")
+        
+        # Add exit conditions from strategy level
+        if hasattr(self.config, 'exit_conditions') and self.config.exit_conditions:
+            lines.append("=" * 80)
+            lines.append("EXIT CONDITIONS (Strategy-Level)")
+            lines.append("=" * 80)
+            lines.append("")
+            
+            for exit_idx, exit_cond in enumerate(self.config.exit_conditions, 1):
+                signal_name = getattr(exit_cond, 'signal_name', 'Unknown')
+                percentage = getattr(exit_cond, 'percentage', 0) * 100
+                mode = getattr(exit_cond, 'exit_mode', 'ABSOLUTE')
+                
+                lines.append(f"   🚪 EXIT #{exit_idx}: {signal_name} triggers")
+                lines.append(f"      └── Action: Close {percentage:.0f}% of position ({mode} mode)")
+                lines.append("")
+        
+        lines.append("=" * 80)
+        lines.append("EXECUTION: Signals evaluated bar-by-bar in real-time")
+        lines.append("=" * 80)
+        
+        return "\n".join(lines)
     
     def _export_csv(self):
         """Export validation report to CSV"""
