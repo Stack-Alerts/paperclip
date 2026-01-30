@@ -696,13 +696,63 @@ class ValidationReportWindow(QDialog):
             return "ℹ️ Review"
     
     def _get_exit_strategy_info(self) -> str:
-        """Get exit strategy analysis text"""
-        # Find exit analysis in info issues
-        for issue in self.report.info:
-            if issue.category == "EXIT_STRATEGY":
-                return f"{issue.rule_name}\n\n{issue.message}\n\n{issue.suggestion or ''}"
+        """Get exit strategy analysis - Extract actual data from config"""
+        lines = []
+        lines.append("EXIT STRATEGY BREAKDOWN")
+        lines.append("=" * 60)
+        lines.append("")
         
-        return "No exit strategy analysis available."
+        exit_count = 0
+        
+        # Strategy-level exits
+        if hasattr(self.config, 'exit_conditions') and self.config.exit_conditions:
+            lines.append("📍 STRATEGY-LEVEL EXITS:")
+            for idx, exit_cond in enumerate(self.config.exit_conditions, 1):
+                signal_name = getattr(exit_cond, 'signal_name', 'Unknown')
+                percentage = getattr(exit_cond, 'percentage', 0) * 100
+                mode = getattr(exit_cond, 'exit_mode', 'ABSOLUTE')
+                lines.append(f"   Exit #{idx}: {signal_name} → Close {percentage:.0f}% ({mode})")
+                exit_count += 1
+            lines.append("")
+        
+        # Block-level exits
+        if hasattr(self.config, 'blocks'):
+            for block_idx, block in enumerate(self.config.blocks, 1):
+                if hasattr(block, 'exit_conditions') and block.exit_conditions:
+                    lines.append(f"📦 BLOCK {block_idx} ({block.name.upper()}) EXITS:")
+                    for idx, exit_cond in enumerate(block.exit_conditions, 1):
+                        signal_name = getattr(exit_cond, 'signal_name', 'Unknown')
+                        percentage = getattr(exit_cond, 'percentage', 0) * 100
+                        mode = getattr(exit_cond, 'exit_mode', 'ABSOLUTE')
+                        lines.append(f"   Exit #{idx}: {signal_name} → Close {percentage:.0f}% ({mode})")
+                        exit_count += 1
+                    lines.append("")
+                
+                # Signal-level exits
+                if hasattr(block, 'signals'):
+                    for signal in block.signals:
+                        if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                            lines.append(f"🎯 SIGNAL ({signal.name}) EXITS:")
+                            for idx, exit_cond in enumerate(signal.exit_conditions, 1):
+                                exit_signal_name = getattr(exit_cond, 'signal_name', 'Unknown')
+                                percentage = getattr(exit_cond, 'percentage', 0) * 100
+                                mode = getattr(exit_cond, 'exit_mode', 'ABSOLUTE')
+                                lines.append(f"   Exit #{idx}: {exit_signal_name} → Close {percentage:.0f}% ({mode})")
+                                exit_count += 1
+                            lines.append("")
+        
+        if exit_count == 0:
+            return "⚠️ WARNING: No exit conditions configured!\n\nThis strategy has no defined exit points. You must add exit conditions to close positions."
+        
+        lines.append("=" * 60)
+        lines.append(f"TOTAL EXIT CONDITIONS: {exit_count}")
+        lines.append("")
+        lines.append("✓ Multiple exit levels provide flexibility")
+        lines.append("✓ Partial exits allow position scaling")
+        lines.append("✓ ABSOLUTE mode: Exit at exact percentage")
+        lines.append("✓ FLEXIBLE mode: Exit percentage of remaining position")
+        
+        return "\n".join(lines)
     
     def _get_timing_conflicts_info(self) -> str:
         """Get timing conflicts detailed info"""
@@ -721,33 +771,91 @@ class ValidationReportWindow(QDialog):
         return info
     
     def _get_direction_info(self) -> str:
-        """Get signal direction breakdown"""
-        summary = self.report.strategy_summary
+        """Get signal direction breakdown - Extract from config"""
+        lines = []
+        lines.append("SIGNAL DIRECTION BREAKDOWN")
+        lines.append("=" * 60)
+        lines.append("")
         
-        bullish_count = summary.get('bullish_signal_count', 0)
-        bearish_count = summary.get('bearish_signal_count', 0)
-        strategy_type = summary.get('strategy_type', 'Unknown')
+        bullish_signals = []
+        bearish_signals = []
+        neutral_signals = []
         
-        total = bullish_count + bearish_count
+        # Extract signals from config and determine direction
+        if hasattr(self.config, 'blocks'):
+            for block in self.config.blocks:
+                if hasattr(block, 'signals'):
+                    for signal in block.signals:
+                        signal_name = signal.name
+                        
+                        # Determine direction from signal name (common patterns)
+                        signal_lower = signal_name.lower()
+                        
+                        # Bullish indicators
+                        if any(word in signal_lower for word in ['bullish', 'bull', 'long', 'buy', 'support', 'bounce', 'breakout_up', 'cross_up']):
+                            bullish_signals.append(signal_name)
+                        # Bearish indicators
+                        elif any(word in signal_lower for word in ['bearish', 'bear', 'short', 'sell', 'resistance', 'rejection', 'breakout_down', 'cross_down']):
+                            bearish_signals.append(signal_name)
+                        else:
+                            neutral_signals.append(signal_name)
+        
+        bullish_count = len(bullish_signals)
+        bearish_count = len(bearish_signals)
+        neutral_count = len(neutral_signals)
+        total = bullish_count + bearish_count + neutral_count
+        
         if total == 0:
-            return "No signals detected in strategy."
+            return "⚠️ No signals detected in strategy.\n\nPlease add building blocks with signals."
         
-        bullish_pct = (bullish_count / total) * 100
-        bearish_pct = (bearish_count / total) * 100
+        # Get strategy type from config
+        strategy_type = getattr(self.config, 'strategy_type', 'Unknown')
+        if not strategy_type or strategy_type == 'Unknown':
+            strategy_type = getattr(self.config, 'type', 'Not Specified')
         
-        info = f"Strategy Type: {strategy_type}\n\n"
-        info += f"Signal Breakdown:\n"
-        info += f"  • Bullish Signals: {bullish_count} ({bullish_pct:.1f}%)\n"
-        info += f"  • Bearish Signals: {bearish_count} ({bearish_pct:.1f}%)\n\n"
+        lines.append(f"Strategy Type: {strategy_type}")
+        lines.append("")
         
-        if bullish_pct > 70 and strategy_type != "Bullish":
-            info += "⚠️ Mismatch: Strategy has majority bullish signals but is not marked as Bullish.\n"
-        elif bearish_pct > 70 and strategy_type != "Bearish":
-            info += "⚠️ Mismatch: Strategy has majority bearish signals but is not marked as Bearish.\n"
-        else:
-            info += "✓ Signal direction matches strategy type."
+        lines.append(f"Total Signals: {total}")
+        lines.append("")
         
-        return info
+        if bullish_count > 0:
+            bullish_pct = (bullish_count / total) * 100
+            lines.append(f"📈 BULLISH SIGNALS: {bullish_count} ({bullish_pct:.1f}%)")
+            for signal in bullish_signals:
+                lines.append(f"   • {signal}")
+            lines.append("")
+        
+        if bearish_count > 0:
+            bearish_pct = (bearish_count / total) * 100
+            lines.append(f"📉 BEARISH SIGNALS: {bearish_count} ({bearish_pct:.1f}%)")
+            for signal in bearish_signals:
+                lines.append(f"   • {signal}")
+            lines.append("")
+        
+        if neutral_count > 0:
+            neutral_pct = (neutral_count / total) * 100
+            lines.append(f"⚖️ NEUTRAL/EXIT SIGNALS: {neutral_count} ({neutral_pct:.1f}%)")
+            for signal in neutral_signals:
+                lines.append(f"   • {signal}")
+            lines.append("")
+        
+        lines.append("=" * 60)
+        lines.append("ANALYSIS:")
+        lines.append("")
+        
+        # Analysis
+        if bullish_count > 0 and bearish_count == 0:
+            lines.append("✓ Pure bullish strategy - All signals aligned")
+        elif bearish_count > 0 and bullish_count == 0:
+            lines.append("✓ Pure bearish strategy - All signals aligned")
+        elif bullish_count > 0 and bearish_count > 0:
+            lines.append("⚠️ Mixed direction signals detected")
+            lines.append("   Consider separating into distinct bullish/bearish strategies")
+        elif neutral_count == total:
+            lines.append("ℹ️ All signals are neutral (exits/conditions)")
+        
+        return "\n".join(lines)
     
     def _create_strategy_flow_panel(self) -> QGroupBox:
         """
