@@ -755,20 +755,45 @@ class ValidationReportWindow(QDialog):
         return "\n".join(lines)
     
     def _get_timing_conflicts_info(self) -> str:
-        """Get timing conflicts detailed info"""
+        """Get timing conflicts detailed info with clear explanation"""
         if not self.report.timing_conflicts:
-            return "No timing conflicts detected."
+            return "✅ No timing conflicts detected.\n\nAll RECHECK delays are within their timing windows."
         
-        info = "TIMING CONFLICT DETAILS:\n\n"
+        lines = []
+        lines.append("⚠️ TIMING CONFLICT DETECTED - CRITICAL ISSUE")
+        lines.append("=" * 60)
+        lines.append("")
+        lines.append("WHAT THIS MEANS:")
+        lines.append("Your RECHECK delay is longer than the timing window,")
+        lines.append("which means the signal will NEVER successfully trigger.")
+        lines.append("")
+        lines.append("=" * 60)
+        lines.append("")
         
-        for conflict in self.report.timing_conflicts:
-            info += f"Signal: {conflict.get('signal', 'Unknown')}\n"
-            info += f"Timing Window: {conflict.get('timing_window', 'N/A')} bars\n"
-            info += f"RECHECK Delay: {conflict.get('recheck_delay', 'N/A')} bars\n"
-            info += f"Status: {conflict.get('status', 'Unknown')}\n"
-            info += "\n"
+        for idx, conflict in enumerate(self.report.timing_conflicts, 1):
+            signal = conflict.get('signal', 'Unknown')
+            timing_window = conflict.get('timing_window', 'N/A')
+            recheck_delay = conflict.get('recheck_delay', 'N/A')
+            
+            lines.append(f"CONFLICT #{idx}:")
+            lines.append(f"Signal: {signal}")
+            lines.append("")
+            lines.append(f"❌ Problem:")
+            lines.append(f"   Timing Window: {timing_window} bars")
+            lines.append(f"   RECHECK Delay: {recheck_delay} bars")
+            lines.append("")
+            lines.append(f"   The RECHECK happens at bar {recheck_delay},")
+            lines.append(f"   but the timing window expires at bar {timing_window}.")
+            lines.append(f"   This signal will NEVER trigger!")
+            lines.append("")
+            lines.append(f"✅ Solution:")
+            lines.append(f"   1. Reduce RECHECK delay to ≤ {timing_window} bars, OR")
+            lines.append(f"   2. Increase timing window to ≥ {recheck_delay} bars")
+            lines.append("")
+            lines.append("=" * 60)
+            lines.append("")
         
-        return info
+        return "\n".join(lines)
     
     def _get_direction_info(self) -> str:
         """Get signal direction breakdown - Extract from config"""
