@@ -852,7 +852,7 @@ class StrategyBuilderMainWindow(QMainWindow):
                 
                 # Create and show validation report window
                 window = ValidationReportWindow(report, config, self)
-                window.exec_()
+                window.show()  # QMainWindow uses .show(), not .exec_()
                 
                 # Update stepper state based on validation result
                 if report.is_valid:
