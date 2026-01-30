@@ -1099,6 +1099,58 @@ def create_font(size: int = 10, bold: bool = False):
     return font
 
 
+def set_hand_cursor(widget):
+    """
+    Set hand cursor for clickable widget.
+    
+    NAUTILUS EXPERT: Centralized hand cursor for professional UI polish.
+    Apply to all buttons, tabs, radio buttons, checkboxes for consistent UX.
+    
+    Args:
+        widget: Qt widget to apply hand cursor to (QPushButton, QRadioButton, etc.)
+    
+    Usage:
+        button = QPushButton("Click Me")
+        set_hand_cursor(button)
+    """
+    from PyQt5.QtCore import Qt
+    widget.setCursor(Qt.PointingHandCursor)
+
+
+def apply_hand_cursor_to_buttons(parent_widget):
+    """
+    Apply hand cursor to ALL buttons in a widget hierarchy.
+    
+    NAUTILUS EXPERT: Call this on dialogs/windows to set hand cursor on all clickable elements.
+    
+    Args:
+        parent_widget: Parent widget (QDialog, QMainWindow, etc.)
+    
+    Usage:
+        dialog = MyDialog()
+        apply_hand_cursor_to_buttons(dialog)
+        dialog.exec_()
+    """
+    from PyQt5.QtWidgets import QPushButton, QRadioButton, QCheckBox, QComboBox, QTabBar
+    from PyQt5.QtCore import Qt
+    
+    # Find all buttons and set hand cursor
+    for button in parent_widget.findChildren(QPushButton):
+        button.setCursor(Qt.PointingHandCursor)
+    
+    for radio in parent_widget.findChildren(QRadioButton):
+        radio.setCursor(Qt.PointingHandCursor)
+    
+    for checkbox in parent_widget.findChildren(QCheckBox):
+        checkbox.setCursor(Qt.PointingHandCursor)
+    
+    for combo in parent_widget.findChildren(QComboBox):
+        combo.setCursor(Qt.PointingHandCursor)
+    
+    for tab in parent_widget.findChildren(QTabBar):
+        tab.setCursor(Qt.PointingHandCursor)
+
+
 # =============================================================================
 # EXIT CONDITION STYLES (Sprint 1.8 - Phase 6)
 # =============================================================================

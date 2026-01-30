@@ -31,7 +31,8 @@ from src.optimizer_v3.validation.institutional_validator import (
 )
 from src.strategy_builder.ui.styles import (
     COLORS, create_font, get_main_stylesheet,
-    get_table_stylesheet, get_tab_widget_stylesheet
+    get_table_stylesheet, get_tab_widget_stylesheet,
+    apply_hand_cursor_to_buttons
 )
 
 
@@ -96,6 +97,9 @@ class ValidationReportWindow(QMainWindow):
         # Footer with actions
         footer = self._create_footer()
         layout.addWidget(footer)
+        
+        # Apply hand cursor to all buttons (professional UI polish)
+        apply_hand_cursor_to_buttons(self)
     
     def _create_header(self) -> QWidget:
         """Create header with title matching main window colors"""
