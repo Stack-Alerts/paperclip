@@ -167,9 +167,11 @@ MAIN_STYLESHEET = """
     QToolButton:hover {
         background-color: #2A2F3A;
         border-radius: 2px;
+        cursor: pointer;
     }
     QToolButton:pressed {
         background-color: #374151;
+        cursor: pointer;
     }
     QStatusBar {
         background-color: #1E2128;
@@ -245,9 +247,11 @@ MAIN_STYLESHEET = """
     }
     QPushButton:hover {
         background-color: #4A5058;
+        cursor: pointer;
     }
     QPushButton:pressed {
         background-color: #2A2F3A;
+        cursor: pointer;
     }
     QPushButton:disabled {
         background-color: #2A2F3A;
@@ -266,10 +270,15 @@ MAIN_STYLESHEET = """
     }
     QRadioButton::indicator:unchecked:hover {
         border: 2px solid #4A5058;
+        cursor: pointer;
     }
     QRadioButton::indicator:checked {
         background-color: #214fa2;
         border: 2px solid #214fa2;
+        cursor: pointer;
+    }
+    QRadioButton:hover {
+        cursor: pointer;
     }
     QCheckBox::indicator {
         width: 18px;
@@ -280,11 +289,19 @@ MAIN_STYLESHEET = """
     }
     QCheckBox::indicator:unchecked:hover {
         border: 2px solid #4A5058;
+        cursor: pointer;
     }
     QCheckBox::indicator:checked {
         background-color: #214fa2;
         border: 2px solid #214fa2;
         image: url(none);
+        cursor: pointer;
+    }
+    QCheckBox:hover {
+        cursor: pointer;
+    }
+    QComboBox:hover {
+        cursor: pointer;
     }
     QToolTip {
         background-color: #374151;
@@ -392,6 +409,10 @@ TAB_WIDGET_STYLESHEET = f"""
     QTabBar::tab:hover:!selected {{
         background: {COLORS['stepper_hover']};
         color: #FFFFFF;
+        cursor: pointer;
+    }}
+    QTabBar::tab:hover {{
+        cursor: pointer;
     }}
 """
 
