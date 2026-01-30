@@ -374,12 +374,8 @@ class ValidationReportWindow(QDialog):
         header.setSectionResizeMode(4, QHeaderView.Stretch)  # Description (takes remaining space)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Action
         
-        # Auto-resize rows to fit content 
+        # Let Qt auto-size rows based on content (no manual override)
         table.resizeRowsToContents()
-        # Set minimum row height
-        for row in range(table.rowCount()):
-            if table.rowHeight(row) < 80:
-                table.setRowHeight(row, 80)
         
         layout.addWidget(table)
         
