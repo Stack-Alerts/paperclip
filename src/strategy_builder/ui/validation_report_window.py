@@ -490,7 +490,8 @@ class ValidationReportWindow(QMainWindow):
         if self.report.timing_conflicts:
             timing_section = self._create_metrics_collapsible_section(
                 "❌ Timing Conflict Analysis",
-                self._get_timing_conflicts_info()
+                self._get_timing_conflicts_info(),
+                title_color=COLORS['error']  # RED for errors
             )
             layout.addWidget(timing_section['widget'], 1)
             self.metrics_sections.append(timing_section)
@@ -519,7 +520,7 @@ class ValidationReportWindow(QMainWindow):
         
         return widget
     
-    def _create_metrics_collapsible_section(self, title: str, content: str) -> dict:
+    def _create_metrics_collapsible_section(self, title: str, content: str, title_color: str = "#095983") -> dict:
         """Create a collapsible section for Metrics tab (copied from AI Request Preview pattern)"""
         from PyQt5.QtWidgets import QFrame, QSizePolicy
         from PyQt5.QtGui import QFont as QFontImport
@@ -534,9 +535,9 @@ class ValidationReportWindow(QMainWindow):
         # Header with title and buttons
         header_layout = QHBoxLayout()
         
-        # Title - match Strategy Builder blue
+        # Title - use custom color or default to Strategy Builder blue
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: #095983; font-weight: bold; font-size: 12pt; border: none; background: transparent;")
+        title_label.setStyleSheet(f"color: {title_color}; font-weight: bold; font-size: 12pt; border: none; background: transparent;")
         header_layout.addWidget(title_label)
         
         header_layout.addStretch()
