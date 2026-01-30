@@ -15,13 +15,13 @@ Date: 2026-01-30
 """
 
 from typing import Optional
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QPushButton, QHBoxLayout, QLabel,
     QScrollArea, QWidget, QGroupBox, QTextEdit, QMessageBox,
     QFileDialog
 )
-from PyQt6.QtCore import Qt, QSettings, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt5.QtCore import Qt, QSettings, pyqtSignal
+from PyQt5.QtGui import QFont
 from datetime import datetime
 import json
 import csv
