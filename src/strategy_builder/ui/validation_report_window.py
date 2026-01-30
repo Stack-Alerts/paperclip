@@ -374,8 +374,8 @@ class ValidationReportWindow(QDialog):
         header.setSectionResizeMode(4, QHeaderView.Stretch)  # Description (takes remaining space)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Action
         
-        # Let Qt auto-size rows based on content (no manual override)
-        table.resizeRowsToContents()
+        # CRITICAL FIX: Set vertical header to resize to contents automatically
+        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         
         layout.addWidget(table)
         
