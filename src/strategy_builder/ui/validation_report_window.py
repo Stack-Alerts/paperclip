@@ -1284,36 +1284,41 @@ class ValidationReportWindow(QMainWindow):
                 lines.append("")
         
         lines.append("=" * 80)
-        lines.append("TRADE OPENING LOGIC - WHEN DOES A TRADE ACTUALLY OPEN?")
+        lines.append("POSITION OPENING LOGIC - CRITICAL UNDERSTANDING")
         lines.append("=" * 80)
         lines.append("")
-        lines.append("Your strategy uses BLOCK LOGIC to determine when to open trades:")
+        lines.append("⚠️  IMPORTANT: Your strategy opens EXACTLY ONE POSITION (not multiple trades)")
+        lines.append("")
+        lines.append("Block logic determines WHEN this single position opens:")
         lines.append("")
         
-        # Explain each block's logic
+        # Explain each block's logic with clear ONE POSITION emphasis
         for block_idx, block in enumerate(self.config.blocks, 1):
             block_logic = getattr(block, 'logic', 'AND')
             lines.append(f"Block {block_idx} ({block.name.upper()}) - {block_logic} Logic:")
             
             if block_logic == "AND":
-                lines.append(f"   ✓ ALL signals in this block must trigger to open trade")
-                lines.append(f"   ✓ If ANY signal fails to trigger, NO TRADE")
-                lines.append(f"   Example: If Block {block_idx} has 3 signals →")
-                lines.append(f"            Signal 1 triggers ✓")
-                lines.append(f"            Signal 2 triggers ✓")
-                lines.append(f"            Signal 3 NEVER triggers ✗")
-                lines.append(f"            Result: NO TRADE OPENED (all 3 required)")
+                lines.append(f"   • Requirement: ALL signals in this block must trigger")
+                lines.append(f"   • If ANY signal missing: Block NOT satisfied")
+                lines.append(f"   ")
+                lines.append(f"   Example with 3 signals:")
+                lines.append(f"      Signal 1: ✓ Triggered")
+                lines.append(f"      Signal 2: ✓ Triggered")
+                lines.append(f"      Signal 3: ✗ Never triggers")
+                lines.append(f"      → Block {block_idx} NOT satisfied (all 3 required)")
             else:  # OR logic
-                lines.append(f"   ✓ ANY 1 signal in this block can open trade")
-                lines.append(f"   ✓ OPTIONAL - whichever signal fires first opens trade")
-                lines.append(f"   Example: If Block {block_idx} has 3 signals →")
-                lines.append(f"            Signal 1 NEVER triggers ✗")
-                lines.append(f"            Signal 2 triggers ✓")
-                lines.append(f"            Result:  TRADE OPENED (only 1 needed)")
+                lines.append(f"   • Requirement: ANY 1 signal in this block can trigger")
+                lines.append(f"   • First signal to fire: Block satisfied")
+                lines.append(f"   ")
+                lines.append(f"   Example with 3 signals:")
+                lines.append(f"      Signal 1: ✗ Never triggers")
+                lines.append(f"      Signal 2: ✓ Triggered")
+                lines.append(f"      Signal 3: ✗ Never triggers")
+                lines.append(f"      → Block {block_idx} SATISFIED (only 1 needed)")
             lines.append("")
         
         lines.append("=" * 80)
-        lines.append("MULTI-BLOCK STRATEGY:")
+        lines.append("WHEN DOES THE POSITION ACTUALLY OPEN?")
         lines.append("=" * 80)
         lines.append("")
         
@@ -1321,21 +1326,62 @@ class ValidationReportWindow(QMainWindow):
         and_blocks = [b for b in self.config.blocks if getattr(b, 'logic', 'AND') == 'AND']
         or_blocks = [b for b in self.config.blocks if getattr(b, 'logic', 'AND') == 'OR']
         
-        if len(and_blocks) > 0 and len(or_blocks) == 0:
-            lines.append("✓ All blocks use AND logic:")
-            lines.append("  - EVERY block must have ALL its signals trigger")
-            lines.append("  - Very strict entry requirements")
-            lines.append("  - Higher quality trades, fewer entries")
-        elif len(or_blocks) > 0 and len(and_blocks) == 0:
-            lines.append("✓ All blocks use OR logic:")
-            lines.append("  - ANY signal from ANY block can open trade")
-            lines.append("  - More flexible entry requirements")
-            lines.append("  - More frequent trades, wider opportunity")
+        lines.append("Position opens when AT LEAST ONE block is satisfied:")
+        lines.append("")
+        
+        # Show current strategy configuration
+        for block_idx, block in enumerate(self.config.blocks, 1):
+            block_logic = getattr(block, 'logic', 'AND')
+            if block_logic == "AND":
+                lines.append(f"   Block {block_idx} ({block.name.upper()}): Needs ALL signals ⏳")
+            else:
+                lines.append(f"   Block {block_idx} ({block.name.upper()}): Needs ANY 1 signal ⏳")
+        
+        lines.append("")
+        lines.append("Result:")
+        lines.append("   ⇨ Position opens when first block becomes satisfied")
+        lines.append("   ⇨ ONLY ONE POSITION is opened (never multiple)")
+        lines.append("   ⇨ Once open, strategy manages THIS POSITION with exits/TP/SL")
+        lines.append("")
+        
+        # Add real example with numbers
+        lines.append("Real Example from YOUR Strategy:")
+        lines.append("")
+        if len(and_blocks) > 0 and len(or_blocks) > 0:
+            # Mixed logic
+            lines.append(f"   You have {len(and_blocks)} AND block(s) + {len(or_blocks)} OR block(s)")
+            lines.append("")
+            lines.append("   Scenario 1: OR block triggers first")
+            for idx, block in enumerate(self.config.blocks, 1):
+                logic = getattr(block, 'logic', 'AND')
+                if logic == "OR":
+                    lines.append(f"      • Block {idx} ({block.name.upper()}): Signal 2 fires ✓")
+                    lines.append(f"      ⇨ POSITION OPENS (first block satisfied)")
+                    break
+            lines.append("")
+            lines.append("   Scenario 2: AND block satisfies first")
+            for idx, block in enumerate(self.config.blocks, 1):
+                logic = getattr(block, 'logic', 'AND')
+                if logic == "AND":
+                    lines.append(f"      • Block {idx} ({block.name.upper()}): All signals fire ✓")
+                    lines.append(f"      ⇨ POSITION OPENS (all required signals present)")
+                    break
+            lines.append("")
+            lines.append("   In BOTH scenarios: Only 1 position opens")
+        elif len(and_blocks) > 0:
+            # All AND blocks
+            lines.append(f"   All {len(and_blocks)} blocks use AND logic (strict)")
+            lines.append("")
+            lines.append("   When ANY block gets all its signals:")
+            lines.append("      ⇨ POSITION OPENS")
+            lines.append("      ⇨ Only 1 position (even if multiple blocks satisfy)")
         else:
-            lines.append("✓ Mixed AND/OR logic:")
-            lines.append(f"  - {len(and_blocks)} blocks require ALL signals (strict)")
-            lines.append(f"  - {len(or_blocks)} blocks accept ANY signal (flexible)")
-            lines.append("  - Trade opens when at least 1 block's condition is met")
+            # All OR blocks
+            lines.append(f"   All {len(or_blocks)} blocks use OR logic (flexible)")
+            lines.append("")
+            lines.append("   When ANY block gets any 1 signal:")
+            lines.append("      ⇨ POSITION OPENS")
+            lines.append("      ⇨ Only 1 position (even if multiple signals fire)")
         
         lines.append("")
         lines.append("=" * 80)
