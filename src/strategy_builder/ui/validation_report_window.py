@@ -1284,105 +1284,100 @@ class ValidationReportWindow(QMainWindow):
                 lines.append("")
         
         lines.append("=" * 80)
-        lines.append("POSITION OPENING LOGIC - CRITICAL UNDERSTANDING")
+        lines.append("POSITION OPENING LOGIC - INSTITUTIONAL-GRADE CONFLUENCE SYSTEM")
         lines.append("=" * 80)
         lines.append("")
-        lines.append("⚠️  IMPORTANT: Your strategy opens EXACTLY ONE POSITION (not multiple trades)")
+        lines.append("⚠️  CRITICAL: Strategy opens EXACTLY ONE POSITION using CONFLUENCE SCORING")
         lines.append("")
-        lines.append("Block logic determines WHEN this single position opens:")
+        lines.append("NOT based on 'blocks satisfied' - based on TOTAL CONFLUENCE POINTS:")
         lines.append("")
         
-        # Explain each block's logic with clear ONE POSITION emphasis
+        # Count REQUIRED vs OPTIONAL blocks
+        required_blocks = [b for b in self.config.blocks if getattr(b, 'logic', 'AND') == 'AND']
+        optional_blocks = [b for b in self.config.blocks if getattr(b, 'logic', 'AND') == 'OR']
+        
+        lines.append("BLOCK TYPES IN YOUR STRATEGY:")
+        lines.append("")
+        
+        # Show each block with correct terminology
         for block_idx, block in enumerate(self.config.blocks, 1):
             block_logic = getattr(block, 'logic', 'AND')
-            lines.append(f"Block {block_idx} ({block.name.upper()}) - {block_logic} Logic:")
+            num_signals = len(block.signals) if hasattr(block, 'signals') else 0
             
             if block_logic == "AND":
-                lines.append(f"   • Requirement: ALL signals in this block must trigger")
-                lines.append(f"   • If ANY signal missing: Block NOT satisfied")
-                lines.append(f"   ")
-                lines.append(f"   Example with 3 signals:")
-                lines.append(f"      Signal 1: ✓ Triggered")
-                lines.append(f"      Signal 2: ✓ Triggered")
-                lines.append(f"      Signal 3: ✗ Never triggers")
-                lines.append(f"      → Block {block_idx} NOT satisfied (all 3 required)")
+                lines.append(f"Block {block_idx} ({block.name.upper()}) - REQUIRED (AND logic)")
+                lines.append(f"   • Type: REQUIRED - ALL {num_signals} signals must trigger")
+                lines.append(f"   • Contributes: ~{num_signals * 10} pts (required)")
+                lines.append(f"   • If ANY signal missing → 0 points from this block")
             else:  # OR logic
-                lines.append(f"   • Requirement: ANY 1 signal in this block can trigger")
-                lines.append(f"   • First signal to fire: Block satisfied")
-                lines.append(f"   ")
-                lines.append(f"   Example with 3 signals:")
-                lines.append(f"      Signal 1: ✗ Never triggers")
-                lines.append(f"      Signal 2: ✓ Triggered")
-                lines.append(f"      Signal 3: ✗ Never triggers")
-                lines.append(f"      → Block {block_idx} SATISFIED (only 1 needed)")
+                lines.append(f"Block {block_idx} ({block.name.upper()}) - OPTIONAL (OR logic)")
+                lines.append(f"   • Type: OPTIONAL - ANY 1 of {num_signals} signals can trigger")
+                lines.append(f"   • Contributes: ~{num_signals * 10} pts (bonus)")
+                lines.append(f"   • Adds bonus points if signals fire")
             lines.append("")
         
         lines.append("=" * 80)
-        lines.append("WHEN DOES THE POSITION ACTUALLY OPEN?")
+        lines.append("CONFLUENCE SCORING SYSTEM - HOW POSITION ACTUALLY OPENS")
         lines.append("=" * 80)
         lines.append("")
         
-        # Count AND blocks and OR blocks
-        and_blocks = [b for b in self.config.blocks if getattr(b, 'logic', 'AND') == 'AND']
-        or_blocks = [b for b in self.config.blocks if getattr(b, 'logic', 'AND') == 'OR']
+        # Calculate points
+        required_points = sum(len(b.signals) * 10 for b in required_blocks if hasattr(b, 'signals'))
+        optional_points = sum(len(b.signals) * 10 for b in optional_blocks if hasattr(b, 'signals'))
+        total_possible = required_points + optional_points
         
-        lines.append("Position opens when AT LEAST ONE block is satisfied:")
+        lines.append(f"Your Strategy Point Breakdown:")
+        lines.append(f"   • Required Points: {required_points} pts ({len(required_blocks)} REQUIRED blocks)")
+        lines.append(f"   • Optional Points: {optional_points} pts ({len(optional_blocks)} OPTIONAL blocks)")
+        lines.append(f"   • Total Possible: {total_possible} pts")
+        lines.append("")
+        lines.append("POSITION OPENS WHEN:")
+        lines.append(f"   ⇨ Confluence Score >= Threshold (e.g., 40 pts)")
+        lines.append(f"   ⇨ ONLY ONE POSITION opens when threshold met")
+        lines.append(f"   ⇨ Once open, strategy manages THIS POSITION with exits/TP/SL")
         lines.append("")
         
-        # Show current strategy configuration
-        for block_idx, block in enumerate(self.config.blocks, 1):
-            block_logic = getattr(block, 'logic', 'AND')
-            if block_logic == "AND":
-                lines.append(f"   Block {block_idx} ({block.name.upper()}): Needs ALL signals ⏳")
+        # Real examples from user's strategy
+        lines.append("Real-World Scenarios:")
+        lines.append("")
+        lines.append("Scenario A: All REQUIRED blocks fire (high confidence)")
+        for idx, block in enumerate(required_blocks[:2], 1):
+            lines.append(f"   • Block {idx} ({block.name.upper()}): ALL signals ✓ → +{len(block.signals) * 10} pts")
+        if len(optional_blocks) > 0:
+            lines.append(f"   • Optional blocks: Not needed")
+        lines.append(f"   Total: {required_points} pts → POSITION OPENS ✓")
+        lines.append("")
+        
+        if len(optional_blocks) > 0:
+            lines.append("Scenario B: Some REQUIRED + OPTIONAL blocks (mixed)")
+            if len(required_blocks) > 0:
+                lines.append(f"   • Block 1 ({required_blocks[0].name.upper()}): ALL signals ✓ → +{len(required_blocks[0].signals) * 10} pts")
+            if len(optional_blocks) > 0:
+                lines.append(f"   • Block {len(required_blocks)+1} ({optional_blocks[0].name.upper()}): 1 signal ✓ → +10 pts")
+            estimated = (len(required_blocks[0].signals) * 10 if required_blocks else 0) + 10
+            if estimated >= 40:
+                lines.append(f"   Total: ~{estimated} pts → POSITION OPENS ✓")
             else:
-                lines.append(f"   Block {block_idx} ({block.name.upper()}): Needs ANY 1 signal ⏳")
+                lines.append(f"   Total: ~{estimated} pts → Need more signals")
+            lines.append("")
         
-        lines.append("")
-        lines.append("Result:")
-        lines.append("   ⇨ Position opens when first block becomes satisfied")
-        lines.append("   ⇨ ONLY ONE POSITION is opened (never multiple)")
-        lines.append("   ⇨ Once open, strategy manages THIS POSITION with exits/TP/SL")
+        lines.append("Scenario C: Insufficient confluence (no position)")
+        if len(required_blocks) > 0:
+            lines.append(f"   • Block 1 ({required_blocks[0].name.upper()}): Missing 1 signal ✗ → 0 pts")
+        if len(optional_blocks) > 0:
+            lines.append(f"   • Optional blocks: 1-2 signals ✓ → +20 pts")
+        lines.append(f"   Total: ~20 pts → Below threshold, NO POSITION")
         lines.append("")
         
-        # Add real example with numbers
-        lines.append("Real Example from YOUR Strategy:")
+        lines.append("=" * 80)
+        lines.append("KEY TAKEAWAYS:")
+        lines.append("=" * 80)
         lines.append("")
-        if len(and_blocks) > 0 and len(or_blocks) > 0:
-            # Mixed logic
-            lines.append(f"   You have {len(and_blocks)} AND block(s) + {len(or_blocks)} OR block(s)")
-            lines.append("")
-            lines.append("   Scenario 1: OR block triggers first")
-            for idx, block in enumerate(self.config.blocks, 1):
-                logic = getattr(block, 'logic', 'AND')
-                if logic == "OR":
-                    lines.append(f"      • Block {idx} ({block.name.upper()}): Signal 2 fires ✓")
-                    lines.append(f"      ⇨ POSITION OPENS (first block satisfied)")
-                    break
-            lines.append("")
-            lines.append("   Scenario 2: AND block satisfies first")
-            for idx, block in enumerate(self.config.blocks, 1):
-                logic = getattr(block, 'logic', 'AND')
-                if logic == "AND":
-                    lines.append(f"      • Block {idx} ({block.name.upper()}): All signals fire ✓")
-                    lines.append(f"      ⇨ POSITION OPENS (all required signals present)")
-                    break
-            lines.append("")
-            lines.append("   In BOTH scenarios: Only 1 position opens")
-        elif len(and_blocks) > 0:
-            # All AND blocks
-            lines.append(f"   All {len(and_blocks)} blocks use AND logic (strict)")
-            lines.append("")
-            lines.append("   When ANY block gets all its signals:")
-            lines.append("      ⇨ POSITION OPENS")
-            lines.append("      ⇨ Only 1 position (even if multiple blocks satisfy)")
-        else:
-            # All OR blocks
-            lines.append(f"   All {len(or_blocks)} blocks use OR logic (flexible)")
-            lines.append("")
-            lines.append("   When ANY block gets any 1 signal:")
-            lines.append("      ⇨ POSITION OPENS")
-            lines.append("      ⇨ Only 1 position (even if multiple signals fire)")
-        
+        lines.append("✓ REQUIRED blocks (AND): Must have ALL signals to contribute points")
+        lines.append("✓ OPTIONAL blocks (OR): Contribute bonus points if ANY signal fires")
+        lines.append("✓ Position opens when: Total points >= Confluence Threshold")
+        lines.append("✓ ONE POSITION only: Not multiple trades")
+        lines.append("✓ Threshold configurable: In backtest config (default ~40 pts)")
         lines.append("")
         lines.append("=" * 80)
         lines.append("EXECUTION: Signals evaluated bar-by-bar in real-time")
