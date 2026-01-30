@@ -35,8 +35,9 @@ from src.strategy_builder.integration.strategy_builder_orchestrator import (
 from src.strategy_builder.ui.strategy_info_panel import StrategyInfoPanel
 from src.strategy_builder.ui.block_search_panel import BlockSearchPanel
 from src.strategy_builder.ui.strategy_blocks_panel import StrategyBlocksPanel
-from src.strategy_builder.ui.validation_dialog import ValidationDialog
+from src.strategy_builder.ui.validation_report_window import ValidationReportWindow
 from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
+from src.optimizer_v3.validation.institutional_validator import InstitutionalValidator
 from src.strategy_builder.ui.data_update_modal import DataUpdateModal
 from src.strategy_builder.ui.alert_dialog import show_warning, ask_question
 from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
@@ -843,35 +844,44 @@ class StrategyBuilderMainWindow(QMainWindow):
             
             self.stepper.set_current_step(1)
             
-            # Create and show validation dialog
-            dialog = ValidationDialog(self.orchestrator, self)
-            
-            # Connect dialog signals to main window actions (with visual feedback)
-            dialog.validation_panel.save_requested.connect(lambda: self._on_save_strategy_with_feedback())
-            dialog.validation_panel.run_test_requested.connect(self._on_run_backtest)
-            
-            # Show modal dialog
-            dialog.exec_()
-            
-            # Update stepper state based on validation result
-            result = self.orchestrator.validate_strategy()
-            if result.success:
-                self.validation_passed = True  # Track completion
-                # IMMEDIATELY set status on config so it persists on save
-                self.orchestrator.config_engine.config.validation_status = 'passed'
-                self.stepper.mark_step_complete(1)
-                self._update_status("Strategy validated successfully")
+            # Run institutional validation
+            try:
+                config = self.orchestrator.get_current_config()
+                validator = InstitutionalValidator()
+                report = validator.validate(config)
                 
-                # AUTO-SAVE after validation (if file exists)
-                if self.current_file:
-                    self._save_to_file(self.current_file)
-            else:
+                # Create and show validation report window
+                window = ValidationReportWindow(report, config, self)
+                window.exec_()
+                
+                # Update stepper state based on validation result
+                if report.is_valid:
+                    self.validation_passed = True  # Track completion
+                    # IMMEDIATELY set status on config so it persists on save
+                    self.orchestrator.config_engine.config.validation_status = 'passed'
+                    self.stepper.mark_step_complete(1)
+                    self._update_status("Strategy validated successfully")
+                    
+                    # AUTO-SAVE after validation (if database strategy exists)
+                    if self.current_strategy_id:
+                        self._on_save_strategy()
+                else:
+                    self.validation_passed = False
+                    # Clear validation status on error
+                    if hasattr(self.orchestrator.config_engine.config, 'validation_status'):
+                        delattr(self.orchestrator.config_engine.config, 'validation_status')
+                    self.stepper.mark_step_error(1)
+                    self._update_status(f"Strategy validation failed - {report.blocking_issues()} blocking issues")
+                    
+            except Exception as e:
                 self.validation_passed = False
-                # Clear validation status on error
-                if hasattr(self.orchestrator.config_engine.config, 'validation_status'):
-                    delattr(self.orchestrator.config_engine.config, 'validation_status')
                 self.stepper.mark_step_error(1)
-                self._update_status("Strategy validation has errors")
+                QMessageBox.critical(
+                    self,
+                    "Validation Error",
+                    f"Error running validation:\n\n{str(e)}"
+                )
+                self._update_status("Validation error occurred")
         
         elif step == 2:
             # Test / Optimize step - CHECK PREREQUISITES  
