@@ -227,6 +227,7 @@ class ValidationReportWindow(QMainWindow):
         # Issue count summary
         summary_group = QGroupBox("Validation Summary")
         summary_group.setFont(create_font(12, bold=True))
+        summary_group.setStyleSheet(f"QGroupBox {{ background-color: {COLORS['bg_input']}; }}")
         summary_layout = QVBoxLayout()
         
         counts = [
@@ -261,6 +262,7 @@ class ValidationReportWindow(QMainWindow):
         # Strategy Composition
         composition_group = QGroupBox("Strategy Composition")
         composition_group.setFont(create_font(12, bold=True))
+        composition_group.setStyleSheet(f"QGroupBox {{ background-color: {COLORS['bg_input']}; }}")
         composition_layout = QVBoxLayout()
         
         # Extract composition data from config
@@ -301,6 +303,7 @@ class ValidationReportWindow(QMainWindow):
         complexity = self.report.complexity_metrics.get('complexity_score', 0)
         complexity_group = QGroupBox("Strategy Complexity")
         complexity_group.setFont(create_font(12, bold=True))  # Match other group boxes
+        complexity_group.setStyleSheet(f"QGroupBox {{ background-color: {COLORS['bg_input']}; }}")
         complexity_layout = QVBoxLayout()
         
         # Single row with both score and rating
