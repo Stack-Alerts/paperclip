@@ -346,10 +346,11 @@ class ValidationReportWindow(QDialog):
         layout.addWidget(complexity_group)
         
         # NEW: Strategy Flow Visualization - Institutional Grade
+        # Uses stretch factor of 1 to expand and fill remaining space
         flow_group = self._create_strategy_flow_panel()
-        layout.addWidget(flow_group)
+        layout.addWidget(flow_group, 1)  # Stretch factor 1 - fills remaining space
         
-        layout.addStretch()
+        # NO addStretch() here - flow panel should expand to fill space
         
         return widget
     
