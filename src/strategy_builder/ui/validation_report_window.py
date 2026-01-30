@@ -202,9 +202,9 @@ class ValidationReportWindow(QDialog):
         issues_tab = self._create_issues_tab()
         tabs.addTab(issues_tab, "⚠️ Issues")
         
-        # Tab 3: Metrics & Analysis
+        # Tab 3: Metrics (shortened to avoid text cutoff)
         metrics_tab = self._create_metrics_tab()
-        tabs.addTab(metrics_tab, "📈 Metrics & Analysis")
+        tabs.addTab(metrics_tab, "📈 Metrics")
         
         # Summary tab is ALWAYS default (tab index 0)
         # User requested: Summary tab should be default regardless of validation status
@@ -853,10 +853,24 @@ class ValidationReportWindow(QDialog):
         lines.append("=" * 60)
         lines.append(f"TOTAL EXIT CONDITIONS: {exit_count}")
         lines.append("")
+        lines.append("EXIT MODE EXPLANATIONS:")
+        lines.append("")
+        lines.append("✓ ABSOLUTE mode:")
+        lines.append("  - Exits immediately when signal triggers")
+        lines.append("  - Closes exact percentage of position")
+        lines.append("  - No deferral logic")
+        lines.append("")
+        lines.append("✓ FLEXIBLE mode (Sprint 1.8 intelligent exits):")
+        lines.append("  - Checks if price is heading toward TP")
+        lines.append("  - DEFERS exit if within TP proximity threshold")
+        lines.append("  - Allows position to reach TP first")
+        lines.append("  - Executes on REVERSAL (price pulls back from TP)")
+        lines.append("  - Protects gains from premature exits")
+        lines.append("")
+        lines.append("BENEFITS:")
         lines.append("✓ Multiple exit levels provide flexibility")
         lines.append("✓ Partial exits allow position scaling")
-        lines.append("✓ ABSOLUTE mode: Exit at exact percentage")
-        lines.append("✓ FLEXIBLE mode: Exit percentage of remaining position")
+        lines.append("✓ FLEXIBLE mode maximizes TP capture rate")
         
         return "\n".join(lines)
     
@@ -990,14 +1004,50 @@ class ValidationReportWindow(QDialog):
     
     def _create_strategy_flow_panel(self) -> QGroupBox:
         """
-        Create institutional-grade Strategy Flow visualization panel
+        Create institutional-grade Strategy Flow visualization panel with maximize/minimize
         
         Presents the strategy execution flow in simple, user-friendly language
         with visual hierarchy showing signal flow, timing, and RECHECKs
         """
-        flow_group = QGroupBox("📋 Strategy Execution Flow")
-        flow_group.setFont(create_font(12, bold=True))
-        flow_layout = QVBoxLayout()
+        from PyQt5.QtWidgets import QFrame
+        
+        # Use QFrame instead of QGroupBox for custom header
+        flow_container = QFrame()
+        flow_container.setStyleSheet(f"QFrame {{ background-color: {COLORS['bg_medium']}; border: 1px solid {COLORS['border']}; border-radius: 4px; }}")
+        main_layout = QVBoxLayout(flow_container)
+        main_layout.setContentsMargins(8, 8, 8, 8)
+        main_layout.setSpacing(8)
+        
+        # Header with title and maximize button
+        header_layout = QHBoxLayout()
+        
+        # Title
+        title_label = QLabel("📋 Strategy Execution Flow")
+        title_label.setStyleSheet("color: #095983; font-weight: bold; font-size: 12pt; border: none; background: transparent;")
+        header_layout.addWidget(title_label)
+        
+        header_layout.addStretch()
+        
+        # Maximize/Minimize button only (no collapse)
+        self.flow_maximize_btn = QPushButton("🗖 Maximize")
+        self.flow_maximize_btn.setFixedSize(180, 38)
+        self.flow_maximize_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['button_primary']};
+                color: white;
+                font-weight: normal;
+                padding: 3px 12px;
+                border-radius: 3px;
+                font-size: 9pt;
+                border: none;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['button_primary_hover']};
+            }}
+        """)
+        header_layout.addWidget(self.flow_maximize_btn)
+        
+        main_layout.addLayout(header_layout)
         
         # Create monospace text area for flow visualization
         flow_text_widget = QTextEdit()
@@ -1005,7 +1055,7 @@ class ValidationReportWindow(QDialog):
         flow_text_widget.setMinimumHeight(300)  # Minimum height, but can expand
         # No maxHeight - let it fill available space
         flow_text_widget.setFont(QFont("Courier New", 10))  # Monospace for alignment
-        flow_text_widget.setStyleSheet(f"color: {COLORS['text_primary']}; background-color: {COLORS['bg_input']};")
+        flow_text_widget.setStyleSheet(f"QTextEdit {{ color: {COLORS['text_primary']}; background-color: {COLORS['bg_input']}; border: 1px solid {COLORS['border']}; padding: 8px; }}")
         
         # Generate flow visualization with error handling
         try:
@@ -1016,12 +1066,46 @@ class ValidationReportWindow(QDialog):
             # Graceful fallback if flow generation fails
             error_msg = f"Error generating strategy flow: {str(e)}\n\nPlease check your strategy configuration."
             flow_text_widget.setPlainText(error_msg)
-            flow_text_widget.setStyleSheet(f"color: {COLORS['error']}; background-color: {COLORS['bg_input']};")
+            flow_text_widget.setStyleSheet(f"QTextEdit {{ color: {COLORS['error']}; background-color: {COLORS['bg_input']}; border: 1px solid {COLORS['border']}; padding: 8px; }}")
         
-        flow_layout.addWidget(flow_text_widget)
-        flow_group.setLayout(flow_layout)
+        main_layout.addWidget(flow_text_widget)
         
-        return flow_group
+        # Store references for maximize functionality
+        self.flow_text_widget = flow_text_widget
+        self.flow_container = flow_container
+        
+        # Maximize/minimize logic
+        # Track other widgets in Summary tab to hide/show
+        is_maximized = [False]
+        
+        def toggle_flow_maximize():
+            if not is_maximized[0]:
+                # Maximize - hide all other widgets in Summary tab
+                # Get the Summary tab widget
+                summary_tab = self.flow_container.parent()
+                if summary_tab:
+                    # Hide all children except flow_container
+                    for child in summary_tab.findChildren(QWidget):
+                        if child != self.flow_container and child.parent() == summary_tab:
+                            child.setVisible(False)
+                
+                self.flow_maximize_btn.setText("🗗 Minimize")
+                is_maximized[0] = True
+            else:
+                # Minimize - restore all widgets
+                summary_tab = self.flow_container.parent()
+                if summary_tab:
+                    # Show all children again
+                   for child in summary_tab.findChildren(QWidget):
+                        if child.parent() == summary_tab:
+                            child.setVisible(True)
+                
+                self.flow_maximize_btn.setText("🗖 Maximize")
+                is_maximized[0] = False
+        
+        self.flow_maximize_btn.clicked.connect(toggle_flow_maximize)
+        
+        return flow_container
     
     def _generate_strategy_flow(self) -> str:
         """
