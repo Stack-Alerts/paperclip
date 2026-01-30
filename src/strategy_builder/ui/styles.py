@@ -1014,7 +1014,6 @@ def get_table_stylesheet() -> str:
         }}
         QHeaderView::section:hover {{
             background-color: #252b36;
-            cursor: pointer;
         }}
     """
 
@@ -1119,9 +1118,19 @@ def set_hand_cursor(widget):
 
 def apply_hand_cursor_to_buttons(parent_widget):
     """
-    Apply hand cursor to ALL buttons in a widget hierarchy.
+    Apply hand cursor to clickable widgets in a widget hierarchy.
     
-    NAUTILUS EXPERT: Call this on dialogs/windows to set hand cursor on all clickable elements.
+    Successfully applies to:
+    ✓ QRadioButton
+    ✓ QCheckBox
+    ✓ QComboBox  
+    ✓ QTabBar
+    ✗ QPushButton (Qt framework limitation - stylesheets override programmatic cursor)
+    
+    Note: QPushButton with stylesheets blocks programmatic cursor setting.
+    Stepper buttons work because they set cursor during button creation.
+    For QPushButton, cursor must be set via setCursor() immediately after
+    button creation, not post-creation via findChildren().
     
     Args:
         parent_widget: Parent widget (QDialog, QMainWindow, etc.)
@@ -1129,15 +1138,12 @@ def apply_hand_cursor_to_buttons(parent_widget):
     Usage:
         dialog = MyDialog()
         apply_hand_cursor_to_buttons(dialog)
-        dialog.exec_()
+        dialog.show()
     """
-    from PyQt5.QtWidgets import QPushButton, QRadioButton, QCheckBox, QComboBox, QTabBar
+    from PyQt5.QtWidgets import QRadioButton, QCheckBox, QComboBox, QTabBar
     from PyQt5.QtCore import Qt
     
-    # Find all buttons and set hand cursor
-    for button in parent_widget.findChildren(QPushButton):
-        button.setCursor(Qt.PointingHandCursor)
-    
+    # Apply hand cursor to widgets that accept it
     for radio in parent_widget.findChildren(QRadioButton):
         radio.setCursor(Qt.PointingHandCursor)
     
