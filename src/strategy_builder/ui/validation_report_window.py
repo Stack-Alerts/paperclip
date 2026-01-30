@@ -97,10 +97,6 @@ class ValidationReportWindow(QMainWindow):
         # Footer with actions
         footer = self._create_footer()
         layout.addWidget(footer)
-        
-        # Apply hand cursor to all buttons (professional UI polish)
-        # Use QTimer to ensure all widgets are fully created first
-        QTimer.singleShot(100, lambda: apply_hand_cursor_to_buttons(self))
     
     def _create_header(self) -> QWidget:
         """Create header with title matching main window colors"""
@@ -1457,6 +1453,12 @@ class ValidationReportWindow(QMainWindow):
         geometry = settings.value("geometry")
         if geometry:
             self.restoreGeometry(geometry)
+    
+    def showEvent(self, event):
+        """Called when window is shown - apply hand cursors to all widgets"""
+        super().showEvent(event)
+        # Apply hand cursor after window is fully displayed with all widgets created
+        apply_hand_cursor_to_buttons(self)
     
     def closeEvent(self, event):
         """Save window geometry on close"""

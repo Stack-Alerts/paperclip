@@ -130,10 +130,6 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         # Start automatic data update system (after modal shown)
         QTimer.singleShot(1500, self._start_auto_update_system)
-        
-        # Apply hand cursor to all buttons (professional UI polish)
-        # Use QTimer to ensure all widgets are fully created first
-        QTimer.singleShot(100, lambda: apply_hand_cursor_to_buttons(self))
     
     def _init_ui(self):
         """Initialize the user interface layout."""
@@ -1621,6 +1617,12 @@ class StrategyBuilderMainWindow(QMainWindow):
         settings.setValue("geometry", self.saveGeometry())
         settings.setValue("windowState", self.saveState())
         self._save_debug_settings()
+    
+    def showEvent(self, event):
+        """Called when window is shown - apply hand cursors to all widgets"""
+        super().showEvent(event)
+        # Apply hand cursor after window is fully displayed with all widgets created
+        apply_hand_cursor_to_buttons(self)
     
     def closeEvent(self, event):
         """Handle window close event."""
