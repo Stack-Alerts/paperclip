@@ -765,7 +765,8 @@ class ValidationReportWindow(QDialog):
         # Generate flow visualization with error handling
         try:
             flow_content = self._generate_strategy_flow()
-            flow_text_widget.setPlainText(flow_content)
+            # Use HTML to support colored text for validation failures
+            flow_text_widget.setHtml(f"<pre style='font-family: Courier New; font-size: 10pt; color: {COLORS['text_primary']};'>{flow_content}</pre>")
         except Exception as e:
             # Graceful fallback if flow generation fails
             error_msg = f"Error generating strategy flow: {str(e)}\n\nPlease check your strategy configuration."
@@ -779,22 +780,42 @@ class ValidationReportWindow(QDialog):
     
     def _generate_strategy_flow(self) -> str:
         """
-        Generate institutional-grade strategy flow visualization
+        Generate institutional-grade strategy flow visualization with HTML coloring
         
         Shows:
         - Entry signal flow with timing windows
         - RECHECK validation chains
         - Exit conditions
-        
-        Format:
-        🎯 ENTRY: Signal triggers
-           └── Timing: Within X candles of reference
-           └── RECHECK: Validation at Y bars
-                └── RECHECK: Second validation at Z bars
-        🚪 EXIT: Condition triggers (close X% of position)
+        - Failed items highlighted in RED
         """
         if not hasattr(self.config, 'blocks') or not self.config.blocks:
             return "No strategy flow available - strategy has no building blocks."
+        
+        # Collect failed signal names from validation issues
+        failed_signals = set()
+        failed_blocks = set()
+        timing_failed_signals = set()
+        
+        for issue in (self.report.critical_issues + self.report.errors):
+            # Extract signal/block names from location
+            if hasattr(issue, 'location') and issue.location:
+                parts = issue.location.split('::')
+                for i in range(0, len(parts)-1, 2):
+                    if i+1 < len(parts):
+                        label = parts[i]
+                        value = parts[i+1]
+                        if label == "Signal":
+                            failed_signals.add(value)
+                        elif label == "Block":
+                            failed_blocks.add(value.lower())
+            
+            # Mark timing conflicts
+            if hasattr(issue, 'rule_id') and issue.rule_id == "TIMING_004":
+                if hasattr(issue, 'location') and 'Signal::' in issue.location:
+                    parts = issue.location.split('::')
+                    for i in range(len(parts)):
+                        if parts[i] == "Signal" and i+1 < len(parts):
+                            timing_failed_signals.add(parts[i+1])
         
         lines = []
         lines.append("=" * 80)
@@ -805,9 +826,9 @@ class ValidationReportWindow(QDialog):
         # Add validation failure notice if strategy failed
         if not self.report.is_valid:
             blocking = self.report.blocking_issues()
-            lines.append("⚠️  VALIDATION FAILED")
-            lines.append(f"⚠️  {blocking} blocking issue(s) detected - items marked in RED below")
-            lines.append("⚠️  See 'Issues' tab for detailed fix instructions")
+            lines.append('<span style="color: #FFA500;">⚠️  VALIDATION FAILED</span>')
+            lines.append(f'<span style="color: #FFA500;">⚠️  {blocking} blocking issue(s) detected - items marked in RED below</span>')
+            lines.append('<span style="color: #FFA500;">⚠️  See \'Issues\' tab for detailed fix instructions</span>')
             lines.append("")
             lines.append("=" * 80)
             lines.append("")
@@ -838,10 +859,19 @@ class ValidationReportWindow(QDialog):
                 elif hasattr(signal, 'exit_for') and signal.exit_for and len(signal.exit_for) > 0:
                     is_exit = True
                 
+                # Check if signal failed validation
+                signal_failed = signal.name in failed_signals or signal.name in timing_failed_signals
+                
                 if is_exit:
-                    lines.append(f"   🚪 EXIT SIGNAL: {signal.name}")
+                    signal_line = f"   🚪 EXIT SIGNAL: {signal.name}"
                 else:
-                    lines.append(f"   🎯 ENTRY SIGNAL: {signal.name}")
+                    signal_line = f"   🎯 ENTRY SIGNAL: {signal.name}"
+                
+                # Apply red color if failed
+                if signal_failed:
+                    lines.append(f'<span style="color: #FF4444;">{signal_line} ⚠️ FAILED VALIDATION</span>')
+                else:
+                    lines.append(signal_line)
                 
                 # Check for timing constraints
                 if hasattr(signal, 'timing_constraint') and signal.timing_constraint:
