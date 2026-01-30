@@ -154,11 +154,12 @@ class ValidationReportWindow(QDialog):
                 }}
             """)
         else:
-            # FAILED
+            # FAILED - Smaller font, muted icon
             icon = QLabel("❌")
-            icon.setFont(create_font(24))
+            icon.setFont(create_font(14))  # Reduced from 24 to 14
+            icon.setStyleSheet(f"color: {COLORS['text_muted']};")  # Muted icon
             title = QLabel(f"VALIDATION FAILED")
-            title.setFont(create_font(14, bold=True))
+            title.setFont(create_font(12, bold=True))  # Reduced from 14 to 12
             title.setStyleSheet(f"color: {COLORS['error']};")
             
             blocking = self.report.blocking_issues()
@@ -166,7 +167,7 @@ class ValidationReportWindow(QDialog):
                 f"{blocking} blocking issue(s) must be fixed before backtest. "
                 "Review the Issues tab below for detailed guidance on resolving each issue."
             )
-            desc.setFont(create_font(11))
+            desc.setFont(create_font(10))  # Reduced from 11 to 10
             desc.setStyleSheet(f"color: {COLORS['text_secondary']};")
             desc.setWordWrap(True)
             
@@ -295,13 +296,13 @@ class ValidationReportWindow(QDialog):
         
         layout.addLayout(top_row)
         
-        # Complexity summary - FIXED FONT SIZE TO MATCH OTHER BOXES
+        # Complexity summary - SINGLE ROW with score and rating side by side
         complexity = self.report.complexity_metrics.get('complexity_score', 0)
         complexity_group = QGroupBox("Strategy Complexity")
         complexity_group.setFont(create_font(12, bold=True))  # Match other group boxes
         complexity_layout = QVBoxLayout()
         
-        # Create row layout matching other boxes
+        # Single row with both score and rating
         complexity_row = QWidget()
         complexity_row_layout = QHBoxLayout(complexity_row)
         complexity_row_layout.setContentsMargins(0, 4, 0, 4)
@@ -326,22 +327,22 @@ class ValidationReportWindow(QDialog):
         
         complexity_value.setStyleSheet(f"color: {color};")
         complexity_row_layout.addWidget(complexity_value)
-        complexity_row_layout.addStretch()
         
-        complexity_layout.addWidget(complexity_row)
+        # Add separator
+        separator = QLabel(" • ")
+        separator.setFont(create_font(11))
+        separator.setStyleSheet(f"color: {COLORS['text_muted']};")
+        complexity_row_layout.addWidget(separator)
         
-        # Add rating on second row
-        rating_row = QWidget()
-        rating_row_layout = QHBoxLayout(rating_row)
-        rating_row_layout.setContentsMargins(0, 4, 0, 4)
-        
+        # Add rating on same row
         rating_label = QLabel(rating)
         rating_label.setFont(create_font(11))
         rating_label.setStyleSheet(f"color: {color};")
-        rating_row_layout.addWidget(rating_label)
-        rating_row_layout.addStretch()
+        complexity_row_layout.addWidget(rating_label)
         
-        complexity_layout.addWidget(rating_row)
+        complexity_row_layout.addStretch()
+        
+        complexity_layout.addWidget(complexity_row)
         complexity_group.setLayout(complexity_layout)
         layout.addWidget(complexity_group)
         
@@ -800,6 +801,16 @@ class ValidationReportWindow(QDialog):
         lines.append("STRATEGY EXECUTION FLOW - HOW YOUR STRATEGY WORKS")
         lines.append("=" * 80)
         lines.append("")
+        
+        # Add validation failure notice if strategy failed
+        if not self.report.is_valid:
+            blocking = self.report.blocking_issues()
+            lines.append("⚠️  VALIDATION FAILED")
+            lines.append(f"⚠️  {blocking} blocking issue(s) detected - items marked in RED below")
+            lines.append("⚠️  See 'Issues' tab for detailed fix instructions")
+            lines.append("")
+            lines.append("=" * 80)
+            lines.append("")
         
         # Process each block
         for block_idx, block in enumerate(self.config.blocks, 1):
