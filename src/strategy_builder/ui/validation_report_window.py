@@ -339,7 +339,9 @@ class ValidationReportWindow(QDialog):
             desc_text = self._get_institutional_description(issue)
             desc_item = QTableWidgetItem(desc_text)
             desc_item.setFont(create_font(10))
-            desc_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            desc_item.setTextAlignment(Qt.AlignLeft | Qt.AlignTop)
+            # Enable word wrap for long descriptions
+            desc_item.setFlags(desc_item.flags() | Qt.ItemIsEditable)
             table.setItem(row, 4, desc_item)
             
             # Column 5: Action
@@ -357,6 +359,10 @@ class ValidationReportWindow(QDialog):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         
+        # Enable word wrapping for all cells
+        table.setWordWrap(True)
+        table.setTextElideMode(Qt.ElideNone)
+        
         # Set column widths
         header = table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Severity
@@ -368,8 +374,12 @@ class ValidationReportWindow(QDialog):
         header.setSectionResizeMode(4, QHeaderView.Stretch)  # Description (takes remaining space)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Action
         
-        # Set row height
-        table.verticalHeader().setDefaultSectionSize(60)
+        # Auto-resize rows to fit content 
+        table.resizeRowsToContents()
+        # Set minimum row height
+        for row in range(table.rowCount()):
+            if table.rowHeight(row) < 80:
+                table.setRowHeight(row, 80)
         
         layout.addWidget(table)
         
