@@ -246,6 +246,43 @@ class ValidationReportWindow(QDialog):
         summary_group.setLayout(summary_layout)
         layout.addWidget(summary_group)
         
+        # Strategy Composition
+        composition_group = QGroupBox("Strategy Composition")
+        composition_group.setFont(create_font(12, bold=True))
+        composition_layout = QVBoxLayout()
+        
+        # Extract composition data from config
+        composition_data = self._get_strategy_composition()
+        
+        composition_items = [
+            ("Building Blocks", composition_data['blocks'], COLORS['info']),
+            ("Total Signals", composition_data['signals'], COLORS['info']),
+            ("RECHECK Conditions", composition_data['rechecks'], COLORS['text_secondary']),
+            ("Exit Conditions", composition_data['exits'], COLORS['success']),
+            ("Entry Signals", composition_data['entry_signals'], COLORS['info']),
+        ]
+        
+        for label, count, color in composition_items:
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 4, 0, 4)
+            
+            label_widget = QLabel(f"{label}:")
+            label_widget.setFont(create_font(11))
+            label_widget.setMinimumWidth(150)
+            row_layout.addWidget(label_widget)
+            
+            count_widget = QLabel(str(count))
+            count_widget.setFont(create_font(11, bold=True))
+            count_widget.setStyleSheet(f"color: {color};")
+            row_layout.addWidget(count_widget)
+            
+            row_layout.addStretch()
+            composition_layout.addWidget(row)
+        
+        composition_group.setLayout(composition_layout)
+        layout.addWidget(composition_group)
+        
         # Complexity summary
         complexity = self.report.complexity_metrics.get('complexity_score', 0)
         complexity_group = QGroupBox("Strategy Complexity")
@@ -529,6 +566,57 @@ class ValidationReportWindow(QDialog):
                     formatted_lines.append(f"└── {label}: {value}")
         
         return '\n'.join(formatted_lines)
+    
+    def _get_strategy_composition(self) -> dict:
+        """
+        Extract strategy composition data from config
+        
+        Returns counts for:
+        - Building blocks
+        - Total signals
+        - RECHECK conditions
+        - Exit conditions
+        - Entry signals
+        """
+        blocks_count = 0
+        signals_count = 0
+        rechecks_count = 0
+        exits_count = 0
+        entry_signals_count = 0
+        
+        if hasattr(self.config, 'blocks') and self.config.blocks:
+            blocks_count = len(self.config.blocks)
+            
+            for block in self.config.blocks:
+                if hasattr(block, 'signals') and block.signals:
+                    signals_count += len(block.signals)
+                    
+                    for signal in block.signals:
+                        # Count RECHECKs
+                        if hasattr(signal, 'recheck_conditions') and signal.recheck_conditions:
+                            rechecks_count += len(signal.recheck_conditions)
+                        
+                        # Count entry signals (signals without exit flag or exit_for empty)
+                        is_exit = False
+                        if hasattr(signal, 'is_exit_signal'):
+                            is_exit = signal.is_exit_signal
+                        elif hasattr(signal, 'exit_for') and signal.exit_for:
+                            is_exit = True
+                        
+                        if not is_exit:
+                            entry_signals_count += 1
+        
+        # Count exit conditions
+        if hasattr(self.config, 'exit_conditions') and self.config.exit_conditions:
+            exits_count = len(self.config.exit_conditions)
+        
+        return {
+            'blocks': blocks_count,
+            'signals': signals_count,
+            'rechecks': rechecks_count,
+            'exits': exits_count,
+            'entry_signals': entry_signals_count
+        }
     
     def _get_action_text(self, issue: any) -> str:
         """Get action text for issue"""
