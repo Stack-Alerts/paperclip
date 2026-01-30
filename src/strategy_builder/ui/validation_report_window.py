@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
     QWidget, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QFileDialog, QTabWidget, QTextEdit, QGroupBox
 )
-from PyQt5.QtCore import Qt, QSettings, pyqtSignal
+from PyQt5.QtCore import Qt, QSettings, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QColor
 from datetime import datetime
 import csv
@@ -99,7 +99,8 @@ class ValidationReportWindow(QMainWindow):
         layout.addWidget(footer)
         
         # Apply hand cursor to all buttons (professional UI polish)
-        apply_hand_cursor_to_buttons(self)
+        # Use QTimer to ensure all widgets are fully created first
+        QTimer.singleShot(100, lambda: apply_hand_cursor_to_buttons(self))
     
     def _create_header(self) -> QWidget:
         """Create header with title matching main window colors"""
