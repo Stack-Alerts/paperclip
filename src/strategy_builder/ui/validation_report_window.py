@@ -477,26 +477,38 @@ class ValidationReportWindow(QDialog):
         # Track all sections for maximize functionality
         self.metrics_sections = []
         
-        # Exit strategy analysis - collapsible
+        # Exit strategy analysis - collapsible (always green - informational)
         exit_section = self._create_metrics_collapsible_section(
-            "Exit Strategy Analysis",
+            "✅ Exit Strategy Analysis",
             self._get_exit_strategy_info()
         )
         layout.addWidget(exit_section['widget'], 1)
         self.metrics_sections.append(exit_section)
         
-        # Timing Conflict analysis - collapsible (if conflicts exist)
+        # Timing Conflict analysis - collapsible (RED if conflicts exist)
         if self.report.timing_conflicts:
             timing_section = self._create_metrics_collapsible_section(
-                "Timing Conflict Analysis",
+                "❌ Timing Conflict Analysis",
                 self._get_timing_conflicts_info()
             )
             layout.addWidget(timing_section['widget'], 1)
             self.metrics_sections.append(timing_section)
         
-        # Signal Direction analysis - collapsible
+        # Signal Direction analysis - collapsible (green if aligned, yellow if mixed)
+        # Check if there are direction conflicts
+        has_direction_issues = False
+        for issue in (self.report.errors + self.report.warnings):
+            if hasattr(issue, 'rule_id') and issue.rule_id == "DIRECTION_001":
+                has_direction_issues = True
+                break
+        
+        if has_direction_issues:
+            direction_icon = "⚠️"
+        else:
+            direction_icon = "✅"
+        
         direction_section = self._create_metrics_collapsible_section(
-            "Signal Direction Analysis",
+            f"{direction_icon} Signal Direction Analysis",
             self._get_direction_info()
         )
         layout.addWidget(direction_section['widget'], 1)
@@ -568,12 +580,12 @@ class ValidationReportWindow(QDialog):
         
         main_layout.addLayout(header_layout)
         
-        # Text editor
+        # Text editor - Use same background as Strategy Flow for consistency
         text_edit = QTextEdit()
         text_edit.setReadOnly(True)
         text_edit.setFont(QFontImport("Courier New", 10))
         text_edit.setWordWrapMode(QTextOption.WrapMode.WordWrap)
-        text_edit.setStyleSheet(f"QTextEdit {{ background-color: {COLORS['bg_dark']}; color: {COLORS['text_muted']}; border: 1px solid {COLORS['border']}; padding: 8px; }}")
+        text_edit.setStyleSheet(f"QTextEdit {{ background-color: {COLORS['bg_input']}; color: {COLORS['text_primary']}; border: 1px solid {COLORS['border']}; padding: 8px; }}")
         text_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         text_edit.setPlainText(content)
         main_layout.addWidget(text_edit)
@@ -1270,6 +1282,61 @@ class ValidationReportWindow(QDialog):
                 lines.append(f"      └── Action: Close {percentage:.0f}% of position ({mode} mode)")
                 lines.append("")
         
+        lines.append("=" * 80)
+        lines.append("TRADE OPENING LOGIC - WHEN DOES A TRADE ACTUALLY OPEN?")
+        lines.append("=" * 80)
+        lines.append("")
+        lines.append("Your strategy uses BLOCK LOGIC to determine when to open trades:")
+        lines.append("")
+        
+        # Explain each block's logic
+        for block_idx, block in enumerate(self.config.blocks, 1):
+            block_logic = getattr(block, 'logic', 'AND')
+            lines.append(f"Block {block_idx} ({block.name.upper()}) - {block_logic} Logic:")
+            
+            if block_logic == "AND":
+                lines.append(f"   ✓ ALL signals in this block must trigger to open trade")
+                lines.append(f"   ✓ If ANY signal fails to trigger, NO TRADE")
+                lines.append(f"   Example: If Block {block_idx} has 3 signals →")
+                lines.append(f"            Signal 1 triggers ✓")
+                lines.append(f"            Signal 2 triggers ✓")
+                lines.append(f"            Signal 3 NEVER triggers ✗")
+                lines.append(f"            Result: NO TRADE OPENED (all 3 required)")
+            else:  # OR logic
+                lines.append(f"   ✓ ANY 1 signal in this block can open trade")
+                lines.append(f"   ✓ OPTIONAL - whichever signal fires first opens trade")
+                lines.append(f"   Example: If Block {block_idx} has 3 signals →")
+                lines.append(f"            Signal 1 NEVER triggers ✗")
+                lines.append(f"            Signal 2 triggers ✓")
+                lines.append(f"            Result:  TRADE OPENED (only 1 needed)")
+            lines.append("")
+        
+        lines.append("=" * 80)
+        lines.append("MULTI-BLOCK STRATEGY:")
+        lines.append("=" * 80)
+        lines.append("")
+        
+        # Count AND blocks and OR blocks
+        and_blocks = [b for b in self.config.blocks if getattr(b, 'logic', 'AND') == 'AND']
+        or_blocks = [b for b in self.config.blocks if getattr(b, 'logic', 'AND') == 'OR']
+        
+        if len(and_blocks) > 0 and len(or_blocks) == 0:
+            lines.append("✓ All blocks use AND logic:")
+            lines.append("  - EVERY block must have ALL its signals trigger")
+            lines.append("  - Very strict entry requirements")
+            lines.append("  - Higher quality trades, fewer entries")
+        elif len(or_blocks) > 0 and len(and_blocks) == 0:
+            lines.append("✓ All blocks use OR logic:")
+            lines.append("  - ANY signal from ANY block can open trade")
+            lines.append("  - More flexible entry requirements")
+            lines.append("  - More frequent trades, wider opportunity")
+        else:
+            lines.append("✓ Mixed AND/OR logic:")
+            lines.append(f"  - {len(and_blocks)} blocks require ALL signals (strict)")
+            lines.append(f"  - {len(or_blocks)} blocks accept ANY signal (flexible)")
+            lines.append("  - Trade opens when at least 1 block's condition is met")
+        
+        lines.append("")
         lines.append("=" * 80)
         lines.append("EXECUTION: Signals evaluated bar-by-bar in real-time")
         lines.append("=" * 80)
