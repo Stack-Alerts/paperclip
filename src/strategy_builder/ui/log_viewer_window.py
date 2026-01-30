@@ -887,6 +887,13 @@ class LogViewerWindow(QDialog):
         if 0 <= last_tab < self.tabs.count():
             self.tabs.setCurrentIndex(last_tab)
     
+    def showEvent(self, event):
+        """Called when window is shown - apply hand cursors to all widgets"""
+        super().showEvent(event)
+        from PyQt5.QtCore import QTimer
+        from .styles import apply_hand_cursor_to_buttons
+        QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+
     def closeEvent(self, event):
         """Save geometry and state on close"""
         settings = QSettings("BTC_Engine", "LogViewer")

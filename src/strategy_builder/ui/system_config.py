@@ -373,6 +373,13 @@ class SystemConfigWindow(QMainWindow):
         # Monitoring
         set_key('.env', 'MONITOR_ENABLED', str(self.monitor_enabled.isChecked()).lower())
         set_key('.env', 'MONITOR_INTERVAL', str(self.monitor_interval.value()))
+    def showEvent(self, event):
+        """Called when window is shown - apply hand cursors to all widgets"""
+        super().showEvent(event)
+        from PyQt5.QtCore import QTimer
+        from .styles import apply_hand_cursor_to_buttons
+        QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+
     
     def reset_to_defaults(self):
         """Reset configuration to default values"""

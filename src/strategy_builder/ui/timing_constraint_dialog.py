@@ -247,6 +247,13 @@ class TimingConstraintDialog(QDialog):
             f"If more than {candles} candle(s) pass without this signal triggering, "
             f"the entire strategy will reset and start counting from scratch."
         )
+    def showEvent(self, event):
+        """Called when window is shown - apply hand cursors to all widgets"""
+        super().showEvent(event)
+        from PyQt5.QtCore import QTimer
+        from .styles import apply_hand_cursor_to_buttons
+        QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+
     
     def get_constraint(self) -> Optional[dict]:
         """
