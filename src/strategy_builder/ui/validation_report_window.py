@@ -15,7 +15,7 @@ Date: 2026-01-30 (Redesigned)
 
 from typing import Optional
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QPushButton, QHBoxLayout, QLabel,
+    QDialog, QMainWindow, QVBoxLayout, QPushButton, QHBoxLayout, QLabel,
     QWidget, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QFileDialog, QTabWidget, QTextEdit, QGroupBox
 )
@@ -35,7 +35,7 @@ from src.strategy_builder.ui.styles import (
 )
 
 
-class ValidationReportWindow(QDialog):
+class ValidationReportWindow(QMainWindow):
     """
     Professional validation report window matching Strategy Browser style
     
@@ -45,6 +45,7 @@ class ValidationReportWindow(QDialog):
     - Blue headers matching system theme
     - Institutional-grade explanations
     - Integrated fix buttons
+    - NON-BLOCKING window (QMainWindow for independence)
     """
     
     # Signals
@@ -61,20 +62,22 @@ class ValidationReportWindow(QDialog):
         self._populate_data()
     
     def _init_ui(self):
-        """Initialize UI with professional styling"""
+        """Initialize UI with professional styling - QMainWindow is NON-BLOCKING by default"""
         self.setWindowTitle("BTC Engine v3 - Validation Report")
         self.setMinimumSize(1400, 900)
         self.resize(1600, 1000)
         
-        # Make window NON-BLOCKING - user can interact with main window while validation report is open
-        self.setModal(False)
-        self.setWindowFlags(Qt.Window)  # Removed WindowStaysOnTopHint to allow working with main window
+        # QMainWindow is naturally non-blocking - no modal flag needed
         
         # Apply main stylesheet
         self.setStyleSheet(get_main_stylesheet())
         
+        # QMainWindow requires central widget
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
         # Main layout
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
         
@@ -93,8 +96,6 @@ class ValidationReportWindow(QDialog):
         # Footer with actions
         footer = self._create_footer()
         layout.addWidget(footer)
-        
-        self.setLayout(layout)
     
     def _create_header(self) -> QWidget:
         """Create header with title matching main window colors"""
@@ -668,7 +669,7 @@ class ValidationReportWindow(QDialog):
         close_btn = QPushButton("Close")
         close_btn.setFont(create_font(11))
         close_btn.setMinimumWidth(120)
-        close_btn.clicked.connect(self.accept)
+        close_btn.clicked.connect(self.close)  # QMainWindow uses close(), not accept()
         layout.addWidget(close_btn)
         
         return widget
