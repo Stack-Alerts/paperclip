@@ -1385,16 +1385,33 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _check_test_prerequisites(self) -> bool:
         """Check if testing prerequisites are met (validated strategy)."""
         if not self.validation_passed:
-            show_warning(
-                self,
-                "Cannot Run Test / Optimize",
-                "Validation Required",
-                "You must validate your strategy before running tests.\n\n"
-                "Steps:\n"
-                "1. Click the Validate step\n"
-                "2. Fix any validation errors\n"
-                "3. Return here to run tests and optimize"
-            )
+            # Check if validation button is in error state (RED) - means validation FAILED
+            validate_step = self.stepper.steps[1]  # Index 1 is Validate step
+            if validate_step.state == 'error':
+                # Validation was run but FAILED
+                show_warning(
+                    self,
+                    "Cannot Run Test / Optimize",
+                    "Strategy Validation FAILED",
+                    "Your strategy has validation errors that must be fixed before testing.\n\n"
+                    "Steps:\n"
+                    "1. Click 'View Validation Report' to see detailed errors\n"
+                    "2. Fix all blocking issues (marked in RED)\n"
+                    "3. Re-validate your strategy\n"
+                    "4. Return here to run tests and optimize"
+                )
+            else:
+                # Validation hasn't been run yet
+                show_warning(
+                    self,
+                    "Cannot Run Test / Optimize",
+                    "Validation Required",
+                    "You must validate your strategy before running tests.\n\n"
+                    "Steps:\n"
+                    "1. Click the Validate step\n"
+                    "2. Fix any validation errors\n"
+                    "3. Return here to run tests and optimize"
+                )
             return False
         return True
     
