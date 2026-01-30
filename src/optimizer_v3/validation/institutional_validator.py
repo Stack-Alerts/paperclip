@@ -1615,13 +1615,48 @@ class InstitutionalValidator:
         if not hasattr(config, 'blocks'):
             return
         
-        # Count components
+        # Count components - ACTUAL CALCULATION (not placeholders)
         total_blocks = len(config.blocks)
         total_signals = sum(len(block.signals) for block in config.blocks if hasattr(block, 'signals'))
-        total_exit_conditions = 0  # Calculate from config
-        max_recheck_depth = 0  # Calculate from RECHECK chains
-        total_timing_constraints = 0  # Calculate from signals
-        max_recheck_cumulative_delay = 0  # Calculate from chains
+        
+        # Calculate total exit conditions at all 3 levels
+        total_exit_conditions = 0
+        
+        # Strategy-level exits
+        if hasattr(config, 'exit_conditions') and config.exit_conditions:
+            total_exit_conditions += len(config.exit_conditions)
+        
+        # Block-level and signal-level exits
+        for block in config.blocks:
+            if hasattr(block, 'exit_conditions') and block.exit_conditions:
+                total_exit_conditions += len(block.exit_conditions)
+            
+            if hasattr(block, 'signals'):
+                for signal in block.signals:
+                    if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                        total_exit_conditions += len(signal.exit_conditions)
+        
+        # Calculate max RECHECK depth and cumulative delay
+        max_recheck_depth = 0
+        max_recheck_cumulative_delay = 0
+        
+        for block in config.blocks:
+            if hasattr(block, 'signals'):
+                for signal in block.signals:
+                    # Calculate RECHECK metrics for this signal
+                    depth, cumulative_delay = self._calculate_recheck_chain_metrics(
+                        config, block.name, signal.name
+                    )
+                    max_recheck_depth = max(max_recheck_depth, depth)
+                    max_recheck_cumulative_delay = max(max_recheck_cumulative_delay, cumulative_delay)
+        
+        # Count total timing constraints
+        total_timing_constraints = 0
+        for block in config.blocks:
+            if hasattr(block, 'signals'):
+                for signal in block.signals:
+                    if hasattr(signal, 'timing_constraint') and signal.timing_constraint:
+                        total_timing_constraints += 1
         
         # Calculate raw score
         raw_score = (
