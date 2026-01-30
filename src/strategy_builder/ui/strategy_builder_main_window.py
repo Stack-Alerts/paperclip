@@ -41,7 +41,7 @@ from src.optimizer_v3.validation.institutional_validator import InstitutionalVal
 from src.strategy_builder.ui.data_update_modal import DataUpdateModal
 from src.strategy_builder.ui.alert_dialog import show_warning, ask_question
 from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
-from src.strategy_builder.ui.styles import get_main_stylesheet
+from src.strategy_builder.ui.styles import get_main_stylesheet, apply_hand_cursor_to_buttons
 from src.strategy_builder.ui.new_strategy_dialog import NewStrategyDialog
 from src.strategy_builder.ui.strategy_browser_dialog import StrategyBrowserDialog
 from src.optimizer_v3.database import get_database_manager
@@ -130,6 +130,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         # Start automatic data update system (after modal shown)
         QTimer.singleShot(1500, self._start_auto_update_system)
+        
+        # Apply hand cursor to all buttons (professional UI polish)
+        apply_hand_cursor_to_buttons(self)
     
     def _init_ui(self):
         """Initialize the user interface layout."""
