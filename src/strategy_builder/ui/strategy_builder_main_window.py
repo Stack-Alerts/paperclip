@@ -1385,9 +1385,9 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _check_test_prerequisites(self) -> bool:
         """Check if testing prerequisites are met (validated strategy)."""
         if not self.validation_passed:
-            # Check if validation button is in error state (RED) - means validation FAILED
-            validate_step = self.stepper.steps[1]  # Index 1 is Validate step
-            if validate_step.state == 'error':
+            # Check if validation step is in error state (RED) - means validation FAILED
+            # StepperRibbon uses error_steps set to track failed steps
+            if 1 in self.stepper.error_steps:  # Index 1 is Validate step
                 # Validation was run but FAILED
                 show_warning(
                     self,
