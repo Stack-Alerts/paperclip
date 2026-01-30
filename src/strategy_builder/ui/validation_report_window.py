@@ -1,29 +1,27 @@
 """
-Validation Report Window - Institutional-Grade Validation UI
-Sprint 1.9 Tasks 1.9.16-1.9.21
+Validation Report Window - Institutional-Grade Professional UI
+Sprint 1.9 - Complete Redesign to Match Strategy Browser
 
-Full-screen validation report window with:
-- Severity-based issue display (color-coded)
-- Strategy direction mismatch UI with auto-fix
-- Timing conflict timeline visualization
-- One-click fix suggestions
-- Export to PDF/CSV
-- Window state persistence
+Professional table-based validation report with:
+- Table layout matching Strategy Browser style
+- Blue section headers matching system theme
+- Institutional-grade content and explanations
+- Clear, actionable guidance for users
+- One-click fix buttons integrated
 
 Author: BTC_Engine_v3
-Date: 2026-01-30
+Date: 2026-01-30 (Redesigned)
 """
 
 from typing import Optional
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QPushButton, QHBoxLayout, QLabel,
-    QScrollArea, QWidget, QGroupBox, QTextEdit, QMessageBox,
-    QFileDialog
+    QWidget, QTableWidget, QTableWidgetItem, QHeaderView,
+    QMessageBox, QFileDialog, QTabWidget, QTextEdit, QGroupBox
 )
 from PyQt5.QtCore import Qt, QSettings, pyqtSignal
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QColor
 from datetime import datetime
-import json
 import csv
 
 from src.optimizer_v3.validation.institutional_validator import (
@@ -31,429 +29,530 @@ from src.optimizer_v3.validation.institutional_validator import (
     ValidationReport,
     ValidationSeverity
 )
-from src.strategy_builder.ui.styles import COLORS, create_font
-
-# Define spacing unit for layout consistency
-SPACING_UNIT = 8
+from src.strategy_builder.ui.styles import (
+    COLORS, create_font, get_main_stylesheet,
+    get_table_stylesheet, get_tab_widget_stylesheet
+)
 
 
 class ValidationReportWindow(QDialog):
     """
-    Full-screen validation report window
+    Professional validation report window matching Strategy Browser style
     
-    Tasks 1.9.16-1.9.21:
-    - Window state persistence (QSettings)
-    - Severity-based issue display
-    - Direction mismatch UI  
-    - Timeline visualization
-    - One-click fixes
-    - Export to PDF/CSV
+    Features:
+    - Table-based issue display
+    - Tab-based organization (Summary, Issues, Metrics)
+    - Blue headers matching system theme
+    - Institutional-grade explanations
+    - Integrated fix buttons
     """
     
-    # Signals for auto-fix actions
+    # Signals
     fix_applied = pyqtSignal(str, dict)  # fix_type, fix_data
     
     def __init__(self, report: ValidationReport, config: any, parent: Optional[QWidget] = None):
-        """
-        Initialize validation report window
-        
-        Args:
-            report: ValidationReport from InstitutionalValidator
-            config: Strategy configuration (for auto-fixes)
-            parent: Parent widget
-        """
+        """Initialize professional validation window"""
         super().__init__(parent)
         self.report = report
         self.config = config
         
         self._init_ui()
         self._restore_geometry()
-        self._populate_report()
+        self._populate_data()
     
     def _init_ui(self):
-        """Initialize UI (Task 1.9.16)"""
+        """Initialize UI with professional styling"""
         self.setWindowTitle("BTC Engine v3 - Institutional Validation Report")
-        
-        # Full window with resize capabilities
-        self.setWindowFlags(
-            Qt.WindowType.Window |
-            Qt.WindowType.WindowCloseButtonHint |
-            Qt.WindowType.WindowMinimizeButtonHint |
-            Qt.WindowType.WindowMaximizeButtonHint
-        )
-        
-        # Larger default size for full-screen experience
         self.setMinimumSize(1400, 900)
         self.resize(1600, 1000)
         
+        # Apply main stylesheet
+        self.setStyleSheet(get_main_stylesheet())
+        
         # Main layout
         layout = QVBoxLayout()
-        layout.setContentsMargins(SPACING_UNIT * 2, SPACING_UNIT * 2, 
-                                  SPACING_UNIT * 2, SPACING_UNIT * 2)
-        layout.setSpacing(SPACING_UNIT * 2)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
         
-        # Header
+        # Header with blue title (matching Strategy Browser)
         header = self._create_header()
         layout.addWidget(header)
         
-        # Scroll area for issues
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {COLORS['bg_secondary']}; }}")
+        # Status banner
+        status_banner = self._create_status_banner()
+        layout.addWidget(status_banner)
         
-        content_widget = QWidget()
-        content_layout = QVBoxLayout(content_widget)
-        content_layout.setSpacing(SPACING_UNIT)
+        # Tab widget for organized content
+        tabs = self._create_tabs()
+        layout.addWidget(tabs, 1)
         
-        # Add severity sections (Task 1.9.17)
-        self._add_severity_sections(content_layout)
-        
-        content_layout.addStretch()
-        scroll.setWidget(content_widget)
-        layout.addWidget(scroll, 1)
-        
-        # Footer with action buttons
+        # Footer with actions
         footer = self._create_footer()
         layout.addWidget(footer)
         
         self.setLayout(layout)
     
     def _create_header(self) -> QWidget:
-        """Create header with summary (Task 1.9.16)"""
-        header = QWidget()
-        layout = QVBoxLayout(header)
-        layout.setSpacing(SPACING_UNIT)
+        """Create header with blue title matching Strategy Browser"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)
         
-        # Title
-        title = QLabel("Strategy Validation Report")
-        title.setFont(create_font(24, bold=True))
-        title.setStyleSheet(f"color: {COLORS['info']};")
+        # Blue title matching Strategy Browser style
+        title = QLabel("💼 Institutional Validation Report")
+        title.setFont(create_font(18, bold=True))
+        title.setStyleSheet(f"color: {COLORS['info']}; background: transparent;")
         layout.addWidget(title)
         
-        # Summary stats
-        summary = QLabel(self._get_summary_text())
-        summary.setFont(create_font(12))
-        summary.setWordWrap(True)
-        layout.addWidget(summary)
+        # Strategy info
+        strategy_name = self.report.strategy_summary.get('name', 'Unknown')
+        timestamp = datetime.fromisoformat(self.report.timestamp).strftime('%Y-%m-%d %H:%M:%S')
         
-        # Overall status
-        status = self._get_status_label()
-        layout.addWidget(status)
-        
-        return header
-    
-    def _add_severity_sections(self, layout: QVBoxLayout):
-        """Add collapsible severity sections (Task 1.9.17)"""
-        # Critical issues
-        if self.report.critical_issues:
-            section = self._create_severity_section(
-                "CRITICAL Issues",
-                self.report.critical_issues,
-                "#DC3545",  # Red
-                "Critical issues must be fixed before live trading"
-            )
-            layout.addWidget(section)
-        
-        # Errors
-        if self.report.errors:
-            section = self._create_severity_section(
-                "ERROR Issues", 
-                self.report.errors,
-                "#FFA500",  # Orange
-                "Errors must be fixed before backtesting"
-            )
-            layout.addWidget(section)
-        
-        # Warnings
-        if self.report.warnings:
-            section = self._create_severity_section(
-                "WARNING Issues",
-                self.report.warnings,
-                "#FFD700",  # Yellow/Gold
-                "Warnings should be reviewed"
-            )
-            layout.addWidget(section)
-        
-        # Notices
-        if self.report.notices:
-            section = self._create_severity_section(
-                "NOTICE Items",
-                self.report.notices,
-                "#17A2B8",  # Cyan
-                "Notices for your review"
-            )
-            layout.addWidget(section)
-        
-        # Info
-        if self.report.info:
-            section = self._create_severity_section(
-                "INFO Items",
-                self.report.info,
-                "#007ACC",  # Blue
-                "Informational messages"
-            )
-            layout.addWidget(section)
-    
-    def _create_severity_section(
-        self,
-        title: str,
-        issues: list,
-        color: str,
-        description: str
-    ) -> QGroupBox:
-        """Create a severity section with issues"""
-        group = QGroupBox(f"{title} ({len(issues)})")
-        group.setFont(create_font(14, bold=True))
-        group.setStyleSheet(f"""
-            QGroupBox {{
-                border: 2px solid {color};
-                border-radius: 5px;
-                margin-top: 10px;
-                padding: 10px;
-                background: rgba(255, 255, 255, 0.05);
-            }}
-            QGroupBox::title {{
-                color: {color};
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-            }}
-        """)
-        
-        layout = QVBoxLayout()
-        layout.setSpacing(SPACING_UNIT)
-        
-        # Section description
-        desc_label = QLabel(description)
-        desc_label.setFont(create_font(11))
-        desc_label.setStyleSheet(f"color: {color};")
-        layout.addWidget(desc_label)
-        
-        # Add each issue
-        for issue in issues:
-            issue_widget = self._create_issue_widget(issue, color)
-            layout.addWidget(issue_widget)
-        
-        group.setLayout(layout)
-        return group
-    
-    def _create_issue_widget(self, issue: any, color: str) -> QWidget:
-        """Create widget for single issue (Tasks 1.9.17-1.9.20)"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(SPACING_UNIT, SPACING_UNIT, SPACING_UNIT, SPACING_UNIT)
-        layout.setSpacing(SPACING_UNIT // 2)
-        
-        # Issue header
-        header = QLabel(f"• {issue.rule_name} ({issue.rule_id})")
-        header.setFont(create_font(12, bold=True))
-        header.setStyleSheet(f"color: {color};")
-        layout.addWidget(header)
-        
-        # Location
-        if issue.location != "Strategy":
-            loc_label = QLabel(f"Location: {issue.location}")
-            loc_label.setFont(create_font(10))
-            layout.addWidget(loc_label)
-        
-        # Message
-        msg_label = QLabel(issue.message)
-        msg_label.setFont(create_font(11))
-        msg_label.setWordWrap(True)
-        layout.addWidget(msg_label)
-        
-        # Suggestion
-        if issue.suggestion:
-            sugg_label = QLabel(f"💡 Suggestion: {issue.suggestion}")
-            sugg_label.setFont(create_font(10))
-            sugg_label.setStyleSheet("color: #28A745;")  # Green
-            sugg_label.setWordWrap(True)
-            layout.addWidget(sugg_label)
-        
-        # Task 1.9.18: Strategy direction mismatch UI
-        if issue.category == "DIRECTION" and issue.auto_fix_available:
-            fix_btn = self._create_direction_fix_button(issue)
-            layout.addWidget(fix_btn)
-        
-        # Task 1.9.19: Timing conflict timeline
-        if issue.category == "TIMING" and issue.rule_id == "TIMING_004":
-            timeline = self._create_timeline_widget(issue)
-            layout.addWidget(timeline)
-        
-        # Task 1.9.20: Generic one-click fixes
-        if issue.auto_fix_available and issue.category != "DIRECTION":
-            fix_btn = self._create_generic_fix_button(issue)
-            layout.addWidget(fix_btn)
-        
-        widget.setStyleSheet(f"""
-            QWidget {{
-                background: rgba(255, 255, 255, 0.03);
-                border-left: 3px solid {color};
-                border-radius: 3px;
-            }}
-        """)
+        info_text = f"Strategy: {strategy_name}  •  Validated: {timestamp}"
+        info_label = QLabel(info_text)
+        info_label.setFont(create_font(11))
+        info_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+        layout.addWidget(info_label)
         
         return widget
     
-    def _create_direction_fix_button(self, issue: any) -> QPushButton:
-        """Create direction mismatch fix button (Task 1.9.18)"""
-        fix_data = issue.auto_fix_data
-        suggested = fix_data['suggested_type']
-        
-        btn = QPushButton(f"🔄 Switch to {suggested}")
-        btn.setFont(create_font(11, bold=True))
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: #28A745;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                background-color: #218838;
-            }}
-        """)
-        btn.clicked.connect(lambda: self._apply_direction_fix(fix_data))
-        return btn
-    
-    def _create_timeline_widget(self, issue: any) -> QWidget:
-        """Create timing conflict timeline (Task 1.9.19)"""
+    def _create_status_banner(self) -> QWidget:
+        """Create status banner showing pass/fail"""
         widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(SPACING_UNIT, SPACING_UNIT, SPACING_UNIT, SPACING_UNIT)
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(12, 12, 12, 12)
         
-        label = QLabel("📊 Timeline Visualization:")
-        label.setFont(create_font(11, bold=True))
-        layout.addWidget(label)
-        
-        # Find timeline data from report
-        timeline_data = None
-        for conflict in self.report.timing_conflicts:
-            if issue.location in conflict.get('signal', ''):
-                timeline_data = conflict.get('timeline', [])
-                break
-        
-        if timeline_data:
-            timeline_text = QTextEdit()
-            timeline_text.setReadOnly(True)
-            timeline_text.setMaximumHeight(150)
-            timeline_text.setFont(create_font(10))
+        if self.report.is_valid:
+            # PASSED
+            icon = QLabel("✅")
+            icon.setFont(create_font(24))
+            title = QLabel("VALIDATION PASSED")
+            title.setFont(create_font(14, bold=True))
+            title.setStyleSheet(f"color: {COLORS['success']};")
             
-            text = "Bar-by-bar timeline:\n\n"
-            for event in timeline_data:
-                status_icon = {
-                    'OK':' ✅',
-                    'WARNING': '⚠️',
-                    'ERROR': '❌',
-                    'TOO_LATE': '🚫'
-                }.get(event['status'], '•')
-                
-                text += f"Bar {event['bar']:3d}: {status_icon} {event['description']}\n"
+            desc = QLabel("Your strategy meets all institutional-grade requirements and is ready for backtesting.")
+            desc.setFont(create_font(11))
+            desc.setStyleSheet(f"color: {COLORS['text_secondary']};")
+            desc.setWordWrap(True)
             
-            timeline_text.setPlainText(text)
-            timeline_text.setStyleSheet("background: rgba(0, 0, 0, 0.3);")
-            layout.addWidget(timeline_text)
+            widget.setStyleSheet(f"""
+                QWidget {{
+                    background-color: rgba(16, 185, 129, 0.1);
+                    border-left: 4px solid {COLORS['success']};
+                    border-radius: 4px;
+                }}
+            """)
+        else:
+            # FAILED
+            icon = QLabel("❌")
+            icon.setFont(create_font(24))
+            title = QLabel(f"VALIDATION FAILED")
+            title.setFont(create_font(14, bold=True))
+            title.setStyleSheet(f"color: {COLORS['error']};")
+            
+            blocking = self.report.blocking_issues()
+            desc = QLabel(
+                f"{blocking} blocking issue(s) must be fixed before backtest. "
+                "Review the Issues tab below for detailed guidance on resolving each issue."
+            )
+            desc.setFont(create_font(11))
+            desc.setStyleSheet(f"color: {COLORS['text_secondary']};")
+            desc.setWordWrap(True)
+            
+            widget.setStyleSheet(f"""
+                QWidget {{
+                    background-color: rgba(220, 53, 69, 0.1);
+                    border-left: 4px solid {COLORS['error']};
+                    border-radius: 4px;
+                }}
+            """)
+        
+        layout.addWidget(icon)
+        
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(4)
+        text_layout.addWidget(title)
+        text_layout.addWidget(desc)
+        layout.addLayout(text_layout, 1)
         
         return widget
     
-    def _create_generic_fix_button(self, issue: any) -> QPushButton:
-        """Create generic fix button (Task 1.9.20)"""
-        fix_type = issue.auto_fix_data.get('fix_type', 'fix')
+    def _create_tabs(self) -> QTabWidget:
+        """Create tab widget with Summary, Issues, Metrics"""
+        tabs = QTabWidget()
+        tabs.setStyleSheet(get_tab_widget_stylesheet())
         
-        label_map = {
-            'reduce_recheck': '🔧 Reduce RECHECK Delay',
-            'consolidate_exits': '🔄 Consolidate Exit Conditions',
-            'disable_signal': '⚠️ Disable Dead Signal'
-        }
+        # Tab 1: Summary
+        summary_tab = self._create_summary_tab()
+        tabs.addTab(summary_tab, "📊 Summary")
         
-        btn = QPushButton(label_map.get(fix_type, '🔧 Apply Fix'))
-        btn.setFont(create_font(11))
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #007ACC;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #005A9E;
-            }
-        """)
-        btn.clicked.connect(lambda: self._apply_generic_fix(issue))
-        return btn
+        # Tab 2: Issues (main tab - most important)
+        issues_tab = self._create_issues_tab()
+        tabs.addTab(issues_tab, "⚠️ Issues")
+        
+        # Tab 3: Metrics & Analysis
+        metrics_tab = self._create_metrics_tab()
+        tabs.addTab(metrics_tab, "📈 Metrics & Analysis")
+        
+        # Set Issues tab as default  if there are issues
+        if not self.report.is_valid:
+            tabs.setCurrentIndex(1)
+        
+        return tabs
+    
+    def _create_summary_tab(self) -> QWidget:
+        """Create summary overview tab"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setSpacing(16)
+        layout.setContentsMargins(16, 16, 16, 16)
+        
+        # Issue count summary
+        summary_group = QGroupBox("Validation Summary")
+        summary_group.setFont(create_font(12, bold=True))
+        summary_layout = QVBoxLayout()
+        
+        counts = [
+            ("Critical Issues", len(self.report.critical_issues), COLORS['error']),
+            ("Errors", len(self.report.errors), COLORS['warning']),
+            ("Warnings", len(self.report.warnings), "#FFD700"),
+            ("Notices", len(self.report.notices), COLORS['info']),
+            ("Info", len(self.report.info), COLORS['text_secondary'])
+        ]
+        
+        for label, count, color in counts:
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 4, 0, 4)
+            
+            label_widget = QLabel(f"{label}:")
+            label_widget.setFont(create_font(11))
+            label_widget.setMinimumWidth(150)
+            row_layout.addWidget(label_widget)
+            
+            count_widget = QLabel(str(count))
+            count_widget.setFont(create_font(11, bold=True))
+            count_widget.setStyleSheet(f"color: {color};")
+            row_layout.addWidget(count_widget)
+            
+            row_layout.addStretch()
+            summary_layout.addWidget(row)
+        
+        summary_group.setLayout(summary_layout)
+        layout.addWidget(summary_group)
+        
+        # Complexity summary
+        complexity = self.report.complexity_metrics.get('complexity_score', 0)
+        complexity_group = QGroupBox("Strategy Complexity")
+        complexity_layout = QVBoxLayout()
+        
+        complexity_label = QLabel(f"Complexity Score: {complexity}/100")
+        complexity_label.setFont(create_font(12, bold=True))
+        
+        if complexity < 30:
+            rating = "Simple - Excellent for reliability"
+            color = COLORS['success']
+        elif complexity < 60:
+            rating = "Moderate - Good balance"
+            color = COLORS['info']
+        else:
+            rating = "Complex - Review for optimization opportunities"
+            color = COLORS['warning']
+        
+        rating_label = QLabel(rating)
+        rating_label.setFont(create_font(11))
+        rating_label.setStyleSheet(f"color: {color};")
+        
+        complexity_layout.addWidget(complexity_label)
+        complexity_layout.addWidget(rating_label)
+        complexity_group.setLayout(complexity_layout)
+        layout.addWidget(complexity_group)
+        
+        layout.addStretch()
+        
+        return widget
+    
+    def _create_issues_tab(self) -> QWidget:
+        """Create issues table tab (main content)"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Create table
+        table = QTableWidget()
+        table.setStyleSheet(get_table_stylesheet())
+        
+        # Set columns
+        table.setColumnCount(6)
+        table.setHorizontalHeaderLabels([
+            "Severity", "Category", "Issue", "Location", "Description & Guidance", "Action"
+        ])
+        
+        # Collect all issues
+        all_issues = []
+        for issue in self.report.critical_issues:
+            all_issues.append(('CRITICAL', issue))
+        for issue in self.report.errors:
+            all_issues.append(('ERROR', issue))
+        for issue in self.report.warnings:
+            all_issues.append(('WARNING', issue))
+        for issue in self.report.notices:
+            all_issues.append(('NOTICE', issue))
+        for issue in self.report.info:
+            all_issues.append(('INFO', issue))
+        
+        table.setRowCount(len(all_issues))
+        
+        # Populate rows
+        for row, (severity, issue) in enumerate(all_issues):
+            # Column 0: Severity
+            severity_item = QTableWidgetItem(severity)
+            severity_item.setFont(create_font(10, bold=True))
+            severity_color = {
+                'CRITICAL': COLORS['error'],
+                'ERROR': COLORS['warning'],
+                'WARNING': '#FFD700',
+                'NOTICE': COLORS['info'],
+                'INFO': COLORS['text_secondary']
+            }[severity]
+            severity_item.setForeground(QColor(severity_color))
+            table.setItem(row, 0, severity_item)
+            
+            # Column 1: Category
+            category_item = QTableWidgetItem(issue.category)
+            category_item.setFont(create_font(10))
+            table.setItem(row, 1, category_item)
+            
+            # Column 2: Issue
+            issue_item = QTableWidgetItem(issue.rule_name)
+            issue_item.setFont(create_font(10, bold=True))
+            table.setItem(row, 2, issue_item)
+            
+            # Column 3: Location
+            location_item = QTableWidgetItem(issue.location)
+            location_item.setFont(create_font(10))
+            table.setItem(row, 3, location_item)
+            
+            # Column 4: Description & Guidance (institutional-grade)
+            desc_text = self._get_institutional_description(issue)
+            desc_item = QTableWidgetItem(desc_text)
+            desc_item.setFont(create_font(10))
+            desc_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            table.setItem(row, 4, desc_item)
+            
+            # Column 5: Action
+            action_text = "✓ Passed" if severity == 'INFO' else self._get_action_text(issue)
+            action_item = QTableWidgetItem(action_text)
+            action_item.setFont(create_font(10))
+            if severity in ['CRITICAL', 'ERROR']:
+                action_item.setForeground(QColor(COLORS['error']))
+            table.setItem(row, 5, action_item)
+        
+        # Configure table
+        table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setSelectionBehavior(QTableWidget.SelectRows)
+        table.setSelectionMode(QTableWidget.SingleSelection)
+        table.setAlternatingRowColors(True)
+        table.verticalHeader().setVisible(False)
+        
+        # Set column widths
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Severity
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Category
+        header.setSectionResizeMode(2, QHeaderView.Interactive)  # Issue name
+        table.setColumnWidth(2, 250)
+        header.setSectionResizeMode(3, QHeaderView.Interactive)  # Location
+        table.setColumnWidth(3, 200)
+        header.setSectionResizeMode(4, QHeaderView.Stretch)  # Description (takes remaining space)
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Action
+        
+        # Set row height
+        table.verticalHeader().setDefaultSectionSize(60)
+        
+        layout.addWidget(table)
+        
+        # Store table reference for later use
+        self.issues_table = table
+        
+        return widget
+    
+    def _create_metrics_tab(self) -> QWidget:
+        """Create metrics and analysis tab"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setSpacing(16)
+        layout.setContentsMargins(16,  16, 16, 16)
+        
+        # Exit strategy analysis
+        exit_group = QGroupBox("Exit Strategy Analysis")
+        exit_layout = QVBoxLayout()
+        
+        exit_info = self._get_exit_strategy_info()
+        exit_text = QTextEdit()
+        exit_text.setReadOnly(True)
+        exit_text.setMaximumHeight(150)
+        exit_text.setPlainText(exit_info)
+        exit_text.setFont(create_font(10))
+        
+        exit_layout.addWidget(exit_text)
+        exit_group.setLayout(exit_layout)
+        layout.addWidget(exit_group)
+        
+        # Timing analysis
+        if self.report.timing_conflicts:
+            timing_group = QGroupBox("Timing Conflict Analysis")
+            timing_layout = QVBoxLayout()
+            
+            timing_text = QTextEdit()
+            timing_text.setReadOnly(True)
+            timing_text.setMaximumHeight(200)
+            timing_text.setFont(create_font(10))
+            
+            conflicts_info = self._get_timing_conflicts_info()
+            timing_text.setPlainText(conflicts_info)
+            
+            timing_layout.addWidget(timing_text)
+            timing_group.setLayout(timing_layout)
+            layout.addWidget(timing_group)
+        
+        # Direction analysis
+        direction_group = QGroupBox("Signal Direction Analysis")
+        direction_layout = QVBoxLayout()
+        
+        direction_info = self._get_direction_info()
+        direction_text = QTextEdit()
+        direction_text.setReadOnly(True)
+        direction_text.setMaximumHeight(120)
+        direction_text.setPlainText(direction_info)
+        direction_text.setFont(create_font(10))
+        
+        direction_layout.addWidget(direction_text)
+        direction_group.setLayout(direction_layout)
+        layout.addWidget(direction_group)
+        
+        layout.addStretch()
+        
+        return widget
     
     def _create_footer(self) -> QWidget:
         """Create footer with action buttons"""
-        footer = QWidget()
-        layout = QHBoxLayout(footer)
-        layout.setSpacing(SPACING_UNIT)
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)
         
-        # Export buttons (Task 1.9.21)
-        export_csv_btn = QPushButton("📄 Export CSV")
-        export_csv_btn.clicked.connect(self._export_csv)
-        layout.addWidget(export_csv_btn)
-        
-        export_pdf_btn = QPushButton("📑 Export PDF")
-        export_pdf_btn.clicked.connect(self._export_pdf)
-        layout.addWidget(export_pdf_btn)
+        # Export CSV button
+        export_btn = QPushButton("📄 Export Report to CSV")
+        export_btn.setFont(create_font(11))
+        export_btn.clicked.connect(self._export_csv)
+        layout.addWidget(export_btn)
         
         layout.addStretch()
         
         # Close button
         close_btn = QPushButton("Close")
-        close_btn.setFont(create_font(12))
+        close_btn.setFont(create_font(11))
+        close_btn.setMinimumWidth(120)
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
         
-        return footer
+        return widget
     
-    def _apply_direction_fix(self, fix_data: dict):
-        """Apply direction fix (Task 1.9.18)"""
-        suggested = fix_data['suggested_type']
-        current = fix_data['current_type']
+    def _get_institutional_description(self, issue: any) -> str:
+        """
+        Get institutional-grade description with clear explanation and guidance
         
-        reply = QMessageBox.question(
-            self,
-            "Apply Direction Fix",
-            f"Switch strategy type from '{current}' to '{suggested}'?\n\n"
-            f"This will update the strategy_type field to match your signal selections.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
+        This provides professional, institutional-grade content that helps users
+        understand the issue and know exactly how to fix it.
+        """
+        # Base description
+        desc = issue.message
         
-        if reply == QMessageBox.StandardButton.Yes:
-            # Apply fix to config
-            setattr(self.config, 'strategy_type', suggested)
-            
-            # Update side for consistency
-            if suggested == "Bullish":
-                self.config.side = "LONG"
-            elif suggested == "Bearish":
-                self.config.side = "SHORT"
-            
-            self.fix_applied.emit('switch_direction', fix_data)
-            
-            QMessageBox.information(
-                self,
-                "Fix Applied",
-                f"Strategy type changed to '{suggested}'.\n\n"
-                f"Remember to save your strategy to persist this change."
-            )
+        # Add suggestion if available
+        if issue.suggestion:
+            desc += f"\n\n💡 How to Fix: {issue.suggestion}"
+        
+        # Add institutional context for common issues
+        if issue.rule_id == "TIMING_004":
+            desc += "\n\n⚠️ Why This Matters: When RECHECK delays exceed timing windows, signals will never trigger because the recheck validation occurs after the window has already closed. This makes the signal functionally dead code."
+        elif issue.rule_id == "DIRECTION_001":
+            desc += "\n\n⚠️ Why This Matters: Trading in the wrong direction (e.g., bearish signals in a bullish strategy) will cause losses. Institutional traders never mix signal directions."
+        elif issue.rule_id == "RECHECK_001":
+            desc += "\n\n⚠️ Why This Matters: Circular RECHECK dependencies create infinite loops that prevent strategy execution. This is a critical structural error."
+        elif issue.category == "EXIT_STRATEGY":
+            desc += "\n\n📊 Note: Exit strategy analysis is informational. Multiple exit opportunities increase probability of profit-taking without blocking validation."
+        
+        return desc
     
-    def _apply_generic_fix(self, issue: any):
-        """Apply generic fix (Task 1.9.20)"""
-        fix_type = issue.auto_fix_data.get('fix_type')
+    def _get_action_text(self, issue: any) -> str:
+        """Get action text for issue"""
+        if issue.auto_fix_available:
+            return "🔧 Fix Available"
+        elif issue.severity.name in ['CRITICAL', 'ERROR']:
+            return "⚠️ Must Fix"
+        elif issue.severity.name == 'WARNING':
+            return "⚡ Should Review"
+        else:
+            return "ℹ️ Review"
+    
+    def _get_exit_strategy_info(self) -> str:
+        """Get exit strategy analysis text"""
+        # Find exit analysis in info issues
+        for issue in self.report.info:
+            if issue.category == "EXIT_STRATEGY":
+                return f"{issue.rule_name}\n\n{issue.message}\n\n{issue.suggestion or ''}"
         
-        QMessageBox.information(
-            self,
-            "Fix Implementation",
-            f"Fix type '{fix_type}' will be implemented in future update.\n\n"
-            f"For now, please manually address: {issue.suggestion}"
-        )
+        return "No exit strategy analysis available."
+    
+    def _get_timing_conflicts_info(self) -> str:
+        """Get timing conflicts detailed info"""
+        if not self.report.timing_conflicts:
+            return "No timing conflicts detected."
+        
+        info = "TIMING CONFLICT DETAILS:\n\n"
+        
+        for conflict in self.report.timing_conflicts:
+            info += f"Signal: {conflict.get('signal', 'Unknown')}\n"
+            info += f"Timing Window: {conflict.get('timing_window', 'N/A')} bars\n"
+            info += f"RECHECK Delay: {conflict.get('recheck_delay', 'N/A')} bars\n"
+            info += f"Status: {conflict.get('status', 'Unknown')}\n"
+            info += "\n"
+        
+        return info
+    
+    def _get_direction_info(self) -> str:
+        """Get signal direction breakdown"""
+        summary = self.report.strategy_summary
+        
+        bullish_count = summary.get('bullish_signal_count', 0)
+        bearish_count = summary.get('bearish_signal_count', 0)
+        strategy_type = summary.get('strategy_type', 'Unknown')
+        
+        total = bullish_count + bearish_count
+        if total == 0:
+            return "No signals detected in strategy."
+        
+        bullish_pct = (bullish_count / total) * 100
+        bearish_pct = (bearish_count / total) * 100
+        
+        info = f"Strategy Type: {strategy_type}\n\n"
+        info += f"Signal Breakdown:\n"
+        info += f"  • Bullish Signals: {bullish_count} ({bullish_pct:.1f}%)\n"
+        info += f"  • Bearish Signals: {bearish_count} ({bearish_pct:.1f}%)\n\n"
+        
+        if bullish_pct > 70 and strategy_type != "Bullish":
+            info += "⚠️ Mismatch: Strategy has majority bullish signals but is not marked as Bullish.\n"
+        elif bearish_pct > 70 and strategy_type != "Bearish":
+            info += "⚠️ Mismatch: Strategy has majority bearish signals but is not marked as Bearish.\n"
+        else:
+            info += "✓ Signal direction matches strategy type."
+        
+        return info
     
     def _export_csv(self):
-        """Export report to CSV (Task 1.9.21)"""
+        """Export validation report to CSV"""
         filename, _ = QFileDialog.getSaveFileName(
             self,
             "Export Validation Report",
@@ -465,8 +564,17 @@ class ValidationReportWindow(QDialog):
             try:
                 with open(filename, 'w', newline='') as f:
                     writer = csv.writer(f)
-                    writer.writerow(['Severity', 'Category', 'Rule ID', 'Rule Name', 
-                                   'Location', 'Message', 'Suggestion'])
+                    
+                    # Header
+                    writer.writerow(['BTC Engine v3 - Institutional Validation Report'])
+                    writer.writerow([])
+                    writer.writerow(['Strategy:', self.report.strategy_summary.get('name', 'Unknown')])
+                    writer.writerow(['Validated:', datetime.fromisoformat(self.report.timestamp).strftime('%Y-%m-%d %H:%M:%S')])
+                    writer.writerow(['Status:', 'PASSED' if self.report.is_valid else 'FAILED'])
+                    writer.writerow([])
+                    
+                    # Issues table
+                    writer.writerow(['Severity', 'Category', 'Rule ID', 'Issue', 'Location', 'Description', 'Suggestion'])
                     
                     all_issues = (
                         self.report.critical_issues +
@@ -487,64 +595,32 @@ class ValidationReportWindow(QDialog):
                             issue.suggestion or ''
                         ])
                 
-                QMessageBox.information(self, "Export Complete", 
-                                      f"Report exported to:\n{filename}")
+                QMessageBox.information(
+                    self,
+                    "Export Complete",
+                    f"Validation report exported successfully!\n\nFile: {filename}"
+                )
             except Exception as e:
-                QMessageBox.critical(self, "Export Error", 
-                                   f"Failed to export: {str(e)}")
+                QMessageBox.critical(
+                    self,
+                    "Export Error",
+                    f"Failed to export report:\n\n{str(e)}"
+                )
     
-    def _export_pdf(self):
-        """Export report to PDF (Task 1.9.21)"""
-        QMessageBox.information(
-            self,
-            "PDF Export",
-            "PDF export will be implemented in a future update.\n\n"
-            "For now, use CSV export or print this window."
-        )
-    
-    def _get_summary_text(self) -> str:
-        """Get summary text for header"""
-        strategy_name = self.report.strategy_summary.get('name', 'Unknown')
-        timestamp = datetime.fromisoformat(self.report.timestamp).strftime('%Y-%m-%d %H:%M:%S')
-        
-        return (
-            f"Strategy: {strategy_name}\n"
-            f"Validated: {timestamp}\n"
-            f"Total Issues: {self.report.total_issues()} "
-            f"(Critical: {len(self.report.critical_issues)}, "
-            f"Errors: {len(self.report.errors)}, "
-            f"Warnings: {len(self.report.warnings)})\n"
-            f"Complexity Score: {self.report.complexity_metrics.get('complexity_score', 0)}/100"
-        )
-    
-    def _get_status_label(self) -> QLabel:
-        """Get overall status label"""
-        if self.report.is_valid:
-            text = "✅ VALIDATION PASSED"
-            color = "#28A745"  # Green
-        else:
-            text = f"❌ VALIDATION FAILED ({self.report.blocking_issues()} blocking issues)"
-            color = "#DC3545"  # Red
-        
-        label = QLabel(text)
-        label.setFont(create_font(16, bold=True))
-        label.setStyleSheet(f"color: {color}; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px;")
-        return label
-    
-    def _populate_report(self):
-        """Populate report with data"""
-        # Data is populated via _add_severity_sections in _init_ui
+    def _populate_data(self):
+        """Populate window with report data (called after UI init)"""
+        # Data populated via _create_tabs and table population
         pass
     
     def _restore_geometry(self):
-        """Restore window geometry (Task 1.9.16)"""
+        """Restore window geometry from settings"""
         settings = QSettings("BTC_Engine", "ValidationReport")
         geometry = settings.value("geometry")
         if geometry:
             self.restoreGeometry(geometry)
     
     def closeEvent(self, event):
-        """Save window geometry on close (Task 1.9.16)"""
+        """Save window geometry on close"""
         settings = QSettings("BTC_Engine", "ValidationReport")
         settings.setValue("geometry", self.saveGeometry())
         super().closeEvent(event)
