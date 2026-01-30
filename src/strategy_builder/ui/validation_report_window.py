@@ -757,7 +757,7 @@ class ValidationReportWindow(QDialog):
         flow_text_widget.setReadOnly(True)
         flow_text_widget.setMaximumHeight(300)
         flow_text_widget.setFont(QFont("Courier New", 10))  # Monospace for alignment
-        flow_text_widget.setStyleSheet(f"color: {COLORS['text']}; background-color: {COLORS['bg_input']};")
+        flow_text_widget.setStyleSheet(f"color: {COLORS['text_primary']}; background-color: {COLORS['bg_input']};")
         
         # Generate flow visualization with error handling
         try:
