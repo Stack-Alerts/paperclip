@@ -555,6 +555,13 @@ class DataUpdateModal(QDialog):
         self.countdown_seconds = 3
         self._update_countdown()  # Show initial countdown
         self.countdown_timer.start(1000)  # Update every second
+    def showEvent(self, event):
+        """Called when window is shown - apply hand cursors to all widgets"""
+        super().showEvent(event)
+        from PyQt5.QtCore import QTimer
+        from .styles import apply_hand_cursor_to_buttons
+        QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+
     
     def _update_countdown(self):
         """Update countdown display and close when reaches 0"""

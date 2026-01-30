@@ -1554,6 +1554,14 @@ class StrategyBrowserDialog(QMainWindow):
         # Save splitter sizes (user's preferred table/details ratio)
         settings.setValue("strategyBrowser/splitterSizes", self.content_splitter.saveState())
     
+    def showEvent(self, event):
+        """Called when window is shown - apply hand cursors to all widgets"""
+        super().showEvent(event)
+        # Apply hand cursor AFTER Qt finishes all stylesheet processing
+        from PyQt5.QtCore import QTimer
+        from .styles import apply_hand_cursor_to_buttons
+        QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+    
     def closeEvent(self, event):
         """Handle window close"""
         self._save_settings()

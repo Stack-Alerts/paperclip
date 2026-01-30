@@ -47,6 +47,13 @@ class MainWindow(QMainWindow):
         menubar.addMenu(tools_menu)
         
         self.setMenuBar(menubar)
+    def showEvent(self, event):
+        """Called when window is shown - apply hand cursors to all widgets"""
+        super().showEvent(event)
+        from PyQt5.QtCore import QTimer
+        from .styles import apply_hand_cursor_to_buttons
+        QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+
     
     def show_system_config(self):
         """Show system configuration window"""
