@@ -66,6 +66,10 @@ class ValidationReportWindow(QDialog):
         self.setMinimumSize(1400, 900)
         self.resize(1600, 1000)
         
+        # Make window independent and movable to other screens
+        self.setModal(False)
+        self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
+        
         # Apply main stylesheet
         self.setStyleSheet(get_main_stylesheet())
         
@@ -330,8 +334,9 @@ class ValidationReportWindow(QDialog):
             issue_item.setFont(create_font(10, bold=True))
             table.setItem(row, 2, issue_item)
             
-            # Column 3: Location
-            location_item = QTableWidgetItem(issue.location)
+            # Column 3: Location (formatted hierarchically)
+            formatted_location = self._format_location(issue.location)
+            location_item = QTableWidgetItem(formatted_location)
             location_item.setFont(create_font(10))
             table.setItem(row, 3, location_item)
             
@@ -491,6 +496,39 @@ class ValidationReportWindow(QDialog):
             desc += "\n\n📊 Note: Exit strategy analysis is informational. Multiple exit opportunities increase probability of profit-taking without blocking validation."
         
         return desc
+    
+    def _format_location(self, location: str) -> str:
+        """
+        Format location string hierarchically
+        
+        Input: "Block::hod::Signal::BELOW_HOD"
+        Output: "Block: Hod\n└── Signal: BELOW_HOD"
+        
+        Capitalizes block names for better readability
+        """
+        if not location or '::' not in location:
+            return location
+        
+        parts = location.split('::')
+        formatted_lines = []
+        
+        # Process pairs (label::value)
+        for i in range(0, len(parts), 2):
+            if i + 1 < len(parts):
+                label = parts[i]
+                value = parts[i + 1]
+                
+                # Capitalize block names only (not signal names)
+                if label == "Block":
+                    value = value.capitalize()
+                
+                # Add tree structure indent for nested items
+                if i == 0:
+                    formatted_lines.append(f"{label}: {value}")
+                else:
+                    formatted_lines.append(f"└── {label}: {value}")
+        
+        return '\n'.join(formatted_lines)
     
     def _get_action_text(self, issue: any) -> str:
         """Get action text for issue"""
