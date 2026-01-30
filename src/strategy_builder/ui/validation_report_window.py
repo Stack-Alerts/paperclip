@@ -548,6 +548,7 @@ class ValidationReportWindow(QMainWindow):
         
         # Maximize button
         maximize_btn = QPushButton("🗖 Maximize")
+        set_hand_cursor(maximize_btn)
         maximize_btn.setFixedSize(180, 38)
         maximize_btn.setStyleSheet(f"""
             QPushButton {{
@@ -567,6 +568,7 @@ class ValidationReportWindow(QMainWindow):
         
         # Collapse/Expand button
         toggle_btn = QPushButton("▼ Collapse")
+        set_hand_cursor(toggle_btn)
         toggle_btn.setFixedSize(180, 38)
         toggle_btn.setStyleSheet(f"""
             QPushButton {{
@@ -664,6 +666,7 @@ class ValidationReportWindow(QMainWindow):
         
         # Export CSV button
         export_btn = QPushButton("📄 Export Report to CSV")
+        set_hand_cursor(export_btn)
         export_btn.setFont(create_font(11))
         export_btn.clicked.connect(self._export_csv)
         layout.addWidget(export_btn)
@@ -672,6 +675,7 @@ class ValidationReportWindow(QMainWindow):
         
         # Close button
         close_btn = QPushButton("Close")
+        set_hand_cursor(close_btn)
         close_btn.setFont(create_font(11))
         close_btn.setMinimumWidth(120)
         close_btn.clicked.connect(self.close)  # QMainWindow uses close(), not accept()
