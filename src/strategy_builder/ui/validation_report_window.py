@@ -755,7 +755,8 @@ class ValidationReportWindow(QDialog):
         # Create monospace text area for flow visualization
         flow_text_widget = QTextEdit()
         flow_text_widget.setReadOnly(True)
-        flow_text_widget.setMaximumHeight(300)
+        flow_text_widget.setMinimumHeight(300)  # Minimum height, but can expand
+        # No maxHeight - let it fill available space
         flow_text_widget.setFont(QFont("Courier New", 10))  # Monospace for alignment
         flow_text_widget.setStyleSheet(f"color: {COLORS['text_primary']}; background-color: {COLORS['bg_input']};")
         
@@ -802,7 +803,11 @@ class ValidationReportWindow(QDialog):
         # Process each block
         for block_idx, block in enumerate(self.config.blocks, 1):
             block_logic = getattr(block, 'logic', 'AND')
-            logic_text = "ALL required" if block_logic == "AND" else "ANY one sufficient"
+            # Clearer explanation for OR logic
+            if block_logic == "AND":
+                logic_text = "ALL signals required"
+            else:
+                logic_text = "OPTIONAL - any 1 signal triggers entry"
             
             lines.append(f"📦 BLOCK {block_idx}: {block.name.upper()} ({logic_text})")
             lines.append("")
@@ -838,7 +843,10 @@ class ValidationReportWindow(QDialog):
                 if hasattr(signal, 'recheck_config') and signal.recheck_config:
                     if hasattr(signal.recheck_config, 'enabled') and signal.recheck_config.enabled:
                         delay = getattr(signal.recheck_config, 'bar_delay', 0)
-                        parent = getattr(signal.recheck_config, 'parent_signal', signal.name)
+                        parent = getattr(signal.recheck_config, 'parent_signal', None)
+                        # FIX: If parent is None, default to signal's own name
+                        if not parent:
+                            parent = signal.name
                         
                         lines.append(f"      └── 🔄 RECHECK: Validate '{parent}' after {delay} bars")
                         lines.append(f"          ├── If found: Signal VALID ✓")
@@ -848,10 +856,31 @@ class ValidationReportWindow(QDialog):
                         if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
                             for recheck_idx, recheck in enumerate(signal.recheck_chain, 1):
                                 recheck_delay = getattr(recheck, 'bar_delay', 0)
-                                recheck_parent = getattr(recheck, 'parent_signal', signal.name)
+                                recheck_parent = getattr(recheck, 'parent_signal', None)
+                                # FIX: If parent is None, default to signal's own name
+                                if not recheck_parent:
+                                    recheck_parent = signal.name
                                 indent = "             " + ("   " * recheck_idx)
                                 lines.append(f"{indent}└── 🔄 RECHECK #{recheck_idx+1}: Validate '{recheck_parent}' after {recheck_delay} bars")
                 
+                # Check for signal-level exit conditions
+                if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                    for exit_idx, exit_cond in enumerate(signal.exit_conditions, 1):
+                        exit_signal_name = getattr(exit_cond, 'signal_name', 'Unknown')
+                        exit_percentage = getattr(exit_cond, 'percentage', 0) * 100
+                        exit_mode = getattr(exit_cond, 'exit_mode', 'ABSOLUTE')
+                        lines.append(f"      └── 🚪 EXIT: {exit_signal_name} → Close {exit_percentage:.0f}% ({exit_mode})")
+                
+                lines.append("")
+            
+            # Add block-level exit conditions
+            if hasattr(block, 'exit_conditions') and block.exit_conditions:
+                lines.append("   📍 BLOCK-LEVEL EXITS:")
+                for exit_idx, exit_cond in enumerate(block.exit_conditions, 1):
+                    exit_signal_name = getattr(exit_cond, 'signal_name', 'Unknown')
+                    exit_percentage = getattr(exit_cond, 'percentage', 0) * 100
+                    exit_mode = getattr(exit_cond, 'exit_mode', 'ABSOLUTE')
+                    lines.append(f"      🚪 EXIT #{exit_idx}: {exit_signal_name} → Close {exit_percentage:.0f}% ({exit_mode})")
                 lines.append("")
         
         # Add exit conditions from strategy level
