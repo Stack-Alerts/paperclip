@@ -268,7 +268,7 @@ class ValidationReportWindow(QDialog):
         composition_items = [
             ("Building Blocks", composition_data['blocks'], COLORS['info']),
             ("Total Signals", composition_data['signals'], COLORS['info']),
-            ("RECHECK Conditions", composition_data['rechecks'], COLORS['text_secondary']),
+            ("RECHECK", composition_data['rechecks'], COLORS['text_secondary']),
             ("Exit Conditions", composition_data['exits'], COLORS['success']),
             ("Entry Signals", composition_data['entry_signals'], COLORS['info']),
         ]
