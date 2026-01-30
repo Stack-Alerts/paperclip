@@ -468,68 +468,174 @@ class ValidationReportWindow(QDialog):
         return widget
     
     def _create_metrics_tab(self) -> QWidget:
-        """Create metrics and analysis tab - Matching Summary tab style"""
+        """Create metrics and analysis tab with collapsible sections (like AI Recommendations)"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        layout.setSpacing(16)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(8)
+        layout.setContentsMargins(8, 8, 8, 8)
         
-        # Exit strategy analysis
-        exit_group = QGroupBox("Exit Strategy Analysis")
-        exit_group.setFont(create_font(12, bold=True))  # Match Summary tab group box font
-        exit_layout = QVBoxLayout()
+        # Track all sections for maximize functionality
+        self.metrics_sections = []
         
-        exit_info = self._get_exit_strategy_info()
-        exit_text = QTextEdit()
-        exit_text.setReadOnly(True)
-        exit_text.setMinimumHeight(150)  # Changed from maxHeight to minHeight
-        # No maxHeight - let it expand to show all content
-        exit_text.setPlainText(exit_info)  
-        exit_text.setFont(create_font(11))  # Match Summary tab font (was 10)
+        # Exit strategy analysis - collapsible
+        exit_section = self._create_metrics_collapsible_section(
+            "Exit Strategy Analysis",
+            self._get_exit_strategy_info()
+        )
+        layout.addWidget(exit_section['widget'], 1)
+        self.metrics_sections.append(exit_section)
         
-        exit_layout.addWidget(exit_text, 1)  # Stretch factor 1 - can expand
-        exit_group.setLayout(exit_layout)
-        layout.addWidget(exit_group)
-        
-        # Timing analysis
+        # Timing Conflict analysis - collapsible (if conflicts exist)
         if self.report.timing_conflicts:
-            timing_group = QGroupBox("Timing Conflict Analysis")
-            timing_group.setFont(create_font(12, bold=True))  # Match Summary tab
-            timing_layout = QVBoxLayout()
-            
-            timing_text = QTextEdit()
-            timing_text.setReadOnly(True)
-            timing_text.setMinimumHeight(150)  # Changed from maxHeight to minHeight
-            # No maxHeight - let it expand to show all content
-            timing_text.setFont(create_font(11))  # Match Summary tab font (was 10)
-            
-            conflicts_info = self._get_timing_conflicts_info()
-            timing_text.setPlainText(conflicts_info)
-            
-            timing_layout.addWidget(timing_text, 1)  # Stretch factor 1 - can expand
-            timing_group.setLayout(timing_layout)
-            layout.addWidget(timing_group)
+            timing_section = self._create_metrics_collapsible_section(
+                "Timing Conflict Analysis",
+                self._get_timing_conflicts_info()
+            )
+            layout.addWidget(timing_section['widget'], 1)
+            self.metrics_sections.append(timing_section)
         
-        # Direction analysis
-        direction_group = QGroupBox("Signal Direction Analysis")
-        direction_group.setFont(create_font(12, bold=True))  # Match Summary tab
-        direction_layout = QVBoxLayout()
+        # Signal Direction analysis - collapsible
+        direction_section = self._create_metrics_collapsible_section(
+            "Signal Direction Analysis",
+            self._get_direction_info()
+        )
+        layout.addWidget(direction_section['widget'], 1)
+        self.metrics_sections.append(direction_section)
         
-        direction_info = self._get_direction_info()
-        direction_text = QTextEdit()
-        direction_text.setReadOnly(True)
-        direction_text.setMinimumHeight(120)  # Changed from maxHeight to minHeight
-        # No maxHeight - let it expand to show all content
-        direction_text.setPlainText(direction_info)
-        direction_text.setFont(create_font(11))  # Match Summary tab font (was 10)
-        
-        direction_layout.addWidget(direction_text, 1)  # Stretch factor 1 - can expand
-        direction_group.setLayout(direction_layout)
-        layout.addWidget(direction_group)
-        
-        # NO addStretch() - let panels expand to fill space
+        # NO addStretch() - let sections expand to fill space
         
         return widget
+    
+    def _create_metrics_collapsible_section(self, title: str, content: str) -> dict:
+        """Create a collapsible section for Metrics tab (copied from AI Request Preview pattern)"""
+        from PyQt5.QtWidgets import QFrame, QSizePolicy
+        from PyQt5.QtGui import QFont as QFontImport
+        from PyQt5.QtGui import QTextOption
+        
+        container = QFrame()
+        container.setStyleSheet(f"QFrame {{ background-color: {COLORS['bg_medium']}; border: 1px solid {COLORS['border']}; border-radius: 4px; }}")
+        main_layout = QVBoxLayout(container)
+        main_layout.setContentsMargins(8, 8, 8, 8)
+        main_layout.setSpacing(8)
+        
+        # Header with title and buttons
+        header_layout = QHBoxLayout()
+        
+        # Title - match Strategy Builder blue
+        title_label = QLabel(title)
+        title_label.setStyleSheet("color: #095983; font-weight: bold; font-size: 12pt; border: none; background: transparent;")
+        header_layout.addWidget(title_label)
+        
+        header_layout.addStretch()
+        
+        # Maximize button
+        maximize_btn = QPushButton("🗖 Maximize")
+        maximize_btn.setFixedSize(180, 38)
+        maximize_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['button_primary']};
+                color: white;
+                font-weight: normal;
+                padding: 3px 12px;
+                border-radius: 3px;
+                font-size: 9pt;
+                border: none;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['button_primary_hover']};
+            }}
+        """)
+        header_layout.addWidget(maximize_btn)
+        
+        # Collapse/Expand button
+        toggle_btn = QPushButton("▼ Collapse")
+        toggle_btn.setFixedSize(180, 38)
+        toggle_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['button_secondary']};
+                color: white;
+                font-weight: normal;
+                padding: 3px 12px;
+                border-radius: 3px;
+                font-size: 9pt;
+                border: none;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['button_secondary_hover']};
+            }}
+        """)
+        header_layout.addWidget(toggle_btn)
+        
+        main_layout.addLayout(header_layout)
+        
+        # Text editor
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setFont(QFontImport("Courier New", 10))
+        text_edit.setWordWrapMode(QTextOption.WrapMode.WordWrap)
+        text_edit.setStyleSheet(f"QTextEdit {{ background-color: {COLORS['bg_dark']}; color: {COLORS['text_muted']}; border: 1px solid {COLORS['border']}; padding: 8px; }}")
+        text_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        text_edit.setPlainText(content)
+        main_layout.addWidget(text_edit)
+        
+        # Toggle collapse/expand
+        def toggle_section():
+            is_visible = text_edit.isVisible()
+            if is_visible:
+                # Check if maximized first
+                if is_maximized[0]:
+                    # Restore all sections
+                    for section in self.metrics_sections:
+                        if section['widget'] != container:
+                            section['widget'].setVisible(True)
+                        section['maximize_btn'].setText("🗖 Maximize")
+                    is_maximized[0] = False
+                
+                # Now collapse
+                text_edit.setVisible(False)
+                toggle_btn.setText("▶ Expand")
+                container.setMaximumHeight(60)
+            else:
+                # Expand
+                text_edit.setVisible(True)
+                toggle_btn.setText("▼ Collapse")
+                container.setMaximumHeight(16777215)
+        
+        # Maximize/Minimize toggle
+        is_maximized = [False]
+        
+        def toggle_maximize():
+            if not is_maximized[0]:
+                # Maximize - hide others
+                for section in self.metrics_sections:
+                    if section['widget'] != container:
+                        section['widget'].setVisible(False)
+                    else:
+                        section['widget'].setVisible(True)
+                        section['text_edit'].setVisible(True)
+                        section['toggle_btn'].setText("▼ Collapse")
+                        section['widget'].setMaximumHeight(16777215)
+                        maximize_btn.setText("🗗 Minimize")
+                is_maximized[0] = True
+            else:
+                # Minimize - restore all
+                for section in self.metrics_sections:
+                    section['widget'].setVisible(True)
+                    section['text_edit'].setVisible(True)
+                    section['toggle_btn'].setText("▼ Collapse")
+                    section['widget'].setMaximumHeight(16777215)
+                    section['maximize_btn'].setText("🗖 Maximize")
+                is_maximized[0] = False
+        
+        toggle_btn.clicked.connect(toggle_section)
+        maximize_btn.clicked.connect(toggle_maximize)
+        
+        return {
+            'widget': container,
+            'text_edit': text_edit,
+            'toggle_btn': toggle_btn,
+            'maximize_btn': maximize_btn
+        }
     
     def _create_footer(self) -> QWidget:
         """Create footer with action buttons"""
