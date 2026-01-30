@@ -31,12 +31,10 @@ from src.optimizer_v3.validation.institutional_validator import (
     ValidationReport,
     ValidationSeverity
 )
-from src.strategy_builder.ui.styles import (
-    PRIMARY_COLOR,
-    SECONDARY_COLOR,
-    SPACING_UNIT,
-    create_font
-)
+from src.strategy_builder.ui.styles import COLORS, create_font
+
+# Define spacing unit for layout consistency
+SPACING_UNIT = 8
 
 
 class ValidationReportWindow(QDialog):
@@ -101,7 +99,7 @@ class ValidationReportWindow(QDialog):
         # Scroll area for issues
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {SECONDARY_COLOR}; }}")
+        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: {COLORS['bg_secondary']}; }}")
         
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
@@ -129,7 +127,7 @@ class ValidationReportWindow(QDialog):
         # Title
         title = QLabel("Strategy Validation Report")
         title.setFont(create_font(24, bold=True))
-        title.setStyleSheet(f"color: {PRIMARY_COLOR};")
+        title.setStyleSheet(f"color: {COLORS['info']};")
         layout.addWidget(title)
         
         # Summary stats
