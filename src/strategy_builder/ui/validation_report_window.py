@@ -62,7 +62,7 @@ class ValidationReportWindow(QDialog):
     
     def _init_ui(self):
         """Initialize UI with professional styling"""
-        self.setWindowTitle("BTC Engine v3 - Institutional Validation Report")
+        self.setWindowTitle("BTC Engine v3 - Validation Report")
         self.setMinimumSize(1400, 900)
         self.resize(1600, 1000)
         
@@ -97,23 +97,29 @@ class ValidationReportWindow(QDialog):
         self.setLayout(layout)
     
     def _create_header(self) -> QWidget:
-        """Create header with blue title matching Strategy Browser"""
+        """Create header with title matching main window colors"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        layout.setSpacing(8)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)  # More padding between title and info
+        layout.setContentsMargins(0, 0, 0, 16)  # Extra padding at bottom before status banner
         
-        # Blue title matching Strategy Browser style
-        title = QLabel("💼 Institutional Validation Report")
+        # Title matching main window style (primary color)
+        title = QLabel("💼 Validation Report")
         title.setFont(create_font(18, bold=True))
-        title.setStyleSheet(f"color: {COLORS['info']}; background: transparent;")
+        title.setStyleSheet(f"color: {COLORS['primary']}; background: transparent;")
         layout.addWidget(title)
         
-        # Strategy info
+        # Strategy info with version
         strategy_name = self.report.strategy_summary.get('name', 'Unknown')
+        version = self.report.strategy_summary.get('version', None)
         timestamp = datetime.fromisoformat(self.report.timestamp).strftime('%Y-%m-%d %H:%M:%S')
         
-        info_text = f"Strategy: {strategy_name}  •  Validated: {timestamp}"
+        # Add version to strategy name if available
+        if version:
+            info_text = f"Strategy: {strategy_name} (v{version})  •  Validated: {timestamp}"
+        else:
+            info_text = f"Strategy: {strategy_name}  •  Validated: {timestamp}"
+        
         info_label = QLabel(info_text)
         info_label.setFont(create_font(11))
         info_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
@@ -212,6 +218,10 @@ class ValidationReportWindow(QDialog):
         layout.setSpacing(16)
         layout.setContentsMargins(16, 16, 16, 16)
         
+        # Horizontal layout for Summary and Composition side by side
+        top_row = QHBoxLayout()
+        top_row.setSpacing(16)
+        
         # Issue count summary
         summary_group = QGroupBox("Validation Summary")
         summary_group.setFont(create_font(12, bold=True))
@@ -244,7 +254,7 @@ class ValidationReportWindow(QDialog):
             summary_layout.addWidget(row)
         
         summary_group.setLayout(summary_layout)
-        layout.addWidget(summary_group)
+        top_row.addWidget(summary_group)
         
         # Strategy Composition
         composition_group = QGroupBox("Strategy Composition")
@@ -281,7 +291,9 @@ class ValidationReportWindow(QDialog):
             composition_layout.addWidget(row)
         
         composition_group.setLayout(composition_layout)
-        layout.addWidget(composition_group)
+        top_row.addWidget(composition_group)
+        
+        layout.addLayout(top_row)
         
         # Complexity summary
         complexity = self.report.complexity_metrics.get('complexity_score', 0)
