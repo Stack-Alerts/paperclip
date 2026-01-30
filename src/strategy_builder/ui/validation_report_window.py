@@ -66,9 +66,9 @@ class ValidationReportWindow(QDialog):
         self.setMinimumSize(1400, 900)
         self.resize(1600, 1000)
         
-        # Make window independent and movable to other screens
+        # Make window NON-BLOCKING - user can interact with main window while validation report is open
         self.setModal(False)
-        self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.Window)  # Removed WindowStaysOnTopHint to allow working with main window
         
         # Apply main stylesheet
         self.setStyleSheet(get_main_stylesheet())
@@ -268,7 +268,7 @@ class ValidationReportWindow(QDialog):
         composition_items = [
             ("Building Blocks", composition_data['blocks'], COLORS['info']),
             ("Total Signals", composition_data['signals'], COLORS['info']),
-            ("RECHECK", composition_data['rechecks'], COLORS['text_secondary']),
+            ("Recheck", composition_data['rechecks'], COLORS['text_secondary']),
             ("Exit Conditions", composition_data['exits'], COLORS['success']),
             ("Entry Signals", composition_data['entry_signals'], COLORS['info']),
         ]
