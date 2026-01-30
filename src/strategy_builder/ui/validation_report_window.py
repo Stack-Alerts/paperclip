@@ -753,17 +753,23 @@ class ValidationReportWindow(QDialog):
         flow_layout = QVBoxLayout()
         
         # Create monospace text area for flow visualization
-        flow_text = QTextEdit()
-        flow_text.setReadOnly(True)
-        flow_text.setMaximumHeight(300)
-        flow_text.setFont(QFont("Courier New", 10))  # Monospace for alignment
-        flow_text.setStyleSheet(f"color: {COLORS['text']}; background-color: {COLORS['bg_input']};")
+        flow_text_widget = QTextEdit()
+        flow_text_widget.setReadOnly(True)
+        flow_text_widget.setMaximumHeight(300)
+        flow_text_widget.setFont(QFont("Courier New", 10))  # Monospace for alignment
+        flow_text_widget.setStyleSheet(f"color: {COLORS['text']}; background-color: {COLORS['bg_input']};")
         
-        # Generate flow visualization
-        flow_content = self._generate_strategy_flow()
-        flow_text.setPlainText(flow_content)
+        # Generate flow visualization with error handling
+        try:
+            flow_content = self._generate_strategy_flow()
+            flow_text_widget.setPlainText(flow_content)
+        except Exception as e:
+            # Graceful fallback if flow generation fails
+            error_msg = f"Error generating strategy flow: {str(e)}\n\nPlease check your strategy configuration."
+            flow_text_widget.setPlainText(error_msg)
+            flow_text_widget.setStyleSheet(f"color: {COLORS['error']}; background-color: {COLORS['bg_input']};")
         
-        flow_layout.addWidget(flow_text)
+        flow_layout.addWidget(flow_text_widget)
         flow_group.setLayout(flow_layout)
         
         return flow_group
