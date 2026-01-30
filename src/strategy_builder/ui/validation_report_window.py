@@ -342,6 +342,8 @@ class ValidationReportWindow(QDialog):
             
             # Column 4: Description & Guidance (institutional-grade)
             desc_text = self._get_institutional_description(issue)
+            # Add 1 line padding at the end
+            desc_text += "\n"
             desc_item = QTableWidgetItem(desc_text)
             desc_item.setFont(create_font(10))
             desc_item.setTextAlignment(Qt.AlignLeft | Qt.AlignTop)
@@ -372,10 +374,8 @@ class ValidationReportWindow(QDialog):
         header = table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Severity
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Category
-        header.setSectionResizeMode(2, QHeaderView.Interactive)  # Issue name
-        table.setColumnWidth(2, 250)
-        header.setSectionResizeMode(3, QHeaderView.Interactive)  # Location
-        table.setColumnWidth(3, 200)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Issue - fit to text
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Location - fit to text
         header.setSectionResizeMode(4, QHeaderView.Stretch)  # Description (takes remaining space)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Action
         
