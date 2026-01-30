@@ -1393,12 +1393,13 @@ class StrategyBuilderMainWindow(QMainWindow):
                     self,
                     "Cannot Run Test / Optimize",
                     "Strategy Validation FAILED",
-                    "Your strategy has validation errors that must be fixed before testing.\n\n"
-                    "Steps:\n"
-                    "1. Click 'View Validation Report' to see detailed errors\n"
-                    "2. Fix all blocking issues (marked in RED)\n"
-                    "3. Re-validate your strategy\n"
-                    "4. Return here to run tests and optimize"
+                    "Your strategy failed validation and cannot be tested until all errors are resolved.\n\n"
+                    "Required Actions:\n"
+                    "1. Click the Validate button\n"
+                    "2. Review the validation report\n"
+                    "3. Fix all blocking issues (marked in RED)\n"
+                    "4. Click Validate again to re-check\n"
+                    "5. Return here once validation passes"
                 )
             else:
                 # Validation hasn't been run yet
