@@ -103,10 +103,10 @@ class ValidationReportWindow(QDialog):
         layout.setSpacing(12)  # More padding between title and info
         layout.setContentsMargins(0, 0, 0, 16)  # Extra padding at bottom before status banner
         
-        # Title matching main window style (info color - blue)
+        # Title matching Strategy Browser style (#095983 - teal/blue)
         title = QLabel("💼 Validation Report")
         title.setFont(create_font(18, bold=True))
-        title.setStyleSheet(f"color: {COLORS['info']}; background: transparent;")
+        title.setStyleSheet("color: #095983; font-size: 16pt; font-weight: bold; background: transparent;")
         layout.addWidget(title)
         
         # Strategy info with version
@@ -608,13 +608,19 @@ class ValidationReportWindow(QDialog):
                         if hasattr(signal, 'recheck_conditions') and signal.recheck_conditions:
                             rechecks_count += len(signal.recheck_conditions)
                         
-                        # Count entry signals (signals without exit flag or exit_for empty)
+                        # Count entry signals (signals that are NOT exits)
+                        # A signal is an EXIT if EITHER condition is true:
+                        # 1. is_exit_signal flag is set to True
+                        # 2. exit_for list is populated (targeting entry signals)
                         is_exit = False
-                        if hasattr(signal, 'is_exit_signal'):
-                            is_exit = signal.is_exit_signal
-                        elif hasattr(signal, 'exit_for') and signal.exit_for:
+                        
+                        if hasattr(signal, 'is_exit_signal') and signal.is_exit_signal:
                             is_exit = True
                         
+                        if hasattr(signal, 'exit_for') and signal.exit_for and len(signal.exit_for) > 0:
+                            is_exit = True
+                        
+                        # Only count as entry if NOT an exit signal
                         if not is_exit:
                             entry_signals_count += 1
         
