@@ -583,6 +583,8 @@ class ValidationReportWindow(QDialog):
         """
         Extract strategy composition data from config
         
+        Uses EXACT same counting logic as main window (strategy_info_panel.py)
+        
         Returns counts for:
         - Building blocks
         - Total signals
@@ -604,14 +606,12 @@ class ValidationReportWindow(QDialog):
                     signals_count += len(block.signals)
                     
                     for signal in block.signals:
-                        # Count RECHECKs
-                        if hasattr(signal, 'recheck_conditions') and signal.recheck_conditions:
-                            rechecks_count += len(signal.recheck_conditions)
+                        # Count RECHECKs - EXACT logic from main window
+                        # Check signal.recheck_config.enabled (not recheck_conditions!)
+                        if hasattr(signal, 'recheck_config') and signal.recheck_config and signal.recheck_config.enabled:
+                            rechecks_count += 1
                         
                         # Count entry signals (signals that are NOT exits)
-                        # A signal is an EXIT if EITHER condition is true:
-                        # 1. is_exit_signal flag is set to True
-                        # 2. exit_for list is populated (targeting entry signals)
                         is_exit = False
                         
                         if hasattr(signal, 'is_exit_signal') and signal.is_exit_signal:
@@ -624,9 +624,22 @@ class ValidationReportWindow(QDialog):
                         if not is_exit:
                             entry_signals_count += 1
         
-        # Count exit conditions
+        # Count exit conditions at ALL levels - EXACT logic from main window
+        # Strategy-level exits
         if hasattr(self.config, 'exit_conditions') and self.config.exit_conditions:
-            exits_count = len(self.config.exit_conditions)
+            exits_count += len(self.config.exit_conditions)
+        
+        # Block-level exits
+        if hasattr(self.config, 'blocks'):
+            for block in self.config.blocks:
+                if hasattr(block, 'exit_conditions') and block.exit_conditions:
+                    exits_count += len(block.exit_conditions)
+                
+                # Signal-level exits
+                if hasattr(block, 'signals'):
+                    for signal in block.signals:
+                        if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                            exits_count += len(signal.exit_conditions)
         
         return {
             'blocks': blocks_count,
