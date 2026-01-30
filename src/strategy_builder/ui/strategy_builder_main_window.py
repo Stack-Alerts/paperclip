@@ -1621,8 +1621,9 @@ class StrategyBuilderMainWindow(QMainWindow):
     def showEvent(self, event):
         """Called when window is shown - apply hand cursors to all widgets"""
         super().showEvent(event)
-        # Apply hand cursor after window is fully displayed with all widgets created
-        apply_hand_cursor_to_buttons(self)
+        # Apply hand cursor AFTER Qt finishes all stylesheet processing
+        # Qt may reapply stylesheets after showEvent, so delay cursor setting
+        QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
     
     def closeEvent(self, event):
         """Handle window close event."""
