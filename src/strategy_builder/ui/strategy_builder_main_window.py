@@ -132,7 +132,8 @@ class StrategyBuilderMainWindow(QMainWindow):
         QTimer.singleShot(1500, self._start_auto_update_system)
         
         # Apply hand cursor to all buttons (professional UI polish)
-        apply_hand_cursor_to_buttons(self)
+        # Use QTimer to ensure all widgets are fully created first
+        QTimer.singleShot(100, lambda: apply_hand_cursor_to_buttons(self))
     
     def _init_ui(self):
         """Initialize the user interface layout."""
