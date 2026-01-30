@@ -1287,10 +1287,6 @@ class ValidationReportWindow(QMainWindow):
         lines.append("POSITION OPENING LOGIC - INSTITUTIONAL-GRADE CONFLUENCE SYSTEM")
         lines.append("=" * 80)
         lines.append("")
-        lines.append("⚠️  CRITICAL: Strategy opens EXACTLY ONE POSITION using CONFLUENCE SCORING")
-        lines.append("")
-        lines.append("NOT based on 'blocks satisfied' - based on TOTAL CONFLUENCE POINTS:")
-        lines.append("")
         
         # Count REQUIRED vs OPTIONAL blocks
         required_blocks = [b for b in self.config.blocks if getattr(b, 'logic', 'AND') == 'AND']
