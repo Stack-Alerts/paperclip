@@ -751,7 +751,7 @@ class StrategyBrowserDialog(QMainWindow):
             strategy_exits = []
         
         html_lines = []
-        html_lines.append("<b>Signals:</b><br>")
+        # No header - start directly with signals to maximize space
         
         signal_counter = 1
         for block in blocks:
