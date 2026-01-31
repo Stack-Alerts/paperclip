@@ -1347,7 +1347,8 @@ class ValidationReportWindow(QMainWindow):
         lines.append("Real-World Scenarios:")
         lines.append("")
         lines.append("Scenario A: All REQUIRED blocks fire (high confidence)")
-        for idx, block in enumerate(required_blocks[:2], 1):
+        # FIXED: Show ALL required blocks, not just first 2
+        for idx, block in enumerate(required_blocks, 1):
             lines.append(f"   • Block {idx} ({block.name.upper()}): ALL signals ✓ → +{len(block.signals) * 10} pts")
         if len(optional_blocks) > 0:
             lines.append(f"   • Optional blocks: Not needed")
