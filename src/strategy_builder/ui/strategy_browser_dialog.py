@@ -261,12 +261,72 @@ class StrategyBrowserDialog(QMainWindow):
         self.detail_labels['meta'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
         details_layout.addWidget(self.detail_labels['meta'], 3, 0, 1, 1)
         
-        # Column 2: Configuration
+        # Column 2: Configuration (with help icon + tooltip)
+        col2_header = QWidget()
+        col2_header_layout = QHBoxLayout(col2_header)
+        col2_header_layout.setContentsMargins(0, 0, 0, 0)
+        col2_header_layout.setSpacing(6)
+        
         col2_title = QLabel("⚙️ CONFIGURATION")
         col2_title.setFont(create_font(10, bold=True))
-        # Use exact GroupBox title color from styles.py
         col2_title.setStyleSheet("color: #095983; padding-bottom: 8px;")
-        details_layout.addWidget(col2_title, 0, 1)
+        col2_header_layout.addWidget(col2_title)
+        
+        # INSTITUTIONAL-GRADE HELP ICON with comprehensive tooltip
+        help_icon = QLabel("ℹ️")
+        help_icon.setFont(create_font(10, bold=True))
+        help_icon.setStyleSheet("color: #095983; padding-bottom: 8px; cursor: help;")
+        help_icon.setToolTip(
+            "<b>CUMULATIVE EXIT PERCENTAGE EXPLAINED</b><br><br>"
+            
+            "<b>What the 'Exits: XX%' badge means:</b><br>"
+            "Shows the total exit percentage from ALL binding levels that apply to each signal.<br><br>"
+            
+            "<b>⚠️ IMPORTANT: Per-Signal (NOT Sequential)</b><br>"
+            "• Each signal's exit percentage is INDEPENDENT<br>"
+            "• NOT 'first signal exits 50%, then second exits 66% of remaining'<br>"
+            "• Each signal has its own complete exit strategy<br><br>"
+            
+            "<b>How It's Calculated (Cumulative Sum):</b><br>"
+            "Total = Signal-Level + Block-Level + Strategy-Level<br><br>"
+            
+            "<b>Example Breakdown:</b><br>"
+            "<span style='color: #4ADE80;'>Signal 1: HOD_REJECTION [AND] Exits: 50%</span><br>"
+            "  └ VWAP_CROSS_UP (15%, FLEXIBLE) [🟡 SIGNAL]<br>"
+            "  └ AT_ASIA_50 (50%, FLEXIBLE) [🟩 BLOCK]<br>"
+            "  └ BULLISH (0%, FLEXIBLE) [🟩 BLOCK]<br>"
+            "  <b>Total: 15% + 50% + 0% = 65%</b> (badge shows 50% if only block exits counted)<br><br>"
+            
+            "<span style='color: #60A5FA;'>Signal 3: BEARISH [OR] Exits: 165%</span><br>"
+            "  └ 0% from Signal-Level exits<br>"
+            "  └ 50% from Block-Level exits (AT_ASIA_50)<br>"
+            "  └ 115% from Strategy-Level exits (BULLISH_BREAKER + BULLISH_CROSS)<br>"
+            "  <b>Total: 0% + 50% + 115% = 165%</b><br><br>"
+            
+            "<b>Why Can It Exceed 100%?</b><br>"
+            "Multiple exit conditions from different binding levels can stack:<br>"
+            "• Signal-level exits (🟡): Apply only to that specific signal<br>"
+            "• Block-level exits (🟩): Apply to ALL signals in that block<br>"
+            "• Strategy-level exits (🔷): Apply to ALL signals in entire strategy<br><br>"
+            
+            "<b>Binding Level Colors:</b><br>"
+            "🟡 SIGNAL = Only this signal<br>"
+            "🟩 BLOCK = All signals in this block<br>"
+            "🔷 STRATEGY = All signals everywhere<br><br>"
+            
+            "<b>Exit Modes:</b><br>"
+            "<span style='color: #FF6B6B;'>• ABSOLUTE:</span> Exit X% of total position size<br>"
+            "<span style='color: #FF6B6B;'>• FLEXIBLE:</span> Exit X% of remaining position<br><br>"
+            
+            "<b>Institutional-Grade Interpretation:</b><br>"
+            "The badge lets you quickly assess exit coverage per signal.<br>"
+            "Higher % = More comprehensive exit strategy<br>"
+            "Lower % = More aggressive position holding strategy"
+        )
+        col2_header_layout.addWidget(help_icon)
+        col2_header_layout.addStretch()
+        
+        details_layout.addWidget(col2_header, 0, 1)
         
         # Configuration signals - wrap in scroll area for overflow
         blocks_scroll = QScrollArea()
