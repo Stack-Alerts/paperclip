@@ -493,16 +493,27 @@ class StrategyBrowserDialog(QMainWindow):
                                 if len(blocks_data) > 3:
                                     blocks_summary += f" + {len(blocks_data) - 3} more"
                         
-                        # Detect strategy type from name
+                        # Detect strategy type from name (comprehensive keyword matching)
                         name_upper = latest['name'].upper()
-                        if 'BULLISH' in name_upper:
-                            strategy_type = "Bullish"
-                        elif 'BEARISH' in name_upper:
+                        
+                        # Bullish keywords
+                        bullish_keywords = ['BULLISH', 'BULL', 'LONG', 'BUY', 'LOD', 'LOW', 'SUPPORT', 'BOUNCE', 'BOTTOM']
+                        # Bearish keywords  
+                        bearish_keywords = ['BEARISH', 'BEAR', 'SHORT', 'SELL', 'HOD', 'HIGH', 'RESISTANCE', 'REJECTION', 'TOP']
+                        
+                        # Check for bullish indicators
+                        is_bullish = any(keyword in name_upper for keyword in bullish_keywords)
+                        # Check for bearish indicators
+                        is_bearish = any(keyword in name_upper for keyword in bearish_keywords)
+                        
+                        # Determine strategy type (bearish takes precedence if both match)
+                        if is_bearish:
                             strategy_type = "Bearish"
-                        elif 'HOD' in name_upper or 'HIGH' in name_upper or 'RESISTANCE' in name_upper:
-                            strategy_type = "Bearish"  # HOD rejection is bearish
-                        elif 'LOD' in name_upper or 'LOW' in name_upper or 'SUPPORT' in name_upper:
-                            strategy_type = "Bullish"  # LOD rejection is bullish
+                        elif is_bullish:
+                            strategy_type = "Bullish"
+                        else:
+                            # Default to Bearish if no keywords found (most strategies are bearish/short)
+                            strategy_type = "Bearish"
                         
                         # Build enriched display name with HTML color coding
                         display_name = latest['name']
