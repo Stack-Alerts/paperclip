@@ -321,10 +321,14 @@ class StrategyBrowserDialog(QMainWindow):
         details_layout.setColumnStretch(1, 3)  # Configuration - LARGER (1.5x others)
         details_layout.setColumnStretch(2, 2)  # Performance - Compact
         
-        # Set row stretches for better spacing
-        details_layout.setRowStretch(1, 2)
-        details_layout.setRowStretch(2, 2)
-        details_layout.setRowStretch(3, 1)
+        # Set row stretches to match screenshot 1
+        # Row 0: Titles (no stretch)
+        # Row 1: Compact - name/tests (minimal height)
+        # Row 2: LARGE - description/blocks/performance (MOST space)
+        # Row 3: Compact - meta/signals/status (minimal height)
+        details_layout.setRowStretch(1, 0)  # Row 1: COMPACT (no stretch)
+        details_layout.setRowStretch(2, 1)  # Row 2: LARGE (gets all extra space)
+        details_layout.setRowStretch(3, 0)  # Row 3: COMPACT (no stretch)
         
         # Create vertical splitter for table + details (resizable like main window)
         content_splitter = QSplitter(Qt.Orientation.Vertical)
