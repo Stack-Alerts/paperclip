@@ -21,7 +21,7 @@ Date: 2026-01-16
 from typing import Optional
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QAction, QToolBar, QStatusBar, QFileDialog, QMessageBox
+    QAction, QToolBar, QStatusBar, QFileDialog, QMessageBox, QLabel
 )
 from PyQt5.QtCore import Qt, QSize, QSettings, QTimer
 from PyQt5.QtGui import QIcon, QKeySequence, QFont
