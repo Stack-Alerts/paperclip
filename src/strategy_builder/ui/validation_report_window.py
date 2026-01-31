@@ -31,8 +31,9 @@ from src.optimizer_v3.validation.institutional_validator import (
 )
 from src.strategy_builder.ui.styles import (
     COLORS, create_font, get_main_stylesheet,
-    get_table_stylesheet, get_tab_widget_stylesheet,
-    apply_hand_cursor_to_buttons
+    get_primary_button_stylesheet, get_secondary_button_stylesheet,
+    get_table_stylesheet, get_text_edit_stylesheet, get_scroll_area_stylesheet,
+    get_tab_widget_stylesheet, set_hand_cursor, apply_hand_cursor_to_buttons
 )
 
 
