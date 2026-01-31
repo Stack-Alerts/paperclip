@@ -956,11 +956,8 @@ class StrategyBrowserDialog(QMainWindow):
             self.detail_labels['blocks'].setText(signal_hierarchy_html)
             
             # Signals summary with actual counts (Sprint 1.8 - exits are exit_conditions now)
-            risk_mgmt = version.get('risk_management', {})
-            
             sig_text = f"<b>Entry:</b> {total_entry_signals} signal{'s' if total_entry_signals != 1 else ''}<br>"
-            sig_text += f"<b>Exit:</b> {total_exit_conditions} condition{'s' if total_exit_conditions != 1 else ''}<br>"
-            sig_text += f"<b>Risk:</b> SL/TP configured" if risk_mgmt else "<b>Risk:</b> Not set"
+            sig_text += f"<b>Exit:</b> {total_exit_conditions} condition{'s' if total_exit_conditions != 1 else ''}"
             self.detail_labels['signals'].setText(sig_text)
             
             # Column 3: Performance & Metrics
