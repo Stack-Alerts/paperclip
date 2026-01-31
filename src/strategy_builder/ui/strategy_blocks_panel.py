@@ -142,6 +142,7 @@ class BlockConfigItem(QWidget):
         move_layout.addStretch()  # Push buttons to the right
 
         self.up_button = QPushButton("▴")  # Sharp small triangle up
+        set_hand_cursor(self.up_button)
         self.up_button.setMaximumWidth(40)
         self.up_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
         self.up_button.setToolTip("Move block up")
@@ -150,6 +151,7 @@ class BlockConfigItem(QWidget):
         move_layout.addWidget(self.up_button)
 
         self.down_button = QPushButton("▾")  # Sharp small triangle down
+        set_hand_cursor(self.down_button)
         self.down_button.setMaximumWidth(40)
         self.down_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
         self.down_button.setToolTip("Move block down")
