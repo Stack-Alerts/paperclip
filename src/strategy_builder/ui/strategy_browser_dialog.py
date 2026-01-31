@@ -861,8 +861,9 @@ class StrategyBrowserDialog(QMainWindow):
             # Show the panel
             self.details_frame.setVisible(True)
             
-            # Trigger smart resize calculation after content is set
-            self._recalculate_details_stretches()
+            # NOTE: Do NOT call _recalculate_details_stretches() here!
+            # It causes columns to change width when switching strategies.
+            # Columns should remain equal width (1:1:1) as set in _init_ui()
             
         except Exception as e:
             print(f"Error populating details: {e}")
