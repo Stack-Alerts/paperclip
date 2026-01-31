@@ -180,7 +180,7 @@ class StrategyBrowserDialog(QMainWindow):
         self.table = QTableWidget()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels([
-            "Strategy Name", "Type", "Version", "Last Modified", "Tests", "Performance"
+            "Strategy Name", "Type", "Version", "Last Modified", "Validation", "Published"
         ])
         self.table.setStyleSheet(get_table_stylesheet())
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -629,15 +629,26 @@ class StrategyBrowserDialog(QMainWindow):
             modified_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(row, 3, modified_item)
             
-            # Tests (centered)
-            tests_item = QTableWidgetItem(str(strategy['test_count']))
-            tests_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 4, tests_item)
+            # Validation status (centered)
+            # TODO: Get actual validation status from database metadata
+            # For now, default to "Un-Validated"
+            validation_status = strategy.get('validation_status', 'Un-Validated')
+            validation_item = QTableWidgetItem(validation_status)
+            validation_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            # Color coding: Un-Validated (gray), Pass (green), Fail (red)
+            if validation_status == 'Pass':
+                validation_item.setForeground(QFont().defaultFamily())  # Will use green from styles
+            elif validation_status == 'Fail':
+                validation_item.setForeground(QFont().defaultFamily())  # Will use red from styles
+            self.table.setItem(row, 4, validation_item)
             
-            # Performance (centered)
-            perf_item = QTableWidgetItem(strategy['performance'])
-            perf_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 5, perf_item)
+            # Published status (centered)
+            # TODO: Get actual published status from database
+            # For now, all strategies are "Draft" (Published feature not yet developed)
+            published_status = strategy.get('published_status', 'Draft')
+            published_item = QTableWidgetItem(published_status)
+            published_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 5, published_item)
         
         self._update_count_label(len(strategies))
     
