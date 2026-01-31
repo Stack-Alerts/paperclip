@@ -312,15 +312,23 @@ class StrategyBrowserDialog(QMainWindow):
         self.detail_labels['status'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
         details_layout.addWidget(self.detail_labels['status'], 3, 2, 1, 1)
         
-        # Set column stretches for equal width
-        details_layout.setColumnStretch(0, 1)
-        details_layout.setColumnStretch(1, 1)
-        details_layout.setColumnStretch(2, 1)
+        # Set column stretches to match screenshot 1 proportions
+        # Strategy Info: Compact (~30%)
+        # Configuration: LARGER (~45%) - needs space for signal hierarchy
+        # Performance: Compact (~25%)
+        # Ratio 2:3:2 gives Configuration 43% of space (3/7)
+        details_layout.setColumnStretch(0, 2)  # Strategy Info - Compact
+        details_layout.setColumnStretch(1, 3)  # Configuration - LARGER (1.5x others)
+        details_layout.setColumnStretch(2, 2)  # Performance - Compact
         
-        # Set row stretches for better spacing
-        details_layout.setRowStretch(1, 2)
-        details_layout.setRowStretch(2, 2)
-        details_layout.setRowStretch(3, 1)
+        # Set row stretches to match screenshot 1
+        # Row 0: Titles (no stretch)
+        # Row 1: Compact - name/tests (minimal height)
+        # Row 2: LARGE - description/blocks/performance (MOST space)
+        # Row 3: Compact - meta/signals/status (minimal height)
+        details_layout.setRowStretch(1, 0)  # Row 1: COMPACT (no stretch)
+        details_layout.setRowStretch(2, 1)  # Row 2: LARGE (gets all extra space)
+        details_layout.setRowStretch(3, 0)  # Row 3: COMPACT (no stretch)
         
         # Create vertical splitter for table + details (resizable like main window)
         content_splitter = QSplitter(Qt.Orientation.Vertical)
@@ -861,8 +869,9 @@ class StrategyBrowserDialog(QMainWindow):
             # Show the panel
             self.details_frame.setVisible(True)
             
-            # Trigger smart resize calculation after content is set
-            self._recalculate_details_stretches()
+            # NOTE: Do NOT call _recalculate_details_stretches() here!
+            # It causes columns to change width when switching strategies.
+            # Columns should remain equal width (1:1:1) as set in _init_ui()
             
         except Exception as e:
             print(f"Error populating details: {e}")
@@ -1553,6 +1562,14 @@ class StrategyBrowserDialog(QMainWindow):
         settings.setValue("strategyBrowser/windowState", self.saveState())
         # Save splitter sizes (user's preferred table/details ratio)
         settings.setValue("strategyBrowser/splitterSizes", self.content_splitter.saveState())
+    
+    def showEvent(self, event):
+        """Called when window is shown - apply hand cursors to all widgets"""
+        super().showEvent(event)
+        # Apply hand cursor AFTER Qt finishes all stylesheet processing
+        from PyQt5.QtCore import QTimer
+        from .styles import apply_hand_cursor_to_buttons
+        QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
     
     def closeEvent(self, event):
         """Handle window close"""
