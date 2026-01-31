@@ -275,7 +275,8 @@ class StrategyBrowserDialog(QMainWindow):
         # INSTITUTIONAL-GRADE HELP ICON with comprehensive tooltip
         help_icon = QLabel("ℹ️")
         help_icon.setFont(create_font(10, bold=True))
-        help_icon.setStyleSheet("color: #095983; padding-bottom: 8px; cursor: help;")
+        help_icon.setStyleSheet("color: #095983; padding-bottom: 8px;")
+        help_icon.setCursor(Qt.CursorShape.WhatsThisCursor)  # Show help cursor on hover
         help_icon.setToolTip(
             "<b>CUMULATIVE EXIT PERCENTAGE EXPLAINED</b><br><br>"
             
