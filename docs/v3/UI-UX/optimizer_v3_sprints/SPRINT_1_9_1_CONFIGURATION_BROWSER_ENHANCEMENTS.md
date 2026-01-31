@@ -3,8 +3,8 @@
 
 **Sprint**: 1.9.1  
 **Status**: 📋 AWAITING APPROVAL  
-**Duration**: 1-2 hours (estimated)  
-**Dependencies**: Sprint 1.9 (Validation Framework)  
+**Duration**: 2-3 hours (estimated)  
+**Dependencies**: Sprint 1.9 (Validation Framework), AUTO_FIX_LOGIC_SPECIFICATIONS.md  
 **Priority**: MEDIUM - UI Enhancement (Not Critical Path)
 
 ---
@@ -63,7 +63,13 @@ Enhance the **Strategy Browser's Configuration Panel** to display Sprint 1.8 exi
 ### **Phase 4: Expandable Exit Details (1 task)**
 - [ ] **Task 1.9.1.6**: Implement Collapsible Exit Sections
 
-**Total Tasks: 7** | **Estimated Time: 1-2 hours** | **Status: Awaiting Approval**
+### **Phase 5: Auto-Fix Integration (4 tasks)**
+- [ ] **Task 1.9.1.7**: Implement "Switch Direction" Auto-Fix
+- [ ] **Task 1.9.1.8**: Implement "Reduce RECHECK" Auto-Fix
+- [ ] **Task 1.9.1.9**: Implement "Consolidate Exits" Auto-Fix
+- [ ] **Task 1.9.1.10**: Implement "Remove Dead Code" Auto-Fix
+
+**Total Tasks: 11** | **Estimated Time: 2-3 hours** | **Status: Awaiting Approval**
 
 ---
 
@@ -159,7 +165,130 @@ Enhance the **Strategy Browser's Configuration Panel** to display Sprint 1.8 exi
 
 ---
 
-### **Phase 5: Strategy Browser Location** (Discovery, 1 task)
+### **Phase 5: Auto-Fix Integration** (30-45 min, 4 tasks)
+
+#### Task 1.9.1.7: Implement "Switch Direction" Auto-Fix
+- **REFERENCE**: AUTO_FIX_LOGIC_SPECIFICATIONS.md - Fix 1
+- **TRIGGER**: Strategy direction mismatch detected by validator
+- **DISPLAY**: Show "⚠️ Direction Mismatch" badge in Configuration Panel
+- **ACTION BUTTON**: "🔄 Switch to [Bullish/Bearish]" button
+- **ALGORITHM**:
+  ```python
+  def auto_fix_strategy_type(config: StrategyConfig, suggested_type: str) -> bool:
+      setattr(config, 'strategy_type', suggested_type)
+      if suggested_type == "Bullish":
+          config.side = "LONG"
+      elif suggested_type == "Bearish":
+          config.side = "SHORT"
+      return True
+  ```
+- **UI FLOW**:
+  1. User opens strategy in browser
+  2. Configuration Panel shows direction mismatch warning
+  3. User clicks "Switch Direction" button
+  4. Confirmation dialog: "Switch strategy from Bullish to Bearish?"
+  5. Apply fix → Save strategy → Refresh panel
+- **VALIDATION**: Re-run validation after fix
+- **FEEDBACK**: Show success message: "✅ Direction updated to [Bearish/Bullish]"
+
+#### Task 1.9.1.8: Implement "Reduce RECHECK" Auto-Fix
+- **REFERENCE**: AUTO_FIX_LOGIC_SPECIFICATIONS.md - Fix 2
+- **TRIGGER**: Timing window < RECHECK delay (validator ERROR)
+- **DISPLAY**: Show "⚠️ Timing Conflict" badge on affected signal
+- **ACTION BUTTON**: "⬇️ Reduce RECHECK to {X} bars" button
+- **ALGORITHM**:
+  ```python
+  def auto_fix_recheck_delay(
+      recheck_config: RecheckConfig,
+      timing_window: int,
+      buffer: float = 0.75
+  ) -> bool:
+      safe_delay = max(1, int(timing_window * buffer))
+      recheck_config.bar_delay = safe_delay
+      return True
+  ```
+- **UI FLOW**:
+  1. Configuration Panel highlights signal with timing conflict
+  2. Shows current RECHECK (e.g., 25 bars) vs window (15 candles)
+  3. User clicks "Reduce RECHECK" button
+  4. Confirmation: "Reduce RECHECK from 25 to 11 bars?"
+  5. Apply fix → Save → Refresh
+- **CALCULATION**: Show math: "Window: 15 candles × 75% buffer = 11 bars"
+- **FEEDBACK**: "✅ RECHECK reduced to fit timing window"
+
+#### Task 1.9.1.9: Implement "Consolidate Exits" Auto-Fix
+- **REFERENCE**: AUTO_FIX_LOGIC_SPECIFICATIONS.md - Fix 3
+- **TRIGGER**: Duplicate exit signal_name detected (validator WARNING)
+- **DISPLAY**: Show "⚠️ Duplicate Exits" badge on signal
+- **ACTION BUTTON**: "🔄 Consolidate Exits" button
+- **ALGORITHM**:
+  ```python
+  def auto_fix_duplicate_exits(
+      exit_conditions: List[ExitCondition],
+      signal_name: str
+  ) -> List[ExitCondition]:
+      matching_conditions = [ec for ec in exit_conditions if ec.signal_name == signal_name]
+      if len(matching_conditions) <= 1:
+          return exit_conditions
+      
+      total_percentage = sum(ec.percentage for ec in matching_conditions)
+      merged_mode = "ABSOLUTE" if any(ec.exit_mode == "ABSOLUTE" for ec in matching_conditions) else "FLEXIBLE"
+      
+      consolidated = ExitCondition(
+          signal_name=signal_name,
+          percentage=min(1.0, total_percentage),
+          exit_mode=merged_mode,
+          binding_level=matching_conditions[0].binding_level,
+          tp_proximity_threshold=matching_conditions[0].tp_proximity_threshold,
+          reversal_trigger=matching_conditions[0].reversal_trigger,
+          recheck_config=matching_conditions[0].recheck_config
+      )
+      
+      new_conditions = [ec for ec in exit_conditions if ec.signal_name != signal_name]
+      new_conditions.append(consolidated)
+      return new_conditions
+  ```
+- **UI FLOW**:
+  1. Show list of duplicate exits with percentages
+  2. Preview consolidated result
+  3. User clicks "Consolidate" button
+  4. Confirmation showing before/after
+  5. Apply fix → Save → Refresh
+- **FEEDBACK**: "✅ Consolidated 3 exits into 1 (80% total)"
+
+#### Task 1.9.1.10: Implement "Remove Dead Code" Auto-Fix
+- **REFERENCE**: AUTO_FIX_LOGIC_SPECIFICATIONS.md - Fix 4
+- **TRIGGER**: Unreachable signals detected (validator WARNING)
+- **DISPLAY**: Show "⚠️ Dead Code" badge with strikethrough styling
+- **ACTION BUTTON**: "🗑️ Disable Signal" button
+- **ALGORITHM**:
+  ```python
+  def auto_fix_dead_code(
+      block: BlockConfig,
+      dead_signal_names: List[str],
+      preserve_history: bool = True
+  ) -> bool:
+      for signal in block.signals:
+          if signal.name in dead_signal_names:
+              if preserve_history:
+                  signal.enabled = False  # Mark disabled
+              else:
+                  block.signals.remove(signal)  # Remove completely
+      return True
+  ```
+- **UI FLOW**:
+  1. Configuration Panel shows dead signal grayed out
+  2. Explanation: "Never triggers due to timing/logic constraints"
+  3. User clicks "Disable Signal" button
+  4. Confirmation: "Disable unreachable signal?"
+  5. Apply fix → Signal marked disabled → Refresh
+- **DEFAULT**: Preserve signals (set enabled=False)
+- **OPTION**: Checkbox "Delete permanently" for full removal
+- **FEEDBACK**: "✅ Signal disabled (preserved for reference)"
+
+---
+
+### **Phase 0: Discovery** (Discovery, 1 task)
 
 #### Task 1.9.1.0: Locate Strategy Browser - Configuration Panel Component
 - **ACTION**: Find Strategy Browser's Configuration Panel signal tree rendering code
