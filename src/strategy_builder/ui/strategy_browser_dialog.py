@@ -764,6 +764,7 @@ class StrategyBrowserDialog(QMainWindow):
             for signal in signals:
                 signal_name = signal.get('name', 'Unknown')
                 signal_logic = signal.get('logic', 'AND')
+                building_block = signal.get('building_block', None)  # NEW: Get building block name
                 
                 # Calculate cumulative exit percentage (Task 1.9.1.5)
                 cumulative_exit_pct = self._calculate_cumulative_exits_for_signal(
@@ -779,10 +780,12 @@ class StrategyBrowserDialog(QMainWindow):
                 else:
                     exit_badge = ''
                 
-                # Signal line with AND/OR badge and cumulative exit badge  
-                # BUG FIX: Use actual signal_logic, not hardcoded [AND]
+                # NEW: Add building block name if available
+                block_name_display = f" ({building_block})" if building_block else ""
+                
+                # Signal line with AND/OR badge, building block name, and cumulative exit badge  
                 logic_color = "#4ADE80" if signal_logic == "AND" else "#60A5FA"
-                signal_line = f'<span style="color: {logic_color};">{signal_counter}. {signal_name} [{signal_logic}]{exit_badge}</span>'
+                signal_line = f'<span style="color: {logic_color};">{signal_counter}. {signal_name}{block_name_display} [{signal_logic}]{exit_badge}</span>'
                 html_lines.append(signal_line)
                 
                 # TIME CONSTRAINT (if exists)
@@ -813,42 +816,50 @@ class StrategyBrowserDialog(QMainWindow):
                                     nested_line = f'<span style="color: #60A5FA;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── RECHECK {target} ({nested_delay} bars)</span>'
                                     html_lines.append(nested_line)
                 
-                # EXIT CONDITIONS (Sprint 1.9.1 - Task 1.9.1.1)
-                # Display ALL exit conditions: strategy-level, block-level, and signal-level
-                # All exits shown in RED per user requirement
+                # SIGNAL-LEVEL EXIT CONDITIONS ONLY (shown under each signal)
+                # Block and strategy exits shown later to avoid duplication
                 exit_icon = get_exit_icon()
-                all_exits = []
-                
-                # Collect all exits that apply to this signal
-                # 1. Signal-level exits
                 signal_exits = signal.get('exit_conditions', [])
-                for exit_cond in signal_exits:
-                    all_exits.append((exit_cond, 'SIGNAL', '🟡'))
                 
-                # 2. Block-level exits (apply to all signals in this block)
-                block_exits = block.get('exit_conditions', [])
-                for exit_cond in block_exits:
-                    all_exits.append((exit_cond, 'BLOCK', '🟩'))
-                
-                # 3. Strategy-level exits (apply to ALL signals in entire strategy)
-                # BUG FIX: Now passed as parameter instead of being unavailable
-                for exit_cond in strategy_exits:
-                    all_exits.append((exit_cond, 'STRATEGY', '🔷'))
-                
-                # Display all collected exits in RED
-                if all_exits:
-                    for exit_cond, binding_level, icon in all_exits:
+                if signal_exits:
+                    for exit_cond in signal_exits:
                         exit_signal_name = exit_cond.get('signal_name', 'Unknown')
-                        exit_percentage = exit_cond.get('percentage', 0) * 100  # Convert to percentage
+                        exit_percentage = exit_cond.get('percentage', 0) * 100
                         exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
                         
-                        # ALL exits in RED (user requirement)
-                        color = '#FF6B6B'  # RED for all exits
-                        
-                        exit_line = f'<span style="color: {color};">&nbsp;&nbsp;&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} ({exit_percentage:.0f}%, {exit_mode}) [{icon} {binding_level}]</span>'
+                        # Signal-level exits in RED
+                        color = '#FF6B6B'
+                        exit_line = f'<span style="color: {color};">&nbsp;&nbsp;&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} ({exit_percentage:.0f}%, {exit_mode}) [🟡 SIGNAL]</span>'
                         html_lines.append(exit_line)
                 
                 signal_counter += 1
+            
+            # BLOCK-LEVEL EXIT CONDITIONS (shown ONCE at end of block)
+            # Apply to ALL signals in this block
+            block_exits = block.get('exit_conditions', [])
+            if block_exits:
+                html_lines.append(f'<br><span style="color: #81C784;"><b>Block-Level Exit Conditions:</b> ({block_name})</span>')
+                for exit_cond in block_exits:
+                    exit_signal_name = exit_cond.get('signal_name', 'Unknown')
+                    exit_percentage = exit_cond.get('percentage', 0) * 100
+                    exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
+                    
+                    color = '#FF6B6B'
+                    exit_line = f'<span style="color: {color};">&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} ({exit_percentage:.0f}%, {exit_mode}) [🟩 BLOCK]</span>'
+                    html_lines.append(exit_line)
+        
+        # STRATEGY-LEVEL EXIT CONDITIONS (shown ONCE at very end)
+        # Apply to ALL signals in entire strategy
+        if strategy_exits:
+            html_lines.append(f'<br><span style="color: #00BCD4;"><b>Strategy Exit Conditions:</b> (Apply to all signals)</span>')
+            for exit_cond in strategy_exits:
+                exit_signal_name = exit_cond.get('signal_name', 'Unknown')
+                exit_percentage = exit_cond.get('percentage', 0) * 100
+                exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
+                
+                color = '#FF6B6B'
+                exit_line = f'<span style="color: {color};">&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} ({exit_percentage:.0f}%, {exit_mode}) [🔷 STRATEGY]</span>'
+                html_lines.append(exit_line)
         
         return "<br>".join(html_lines)
     
