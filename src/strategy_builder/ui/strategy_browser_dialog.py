@@ -203,8 +203,8 @@ class StrategyBrowserDialog(QMainWindow):
         header.resizeSection(1, 240)  # Type
         header.resizeSection(2, 240)  # Version
         header.resizeSection(3, 400)  # Last Modified
-        header.resizeSection(4, 150)  # Tests
-        header.resizeSection(5, 240)  # Performance
+        header.resizeSection(4, 180)  # Validation (fits "Un-Validated")
+        header.resizeSection(5, 160)  # Published (fits "Published")
         
         # Enable sorting (clickable headers with sort indicators)
         self.table.setSortingEnabled(True)
