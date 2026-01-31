@@ -1217,12 +1217,13 @@ class StrategyBrowserDialog(QMainWindow):
             all_versions = self.db.strategy.get_strategy_versions(self.selected_strategy_id)
             
             # Show choice modal
-            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QRadioButton, QComboBox, QDialogButtonBox, QButtonGroup
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QRadioButton, QComboBox, QDialogButtonBox, QButtonGroup, QListWidget, QListWidgetItem
             
             dialog = QDialog(self)
             dialog.setWindowTitle("Delete Strategy")
             dialog.setStyleSheet(get_main_stylesheet())
-            dialog.setMinimumWidth(450)
+            dialog.setMinimumWidth(500)
+            dialog.setMinimumHeight(400)
             
             layout = QVBoxLayout(dialog)
             layout.setSpacing(16)
@@ -1258,25 +1259,33 @@ class StrategyBrowserDialog(QMainWindow):
             layout.addWidget(option2)
             
             # Version selector (visible by default since option 2 is default)
-            version_label = QLabel("Select version to delete:")
+            # MULTI-SELECT: Allow users to select multiple versions at once
+            version_label = QLabel("Select version(s) to delete (Ctrl+Click for multiple):")
             version_label.setFont(create_font(10))
             version_label.setStyleSheet(f"color: {get_color('text_secondary')};")
             layout.addWidget(version_label)
             
-            version_combo = QComboBox()
+            # Use QListWidget instead of QComboBox for multi-selection
+            version_list = QListWidget()
+            version_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)  # Multi-select with Ctrl/Shift
+            version_list.setMinimumHeight(150)  # Show multiple items
+            version_list.setStyleSheet(get_input_field_stylesheet())
+            
             for ver in all_versions:
-                version_combo.addItem(f"v{ver['version_number']} - {ver['created_at']}", ver['version_id'])
-            # Set current version as default
-            current_index = next((i for i, v in enumerate(all_versions) if v['version_id'] == self.selected_version_id), 0)
-            version_combo.setCurrentIndex(current_index)
-            version_combo.setStyleSheet(get_input_field_stylesheet())
-            layout.addWidget(version_combo)
+                item = QListWidgetItem(f"v{ver['version_number']} - {ver['created_at']}")
+                item.setData(Qt.ItemDataRole.UserRole, ver['version_id'])
+                version_list.addItem(item)
+                # Mark current version as default selection
+                if ver['version_id'] == self.selected_version_id:
+                    item.setSelected(True)
+            
+            layout.addWidget(version_list)
             
             # Show/hide version selector based on selection
             def on_option_changed():
                 show_selector = option2.isChecked()
                 version_label.setVisible(show_selector)
-                version_combo.setVisible(show_selector)
+                version_list.setVisible(show_selector)
             
             option1.toggled.connect(on_option_changed)
             option2.toggled.connect(on_option_changed)
@@ -1307,20 +1316,36 @@ class StrategyBrowserDialog(QMainWindow):
                     from .alert_dialog import show_error
                     show_error(self, "Delete Strategy", "Error", "Strategy not found")
             else:
-                # Delete specific version only
-                selected_version_id = version_combo.currentData()
-                deleted_version = self.db.strategy.get_strategy_version(selected_version_id)
+                # Delete specific versions (MULTI-SELECT support)
+                selected_items = version_list.selectedItems()
                 
-                if deleted_version:
-                    # Delete the version
-                    self.db.strategy.delete_strategy_version(selected_version_id)
-                    
+                if not selected_items:
+                    from .alert_dialog import show_error
+                    show_error(self, "Delete Versions", "Error", "No versions selected")
+                    return
+                
+                # Collect version IDs to delete
+                version_ids_to_delete = []
+                for item in selected_items:
+                    version_id = item.data(Qt.ItemDataRole.UserRole)
+                    version_ids_to_delete.append(version_id)
+                
+                # Delete all selected versions
+                deleted_count = 0
+                for version_id in version_ids_to_delete:
+                    try:
+                        self.db.strategy.delete_strategy_version(version_id)
+                        deleted_count += 1
+                    except Exception as e:
+                        print(f"Failed to delete version {version_id}: {e}")
+                
+                if deleted_count > 0:
                     from .alert_dialog import show_success
-                    show_success(self, "Delete Version", "Success", 
-                               f"Version v{deleted_version['version_number']} deleted successfully")
+                    show_success(self, "Delete Versions", "Success", 
+                               f"Deleted {deleted_count} version{'s' if deleted_count != 1 else ''} successfully")
                 else:
                     from .alert_dialog import show_error
-                    show_error(self, "Delete Version", "Error", "Version not found")
+                    show_error(self, "Delete Versions", "Error", "Failed to delete versions")
             
             # Reload strategies
             self._load_strategies()
