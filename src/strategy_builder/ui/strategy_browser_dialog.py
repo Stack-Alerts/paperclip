@@ -813,13 +813,11 @@ class StrategyBrowserDialog(QMainWindow):
                         exit_percentage = exit_cond.get('percentage', 0) * 100
                         exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
                         
-                        # INSTITUTIONAL-GRADE PRECISION: Use NautilusTrader terminology
-                        # ABSOLUTE = Always relative to INITIAL (entry) position size
-                        # FLEXIBLE = Always relative to CURRENT (at trigger time) position size
+                        # Intelligent label based on exit mode
                         if exit_mode == 'ABSOLUTE':
-                            mode_label = f"Exits {exit_percentage:.0f}% of INITIAL position"
+                            mode_label = f"Exits {exit_percentage:.0f}% of total position"
                         else:  # FLEXIBLE
-                            mode_label = f"Exits {exit_percentage:.0f}% of CURRENT position"
+                            mode_label = f"Exits {exit_percentage:.0f}% of remaining position"
                         
                         # Signal-level exits in RED with intelligent label
                         color = '#FF6B6B'
@@ -838,13 +836,11 @@ class StrategyBrowserDialog(QMainWindow):
                     exit_percentage = exit_cond.get('percentage', 0) * 100
                     exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
                     
-                    # INSTITUTIONAL-GRADE PRECISION: Use NautilusTrader terminology
-                    # ABSOLUTE = Always relative to INITIAL (entry) position size
-                    # FLEXIBLE = Always relative to CURRENT (at trigger time) position size
+                    # Intelligent label based on exit mode
                     if exit_mode == 'ABSOLUTE':
-                        mode_label = f"Exits {exit_percentage:.0f}% of INITIAL position"
+                        mode_label = f"Exits {exit_percentage:.0f}% of total position"
                     else:  # FLEXIBLE
-                        mode_label = f"Exits {exit_percentage:.0f}% of CURRENT position"
+                        mode_label = f"Exits {exit_percentage:.0f}% of remaining position"
                     
                     color = '#FF6B6B'
                     exit_line = f'<span style="color: {color};">&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} - {mode_label} [🟩 BLOCK]</span>'
@@ -859,13 +855,11 @@ class StrategyBrowserDialog(QMainWindow):
                 exit_percentage = exit_cond.get('percentage', 0) * 100
                 exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
                 
-                # INSTITUTIONAL-GRADE PRECISION: Use NautilusTrader terminology
-                # ABSOLUTE = Always relative to INITIAL (entry) position size
-                # FLEXIBLE = Always relative to CURRENT (at trigger time) position size
+                # Intelligent label based on exit mode
                 if exit_mode == 'ABSOLUTE':
-                    mode_label = f"Exits {exit_percentage:.0f}% of INITIAL position"
+                    mode_label = f"Exits {exit_percentage:.0f}% of total position"
                 else:  # FLEXIBLE
-                    mode_label = f"Exits {exit_percentage:.0f}% of CURRENT position"
+                    mode_label = f"Exits {exit_percentage:.0f}% of remaining position"
                 
                 color = '#FF6B6B'
                 exit_line = f'<span style="color: {color};">&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} - {mode_label} [🔷 STRATEGY]</span>'
