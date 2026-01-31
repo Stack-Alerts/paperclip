@@ -75,6 +75,15 @@
 **Status**: ✅ COMPLETE (102/102 tasks, 2026-01-28)  
 **Purpose**: Separate exit conditions from TP/SL, "Add as Exit" button (red), percentage-based exits with ABSOLUTE/FLEXIBLE modes, three binding levels (STRATEGY/BLOCK/SIGNAL), nested RECHECK for exits, full backtest integration
 
+#### **Sprint 1.8.1: Strategy Browser UI Enhancements** (1 hour, 2 tasks)
+**File**: None (ad-hoc UI fixes)  
+**Status**: ✅ COMPLETE (2/2 tasks, 2026-01-31, 1 hour)  
+**Purpose**: Strategy Builder drag bar styling, Strategy Browser details panel layout fixes
+**Commits**: 5 commits (7badfa8, bce9823, ca0b6f7, fe936dd, 6a403a8)
+**Tasks Completed**:
+- Task 1: Strategy Builder main window drag bar enhancement (visual indicator, size persistence)
+- Task 2: Strategy Browser details panel layout (column widths 2:3:2, row heights 0:1:0, stable on selection change)
+
 #### **Sprint 1.9: Institutional-Grade Validation Framework** (5-8 hours, 30 tasks)
 **File**: `SPRINT_1_9_VALIDATION_FRAMEWORK.md`  
 **Status**: 📋 DESIGN SPECIFICATION  
@@ -157,6 +166,7 @@
 - [x] Sprint 1.6.1: AI Recommendations Database (15/15 tasks COMPLETE ✅ - 2026-01-29)
 - [x] Sprint 1.7: Nested RECHECK Foundation (14/14 tasks COMPLETE ✅ - 2026-01-22)
 - [x] Sprint 1.8: Exit Conditions Foundation (102/102 tasks COMPLETE ✅ - 2026-01-28)
+- [x] Sprint 1.8.1: Strategy Browser UI Enhancements (2/2 tasks COMPLETE ✅ - 2026-01-31)
 - [ ] Sprint 1.9: Institutional-Grade Validation Framework (30 tasks, 5-8 hours - Design Specification)
 - [ ] Sprint 2.1: Automated Trainer (20 tasks, 10 days)
 - [ ] Sprint 2.2: Signal Intelligence + Nested RECHECK Execution (37 tasks, 12 days)
