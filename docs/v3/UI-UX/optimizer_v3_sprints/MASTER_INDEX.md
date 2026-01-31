@@ -90,12 +90,12 @@
 **Purpose**: Comprehensive strategy validation with 59 rules across 8 categories, RECHECK cycle detection, exit percentage validation, direction mismatch detection, timing conflict detection, dead code detection, one-click fixes
 **Completed**: All validation logic, UI, tests, and documentation complete
 
-#### **Sprint 1.9.1: Configuration Browser Enhancements** (1-2 hours, 7 tasks)
+#### **Sprint 1.9.1: Configuration Browser Enhancements + Auto-Fix Integration** (2-3 hours, 11 tasks)
 **File**: `SPRINT_1_9_1_CONFIGURATION_BROWSER_ENHANCEMENTS.md`  
 **Status**: 📋 AWAITING APPROVAL  
-**Purpose**: Strategy Browser Configuration Panel enhancements - display Sprint 1.8 exit conditions in signal tree
-**Dependencies**: Sprint 1.9 must complete first
-**Scope**: Configuration Panel ONLY (middle section of Strategy Browser window)
+**Purpose**: Strategy Browser Configuration Panel enhancements - display Sprint 1.8 exit conditions in signal tree, implement 4 auto-fix actions from validation framework
+**Dependencies**: Sprint 1.9 (Validation Framework), AUTO_FIX_LOGIC_SPECIFICATIONS.md
+**Scope**: Configuration Panel (middle section of Strategy Browser) + Auto-Fix Integration (Switch Direction, Reduce RECHECK, Consolidate Exits, Remove Dead Code)
 
 ---
 
