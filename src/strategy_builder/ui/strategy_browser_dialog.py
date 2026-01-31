@@ -883,32 +883,45 @@ class StrategyBrowserDialog(QMainWindow):
             blocks = version.get('blocks', [])
             block_count = len(blocks)
             
-            # Count actual signals by looking inside blocks
+            # Count actual signals and exit conditions (Sprint 1.8 - exits are now exit_conditions, not position='exit')
             total_entry_signals = 0
-            total_exit_signals = 0
+            total_exit_conditions = 0
             
+            # Count entry signals (all signals are entries unless marked otherwise)
             for block in blocks:
                 signals = block.get('signals', [])
                 for signal in signals:
                     if isinstance(signal, dict):
-                        position = signal.get('position', 'entry')
-                        if position == 'entry':
-                            total_entry_signals += 1
-                        elif position == 'exit':
-                            total_exit_signals += 1
-                        elif position == 'both':
-                            total_entry_signals += 1
-                            total_exit_signals += 1
+                        # All signals count as entries (Sprint 1.8 removed position field)
+                        total_entry_signals += 1
+            
+            # Count exit conditions at all 3 binding levels (Sprint 1.8 architecture)
+            # 1. Strategy-level exits
+            strategy_exits = version.get('exit_conditions', [])
+            total_exit_conditions += len(strategy_exits)
+            
+            # 2. Block-level exits
+            for block in blocks:
+                block_exits = block.get('exit_conditions', [])
+                total_exit_conditions += len(block_exits)
+            
+            # 3. Signal-level exits
+            for block in blocks:
+                signals = block.get('signals', [])
+                for signal in signals:
+                    if isinstance(signal, dict):
+                        signal_exits = signal.get('exit_conditions', [])
+                        total_exit_conditions += len(signal_exits)
             
             # Use hierarchical signal display (matching Window 1 format)
             signal_hierarchy_html = self._build_signal_hierarchy_html(blocks)
             self.detail_labels['blocks'].setText(signal_hierarchy_html)
             
-            # Signals summary with actual counts
+            # Signals summary with actual counts (Sprint 1.8 - exits are exit_conditions now)
             risk_mgmt = version.get('risk_management', {})
             
             sig_text = f"<b>Entry:</b> {total_entry_signals} signal{'s' if total_entry_signals != 1 else ''}<br>"
-            sig_text += f"<b>Exit:</b> {total_exit_signals} signal{'s' if total_exit_signals != 1 else ''}<br>"
+            sig_text += f"<b>Exit:</b> {total_exit_conditions} condition{'s' if total_exit_conditions != 1 else ''}<br>"
             sig_text += f"<b>Risk:</b> SL/TP configured" if risk_mgmt else "<b>Risk:</b> Not set"
             self.detail_labels['signals'].setText(sig_text)
             
