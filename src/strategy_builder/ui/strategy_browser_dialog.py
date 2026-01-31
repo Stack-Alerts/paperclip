@@ -813,13 +813,15 @@ class StrategyBrowserDialog(QMainWindow):
                         exit_percentage = exit_cond.get('percentage', 0) * 100
                         exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
                         
-                        # Intelligent label based on exit mode
+                        # PROJECT-SPECIFIC: Based on Sprint 1.8 semantics
+                        # ABSOLUTE = Exits immediately when signal fires (no TP consideration)
+                        # FLEXIBLE = Defers exit if heading toward TP, fires on reversal
                         if exit_mode == 'ABSOLUTE':
-                            mode_label = f"Exits {exit_percentage:.0f}% of total position"
+                            mode_label = f"{exit_percentage:.0f}% immediate exit"
                         else:  # FLEXIBLE
-                            mode_label = f"Exits {exit_percentage:.0f}% of remaining position"
+                            mode_label = f"{exit_percentage:.0f}% TP-aware exit"
                         
-                        # Signal-level exits in RED with intelligent label
+                        # Signal-level exits in RED with execution behavior label
                         color = '#FF6B6B'
                         exit_line = f'<span style="color: {color};">&nbsp;&nbsp;&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} - {mode_label} [🟡 SIGNAL]</span>'
                         html_lines.append(exit_line)
@@ -836,11 +838,13 @@ class StrategyBrowserDialog(QMainWindow):
                     exit_percentage = exit_cond.get('percentage', 0) * 100
                     exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
                     
-                    # Intelligent label based on exit mode
+                    # PROJECT-SPECIFIC: Based on Sprint 1.8 semantics
+                    # ABSOLUTE = Exits immediately when signal fires (no TP consideration)
+                    # FLEXIBLE = Defers exit if heading toward TP, fires on reversal
                     if exit_mode == 'ABSOLUTE':
-                        mode_label = f"Exits {exit_percentage:.0f}% of total position"
+                        mode_label = f"{exit_percentage:.0f}% immediate exit"
                     else:  # FLEXIBLE
-                        mode_label = f"Exits {exit_percentage:.0f}% of remaining position"
+                        mode_label = f"{exit_percentage:.0f}% TP-aware exit"
                     
                     color = '#FF6B6B'
                     exit_line = f'<span style="color: {color};">&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} - {mode_label} [🟩 BLOCK]</span>'
@@ -855,11 +859,13 @@ class StrategyBrowserDialog(QMainWindow):
                 exit_percentage = exit_cond.get('percentage', 0) * 100
                 exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
                 
-                # Intelligent label based on exit mode
+                # PROJECT-SPECIFIC: Based on Sprint 1.8 semantics
+                # ABSOLUTE = Exits immediately when signal fires (no TP consideration)
+                # FLEXIBLE = Defers exit if heading toward TP, fires on reversal
                 if exit_mode == 'ABSOLUTE':
-                    mode_label = f"Exits {exit_percentage:.0f}% of total position"
+                    mode_label = f"{exit_percentage:.0f}% immediate exit"
                 else:  # FLEXIBLE
-                    mode_label = f"Exits {exit_percentage:.0f}% of remaining position"
+                    mode_label = f"{exit_percentage:.0f}% TP-aware exit"
                 
                 color = '#FF6B6B'
                 exit_line = f'<span style="color: {color};">&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} - {mode_label} [🔷 STRATEGY]</span>'
