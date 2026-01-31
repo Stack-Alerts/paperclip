@@ -1409,29 +1409,32 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         try:
             from datetime import datetime
+            from src.optimizer_v3.database.models import StrategyVersion
             
             db = get_database_manager()
             
-            # Update the strategy version in database
-            db.strategy.session.execute(
-                """
-                UPDATE strategy_versions
-                SET validation_status = :status,
-                    validation_timestamp = :timestamp
-                WHERE version_id = :version_id
-                """,
-                {
-                    'status': status,
-                    'timestamp': datetime.utcnow(),
-                    'version_id': str(self.current_version_id)
-                }
-            )
-            db.strategy.session.commit()
+            # Get the strategy version using ORM
+            version = db.strategy.session.query(StrategyVersion).filter(
+                StrategyVersion.version_id == self.current_version_id
+            ).first()
             
-            print(f"✅ Validation status saved: {status} for version {self.current_version_id}")
+            if version:
+                # Update using ORM
+                version.validation_status = status
+                version.validation_timestamp = datetime.utcnow()
+                db.strategy.session.commit()
+                
+                print(f"✅ Validation status saved: {status} for version {self.current_version_id}")
+            else:
+                print(f"⚠️ Version not found: {self.current_version_id}")
             
         except Exception as e:
             print(f"⚠️ Failed to save validation status: {e}")
+            # Rollback on error
+            try:
+                db.strategy.session.rollback()
+            except:
+                pass
             # Don't fail the UI if database save fails
             import traceback
             traceback.print_exc()
