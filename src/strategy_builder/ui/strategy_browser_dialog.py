@@ -683,6 +683,44 @@ class StrategyBrowserDialog(QMainWindow):
         """Update strategy count label"""
         self.count_label.setText(f"{count} strateg{'y' if count == 1 else 'ies'}")
     
+    def _calculate_cumulative_exits_for_signal(
+        self, signal: Dict, block: Dict, all_blocks: List[Dict]
+    ) -> float:
+        """
+        Calculate cumulative exit percentage across all binding levels for a signal.
+        Sprint 1.9.1 Task 1.9.1.5
+        
+        Args:
+            signal: Signal dictionary
+            block: Block containing this signal
+            all_blocks: All blocks in strategy (to check strategy-level exits)
+        
+        Returns:
+            Total exit percentage (0-1000+)
+        """
+        total_percentage = 0.0
+        signal_name = signal.get('name', '')
+        
+        # 1. Signal-level exits (attached to this signal)
+        signal_exits = signal.get('exit_conditions', [])
+        for exit_cond in signal_exits:
+            percentage = exit_cond.get('percentage', 0) * 100  # Convert to percentage
+            total_percentage += percentage
+        
+        # 2. Block-level exits (attached to parent block)
+        block_exits = block.get('exit_conditions', [])
+        for exit_cond in block_exits:
+            # Block exits apply to all signals in block
+            percentage = exit_cond.get('percentage', 0) * 100
+            total_percentage += percentage
+        
+        # 3. Strategy-level exits (need to check version data if available)
+        # NOTE: Strategy-level exits are typically stored at version level, not in blocks
+        # For now, we'll check if blocks have strategy_exit_conditions metadata
+        # This is a limitation of the current data structure
+        
+        return total_percentage
+    
     def _build_signal_hierarchy_html(self, blocks: List[Dict]) -> str:
         """
         Build hierarchical signal display HTML matching Window 1 format
@@ -705,13 +743,29 @@ class StrategyBrowserDialog(QMainWindow):
             if not signals:
                 continue
             
+            block_name = block.get('name', 'unknown')
+            
             for signal in signals:
                 signal_name = signal.get('name', 'Unknown')
                 signal_logic = signal.get('logic', 'AND')
                 
-                # Signal line with AND/OR badge
+                # Calculate cumulative exit percentage (Task 1.9.1.5)
+                cumulative_exit_pct = self._calculate_cumulative_exits_for_signal(
+                    signal, block, blocks
+                )
+                
+                # Get color for cumulative exit badge
+                exit_badge_color = get_cumulative_exit_color(cumulative_exit_pct)
+                
+                # Build cumulative exit badge
+                if cumulative_exit_pct > 0:
+                    exit_badge = f'<span style="background-color: {exit_badge_color}; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; margin-left: 8px;">{cumulative_exit_pct:.0f}%</span>'
+                else:
+                    exit_badge = ''
+                
+                # Signal line with AND/OR badge and cumulative exit badge
                 logic_color = "#4ADE80" if signal_logic == "AND" else "#60A5FA"
-                signal_line = f'<span style="color: {logic_color};">{signal_counter}. {signal_name} [AND]</span>'
+                signal_line = f'<span style="color: {logic_color};">{signal_counter}. {signal_name} [AND]{exit_badge}</span>'
                 html_lines.append(signal_line)
                 
                 # TIME CONSTRAINT (if exists)
