@@ -902,6 +902,9 @@ class StrategyBuilderMainWindow(QMainWindow):
                     self.stepper.mark_step_complete(1)
                     self._update_status("Strategy validated successfully")
                     
+                    # PERSIST VALIDATION STATUS TO DATABASE (Sprint 1.9 ORM)
+                    self._save_validation_status_to_db('Pass')
+                    
                     # AUTO-SAVE after validation (if database strategy exists)
                     if self.current_strategy_id:
                         self._on_save_strategy()
@@ -912,6 +915,9 @@ class StrategyBuilderMainWindow(QMainWindow):
                         delattr(self.orchestrator.config_engine.config, 'validation_status')
                     self.stepper.mark_step_error(1)
                     self._update_status(f"Strategy validation failed - {report.blocking_issues()} blocking issues")
+                    
+                    # PERSIST FAILURE STATUS TO DATABASE (Sprint 1.9 ORM)
+                    self._save_validation_status_to_db('Fail')
                     
             except Exception as e:
                 self.validation_passed = False
@@ -1388,6 +1394,47 @@ class StrategyBuilderMainWindow(QMainWindow):
         except Exception as e:
             # Silently fail to avoid disrupting UI
             pass
+    
+    def _save_validation_status_to_db(self, status: str):
+        """
+        Persist validation status to database (Sprint 1.9 ORM persistence).
+        
+        Updates the strategy_versions table with validation_status and validation_timestamp.
+        
+        Args:
+            status: 'Pass' or 'Fail'
+        """
+        if not self.current_version_id:
+            return  # No version to update yet (strategy not saved)
+        
+        try:
+            from datetime import datetime
+            
+            db = get_database_manager()
+            
+            # Update the strategy version in database
+            db.strategy.session.execute(
+                """
+                UPDATE strategy_versions
+                SET validation_status = :status,
+                    validation_timestamp = :timestamp
+                WHERE version_id = :version_id
+                """,
+                {
+                    'status': status,
+                    'timestamp': datetime.utcnow(),
+                    'version_id': str(self.current_version_id)
+                }
+            )
+            db.strategy.session.commit()
+            
+            print(f"✅ Validation status saved: {status} for version {self.current_version_id}")
+            
+        except Exception as e:
+            print(f"⚠️ Failed to save validation status: {e}")
+            # Don't fail the UI if database save fails
+            import traceback
+            traceback.print_exc()
     
     def _check_validation_prerequisites(self) -> bool:
         """Check if validation prerequisites are met (strategy name + blocks)."""
