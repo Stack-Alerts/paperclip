@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (
     QFrame, QScrollArea, QSplitter
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QModelIndex, QRectF
-from PyQt5.QtGui import QFont, QTextDocument, QAbstractTextDocumentLayout, QPalette
+from PyQt5.QtGui import QFont, QTextDocument, QAbstractTextDocumentLayout, QPalette, QColor
 
 from src.optimizer_v3.database import get_database_manager
 from .styles import (
@@ -629,17 +629,20 @@ class StrategyBrowserDialog(QMainWindow):
             modified_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(row, 3, modified_item)
             
-            # Validation status (centered)
-            # TODO: Get actual validation status from database metadata
-            # For now, default to "Un-Validated"
-            validation_status = strategy.get('validation_status', 'Un-Validated')
+            # Validation status (centered) - Sprint 1.9 ORM persistence
+            # Get actual validation status from database version
+            version_data = self.db.strategy.get_strategy_version(strategy['version_id'])
+            validation_status = version_data.get('validation_status', 'Un-Validated') if version_data else 'Un-Validated'
+            
             validation_item = QTableWidgetItem(validation_status)
             validation_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             # Color coding: Un-Validated (gray), Pass (green), Fail (red)
             if validation_status == 'Pass':
-                validation_item.setForeground(QFont().defaultFamily())  # Will use green from styles
+                validation_item.setForeground(QColor('#4ADE80'))  # Green
             elif validation_status == 'Fail':
-                validation_item.setForeground(QFont().defaultFamily())  # Will use red from styles
+                validation_item.setForeground(QColor('#EF4444'))  # Red
+            else:  # Un-Validated
+                validation_item.setForeground(QColor('#9CA3AF'))  # Gray
             self.table.setItem(row, 4, validation_item)
             
             # Published status (centered)
@@ -1222,8 +1225,8 @@ class StrategyBrowserDialog(QMainWindow):
             dialog = QDialog(self)
             dialog.setWindowTitle("Delete Strategy")
             dialog.setStyleSheet(get_main_stylesheet())
-            dialog.setMinimumWidth(500)
-            dialog.setMinimumHeight(400)
+            dialog.setMinimumWidth(800)
+            dialog.setMinimumHeight(800)
             
             layout = QVBoxLayout(dialog)
             layout.setSpacing(16)
