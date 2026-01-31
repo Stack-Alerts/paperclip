@@ -774,9 +774,9 @@ class StrategyBrowserDialog(QMainWindow):
                 # Get color for cumulative exit badge
                 exit_badge_color = get_cumulative_exit_color(cumulative_exit_pct)
                 
-                # Build cumulative exit badge
+                # Build cumulative exit badge with descriptive label
                 if cumulative_exit_pct > 0:
-                    exit_badge = f'<span style="background-color: {exit_badge_color}; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; margin-left: 8px;">{cumulative_exit_pct:.0f}%</span>'
+                    exit_badge = f'<span style="background-color: {exit_badge_color}; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; margin-left: 8px;">Exits: {cumulative_exit_pct:.0f}%</span>'
                 else:
                     exit_badge = ''
                 
