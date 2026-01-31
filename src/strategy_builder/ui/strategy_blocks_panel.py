@@ -36,7 +36,8 @@ from src.strategy_builder.ui.styles import (
     get_recheck_duplicate_button_stylesheet, get_recheck_remove_button_stylesheet,
     get_spinbox_button_stylesheet, get_success_button_stylesheet, get_color,
     get_dialog_stylesheet, get_radio_container_stylesheet, get_signal_radio_stylesheet,
-    get_recheck_radio_stylesheet, get_exit_tree_item_style, get_exit_button_stylesheet
+    get_recheck_radio_stylesheet, get_exit_tree_item_style, get_exit_button_stylesheet,
+    set_hand_cursor
 )
 
 
@@ -141,6 +142,7 @@ class BlockConfigItem(QWidget):
         move_layout.addStretch()  # Push buttons to the right
 
         self.up_button = QPushButton("▴")  # Sharp small triangle up
+        set_hand_cursor(self.up_button)
         self.up_button.setMaximumWidth(40)
         self.up_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
         self.up_button.setToolTip("Move block up")
@@ -149,6 +151,7 @@ class BlockConfigItem(QWidget):
         move_layout.addWidget(self.up_button)
 
         self.down_button = QPushButton("▾")  # Sharp small triangle down
+        set_hand_cursor(self.down_button)
         self.down_button.setMaximumWidth(40)
         self.down_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
         self.down_button.setToolTip("Move block down")
@@ -161,6 +164,7 @@ class BlockConfigItem(QWidget):
         # Configure button for blocks #2+ (need reference to previous block)
         if self.position > 1:
             self.configure_block_button = QPushButton("⚙️ Config")
+            set_hand_cursor(self.configure_block_button)
             self.configure_block_button.setMinimumWidth(100)
             self.configure_block_button.setStyleSheet(get_primary_button_stylesheet())
             self.configure_block_button.setToolTip("Configure timing constraint for this block")
@@ -170,6 +174,7 @@ class BlockConfigItem(QWidget):
         
         # Remove button
         self.remove_button = QPushButton("✕ Remove")
+        set_hand_cursor(self.remove_button)
         self.remove_button.setMinimumWidth(100)  # Changed from setMaximumWidth(90)
         self.remove_button.setStyleSheet(get_danger_button_stylesheet())
         self.remove_button.clicked.connect(lambda: self.remove_clicked.emit(self.block_name))
@@ -231,6 +236,7 @@ class BlockConfigItem(QWidget):
                 # Add "Recheck On Delayed Candles" button - hide if recheck already configured
                 if not signal.get('recheck_config') or not signal['recheck_config'].get('enabled'):
                     recheck_btn = QPushButton("Recheck On Delayed Candles")
+                    set_hand_cursor(recheck_btn)
                     recheck_btn.setMinimumWidth(180)
                     recheck_btn.setMinimumHeight(28)
                     recheck_btn.setStyleSheet(get_recheck_button_stylesheet())
@@ -243,6 +249,7 @@ class BlockConfigItem(QWidget):
                 # Add configure button for signals after the first (need reference signal)
                 if idx > 1:
                     configure_btn = QPushButton("⚙️ Config")
+                    set_hand_cursor(configure_btn)
                     configure_btn.setMinimumWidth(90)
                     configure_btn.setMinimumHeight(28)
                     configure_btn.setStyleSheet(get_primary_button_stylesheet())
@@ -291,6 +298,7 @@ class BlockConfigItem(QWidget):
                         
                         # Gear icon button for RECHECK configuration
                         gear_btn = QPushButton("⚙")
+                        set_hand_cursor(gear_btn)
                         gear_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                         gear_btn.setToolTip("Configure RECHECK validation")
                         gear_btn.clicked.connect(
@@ -300,6 +308,7 @@ class BlockConfigItem(QWidget):
                         
                         # Duplicate button for nested RECHECK
                         duplicate_btn = QPushButton("⎘")
+                        set_hand_cursor(duplicate_btn)
                         duplicate_btn.setStyleSheet(get_recheck_duplicate_button_stylesheet())
                         duplicate_btn.setToolTip("Add nested RECHECK validation")
                         duplicate_btn.clicked.connect(
@@ -309,6 +318,7 @@ class BlockConfigItem(QWidget):
                         
                         # Remove recheck button
                         remove_recheck_btn = QPushButton("✕")
+                        set_hand_cursor(remove_recheck_btn)
                         remove_recheck_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                         remove_recheck_btn.setToolTip("Remove recheck validation")
                         remove_recheck_btn.clicked.connect(
@@ -393,6 +403,7 @@ class BlockConfigItem(QWidget):
                         
                         # Config button - same style as other exits
                         exit_config_btn = QPushButton("⚙")
+                        set_hand_cursor(exit_config_btn)
                         exit_config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                         exit_config_btn.setToolTip("Configure signal exit condition")
                         exit_config_btn.clicked.connect(
@@ -403,6 +414,7 @@ class BlockConfigItem(QWidget):
                         
                         # Duplicate button - add another exit to this signal
                         exit_duplicate_btn = QPushButton("⎘")
+                        set_hand_cursor(exit_duplicate_btn)
                         exit_duplicate_btn.setStyleSheet(get_recheck_duplicate_button_stylesheet())
                         exit_duplicate_btn.setToolTip("Add another exit condition to this signal")
                         exit_duplicate_btn.clicked.connect(
@@ -413,6 +425,7 @@ class BlockConfigItem(QWidget):
                         
                         # Remove button - remove this exit
                         exit_remove_btn = QPushButton("✕")
+                        set_hand_cursor(exit_remove_btn)
                         exit_remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                         exit_remove_btn.setToolTip("Remove this signal exit condition")
                         exit_remove_btn.clicked.connect(
@@ -452,6 +465,7 @@ class BlockConfigItem(QWidget):
                                 
                                 # Gear icon button for RECHECK configuration
                                 recheck_gear_btn = QPushButton("⚙")
+                                set_hand_cursor(recheck_gear_btn)
                                 recheck_gear_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                                 recheck_gear_btn.setToolTip("Configure RECHECK validation for this exit")
                                 recheck_gear_btn.clicked.connect(
@@ -462,6 +476,7 @@ class BlockConfigItem(QWidget):
                                 
                                 # Remove recheck button
                                 recheck_remove_btn = QPushButton("✕")
+                                set_hand_cursor(recheck_remove_btn)
                                 recheck_remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                                 recheck_remove_btn.setToolTip("Remove RECHECK validation from this exit")
                                 recheck_remove_btn.clicked.connect(
@@ -525,6 +540,7 @@ class BlockConfigItem(QWidget):
                     
                     # Config/Edit button - same style as strategy exit buttons
                     config_btn = QPushButton("⚙")
+                    set_hand_cursor(config_btn)
                     config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                     config_btn.setToolTip("Configure block exit condition")
                     # Use lambda to call panel method with captured variables
@@ -536,6 +552,7 @@ class BlockConfigItem(QWidget):
                     
                     # Duplicate button - add another exit to this block
                     duplicate_btn = QPushButton("⎘")
+                    set_hand_cursor(duplicate_btn)
                     duplicate_btn.setStyleSheet(get_recheck_duplicate_button_stylesheet())
                     duplicate_btn.setToolTip("Add another exit condition to this block")
                     duplicate_btn.clicked.connect(
@@ -546,6 +563,7 @@ class BlockConfigItem(QWidget):
                     
                     # Remove button - same style as strategy exit buttons
                     remove_btn = QPushButton("✕")
+                    set_hand_cursor(remove_btn)
                     remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                     remove_btn.setToolTip("Remove this block exit condition")
                     # Use lambda to call panel method with captured variables
@@ -707,11 +725,13 @@ class BlockConfigItem(QWidget):
         button_layout.setSpacing(10)
         
         cancel_btn = QPushButton("Cancel")
+        set_hand_cursor(cancel_btn)
         cancel_btn.setStyleSheet(get_danger_button_stylesheet())
         cancel_btn.clicked.connect(dialog.reject)
         button_layout.addWidget(cancel_btn)
         
         ok_btn = QPushButton("OK")
+        set_hand_cursor(ok_btn)
         ok_btn.setStyleSheet(get_success_button_stylesheet())
         ok_btn.clicked.connect(dialog.accept)
         button_layout.addWidget(ok_btn)
@@ -1636,6 +1656,7 @@ class StrategyBlocksPanel(QWidget):
                 
                 # Config/Edit button - same style as recheck gear button
                 config_btn = QPushButton("⚙")
+                set_hand_cursor(config_btn)
                 config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                 config_btn.setToolTip("Configure exit condition")
                 # Use functools.partial - proper PyQt5 pattern
@@ -1645,6 +1666,7 @@ class StrategyBlocksPanel(QWidget):
                 
                 # Remove button - same style and size as recheck remove button
                 remove_btn = QPushButton("✕")
+                set_hand_cursor(remove_btn)
                 remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                 remove_btn.setToolTip("Remove this exit condition")
                 # Use functools.partial - proper PyQt5 pattern

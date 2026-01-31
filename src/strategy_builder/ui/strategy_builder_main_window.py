@@ -21,7 +21,7 @@ Date: 2026-01-16
 from typing import Optional
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QAction, QToolBar, QStatusBar, QFileDialog, QMessageBox
+    QAction, QToolBar, QStatusBar, QFileDialog, QMessageBox, QLabel
 )
 from PyQt5.QtCore import Qt, QSize, QSettings, QTimer
 from PyQt5.QtGui import QIcon, QKeySequence, QFont
@@ -35,12 +35,13 @@ from src.strategy_builder.integration.strategy_builder_orchestrator import (
 from src.strategy_builder.ui.strategy_info_panel import StrategyInfoPanel
 from src.strategy_builder.ui.block_search_panel import BlockSearchPanel
 from src.strategy_builder.ui.strategy_blocks_panel import StrategyBlocksPanel
-from src.strategy_builder.ui.validation_dialog import ValidationDialog
+from src.strategy_builder.ui.validation_report_window import ValidationReportWindow
 from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
+from src.optimizer_v3.validation.institutional_validator import InstitutionalValidator
 from src.strategy_builder.ui.data_update_modal import DataUpdateModal
 from src.strategy_builder.ui.alert_dialog import show_warning, ask_question
 from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
-from src.strategy_builder.ui.styles import get_main_stylesheet
+from src.strategy_builder.ui.styles import get_main_stylesheet, apply_hand_cursor_to_buttons
 from src.strategy_builder.ui.new_strategy_dialog import NewStrategyDialog
 from src.strategy_builder.ui.strategy_browser_dialog import StrategyBrowserDialog
 from src.optimizer_v3.database import get_database_manager
@@ -177,6 +178,46 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         # Set initial splitter sizes (40% left, 60% right)
         main_splitter.setSizes([560, 840])
+        
+        # CRITICAL: Prevent panels from being collapsed/disappearing
+        # Index 0 = left (info + blocks), Index 1 = right (search panel)
+        main_splitter.setCollapsible(0, False)  # Left cannot collapse
+        main_splitter.setCollapsible(1, False)  # Right cannot collapse
+        
+        # Add visual drag indicator to splitter handle (match Strategy Browser)
+        main_splitter.setHandleWidth(8)  # Wider handle for better visibility
+        main_splitter.setStyleSheet("""
+            QSplitter::handle:horizontal {
+                background-color: #3C4149;
+                width: 8px;
+                margin: 0px;
+                padding: 0px;
+                image: url(none);
+            }
+            QSplitter::handle:horizontal:hover {
+                background-color: #095983;
+            }
+        """)
+        
+        # Add drag indicator icon to handle  
+        handle = main_splitter.handle(1)
+        if handle:
+            from PyQt5.QtGui import QFont
+            from .styles import create_font
+            
+            handle_layout = QVBoxLayout(handle)
+            handle_layout.setContentsMargins(0, 0, 0, 0)
+            handle_layout.setSpacing(0)
+            
+            # Add centered drag icon (⋮⋮⋮) - muted color
+            drag_icon = QLabel("⋮\n⋮\n⋮")
+            drag_icon.setFont(create_font(10, bold=True))
+            drag_icon.setStyleSheet("color: #4A4F58; background: transparent;")  # Muted gray
+            drag_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            handle_layout.addWidget(drag_icon)
+        
+        # Store splitter for settings save/restore
+        self.main_splitter = main_splitter
         
         # Add splitter to main layout
         main_layout.addWidget(main_splitter)
@@ -843,35 +884,44 @@ class StrategyBuilderMainWindow(QMainWindow):
             
             self.stepper.set_current_step(1)
             
-            # Create and show validation dialog
-            dialog = ValidationDialog(self.orchestrator, self)
-            
-            # Connect dialog signals to main window actions (with visual feedback)
-            dialog.validation_panel.save_requested.connect(lambda: self._on_save_strategy_with_feedback())
-            dialog.validation_panel.run_test_requested.connect(self._on_run_backtest)
-            
-            # Show modal dialog
-            dialog.exec_()
-            
-            # Update stepper state based on validation result
-            result = self.orchestrator.validate_strategy()
-            if result.success:
-                self.validation_passed = True  # Track completion
-                # IMMEDIATELY set status on config so it persists on save
-                self.orchestrator.config_engine.config.validation_status = 'passed'
-                self.stepper.mark_step_complete(1)
-                self._update_status("Strategy validated successfully")
+            # Run institutional validation
+            try:
+                config = self.orchestrator.get_current_config()
+                validator = InstitutionalValidator()
+                report = validator.validate(config)
                 
-                # AUTO-SAVE after validation (if file exists)
-                if self.current_file:
-                    self._save_to_file(self.current_file)
-            else:
+                # Create and show validation report window
+                window = ValidationReportWindow(report, config, self)
+                window.show()  # QMainWindow uses .show(), not .exec_()
+                
+                # Update stepper state based on validation result
+                if report.is_valid:
+                    self.validation_passed = True  # Track completion
+                    # IMMEDIATELY set status on config so it persists on save
+                    self.orchestrator.config_engine.config.validation_status = 'passed'
+                    self.stepper.mark_step_complete(1)
+                    self._update_status("Strategy validated successfully")
+                    
+                    # AUTO-SAVE after validation (if database strategy exists)
+                    if self.current_strategy_id:
+                        self._on_save_strategy()
+                else:
+                    self.validation_passed = False
+                    # Clear validation status on error
+                    if hasattr(self.orchestrator.config_engine.config, 'validation_status'):
+                        delattr(self.orchestrator.config_engine.config, 'validation_status')
+                    self.stepper.mark_step_error(1)
+                    self._update_status(f"Strategy validation failed - {report.blocking_issues()} blocking issues")
+                    
+            except Exception as e:
                 self.validation_passed = False
-                # Clear validation status on error
-                if hasattr(self.orchestrator.config_engine.config, 'validation_status'):
-                    delattr(self.orchestrator.config_engine.config, 'validation_status')
                 self.stepper.mark_step_error(1)
-                self._update_status("Strategy validation has errors")
+                QMessageBox.critical(
+                    self,
+                    "Validation Error",
+                    f"Error running validation:\n\n{str(e)}"
+                )
+                self._update_status("Validation error occurred")
         
         elif step == 2:
             # Test / Optimize step - CHECK PREREQUISITES  
@@ -1038,6 +1088,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         window_state = settings.value("windowState")
         if window_state:
             self.restoreState(window_state)
+        
+        # Restore splitter sizes (user's preferred panel ratio)
+        splitter_sizes = settings.value("mainSplitterSizes")
+        if splitter_sizes:
+            self.main_splitter.restoreState(splitter_sizes)
     
     def _check_strategy_type_match(self) -> bool:
         """
@@ -1375,16 +1430,34 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _check_test_prerequisites(self) -> bool:
         """Check if testing prerequisites are met (validated strategy)."""
         if not self.validation_passed:
-            show_warning(
-                self,
-                "Cannot Run Test / Optimize",
-                "Validation Required",
-                "You must validate your strategy before running tests.\n\n"
-                "Steps:\n"
-                "1. Click the Validate step\n"
-                "2. Fix any validation errors\n"
-                "3. Return here to run tests and optimize"
-            )
+            # Check if validation step is in error state (RED) - means validation FAILED
+            # StepperRibbon uses error_steps set to track failed steps
+            if 1 in self.stepper.error_steps:  # Index 1 is Validate step
+                # Validation was run but FAILED
+                show_warning(
+                    self,
+                    "Cannot Run Test / Optimize",
+                    "Strategy Validation FAILED",
+                    "Your strategy failed validation and cannot be tested until all errors are resolved.\n\n"
+                    "Required Actions:\n"
+                    "1. Click the Validate button\n"
+                    "2. Review the validation report\n"
+                    "3. Fix all blocking issues (marked in RED)\n"
+                    "4. Click Validate again to re-check\n"
+                    "5. Return here once validation passes"
+                )
+            else:
+                # Validation hasn't been run yet
+                show_warning(
+                    self,
+                    "Cannot Run Test / Optimize",
+                    "Validation Required",
+                    "You must validate your strategy before running tests.\n\n"
+                    "Steps:\n"
+                    "1. Click the Validate step\n"
+                    "2. Fix any validation errors\n"
+                    "3. Return here to run tests and optimize"
+                )
             return False
         return True
     
@@ -1588,7 +1661,16 @@ class StrategyBuilderMainWindow(QMainWindow):
         settings = QSettings("BTC_Engine", "StrategyBuilder")
         settings.setValue("geometry", self.saveGeometry())
         settings.setValue("windowState", self.saveState())
+        # Save splitter sizes (user's preferred panel ratio)
+        settings.setValue("mainSplitterSizes", self.main_splitter.saveState())
         self._save_debug_settings()
+    
+    def showEvent(self, event):
+        """Called when window is shown - apply hand cursors to all widgets"""
+        super().showEvent(event)
+        # Apply hand cursor AFTER Qt finishes all stylesheet processing
+        # Qt may reapply stylesheets after showEvent, so delay cursor setting
+        QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
     
     def closeEvent(self, event):
         """Handle window close event."""

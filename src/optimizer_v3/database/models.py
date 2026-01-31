@@ -673,3 +673,79 @@ class StrategyTestResult(Base):
     
     def __repr__(self):
         return f"<StrategyTestResult(type='{self.test_type}', sharpe={self.sharpe_ratio})>"
+
+
+# ==============================================================================
+# SPRINT 1.9 ORM MODEL - Validation Report Persistence
+# ==============================================================================
+
+class ValidationReportDB(Base):
+    """
+    Sprint 1.9 Task 1.9.31
+    Validation report persistence for trending analysis.
+    
+    Tracks validation history for each strategy version:
+    - Validation results (pass/fail)
+    - Issue counts by severity
+    - Complete issues list (JSONB)
+    - Complexity metrics
+    
+    Used for:
+    - Tracking validation issues over time
+    - Identifying recurring problems
+    - Complexity trend analysis
+    """
+    __tablename__ = 'validation_reports'
+    
+    report_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    strategy_id = Column(
+        String(255),
+        ForeignKey('strategies.strategy_id', ondelete='CASCADE'),
+        nullable=False,
+        index=True
+    )
+    version_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey('strategy_versions.version_id', ondelete='CASCADE'),
+        nullable=False,
+        index=True
+    )
+    
+    # Validation metadata
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
+    validation_level = Column(String(50), nullable=False, default='INSTITUTIONAL')
+    
+    # Overall results
+    is_valid = Column(Boolean, nullable=False)
+    total_issues = Column(Integer, default=0)
+    
+    # Issue counts by severity
+    critical_count = Column(Integer, default=0)
+    error_count = Column(Integer, default=0)
+    warning_count = Column(Integer, default=0)
+    notice_count = Column(Integer, default=0)
+    info_count = Column(Integer, default=0)
+    
+    # Complete validation data (JSONB)
+    issues = Column(JSONB, nullable=False, default=list)  # List[ValidationIssue as dict]
+    complexity_metrics = Column(JSONB, nullable=False, default=dict)
+    strategy_summary = Column(JSONB, default=dict)
+    direction_analysis = Column(JSONB)  # Strategy direction analysis
+    exit_strategy_analysis = Column(JSONB)  # Exit condition analysis
+    timing_conflicts = Column(JSONB, default=list)  # Timeline data
+    recheck_chains = Column(JSONB, default=list)  # RECHECK analysis
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    
+    __table_args__ = (
+        Index('idx_validation_reports_strategy', 'strategy_id'),
+        Index('idx_validation_reports_version', 'version_id'),
+        Index('idx_validation_reports_timestamp', 'timestamp'),
+        Index('idx_validation_reports_is_valid', 'is_valid'),
+        Index('idx_validation_reports_strategy_timestamp', 'strategy_id', 'timestamp'),
+    )
+    
+    def __repr__(self):
+        status = "PASSED" if self.is_valid else "FAILED"
+        return f"<ValidationReportDB(strategy_id='{self.strategy_id}', status='{status}', issues={self.total_issues})>"

@@ -1014,7 +1014,6 @@ def get_table_stylesheet() -> str:
         }}
         QHeaderView::section:hover {{
             background-color: #252b36;
-            cursor: pointer;
         }}
     """
 
@@ -1097,6 +1096,70 @@ def create_font(size: int = 10, bold: bool = False):
     if bold:
         font.setBold(True)
     return font
+
+
+def set_hand_cursor(widget):
+    """
+    Set hand cursor for clickable widget.
+    
+    NAUTILUS EXPERT: Centralized hand cursor for professional UI polish.
+    Apply to all buttons, tabs, radio buttons, checkboxes for consistent UX.
+    
+    Args:
+        widget: Qt widget to apply hand cursor to (QPushButton, QRadioButton, etc.)
+    
+    Usage:
+        button = QPushButton("Click Me")
+        set_hand_cursor(button)
+    """
+    from PyQt5.QtCore import Qt
+    widget.setCursor(Qt.PointingHandCursor)
+
+
+def apply_hand_cursor_to_buttons(parent_widget):
+    """
+    Apply hand cursor to clickable widgets in a widget hierarchy.
+    
+    Successfully applies to:
+    ✓ QToolButton (toolbar buttons)
+    ✓ QPushButton (when set during creation)
+    ✓ QRadioButton
+    ✓ QCheckBox
+    ✓ QComboBox  
+    ✓ QTabBar
+    
+    Args:
+        parent_widget: Parent widget (QDialog, QMainWindow, etc.)
+    
+    Usage:
+        dialog = MyDialog()
+        apply_hand_cursor_to_buttons(dialog)
+        dialog.show()
+    """
+    from PyQt5.QtWidgets import (
+        QToolButton, QPushButton, QRadioButton, 
+        QCheckBox, QComboBox, QTabBar
+    )
+    from PyQt5.QtCore import Qt
+    
+    # Apply hand cursor to widgets
+    for tool_btn in parent_widget.findChildren(QToolButton):
+        tool_btn.setCursor(Qt.PointingHandCursor)
+    
+    for push_btn in parent_widget.findChildren(QPushButton):
+        push_btn.setCursor(Qt.PointingHandCursor)
+    
+    for radio in parent_widget.findChildren(QRadioButton):
+        radio.setCursor(Qt.PointingHandCursor)
+    
+    for checkbox in parent_widget.findChildren(QCheckBox):
+        checkbox.setCursor(Qt.PointingHandCursor)
+    
+    for combo in parent_widget.findChildren(QComboBox):
+        combo.setCursor(Qt.PointingHandCursor)
+    
+    for tab in parent_widget.findChildren(QTabBar):
+        tab.setCursor(Qt.PointingHandCursor)
 
 
 # =============================================================================
