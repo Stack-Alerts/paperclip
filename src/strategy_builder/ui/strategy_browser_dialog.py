@@ -312,11 +312,14 @@ class StrategyBrowserDialog(QMainWindow):
         self.detail_labels['status'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
         details_layout.addWidget(self.detail_labels['status'], 3, 2, 1, 1)
         
-        # Set column stretches for EQUAL WIDTH (matches screenshot 1)
-        # DO NOT CHANGE - columns should be equal and STABLE
-        details_layout.setColumnStretch(0, 1)  # Strategy Info - Equal
-        details_layout.setColumnStretch(1, 1)  # Configuration - Equal  
-        details_layout.setColumnStretch(2, 1)  # Performance - Equal
+        # Set column stretches to match screenshot 1 proportions
+        # Strategy Info: Compact (~30%)
+        # Configuration: LARGER (~45%) - needs space for signal hierarchy
+        # Performance: Compact (~25%)
+        # Ratio 2:3:2 gives Configuration 43% of space (3/7)
+        details_layout.setColumnStretch(0, 2)  # Strategy Info - Compact
+        details_layout.setColumnStretch(1, 3)  # Configuration - LARGER (1.5x others)
+        details_layout.setColumnStretch(2, 2)  # Performance - Compact
         
         # Set row stretches for better spacing
         details_layout.setRowStretch(1, 2)
