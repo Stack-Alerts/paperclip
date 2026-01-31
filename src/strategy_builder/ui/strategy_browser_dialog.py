@@ -312,13 +312,11 @@ class StrategyBrowserDialog(QMainWindow):
         self.detail_labels['status'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
         details_layout.addWidget(self.detail_labels['status'], 3, 2, 1, 1)
         
-        # Set column stretches to match screenshot 1 layout
-        # Strategy Information (left): MINIMAL - just fits text like "HOD Rejection (🔴 Bearish)"
-        # Configuration (middle): EXPANDABLE - takes all available space for signal hierarchy
-        # Performance (right): MINIMAL - just fits text like "Tests Run: 0"
-        details_layout.setColumnStretch(0, 0)  # Strategy Info - MINIMAL (no stretch)
-        details_layout.setColumnStretch(1, 1)  # Configuration - EXPANDABLE (takes all space)
-        details_layout.setColumnStretch(2, 0)  # Performance - MINIMAL (no stretch)
+        # Set column stretches for EQUAL WIDTH (matches screenshot 1)
+        # DO NOT CHANGE - columns should be equal and STABLE
+        details_layout.setColumnStretch(0, 1)  # Strategy Info - Equal
+        details_layout.setColumnStretch(1, 1)  # Configuration - Equal  
+        details_layout.setColumnStretch(2, 1)  # Performance - Equal
         
         # Set row stretches for better spacing
         details_layout.setRowStretch(1, 2)
