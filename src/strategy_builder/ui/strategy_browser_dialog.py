@@ -808,26 +808,35 @@ class StrategyBrowserDialog(QMainWindow):
                                     html_lines.append(nested_line)
                 
                 # EXIT CONDITIONS (Sprint 1.9.1 - Task 1.9.1.1)
-                # Display signal-level exit conditions with color-coding by binding level
-                exit_conditions = signal.get('exit_conditions', [])
-                if exit_conditions:
-                    exit_icon = get_exit_icon()
-                    for exit_cond in exit_conditions:
+                # Display ALL exit conditions: strategy-level, block-level, and signal-level
+                # All exits shown in RED per user requirement
+                exit_icon = get_exit_icon()
+                all_exits = []
+                
+                # Collect all exits that apply to this signal
+                # 1. Signal-level exits
+                signal_exits = signal.get('exit_conditions', [])
+                for exit_cond in signal_exits:
+                    all_exits.append((exit_cond, 'SIGNAL', '🟡'))
+                
+                # 2. Block-level exits (apply to all signals in this block)
+                block_exits = block.get('exit_conditions', [])
+                for exit_cond in block_exits:
+                    all_exits.append((exit_cond, 'BLOCK', '🟩'))
+                
+                # 3. Strategy-level exits (would need to be passed in - not available in blocks list)
+                # NOTE: Strategy-level exits are stored at version level, not in blocks
+                # They would apply to ALL signals but aren't accessible from blocks data structure
+                
+                # Display all collected exits in RED
+                if all_exits:
+                    for exit_cond, binding_level, icon in all_exits:
                         exit_signal_name = exit_cond.get('signal_name', 'Unknown')
                         exit_percentage = exit_cond.get('percentage', 0) * 100  # Convert to percentage
                         exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
-                        binding_level = exit_cond.get('binding_level', 'SIGNAL')
                         
-                        # Color-code by binding level
-                        if binding_level == 'STRATEGY':
-                            color = get_color('exit_strategy_level')  # Blue
-                            icon = '🔷'  # Diamond for colorblind accessibility
-                        elif binding_level == 'BLOCK':
-                            color = get_color('exit_block_level')  # Green
-                            icon = '🟩'  # Square for colorblind accessibility
-                        else:  # SIGNAL
-                            color = get_color('exit_signal_level')  # Yellow
-                            icon = '🟡'  # Circle for colorblind accessibility
+                        # ALL exits in RED (user requirement)
+                        color = '#FF6B6B'  # RED for all exits
                         
                         exit_line = f'<span style="color: {color};">&nbsp;&nbsp;&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} ({exit_percentage:.0f}%, {exit_mode}) [{icon} {binding_level}]</span>'
                         html_lines.append(exit_line)
