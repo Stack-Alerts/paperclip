@@ -164,6 +164,7 @@ class BlockConfigItem(QWidget):
         # Configure button for blocks #2+ (need reference to previous block)
         if self.position > 1:
             self.configure_block_button = QPushButton("⚙️ Config")
+            set_hand_cursor(self.configure_block_button)
             self.configure_block_button.setMinimumWidth(100)
             self.configure_block_button.setStyleSheet(get_primary_button_stylesheet())
             self.configure_block_button.setToolTip("Configure timing constraint for this block")
@@ -173,6 +174,7 @@ class BlockConfigItem(QWidget):
         
         # Remove button
         self.remove_button = QPushButton("✕ Remove")
+        set_hand_cursor(self.remove_button)
         self.remove_button.setMinimumWidth(100)  # Changed from setMaximumWidth(90)
         self.remove_button.setStyleSheet(get_danger_button_stylesheet())
         self.remove_button.clicked.connect(lambda: self.remove_clicked.emit(self.block_name))
