@@ -732,18 +732,23 @@ class StrategyBrowserDialog(QMainWindow):
         
         return total_percentage
     
-    def _build_signal_hierarchy_html(self, blocks: List[Dict]) -> str:
+    def _build_signal_hierarchy_html(self, blocks: List[Dict], strategy_exits: List[Dict] = None) -> str:
         """
         Build hierarchical signal display HTML matching Window 1 format
         
         Args:
             blocks: List of block dictionaries from database
+            strategy_exits: Strategy-level exit conditions (apply to ALL signals)
             
         Returns:
             HTML string with hierarchical signal display
         """
         if not blocks:
             return "No signals configured"
+        
+        # Default to empty list if not provided
+        if strategy_exits is None:
+            strategy_exits = []
         
         html_lines = []
         html_lines.append("<b>Signals:</b><br>")
@@ -774,9 +779,10 @@ class StrategyBrowserDialog(QMainWindow):
                 else:
                     exit_badge = ''
                 
-                # Signal line with AND/OR badge and cumulative exit badge
+                # Signal line with AND/OR badge and cumulative exit badge  
+                # BUG FIX: Use actual signal_logic, not hardcoded [AND]
                 logic_color = "#4ADE80" if signal_logic == "AND" else "#60A5FA"
-                signal_line = f'<span style="color: {logic_color};">{signal_counter}. {signal_name} [AND]{exit_badge}</span>'
+                signal_line = f'<span style="color: {logic_color};">{signal_counter}. {signal_name} [{signal_logic}]{exit_badge}</span>'
                 html_lines.append(signal_line)
                 
                 # TIME CONSTRAINT (if exists)
@@ -824,9 +830,10 @@ class StrategyBrowserDialog(QMainWindow):
                 for exit_cond in block_exits:
                     all_exits.append((exit_cond, 'BLOCK', '🟩'))
                 
-                # 3. Strategy-level exits (would need to be passed in - not available in blocks list)
-                # NOTE: Strategy-level exits are stored at version level, not in blocks
-                # They would apply to ALL signals but aren't accessible from blocks data structure
+                # 3. Strategy-level exits (apply to ALL signals in entire strategy)
+                # BUG FIX: Now passed as parameter instead of being unavailable
+                for exit_cond in strategy_exits:
+                    all_exits.append((exit_cond, 'STRATEGY', '🔷'))
                 
                 # Display all collected exits in RED
                 if all_exits:
@@ -923,7 +930,8 @@ class StrategyBrowserDialog(QMainWindow):
                         total_exit_conditions += len(signal_exits)
             
             # Use hierarchical signal display (matching Window 1 format)
-            signal_hierarchy_html = self._build_signal_hierarchy_html(blocks)
+            # BUG FIX: Pass strategy-level exits so they display in tree
+            signal_hierarchy_html = self._build_signal_hierarchy_html(blocks, strategy_exits)
             self.detail_labels['blocks'].setText(signal_hierarchy_html)
             
             # Signals summary with actual counts (Sprint 1.8 - exits are exit_conditions now)
