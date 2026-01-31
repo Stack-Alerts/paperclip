@@ -36,7 +36,8 @@ from src.strategy_builder.ui.styles import (
     get_recheck_duplicate_button_stylesheet, get_recheck_remove_button_stylesheet,
     get_spinbox_button_stylesheet, get_success_button_stylesheet, get_color,
     get_dialog_stylesheet, get_radio_container_stylesheet, get_signal_radio_stylesheet,
-    get_recheck_radio_stylesheet, get_exit_tree_item_style, get_exit_button_stylesheet
+    get_recheck_radio_stylesheet, get_exit_tree_item_style, get_exit_button_stylesheet,
+    set_hand_cursor
 )
 
 
