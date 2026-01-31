@@ -239,6 +239,7 @@ Enhance the **Strategy Browser's Configuration Panel** to display Sprint 1.8 exi
 **Required:**
 - Sprint 1.8 Exit Conditions (data structures)
 - Sprint 1.9 Validation Framework (optional - for highlighting conflicts)
+  - AUTO_FIX_LOGIC_SPECIFICATIONS.md (reference for understanding validation auto-fixes)
 - Strategy configuration models
 - Configuration Browser component (must locate first)
 

@@ -90,6 +90,13 @@
 **Purpose**: Comprehensive strategy validation with 59 rules across 8 categories, RECHECK cycle detection, exit percentage validation, direction mismatch detection, timing conflict detection, dead code detection, one-click fixes
 **Completed**: All validation logic, UI, tests, and documentation complete
 
+#### **Sprint 1.9.1: Configuration Browser Enhancements** (1-2 hours, 7 tasks)
+**File**: `SPRINT_1_9_1_CONFIGURATION_BROWSER_ENHANCEMENTS.md`  
+**Status**: 📋 AWAITING APPROVAL  
+**Purpose**: Strategy Browser Configuration Panel enhancements - display Sprint 1.8 exit conditions in signal tree
+**Dependencies**: Sprint 1.9 must complete first
+**Scope**: Configuration Panel ONLY (middle section of Strategy Browser window)
+
 ---
 
 ### **PHASE 2: Signal Intelligence & Training** (28 days, 72 tasks)
