@@ -47,10 +47,10 @@ Enhance the **Strategy Browser's Configuration Panel** to display Sprint 1.8 exi
 ## ✅ TASK CHECKLIST (Complete in Order - Check Off Before Next Task)
 
 ### **Phase 0: Discovery (1 task) - MUST COMPLETE FIRST**
-- [ ] **Task 1.9.1.0**: Locate Configuration Browser Component
+- [x] **Task 1.9.1.0**: Locate Configuration Browser Component
 
 ### **Phase 1: Exit Conditions Display (2 tasks)**
-- [ ] **Task 1.9.1.1**: Add Exit Conditions to Signal Display
+- [x] **Task 1.9.1.1**: Add Exit Conditions to Signal Display
 - [ ] **Task 1.9.1.2**: Display Exit Percentage and Mode
 
 ### **Phase 2: Enhanced Signal Tree Formatting (2 tasks)**

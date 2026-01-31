@@ -340,6 +340,17 @@ COLORS = {
     'stepper_hover': '#4B5563',
     'stepper_complete': '#10B981',
     'stepper_error': '#C35252',
+    
+    # Exit condition specific colors (Sprint 1.9.1)
+    'exit_strategy_level': '#2070FF',           # Blue - STRATEGY-level exits
+    'exit_block_level': '#10B981',              # Green - BLOCK-level exits
+    'exit_signal_level': '#FFA500',             # Yellow - SIGNAL-level exits
+    'exit_cumulative_tp_only': '#9AA0A6',       # Gray (0% - TP-only)
+    'exit_cumulative_hybrid': '#2070FF',        # Blue (1-99% - Hybrid)
+    'exit_cumulative_full': '#10B981',          # Green (100% - Full exit)
+    'exit_cumulative_multiple': '#FFA500',      # Yellow (101-500% - Multiple opportunities)
+    'exit_cumulative_high': '#FF6B6B',          # Orange (>500% - High redundancy)
+    'dead_code_strikethrough': '#6B7280',       # Gray for disabled signals
 }
 
 # Standardized label styling (used throughout main window)
@@ -1294,3 +1305,93 @@ def get_exit_tree_item_style() -> str:
 EXIT_BUTTON_STYLE = get_exit_button_stylesheet()
 EXIT_DIALOG_STYLE = get_exit_dialog_stylesheet()
 EXIT_TREE_ITEM_STYLE = get_exit_tree_item_style()
+
+
+# =============================================================================
+# EXIT CONDITION BROWSER STYLES (Sprint 1.9.1)
+# =============================================================================
+
+def get_exit_binding_badge_style(binding_level: str) -> str:
+    """
+    Get badge style for exit condition binding levels.
+    Sprint 1.9.1 Task 1.9.1.2
+    
+    Args:
+        binding_level: 'STRATEGY', 'BLOCK', or 'SIGNAL'
+    
+    Returns:
+        CSS style string with color-coded background
+    """
+    colors = {
+        'STRATEGY': COLORS['exit_strategy_level'],  # Blue
+        'BLOCK': COLORS['exit_block_level'],         # Green
+        'SIGNAL': COLORS['exit_signal_level']        # Yellow
+    }
+    color = colors.get(binding_level, COLORS['exit_strategy_level'])
+    
+    return f"background-color: {color}; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;"
+
+
+def get_cumulative_exit_color(cumulative_percentage: float) -> str:
+    """
+    Get color for cumulative exit percentage badge.
+    Sprint 1.9.1 Task 1.9.1.5
+    
+    Color coding:
+    - 0%: Gray (TP-only)
+    - 1-99%: Blue (Hybrid)
+    - 100%: Green (Full exit)
+    - 101-500%: Yellow (Multiple opportunities)
+    - >500%: Orange (High redundancy - review recommended)
+    
+    Args:
+        cumulative_percentage: Total exit percentage (0-1000+)
+    
+    Returns:
+        Hex color string
+    """
+    if cumulative_percentage == 0:
+        return COLORS['exit_cumulative_tp_only']      # Gray
+    elif cumulative_percentage < 100:
+        return COLORS['exit_cumulative_hybrid']       # Blue
+    elif cumulative_percentage == 100:
+        return COLORS['exit_cumulative_full']         # Green
+    elif cumulative_percentage <= 500:
+        return COLORS['exit_cumulative_multiple']     # Yellow
+    else:
+        return COLORS['exit_cumulative_high']         # Orange
+
+
+def get_exit_icon() -> str:
+    """
+    Get exit condition icon.
+    Sprint 1.9.1 Task 1.9.1.1
+    
+    Returns:
+        Exit icon emoji
+    """
+    return "🚪"
+
+
+def get_recheck_depth_color(depth: int) -> str:
+    """
+    Get color for RECHECK chain depth visualization.
+    Sprint 1.9.1 Task 1.9.1.4
+    
+    Color coding:
+    - Depth 1: Green
+    - Depth 2: Yellow
+    - Depth 3+: Red
+    
+    Args:
+        depth: RECHECK nesting depth (1, 2, 3+)
+    
+    Returns:
+        Hex color string
+    """
+    if depth == 1:
+        return COLORS['exit_block_level']      # Green
+    elif depth == 2:
+        return COLORS['exit_signal_level']     # Yellow
+    else:
+        return COLORS['exit_cumulative_high']  # Red

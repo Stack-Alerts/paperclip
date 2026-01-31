@@ -28,7 +28,10 @@ from .styles import (
     get_input_field_stylesheet,
     get_table_stylesheet,
     create_font,
-    get_color
+    get_color,
+    get_exit_icon,
+    get_cumulative_exit_color,
+    get_recheck_depth_color
 )
 # Import universal combo box fix (EXACTLY like block_search_panel.py)
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
@@ -738,6 +741,31 @@ class StrategyBrowserDialog(QMainWindow):
                                     target = "of RECHECK" if validation_mode == "RECHECK" else "of Signal"
                                     nested_line = f'<span style="color: #60A5FA;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── RECHECK {target} ({nested_delay} bars)</span>'
                                     html_lines.append(nested_line)
+                
+                # EXIT CONDITIONS (Sprint 1.9.1 - Task 1.9.1.1)
+                # Display signal-level exit conditions with color-coding by binding level
+                exit_conditions = signal.get('exit_conditions', [])
+                if exit_conditions:
+                    exit_icon = get_exit_icon()
+                    for exit_cond in exit_conditions:
+                        exit_signal_name = exit_cond.get('signal_name', 'Unknown')
+                        exit_percentage = exit_cond.get('percentage', 0) * 100  # Convert to percentage
+                        exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
+                        binding_level = exit_cond.get('binding_level', 'SIGNAL')
+                        
+                        # Color-code by binding level
+                        if binding_level == 'STRATEGY':
+                            color = get_color('exit_strategy_level')  # Blue
+                            icon = '🔷'  # Diamond for colorblind accessibility
+                        elif binding_level == 'BLOCK':
+                            color = get_color('exit_block_level')  # Green
+                            icon = '🟩'  # Square for colorblind accessibility
+                        else:  # SIGNAL
+                            color = get_color('exit_signal_level')  # Yellow
+                            icon = '🟡'  # Circle for colorblind accessibility
+                        
+                        exit_line = f'<span style="color: {color};">&nbsp;&nbsp;&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} ({exit_percentage:.0f}%, {exit_mode}) [{icon} {binding_level}]</span>'
+                        html_lines.append(exit_line)
                 
                 signal_counter += 1
         
