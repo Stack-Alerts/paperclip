@@ -179,6 +179,46 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Set initial splitter sizes (40% left, 60% right)
         main_splitter.setSizes([560, 840])
         
+        # CRITICAL: Prevent panels from being collapsed/disappearing
+        # Index 0 = left (info + blocks), Index 1 = right (search panel)
+        main_splitter.setCollapsible(0, False)  # Left cannot collapse
+        main_splitter.setCollapsible(1, False)  # Right cannot collapse
+        
+        # Add visual drag indicator to splitter handle (match Strategy Browser)
+        main_splitter.setHandleWidth(8)  # Wider handle for better visibility
+        main_splitter.setStyleSheet("""
+            QSplitter::handle:horizontal {
+                background-color: #3C4149;
+                width: 8px;
+                margin: 0px;
+                padding: 0px;
+                image: url(none);
+            }
+            QSplitter::handle:horizontal:hover {
+                background-color: #095983;
+            }
+        """)
+        
+        # Add drag indicator icon to handle  
+        handle = main_splitter.handle(1)
+        if handle:
+            from PyQt5.QtGui import QFont
+            from .styles import create_font
+            
+            handle_layout = QVBoxLayout(handle)
+            handle_layout.setContentsMargins(0, 0, 0, 0)
+            handle_layout.setSpacing(0)
+            
+            # Add centered drag icon (⋮⋮⋮) - muted color
+            drag_icon = QLabel("⋮\n⋮\n⋮")
+            drag_icon.setFont(create_font(10, bold=True))
+            drag_icon.setStyleSheet("color: #4A4F58; background: transparent;")  # Muted gray
+            drag_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            handle_layout.addWidget(drag_icon)
+        
+        # Store splitter for settings save/restore
+        self.main_splitter = main_splitter
+        
         # Add splitter to main layout
         main_layout.addWidget(main_splitter)
     
@@ -1048,6 +1088,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         window_state = settings.value("windowState")
         if window_state:
             self.restoreState(window_state)
+        
+        # Restore splitter sizes (user's preferred panel ratio)
+        splitter_sizes = settings.value("mainSplitterSizes")
+        if splitter_sizes:
+            self.main_splitter.restoreState(splitter_sizes)
     
     def _check_strategy_type_match(self) -> bool:
         """
@@ -1616,6 +1661,8 @@ class StrategyBuilderMainWindow(QMainWindow):
         settings = QSettings("BTC_Engine", "StrategyBuilder")
         settings.setValue("geometry", self.saveGeometry())
         settings.setValue("windowState", self.saveState())
+        # Save splitter sizes (user's preferred panel ratio)
+        settings.setValue("mainSplitterSizes", self.main_splitter.saveState())
         self._save_debug_settings()
     
     def showEvent(self, event):
