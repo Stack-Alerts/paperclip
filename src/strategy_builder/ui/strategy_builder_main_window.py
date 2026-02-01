@@ -902,12 +902,8 @@ class StrategyBuilderMainWindow(QMainWindow):
                     self.stepper.mark_step_complete(1)
                     self._update_status("Strategy validated successfully")
                     
-                    # AUTO-SAVE after validation (if database strategy exists)
-                    if self.current_strategy_id:
-                        self._on_save_strategy()
-                    
                     # PERSIST VALIDATION STATUS TO DATABASE (Sprint 1.9 ORM)
-                    # CRITICAL: Must happen AFTER save so current_version_id exists
+                    # Update existing version's status (don't create new version)
                     self._save_validation_status_to_db('Pass')
                 else:
                     self.validation_passed = False
@@ -917,12 +913,8 @@ class StrategyBuilderMainWindow(QMainWindow):
                     self.stepper.mark_step_error(1)
                     self._update_status(f"Strategy validation failed - {report.blocking_issues()} blocking issues")
                     
-                    # AUTO-SAVE failure state if strategy exists
-                    if self.current_strategy_id:
-                        self._on_save_strategy()
-                    
                     # PERSIST FAILURE STATUS TO DATABASE (Sprint 1.9 ORM)
-                    # CRITICAL: Must happen AFTER save so current_version_id exists
+                    # Update existing version's status (don't create new version)
                     self._save_validation_status_to_db('Fail')
                     
             except Exception as e:
