@@ -531,6 +531,21 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_open_strategy(self):
         """Open strategy from database using StrategyBrowserDialog."""
+        # Check if current strategy should be saved
+        if self.is_modified:
+            reply = ask_question(
+                self,
+                "Unsaved Changes",
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before opening another strategy?"
+            )
+            
+            if reply == 'yes':
+                if not self._on_save_strategy():
+                    return  # Save was cancelled
+            elif reply == 'cancel':
+                return
+        
         # Create and show strategy browser window
         browser = StrategyBrowserDialog(mode='open', parent=self)
         
