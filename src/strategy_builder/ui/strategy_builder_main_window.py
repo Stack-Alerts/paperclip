@@ -438,11 +438,9 @@ class StrategyBuilderMainWindow(QMainWindow):
             self.stepper.error_steps.discard(1)
             print(f"   completed_steps (after): {self.stepper.completed_steps}")
             print(f"   error_steps (after): {self.stepper.error_steps}")
-            print(f"   Calling update() to force visual refresh...")
-            # Force step 1 button to repaint by triggering full update cycle
-            self.stepper.current_step = 1  # Ensure step 1 is highlighted
-            self.stepper.update()  # Refresh the UI
-            self.stepper.repaint()  # Force immediate visual update
+            print(f"   Calling _update_display() to rebuild button styles...")
+            # Force visual refresh by calling _update_display() which rebuilds button styles
+            self.stepper._update_display()
             print(f"   ✅ Validation reset complete\n")
         else:
             print(f"   ℹ️ Step 1 not in completed or error, no reset needed\n")
