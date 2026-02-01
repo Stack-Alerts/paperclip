@@ -95,6 +95,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.validation_passed = False
         self.test_completed = False
         
+        # Flag to prevent validation reset during strategy load
+        self.loading_strategy = False
+        
         # Auto-update timers
         self.candle_check_timer: Optional[QTimer] = None
         self.retry_timer: Optional[QTimer] = None
@@ -427,7 +430,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         print(f"   completed_steps (before): {self.stepper.completed_steps}")
         
         # FIX: Always reset if step 1 has ANY status (completed or error)
-        # Must clear completed_steps AND force visual button reset
+        # Must clear completed_steps AND force visual button reset FOR STEP 1 ONLY
         if 1 in self.stepper.completed_steps or 1 in self.stepper.error_steps:
             self.validation_passed = False
             # Clear step 1 from sets
@@ -435,9 +438,11 @@ class StrategyBuilderMainWindow(QMainWindow):
             self.stepper.error_steps.discard(1)
             print(f"   completed_steps (after): {self.stepper.completed_steps}")
             print(f"   error_steps (after): {self.stepper.error_steps}")
-            print(f"   Calling reset_all_steps() to force visual reset...")
-            # Force complete visual reset - this actually updates button colors!
-            self.stepper.reset_all_steps()
+            print(f"   Calling update() to force visual refresh...")
+            # Force step 1 button to repaint by triggering full update cycle
+            self.stepper.current_step = 1  # Ensure step 1 is highlighted
+            self.stepper.update()  # Refresh the UI
+            self.stepper.repaint()  # Force immediate visual update
             print(f"   ✅ Validation reset complete\n")
         else:
             print(f"   ℹ️ Step 1 not in completed or error, no reset needed\n")
@@ -451,8 +456,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.is_modified = True
         self._update_window_title()
         
-        # RESET VALIDATION when blocks change
-        self.reset_validation()
+        # RESET VALIDATION when blocks change (BUT NOT during strategy load)
+        if not self.loading_strategy:
+            self.reset_validation()
         
         # Update status
         block_count = self.blocks_panel.get_block_count()
@@ -579,8 +585,11 @@ class StrategyBuilderMainWindow(QMainWindow):
                 'exit_conditions': exit_conditions_data  # Sprint 1.8: Include exit conditions
             }
             
-            # Use persistence._dict_to_config() - EXACT same as file load
+            # SUPPRESS validation reset during load
+            self.loading_strategy = True
+            
             try:
+                # Use persistence._dict_to_config() - EXACT same as file load
                 restored_config = self.orchestrator.persistence._dict_to_config(config_dict)
                 
                 # Assign to config engine (SAME PATTERN as orchestrator.load_strategy)
@@ -594,6 +603,9 @@ class StrategyBuilderMainWindow(QMainWindow):
                 traceback.print_exc()
                 # Fallback to empty config
                 self.orchestrator.create_strategy(version['name'])
+            finally:
+                # Always re-enable validation reset after load
+                self.loading_strategy = False
             
             # Update UI panels with loaded data
             self.info_panel.set_strategy_name(version['name'])
