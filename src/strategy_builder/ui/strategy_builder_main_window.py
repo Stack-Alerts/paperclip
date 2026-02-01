@@ -426,17 +426,18 @@ class StrategyBuilderMainWindow(QMainWindow):
         print(f"   error_steps: {self.stepper.error_steps}")
         print(f"   completed_steps (before): {self.stepper.completed_steps}")
         
-        # FIX: Check stepper state directly, not validation_passed flag
-        # After first reset, validation_passed becomes False but completed_steps
-        # needs to be cleared on every subsequent config change too
+        # FIX: Always reset if step 1 has ANY status (completed or error)
+        # Must clear completed_steps AND force visual button reset
         if 1 in self.stepper.completed_steps or 1 in self.stepper.error_steps:
             self.validation_passed = False
-            # Clear step 1 from completed and error sets
+            # Clear step 1 from sets
             self.stepper.completed_steps.discard(1)
             self.stepper.error_steps.discard(1)
             print(f"   completed_steps (after): {self.stepper.completed_steps}")
-            print(f"   Calling stepper.update()...")
-            self.stepper.update()  # Refresh the UI
+            print(f"   error_steps (after): {self.stepper.error_steps}")
+            print(f"   Calling reset_all_steps() to force visual reset...")
+            # Force complete visual reset - this actually updates button colors!
+            self.stepper.reset_all_steps()
             print(f"   ✅ Validation reset complete\n")
         else:
             print(f"   ℹ️ Step 1 not in completed or error, no reset needed\n")
