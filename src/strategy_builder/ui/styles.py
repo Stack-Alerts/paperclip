@@ -1246,9 +1246,10 @@ def get_exit_button_stylesheet() -> str:
             background-color: {COLORS['button_danger']};
             color: white;
             font-weight: bold;
-            padding: 8px 16px;
+            border: none;
             border-radius: 6px;
-            min-width: 120px;
+            padding: 10px 20px;
+            font-size: 10pt;
         }}
         QPushButton:hover {{
             background-color: {COLORS['button_danger_hover']};
@@ -1257,8 +1258,8 @@ def get_exit_button_stylesheet() -> str:
             background-color: #8B3333;
         }}
         QPushButton:disabled {{
-            background-color: #555555;
-            color: #888888;
+            background-color: #374151;
+            color: #94A3B8;
         }}
     """
 
