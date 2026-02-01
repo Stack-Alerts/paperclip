@@ -206,9 +206,9 @@ class BlockListItem(QWidget):
             
             # Add signal description
             if hasattr(signal_info, 'description') and signal_info.description:
-                desc_label = QLabel(f"   {signal_info.description}")
+                desc_label = QLabel(signal_info.description)
                 desc_label.setWordWrap(True)
-                desc_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt; padding: 2px 0 4px 28px; font-style: italic;")
+                desc_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt; padding-left: 28px; padding-top: 2px; padding-bottom: 4px; font-style: italic;")
                 checkbox_layout.addWidget(desc_label)
             
             signals_layout.addLayout(checkbox_layout)
