@@ -83,6 +83,9 @@ class BlockListItem(QWidget):
         # Track which signals have been added (to disable them)
         self.added_signals: set = set()
         
+        # Track whether strategy has blocks (for button state management)
+        self.strategy_has_blocks = False
+        
         self._init_ui()
     
     def _init_ui(self):
