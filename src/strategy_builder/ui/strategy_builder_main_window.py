@@ -405,6 +405,26 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.is_modified = True
         self._update_window_title()
     
+    def reset_validation(self):
+        """
+        CENTRAL METHOD: Reset validation state when ANY configuration changes.
+        
+        Called by:
+        - Block changes (add/remove/reorder)
+        - Signal timing/recheck configuration
+        - Exit condition configuration
+        - Strategy name/type changes
+        - Any other strategy mutation
+        
+        Forces user to re-validate after ANY modification.
+        """
+        if self.validation_passed or 1 in self.stepper.error_steps:
+            self.validation_passed = False
+            # Clear step 1 from completed and error sets
+            self.stepper.completed_steps.discard(1)
+            self.stepper.error_steps.discard(1)
+            self.stepper.update()  # Refresh the UI
+    
     def _on_blocks_changed(self):
         """Handle blocks changed event."""
         # Refresh info panel to update description and required signals
@@ -414,14 +434,8 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.is_modified = True
         self._update_window_title()
         
-        # RESET VALIDATION when strategy configuration changes
-        # User must re-validate after modifying blocks
-        if self.validation_passed or 1 in self.stepper.error_steps:
-            self.validation_passed = False
-            # Clear step 1 from completed and error sets
-            self.stepper.completed_steps.discard(1)
-            self.stepper.error_steps.discard(1)
-            self.stepper.update()  # Refresh the UI
+        # RESET VALIDATION when blocks change
+        self.reset_validation()
         
         # Update status
         block_count = self.blocks_panel.get_block_count()
@@ -431,6 +445,8 @@ class StrategyBuilderMainWindow(QMainWindow):
         """Handle strategy name change."""
         self.is_modified = True
         self._update_window_title()
+        # RESET VALIDATION when strategy name/type changes
+        self.reset_validation()
     
     def _on_new_strategy(self):
         """Create a new strategy in database."""
