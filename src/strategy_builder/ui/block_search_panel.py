@@ -209,7 +209,7 @@ class BlockListItem(QWidget):
                 # Create container widget for indentation
                 desc_container = QWidget()
                 desc_container_layout = QHBoxLayout(desc_container)
-                desc_container_layout.setContentsMargins(28, 0, 0, 0)  # 28px left indent
+                desc_container_layout.setContentsMargins(40, 0, 0, 0)  # 95px left indent to align properly
                 desc_container_layout.setSpacing(0)
                 
                 desc_label = QLabel(signal_info.description)
