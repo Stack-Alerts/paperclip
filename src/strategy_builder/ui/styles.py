@@ -1177,6 +1177,62 @@ def apply_hand_cursor_to_buttons(parent_widget):
 # EXIT CONDITION STYLES (Sprint 1.8 - Phase 6)
 # =============================================================================
 
+def get_and_button_stylesheet() -> str:
+    """
+    Get stylesheet for "Add as AND (Required)" button (cyan/teal theme).
+    Used in block search panel for required signal logic.
+    
+    Returns:
+        Button stylesheet string with cyan/teal theme
+    """
+    return """
+        QPushButton {
+            background-color: #00D9FF;
+            color: #0F1419;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-size: 10pt;
+        }
+        QPushButton:hover {
+            background-color: #0A7EA4;
+        }
+        QPushButton:disabled {
+            background-color: #374151;
+            color: #94A3B8;
+        }
+    """
+
+
+def get_or_button_stylesheet() -> str:
+    """
+    Get stylesheet for "Add as OR (Optional)" button (green theme).
+    Used in block search panel for optional signal logic.
+    
+    Returns:
+        Button stylesheet string with green theme
+    """
+    return """
+        QPushButton {
+            background-color: #10B981;
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-size: 10pt;
+        }
+        QPushButton:hover {
+            background-color: #059669;
+        }
+        QPushButton:disabled {
+            background-color: #374151;
+            color: #94A3B8;
+        }
+    """
+
+
 def get_exit_button_stylesheet() -> str:
     """
     Get stylesheet for "Add as Exit" button (red theme).

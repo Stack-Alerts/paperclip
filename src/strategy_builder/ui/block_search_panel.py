@@ -30,7 +30,7 @@ from src.strategy_builder.core.registry_interface import BlockInfo, SearchFilter
 from src.strategy_builder.ui.styles import (
     get_label_style, get_expand_button_style, get_add_button_style,
     get_checkbox_style, get_success_button_stylesheet, get_color,
-    get_exit_button_stylesheet
+    get_exit_button_stylesheet, get_and_button_stylesheet, get_or_button_stylesheet
 )
 
 # Import exit condition dialog
@@ -227,51 +227,17 @@ class BlockListItem(QWidget):
         buttons_layout.setSpacing(10)
         buttons_layout.setContentsMargins(0, 15, 0, 10)
         
-        # Add as AND button (required)
+        # Add as AND button (required) - using centralized style
         self.and_button = QPushButton("➕ Add as AND (Required)")
         self.and_button.setMinimumHeight(40)
-        self.and_button.setStyleSheet("""
-            QPushButton {
-                background-color: #00D9FF;
-                color: #0F1419;
-                font-weight: bold;
-                border: none;
-                border-radius: 6px;
-                padding: 10px 20px;
-                font-size: 10pt;
-            }
-            QPushButton:hover {
-                background-color: #0A7EA4;
-            }
-            QPushButton:disabled {
-                background-color: #374151;
-                color: #94A3B8;
-            }
-        """)
+        self.and_button.setStyleSheet(get_and_button_stylesheet())
         self.and_button.clicked.connect(lambda: self._add_with_logic("AND"))
         buttons_layout.addWidget(self.and_button)
         
-        # Add as OR button (optional/booster)
+        # Add as OR button (optional/booster) - using centralized style
         self.or_button = QPushButton("➕ Add as OR (Optional)")
         self.or_button.setMinimumHeight(40)
-        self.or_button.setStyleSheet("""
-            QPushButton {
-                background-color: #10B981;
-                color: white;
-                font-weight: bold;
-                border: none;
-                border-radius: 6px;
-                padding: 10px 20px;
-                font-size: 10pt;
-            }
-            QPushButton:hover {
-                background-color: #059669;
-            }
-            QPushButton:disabled {
-                background-color: #374151;
-                color: #94A3B8;
-            }
-        """)
+        self.or_button.setStyleSheet(get_or_button_stylesheet())
         self.or_button.clicked.connect(lambda: self._add_with_logic("OR"))
         buttons_layout.addWidget(self.or_button)
         
