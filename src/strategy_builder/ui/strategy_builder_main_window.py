@@ -384,6 +384,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         # Strategy name changed: Update window title
         self.info_panel.strategy_name_changed.connect(self._on_strategy_name_changed)
+        
+        # Strategy type changed: Reset validation (requires re-validation)
+        self.info_panel.strategy_type_changed.connect(self._on_strategy_type_changed)
     
     def _on_block_selected(self, block_name: str):
         """Handle block selection from search panel."""
@@ -445,7 +448,13 @@ class StrategyBuilderMainWindow(QMainWindow):
         """Handle strategy name change."""
         self.is_modified = True
         self._update_window_title()
-        # RESET VALIDATION when strategy name/type changes
+        # RESET VALIDATION when strategy name changes
+        self.reset_validation()
+    
+    def _on_strategy_type_changed(self, strategy_type: str):
+        """Handle strategy type change (Bullish/Bearish)."""
+        self.is_modified = True
+        # RESET VALIDATION when strategy type changes
         self.reset_validation()
     
     def _on_new_strategy(self):
