@@ -1410,12 +1410,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         Args:
             status: 'Pass' or 'Fail'
         """
-        print(f"\n🔍 DEBUG: _save_validation_status_to_db called")
-        print(f"   Status: {status}")
-        print(f"   current_version_id: {self.current_version_id}")
-        
         if not self.current_version_id:
-            print(f"   ❌ SKIP: No current_version_id")
             return  # No version to update yet (strategy not saved)
         
         try:
@@ -1424,36 +1419,24 @@ class StrategyBuilderMainWindow(QMainWindow):
             
             db = get_database_manager()
             
-            print(f"   Querying for version: {self.current_version_id}")
-            
             # Get the strategy version using ORM
             version = db.strategy.session.query(StrategyVersion).filter(
                 StrategyVersion.version_id == self.current_version_id
             ).first()
             
-            print(f"   Query result: {version}")
-            
             if version:
-                print(f"   BEFORE: validation_status = {version.validation_status}")
-                
                 # Update using ORM
                 version.validation_status = status
                 version.validation_timestamp = datetime.utcnow()
                 db.strategy.session.commit()
-                
-                print(f"   AFTER: validation_status = {version.validation_status}")
-                print(f"✅ Validation status saved: {status} for version {self.current_version_id}")
-            else:
-                print(f"⚠️ Version not found in database: {self.current_version_id}")
             
         except Exception as e:
-            print(f"⚠️ Failed to save validation status: {e}")
             # Rollback on error
             try:
                 db.strategy.session.rollback()
             except:
                 pass
-            # Don't fail the UI if database save fails
+            # Don't fail the UI if database save fails - log silently
             import traceback
             traceback.print_exc()
     
