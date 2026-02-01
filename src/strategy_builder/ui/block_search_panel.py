@@ -86,6 +86,9 @@ class BlockListItem(QWidget):
         # Track whether strategy has blocks (for button state management)
         self.strategy_has_blocks = False
         
+        # Store parent panel reference (will be set by BlockSearchPanel)
+        self.parent_panel = None
+        
         self._init_ui()
     
     def _init_ui(self):
