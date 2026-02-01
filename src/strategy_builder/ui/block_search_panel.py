@@ -1016,3 +1016,24 @@ class BlockSearchPanel(QWidget):
         # Update all block items
         for block_item in self.block_items.values():
             block_item.update_button_state(strategy_has_blocks)
+    
+    def sync_with_strategy(self):
+        """
+        Synchronize added_blocks with actual strategy blocks from orchestrator.
+        
+        Called when blocks change to ensure UI state matches actual strategy state.
+        This is critical for button state management.
+        """
+        # Get actual blocks from orchestrator
+        config = self.orchestrator.get_current_config()
+        actual_block_names = set()
+        
+        if config and config.blocks:
+            for block in config.blocks:
+                actual_block_names.add(block.name)
+        
+        # Update added_blocks to match reality
+        self.added_blocks = actual_block_names
+        
+        # Update button states to match new reality
+        self.update_all_button_states()

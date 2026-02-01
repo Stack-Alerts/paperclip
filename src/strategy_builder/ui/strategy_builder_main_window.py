@@ -439,6 +439,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Refresh info panel to update description and required signals
         self.info_panel.refresh_from_orchestrator()
         
+        # Sync search panel button states with actual strategy blocks
+        self.search_panel.sync_with_strategy()
+        
         # Mark as modified
         self.is_modified = True
         self._update_window_title()
