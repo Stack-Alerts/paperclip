@@ -204,12 +204,23 @@ class BlockListItem(QWidget):
             self.signal_checkboxes[signal_info.name] = checkbox
             checkbox_layout.addWidget(checkbox)
             
-            # Add signal description
+            # Add signal description with proper indentation using layout
             if hasattr(signal_info, 'description') and signal_info.description:
+                desc_container = QHBoxLayout()
+                desc_container.setContentsMargins(0, 2, 0, 4)
+                desc_container.setSpacing(0)
+                
+                # Add spacer for indentation (28px to align with checkbox text)
+                desc_spacer = QWidget()
+                desc_spacer.setFixedWidth(28)
+                desc_container.addWidget(desc_spacer)
+                
                 desc_label = QLabel(signal_info.description)
                 desc_label.setWordWrap(True)
-                desc_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt; padding-left: 28px; padding-top: 2px; padding-bottom: 4px; font-style: italic;")
-                checkbox_layout.addWidget(desc_label)
+                desc_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt; font-style: italic;")
+                desc_container.addWidget(desc_label, stretch=1)
+                
+                checkbox_layout.addLayout(desc_container)
             
             signals_layout.addLayout(checkbox_layout)
         
