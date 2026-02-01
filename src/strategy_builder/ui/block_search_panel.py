@@ -964,18 +964,16 @@ class BlockSearchPanel(QWidget):
     
     def mark_block_as_removed(self, block_name: str):
         """
-        Mark a block as removed (would need to re-enable UI).
-        
-        NOTE: Currently blocks can't be removed after adding (buttons stay disabled).
+        Mark a block as removed and update button states.
         
         Args:
             block_name: Name of the block to mark as removed
         """
         if block_name in self.added_blocks:
             self.added_blocks.remove(block_name)
-        
-        # NOTE: Would need to re-enable the expand button and reset checkboxes
-        # This is a TODO for later - for now blocks remain disabled after adding
+            
+            # Update button states - if empty, disable OR/Exit and rename AND button
+            self.update_all_button_states()
     
     def get_added_blocks(self) -> List[str]:
         """
