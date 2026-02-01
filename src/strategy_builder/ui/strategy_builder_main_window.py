@@ -466,14 +466,16 @@ class StrategyBuilderMainWindow(QMainWindow):
         """Handle strategy name change."""
         self.is_modified = True
         self._update_window_title()
-        # RESET VALIDATION when strategy name changes
-        self.reset_validation()
+        # RESET VALIDATION when strategy name changes (BUT NOT during load)
+        if not self.loading_strategy:
+            self.reset_validation()
     
     def _on_strategy_type_changed(self, strategy_type: str):
         """Handle strategy type change (Bullish/Bearish)."""
         self.is_modified = True
-        # RESET VALIDATION when strategy type changes
-        self.reset_validation()
+        # RESET VALIDATION when strategy type changes (BUT NOT during load)
+        if not self.loading_strategy:
+            self.reset_validation()
     
     def _on_new_strategy(self):
         """Create a new strategy in database."""
@@ -583,7 +585,7 @@ class StrategyBuilderMainWindow(QMainWindow):
                 'exit_conditions': exit_conditions_data  # Sprint 1.8: Include exit conditions
             }
             
-            # SUPPRESS validation reset during load
+            # SUPPRESS validation reset during load AND all refresh operations
             self.loading_strategy = True
             
             try:
@@ -601,11 +603,8 @@ class StrategyBuilderMainWindow(QMainWindow):
                 traceback.print_exc()
                 # Fallback to empty config
                 self.orchestrator.create_strategy(version['name'])
-            finally:
-                # Always re-enable validation reset after load
-                self.loading_strategy = False
             
-            # Update UI panels with loaded data
+            # Update UI panels with loaded data (STILL loading)
             self.info_panel.set_strategy_name(version['name'])
             if version.get('description'):
                 self.info_panel.set_description(version['description'])
@@ -618,10 +617,13 @@ class StrategyBuilderMainWindow(QMainWindow):
             self.current_file = None
             self.is_modified = False
             
-            # Clear and refresh panels
+            # Clear and refresh panels (refresh can trigger blocks_changed!)
             self.search_panel.clear_added_blocks()
             self.blocks_panel.refresh_from_orchestrator()
             self.info_panel.refresh_from_orchestrator()
+            
+            # NOW re-enable validation reset (AFTER all refresh operations)
+            self.loading_strategy = False
             
             # Update UI
             self._update_window_title()
