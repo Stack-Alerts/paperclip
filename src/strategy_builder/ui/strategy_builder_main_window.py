@@ -414,6 +414,12 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.is_modified = True
         self._update_window_title()
         
+        # RESET VALIDATION when strategy configuration changes
+        # User must re-validate after modifying blocks
+        if self.validation_passed or 1 in self.stepper.error_steps:
+            self.validation_passed = False
+            self.stepper.reset_step(1)  # Reset Validate button to default state
+        
         # Update status
         block_count = self.blocks_panel.get_block_count()
         self._update_status(f"Strategy updated - {block_count} block(s) configured")
@@ -501,10 +507,23 @@ class StrategyBuilderMainWindow(QMainWindow):
                 QMessageBox.warning(self, "Load Failed", "Strategy version not found in database")
                 return
             
-            # Reset workflow state
-            self.validation_passed = False
-            self.test_completed = False
-            self.stepper.reset_all_steps()
+            # Load validation status from database and restore stepper state
+            validation_status = version.get('validation_status', 'Un-Validated')
+            
+            if validation_status == 'Pass':
+                self.validation_passed = True
+                self.test_completed = False
+                self.stepper.reset_all_steps()
+                self.stepper.mark_step_complete(1)  # Green check mark
+            elif validation_status == 'Fail':
+                self.validation_passed = False
+                self.test_completed = False
+                self.stepper.reset_all_steps()
+                self.stepper.mark_step_error(1)  # Red X mark
+            else:  # Un-Validated
+                self.validation_passed = False
+                self.test_completed = False
+                self.stepper.reset_all_steps()  # Default state
             
             # Load blocks from database using persistence (SAME AS FILE LOAD)
             blocks_data = version.get('blocks', [])
