@@ -468,6 +468,66 @@ class BlockListItem(QWidget):
             self.and_button.setText("➕ Add Required Signal")
             self.or_button.setEnabled(False)
             self.exit_button.setEnabled(False)
+    
+    def reset_added_signals(self):
+        """
+        Reset all added signals, making them available again.
+        
+        Called when this block is removed from the strategy.
+        Clears the added_signals set and restores all checkboxes to enabled state.
+        """
+        # Clear all added signals
+        for signal_name in list(self.added_signals):
+            checkbox = self.signal_checkboxes.get(signal_name)
+            if checkbox:
+                # Re-enable checkbox
+                checkbox.setEnabled(True)
+                checkbox.setChecked(False)
+                
+                # Restore normal styling
+                checkbox.setStyleSheet("""
+                    QCheckBox {
+                        color: #A0AEC0;
+                        font-size: 10pt;
+                        font-weight: bold;
+                        padding: 4px;
+                    }
+                    QCheckBox::indicator {
+                        width: 18px;
+                        height: 18px;
+                        border: 2px solid #374151;
+                        border-radius: 4px;
+                        background-color: #1A202C;
+                    }
+                    QCheckBox::indicator:checked {
+                        background-color: #00D9FF;
+                        border-color: #00D9FF;
+                    }
+                    QCheckBox::indicator:hover {
+                        border-color: #00D9FF;
+                    }
+                """)
+        
+        # Clear the added signals set
+        self.added_signals.clear()
+        
+        # Re-enable expand button and action buttons
+        self.expand_button.setEnabled(True)
+        self.and_button.setEnabled(True)
+        self.or_button.setEnabled(True)
+        self.exit_button.setEnabled(True)
+        
+        # Reset expand button text
+        visible_count = len(self.visible_signals)
+        if self.expanded:
+            self.expand_button.setText(f"▼ Hide Signals ({visible_count})")
+        else:
+            self.expand_button.setText(f"▶ Show Signals ({visible_count})")
+        
+        if LOGGER_AVAILABLE and logger:
+            logger.info(LogComponent.SEARCH_PANEL,
+                       f"Reset all signals for block {self.block_info.name}",
+                       {'signals_cleared': len(self.signal_checkboxes)})
 
 
 class BlockSearchPanel(QWidget):
@@ -966,11 +1026,24 @@ class BlockSearchPanel(QWidget):
         """
         Mark a block as removed and update button states.
         
+        BUG FIX: Also reset the signals in the corresponding BlockListItem
+        so they become available again.
+        
         Args:
             block_name: Name of the block to mark as removed
         """
         if block_name in self.added_blocks:
             self.added_blocks.remove(block_name)
+            
+            # CRITICAL FIX: Reset signals in the corresponding BlockListItem
+            if block_name in self.block_items:
+                block_item = self.block_items[block_name]
+                block_item.reset_added_signals()
+                
+                if LOGGER_AVAILABLE and logger:
+                    logger.info(LogComponent.SEARCH_PANEL,
+                               f"Block removed and signals reset",
+                               {'block': block_name})
             
             # Update button states - if empty, disable OR/Exit and rename AND button
             self.update_all_button_states()
@@ -1023,14 +1096,90 @@ class BlockSearchPanel(QWidget):
         
         Called when blocks change to ensure UI state matches actual strategy state.
         This is critical for button state management.
+        
+        BUG FIX: Also resets signals for blocks that were removed and marks signals
+        as added for blocks that are in the strategy.
         """
         # Get actual blocks from orchestrator
         config = self.orchestrator.get_current_config()
         actual_block_names = set()
+        block_signals_map = {}  # Map of block_name -> list of signal names
         
         if config and config.blocks:
             for block in config.blocks:
                 actual_block_names.add(block.name)
+                # Collect the signals that are in this block
+                signal_names = [signal.name for signal in block.signals]
+                block_signals_map[block.name] = signal_names
+        
+        # CRITICAL FIX: Find blocks that were removed (in added_blocks but not in actual)
+        removed_blocks = self.added_blocks - actual_block_names
+        
+        # Reset signals for removed blocks
+        for block_name in removed_blocks:
+            if block_name in self.block_items:
+                block_item = self.block_items[block_name]
+                block_item.reset_added_signals()
+                
+                if LOGGER_AVAILABLE and logger:
+                    logger.info(LogComponent.SEARCH_PANEL,
+                               f"Block removed via sync - signals reset",
+                               {'block': block_name})
+        
+        # NEW FIX: Mark signals as added for blocks that are in the strategy
+        for block_name in actual_block_names:
+            if block_name in self.block_items:
+                block_item = self.block_items[block_name]
+                signal_names = block_signals_map.get(block_name, [])
+                
+                # Mark each signal as added (same logic as _add_with_logic)
+                for signal_name in signal_names:
+                    if signal_name not in block_item.added_signals:
+                        checkbox = block_item.signal_checkboxes.get(signal_name)
+                        if checkbox:
+                            # Mark as added
+                            block_item.added_signals.add(signal_name)
+                            checkbox.setChecked(False)
+                            checkbox.setEnabled(False)
+                            
+                            # Apply strikethrough styling
+                            checkbox.setStyleSheet("""
+                                QCheckBox {
+                                    color: #666666;
+                                    font-size: 10pt;
+                                    padding: 4px;
+                                    text-decoration: line-through;
+                                }
+                                QCheckBox::indicator {
+                                    width: 18px;
+                                    height: 18px;
+                                    border: 2px solid #3C4149;
+                                    border-radius: 4px;
+                                    background-color: #3C4149;
+                                }
+                            """)
+                
+                # Update expand button text if signals were marked
+                if signal_names:
+                    added_count = len(block_item.added_signals)
+                    total_count = len(block_item.visible_signals)
+                    remaining = total_count - added_count
+                    
+                    if remaining > 0:
+                        if block_item.expanded:
+                            block_item.expand_button.setText(
+                                f"▼ Hide Signals ({remaining} available, {added_count} added)"
+                            )
+                        else:
+                            block_item.expand_button.setText(
+                                f"▶ Show Signals ({remaining} available, {added_count} added)"
+                            )
+                    else:
+                        # All signals added
+                        block_item.expand_button.setText(f"✓ All Signals Added ({added_count})")
+                        block_item.expand_button.setEnabled(False)
+                        block_item.and_button.setEnabled(False)
+                        block_item.or_button.setEnabled(False)
         
         # Update added_blocks to match reality
         self.added_blocks = actual_block_names

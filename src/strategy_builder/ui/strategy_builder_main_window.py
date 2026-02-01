@@ -396,11 +396,20 @@ class StrategyBuilderMainWindow(QMainWindow):
         # NOTE: Blocks are now added via orchestrator.add_block_with_signals()
         # which is called from the search panel. We just need to refresh the display.
         
+        # Save current name if it's blank (user hasn't named strategy yet)
+        current_name = self.info_panel.get_strategy_name()
+        preserve_blank = (current_name == "" or current_name.strip() == "")
+        
         # Refresh blocks panel to show newly added block
         self.blocks_panel.refresh_from_orchestrator()
         
         # Refresh info panel to update description and required signals
         self.info_panel.refresh_from_orchestrator()
+        
+        # CRITICAL: Restore blank name if user hasn't named strategy yet
+        # (refresh pulls "New_Strategy" from config, which should stay hidden from user)
+        if preserve_blank:
+            self.info_panel.set_strategy_name("")
         
         # Mark as added in search panel
         self.search_panel.mark_block_as_added(block_name)
@@ -436,8 +445,17 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_blocks_changed(self):
         """Handle blocks changed event."""
+        # Save current name if it's blank (user hasn't named strategy yet)
+        current_name = self.info_panel.get_strategy_name()
+        preserve_blank = (current_name == "" or current_name.strip() == "")
+        
         # Refresh info panel to update description and required signals
         self.info_panel.refresh_from_orchestrator()
+        
+        # CRITICAL: Restore blank name if user hasn't named strategy yet
+        # (refresh pulls "New_Strategy" from config, which should stay hidden from user)
+        if preserve_blank:
+            self.info_panel.set_strategy_name("")
         
         # Sync search panel button states with actual strategy blocks
         self.search_panel.sync_with_strategy()
@@ -469,10 +487,23 @@ class StrategyBuilderMainWindow(QMainWindow):
         if not self.loading_strategy:
             self.reset_validation()
     
+    def _is_strategy_empty(self) -> bool:
+        """
+        Check if strategy is truly empty (nothing worth saving).
+        
+        Returns:
+            True if strategy has no name and no blocks, False otherwise
+        """
+        strategy_name = self.info_panel.get_strategy_name()
+        block_count = self.blocks_panel.get_block_count()
+        
+        # Empty if no name AND no blocks
+        return (not strategy_name or strategy_name.strip() == "") and block_count == 0
+    
     def _on_new_strategy(self):
-        """Create a new strategy in database."""
-        # Check if current strategy should be saved
-        if self.is_modified:
+        """Create a new strategy - reset to clean state."""
+        # Check if current strategy should be saved (skip if empty)
+        if self.is_modified and not self._is_strategy_empty():
             reply = ask_question(
                 self,
                 "Unsaved Changes",
@@ -486,45 +517,43 @@ class StrategyBuilderMainWindow(QMainWindow):
             elif reply == 'cancel':
                 return
         
-        # Show new strategy dialog
-        dialog = NewStrategyDialog(self)
-        if dialog.exec_() != NewStrategyDialog.Accepted:
-            return  # User cancelled
+        # Reset strategy in orchestrator with placeholder (allows adding blocks immediately)
+        self.orchestrator.create_strategy("New_Strategy")
         
-        # Get strategy data from dialog
-        data = dialog.get_strategy_data()
+        # Update UI with blank name field (user enters their own name)
+        # The placeholder "New_Strategy" is used internally but hidden from user
+        self.info_panel.set_strategy_name("")
+        self.info_panel.set_description("")
         
-        # Reset strategy in orchestrator (clears all blocks)
-        self.orchestrator.create_strategy(data['name'])
+        # Clear database IDs (new strategy, not saved yet)
+        self.current_strategy_id = None
+        self.current_version_id = None
         
-        # Update UI with new strategy name
-        self.info_panel.set_strategy_name(data['name'])
-        if data.get('description'):
-            self.info_panel.set_description(data['description'])
-        
-        # Track database IDs
-        self.current_strategy_id = data['strategy_id']
-        self.current_version_id = None  # Will be set on first save
-        
-        # Clear file tracking (using database now)
+        # Clear file tracking
         self.current_file = None
-        self.is_modified = True
+        self.is_modified = False  # Clean state, nothing to save yet
         
         # Clear visual markers
         self.search_panel.clear_added_blocks()
         
-        # Refresh panels
+        # Refresh blocks panel to show empty state
         self.blocks_panel.refresh_from_orchestrator()
-        self.info_panel.refresh_from_orchestrator()
+        # NOTE: Don't refresh info_panel - it would pull "New_Strategy" from config
+        # and overwrite the blank name we just set. We already set name/description above.
+        
+        # Reset validation and test states
+        self.validation_passed = False
+        self.test_completed = False
+        self.stepper.reset_all_steps()
         
         # Update UI
         self._update_window_title()
-        self._update_status(f"New strategy created: {data['name']} (database-backed)")
+        self._update_status("New strategy created - Ready to add blocks")
     
     def _on_open_strategy(self):
         """Open strategy from database using StrategyBrowserDialog."""
-        # Check if current strategy should be saved
-        if self.is_modified:
+        # Check if current strategy should be saved (skip if empty)
+        if self.is_modified and not self._is_strategy_empty():
             reply = ask_question(
                 self,
                 "Unsaved Changes",
@@ -628,6 +657,9 @@ class StrategyBuilderMainWindow(QMainWindow):
             self.search_panel.clear_added_blocks()
             self.blocks_panel.refresh_from_orchestrator()
             self.info_panel.refresh_from_orchestrator()
+            
+            # CRITICAL FIX: Sync search panel with loaded strategy to update button states
+            self.search_panel.sync_with_strategy()
             
             # NOW re-enable validation reset (AFTER all refresh operations)
             self.loading_strategy = False
@@ -1789,7 +1821,8 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def closeEvent(self, event):
         """Handle window close event."""
-        if self.is_modified:
+        # Check if current strategy should be saved (skip if empty)
+        if self.is_modified and not self._is_strategy_empty():
             reply = ask_question(
                 self,
                 "Unsaved Changes",
