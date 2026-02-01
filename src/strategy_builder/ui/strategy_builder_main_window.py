@@ -424,11 +424,6 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         Forces user to re-validate after ANY modification.
         """
-        print(f"\n🔄 DEBUG: reset_validation() CALLED")
-        print(f"   validation_passed: {self.validation_passed}")
-        print(f"   error_steps: {self.stepper.error_steps}")
-        print(f"   completed_steps (before): {self.stepper.completed_steps}")
-        
         # FIX: Always reset if step 1 has ANY status (completed or error)
         # Must clear completed_steps AND force visual button reset FOR STEP 1 ONLY
         if 1 in self.stepper.completed_steps or 1 in self.stepper.error_steps:
@@ -436,14 +431,8 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Clear step 1 from sets
             self.stepper.completed_steps.discard(1)
             self.stepper.error_steps.discard(1)
-            print(f"   completed_steps (after): {self.stepper.completed_steps}")
-            print(f"   error_steps (after): {self.stepper.error_steps}")
-            print(f"   Calling _update_display() to rebuild button styles...")
             # Force visual refresh by calling _update_display() which rebuilds button styles
             self.stepper._update_display()
-            print(f"   ✅ Validation reset complete\n")
-        else:
-            print(f"   ℹ️ Step 1 not in completed or error, no reset needed\n")
     
     def _on_blocks_changed(self):
         """Handle blocks changed event."""
@@ -694,17 +683,9 @@ class StrategyBuilderMainWindow(QMainWindow):
                 'tags': []  # Reserved
             }
             
-            # Create new version (THIS IS WHERE IT FAILS)
+            # Create new version
             try:
-                print(f"\n🔍 DEBUG: Attempting to create version...")
-                print(f"   Strategy ID: {version_data['strategy_id']}")
-                print(f"   Name: {version_data['name']}")
-                print(f"   Blocks type: {type(version_data['blocks'])}")
-                print(f"   Blocks length: {len(version_data['blocks']) if isinstance(version_data['blocks'], list) else 'N/A'}")
-                
                 self.current_version_id = db.strategy.create_strategy_version(version_data)
-                
-                print(f"✅ Version created successfully: {self.current_version_id}")
                 
             except Exception as version_error:
                 # VERSION CREATION FAILED
