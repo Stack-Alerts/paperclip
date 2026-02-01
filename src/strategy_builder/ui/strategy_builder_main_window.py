@@ -418,7 +418,10 @@ class StrategyBuilderMainWindow(QMainWindow):
         # User must re-validate after modifying blocks
         if self.validation_passed or 1 in self.stepper.error_steps:
             self.validation_passed = False
-            self.stepper.reset_step(1)  # Reset Validate button to default state
+            # Clear step 1 from completed and error sets
+            self.stepper.completed_steps.discard(1)
+            self.stepper.error_steps.discard(1)
+            self.stepper.update()  # Refresh the UI
         
         # Update status
         block_count = self.blocks_panel.get_block_count()
