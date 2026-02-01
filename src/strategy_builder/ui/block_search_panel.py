@@ -449,9 +449,25 @@ class BlockListItem(QWidget):
                                'block': self.block_info.name
                            })
     
-    # NOTE: disable_add_button() and enable_add_button() methods removed
-    # The old "Add to Strategy" button no longer exists
-    # Blocks are now disabled via the expand button after selection
+    def update_button_state(self, strategy_has_blocks: bool):
+        """
+        Update button states based on whether strategy has blocks.
+        
+        Args:
+            strategy_has_blocks: True if strategy has any building blocks, False otherwise
+        """
+        self.strategy_has_blocks = strategy_has_blocks
+        
+        if strategy_has_blocks:
+            # Strategy has blocks - enable all buttons with normal labels
+            self.and_button.setText("➕ Add as AND (Required)")
+            self.or_button.setEnabled(True)
+            self.exit_button.setEnabled(True)
+        else:
+            # Empty strategy - disable OR/Exit, rename AND button
+            self.and_button.setText("➕ Add Required Signal")
+            self.or_button.setEnabled(False)
+            self.exit_button.setEnabled(False)
 
 
 class BlockSearchPanel(QWidget):
@@ -712,6 +728,9 @@ class BlockSearchPanel(QWidget):
                         # Create block item widget
                         block_item = BlockListItem(block_info)
                         
+                        # Set parent panel reference
+                        block_item.parent_panel = self
+                        
                         # NEW: Connect to signal with AND/OR logic
                         block_item.block_with_signals_selected.connect(self._on_block_with_signals_selected)
                         
@@ -746,6 +765,9 @@ class BlockSearchPanel(QWidget):
             
             for block_type in sorted(types):
                 self.type_filter.addItem(block_type)
+            
+            # Initialize button states (empty strategy = disabled OR/Exit)
+            self.update_all_button_states()
                 
         except Exception as e:
             # Log the error with full details
@@ -834,6 +856,9 @@ class BlockSearchPanel(QWidget):
         if result.success:
             # Mark as added
             self.added_blocks.add(block_name)
+            
+            # Update all button states (enable OR/Exit now that we have blocks)
+            self.update_all_button_states()
             
             # Emit for backward compatibility
             self.block_selected.emit(block_name)
@@ -981,3 +1006,15 @@ class BlockSearchPanel(QWidget):
     def get_visible_blocks_count(self) -> int:
         """Get the count of currently visible blocks."""
         return sum(1 for item in self.block_items.values() if item.isVisible())
+    
+    def update_all_button_states(self):
+        """
+        Update button states for all block items based on whether strategy has blocks.
+        
+        Called after adding or removing blocks to update UI state.
+        """
+        strategy_has_blocks = len(self.added_blocks) > 0
+        
+        # Update all block items
+        for block_item in self.block_items.values():
+            block_item.update_button_state(strategy_has_blocks)
