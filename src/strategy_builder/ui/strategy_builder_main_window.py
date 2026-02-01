@@ -421,12 +421,25 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         Forces user to re-validate after ANY modification.
         """
-        if self.validation_passed or 1 in self.stepper.error_steps:
+        print(f"\n🔄 DEBUG: reset_validation() CALLED")
+        print(f"   validation_passed: {self.validation_passed}")
+        print(f"   error_steps: {self.stepper.error_steps}")
+        print(f"   completed_steps (before): {self.stepper.completed_steps}")
+        
+        # FIX: Check stepper state directly, not validation_passed flag
+        # After first reset, validation_passed becomes False but completed_steps
+        # needs to be cleared on every subsequent config change too
+        if 1 in self.stepper.completed_steps or 1 in self.stepper.error_steps:
             self.validation_passed = False
             # Clear step 1 from completed and error sets
             self.stepper.completed_steps.discard(1)
             self.stepper.error_steps.discard(1)
+            print(f"   completed_steps (after): {self.stepper.completed_steps}")
+            print(f"   Calling stepper.update()...")
             self.stepper.update()  # Refresh the UI
+            print(f"   ✅ Validation reset complete\n")
+        else:
+            print(f"   ℹ️ Step 1 not in completed or error, no reset needed\n")
     
     def _on_blocks_changed(self):
         """Handle blocks changed event."""
