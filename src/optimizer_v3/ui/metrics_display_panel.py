@@ -860,11 +860,12 @@ class MetricsDisplayPanel(QWidget):
         if self.rec_engine is None:
             self._initialize_recommendation_engine()
         
-        # ONLY show AI preview when backtest is COMPLETE
-        # (NOT on every metrics update - preview is the gate before AI)
+        # ONLY populate AI Recommendations Panel when backtest is COMPLETE
+        # (NOT on every metrics update)
+        # DO NOT auto-generate - wait for user to click "Approve & Send to AI" button
         if backtest_complete:
-            print("[UI] Backtest complete - showing AI request preview...")
-            self._show_ai_request_preview()
+            print("[UI] Backtest complete - populating AI Recommendations panel preview...")
+            self._populate_ai_recommendations_panel()
         
         # Update tables with metrics and recommendations
         self._update_performance_table()
@@ -1403,12 +1404,24 @@ class MetricsDisplayPanel(QWidget):
         
         CRITICAL FIX: Runs in background thread to prevent UI freeze.
         """
+        print("=" * 80)
+        print("[AI GEN] _generate_batch_recommendations() CALLED")
+        print(f"[AI GEN] rec_engine: {self.rec_engine is not None}")
+        print(f"[AI GEN] current_metrics: {self.current_metrics is not None}")
+        if self.current_metrics:
+            print(f"[AI GEN] current_metrics keys: {list(self.current_metrics.keys())}")
+        print("=" * 80)
+        
         if not self.rec_engine or not self.current_metrics:
+            print(f"[AI GEN] ❌ EARLY RETURN: rec_engine={self.rec_engine is not None}, metrics={self.current_metrics is not None}")
             return
         
         try:
+            print("[AI GEN] Getting strategy config...")
             # Prepare strategy config (get from orchestrator)
             strategy_config_obj = self._get_current_strategy_config()
+            print(f"[AI GEN] strategy_config_obj: {strategy_config_obj is not None}")
+            
             if not strategy_config_obj:
                 print("⚠️ No strategy config available - using generic recommendations")
                 self.batch_recommendations = []
@@ -1444,12 +1457,15 @@ class MetricsDisplayPanel(QWidget):
             self.progress_dialog.setWindowModality(Qt.WindowModality.NonModal)  # CRITICAL: Non-modal
             self.progress_dialog.setMinimumDuration(0)  # Show immediately
             self.progress_dialog.setValue(0)
-            self.progress_dialog.setAutoClose(True)
-            self.progress_dialog.setAutoReset(True)
+            self.progress_dialog.setAutoClose(False)  # FIXED: Don't auto-close (manual control)
+            self.progress_dialog.setAutoReset(False)  # FIXED: Don't auto-reset
             self.progress_dialog.setCancelButton(None)  # CRITICAL: Disable cancel to prevent blocking
             # FIXED: Make dialog 2x larger
             self.progress_dialog.setMinimumSize(800, 300)
             self.progress_dialog.resize(800, 300)
+            # CRITICAL FIX: Force show() immediately to ensure dialog renders
+            self.progress_dialog.show()
+            QApplication.processEvents()  # Force UI update before starting worker
             
             # Create background worker (FIXED: Pass full backtest results with trade list)
             self.rec_worker = RecommendationWorker(
@@ -1466,6 +1482,15 @@ class MetricsDisplayPanel(QWidget):
             self.rec_worker.error_occurred.connect(self._on_ai_error)
             self.progress_dialog.canceled.connect(self.rec_worker.terminate)
             
+            # CRITICAL FIX: Add minimum display time to ensure user sees progress
+            # Even if worker finishes instantly, dialog stays visible for 1 second
+            from PyQt5.QtCore import QTimer
+            self.min_dialog_timer = QTimer()
+            self.min_dialog_timer.setSingleShot(True)
+            self.min_dialog_timer.timeout.connect(self._allow_dialog_close)
+            self.dialog_can_close = False  # Flag to prevent instant close
+            self.min_dialog_timer.start(1000)  # Minimum 1 second display
+            
             # Start background generation
             print("[UI] Starting AI recommendation generation in background thread...")
             self.rec_worker.start()
@@ -1476,6 +1501,14 @@ class MetricsDisplayPanel(QWidget):
             traceback.print_exc()
             self.batch_recommendations = []
     
+    def _allow_dialog_close(self) -> None:
+        """Allow progress dialog to close after minimum display time"""
+        self.dialog_can_close = True
+        # If recommendations are already ready, close dialog now
+        if hasattr(self, 'progress_dialog') and hasattr(self, '_recommendations_waiting'):
+            print("[UI] Minimum dialog time elapsed - closing now")
+            self.progress_dialog.close()
+    
     def _on_recommendations_ready(self, recommendations: List[IntegratedRecommendation]) -> None:
         """
         Handle completion of background AI recommendation generation.
@@ -1483,25 +1516,42 @@ class MetricsDisplayPanel(QWidget):
         Args:
             recommendations: List of generated recommendations
         """
-        # Close progress dialog
-        if hasattr(self, 'progress_dialog'):
-            self.progress_dialog.close()
-        
-        # Store results
+        # Store results first
         self.batch_recommendations = recommendations
         print(f"[UI] ✅ Received {len(recommendations)} AI recommendations")
+        
+        # Close progress dialog ONLY if minimum time has elapsed
+        if hasattr(self, 'progress_dialog'):
+            if self.dialog_can_close:
+                # Minimum time elapsed - close immediately
+                print("[UI] Closing dialog (minimum time already elapsed)")
+                self.progress_dialog.close()
+            else:
+                # Minimum time not elapsed - mark as waiting and let timer close it
+                print("[UI] Recommendations ready but waiting for minimum dialog time...")
+                self._recommendations_waiting = True
+                return  # Don't update UI yet - wait for timer
+        
+        # Continue with UI updates
+        self._finalize_recommendations()
+    
+    def _finalize_recommendations(self) -> None:
+        """Finalize recommendations display (called after dialog closes)"""
+        print("[UI] Finalizing recommendations display...")
         
         # Update tables to show new recommendations
         self._update_performance_table()
         self._update_risk_table()
         
         # Update status
-        self.status_label.setText(f"Status: <b>{len(recommendations)} AI recommendations generated</b>")
+        self.status_label.setText(f"Status: <b>{len(self.batch_recommendations)} AI recommendations generated</b>")
         
-        # CRITICAL: Emit signal to AI Recommendations Panel with formatted data
-        formatted_recs = self._format_recommendations_for_ai_panel(recommendations)
-        self.recommendations_generated.emit(formatted_recs)
-        print(f"[UI] ✅ Emitted {len(formatted_recs)} recommendations to AI Recommendations Panel")
+        # CRITICAL: Populate AI Recommendations Panel with FULL preview data
+        self._populate_ai_recommendations_panel()
+        print(f"[UI] ✅ Populated AI Recommendations Panel with full preview data")
+        
+        # AUTO-SWITCH to Metrics tab to show user where recommendations are
+        self._switch_to_metrics_tab()
     
     def _on_ai_progress(self, message: str, percentage: int) -> None:
         """
@@ -2549,47 +2599,280 @@ class MetricsDisplayPanel(QWidget):
     def _on_ai_request_approved(self, request_data: Dict) -> None:
         """
         Handle user approval of AI request from preview window.
-        
+
         NOW the actual AI generation happens (after user preview & approval).
         
+        CRITICAL: Uses the EXACT data from preview (request_data parameter).
+        This ensures what user reviewed is what AI receives.
+
         Args:
-            request_data: Complete request data from preview window
+            request_data: Complete request data from preview window (EXACT preview data)
         """
-        print("[UI] ✅ User approved AI request - starting generation...")
-        
-        # NOW trigger the actual AI recommendation generation
-        # (This was previously automatic, now it's user-gated)
-        self._generate_batch_recommendations()
+        print("=" * 80)
+        print("[AI REQUEST] ✅ _on_ai_request_approved() CALLED")
+        print(f"[AI REQUEST] Request data keys: {list(request_data.keys()) if request_data else 'None'}")
+        print(f"[AI REQUEST] Using EXACT preview data (no rebuild)")
+        print(f"[AI REQUEST] Trades in preview: {len(request_data.get('trades', []))}")
+        print(f"[AI REQUEST] Metrics in preview: {len(request_data.get('metrics', {}))}")
+        print("=" * 80)
+
+        # CRITICAL FIX: Use the EXACT data from preview, don't rebuild
+        # This ensures what the user approved is what the AI receives
+        print("[AI REQUEST] Calling _generate_batch_recommendations_with_preview_data()...")
+        try:
+            self._generate_batch_recommendations_with_preview_data(request_data)
+            print("[AI REQUEST] ✅ _generate_batch_recommendations() completed")
+        except Exception as e:
+            print(f"[AI REQUEST] ❌ ERROR in _generate_batch_recommendations(): {e}")
+            import traceback
+            traceback.print_exc()
     
-    def _format_recommendations_for_ai_panel(self, recommendations: List[IntegratedRecommendation]) -> List[Dict]:
+    def _generate_batch_recommendations_with_preview_data(self, preview_data: Dict) -> None:
         """
-        Format IntegratedRecommendation objects to dictionaries for AI Recommendations Panel.
+        Generate AI recommendations using EXACT data from preview window.
+        
+        CRITICAL: This ensures what the user approved in preview is what AI receives.
+        NO rebuilding, NO re-gathering - uses preview_data AS-IS.
         
         Args:
-            recommendations: List of IntegratedRecommendation objects from engine
-        
-        Returns:
-            List of dictionaries compatible with AIRecommendationsPanel
+            preview_data: Complete request data from preview window (strategy, backtest, trades, metrics)
         """
-        formatted = []
+        print("=" * 80)
+        print("[AI GEN PREVIEW] Using EXACT preview data for AI request")
+        print(f"[AI GEN PREVIEW] Preview data keys: {list(preview_data.keys())}")
+        print(f"[AI GEN PREVIEW] Trades count: {len(preview_data.get('trades', []))}")
+        print(f"[AI GEN PREVIEW] Metrics count: {len(preview_data.get('metrics', {}))}")
+        print("=" * 80)
         
-        for i, rec in enumerate(recommendations):
-            # Convert to dictionary format expected by AI panel
-            rec_dict = {
-                'id': str(i),
-                'type': rec.action_type if hasattr(rec, 'action_type') else rec.type,
-                'block_name': rec.block_name if hasattr(rec, 'block_name') else '',
-                'signal_name': rec.signal_name if hasattr(rec, 'signal_name') else '',
-                'parameter_name': rec.parameter_name if hasattr(rec, 'parameter_name') else '',
-                'configuration': rec.configuration if hasattr(rec, 'configuration') else {},
-                'ai_enhanced': rec.ai_enhanced if hasattr(rec, 'ai_enhanced') else False,
-                'reasoning': rec.reasoning if hasattr(rec, 'reasoning') else '',
-                'expected_impact': rec.expected_impact if hasattr(rec, 'expected_impact') else {},
-                'combined_confidence': rec.combined_confidence if hasattr(rec, 'combined_confidence') else rec.confidence_score if hasattr(rec, 'confidence_score') else 0.0,
-                'root_cause': rec.root_cause if hasattr(rec, 'root_cause') else '',
-                'warnings': rec.warnings if hasattr(rec, 'warnings') else []
+        if not self.rec_engine:
+            print("[AI GEN PREVIEW] ❌ No recommendation engine available")
+            return
+        
+        # CRITICAL: Check if OpenRouter API key is configured
+        if not self._check_api_key_configured():
+            self._show_api_key_warning()
+            # Continue anyway - will use data-driven recommendations as fallback
+        
+        try:
+            # Extract components from preview data (NO REBUILDING)
+            strategy_config = preview_data.get('strategy_config', {})
+            backtest_results = {
+                'config': preview_data.get('backtest_config', {}),
+                'trades': preview_data.get('trades', []),
+                'metrics': preview_data.get('metrics', {})
             }
             
-            formatted.append(rec_dict)
+            # Prepare metrics with ratings
+            metrics_with_ratings = {}
+            for metric_key, metric_value in preview_data.get('metrics', {}).items():
+                if isinstance(metric_value, (int, float)):
+                    rating = self._get_rating(metric_key, metric_value)
+                    metrics_with_ratings[metric_key] = {
+                        'value': float(metric_value),
+                        'rating': rating
+                    }
+            
+            # Create progress dialog
+            self.progress_dialog = QProgressDialog(
+                "Generating AI recommendations using approved data...",
+                None,
+                0,
+                100,
+                self
+            )
+            self.progress_dialog.setWindowTitle("🤖 AI Analysis in Progress")
+            self.progress_dialog.setWindowModality(Qt.WindowModality.NonModal)
+            self.progress_dialog.setMinimumDuration(0)
+            self.progress_dialog.setValue(0)
+            self.progress_dialog.setAutoClose(False)
+            self.progress_dialog.setAutoReset(False)
+            self.progress_dialog.setCancelButton(None)
+            self.progress_dialog.setMinimumSize(800, 300)
+            self.progress_dialog.resize(800, 300)
+            self.progress_dialog.show()
+            QApplication.processEvents()
+            
+            # Create worker with EXACT preview data
+            self.rec_worker = RecommendationWorker(
+                engine=self.rec_engine,
+                strategy_config=strategy_config,
+                backtest_results=backtest_results,
+                metrics=metrics_with_ratings,
+                lookback_days=180
+            )
+            
+            # Connect signals
+            self.rec_worker.recommendations_ready.connect(self._on_recommendations_ready)
+            self.rec_worker.progress_update.connect(self._on_ai_progress)
+            self.rec_worker.error_occurred.connect(self._on_ai_error)
+            
+            # Minimum display time
+            from PyQt5.QtCore import QTimer
+            self.min_dialog_timer = QTimer()
+            self.min_dialog_timer.setSingleShot(True)
+            self.min_dialog_timer.timeout.connect(self._allow_dialog_close)
+            self.dialog_can_close = False
+            self.min_dialog_timer.start(1000)
+            
+            # Start AI generation
+            print("[AI GEN PREVIEW] Starting worker with exact preview data...")
+            self.rec_worker.start()
+            
+        except Exception as e:
+            print(f"❌ Failed to generate recommendations with preview data: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            self.batch_recommendations = []
+    
+    def _check_api_key_configured(self) -> bool:
+        """
+        Check if OpenRouter API key is configured in environment.
         
-        return formatted
+        Returns:
+            True if API key is set, False otherwise
+        """
+        import os
+        api_key = os.getenv('OPENROUTER_API_KEY')
+        return api_key is not None and api_key.strip() != ''
+    
+    def _show_api_key_warning(self) -> None:
+        """
+        Show institutional-grade non-blocking warning dialog about missing API key.
+        
+        Informs user that AI enhancement is unavailable, but data-driven recommendations
+        will still be provided as fallback.
+        """
+        from PyQt5.QtWidgets import QMessageBox
+        
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.setWindowTitle("⚠️ AI Configuration Required")
+        msg.setText("<h3>OpenRouter API Key Not Configured</h3>")
+        msg.setInformativeText(
+            "<p><b>AI-Enhanced Recommendations Unavailable</b></p>"
+            "<p>The system will continue with data-driven recommendations as a fallback, "
+            "but AI-powered strategic insights will not be available.</p>"
+            "<br>"
+            "<p><b>To enable AI enhancement:</b></p>"
+            "<ol>"
+            "<li>Obtain an API key from <a href='https://openrouter.ai/keys'>OpenRouter.ai</a></li>"
+            "<li>Add to your <code>.env</code> file:<br><code>OPENROUTER_API_KEY=your_key_here</code></li>"
+            "<li>Restart the application</li>"
+            "</ol>"
+            "<br>"
+            "<p><i>Note: AI enhancement provides deeper strategic analysis and context-aware "
+            "recommendations. Data-driven recommendations are still highly effective for "
+            "identifying technical improvements.</i></p>"
+        )
+        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg.setDefaultButton(QMessageBox.StandardButton.Ok)
+        
+        # Non-blocking - don't wait for user response
+        msg.setModal(False)
+        msg.show()
+        
+        print("⚠️ API key warning dialog shown to user")
+    
+    def _switch_to_metrics_tab(self) -> None:
+        """
+        Switch to Metrics tab after AI recommendations complete.
+        
+        This helps user discover where the AI recommendations were applied.
+        """
+        try:
+            # Find the tab widget containing this panel
+            dialog = self.window()
+            
+            # Look for QTabWidget parent
+            parent = self.parent()
+            while parent and not isinstance(parent, QTabWidget):
+                parent = parent.parent()
+            
+            if parent and isinstance(parent, QTabWidget):
+                # Find index of "Metrics" or "AI Recommendations" tab
+                for i in range(parent.count()):
+                    tab_text = parent.tabText(i).lower()
+                    if 'metric' in tab_text or 'ai' in tab_text:
+                        parent.setCurrentIndex(i)
+                        print(f"[UI] ✅ Switched to tab: {parent.tabText(i)}")
+                        return
+            
+            print("[UI] ⚠️ Could not find tab widget to switch")
+                
+        except Exception as e:
+            print(f"❌ Failed to switch tabs: {str(e)}")
+    
+    def _populate_ai_recommendations_panel(self):
+        """
+        Populate AI Recommendations Panel with complete preview data.
+        
+        CRITICAL FIX: Directly access TradesPanel instead of waiting for 1-second timer emission.
+        """
+        try:
+            # Get strategy config
+            strategy_config_obj = self._get_current_strategy_config()
+            if not strategy_config_obj:
+                print("⚠️ No strategy config available - cannot populate AI panel")
+                return
+            
+            strategy_config_dict = self._convert_strategy_config_to_dict(strategy_config_obj)
+            
+            # Get backtest config
+            backtest_config = {}
+            if self.full_backtest_results and 'config' in self.full_backtest_results:
+                backtest_config = self.full_backtest_results['config']
+            else:
+                backtest_config = self._build_backtest_config_manually()
+            
+            # CRITICAL FIX: Get trades DIRECTLY from TradesPanel (don't wait for timer)
+            # The 1-second timer emission might not have fired yet when AI recs are ready
+            trades = []
+            dialog = self.window()
+            if hasattr(dialog, 'backtest_panel'):
+                backtest_panel = dialog.backtest_panel
+                if hasattr(backtest_panel, 'trades_panel'):
+                    trades_panel = backtest_panel.trades_panel
+                    if hasattr(trades_panel, 'get_trades'):
+                        trades = trades_panel.get_trades()
+                        print(f"[DEBUG] Got {len(trades)} trades DIRECTLY from TradesPanel.get_trades()")
+            
+            if not trades:
+                print(f"[DEBUG] ⚠️ No trades available - checking current_metrics fallback")
+                trades = self.current_metrics.get('trades', [])
+                print(f"[DEBUG] Fallback got {len(trades)} trades from current_metrics")
+            
+            # Get available blocks
+            from src.optimizer_v3.core.comprehensive_ai_request_builder import ComprehensiveAIRequestBuilder
+            builder = ComprehensiveAIRequestBuilder()
+            available_blocks = builder._extract_available_blocks()
+            
+            # Access AI Recommendations Panel and populate it
+            dialog = self.window()
+            if hasattr(dialog, 'backtest_panel'):
+                backtest_panel = dialog.backtest_panel
+                if hasattr(backtest_panel, 'ai_recommendations_panel'):
+                    ai_panel = backtest_panel.ai_recommendations_panel
+                    
+                    # Call populate_preview() with full data (EXACT same as standalone window)
+                    ai_panel.populate_preview(
+                        strategy_config=strategy_config_dict,
+                        backtest_config=backtest_config,
+                        trades=trades,  # From metrics emission
+                        metrics=self.current_metrics,
+                        available_blocks=available_blocks
+                    )
+                    
+                    print(f"[UI] ✅ AI Recommendations Panel populated with:")
+                    print(f"     Strategy Blocks: {len(strategy_config_dict.get('blocks', []))}")
+                    print(f"     Trades: {len(trades)}")
+                    print(f"     Metrics: {len(self.current_metrics)}")
+                    print(f"     Available Blocks: {len(available_blocks)}")
+                else:
+                    print("⚠️ AI Recommendations Panel not found")
+            else:
+                print("⚠️ Backtest panel not found")
+                
+        except Exception as e:
+            print(f"❌ Failed to populate AI Recommendations Panel: {str(e)}")
+            import traceback
+            traceback.print_exc()

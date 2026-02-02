@@ -98,6 +98,12 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Flag to prevent validation reset during strategy load
         self.loading_strategy = False
         
+        # Track open windows (singleton pattern)
+        self.validation_window: Optional[ValidationReportWindow] = None
+        self.browser_window: Optional[StrategyBrowserDialog] = None
+        self.backtest_window: Optional[BacktestConfigDialog] = None
+        self.log_viewer_window: Optional['LogViewerWindow'] = None
+        
         # Auto-update timers
         self.candle_check_timer: Optional[QTimer] = None
         self.retry_timer: Optional[QTimer] = None
@@ -551,7 +557,14 @@ class StrategyBuilderMainWindow(QMainWindow):
         self._update_status("New strategy created - Ready to add blocks")
     
     def _on_open_strategy(self):
-        """Open strategy from database using StrategyBrowserDialog."""
+        """Open strategy from database using StrategyBrowserDialog (singleton pattern)."""
+        # Check if browser window already exists and is visible
+        if self.browser_window and self.browser_window.isVisible():
+            # Focus existing window instead of creating new one
+            self.browser_window.raise_()
+            self.browser_window.activateWindow()
+            return
+        
         # Check if current strategy should be saved (skip if empty)
         if self.is_modified and not self._is_strategy_empty():
             reply = ask_question(
@@ -568,13 +581,16 @@ class StrategyBuilderMainWindow(QMainWindow):
                 return
         
         # Create and show strategy browser window
-        browser = StrategyBrowserDialog(mode='open', parent=self)
+        self.browser_window = StrategyBrowserDialog(mode='open', parent=self)
         
         # Connect signal for when strategy is selected
-        browser.strategy_selected.connect(self._load_strategy_from_browser)
+        self.browser_window.strategy_selected.connect(self._load_strategy_from_browser)
+        
+        # Clear reference when window is destroyed
+        self.browser_window.destroyed.connect(lambda: setattr(self, 'browser_window', None))
         
         # Show as non-modal window
-        browser.show()
+        self.browser_window.show()
     
     def _load_strategy_from_browser(self, strategy_id: str, version_id: str):
         """Load strategy after selection from browser"""
@@ -957,10 +973,22 @@ class StrategyBuilderMainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Error validating strategy: {str(e)}")
     
     def _on_run_backtest(self):
-        """Run backtest for the current strategy."""
+        """Run backtest for the current strategy (singleton pattern)."""
         try:
-            dialog = BacktestConfigDialog(self.orchestrator, self)
-            dialog.show()  # Non-modal so user can see strategy
+            # Check if backtest window already exists and is visible
+            if self.backtest_window and self.backtest_window.isVisible():
+                # Focus existing window instead of creating new one
+                self.backtest_window.raise_()
+                self.backtest_window.activateWindow()
+                return
+            
+            # Create and show backtest config dialog
+            self.backtest_window = BacktestConfigDialog(self.orchestrator, self)
+            
+            # Clear reference when window is destroyed
+            self.backtest_window.destroyed.connect(lambda: setattr(self, 'backtest_window', None))
+            
+            self.backtest_window.show()  # Non-modal so user can see strategy
             self._update_status("Backtest configuration opened")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error opening backtest dialog: {str(e)}")
@@ -994,9 +1022,18 @@ class StrategyBuilderMainWindow(QMainWindow):
                 validator = InstitutionalValidator()
                 report = validator.validate(config)
                 
-                # Create and show validation report window
-                window = ValidationReportWindow(report, config, self)
-                window.show()  # QMainWindow uses .show(), not .exec_()
+                # Check if validation window already exists and is visible
+                if self.validation_window and self.validation_window.isVisible():
+                    # Close existing window before showing new validation results
+                    self.validation_window.close()
+                
+                # Create and show validation report window (singleton pattern)
+                self.validation_window = ValidationReportWindow(report, config, self)
+                
+                # Clear reference when window is destroyed
+                self.validation_window.destroyed.connect(lambda: setattr(self, 'validation_window', None))
+                
+                self.validation_window.show()  # QMainWindow uses .show(), not .exec_()
                 
                 # Update stepper state based on validation result
                 if report.is_valid:
@@ -1718,11 +1755,18 @@ class StrategyBuilderMainWindow(QMainWindow):
             )
     
     def _on_view_current_log(self):
-        """Open the most recent log file in professional log viewer."""
+        """Open the most recent log file in professional log viewer (singleton pattern)."""
         from pathlib import Path
         from src.strategy_builder.ui.log_viewer_window import LogViewerWindow
         
         try:
+            # Check if log viewer window already exists and is visible
+            if self.log_viewer_window and self.log_viewer_window.isVisible():
+                # Focus existing window instead of creating new one
+                self.log_viewer_window.raise_()
+                self.log_viewer_window.activateWindow()
+                return
+            
             # Get logs directory
             logs_dir = Path('logs')
             if not logs_dir.exists():
@@ -1750,9 +1794,13 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Get the newest log file
             newest_log = log_files[0]
             
-            # Open in professional log viewer window
-            viewer = LogViewerWindow(newest_log, self)
-            viewer.show()
+            # Create and show log viewer window
+            self.log_viewer_window = LogViewerWindow(newest_log, self)
+            
+            # Clear reference when window is destroyed
+            self.log_viewer_window.destroyed.connect(lambda: setattr(self, 'log_viewer_window', None))
+            
+            self.log_viewer_window.show()
             
             self._update_status(f"Opened log viewer: {newest_log.name}")
             

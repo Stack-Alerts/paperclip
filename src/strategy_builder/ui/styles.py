@@ -1452,3 +1452,40 @@ def get_recheck_depth_color(depth: int) -> str:
         return COLORS['exit_signal_level']     # Yellow
     else:
         return COLORS['exit_cumulative_high']  # Red
+
+
+def format_block_name(block_name: str) -> str:
+    """
+    Format block name for UI display with proper title casing.
+    
+    Rules:
+    - Replace underscores with spaces
+    - Capitalize first letter of each word
+    - Keep "and" lowercase
+    
+    Examples:
+        "cup_and_handle" → "Cup and Handle"
+        "inverse_head_and_shoulders" → "Inverse Head and Shoulders"
+        "falling_wedge" → "Falling Wedge"
+    
+    Args:
+        block_name: Raw block name with underscores
+        
+    Returns:
+        Formatted block name for display
+    """
+    # Replace underscores with spaces
+    formatted = block_name.replace('_', ' ')
+    
+    # Split into words and capitalize each
+    words = formatted.split()
+    capitalized_words = []
+    
+    for word in words:
+        # Keep "and" lowercase, capitalize everything else
+        if word.lower() == 'and':
+            capitalized_words.append('and')
+        else:
+            capitalized_words.append(word.capitalize())
+    
+    return ' '.join(capitalized_words)
