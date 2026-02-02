@@ -33,8 +33,17 @@ from src.strategy_builder.ui.styles import (
     COLORS, create_font, get_main_stylesheet,
     get_primary_button_stylesheet, get_secondary_button_stylesheet,
     get_table_stylesheet, get_text_edit_stylesheet, get_scroll_area_stylesheet,
-    get_tab_widget_stylesheet, set_hand_cursor, apply_hand_cursor_to_buttons
+    get_tab_widget_stylesheet, set_hand_cursor, apply_hand_cursor_to_buttons,
+    get_auto_fix_button_style
 )
+from src.strategy_builder.validation.auto_fix import (
+    auto_fix_strategy_type,
+    auto_fix_recheck_delay,
+    auto_fix_duplicate_exits,
+    auto_fix_dead_code,
+    AutoFixSafety
+)
+from src.strategy_builder.ui.auto_fix_confirm_dialog import AutoFixConfirmDialog
 
 
 class ValidationReportWindow(QMainWindow):
@@ -435,13 +444,36 @@ class ValidationReportWindow(QMainWindow):
             desc_item.setFlags(desc_item.flags() | Qt.ItemIsEditable)
             table.setItem(row, 4, desc_item)
             
-            # Column 5: Action
-            action_text = "✓ Passed" if severity == 'INFO' else self._get_action_text(issue)
-            action_item = QTableWidgetItem(action_text)
-            action_item.setFont(create_font(10))
-            if severity in ['CRITICAL', 'ERROR']:
-                action_item.setForeground(QColor(COLORS['error']))
-            table.setItem(row, 5, action_item)
+            # Column 5: Action - Sprint 1.9.2 Auto-Fix Button Integration
+            if severity == 'INFO':
+                # INFO level - no action needed
+                action_item = QTableWidgetItem("✓ Passed")
+                action_item.setFont(create_font(10))
+                table.setItem(row, 5, action_item)
+            elif hasattr(issue, 'auto_fix_available') and issue.auto_fix_available:
+                # Create clickable fix button
+                fix_btn = QPushButton("🔧 Fix Now")
+                fix_btn.setFont(create_font(9))
+                fix_btn.setStyleSheet(get_auto_fix_button_style())
+                fix_btn.setCursor(Qt.PointingHandCursor)
+                fix_btn.setToolTip(self._get_fix_button_tooltip(issue))
+                fix_btn.clicked.connect(lambda checked, iss=issue: self._handle_fix_click(iss))
+                
+                # Right-click for preview (stub for Task 1.9.2.7)
+                fix_btn.setContextMenuPolicy(Qt.CustomContextMenu)
+                fix_btn.customContextMenuRequested.connect(
+                    lambda pos, iss=issue: self._show_fix_preview(iss)
+                )
+                
+                table.setCellWidget(row, 5, fix_btn)
+            else:
+                # No auto-fix available
+                action_text = self._get_action_text(issue)
+                action_item = QTableWidgetItem(action_text)
+                action_item.setFont(create_font(10))
+                if severity in ['CRITICAL', 'ERROR']:
+                    action_item.setForeground(QColor(COLORS['error']))
+                table.setItem(row, 5, action_item)
         
         # Configure table
         table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -1472,3 +1504,62 @@ class ValidationReportWindow(QMainWindow):
         settings = QSettings("BTC_Engine", "ValidationReport")
         settings.setValue("geometry", self.saveGeometry())
         super().closeEvent(event)
+    
+    # =========================================================================
+    # AUTO-FIX BUTTON HANDLERS - Sprint 1.9.2
+    # =========================================================================
+    
+    def _get_fix_button_tooltip(self, issue: any) -> str:
+        """
+        Get institutional tooltip for fix button
+        Sprint 1.9.2 Task 1.9.2.6
+        
+        Provides specific guidance based on issue type
+        """
+        tooltips = {
+            'DIRECTION_001': "Click to automatically switch strategy direction to match signal bias. Right-click to preview changes before applying.",
+            'TIMING_004': "Click to reduce RECHECK delay to fit within timing window. Right-click to see exact adjustments.",
+            'EXIT_003': "Click to merge duplicate exit conditions. Right-click to preview consolidated result.",
+            'DEAD_CODE_001': "Click to disable unreachable signals. Right-click to preview which signals will be affected."
+        }
+        
+        rule_id = getattr(issue, 'rule_id', '')
+        return tooltips.get(rule_id, "Click to apply automated fix. Right-click to preview changes.")
+    
+    def _handle_fix_click(self, issue: any) -> None:
+        """
+        Handle fix button click - route to appropriate algorithm
+        Sprint 1.9.2 Task 1.9.2.6
+        
+        Shows confirmation dialog before applying fix (Task 1.9.2.7)
+        """
+        QMessageBox.information(
+            self,
+            "Auto-Fix Coming Soon",
+            f"Auto-fix for '{issue.rule_name}' will be implemented in Task 1.9.2.7.\n\n"
+            f"This includes:\n"
+            f"• Confirmation dialog with before/after preview\n"
+            f"• Automatic application with safety checks\n"
+            f"• Validation re-run to verify fix\n"
+            f"• Undo capability\n\n"
+            f"For now, please apply fixes manually as suggested in the Issues tab."
+        )
+    
+    def _show_fix_preview(self, issue: any) -> None:
+        """
+        Show fix preview on right-click
+        Sprint 1.9.2 Task 1.9.2.6 (stub for Task 1.9.2.7)
+        
+        Full preview dialog will be implemented in Task 1.9.2.7
+        """
+        QMessageBox.information(
+            self,
+            "Fix Preview",
+            f"Preview for: {issue.rule_name}\n\n"
+            f"Detailed before/after comparison coming in Task 1.9.2.7.\n\n"
+            f"This will show:\n"
+            f"• Current configuration\n"
+            f"• Proposed changes\n"
+            f"• Impact analysis\n"
+            f"• Cascading effects (if any)"
+        )

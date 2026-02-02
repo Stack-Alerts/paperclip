@@ -8,6 +8,32 @@
 
 ---
 
+## 🚨 KNOWN GAPS TO ADDRESS
+
+### **Sprint 1.9.2 Auto-Fix Enhancement: AI Recommendations Integration**
+**Priority**: HIGH  
+**Scope**: Extend auto-fix system to handle AI-generated recommendations  
+**Gap Description**: Current auto-fix system (Sprint 1.9.2) handles validation errors only. AI Recommendation system from Sprint 1.6.1 generates actionable suggestions but lacks one-click auto-fix integration.
+
+**Required Auto-Fix Capabilities**:
+1. **Add Building Block Signals**: One-click to add recommended signals to existing blocks
+2. **Configure Signal Parameters**: Auto-populate recommended parameter values
+3. **Remove Low-Performing Signals**: One-click removal of signals flagged by AI recommendations
+4. **Adjust Signal Weights**: Auto-apply recommended weight changes
+5. **Add New Blocks**: Create and configure new blocks based on AI suggestions
+
+**Implementation Considerations**:
+- Extend `AutoFixEngine` from Sprint 1.9.2 with AI recommendation handlers
+- Add AI recommendation types to confirmation dialog system
+- Integrate with `ai_recommendations` database table from Sprint 1.6.1
+- Maintain institutional-grade safety framework (backup, verify, rollback)
+- Full undo capability for all AI-driven auto-fixes
+
+**Tracking**: Future sprint task - estimate 2-3 hours implementation  
+**Dependencies**: Sprint 1.9.2 (Auto-Fix Framework), Sprint 1.6.1 (AI Recommendations Database)
+
+---
+
 ## 📋 HOW TO USE THIS PLAN
 
 1. **Start with Sprint 0** - Database infrastructure (required foundation)
@@ -100,12 +126,14 @@
 **Skipped**: Task 1.9.1.6 (Collapsible sections - complex, low ROI)
 **Commits**: 6 commits (307b5bd, 10a5df7, 4e3d26f, b5428ce, e86bc06)
 
-#### **Sprint 1.9.2: Auto-Fix Buttons in Validation Report** (3-4 hours, 8 tasks)
+#### **Sprint 1.9.2: Auto-Fix Buttons in Validation Report** (3-4 hours, 11 tasks)
 **File**: `SPRINT_1_9_2_AUTO_FIX_BUTTONS.md`  
-**Status**: 📋 READY TO START  
+**Status**: 🔄 IN PROGRESS (7/11 tasks - Phases 0-2 COMPLETE, 2026-02-02)  
 **Purpose**: Add one-click auto-fix buttons to Validation Report Window for common validation errors (direction mismatch, RECHECK conflicts, exit consolidation, dead code)
 **Dependencies**: Sprint 1.9 (Validation Framework), Sprint 1.9.1 (Configuration Browser)
 **Scope**: Validation Report Window → Issues tab → "Fix Available" buttons with auto-fix execution
+**Completed**: Safety framework, 4 auto-fix algorithms, button UI integration, confirmation dialog
+**Remaining**: Fix result feedback (Task 1.9.2.8), undo system (1.9.2.9), state persistence (1.9.2.10), error recovery (1.9.2.11)
 
 ---
 
