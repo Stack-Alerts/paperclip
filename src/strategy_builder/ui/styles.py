@@ -1419,6 +1419,42 @@ def get_cumulative_exit_color(cumulative_percentage: float) -> str:
         return COLORS['exit_cumulative_high']         # Orange
 
 
+def get_auto_fix_button_style() -> str:
+    """
+    Get stylesheet for auto-fix action buttons.
+    Sprint 1.9.2 Task 1.9.2.6
+    
+    Institutional-grade styling for one-click auto-fix buttons.
+    Uses success color (green) to indicate safe, automated action.
+    
+    Returns:
+        Button stylesheet string with success theme
+    """
+    return f'''
+        QPushButton {{
+            background-color: {COLORS['success']};
+            color: white;
+            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 4px;
+            min-width: 90px;
+            font-size: 9pt;
+            border: none;
+        }}
+        QPushButton:hover {{
+            background-color: #059669;
+            border: 1px solid #10B981;
+        }}
+        QPushButton:pressed {{
+            background-color: #047857;
+        }}
+        QPushButton:disabled {{
+            background-color: #555555;
+            color: #888888;
+        }}
+    '''
+
+
 def get_exit_icon() -> str:
     """
     Get exit condition icon.
