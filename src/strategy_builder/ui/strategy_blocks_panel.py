@@ -37,7 +37,7 @@ from src.strategy_builder.ui.styles import (
     get_spinbox_button_stylesheet, get_success_button_stylesheet, get_color,
     get_dialog_stylesheet, get_radio_container_stylesheet, get_signal_radio_stylesheet,
     get_recheck_radio_stylesheet, get_exit_tree_item_style, get_exit_button_stylesheet,
-    set_hand_cursor
+    set_hand_cursor, format_block_name
 )
 
 
@@ -91,11 +91,11 @@ class BlockConfigItem(QWidget):
         # Block info layout
         info_layout = QVBoxLayout()
         
-        # Block name with AND/OR badge
+        # Block name with AND/OR badge - format to title case with "and" lowercase
         name_layout = QHBoxLayout()
         name_layout.setSpacing(10)
         
-        name_label = QLabel(f"📊 {self.block_name}")
+        name_label = QLabel(f"📊 {format_block_name(self.block_name)}")
         name_font = QFont()
         name_font.setBold(True)
         name_font.setPointSize(10)

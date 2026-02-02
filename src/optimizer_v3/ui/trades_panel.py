@@ -704,7 +704,10 @@ class TradesPanel(QWidget):
             'avg_drawdown': avg_drawdown,
             'std_deviation': std_deviation,
             'downside_deviation': downside_deviation,
-            'ulcer_index': ulcer_index
+            'ulcer_index': ulcer_index,
+            
+            # CRITICAL FIX: Include trades data for AI Recommendations Panel
+            'trades': self.trades.copy()  # Include complete trades list
         }
         
         # 🔥 EMIT METRICS TO METRICS DISPLAY PANEL (via proper signal)

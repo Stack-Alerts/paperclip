@@ -30,7 +30,8 @@ from src.strategy_builder.core.registry_interface import BlockInfo, SearchFilter
 from src.strategy_builder.ui.styles import (
     get_label_style, get_expand_button_style, get_add_button_style,
     get_checkbox_style, get_success_button_stylesheet, get_color,
-    get_exit_button_stylesheet, get_and_button_stylesheet, get_or_button_stylesheet
+    get_exit_button_stylesheet, get_and_button_stylesheet, get_or_button_stylesheet,
+    format_block_name
 )
 
 # Import exit condition dialog
@@ -103,8 +104,8 @@ class BlockListItem(QWidget):
         info_layout = QVBoxLayout()
         info_layout.setSpacing(4)
         
-        # Name (bold and larger)
-        name_label = QLabel(f"📊 {self.block_info.name}")
+        # Name (bold and larger) - format to title case with "and" lowercase
+        name_label = QLabel(f"📊 {format_block_name(self.block_info.name)}")
         name_font = QFont()
         name_font.setBold(True)
         name_font.setPointSize(12)

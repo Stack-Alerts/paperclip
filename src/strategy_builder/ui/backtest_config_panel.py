@@ -455,7 +455,14 @@ class BacktestConfigPanel(QWidget):
         from src.optimizer_v3.ui.ai_recommendations_panel import AIRecommendationsPanel
         self.ai_recommendations_panel = AIRecommendationsPanel()
         self.tab_widget.addTab(self.ai_recommendations_panel, "🤖 AI Recommendations")
-        
+
+        # Connect AI panel's send_approved signal to metrics panel's handler
+        # When user clicks "Approve & Send to AI" button, trigger AI request
+        if hasattr(self.metrics_panel, '_on_ai_request_approved'):
+            self.ai_recommendations_panel.send_approved.connect(
+                self.metrics_panel._on_ai_request_approved
+            )
+
         # Connect metrics panel to AI recommendations panel
         # When metrics panel generates recommendations, forward them to AI panel
         if hasattr(self.metrics_panel, 'recommendations_generated'):
