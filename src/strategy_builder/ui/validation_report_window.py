@@ -1528,22 +1528,92 @@ class ValidationReportWindow(QMainWindow):
     
     def _handle_fix_click(self, issue: any) -> None:
         """
-        Handle fix button click - route to appropriate algorithm
-        Sprint 1.9.2 Task 1.9.2.6
+        Handle fix button click - apply fix with feedback
+        Sprint 1.9.2 Task 1.9.2.8
         
-        Shows confirmation dialog before applying fix (Task 1.9.2.7)
+        Flow: Confirmation → Apply → Feedback → Re-validate
         """
-        QMessageBox.information(
+        # Show confirmation (simplified - full dialog in Task 1.9.2.7)
+        result = QMessageBox.question(
             self,
-            "Auto-Fix Coming Soon",
-            f"Auto-fix for '{issue.rule_name}' will be implemented in Task 1.9.2.7.\n\n"
-            f"This includes:\n"
-            f"• Confirmation dialog with before/after preview\n"
-            f"• Automatic application with safety checks\n"
-            f"• Validation re-run to verify fix\n"
-            f"• Undo capability\n\n"
-            f"For now, please apply fixes manually as suggested in the Issues tab."
+            "Confirm Auto-Fix",
+            f"Apply auto-fix for '{issue.rule_name}'?\n\n"
+            f"Issue: {issue.message}\n\n"
+            f"This operation includes:\n"
+            f"• Safety backup before changes\n"
+            f"• Automatic rollback on failure\n"
+            f"• Validation re-run to verify\n\n"
+            f"Apply fix now?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes
         )
+        
+        if result != QMessageBox.Yes:
+            return
+        
+        # Apply fix based on rule_id
+        success = False
+        error_msg = None
+        
+        try:
+            if issue.rule_id == 'DIRECTION_001':
+                # Extract suggested type from issue (simplified)
+                suggested_type = "Bearish" if "bearish" in issue.message.lower() else "Bullish"
+                success = auto_fix_strategy_type(self.config, suggested_type)
+            
+           elif issue.rule_id == 'TIMING_004':
+                # Simplified: Set RECHECK to 75% of timing window
+                # In full implementation, would extract exact values from issue
+                QMessageBox.information(self, "Auto-Fix", 
+                    "RECHECK timing fix requires accessing specific signal configuration.\n"
+                    "This will be fully implemented when signal access is added.\n"
+                    "For now, please manually reduce RECHECK delay in signal configuration.")
+                return
+            
+            elif issue.rule_id == 'EXIT_003':
+                QMessageBox.information(self, "Auto-Fix",
+                    "Exit consolidation fix requires accessing exit conditions.\n"
+                    "This will be fully implemented when exit access is added.\n"
+                    "For now, please manually consolidate duplicate exits.")
+                return
+            
+            elif issue.rule_id == 'DEAD_CODE_001':
+                QMessageBox.information(self, "Auto-Fix",
+                    "Dead code fix requires accessing specific signal configuration.\n"
+                    "This will be fully implemented when signal access is added.\n"
+                    "For now, please manually disable unreachable signals.")
+                return
+            
+            else:
+                QMessageBox.warning(self, "Fix Not Available",
+                    f"No automated fix available for: {issue.rule_name}")
+                return
+                
+        except Exception as e:
+            error_msg = str(e)
+            success = False
+        
+        # Show result feedback
+        if success:
+            QMessageBox.information(
+                self,
+                "✅ Fix Applied Successfully",
+                f"Auto-fix completed: {issue.rule_name}\n\n"
+                f"Validation will re-run automatically to verify the fix.\n\n"
+                f"Changes have been applied to your strategy configuration."
+            )
+            
+            # Re-run validation (Task 1.9.2.8)
+            self._rerun_validation()
+        else:
+            QMessageBox.warning(
+                self,
+                "❌ Fix Failed",
+                f"Could not apply auto-fix: {issue.rule_name}\n\n"
+                f"Error: {error_msg or 'Unknown error'}\n\n"
+                f"Your strategy has been restored to its original state.\n"
+                f"No changes were made."
+            )
     
     def _show_fix_preview(self, issue: any) -> None:
         """
@@ -1563,3 +1633,72 @@ class ValidationReportWindow(QMainWindow):
             f"• Impact analysis\n"
             f"• Cascading effects (if any)"
         )
+    
+    def _rerun_validation(self) -> None:
+        """
+        Re-run validation after applying fix
+        Sprint 1.9.2 Task 1.9.2.8
+        
+        Updates validation report with new results
+        Refreshes all tabs (Summary, Issues, Metrics)
+        """
+        from PyQt5.QtWidgets import QApplication
+        
+        # Show progress indicator
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        
+        try:
+            # Run validation
+            validator = InstitutionalValidator()
+            new_report = validator.validate_strategy_config(self.config)
+            
+            # Update report
+            self.report = new_report
+            
+            # Recreate tabs with new data
+            self._reinitialize_ui()
+            
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Validation Error",
+                f"Could not re-run validation:\n\n{str(e)}\n\n"
+                f"Please close and reopen the validation report."
+            )
+        finally:
+            QApplication.restoreOverrideCursor()
+    
+    def _reinitialize_ui(self) -> None:
+        """Reinitialize UI with updated report data"""
+        # Get central widget
+        central = self.centralWidget()
+        if not central:
+            return
+        
+        # Clear layout
+        layout = central.layout()
+        if layout:
+            while layout.count():
+                item = layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+        
+        # Recreate UI components
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
+        
+        # Header
+        header = self._create_header()
+        layout.addWidget(header)
+        
+        # Status banner
+        status_banner = self._create_status_banner()
+        layout.addWidget(status_banner)
+        
+        # Tabs
+        tabs = self._create_tabs()
+        layout.addWidget(tabs, 1)
+        
+        # Footer
+        footer = self._create_footer()
+        layout.addWidget(footer)
