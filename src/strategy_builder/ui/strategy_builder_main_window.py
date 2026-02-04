@@ -1583,6 +1583,8 @@ class StrategyBuilderMainWindow(QMainWindow):
         Automatically saves updated config to database AND reloads it
         so main window displays the exact saved version.
         
+        CRITICAL: Also saves validation status as 'Pass' since fix was successful.
+        
         Args:
             fix_type: Type of fix applied (rule_id)
             fix_data: Dict with fix details
@@ -1597,6 +1599,12 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         if success:
             print(f"✅ Configuration saved to database successfully")
+            
+            # CRITICAL: Save validation status as 'Pass' (fix was applied successfully)
+            # This must happen BEFORE reload so reload sees the Pass status
+            print(f"💾 Saving validation status = 'Pass' to database...")
+            self._save_validation_status_to_db('Pass')
+            print(f"✅ Validation status saved")
             
             # CRITICAL: Reload the saved version from database
             # This ensures main window shows exact config that was saved
