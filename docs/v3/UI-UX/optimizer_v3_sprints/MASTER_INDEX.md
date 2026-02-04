@@ -10,27 +10,46 @@
 
 ## 🚨 KNOWN GAPS TO ADDRESS
 
-### **Sprint 1.9.2 Auto-Fix Enhancement: AI Recommendations Integration**
+### **Sprint 1.9.3: AI Recommendations Auto-Fix (DEFERRED)**
 **Priority**: HIGH  
-**Scope**: Extend auto-fix system to handle AI-generated recommendations  
-**Gap Description**: Current auto-fix system (Sprint 1.9.2) handles validation errors only. AI Recommendation system from Sprint 1.6.1 generates actionable suggestions but lacks one-click auto-fix integration.
+**Status**: 🔴 DEFERRED - Blocked by Sprint 2+ (Real Backtest System)  
+**Sprint File**: `SPRINT_1_9_3_AI_RECOMMENDATIONS_AUTOFIX.md`  
+**Estimated Duration**: 3-4 hours  
+
+**Gap Description**: AI Recommendation system (Sprint 1.6.1) generates intelligent suggestions but requires manual implementation. AutoFix framework (Sprint 1.9.2) handles validation errors but not AI recommendations.
 
 **Required Auto-Fix Capabilities**:
-1. **Add Building Block Signals**: One-click to add recommended signals to existing blocks
-2. **Configure Signal Parameters**: Auto-populate recommended parameter values
-3. **Remove Low-Performing Signals**: One-click removal of signals flagged by AI recommendations
-4. **Adjust Signal Weights**: Auto-apply recommended weight changes
-5. **Add New Blocks**: Create and configure new blocks based on AI suggestions
+1. **Add Building Block Signals**: One-click add AI-recommended signals to existing blocks
+2. **Configure Signal Parameters**: Auto-apply AI-optimized parameter values
+3. **Remove Underperforming Signals**: One-click removal of signals identified as detrimental
+4. **Complete Workflow**: Add recommendation → Apply fix → Validate → Save as new version
 
-**Implementation Considerations**:
-- Extend `AutoFixEngine` from Sprint 1.9.2 with AI recommendation handlers
-- Add AI recommendation types to confirmation dialog system
-- Integrate with `ai_recommendations` database table from Sprint 1.6.1
-- Maintain institutional-grade safety framework (backup, verify, rollback)
-- Full undo capability for all AI-driven auto-fixes
+**Why Deferred**:
+- Sprint 2+ must complete first (real backtest system)
+- AI recommendations currently based on mock/hardcoded data
+- Need production-quality metrics for intelligent recommendations
+- Metrics Panel must be connected to real backtest results
 
-**Tracking**: Future sprint task - estimate 2-3 hours implementation  
-**Dependencies**: Sprint 1.9.2 (Auto-Fix Framework), Sprint 1.6.1 (AI Recommendations Database)
+**Implementation Location**: Metrics Panel (NOT Validation Panel)
+- AI Request System sends recommendations after backtest completes
+- Recommendations displayed in Metrics Panel with "Apply Recommendation" buttons
+- Uses existing AutoFixConfirmDialog from Sprint 1.9.2
+- Database versioning provides automatic undo (no separate undo system needed)
+
+**Dependencies**: 
+- Sprint 1.9.2 (Auto-Fix Framework) ✅ COMPLETE
+- Sprint 1.6.1 (AI Recommendations Database) ✅ COMPLETE
+- Sprint 2+ (Real Backtest System) ❌ NOT STARTED
+- AI Request System operational ✅ EXISTS
+- Metrics Panel ✅ EXISTS
+
+**Gate Conditions** (must be TRUE to start):
+- [ ] Sprint 2+ complete with real backtest system
+- [ ] AI Request System returns recommendations from real data (not mock)
+- [ ] Metrics Panel showing production backtest results
+- [ ] User approval to proceed
+
+**Tracking**: Sprint 1.9.3 created and documented, implementation deferred until dependencies met
 
 ---
 
@@ -126,15 +145,35 @@
 **Skipped**: Task 1.9.1.6 (Collapsible sections - complex, low ROI)
 **Commits**: 6 commits (307b5bd, 10a5df7, 4e3d26f, b5428ce, e86bc06)
 
-#### **Sprint 1.9.2: Auto-Fix Buttons in Validation Report** (3-4 hours, 11 tasks)
+#### **Sprint 1.9.2: Auto-Fix Buttons in Validation Report** (3 hours actual, 11 tasks)
 **File**: `SPRINT_1_9_2_AUTO_FIX_BUTTONS.md`  
-**Status**: ✅ COMPLETE (8/11 tasks - CORE FUNCTIONALITY 100%, 2026-02-03)  
-**Purpose**: Add one-click auto-fix buttons to Validation Report Window for common validation errors (direction mismatch, RECHECK conflicts, exit consolidation, dead code)
-**Dependencies**: Sprint 1.9 (Validation Framework), Sprint 1.9.1 (Configuration Browser)
-**Scope**: Validation Report Window → Issues tab → "Fix Available" buttons with auto-fix execution
-**Completed**: Safety framework, 4 auto-fix algorithms, button UI integration, confirmation dialog, fix result feedback, validation re-run
-**Future Enhancements**: Tasks 1.9.2.9-11 (Undo system, state persistence, error recovery) - optional polish features
-**Commits**: 3 commits (31fed6b, 4c537c6, Phase 0-2 + Task 1.9.2.8)
+**Status**: ✅ COMPLETE - Core Functionality 100% (2026-02-04)  
+**Purpose**: One-click auto-fix for validation errors with institutional-grade safety  
+**Scope**: Timing conflict resolution (increase window vs reduce delays), database persistence, auto-reload, validation status sync  
+**Completed**: 
+- Institutional timing fix algorithm (preserves RECHECK delays, increases window)
+- Database persistence (auto-save with validation status)
+- Auto-reload main window after fix
+- Validation status sync with stepper (GREEN button)
+- AutoFixConfirmDialog for user confirmation
+- Cross-session persistence via database versioning
+**Key Insight**: Database versioning eliminates need for separate undo/history/recovery systems (user observation)
+**Commits**: 13 commits (timing fix iterations, database integration, status sync fixes)
+**Future**: Tasks 1.9.2.2-5 (direction, exits, dead code fixes), 1.9.2.9-11 (undo/history) - deferred (low ROI with database versioning)
+
+#### **Sprint 1.9.3: AI Recommendations Auto-Fix** (3-4 hours estimated, 10 tasks)
+**File**: `SPRINT_1_9_3_AI_RECOMMENDATIONS_AUTOFIX.md`  
+**Status**: 🔴 DEFERRED - Blocked by Sprint 2+ (Real Backtest System)  
+**Purpose**: One-click implementation of AI-recommended strategy improvements  
+**Scope**: Metrics Panel → AI Recommendations → "Apply Recommendation" buttons  
+**Location**: Metrics Panel (NOT Validation Panel) - AI recommendations appear after backtest completes  
+**Deferred Because**: 
+- Sprint 2+ required for real backtest system
+- Current AI recommendations based on mock data
+- Need production-quality metrics for intelligent suggestions
+**Gate Conditions**: Sprint 2+ complete, real backtest operational, AI recommendations from real data  
+**Dependencies**: Sprint 1.9.2 (AutoFix Framework) ✅, Sprint 1.6.1 (AI Database) ✅, Sprint 2+ ❌  
+**Features Planned**: Add/configure/remove signals via one-click, database versioning for undo, full institutional safety
 
 ---
 
@@ -215,6 +254,9 @@
 - [x] Sprint 1.8: Exit Conditions Foundation (102/102 tasks COMPLETE ✅ - 2026-01-28)
 - [x] Sprint 1.8.1: Strategy Browser UI Enhancements (2/2 tasks COMPLETE ✅ - 2026-01-31)
 - [x] Sprint 1.9: Institutional-Grade Validation Framework (32/32 tasks COMPLETE ✅ - 2026-01-31)
+- [x] Sprint 1.9.1: Configuration Browser Enhancements (5/6 tasks COMPLETE ✅ - 2026-01-31)
+- [x] Sprint 1.9.2: Auto-Fix Buttons in Validation Report (Core COMPLETE ✅ - 2026-02-04)
+- [ ] Sprint 1.9.3: AI Recommendations Auto-Fix (DEFERRED - Sprint 2+ required)
 - [ ] Sprint 2.1: Automated Trainer (20 tasks, 10 days)
 - [ ] Sprint 2.2: Signal Intelligence + Nested RECHECK Execution (37 tasks, 12 days)
 - [ ] Sprint 2.3: ML Generator (15 tasks, 4 days)
