@@ -127,7 +127,7 @@ class AIRecommendationsPanel(QWidget):
         layout.addWidget(request_content)
         
         # Statistics summary - use dark theme
-        self.stats_label = QLabel("Backtest not executed or completed")
+        self.stats_label = QLabel("Status: Backtest not executed or completed")
         self.stats_label.setStyleSheet(f"background-color: {COLORS['bg_medium']}; color: {COLORS['text_secondary']}; padding: 8px; font-family: 'Courier New';")
         layout.addWidget(self.stats_label)
         
@@ -135,84 +135,24 @@ class AIRecommendationsPanel(QWidget):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        # Export button - same size as others, disabled when no backtest
+        # Export button - uses centralized secondary button style
         self.export_btn = QPushButton("💾 Export to JSON")
         self.export_btn.clicked.connect(self._export_to_json)
-        self.export_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['button_secondary']};
-                color: white;
-                font-weight: bold;
-                font-size: 10pt;
-                padding: 4px 10px;
-                border-radius: 4px;
-                min-width: 120px;
-                min-height: 40px;
-                max-height: 40px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['button_secondary_hover']};
-            }}
-            QPushButton:disabled {{
-                background-color: #555555;
-                color: #888888;
-                font-weight: bold;
-            }}
-        """)
+        self.export_btn.setStyleSheet(get_secondary_button_stylesheet())
         self.export_btn.setEnabled(False)  # Disabled by default until backtest run
         button_layout.addWidget(self.export_btn)
         
-        # Preview AI Request button - NEW (shows the actual formatted prompt)
+        # Preview AI Request button - uses centralized primary button style
         self.preview_request_btn = QPushButton("🔍 Preview AI Request")
         self.preview_request_btn.clicked.connect(self._preview_ai_request)
-        self.preview_request_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['button_primary']};
-                color: white;
-                font-weight: bold;
-                font-size: 10pt;
-                padding: 4px 10px;
-                border-radius: 4px;
-                min-width: 120px;
-                min-height: 40px;
-                max-height: 40px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['button_primary_hover']};
-            }}
-            QPushButton:disabled {{
-                background-color: #555555;
-                color: #888888;
-                font-weight: bold;
-            }}
-        """)
+        self.preview_request_btn.setStyleSheet(get_primary_button_stylesheet())
         self.preview_request_btn.setEnabled(False)  # Disabled by default until backtest run
         button_layout.addWidget(self.preview_request_btn)
         
-        # Approve button - compact version
+        # Approve button - uses centralized success button style
         self.approve_btn = QPushButton("✅ Approve & Send to AI")
         self.approve_btn.clicked.connect(self._approve_and_send)
-        self.approve_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['button_success']};
-                color: white;
-                font-weight: bold;
-                font-size: 10pt;
-                padding: 4px 10px;
-                border-radius: 4px;
-                min-width: 120px;
-                min-height: 40px;
-                max-height: 40px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['button_success_hover']};
-            }}
-            QPushButton:disabled {{
-                background-color: #555555;
-                color: #888888;
-                font-weight: bold;
-            }}
-        """)
+        self.approve_btn.setStyleSheet(get_success_button_stylesheet())
         self.approve_btn.setEnabled(False)  # Disabled by default until backtest run
         button_layout.addWidget(self.approve_btn)
         
