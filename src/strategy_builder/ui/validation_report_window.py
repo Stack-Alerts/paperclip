@@ -146,11 +146,14 @@ class ValidationReportWindow(QMainWindow):
         status_badge.setFont(create_font(11))
         
         if self.report.is_valid:
-            status_badge.setText("  ✅ VALIDATION PASSED  Your strategy meets all institutional-grade requirements and is ready for backtesting.")
+            # Use HTML for colored text with separator bars
+            status_badge.setText(
+                f"<span style='color: {COLORS['success']}; font-weight: bold;'>  ✅ VALIDATION PASSED  </span>"
+                f"<span style='color: {COLORS['text_primary']};'>│  Your strategy meets all institutional-grade requirements and is ready for backtesting.</span>"
+            )
             status_badge.setStyleSheet(f"""
                 QLabel {{
                     background-color: rgba(16, 185, 129, 0.15);
-                    color: {COLORS['text_primary']};
                     padding: 6px 12px;
                     border-radius: 4px;
                     border-left: 4px solid {COLORS['success']};
@@ -158,11 +161,14 @@ class ValidationReportWindow(QMainWindow):
             """)
         else:
             blocking = self.report.blocking_issues()
-            status_badge.setText(f"  ❌ VALIDATION FAILED  {blocking} blocking issue(s) must be fixed before backtest.")
+            # Use HTML for colored text with separator bars
+            status_badge.setText(
+                f"<span style='color: {COLORS['error']}; font-weight: bold;'>  ❌ VALIDATION FAILED  </span>"
+                f"<span style='color: {COLORS['text_primary']};'>│  {blocking} blocking issue(s) must be fixed before backtest.</span>"
+            )
             status_badge.setStyleSheet(f"""
                 QLabel {{
                     background-color: rgba(220, 53, 69, 0.15);
-                    color: {COLORS['text_primary']};
                     padding: 6px 12px;
                     border-radius: 4px;
                     border-left: 4px solid {COLORS['error']};
