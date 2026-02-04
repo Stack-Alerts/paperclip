@@ -136,24 +136,24 @@ class AIRecommendationsPanel(QWidget):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        # Export button - uses centralized secondary button style
-        self.export_btn = QPushButton("💾 Export to JSON")
+        # Export button - uses centralized secondary button style (NO EMOJI - clean text only)
+        self.export_btn = QPushButton("Export to JSON")
         self.export_btn.clicked.connect(self._export_to_json)
         self.export_btn.setStyleSheet(get_secondary_button_stylesheet())
         self.export_btn.setFixedHeight(40)  # Force uniform HEIGHT
         self.export_btn.setEnabled(False)  # Disabled by default until backtest run
         button_layout.addWidget(self.export_btn)
         
-        # Preview AI Request button - uses centralized primary button style
-        self.preview_request_btn = QPushButton("🔍 Preview AI Request")
+        # Preview AI Request button - uses centralized primary button style (NO EMOJI - clean text only)
+        self.preview_request_btn = QPushButton("Preview AI Request")
         self.preview_request_btn.clicked.connect(self._preview_ai_request)
         self.preview_request_btn.setStyleSheet(get_primary_button_stylesheet())
         self.preview_request_btn.setFixedHeight(40)  # Force uniform HEIGHT
         self.preview_request_btn.setEnabled(False)  # Disabled by default until backtest run
         button_layout.addWidget(self.preview_request_btn)
         
-        # Approve button - uses centralized success button style
-        self.approve_btn = QPushButton("✅ Approve & Send to AI")
+        # Approve button - uses centralized success button style (NO EMOJI - clean text only)
+        self.approve_btn = QPushButton("Approve & Send to AI")
         self.approve_btn.clicked.connect(self._approve_and_send)
         self.approve_btn.setStyleSheet(get_success_button_stylesheet())
         self.approve_btn.setFixedHeight(40)  # Force uniform HEIGHT
