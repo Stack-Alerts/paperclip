@@ -1561,28 +1561,32 @@ class ValidationReportWindow(QMainWindow):
                 suggested_type = "Bearish" if "bearish" in issue.message.lower() else "Bullish"
                 success = auto_fix_strategy_type(self.config, suggested_type)
             
-           elif issue.rule_id == 'TIMING_004':
-                # Simplified: Set RECHECK to 75% of timing window
-                # In full implementation, would extract exact values from issue
-                QMessageBox.information(self, "Auto-Fix", 
-                    "RECHECK timing fix requires accessing specific signal configuration.\n"
-                    "This will be fully implemented when signal access is added.\n"
-                    "For now, please manually reduce RECHECK delay in signal configuration.")
-                return
+            elif issue.rule_id == 'TIMING_004':
+                # Extract signal location from issue
+                signal_name, timing_window, recheck_delay = self._extract_timing_fix_data(issue)
+                if signal_name and timing_window:
+                    success = self._apply_recheck_timing_fix(signal_name, timing_window, recheck_delay)
+                else:
+                    QMessageBox.warning(self, "Fix Failed", "Could not extract signal information from issue.")
+                    return
             
             elif issue.rule_id == 'EXIT_003':
-                QMessageBox.information(self, "Auto-Fix",
-                    "Exit consolidation fix requires accessing exit conditions.\n"
-                    "This will be fully implemented when exit access is added.\n"
-                    "For now, please manually consolidate duplicate exits.")
-                return
+                # Extract exit consolidation data from issue
+                signal_name, exit_level = self._extract_exit_fix_data(issue)
+                if signal_name:
+                    success = self._apply_exit_consolidation_fix(signal_name, exit_level)
+                else:
+                    QMessageBox.warning(self, "Fix Failed", "Could not extract exit information from issue.")
+                    return
             
             elif issue.rule_id == 'DEAD_CODE_001':
-                QMessageBox.information(self, "Auto-Fix",
-                    "Dead code fix requires accessing specific signal configuration.\n"
-                    "This will be fully implemented when signal access is added.\n"
-                    "For now, please manually disable unreachable signals.")
-                return
+                # Extract dead code signal information
+                signal_name, block_name = self._extract_dead_code_data(issue)
+                if signal_name and block_name:
+                    success = self._apply_dead_code_fix(signal_name, block_name)
+                else:
+                    QMessageBox.warning(self, "Fix Failed", "Could not extract signal information from issue.")
+                    return
             
             else:
                 QMessageBox.warning(self, "Fix Not Available",
@@ -1702,3 +1706,165 @@ class ValidationReportWindow(QMainWindow):
         # Footer
         footer = self._create_footer()
         layout.addWidget(footer)
+    
+    # =========================================================================
+    # AUTO-FIX DATA EXTRACTION METHODS
+    # =========================================================================
+    
+    def _extract_timing_fix_data(self, issue: any) -> tuple:
+        """Extract timing fix data from validation issue"""
+        # Parse location to get signal name
+        # Location format: "Block::hod::Signal::BELOW_HOD"
+        signal_name = None
+        if hasattr(issue, 'location') and issue.location:
+            parts = issue.location.split('::')
+            for i in range(len(parts)):
+                if parts[i] == "Signal" and i+1 < len(parts):
+                    signal_name = parts[i+1]
+                    break
+        
+        # Extract timing window and recheck delay from message
+        # Message contains these values
+        timing_window = None
+        recheck_delay = None
+        
+        if hasattr(issue, 'context') and issue.context:
+            timing_window = issue.context.get('timing_window')
+            recheck_delay = issue.context.get('recheck_delay')
+        
+        return (signal_name, timing_window, recheck_delay)
+    
+    def _extract_exit_fix_data(self, issue: any) -> tuple:
+        """Extract exit consolidation data from validation issue"""
+        signal_name = None
+        exit_level = 'strategy'  # Default to strategy level
+        
+        # Parse location
+        if hasattr(issue, 'location') and issue.location:
+            # Could be signal name or block name depending on where exits are
+            if 'Signal::' in issue.location:
+                parts = issue.location.split('::')
+                for i in range(len(parts)):
+                    if parts[i] == "Signal" and i+1 < len(parts):
+                        signal_name = parts[i+1]
+                        exit_level = 'signal'
+                        break
+            elif 'Block::' in issue.location:
+                parts = issue.location.split('::')
+                for i in range(len(parts)):
+                    if parts[i] == "Block" and i+1 < len(parts):
+                        signal_name = parts[i+1]
+                        exit_level = 'block'
+                        break
+        
+        return (signal_name, exit_level)
+    
+    def _extract_dead_code_data(self, issue: any) -> tuple:
+        """Extract dead code signal information"""
+        signal_name = None
+        block_name = None
+        
+        if hasattr(issue, 'location') and issue.location:
+            parts = issue.location.split('::')
+            for i in range(len(parts)):
+                if parts[i] == "Block" and i+1 < len(parts):
+                    block_name = parts[i+1]
+                if parts[i] == "Signal" and i+1 < len(parts):
+                    signal_name = parts[i+1]
+        
+        return (signal_name, block_name)
+    
+    # =========================================================================
+    # AUTO-FIX APPLICATION METHODS
+    # =========================================================================
+    
+    def _apply_recheck_timing_fix(self, signal_name: str, timing_window: int, recheck_delay: int) -> bool:
+        """Apply RECHECK timing fix to specific signal"""
+        try:
+            # Find signal in config
+            for block in self.config.blocks:
+                for signal in block.signals:
+                    if signal.name == signal_name:
+                        # Found the signal - apply fix
+                        if hasattr(signal, 'recheck_config') and signal.recheck_config:
+                            # Calculate safe delay (75% of timing window)
+                            safe_delay = max(1, int(timing_window * 0.75))
+                            
+                            # Apply fix using auto_fix module
+                            success = auto_fix_recheck_delay(
+                                signal.recheck_config,
+                                timing_window,
+                                buffer=0.75
+                            )
+                            
+                            return success
+            
+            return False
+            
+        except Exception as e:
+            print(f"RECHECK timing fix failed: {e}")
+            return False
+    
+    def _apply_exit_consolidation_fix(self, identifier: str, level: str) -> bool:
+        """Apply exit consolidation fix"""
+        try:
+            if level == 'strategy':
+                # Consolidate at strategy level
+                if hasattr(self.config, 'exit_conditions'):
+                    new_exits = auto_fix_duplicate_exits(
+                        self.config.exit_conditions,
+                        identifier
+                    )
+                    self.config.exit_conditions = new_exits
+                    return True
+            
+            elif level == 'block':
+                # Find block and consolidate
+                for block in self.config.blocks:
+                    if block.name.lower() == identifier.lower():
+                        if hasattr(block, 'exit_conditions'):
+                            new_exits = auto_fix_duplicate_exits(
+                                block.exit_conditions,
+                                identifier
+                            )
+                            block.exit_conditions = new_exits
+                            return True
+            
+            elif level == 'signal':
+                # Find signal and consolidate
+                for block in self.config.blocks:
+                    for signal in block.signals:
+                        if signal.name == identifier:
+                            if hasattr(signal, 'exit_conditions'):
+                                new_exits = auto_fix_duplicate_exits(
+                                    signal.exit_conditions,
+                                    identifier
+                                )
+                                signal.exit_conditions = new_exits
+                                return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"Exit consolidation fix failed: {e}")
+            return False
+    
+    def _apply_dead_code_fix(self, signal_name: str, block_name: str) -> bool:
+        """Apply dead code fix to disable unreachable signal"""
+        try:
+            # Find block
+            for block in self.config.blocks:
+                if block.name.lower() == block_name.lower():
+                    # Apply fix using auto_fix module
+                    success = auto_fix_dead_code(
+                        block,
+                        [signal_name],
+                        preserve_history=True  # Disable, don't delete
+                    )
+                    return success
+            
+            return False
+            
+        except Exception as e:
+            print(f"Dead code fix failed: {e}")
+            return False
