@@ -586,6 +586,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Connect signal for when strategy is selected
         self.browser_window.strategy_selected.connect(self._load_strategy_from_browser)
         
+        # Connect signal for when strategy is deleted (handle cleanup)
+        self.browser_window.strategy_deleted.connect(self._on_strategy_deleted)
+
         # Clear reference when window is destroyed
         self.browser_window.destroyed.connect(lambda: setattr(self, 'browser_window', None))
         
@@ -691,6 +694,35 @@ class StrategyBuilderMainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Error loading strategy from database:\n\n{str(e)}")
             import traceback
             traceback.print_exc()
+    
+    def _on_strategy_deleted(self, strategy_id: str, was_entire_strategy: bool):
+        """
+        Handle strategy deletion from browser dialog.
+        
+        If the currently loaded strategy was deleted, clear the main window.
+        
+        Args:
+            strategy_id: ID of deleted strategy
+            was_entire_strategy: True if entire strategy deleted, False if just versions
+        """
+        # Check if the deleted strategy is the one currently loaded
+        if self.current_strategy_id == strategy_id:
+            if was_entire_strategy:
+                # Entire strategy deleted - clear main window
+                self._on_new_strategy()
+                self._update_status(f"Loaded strategy was deleted - cleared workspace")
+            else:
+                # Specific versions deleted - check if current version still exists
+                if self.current_version_id:
+                    try:
+                        db = get_database_manager()
+                        version = db.strategy.get_strategy_version(self.current_version_id)
+                        if not version:
+                            # Current version was deleted - clear workspace
+                            self._on_new_strategy()
+                            self._update_status(f"Loaded version was deleted - cleared workspace")
+                    except:
+                        pass  # Silence errors
     
     def _on_save_strategy(self) -> bool:
         """Save the current strategy to database with proper rollback on failure."""
