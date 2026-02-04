@@ -140,6 +140,7 @@ class AIRecommendationsPanel(QWidget):
         self.export_btn = QPushButton("💾 Export to JSON")
         self.export_btn.clicked.connect(self._export_to_json)
         self.export_btn.setStyleSheet(get_secondary_button_stylesheet())
+        self.export_btn.setFixedWidth(200)  # Force exact width for uniformity
         self.export_btn.setEnabled(False)  # Disabled by default until backtest run
         button_layout.addWidget(self.export_btn)
         
@@ -147,6 +148,7 @@ class AIRecommendationsPanel(QWidget):
         self.preview_request_btn = QPushButton("🔍 Preview AI Request")
         self.preview_request_btn.clicked.connect(self._preview_ai_request)
         self.preview_request_btn.setStyleSheet(get_primary_button_stylesheet())
+        self.preview_request_btn.setFixedWidth(200)  # Force exact width for uniformity
         self.preview_request_btn.setEnabled(False)  # Disabled by default until backtest run
         button_layout.addWidget(self.preview_request_btn)
         
@@ -154,6 +156,7 @@ class AIRecommendationsPanel(QWidget):
         self.approve_btn = QPushButton("✅ Approve & Send to AI")
         self.approve_btn.clicked.connect(self._approve_and_send)
         self.approve_btn.setStyleSheet(get_success_button_stylesheet())
+        self.approve_btn.setFixedWidth(200)  # Force exact width for uniformity
         self.approve_btn.setEnabled(False)  # Disabled by default until backtest run
         button_layout.addWidget(self.approve_btn)
         
