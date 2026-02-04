@@ -1766,12 +1766,26 @@ class ValidationReportWindow(QMainWindow):
     def _apply_recheck_timing_fix(self, signal_name: str, timing_window: int) -> bool:
         """Apply RECHECK timing fix to specific signal - INSTITUTIONAL GRADE"""
         try:
+            print(f"\n{'='*80}")
+            print(f"DEBUG: RECHECK TIMING FIX - START")
+            print(f"{'='*80}")
+            print(f"Signal name: {signal_name}")
+            print(f"Timing window: {timing_window}")
+            print(f"Target delay (75%): {max(1, int(timing_window * 0.75))}")
+            
             # Find signal in config
             for block in self.config.blocks:
+                print(f"DEBUG: Checking block '{block.name}'")
                 for signal in block.signals:
+                    print(f"  DEBUG: Checking signal '{signal.name}'")
                     if signal.name == signal_name:
+                        print(f"  DEBUG: ✓ FOUND target signal '{signal_name}'")
+                        
                         # Found the signal - apply fix
                         if hasattr(signal, 'recheck_config') and signal.recheck_config:
+                            print(f"  DEBUG: RECHECK config exists")
+                            print(f"  DEBUG: BEFORE FIX - bar_delay = {signal.recheck_config.bar_delay}")
+                            
                             # Calculate safe delay (75% of timing window)
                             safe_delay = max(1, int(timing_window * 0.75))
                             
@@ -1782,12 +1796,25 @@ class ValidationReportWindow(QMainWindow):
                                 buffer=0.75
                             )
                             
+                            print(f"  DEBUG: AFTER FIX - bar_delay = {signal.recheck_config.bar_delay}")
+                            print(f"  DEBUG: Fix returned: {success}")
+                            print(f"  DEBUG: Signal object ID: {id(signal)}")
+                            print(f"  DEBUG: Recheck config ID: {id(signal.recheck_config)}")
+                            print(f"{'='*80}\n")
+                            
                             return success
+                        else:
+                            print(f"  DEBUG: ❌ No recheck_config found on signal")
             
+            print(f"DEBUG: ❌ Signal '{signal_name}' not found in config")
+            print(f"{'='*80}\n")
             return False
             
         except Exception as e:
-            print(f"RECHECK timing fix failed: {e}")
+            print(f"DEBUG: ❌ EXCEPTION: {e}")
+            import traceback
+            traceback.print_exc()
+            print(f"{'='*80}\n")
             return False
     
     def _apply_exit_consolidation_fix(self, identifier: str, level: str) -> bool:
