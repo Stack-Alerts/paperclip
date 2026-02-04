@@ -1731,7 +1731,7 @@ class ValidationReportWindow(QMainWindow):
             QApplication.restoreOverrideCursor()
     
     def _reinitialize_ui(self) -> None:
-        """Reinitialize UI with updated report data"""
+        """Reinitialize UI with updated report data (Screenshot 2 design)"""
         # Get central widget
         central = self.centralWidget()
         if not central:
@@ -1749,15 +1749,11 @@ class ValidationReportWindow(QMainWindow):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
         
-        # Header
+        # Header with inline status (Screenshot 2 design - NO separate status banner)
         header = self._create_header()
         layout.addWidget(header)
         
-        # Status banner
-        status_banner = self._create_status_banner()
-        layout.addWidget(status_banner)
-        
-        # Tabs
+        # Tabs (no status banner between header and tabs)
         tabs = self._create_tabs()
         layout.addWidget(tabs, 1)
         
