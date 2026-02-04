@@ -177,7 +177,7 @@ class ValidationReportWindow(QMainWindow):
             # Description
             desc_label = QLabel("  Your strategy meets all institutional-grade requirements and is ready for backtesting.")
             desc_label.setFont(create_font(11))
-            desc_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+            desc_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
             desc_label.setWordWrap(True)
             status_layout.addWidget(desc_label, 1)
             
@@ -213,7 +213,7 @@ class ValidationReportWindow(QMainWindow):
             # Description
             desc_label = QLabel(f"  {blocking} blocking issue(s) must be fixed before backtest.")
             desc_label.setFont(create_font(11))
-            desc_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+            desc_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
             desc_label.setWordWrap(True)
             status_layout.addWidget(desc_label, 1)
         
