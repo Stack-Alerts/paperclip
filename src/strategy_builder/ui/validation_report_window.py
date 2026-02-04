@@ -153,6 +153,7 @@ class ValidationReportWindow(QMainWindow):
                     color: {COLORS['text_primary']};
                     padding: 6px 12px;
                     border-radius: 4px;
+                    border-left: 4px solid {COLORS['success']};
                 }}
             """)
         else:
@@ -164,6 +165,7 @@ class ValidationReportWindow(QMainWindow):
                     color: {COLORS['text_primary']};
                     padding: 6px 12px;
                     border-radius: 4px;
+                    border-left: 4px solid {COLORS['error']};
                 }}
             """)
         
