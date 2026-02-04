@@ -95,13 +95,9 @@ class ValidationReportWindow(QMainWindow):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
         
-        # Header with blue title (matching Strategy Browser)
+        # Header with blue title and inline status (Screenshot 2 design)
         header = self._create_header()
         layout.addWidget(header)
-        
-        # Status banner
-        status_banner = self._create_status_banner()
-        layout.addWidget(status_banner)
         
         # Tab widget for organized content
         tabs = self._create_tabs()
@@ -112,11 +108,11 @@ class ValidationReportWindow(QMainWindow):
         layout.addWidget(footer)
     
     def _create_header(self) -> QWidget:
-        """Create header with title matching main window colors"""
+        """Create header with title and inline status (Screenshot 2 design)"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        layout.setSpacing(12)  # More padding between title and info
-        layout.setContentsMargins(0, 0, 0, 16)  # Extra padding at bottom before status banner
+        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 12)
         
         # Title matching Strategy Browser style (#095983 - teal/blue)
         title = QLabel("💼 Validation Report")
@@ -124,20 +120,28 @@ class ValidationReportWindow(QMainWindow):
         title.setStyleSheet("color: #095983; font-size: 16pt; font-weight: bold; background: transparent;")
         layout.addWidget(title)
         
-        # Strategy info with version
+        # Strategy info with inline status (Screenshot 2 design)
         strategy_name = self.report.strategy_summary.get('name', 'Unknown')
         version = self.report.strategy_summary.get('version', None)
         timestamp = datetime.fromisoformat(self.report.timestamp).strftime('%Y-%m-%d %H:%M:%S')
         
-        # Add version to strategy name if available
+        # Build info text with version
         if version:
             info_text = f"Strategy: {strategy_name} (v{version})  •  Validated: {timestamp}"
         else:
             info_text = f"Strategy: {strategy_name}  •  Validated: {timestamp}"
         
+        # Add inline status to info text
+        if self.report.is_valid:
+            info_text += "  | ✅ VALIDATION PASSED  Your strategy meets all institutional-grade requirements and is ready for backtesting."
+        else:
+            blocking = self.report.blocking_issues()
+            info_text += f"  | ❌ VALIDATION FAILED  {blocking} blocking issue(s) must be fixed before backtest."
+        
         info_label = QLabel(info_text)
         info_label.setFont(create_font(11))
         info_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+        info_label.setWordWrap(True)  # Allow wrapping if needed
         layout.addWidget(info_label)
         
         return widget
