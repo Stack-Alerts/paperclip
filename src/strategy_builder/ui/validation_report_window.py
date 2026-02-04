@@ -1528,12 +1528,14 @@ class ValidationReportWindow(QMainWindow):
     
     def _handle_fix_click(self, issue: any) -> None:
         """
-        Handle fix button click - apply fix with feedback
-        Sprint 1.9.2 Task 1.9.2.8
+        Handle fix button click - INSTITUTIONAL GRADE DIRECT ACCESS
+        Sprint 1.9.2 - Refactored to use validator-provided data
         
-        Flow: Confirmation → Apply → Feedback → Re-validate
+        Flow: Extract data from issue → Apply fix → Feedback → Re-validate
+        
+        Key: Uses issue.auto_fix_data dict and issue.location (no regex needed)
         """
-        # Show confirmation (simplified - full dialog in Task 1.9.2.7)
+        # Show confirmation
         result = QMessageBox.question(
             self,
             "Confirm Auto-Fix",
@@ -1551,47 +1553,64 @@ class ValidationReportWindow(QMainWindow):
         if result != QMessageBox.Yes:
             return
         
-        # Apply fix based on rule_id
+        # Extract location components (block_name, signal_name)
+        location_data = self._extract_location_components(issue.location)
+        
+        # Get auto-fix data from validator (already computed!)
+        auto_fix_data = getattr(issue, 'auto_fix_data', {}) or {}
+        
+        # Apply fix - institutional grade direct access approach
         success = False
         error_msg = None
         
         try:
             if issue.rule_id == 'DIRECTION_001':
-                # Extract suggested type from issue (simplified)
-                suggested_type = "Bearish" if "bearish" in issue.message.lower() else "Bullish"
-                success = auto_fix_strategy_type(self.config, suggested_type)
+                # Direction switch - use suggested_type from auto_fix_data
+                suggested_type = auto_fix_data.get('suggested_type')
+                if suggested_type:
+                    success = auto_fix_strategy_type(self.config, suggested_type)
+                else:
+                    error_msg = "No suggested direction in fix data"
+          
             
             elif issue.rule_id == 'TIMING_004':
-                # Extract signal location from issue
-                signal_name, timing_window, recheck_delay = self._extract_timing_fix_data(issue)
+                # RECHECK timing fix - use data from auto_fix_data
+                timing_window = auto_fix_data.get('timing_window')
+                signal_name = location_data.get('signal_name')
+                
                 if signal_name and timing_window:
-                    success = self._apply_recheck_timing_fix(signal_name, timing_window, recheck_delay)
+                    success = self._apply_recheck_timing_fix(signal_name, timing_window)
                 else:
-                    QMessageBox.warning(self, "Fix Failed", "Could not extract signal information from issue.")
-                    return
+                    error_msg = f"Missing data - signal:{signal_name}, window:{timing_window}"
             
-            elif issue.rule_id == 'EXIT_003':
-                # Extract exit consolidation data from issue
-                signal_name, exit_level = self._extract_exit_fix_data(issue)
+            elif issue.rule_id == 'EXIT_009':
+                # Exit consolidation - use signal_name from auto_fix_data
+                signal_name = auto_fix_data.get('signal_name')
                 if signal_name:
-                    success = self._apply_exit_consolidation_fix(signal_name, exit_level)
+                    # Determine level from location
+                    if 'Signal::' in issue.location:
+                        level = 'signal'
+                    elif 'Block::' in issue.location:
+                        level = 'block'
+                    else:
+                        level = 'strategy'
+                    
+                    success = self._apply_exit_consolidation_fix(signal_name, level)
                 else:
-                    QMessageBox.warning(self, "Fix Failed", "Could not extract exit information from issue.")
-                    return
+                    error_msg = "No signal name in fix data"
             
-            elif issue.rule_id == 'DEAD_CODE_001':
-                # Extract dead code signal information
-                signal_name, block_name = self._extract_dead_code_data(issue)
+            elif issue.rule_id == 'LOGIC_003':
+                # Dead code - use signal_name from auto_fix_data
+                signal_name = auto_fix_data.get('signal_name') or location_data.get('signal_name')
+                block_name = location_data.get('block_name')
+                
                 if signal_name and block_name:
                     success = self._apply_dead_code_fix(signal_name, block_name)
                 else:
-                    QMessageBox.warning(self, "Fix Failed", "Could not extract signal information from issue.")
-                    return
+                    error_msg = f"Missing data - signal:{signal_name}, block:{block_name}"
             
             else:
-                QMessageBox.warning(self, "Fix Not Available",
-                    f"No automated fix available for: {issue.rule_name}")
-                return
+                error_msg = f"No auto-fix handler for rule {issue.rule_id}"
                 
         except Exception as e:
             error_msg = str(e)
@@ -1607,7 +1626,7 @@ class ValidationReportWindow(QMainWindow):
                 f"Changes have been applied to your strategy configuration."
             )
             
-            # Re-run validation (Task 1.9.2.8)
+            # Re-run validation
             self._rerun_validation()
         else:
             QMessageBox.warning(
@@ -1708,118 +1727,37 @@ class ValidationReportWindow(QMainWindow):
         layout.addWidget(footer)
     
     # =========================================================================
-    # AUTO-FIX DATA EXTRACTION METHODS
+    # AUTO-FIX DATA EXTRACTION - INSTITUTIONAL GRADE (Direct Access)
     # =========================================================================
     
-    def _extract_timing_fix_data(self, issue: any) -> tuple:
-        """Extract timing fix data from validation issue"""
-        import re
+    def _extract_location_components(self, location: str) -> dict:
+        """
+        Extract block and signal names from location string
         
-        # Parse location to get signal name
-        # Location format: "Block::hod::Signal::BELOW_HOD"
-        signal_name = None
-        if hasattr(issue, 'location') and issue.location:
-            parts = issue.location.split('::')
-            for i in range(len(parts)):
-                if parts[i] == "Signal" and i+1 < len(parts):
-                    signal_name = parts[i+1]
-                    break
+        Location format: "Block::block_name::Signal::signal_name"
         
-        # Extract timing window and recheck delay from message
-        # Parse from message text: "RECHECK delay (X bars) exceeds timing window (Y candles)"
-        timing_window = None
-        recheck_delay = None
+        Returns dict with 'block_name' and 'signal_name' keys
+        """
+        components = {'block_name': None, 'signal_name': None}
         
-        if hasattr(issue, 'message') and issue.message:
-            # Look for timing window pattern
-            window_match = re.search(r'timing window \((\d+)', issue.message)
-            if window_match:
-                timing_window = int(window_match.group(1))
-            
-            # Look for recheck delay pattern  
-            delay_match = re.search(r'RECHECK delay \((\d+)', issue.message)
-            if delay_match:
-                recheck_delay = int(delay_match.group(1))
+        if not location or '::' not in location:
+            return components
         
-        # Debug log
-        print(f"DEBUG: Extracted timing data - signal={signal_name}, window={timing_window}, delay={recheck_delay}")
+        parts = location.split('::')
+        for i in range(len(parts)):
+            if parts[i] == "Block" and i+1 < len(parts):
+                components['block_name'] = parts[i+1]
+            if parts[i] == "Signal" and i+1 < len(parts):
+                components['signal_name'] = parts[i+1]
         
-        return (signal_name, timing_window, recheck_delay)
-    
-    def _extract_exit_fix_data(self, issue: any) -> tuple:
-        """Extract exit consolidation data from validation issue"""
-        import re
-        
-        signal_name = None
-        exit_level = 'strategy'  # Default to strategy level
-        
-        # Parse location
-        if hasattr(issue, 'location') and issue.location:
-            # Could be signal name or block name depending on where exits are
-            if 'Signal::' in issue.location:
-                parts = issue.location.split('::')
-                for i in range(len(parts)):
-                    if parts[i] == "Signal" and i+1 < len(parts):
-                        signal_name = parts[i+1]
-                        exit_level = 'signal'
-                        break
-            elif 'Block::' in issue.location:
-                parts = issue.location.split('::')
-                for i in range(len(parts)):
-                    if parts[i] == "Block" and i+1 < len(parts):
-                        signal_name = parts[i+1]
-                        exit_level = 'block'
-                        break
-        
-        # Also try to extract from message if location parsing failed
-        if not signal_name and hasattr(issue, 'message') and issue.message:
-            # Try to extract signal name from message
-            match = re.search(r"signal[:\s]+['\"]?([A-Z_]+)['\"]?", issue.message, re.IGNORECASE)
-            if match:
-                signal_name = match.group(1)
-        
-        # Debug log
-        print(f"DEBUG: Extracted exit data - signal={signal_name}, level={exit_level}")
-        
-        return (signal_name, exit_level)
-    
-    def _extract_dead_code_data(self, issue: any) -> tuple:
-        """Extract dead code signal information"""
-        import re
-        
-        signal_name = None
-        block_name = None
-        
-        if hasattr(issue, 'location') and issue.location:
-            parts = issue.location.split('::')
-            for i in range(len(parts)):
-                if parts[i] == "Block" and i+1 < len(parts):
-                    block_name = parts[i+1]
-                if parts[i] == "Signal" and i+1 < len(parts):
-                    signal_name = parts[i+1]
-        
-        # Also try to extract from message if location parsing failed
-        if (not signal_name or not block_name) and hasattr(issue, 'message') and issue.message:
-            if not signal_name:
-                sig_match = re.search(r"signal[:\s]+['\"]?([A-Z_]+)['\"]?", issue.message, re.IGNORECASE)
-                if sig_match:
-                    signal_name = sig_match.group(1)
-            if not block_name:
-                block_match = re.search(r"block[:\s]+['\"]?([a-z_]+)['\"]?", issue.message, re.IGNORECASE)
-                if block_match:
-                    block_name = block_match.group(1)
-        
-        # Debug log
-        print(f"DEBUG: Extracted dead code data - signal={signal_name}, block={block_name}")
-        
-        return (signal_name, block_name)
+        return components
     
     # =========================================================================
     # AUTO-FIX APPLICATION METHODS
     # =========================================================================
     
-    def _apply_recheck_timing_fix(self, signal_name: str, timing_window: int, recheck_delay: int) -> bool:
-        """Apply RECHECK timing fix to specific signal"""
+    def _apply_recheck_timing_fix(self, signal_name: str, timing_window: int) -> bool:
+        """Apply RECHECK timing fix to specific signal - INSTITUTIONAL GRADE"""
         try:
             # Find signal in config
             for block in self.config.blocks:
