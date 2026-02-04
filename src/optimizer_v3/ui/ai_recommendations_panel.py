@@ -42,6 +42,7 @@ sys.path.insert(0, str(project_root))
 from src.strategy_builder.ui.styles import (
     get_main_stylesheet,
     get_tab_widget_stylesheet,
+    get_primary_button_stylesheet,
     get_success_button_stylesheet,
     get_secondary_button_stylesheet,
     get_text_edit_stylesheet,
