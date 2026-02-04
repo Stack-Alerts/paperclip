@@ -142,13 +142,13 @@ class AIRecommendationsPanel(QWidget):
             QPushButton {{
                 background-color: {COLORS['button_secondary']};
                 color: white;
-                font-weight: normal;
+                font-weight: bold;
+                font-size: 10pt;
                 padding: 4px 10px;
                 border-radius: 4px;
                 min-width: 120px;
-                min-height: 28px;
-                max-height: 28px;
-                font-size: 9pt;
+                min-height: 40px;
+                max-height: 40px;
             }}
             QPushButton:hover {{
                 background-color: {COLORS['button_secondary_hover']};
@@ -156,6 +156,7 @@ class AIRecommendationsPanel(QWidget):
             QPushButton:disabled {{
                 background-color: #555555;
                 color: #888888;
+                font-weight: bold;
             }}
         """)
         self.export_btn.setEnabled(False)  # Disabled by default until backtest run
@@ -168,13 +169,13 @@ class AIRecommendationsPanel(QWidget):
             QPushButton {{
                 background-color: {COLORS['button_primary']};
                 color: white;
-                font-weight: normal;
+                font-weight: bold;
+                font-size: 10pt;
                 padding: 4px 10px;
                 border-radius: 4px;
                 min-width: 120px;
-                min-height: 28px;
-                max-height: 28px;
-                font-size: 9pt;
+                min-height: 40px;
+                max-height: 40px;
             }}
             QPushButton:hover {{
                 background-color: {COLORS['button_primary_hover']};
@@ -182,6 +183,7 @@ class AIRecommendationsPanel(QWidget):
             QPushButton:disabled {{
                 background-color: #555555;
                 color: #888888;
+                font-weight: bold;
             }}
         """)
         self.preview_request_btn.setEnabled(False)  # Disabled by default until backtest run
@@ -194,13 +196,13 @@ class AIRecommendationsPanel(QWidget):
             QPushButton {{
                 background-color: {COLORS['button_success']};
                 color: white;
-                font-weight: normal;
+                font-weight: bold;
+                font-size: 10pt;
                 padding: 4px 10px;
                 border-radius: 4px;
                 min-width: 120px;
-                min-height: 28px;
-                max-height: 28px;
-                font-size: 9pt;
+                min-height: 40px;
+                max-height: 40px;
             }}
             QPushButton:hover {{
                 background-color: {COLORS['button_success_hover']};
@@ -208,6 +210,7 @@ class AIRecommendationsPanel(QWidget):
             QPushButton:disabled {{
                 background-color: #555555;
                 color: #888888;
+                font-weight: bold;
             }}
         """)
         self.approve_btn.setEnabled(False)  # Disabled by default until backtest run
@@ -710,7 +713,7 @@ class AIRecommendationsPanel(QWidget):
             self.approve_btn.setEnabled(True)
         else:
             # No backtest data - keep default message and disabled ALL buttons
-            stats_text = "Backtest not executed or completed"
+            stats_text = "Status: Backtest not executed or completed"
             
             # Disable ALL buttons - show grey
             self.export_btn.setEnabled(False)
