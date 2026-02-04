@@ -644,6 +644,9 @@ class StrategyBuilderMainWindow(QMainWindow):
                 # Use persistence._dict_to_config() - EXACT same as file load
                 restored_config = self.orchestrator.persistence._dict_to_config(config_dict)
                 
+                # Add version number to config for UI display
+                restored_config.version = version['version_number']
+                
                 # Assign to config engine (SAME PATTERN as orchestrator.load_strategy)
                 self.orchestrator.config_engine.config = restored_config
                 
