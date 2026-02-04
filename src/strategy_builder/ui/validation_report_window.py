@@ -1795,25 +1795,29 @@ class ValidationReportWindow(QMainWindow):
                         
                         print(f"  DEBUG: CUMULATIVE BEFORE FIX = {cumulative_before} bars")
                         
-                        # FIX: Apply to main config
-                        if hasattr(signal, 'recheck_config') and signal.recheck_config:
-                            success = auto_fix_recheck_delay(
-                                signal.recheck_config,
-                                timing_window,
-                                buffer=0.75
-                            )
-                            print(f"  DEBUG: Main config fixed: {success}")
+                        # CRITICAL FIX: Distribute safe delay across ENTIRE chain (main + all chain items)
+                        safe_delay_total = max(1, int(timing_window * 0.75))
+                        print(f"  DEBUG: Safe delay target (75% of {timing_window}) = {safe_delay_total} bars")
                         
-                        # CRITICAL FIX: Also fix the RECHECK CHAIN!
-                        if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
-                            safe_delay = max(1, int(timing_window * 0.75))
-                            # Distribute safe delay across chain
-                            for idx, recheck in enumerate(signal.recheck_chain):
-                                # Reduce each chain delay proportionally
-                                reduction_factor = safe_delay / cumulative_before if cumulative_before > 0 else 0.5
-                                new_delay = max(1, int(recheck.bar_delay * reduction_factor))
-                                print(f"    DEBUG: Chain[{idx}] BEFORE = {recheck.bar_delay}, AFTER = {new_delay}")
-                                recheck.bar_delay = new_delay
+                        if cumulative_before > 0:
+                            # Calculate reduction factor to fit within safe_delay_total
+                            reduction_factor = safe_delay_total / cumulative_before
+                            print(f"  DEBUG: Reduction factor = {reduction_factor:.3f}")
+                            
+                            # Apply to main config
+                            if hasattr(signal, 'recheck_config') and signal.recheck_config:
+                                old_main = signal.recheck_config.bar_delay
+                                new_main = max(1, int(old_main * reduction_factor))
+                                signal.recheck_config.bar_delay = new_main
+                                print(f"  DEBUG: Main config BEFORE = {old_main}, AFTER = {new_main}")
+                            
+                            # Apply to ALL chain items
+                            if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
+                                for idx, recheck in enumerate(signal.recheck_chain):
+                                    old_delay = recheck.bar_delay
+                                    new_delay = max(1, int(old_delay * reduction_factor))
+                                    recheck.bar_delay = new_delay
+                                    print(f"    DEBUG: Chain[{idx}] BEFORE = {old_delay}, AFTER = {new_delay}")
                         
                         # Calculate new cumulative
                         cumulative_after = 0
