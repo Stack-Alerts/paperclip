@@ -49,6 +49,10 @@ class StrategyInfoPanel(QWidget):
         super().__init__(parent)
         self.orchestrator = orchestrator
         
+        # CRITICAL: Store actual strategy name separately from display
+        # Display may include version "(vX)" but actual name does not
+        self._actual_strategy_name: str = ""
+        
         # UI Components
         self.name_input: Optional[QLineEdit] = None
         self.desc_label: Optional[QLabel] = None
@@ -294,8 +298,12 @@ class StrategyInfoPanel(QWidget):
         Handle strategy name change.
         
         Args:
-            text: New strategy name
+            text: New strategy name (may include version for display)
         """
+        # CRITICAL: Store actual name (strip version if present in display)
+        # User may be editing so we update actual name from input
+        self._actual_strategy_name = text.strip()
+        
         self.strategy_name_changed.emit(text)
         self._update_status()
     
@@ -318,12 +326,26 @@ class StrategyInfoPanel(QWidget):
     
     def get_strategy_name(self) -> str:
         """
-        Get the current strategy name.
+        Get the current strategy name (WITHOUT version suffix).
+        
+        Returns the actual strategy name, stripping any version suffix like " (vX)"
+        that may have been added for display purposes.
         
         Returns:
-            Strategy name string
+            Strategy name string without version
         """
-        return self.name_input.text().strip()
+        # Return stored actual name if available
+        if self._actual_strategy_name:
+            return self._actual_strategy_name
+        
+        # Otherwise get from input and strip version suffix if present
+        name = self.name_input.text().strip()
+        
+        # Strip version suffix pattern: " (v1)", " (v13)", etc.
+        import re
+        name = re.sub(r'\s*\(v\d+\)\s*$', '', name)
+        
+        return name
     
     def set_strategy_name(self, name: str):
         """
@@ -521,6 +543,9 @@ class StrategyInfoPanel(QWidget):
         try:
             config = self.orchestrator.get_current_config()
             if config and hasattr(config, 'name') and config.name:
+                # CRITICAL: Store actual name (without version) separately
+                self._actual_strategy_name = config.name
+                
                 # Include version in display if available
                 display_name = config.name
                 if hasattr(config, 'version') and config.version:
