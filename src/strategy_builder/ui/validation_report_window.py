@@ -146,11 +146,10 @@ class ValidationReportWindow(QMainWindow):
         status_badge.setFont(create_font(11))
         
         if self.report.is_valid:
-            # Use HTML for colored text with separator bars (green separator matching status)
-            status_badge.setText(
-                f"<span style='color: {COLORS['success']}; font-weight: bold;'>  ✅ VALIDATION PASSED  │  </span>"
-                f"<span style='color: {COLORS['text_primary']};'>Your strategy meets all institutional-grade requirements and is ready for backtesting.</span>"
-            )
+            # Separate status and description for proper border positioning
+            status_text = f"<span style='display: inline-block; color: {COLORS['success']}; font-weight: bold; padding-right: 12px; border-right: 4px solid {COLORS['success']};'>  ✅ VALIDATION PASSED</span>"
+            desc_text = f"<span style='padding-left: 12px; color: {COLORS['text_primary']};'>Your strategy meets all institutional-grade requirements and is ready for backtesting.</span>"
+            status_badge.setText(status_text + desc_text)
             status_badge.setStyleSheet(f"""
                 QLabel {{
                     background-color: rgba(16, 185, 129, 0.15);
@@ -161,11 +160,10 @@ class ValidationReportWindow(QMainWindow):
             """)
         else:
             blocking = self.report.blocking_issues()
-            # Use HTML for colored text with separator bars (red separator matching status)
-            status_badge.setText(
-                f"<span style='color: {COLORS['error']}; font-weight: bold;'>  ❌ VALIDATION FAILED  │  </span>"
-                f"<span style='color: {COLORS['text_primary']};'>{blocking} blocking issue(s) must be fixed before backtest.</span>"
-            )
+            # Separate status and description for proper border positioning
+            status_text = f"<span style='display: inline-block; color: {COLORS['error']}; font-weight: bold; padding-right: 12px; border-right: 4px solid {COLORS['error']};'>  ❌ VALIDATION FAILED</span>"
+            desc_text = f"<span style='padding-left: 12px; color: {COLORS['text_primary']};'>{blocking} blocking issue(s) must be fixed before backtest.</span>"
+            status_badge.setText(status_text + desc_text)
             status_badge.setStyleSheet(f"""
                 QLabel {{
                     background-color: rgba(220, 53, 69, 0.15);
