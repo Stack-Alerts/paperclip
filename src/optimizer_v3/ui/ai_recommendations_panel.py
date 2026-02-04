@@ -161,32 +161,6 @@ class AIRecommendationsPanel(QWidget):
         self.export_btn.setEnabled(False)  # Disabled by default until backtest run
         button_layout.addWidget(self.export_btn)
         
-        # Close button - same size as others, disabled when no backtest
-        self.close_btn = QPushButton("❌ Close (Don't Send)")
-        self.close_btn.clicked.connect(self.close)
-        self.close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['button_secondary']};
-                color: white;
-                font-weight: normal;
-                padding: 4px 10px;
-                border-radius: 4px;
-                min-width: 120px;
-                min-height: 28px;
-                max-height: 28px;
-                font-size: 9pt;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['button_secondary_hover']};
-            }}
-            QPushButton:disabled {{
-                background-color: #555555;
-                color: #888888;
-            }}
-        """)
-        self.close_btn.setEnabled(False)  # Disabled by default until backtest run
-        button_layout.addWidget(self.close_btn)
-        
         # Preview AI Request button - NEW (shows the actual formatted prompt)
         self.preview_request_btn = QPushButton("🔍 Preview AI Request")
         self.preview_request_btn.clicked.connect(self._preview_ai_request)
@@ -220,10 +194,10 @@ class AIRecommendationsPanel(QWidget):
             QPushButton {{
                 background-color: {COLORS['button_success']};
                 color: white;
-                font-weight: bold;
+                font-weight: normal;
                 padding: 4px 10px;
                 border-radius: 4px;
-                min-width: 100px;
+                min-width: 120px;
                 min-height: 28px;
                 max-height: 28px;
                 font-size: 9pt;
@@ -732,7 +706,6 @@ class AIRecommendationsPanel(QWidget):
             
             # Enable ALL buttons when backtest data is available
             self.export_btn.setEnabled(True)
-            self.close_btn.setEnabled(True)
             self.preview_request_btn.setEnabled(True)
             self.approve_btn.setEnabled(True)
         else:
@@ -741,7 +714,6 @@ class AIRecommendationsPanel(QWidget):
             
             # Disable ALL buttons - show grey
             self.export_btn.setEnabled(False)
-            self.close_btn.setEnabled(False)
             self.preview_request_btn.setEnabled(False)
             self.approve_btn.setEnabled(False)
         
