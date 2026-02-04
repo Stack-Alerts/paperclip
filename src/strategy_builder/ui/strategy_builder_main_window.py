@@ -1615,6 +1615,8 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         Called after auto-fix to ensure main window displays
         the exact configuration that was saved.
+        
+        CRITICAL: Also restores validation status so stepper shows correct state.
         """
         if not self.current_version_id:
             return
@@ -1658,6 +1660,25 @@ class StrategyBuilderMainWindow(QMainWindow):
                 self.search_panel.sync_with_strategy()
                 
                 print(f"✅ UI refreshed with reloaded data")
+                
+                # CRITICAL: Restore validation status from database
+                # This updates the stepper to show correct validation state
+                validation_status = version.get('validation_status', 'Un-Validated')
+                
+                if validation_status == 'Pass':
+                    self.validation_passed = True
+                    self.stepper.reset_all_steps()
+                    self.stepper.mark_step_complete(1)  # Green check mark
+                    print(f"✅ Validation status restored: PASS (stepper GREEN)")
+                elif validation_status == 'Fail':
+                    self.validation_passed = False
+                    self.stepper.reset_all_steps()
+                    self.stepper.mark_step_error(1)  # Red X mark
+                    print(f"⚠️ Validation status restored: FAIL (stepper RED)")
+                else:  # Un-Validated
+                    self.validation_passed = False
+                    self.stepper.reset_all_steps()  # Default state
+                    print(f"ℹ️ Validation status: Un-Validated (stepper default)")
                 
             finally:
                 # Re-enable validation reset
