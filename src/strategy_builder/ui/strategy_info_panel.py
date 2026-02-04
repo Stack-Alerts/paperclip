@@ -264,20 +264,6 @@ class StrategyInfoPanel(QWidget):
         meta_layout.addStretch()
         group_layout.addLayout(meta_layout)
         
-        # Add horizontal line separator
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
-        group_layout.addWidget(line)
-        
-        # Status indicator (for future validation integration)
-        status_layout = QHBoxLayout()
-        self.status_label = QLabel("Status: Not configured")
-        self.status_label.setStyleSheet(f"color: {get_color('text_disabled')}; font-style: italic;")
-        status_layout.addWidget(self.status_label)
-        status_layout.addStretch()
-        group_layout.addLayout(status_layout)
-        
         group_box.setLayout(group_layout)
         layout.addWidget(group_box)
         layout.addStretch()
@@ -308,24 +294,11 @@ class StrategyInfoPanel(QWidget):
         self._actual_strategy_name = clean_name
         
         self.strategy_name_changed.emit(text)
-        self._update_status()
     
     def _on_type_changed(self):
         """Handle strategy type change."""
         strategy_type = self.get_strategy_type()
         self.strategy_type_changed.emit(strategy_type)
-        self._update_status()
-    
-    def _update_status(self):
-        """Update the status indicator based on current configuration."""
-        name = self.name_input.text().strip()
-        
-        if not name:
-            self.status_label.setText("Status: Enter strategy name")
-            self.status_label.setStyleSheet(get_label_style('warning') + " font-style: italic;")
-        else:
-            self.status_label.setText("Status: Ready to add blocks")
-            self.status_label.setStyleSheet(get_label_style('success') + " font-style: italic;")
     
     def get_strategy_name(self) -> str:
         """
@@ -569,7 +542,6 @@ class StrategyInfoPanel(QWidget):
         self.update_description_from_config()
         self.update_required_signals_from_config()
         self._update_metadata_row()
-        self._update_status()
     
     def _update_metadata_row(self):
         """Update the metadata row (optional signals and time constraint)."""
@@ -679,23 +651,10 @@ class StrategyInfoPanel(QWidget):
         description = self.get_description()
         
         if not name:
-            self.status_label.setText("Status: Name required!")
-            self.status_label.setStyleSheet(get_label_style('error') + " font-style: italic;")
             return False
         
         try:
             result = self.orchestrator.create_strategy(name, description)
-            
-            if result.success:
-                self.status_label.setText("Status: Strategy created")
-                self.status_label.setStyleSheet(get_label_style('success') + " font-style: italic;")
-                return True
-            else:
-                error_msg = result.message if hasattr(result, 'message') else "Unknown error"
-                self.status_label.setText(f"Status: Error - {error_msg}")
-                self.status_label.setStyleSheet(get_label_style('error') + " font-style: italic;")
-                return False
-        except Exception as e:
-            self.status_label.setText(f"Status: Exception - {str(e)}")
-            self.status_label.setStyleSheet(get_label_style('error') + " font-style: italic;")
+            return result.success if hasattr(result, 'success') else False
+        except Exception:
             return False
