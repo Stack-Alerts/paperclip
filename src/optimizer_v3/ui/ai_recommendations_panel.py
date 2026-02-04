@@ -146,6 +146,8 @@ class AIRecommendationsPanel(QWidget):
                 padding: 4px 10px;
                 border-radius: 4px;
                 min-width: 120px;
+                min-height: 28px;
+                max-height: 28px;
                 font-size: 9pt;
             }}
             QPushButton:hover {{
@@ -170,6 +172,8 @@ class AIRecommendationsPanel(QWidget):
                 padding: 4px 10px;
                 border-radius: 4px;
                 min-width: 120px;
+                min-height: 28px;
+                max-height: 28px;
                 font-size: 9pt;
             }}
             QPushButton:hover {{
@@ -194,6 +198,7 @@ class AIRecommendationsPanel(QWidget):
                 padding: 4px 10px;
                 border-radius: 4px;
                 min-width: 120px;
+                min-height: 28px;
                 max-height: 28px;
                 font-size: 9pt;
             }}
@@ -219,6 +224,8 @@ class AIRecommendationsPanel(QWidget):
                 padding: 4px 10px;
                 border-radius: 4px;
                 min-width: 100px;
+                min-height: 28px;
+                max-height: 28px;
                 font-size: 9pt;
             }}
             QPushButton:hover {{
