@@ -1764,7 +1764,7 @@ class ValidationReportWindow(QMainWindow):
     # =========================================================================
     
     def _apply_recheck_timing_fix(self, signal_name: str, timing_window: int) -> bool:
-        """Apply RECHECK timing fix to specific signal - INSTITUTIONAL GRADE"""
+        """Apply RECHECK timing fix - FIX ENTIRE CHAIN, NOT JUST FIRST DELAY"""
         try:
             print(f"\n{'='*80}")
             print(f"DEBUG: RECHECK TIMING FIX - START")
@@ -1781,30 +1781,52 @@ class ValidationReportWindow(QMainWindow):
                     if signal.name == signal_name:
                         print(f"  DEBUG: ✓ FOUND target signal '{signal_name}'")
                         
-                        # Found the signal - apply fix
+                        # Calculate CUMULATIVE delay (same as validator!)
+                        cumulative_before = 0
                         if hasattr(signal, 'recheck_config') and signal.recheck_config:
-                            print(f"  DEBUG: RECHECK config exists")
-                            print(f"  DEBUG: BEFORE FIX - bar_delay = {signal.recheck_config.bar_delay}")
-                            
-                            # Calculate safe delay (75% of timing window)
-                            safe_delay = max(1, int(timing_window * 0.75))
-                            
-                            # Apply fix using auto_fix module
+                            cumulative_before = signal.recheck_config.bar_delay
+                            print(f"  DEBUG: Main recheck_config.bar_delay = {signal.recheck_config.bar_delay}")
+                        
+                        if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
+                            chain_delays = [rc.bar_delay for rc in signal.recheck_chain]
+                            cumulative_before += sum(chain_delays)
+                            print(f"  DEBUG: RECHECK CHAIN exists with {len(signal.recheck_chain)} items")
+                            print(f"  DEBUG: Chain delays: {chain_delays}")
+                        
+                        print(f"  DEBUG: CUMULATIVE BEFORE FIX = {cumulative_before} bars")
+                        
+                        # FIX: Apply to main config
+                        if hasattr(signal, 'recheck_config') and signal.recheck_config:
                             success = auto_fix_recheck_delay(
                                 signal.recheck_config,
                                 timing_window,
                                 buffer=0.75
                             )
-                            
-                            print(f"  DEBUG: AFTER FIX - bar_delay = {signal.recheck_config.bar_delay}")
-                            print(f"  DEBUG: Fix returned: {success}")
-                            print(f"  DEBUG: Signal object ID: {id(signal)}")
-                            print(f"  DEBUG: Recheck config ID: {id(signal.recheck_config)}")
-                            print(f"{'='*80}\n")
-                            
-                            return success
-                        else:
-                            print(f"  DEBUG: ❌ No recheck_config found on signal")
+                            print(f"  DEBUG: Main config fixed: {success}")
+                        
+                        # CRITICAL FIX: Also fix the RECHECK CHAIN!
+                        if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
+                            safe_delay = max(1, int(timing_window * 0.75))
+                            # Distribute safe delay across chain
+                            for idx, recheck in enumerate(signal.recheck_chain):
+                                # Reduce each chain delay proportionally
+                                reduction_factor = safe_delay / cumulative_before if cumulative_before > 0 else 0.5
+                                new_delay = max(1, int(recheck.bar_delay * reduction_factor))
+                                print(f"    DEBUG: Chain[{idx}] BEFORE = {recheck.bar_delay}, AFTER = {new_delay}")
+                                recheck.bar_delay = new_delay
+                        
+                        # Calculate new cumulative
+                        cumulative_after = 0
+                        if hasattr(signal, 'recheck_config') and signal.recheck_config:
+                            cumulative_after = signal.recheck_config.bar_delay
+                        if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
+                            cumulative_after += sum(rc.bar_delay for rc in signal.recheck_chain)
+                        
+                        print(f"  DEBUG: CUMULATIVE AFTER FIX = {cumulative_after} bars")
+                        print(f"  DEBUG: ✅ Fix successful! {cumulative_before} → {cumulative_after} bars")
+                        print(f"{'='*80}\n")
+                        
+                        return True
             
             print(f"DEBUG: ❌ Signal '{signal_name}' not found in config")
             print(f"{'='*80}\n")
