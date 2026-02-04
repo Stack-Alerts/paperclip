@@ -751,6 +751,17 @@ class StrategyBuilderMainWindow(QMainWindow):
             try:
                 self.current_version_id = db.strategy.create_strategy_version(version_data)
                 
+                # CRITICAL: Get new version number from database and update UI
+                new_version = db.strategy.get_strategy_version(self.current_version_id)
+                if new_version:
+                    new_version_number = new_version['version_number']
+                    
+                    # Update config with new version number
+                    self.orchestrator.config_engine.config.version = new_version_number
+                    
+                    # Refresh info panel to show new version in display
+                    self.info_panel.refresh_from_orchestrator()
+                
             except Exception as version_error:
                 # VERSION CREATION FAILED
                 print(f"\n❌ VERSION CREATION FAILED!")
