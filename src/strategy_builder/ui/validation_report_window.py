@@ -108,7 +108,7 @@ class ValidationReportWindow(QMainWindow):
         layout.addWidget(footer)
     
     def _create_header(self) -> QWidget:
-        """Create header with title and inline status (Screenshot 2 design)"""
+        """Create header with title and inline status with background (Screenshot 2 design)"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setSpacing(8)
@@ -120,29 +120,57 @@ class ValidationReportWindow(QMainWindow):
         title.setStyleSheet("color: #095983; font-size: 16pt; font-weight: bold; background: transparent;")
         layout.addWidget(title)
         
-        # Strategy info with inline status (Screenshot 2 design)
+        # Strategy info with inline status badge (Screenshot 2 design)
+        info_container = QWidget()
+        info_layout = QHBoxLayout(info_container)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(12)
+        
+        # Strategy info text (left side)
         strategy_name = self.report.strategy_summary.get('name', 'Unknown')
         version = self.report.strategy_summary.get('version', None)
         timestamp = datetime.fromisoformat(self.report.timestamp).strftime('%Y-%m-%d %H:%M:%S')
         
-        # Build info text with version
         if version:
             info_text = f"Strategy: {strategy_name} (v{version})  •  Validated: {timestamp}"
         else:
             info_text = f"Strategy: {strategy_name}  •  Validated: {timestamp}"
         
-        # Add inline status to info text
-        if self.report.is_valid:
-            info_text += "  | ✅ VALIDATION PASSED  Your strategy meets all institutional-grade requirements and is ready for backtesting."
-        else:
-            blocking = self.report.blocking_issues()
-            info_text += f"  | ❌ VALIDATION FAILED  {blocking} blocking issue(s) must be fixed before backtest."
-        
         info_label = QLabel(info_text)
         info_label.setFont(create_font(11))
         info_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
-        info_label.setWordWrap(True)  # Allow wrapping if needed
-        layout.addWidget(info_label)
+        info_layout.addWidget(info_label)
+        
+        # Status badge with colored background (Screenshot 2 design)
+        status_badge = QLabel()
+        status_badge.setFont(create_font(11))
+        
+        if self.report.is_valid:
+            status_badge.setText("  ✅ VALIDATION PASSED  Your strategy meets all institutional-grade requirements and is ready for backtesting.")
+            status_badge.setStyleSheet(f"""
+                QLabel {{
+                    background-color: rgba(16, 185, 129, 0.15);
+                    color: {COLORS['text_primary']};
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                }}
+            """)
+        else:
+            blocking = self.report.blocking_issues()
+            status_badge.setText(f"  ❌ VALIDATION FAILED  {blocking} blocking issue(s) must be fixed before backtest.")
+            status_badge.setStyleSheet(f"""
+                QLabel {{
+                    background-color: rgba(220, 53, 69, 0.15);
+                    color: {COLORS['text_primary']};
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                }}
+            """)
+        
+        status_badge.setWordWrap(True)
+        info_layout.addWidget(status_badge, 1)  # Stretch to take remaining space
+        
+        layout.addWidget(info_container)
         
         return widget
     
