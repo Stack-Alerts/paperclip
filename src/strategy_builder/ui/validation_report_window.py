@@ -146,10 +146,10 @@ class ValidationReportWindow(QMainWindow):
         status_badge.setFont(create_font(11))
         
         if self.report.is_valid:
-            # Use HTML for colored text with separator bars
+            # Use HTML for colored text with separator bars (green separator matching status)
             status_badge.setText(
-                f"<span style='color: {COLORS['success']}; font-weight: bold;'>  ✅ VALIDATION PASSED  </span>"
-                f"<span style='color: {COLORS['text_primary']};'>│  Your strategy meets all institutional-grade requirements and is ready for backtesting.</span>"
+                f"<span style='color: {COLORS['success']}; font-weight: bold;'>  ✅ VALIDATION PASSED  │  </span>"
+                f"<span style='color: {COLORS['text_primary']};'>Your strategy meets all institutional-grade requirements and is ready for backtesting.</span>"
             )
             status_badge.setStyleSheet(f"""
                 QLabel {{
@@ -161,10 +161,10 @@ class ValidationReportWindow(QMainWindow):
             """)
         else:
             blocking = self.report.blocking_issues()
-            # Use HTML for colored text with separator bars
+            # Use HTML for colored text with separator bars (red separator matching status)
             status_badge.setText(
-                f"<span style='color: {COLORS['error']}; font-weight: bold;'>  ❌ VALIDATION FAILED  </span>"
-                f"<span style='color: {COLORS['text_primary']};'>│  {blocking} blocking issue(s) must be fixed before backtest.</span>"
+                f"<span style='color: {COLORS['error']}; font-weight: bold;'>  ❌ VALIDATION FAILED  │  </span>"
+                f"<span style='color: {COLORS['text_primary']};'>{blocking} blocking issue(s) must be fixed before backtest.</span>"
             )
             status_badge.setStyleSheet(f"""
                 QLabel {{
