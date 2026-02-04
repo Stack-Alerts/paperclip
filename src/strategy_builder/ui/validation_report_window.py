@@ -1621,24 +1621,16 @@ class ValidationReportWindow(QMainWindow):
         
         # Show result feedback
         if success:
-            # CRITICAL: Save config to database before re-validation
-            # Otherwise validator may load stale data from DB
-            try:
-                self._save_config_to_database()
-            except Exception as save_err:
-                QMessageBox.warning(
-                    self,
-                    "⚠️ Save Warning",
-                    f"Fix applied but could not save to database:\n\n{str(save_err)}\n\n"
-                    f"Changes are in memory only. Please save your strategy manually."
-                )
+            # Emit signal to notify parent window of config changes
+            # Parent window (Strategy Builder) will handle database persistence
+            self.fix_applied.emit(issue.rule_id, {'issue': issue.rule_name})
             
             QMessageBox.information(
                 self,
                 "✅ Fix Applied Successfully",
                 f"Auto-fix completed: {issue.rule_name}\n\n"
                 f"Validation will re-run automatically to verify the fix.\n\n"
-                f"Changes have been applied to your strategy configuration."
+                f"⚠️ IMPORTANT: Please save your strategy to persist these changes."
             )
             
             # Re-run validation
@@ -1861,26 +1853,3 @@ class ValidationReportWindow(QMainWindow):
         except Exception as e:
             print(f"Dead code fix failed: {e}")
             return False
-    
-    def _save_config_to_database(self) -> None:
-        """
-        Save strategy configuration to database after auto-fix
-        
-        CRITICAL: Without this, fixes only exist in memory and validator
-        will load stale data from database when re-running validation
-        
-        Raises:
-            Exception: If save fails
-        """
-        from src.strategy_builder.data.strategy_repository import StrategyRepository
-        
-        try:
-            # Use StrategyRepository to save config to database
-            repo = StrategyRepository()
-            repo.save_strategy(self.config)
-            
-            logger.info(f"Strategy '{self.config.name}' saved to database after auto-fix")
-            
-        except Exception as e:
-            logger.error(f"Failed to save strategy to database: {e}")
-            raise  # Re-raise to be caught by caller
