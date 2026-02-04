@@ -1662,30 +1662,54 @@ class StrategyBuilderMainWindow(QMainWindow):
                 print(f"✅ UI refreshed with reloaded data")
                 
                 # CRITICAL: Restore validation status from database
-                # This updates the stepper to show correct validation state
+                # This updates BOTH the flag AND the stepper to show correct validation state
                 validation_status = version.get('validation_status', 'Un-Validated')
                 
+                print(f"\n{'='*80}")
+                print(f"RESTORING VALIDATION STATUS FROM DATABASE")
+                print(f"{'='*80}")
+                print(f"Database status = '{validation_status}'")
+                
                 if validation_status == 'Pass':
+                    # Set flag FIRST
                     self.validation_passed = True
-                    # Don't reset - directly mark step complete
-                    self.stepper.completed_steps.discard(1)  # Clear any old state
-                    self.stepper.error_steps.discard(1)      # Clear any old state
-                    self.stepper.mark_step_complete(1)  # Green check mark
-                    print(f"✅ Validation status restored: PASS (stepper GREEN)")
+                    print(f"✅ Set validation_passed = True")
+                    
+                    # Clear ALL step states first
+                    self.stepper.completed_steps.clear()
+                    self.stepper.error_steps.clear()
+                    
+                    # Now mark step 1 as complete (GREEN with checkmark)
+                    self.stepper.mark_step_complete(1)
+                    print(f"✅ Stepper step 1 marked COMPLETE (should be GREEN)")
+                    print(f"   completed_steps = {self.stepper.completed_steps}")
+                    print(f"   error_steps = {self.stepper.error_steps}")
+                    
                 elif validation_status == 'Fail':
+                    # Set flag FIRST
                     self.validation_passed = False
-                    # Don't reset - directly mark step error
-                    self.stepper.completed_steps.discard(1)  # Clear any old state
-                    self.stepper.error_steps.discard(1)      # Clear any old state
-                    self.stepper.mark_step_error(1)  # Red X mark
-                    print(f"⚠️ Validation status restored: FAIL (stepper RED)")
+                    print(f"⚠️ Set validation_passed = False")
+                    
+                    # Clear ALL step states first
+                    self.stepper.completed_steps.clear()
+                    self.stepper.error_steps.clear()
+                    
+                    # Mark step 1 as error (RED with X)
+                    self.stepper.mark_step_error(1)
+                    print(f"❌ Stepper step 1 marked ERROR (should be RED)")
+                    
                 else:  # Un-Validated
+                    # Set flag FIRST
                     self.validation_passed = False
-                    # Clear step 1 state to show default (grey)
-                    self.stepper.completed_steps.discard(1)
-                    self.stepper.error_steps.discard(1)
-                    self.stepper._update_display()  # Force visual refresh
-                    print(f"ℹ️ Validation status: Un-Validated (stepper default)")
+                    print(f"ℹ️ Set validation_passed = False (un-validated)")
+                    
+                    # Clear ALL step states - no mark needed (grey default)
+                    self.stepper.completed_steps.clear()
+                    self.stepper.error_steps.clear()
+                    self.stepper._update_display()
+                    print(f"   Stepper reset to default (should be GREY)")
+                
+                print(f"{'='*80}\n")
                 
             finally:
                 # Re-enable validation reset
