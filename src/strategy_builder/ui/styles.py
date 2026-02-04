@@ -499,6 +499,8 @@ def get_primary_button_stylesheet(compact=False) -> str:
             padding: {padding};
             border-radius: {radius};
             min-width: 120px;
+            text-align: center;
+            qproperty-iconSize: 16px 16px;
         }}
         QPushButton:hover {{
             background-color: {COLORS['button_primary_hover']};
@@ -548,6 +550,7 @@ def get_success_button_stylesheet() -> str:
             padding: 10px 20px;
             border-radius: 6px;
             min-width: 120px;
+            text-align: center;
         }}
         QPushButton:hover {{
             background-color: {COLORS['button_success_hover']};
@@ -677,6 +680,7 @@ def get_secondary_button_stylesheet() -> str:
             padding: 10px 20px;
             border-radius: 6px;
             min-width: 120px;
+            text-align: center;
         }}
         QPushButton:hover {{
             background-color: {COLORS['button_secondary_hover']};
