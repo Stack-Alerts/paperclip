@@ -1764,70 +1764,66 @@ class ValidationReportWindow(QMainWindow):
     # =========================================================================
     
     def _apply_recheck_timing_fix(self, signal_name: str, timing_window: int) -> bool:
-        """Apply RECHECK timing fix - FIX ENTIRE CHAIN, NOT JUST FIRST DELAY"""
+        """
+        Apply RECHECK timing fix - INSTITUTIONAL GRADE APPROACH
+        
+        PRESERVES user's strategic RECHECK delays (core strategy)
+        ADJUSTS timing window constraint to accommodate delays
+        
+        This is the correct approach because:
+        - RECHECK delays are strategic choices (when to validate)
+        - Timing windows are constraints (ordering/synchronization)
+        - Should adjust constraint, NOT strategy
+        """
         try:
             print(f"\n{'='*80}")
-            print(f"DEBUG: RECHECK TIMING FIX - START")
+            print(f"DEBUG: RECHECK TIMING FIX - INSTITUTIONAL APPROACH")
             print(f"{'='*80}")
             print(f"Signal name: {signal_name}")
-            print(f"Timing window: {timing_window}")
-            print(f"Target delay (75%): {max(1, int(timing_window * 0.75))}")
+            print(f"Current timing window: {timing_window} bars")
             
             # Find signal in config
             for block in self.config.blocks:
-                print(f"DEBUG: Checking block '{block.name}'")
                 for signal in block.signals:
-                    print(f"  DEBUG: Checking signal '{signal.name}'")
                     if signal.name == signal_name:
                         print(f"  DEBUG: ✓ FOUND target signal '{signal_name}'")
                         
-                        # Calculate CUMULATIVE delay (same as validator!)
-                        cumulative_before = 0
+                        # Calculate CUMULATIVE delay (same as validator)
+                        cumulative_delay = 0
                         if hasattr(signal, 'recheck_config') and signal.recheck_config:
-                            cumulative_before = signal.recheck_config.bar_delay
-                            print(f"  DEBUG: Main recheck_config.bar_delay = {signal.recheck_config.bar_delay}")
+                            cumulative_delay = signal.recheck_config.bar_delay
+                            print(f"  DEBUG: Main recheck_config.bar_delay = {signal.recheck_config.bar_delay} bars")
                         
                         if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
                             chain_delays = [rc.bar_delay for rc in signal.recheck_chain]
-                            cumulative_before += sum(chain_delays)
-                            print(f"  DEBUG: RECHECK CHAIN exists with {len(signal.recheck_chain)} items")
+                            cumulative_delay += sum(chain_delays)
+                            print(f"  DEBUG: RECHECK CHAIN: {len(signal.recheck_chain)} items")
                             print(f"  DEBUG: Chain delays: {chain_delays}")
                         
-                        print(f"  DEBUG: CUMULATIVE BEFORE FIX = {cumulative_before} bars")
+                        print(f"  DEBUG: CUMULATIVE RECHECK DELAY = {cumulative_delay} bars (PRESERVED)")
                         
-                        # CRITICAL FIX: Distribute safe delay across ENTIRE chain (main + all chain items)
-                        safe_delay_total = max(1, int(timing_window * 0.75))
-                        print(f"  DEBUG: Safe delay target (75% of {timing_window}) = {safe_delay_total} bars")
+                        # INSTITUTIONAL FIX: Increase timing window to fit delays + buffer
+                        # Add 20% buffer for safety
+                        buffer = int(cumulative_delay * 0.2)
+                        new_timing_window = cumulative_delay + buffer
                         
-                        if cumulative_before > 0:
-                            # Calculate reduction factor to fit within safe_delay_total
-                            reduction_factor = safe_delay_total / cumulative_before
-                            print(f"  DEBUG: Reduction factor = {reduction_factor:.3f}")
+                        print(f"  DEBUG: Required window = {cumulative_delay} + {buffer} buffer = {new_timing_window} bars")
+                        
+                        # Update timing constraint
+                        if hasattr(signal, 'timing_constraint') and signal.timing_constraint:
+                            old_window = signal.timing_constraint.max_candles
+                            signal.timing_constraint.max_candles = new_timing_window
                             
-                            # Apply to main config
-                            if hasattr(signal, 'recheck_config') and signal.recheck_config:
-                                old_main = signal.recheck_config.bar_delay
-                                new_main = max(1, int(old_main * reduction_factor))
-                                signal.recheck_config.bar_delay = new_main
-                                print(f"  DEBUG: Main config BEFORE = {old_main}, AFTER = {new_main}")
-                            
-                            # Apply to ALL chain items
-                            if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
-                                for idx, recheck in enumerate(signal.recheck_chain):
-                                    old_delay = recheck.bar_delay
-                                    new_delay = max(1, int(old_delay * reduction_factor))
-                                    recheck.bar_delay = new_delay
-                                    print(f"    DEBUG: Chain[{idx}] BEFORE = {old_delay}, AFTER = {new_delay}")
+                            print(f"  DEBUG: TIMING WINDOW BEFORE = {old_window} bars")
+                            print(f"  DEBUG: TIMING WINDOW AFTER = {new_timing_window} bars")
+                            print(f"  DEBUG: ✅ RECHECK delays PRESERVED (strategic choice)")
+                            print(f"  DEBUG: ✅ Timing window ADJUSTED (constraint)")
+                        else:
+                            print(f"  DEBUG: ❌ No timing_constraint found")
+                            print(f"{'='*80}\n")
+                            return False
                         
-                        # Calculate new cumulative
-                        cumulative_after = 0
-                        if hasattr(signal, 'recheck_config') and signal.recheck_config:
-                            cumulative_after = signal.recheck_config.bar_delay
-                        if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
-                            cumulative_after += sum(rc.bar_delay for rc in signal.recheck_chain)
-                        
-                        print(f"  DEBUG: CUMULATIVE AFTER FIX = {cumulative_after} bars")
-                        print(f"  DEBUG: ✅ Fix successful! {cumulative_before} → {cumulative_after} bars")
+                        print(f"  DEBUG: ✅ Fix successful! Window {old_window} → {new_timing_window} bars")
                         print(f"{'='*80}\n")
                         
                         return True
