@@ -1250,7 +1250,8 @@ class StrategyBrowserDialog(QMainWindow):
             button_group = QButtonGroup(dialog)
             
             version_count = len(all_versions)
-            option1 = QRadioButton(f"Delete entire strategy (all {version_count} version{'s' if version_count != 1 else ''})")
+            # Use hyphen format: "Delete entire strategy - All X version(s)"
+            option1 = QRadioButton(f"Delete entire strategy - All {version_count} version{'s' if version_count != 1 else ''}")
             option1.setFont(create_font(10))
             option1.setStyleSheet(f"color: {get_color('text_secondary')};")
             button_group.addButton(option1, 1)
@@ -1259,9 +1260,16 @@ class StrategyBrowserDialog(QMainWindow):
             option2 = QRadioButton("Delete specific version only")
             option2.setFont(create_font(10))
             option2.setStyleSheet(f"color: {get_color('text_secondary')};")
-            option2.setChecked(True)  # Default to specific version
             button_group.addButton(option2, 2)
             layout.addWidget(option2)
+            
+            # CRITICAL: If only 1 version, disable "specific version" option
+            # User must delete entire strategy (can't delete last version)
+            if version_count == 1:
+                option2.setEnabled(False)
+                option1.setChecked(True)  # Force entire strategy deletion
+            else:
+                option2.setChecked(True)  # Default to specific version when multiple exist
             
             # Version selector (visible by default since option 2 is default)
             # MULTI-SELECT: Allow users to select multiple versions at once
