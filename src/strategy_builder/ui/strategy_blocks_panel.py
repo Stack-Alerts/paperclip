@@ -37,7 +37,7 @@ from src.strategy_builder.ui.styles import (
     get_spinbox_button_stylesheet, get_success_button_stylesheet, get_color,
     get_dialog_stylesheet, get_radio_container_stylesheet, get_signal_radio_stylesheet,
     get_recheck_radio_stylesheet, get_exit_tree_item_style, get_exit_button_stylesheet,
-    set_hand_cursor
+    set_hand_cursor, format_block_name
 )
 
 
@@ -91,11 +91,11 @@ class BlockConfigItem(QWidget):
         # Block info layout
         info_layout = QVBoxLayout()
         
-        # Block name with AND/OR badge
+        # Block name with AND/OR badge - format to title case with "and" lowercase
         name_layout = QHBoxLayout()
         name_layout.setSpacing(10)
         
-        name_label = QLabel(f"📊 {self.block_name}")
+        name_label = QLabel(f"📊 {format_block_name(self.block_name)}")
         name_font = QFont()
         name_font.setBold(True)
         name_font.setPointSize(10)
@@ -1660,7 +1660,6 @@ class StrategyBlocksPanel(QWidget):
                 config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
                 config_btn.setToolTip("Configure exit condition")
                 # Use functools.partial - proper PyQt5 pattern
-                print(f"DEBUG: Connecting config button for signal: {current_signal_name}")
                 config_btn.clicked.connect(partial(self._on_edit_strategy_exit, current_signal_name))
                 exit_row_layout.addWidget(config_btn)
                 
@@ -1670,7 +1669,6 @@ class StrategyBlocksPanel(QWidget):
                 remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
                 remove_btn.setToolTip("Remove this exit condition")
                 # Use functools.partial - proper PyQt5 pattern
-                print(f"DEBUG: Connecting remove button for signal: {current_signal_name}")
                 remove_btn.clicked.connect(partial(self._on_remove_strategy_exit, current_signal_name))
                 exit_row_layout.addWidget(remove_btn)
                 

@@ -1399,16 +1399,20 @@ class InstitutionalValidator:
         50. Signal names valid Python identifiers
         51. No special characters in references
         """
-        # Rule 48: Strategy name valid Python identifier
+        # Rule 48: Strategy name contains invalid characters (allow spaces - system will auto-convert)
         if hasattr(config, 'name') and config.name:
-            if not self._is_valid_python_identifier(config.name):
+            # Check for truly problematic characters that can't be safely converted
+            problematic_chars = [':', '/', '\\', '"', "'", '<', '>', '|', '*', '?', '\n', '\t']
+            has_problematic = any(char in config.name for char in problematic_chars)
+            
+            if has_problematic:
                 self._add_issue(
                     severity=ValidationSeverity.WARNING,
                     category="NAUTILUS",
                     rule_id="NAUTILUS_001",
                     rule_name="Invalid Strategy Name",
-                    message=f"Strategy name '{config.name}' is not a valid Python identifier",
-                    suggestion="Use only letters, numbers, and underscores (no spaces or special characters)"
+                    message=f"Strategy name '{config.name}' contains invalid characters (: / \\ \" ' < > | * ? etc.)",
+                    suggestion="Avoid special characters like colons, slashes, quotes (spaces are OK - system auto-converts)"
                 )
         
         if not hasattr(config, 'blocks'):

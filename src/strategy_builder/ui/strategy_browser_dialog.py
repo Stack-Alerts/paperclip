@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (
     QFrame, QScrollArea, QSplitter
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QModelIndex, QRectF
-from PyQt5.QtGui import QFont, QTextDocument, QAbstractTextDocumentLayout, QPalette
+from PyQt5.QtGui import QFont, QTextDocument, QAbstractTextDocumentLayout, QPalette, QColor
 
 from src.optimizer_v3.database import get_database_manager
 from .styles import (
@@ -28,7 +28,10 @@ from .styles import (
     get_input_field_stylesheet,
     get_table_stylesheet,
     create_font,
-    get_color
+    get_color,
+    get_exit_icon,
+    get_cumulative_exit_color,
+    get_recheck_depth_color
 )
 # Import universal combo box fix (EXACTLY like block_search_panel.py)
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
@@ -177,7 +180,7 @@ class StrategyBrowserDialog(QMainWindow):
         self.table = QTableWidget()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels([
-            "Strategy Name", "Type", "Version", "Last Modified", "Tests", "Performance"
+            "Strategy Name", "Type", "Version", "Last Modified", "Validation", "Published"
         ])
         self.table.setStyleSheet(get_table_stylesheet())
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -200,8 +203,8 @@ class StrategyBrowserDialog(QMainWindow):
         header.resizeSection(1, 240)  # Type
         header.resizeSection(2, 240)  # Version
         header.resizeSection(3, 400)  # Last Modified
-        header.resizeSection(4, 150)  # Tests
-        header.resizeSection(5, 240)  # Performance
+        header.resizeSection(4, 180)  # Validation (fits "Un-Validated")
+        header.resizeSection(5, 160)  # Published (fits "Published")
         
         # Enable sorting (clickable headers with sort indicators)
         self.table.setSortingEnabled(True)
@@ -490,16 +493,27 @@ class StrategyBrowserDialog(QMainWindow):
                                 if len(blocks_data) > 3:
                                     blocks_summary += f" + {len(blocks_data) - 3} more"
                         
-                        # Detect strategy type from name
+                        # Detect strategy type from name (comprehensive keyword matching)
                         name_upper = latest['name'].upper()
-                        if 'BULLISH' in name_upper:
-                            strategy_type = "Bullish"
-                        elif 'BEARISH' in name_upper:
+                        
+                        # Bullish keywords
+                        bullish_keywords = ['BULLISH', 'BULL', 'LONG', 'BUY', 'LOD', 'LOW', 'SUPPORT', 'BOUNCE', 'BOTTOM']
+                        # Bearish keywords  
+                        bearish_keywords = ['BEARISH', 'BEAR', 'SHORT', 'SELL', 'HOD', 'HIGH', 'RESISTANCE', 'REJECTION', 'TOP']
+                        
+                        # Check for bullish indicators
+                        is_bullish = any(keyword in name_upper for keyword in bullish_keywords)
+                        # Check for bearish indicators
+                        is_bearish = any(keyword in name_upper for keyword in bearish_keywords)
+                        
+                        # Determine strategy type (bearish takes precedence if both match)
+                        if is_bearish:
                             strategy_type = "Bearish"
-                        elif 'HOD' in name_upper or 'HIGH' in name_upper or 'RESISTANCE' in name_upper:
-                            strategy_type = "Bearish"  # HOD rejection is bearish
-                        elif 'LOD' in name_upper or 'LOW' in name_upper or 'SUPPORT' in name_upper:
-                            strategy_type = "Bullish"  # LOD rejection is bullish
+                        elif is_bullish:
+                            strategy_type = "Bullish"
+                        else:
+                            # Default to Bearish if no keywords found (most strategies are bearish/short)
+                            strategy_type = "Bearish"
                         
                         # Build enriched display name with HTML color coding
                         display_name = latest['name']
@@ -615,15 +629,29 @@ class StrategyBrowserDialog(QMainWindow):
             modified_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(row, 3, modified_item)
             
-            # Tests (centered)
-            tests_item = QTableWidgetItem(str(strategy['test_count']))
-            tests_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 4, tests_item)
+            # Validation status (centered) - Sprint 1.9 ORM persistence
+            # Get actual validation status from database version
+            version_data = self.db.strategy.get_strategy_version(strategy['version_id'])
+            validation_status = version_data.get('validation_status', 'Un-Validated') if version_data else 'Un-Validated'
             
-            # Performance (centered)
-            perf_item = QTableWidgetItem(strategy['performance'])
-            perf_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 5, perf_item)
+            validation_item = QTableWidgetItem(validation_status)
+            validation_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            # Color coding: Un-Validated (gray), Pass (green), Fail (red)
+            if validation_status == 'Pass':
+                validation_item.setForeground(QColor('#4ADE80'))  # Green
+            elif validation_status == 'Fail':
+                validation_item.setForeground(QColor('#EF4444'))  # Red
+            else:  # Un-Validated
+                validation_item.setForeground(QColor('#9CA3AF'))  # Gray
+            self.table.setItem(row, 4, validation_item)
+            
+            # Published status (centered)
+            # TODO: Get actual published status from database
+            # For now, all strategies are "Draft" (Published feature not yet developed)
+            published_status = strategy.get('published_status', 'Draft')
+            published_item = QTableWidgetItem(published_status)
+            published_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 5, published_item)
         
         self._update_count_label(len(strategies))
     
@@ -680,12 +708,51 @@ class StrategyBrowserDialog(QMainWindow):
         """Update strategy count label"""
         self.count_label.setText(f"{count} strateg{'y' if count == 1 else 'ies'}")
     
-    def _build_signal_hierarchy_html(self, blocks: List[Dict]) -> str:
+    def _calculate_cumulative_exits_for_signal(
+        self, signal: Dict, block: Dict, all_blocks: List[Dict]
+    ) -> float:
+        """
+        Calculate cumulative exit percentage across all binding levels for a signal.
+        Sprint 1.9.1 Task 1.9.1.5
+        
+        Args:
+            signal: Signal dictionary
+            block: Block containing this signal
+            all_blocks: All blocks in strategy (to check strategy-level exits)
+        
+        Returns:
+            Total exit percentage (0-1000+)
+        """
+        total_percentage = 0.0
+        signal_name = signal.get('name', '')
+        
+        # 1. Signal-level exits (attached to this signal)
+        signal_exits = signal.get('exit_conditions', [])
+        for exit_cond in signal_exits:
+            percentage = exit_cond.get('percentage', 0) * 100  # Convert to percentage
+            total_percentage += percentage
+        
+        # 2. Block-level exits (attached to parent block)
+        block_exits = block.get('exit_conditions', [])
+        for exit_cond in block_exits:
+            # Block exits apply to all signals in block
+            percentage = exit_cond.get('percentage', 0) * 100
+            total_percentage += percentage
+        
+        # 3. Strategy-level exits (need to check version data if available)
+        # NOTE: Strategy-level exits are typically stored at version level, not in blocks
+        # For now, we'll check if blocks have strategy_exit_conditions metadata
+        # This is a limitation of the current data structure
+        
+        return total_percentage
+    
+    def _build_signal_hierarchy_html(self, blocks: List[Dict], strategy_exits: List[Dict] = None) -> str:
         """
         Build hierarchical signal display HTML matching Window 1 format
         
         Args:
             blocks: List of block dictionaries from database
+            strategy_exits: Strategy-level exit conditions (apply to ALL signals)
             
         Returns:
             HTML string with hierarchical signal display
@@ -693,8 +760,12 @@ class StrategyBrowserDialog(QMainWindow):
         if not blocks:
             return "No signals configured"
         
+        # Default to empty list if not provided
+        if strategy_exits is None:
+            strategy_exits = []
+        
         html_lines = []
-        html_lines.append("<b>Signals:</b><br>")
+        # No header - start directly with signals to maximize space
         
         signal_counter = 1
         for block in blocks:
@@ -702,13 +773,19 @@ class StrategyBrowserDialog(QMainWindow):
             if not signals:
                 continue
             
+            block_name = block.get('name', 'unknown')
+            
             for signal in signals:
                 signal_name = signal.get('name', 'Unknown')
                 signal_logic = signal.get('logic', 'AND')
+                building_block = signal.get('building_block', None)  # NEW: Get building block name
                 
-                # Signal line with AND/OR badge
+                # NEW: Add building block name if available
+                block_name_display = f" ({building_block})" if building_block else ""
+                
+                # Signal line with AND/OR badge and building block name (NO exit badge on signals)
                 logic_color = "#4ADE80" if signal_logic == "AND" else "#60A5FA"
-                signal_line = f'<span style="color: {logic_color};">{signal_counter}. {signal_name} [AND]</span>'
+                signal_line = f'<span style="color: {logic_color};">{signal_counter}. {signal_name}{block_name_display} [{signal_logic}]</span>'
                 html_lines.append(signal_line)
                 
                 # TIME CONSTRAINT (if exists)
@@ -739,7 +816,74 @@ class StrategyBrowserDialog(QMainWindow):
                                     nested_line = f'<span style="color: #60A5FA;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── RECHECK {target} ({nested_delay} bars)</span>'
                                     html_lines.append(nested_line)
                 
+                # SIGNAL-LEVEL EXIT CONDITIONS ONLY (shown under each signal)
+                # Block and strategy exits shown later to avoid duplication
+                exit_icon = get_exit_icon()
+                signal_exits = signal.get('exit_conditions', [])
+                
+                if signal_exits:
+                    for exit_cond in signal_exits:
+                        exit_signal_name = exit_cond.get('signal_name', 'Unknown')
+                        exit_percentage = exit_cond.get('percentage', 0) * 100
+                        exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
+                        
+                        # PROJECT-SPECIFIC: Based on Sprint 1.8 semantics
+                        # ABSOLUTE = Exits immediately when signal fires (no TP consideration)
+                        # FLEXIBLE = Defers exit if heading toward TP, fires on reversal
+                        if exit_mode == 'ABSOLUTE':
+                            mode_label = f"{exit_percentage:.0f}% immediate exit"
+                        else:  # FLEXIBLE
+                            mode_label = f"{exit_percentage:.0f}% TP-aware exit"
+                        
+                        # Signal-level exits in RED with execution behavior label
+                        color = '#FF6B6B'
+                        exit_line = f'<span style="color: {color};">&nbsp;&nbsp;&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} - {mode_label} [🟡 SIGNAL]</span>'
+                        html_lines.append(exit_line)
+                
                 signal_counter += 1
+            
+            # BLOCK-LEVEL EXIT CONDITIONS (shown ONCE at end of block)
+            # Apply to ALL signals in this block
+            block_exits = block.get('exit_conditions', [])
+            if block_exits:
+                html_lines.append(f'<br><span style="color: #81C784;"><b>Block-Level Exit Conditions:</b> ({block_name})</span>')
+                for exit_cond in block_exits:
+                    exit_signal_name = exit_cond.get('signal_name', 'Unknown')
+                    exit_percentage = exit_cond.get('percentage', 0) * 100
+                    exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
+                    
+                    # PROJECT-SPECIFIC: Based on Sprint 1.8 semantics
+                    # ABSOLUTE = Exits immediately when signal fires (no TP consideration)
+                    # FLEXIBLE = Defers exit if heading toward TP, fires on reversal
+                    if exit_mode == 'ABSOLUTE':
+                        mode_label = f"{exit_percentage:.0f}% immediate exit"
+                    else:  # FLEXIBLE
+                        mode_label = f"{exit_percentage:.0f}% TP-aware exit"
+                    
+                    color = '#FF6B6B'
+                    exit_line = f'<span style="color: {color};">&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} - {mode_label} [🟩 BLOCK]</span>'
+                    html_lines.append(exit_line)
+        
+        # STRATEGY-LEVEL EXIT CONDITIONS (shown ONCE at very end)
+        # Apply to ALL signals in entire strategy
+        if strategy_exits:
+            html_lines.append(f'<br><span style="color: #00BCD4;"><b>Strategy Exit Conditions:</b> (Apply to all signals)</span>')
+            for exit_cond in strategy_exits:
+                exit_signal_name = exit_cond.get('signal_name', 'Unknown')
+                exit_percentage = exit_cond.get('percentage', 0) * 100
+                exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
+                
+                # PROJECT-SPECIFIC: Based on Sprint 1.8 semantics
+                # ABSOLUTE = Exits immediately when signal fires (no TP consideration)
+                # FLEXIBLE = Defers exit if heading toward TP, fires on reversal
+                if exit_mode == 'ABSOLUTE':
+                    mode_label = f"{exit_percentage:.0f}% immediate exit"
+                else:  # FLEXIBLE
+                    mode_label = f"{exit_percentage:.0f}% TP-aware exit"
+                
+                color = '#FF6B6B'
+                exit_line = f'<span style="color: {color};">&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} - {mode_label} [🔷 STRATEGY]</span>'
+                html_lines.append(exit_line)
         
         return "<br>".join(html_lines)
     
@@ -790,33 +934,44 @@ class StrategyBrowserDialog(QMainWindow):
             blocks = version.get('blocks', [])
             block_count = len(blocks)
             
-            # Count actual signals by looking inside blocks
+            # Count actual signals and exit conditions (Sprint 1.8 - exits are now exit_conditions, not position='exit')
             total_entry_signals = 0
-            total_exit_signals = 0
+            total_exit_conditions = 0
             
+            # Count entry signals (all signals are entries unless marked otherwise)
             for block in blocks:
                 signals = block.get('signals', [])
                 for signal in signals:
                     if isinstance(signal, dict):
-                        position = signal.get('position', 'entry')
-                        if position == 'entry':
-                            total_entry_signals += 1
-                        elif position == 'exit':
-                            total_exit_signals += 1
-                        elif position == 'both':
-                            total_entry_signals += 1
-                            total_exit_signals += 1
+                        # All signals count as entries (Sprint 1.8 removed position field)
+                        total_entry_signals += 1
+            
+            # Count exit conditions at all 3 binding levels (Sprint 1.8 architecture)
+            # 1. Strategy-level exits
+            strategy_exits = version.get('exit_conditions', [])
+            total_exit_conditions += len(strategy_exits)
+            
+            # 2. Block-level exits
+            for block in blocks:
+                block_exits = block.get('exit_conditions', [])
+                total_exit_conditions += len(block_exits)
+            
+            # 3. Signal-level exits
+            for block in blocks:
+                signals = block.get('signals', [])
+                for signal in signals:
+                    if isinstance(signal, dict):
+                        signal_exits = signal.get('exit_conditions', [])
+                        total_exit_conditions += len(signal_exits)
             
             # Use hierarchical signal display (matching Window 1 format)
-            signal_hierarchy_html = self._build_signal_hierarchy_html(blocks)
+            # BUG FIX: Pass strategy-level exits so they display in tree
+            signal_hierarchy_html = self._build_signal_hierarchy_html(blocks, strategy_exits)
             self.detail_labels['blocks'].setText(signal_hierarchy_html)
             
-            # Signals summary with actual counts
-            risk_mgmt = version.get('risk_management', {})
-            
+            # Signals summary with actual counts (Sprint 1.8 - exits are exit_conditions now)
             sig_text = f"<b>Entry:</b> {total_entry_signals} signal{'s' if total_entry_signals != 1 else ''}<br>"
-            sig_text += f"<b>Exit:</b> {total_exit_signals} signal{'s' if total_exit_signals != 1 else ''}<br>"
-            sig_text += f"<b>Risk:</b> SL/TP configured" if risk_mgmt else "<b>Risk:</b> Not set"
+            sig_text += f"<b>Exit:</b> {total_exit_conditions} condition{'s' if total_exit_conditions != 1 else ''}"
             self.detail_labels['signals'].setText(sig_text)
             
             # Column 3: Performance & Metrics
@@ -1065,12 +1220,13 @@ class StrategyBrowserDialog(QMainWindow):
             all_versions = self.db.strategy.get_strategy_versions(self.selected_strategy_id)
             
             # Show choice modal
-            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QRadioButton, QComboBox, QDialogButtonBox, QButtonGroup
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QRadioButton, QComboBox, QDialogButtonBox, QButtonGroup, QListWidget, QListWidgetItem
             
             dialog = QDialog(self)
             dialog.setWindowTitle("Delete Strategy")
             dialog.setStyleSheet(get_main_stylesheet())
-            dialog.setMinimumWidth(450)
+            dialog.setMinimumWidth(800)
+            dialog.setMinimumHeight(800)
             
             layout = QVBoxLayout(dialog)
             layout.setSpacing(16)
@@ -1106,25 +1262,33 @@ class StrategyBrowserDialog(QMainWindow):
             layout.addWidget(option2)
             
             # Version selector (visible by default since option 2 is default)
-            version_label = QLabel("Select version to delete:")
+            # MULTI-SELECT: Allow users to select multiple versions at once
+            version_label = QLabel("Select version(s) to delete (Ctrl+Click for multiple):")
             version_label.setFont(create_font(10))
             version_label.setStyleSheet(f"color: {get_color('text_secondary')};")
             layout.addWidget(version_label)
             
-            version_combo = QComboBox()
+            # Use QListWidget instead of QComboBox for multi-selection
+            version_list = QListWidget()
+            version_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)  # Multi-select with Ctrl/Shift
+            version_list.setMinimumHeight(150)  # Show multiple items
+            version_list.setStyleSheet(get_input_field_stylesheet())
+            
             for ver in all_versions:
-                version_combo.addItem(f"v{ver['version_number']} - {ver['created_at']}", ver['version_id'])
-            # Set current version as default
-            current_index = next((i for i, v in enumerate(all_versions) if v['version_id'] == self.selected_version_id), 0)
-            version_combo.setCurrentIndex(current_index)
-            version_combo.setStyleSheet(get_input_field_stylesheet())
-            layout.addWidget(version_combo)
+                item = QListWidgetItem(f"v{ver['version_number']} - {ver['created_at']}")
+                item.setData(Qt.ItemDataRole.UserRole, ver['version_id'])
+                version_list.addItem(item)
+                # Mark current version as default selection
+                if ver['version_id'] == self.selected_version_id:
+                    item.setSelected(True)
+            
+            layout.addWidget(version_list)
             
             # Show/hide version selector based on selection
             def on_option_changed():
                 show_selector = option2.isChecked()
                 version_label.setVisible(show_selector)
-                version_combo.setVisible(show_selector)
+                version_list.setVisible(show_selector)
             
             option1.toggled.connect(on_option_changed)
             option2.toggled.connect(on_option_changed)
@@ -1155,20 +1319,36 @@ class StrategyBrowserDialog(QMainWindow):
                     from .alert_dialog import show_error
                     show_error(self, "Delete Strategy", "Error", "Strategy not found")
             else:
-                # Delete specific version only
-                selected_version_id = version_combo.currentData()
-                deleted_version = self.db.strategy.get_strategy_version(selected_version_id)
+                # Delete specific versions (MULTI-SELECT support)
+                selected_items = version_list.selectedItems()
                 
-                if deleted_version:
-                    # Delete the version
-                    self.db.strategy.delete_strategy_version(selected_version_id)
-                    
+                if not selected_items:
+                    from .alert_dialog import show_error
+                    show_error(self, "Delete Versions", "Error", "No versions selected")
+                    return
+                
+                # Collect version IDs to delete
+                version_ids_to_delete = []
+                for item in selected_items:
+                    version_id = item.data(Qt.ItemDataRole.UserRole)
+                    version_ids_to_delete.append(version_id)
+                
+                # Delete all selected versions
+                deleted_count = 0
+                for version_id in version_ids_to_delete:
+                    try:
+                        self.db.strategy.delete_strategy_version(version_id)
+                        deleted_count += 1
+                    except Exception as e:
+                        print(f"Failed to delete version {version_id}: {e}")
+                
+                if deleted_count > 0:
                     from .alert_dialog import show_success
-                    show_success(self, "Delete Version", "Success", 
-                               f"Version v{deleted_version['version_number']} deleted successfully")
+                    show_success(self, "Delete Versions", "Success", 
+                               f"Deleted {deleted_count} version{'s' if deleted_count != 1 else ''} successfully")
                 else:
                     from .alert_dialog import show_error
-                    show_error(self, "Delete Version", "Error", "Version not found")
+                    show_error(self, "Delete Versions", "Error", "Failed to delete versions")
             
             # Reload strategies
             self._load_strategies()

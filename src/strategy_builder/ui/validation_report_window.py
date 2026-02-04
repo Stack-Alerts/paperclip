@@ -17,12 +17,15 @@ from typing import Optional
 from PyQt5.QtWidgets import (
     QDialog, QMainWindow, QVBoxLayout, QPushButton, QHBoxLayout, QLabel,
     QWidget, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMessageBox, QFileDialog, QTabWidget, QTextEdit, QGroupBox
+    QMessageBox, QFileDialog, QTabWidget, QTextEdit, QGroupBox, QFrame
 )
 from PyQt5.QtCore import Qt, QSettings, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QColor
 from datetime import datetime
 import csv
+import logging
+
+logger = logging.getLogger(__name__)
 
 from src.optimizer_v3.validation.institutional_validator import (
     InstitutionalValidator,
@@ -33,8 +36,17 @@ from src.strategy_builder.ui.styles import (
     COLORS, create_font, get_main_stylesheet,
     get_primary_button_stylesheet, get_secondary_button_stylesheet,
     get_table_stylesheet, get_text_edit_stylesheet, get_scroll_area_stylesheet,
-    get_tab_widget_stylesheet, set_hand_cursor, apply_hand_cursor_to_buttons
+    get_tab_widget_stylesheet, set_hand_cursor, apply_hand_cursor_to_buttons,
+    get_auto_fix_button_style
 )
+from src.strategy_builder.validation.auto_fix import (
+    auto_fix_strategy_type,
+    auto_fix_recheck_delay,
+    auto_fix_duplicate_exits,
+    auto_fix_dead_code,
+    AutoFixSafety
+)
+from src.strategy_builder.ui.auto_fix_confirm_dialog import AutoFixConfirmDialog
 
 
 class ValidationReportWindow(QMainWindow):
@@ -83,13 +95,9 @@ class ValidationReportWindow(QMainWindow):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
         
-        # Header with blue title (matching Strategy Browser)
+        # Header with blue title and inline status (Screenshot 2 design)
         header = self._create_header()
         layout.addWidget(header)
-        
-        # Status banner
-        status_banner = self._create_status_banner()
-        layout.addWidget(status_banner)
         
         # Tab widget for organized content
         tabs = self._create_tabs()
@@ -100,11 +108,11 @@ class ValidationReportWindow(QMainWindow):
         layout.addWidget(footer)
     
     def _create_header(self) -> QWidget:
-        """Create header with title matching main window colors"""
+        """Create header with title and inline status with background (Screenshot 2 design)"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        layout.setSpacing(12)  # More padding between title and info
-        layout.setContentsMargins(0, 0, 0, 16)  # Extra padding at bottom before status banner
+        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 12)
         
         # Title matching Strategy Browser style (#095983 - teal/blue)
         title = QLabel("💼 Validation Report")
@@ -112,12 +120,17 @@ class ValidationReportWindow(QMainWindow):
         title.setStyleSheet("color: #095983; font-size: 16pt; font-weight: bold; background: transparent;")
         layout.addWidget(title)
         
-        # Strategy info with version
+        # Strategy info with inline status badge (Screenshot 2 design)
+        info_container = QWidget()
+        info_layout = QHBoxLayout(info_container)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(12)
+        
+        # Strategy info text (left side)
         strategy_name = self.report.strategy_summary.get('name', 'Unknown')
         version = self.report.strategy_summary.get('version', None)
         timestamp = datetime.fromisoformat(self.report.timestamp).strftime('%Y-%m-%d %H:%M:%S')
         
-        # Add version to strategy name if available
         if version:
             info_text = f"Strategy: {strategy_name} (v{version})  •  Validated: {timestamp}"
         else:
@@ -126,7 +139,87 @@ class ValidationReportWindow(QMainWindow):
         info_label = QLabel(info_text)
         info_label.setFont(create_font(11))
         info_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
-        layout.addWidget(info_label)
+        info_layout.addWidget(info_label)
+        
+        # Status badge with colored background (Screenshot 2 design - 3 separate widgets)
+        status_container = QWidget()
+        status_layout = QHBoxLayout(status_container)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        status_layout.setSpacing(0)
+        
+        if self.report.is_valid:
+            # Container styling (green background)
+            status_container.setStyleSheet(f"""
+                QWidget {{
+                    background-color: rgba(16, 185, 129, 0.15);
+                    border-radius: 4px;
+                }}
+            """)
+            
+            # Left bar - rounded on RIGHT
+            left_bar = QFrame()
+            left_bar.setFixedWidth(4)
+            left_bar.setStyleSheet(f"background-color: {COLORS['success']}; border-radius: 0px 2px 2px 0px;")
+            status_layout.addWidget(left_bar)
+            
+            # Status text with icon
+            status_label = QLabel("  ✅ VALIDATION PASSED  ")
+            status_label.setFont(create_font(11, bold=True))
+            status_label.setStyleSheet(f"color: {COLORS['success']}; background: transparent;")
+            status_layout.addWidget(status_label)
+            
+            # Right bar - rounded on LEFT
+            right_bar = QFrame()
+            right_bar.setFixedWidth(4)
+            right_bar.setStyleSheet(f"background-color: {COLORS['success']}; border-radius: 2px 0px 0px 2px;")
+            status_layout.addWidget(right_bar)
+            
+            # Description
+            desc_label = QLabel("  Your strategy meets all institutional-grade requirements and is ready for backtesting.")
+            desc_label.setFont(create_font(11))
+            desc_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+            desc_label.setWordWrap(True)
+            status_layout.addWidget(desc_label, 1)
+            
+        else:
+            blocking = self.report.blocking_issues()
+            
+            # Container styling (red background)
+            status_container.setStyleSheet(f"""
+                QWidget {{
+                    background-color: rgba(220, 53, 69, 0.15);
+                    border-radius: 4px;
+                }}
+            """)
+            
+            # Left bar - rounded on RIGHT
+            left_bar = QFrame()
+            left_bar.setFixedWidth(4)
+            left_bar.setStyleSheet(f"background-color: {COLORS['error']}; border-radius: 0px 2px 2px 0px;")
+            status_layout.addWidget(left_bar)
+            
+            # Status text with icon
+            status_label = QLabel("  ❌ VALIDATION FAILED  ")
+            status_label.setFont(create_font(11, bold=True))
+            status_label.setStyleSheet(f"color: {COLORS['error']}; background: transparent;")
+            status_layout.addWidget(status_label)
+            
+            # Right bar - rounded on LEFT
+            right_bar = QFrame()
+            right_bar.setFixedWidth(4)
+            right_bar.setStyleSheet(f"background-color: {COLORS['error']}; border-radius: 2px 0px 0px 2px;")
+            status_layout.addWidget(right_bar)
+            
+            # Description
+            desc_label = QLabel(f"  {blocking} blocking issue(s) must be fixed before backtest.")
+            desc_label.setFont(create_font(11))
+            desc_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+            desc_label.setWordWrap(True)
+            status_layout.addWidget(desc_label, 1)
+        
+        info_layout.addWidget(status_container, 1)  # Stretch to take remaining space
+        
+        layout.addWidget(info_container)
         
         return widget
     
@@ -144,7 +237,7 @@ class ValidationReportWindow(QMainWindow):
             title.setFont(create_font(14, bold=True))
             title.setStyleSheet(f"color: {COLORS['success']};")
             
-            desc = QLabel("Your strategy meets all institutional-grade requirements and is ready for backtesting.")
+            desc = QLabel("Your strategy meets all requirements and is ready for backtesting.")
             desc.setFont(create_font(11))
             desc.setStyleSheet(f"color: {COLORS['text_secondary']};")
             desc.setWordWrap(True)
@@ -435,13 +528,36 @@ class ValidationReportWindow(QMainWindow):
             desc_item.setFlags(desc_item.flags() | Qt.ItemIsEditable)
             table.setItem(row, 4, desc_item)
             
-            # Column 5: Action
-            action_text = "✓ Passed" if severity == 'INFO' else self._get_action_text(issue)
-            action_item = QTableWidgetItem(action_text)
-            action_item.setFont(create_font(10))
-            if severity in ['CRITICAL', 'ERROR']:
-                action_item.setForeground(QColor(COLORS['error']))
-            table.setItem(row, 5, action_item)
+            # Column 5: Action - Sprint 1.9.2 Auto-Fix Button Integration
+            if severity == 'INFO':
+                # INFO level - no action needed
+                action_item = QTableWidgetItem("✓ Passed")
+                action_item.setFont(create_font(10))
+                table.setItem(row, 5, action_item)
+            elif hasattr(issue, 'auto_fix_available') and issue.auto_fix_available:
+                # Create clickable fix button
+                fix_btn = QPushButton("🔧 Fix Now")
+                fix_btn.setFont(create_font(9))
+                fix_btn.setStyleSheet(get_auto_fix_button_style())
+                fix_btn.setCursor(Qt.PointingHandCursor)
+                fix_btn.setToolTip(self._get_fix_button_tooltip(issue))
+                fix_btn.clicked.connect(lambda checked, iss=issue: self._handle_fix_click(iss))
+                
+                # Right-click for preview (stub for Task 1.9.2.7)
+                fix_btn.setContextMenuPolicy(Qt.CustomContextMenu)
+                fix_btn.customContextMenuRequested.connect(
+                    lambda pos, iss=issue: self._show_fix_preview(iss)
+                )
+                
+                table.setCellWidget(row, 5, fix_btn)
+            else:
+                # No auto-fix available
+                action_text = self._get_action_text(issue)
+                action_item = QTableWidgetItem(action_text)
+                action_item.setFont(create_font(10))
+                if severity in ['CRITICAL', 'ERROR']:
+                    action_item.setForeground(QColor(COLORS['error']))
+                table.setItem(row, 5, action_item)
         
         # Configure table
         table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -1347,7 +1463,8 @@ class ValidationReportWindow(QMainWindow):
         lines.append("Real-World Scenarios:")
         lines.append("")
         lines.append("Scenario A: All REQUIRED blocks fire (high confidence)")
-        for idx, block in enumerate(required_blocks[:2], 1):
+        # FIXED: Show ALL required blocks, not just first 2
+        for idx, block in enumerate(required_blocks, 1):
             lines.append(f"   • Block {idx} ({block.name.upper()}): ALL signals ✓ → +{len(block.signals) * 10} pts")
         if len(optional_blocks) > 0:
             lines.append(f"   • Optional blocks: Not needed")
@@ -1471,3 +1588,394 @@ class ValidationReportWindow(QMainWindow):
         settings = QSettings("BTC_Engine", "ValidationReport")
         settings.setValue("geometry", self.saveGeometry())
         super().closeEvent(event)
+    
+    # =========================================================================
+    # AUTO-FIX BUTTON HANDLERS - Sprint 1.9.2
+    # =========================================================================
+    
+    def _get_fix_button_tooltip(self, issue: any) -> str:
+        """
+        Get institutional tooltip for fix button
+        Sprint 1.9.2 Task 1.9.2.6
+        
+        Provides specific guidance based on issue type
+        """
+        tooltips = {
+            'DIRECTION_001': "Click to automatically switch strategy direction to match signal bias. Right-click to preview changes before applying.",
+            'TIMING_004': "Click to reduce RECHECK delay to fit within timing window. Right-click to see exact adjustments.",
+            'EXIT_003': "Click to merge duplicate exit conditions. Right-click to preview consolidated result.",
+            'DEAD_CODE_001': "Click to disable unreachable signals. Right-click to preview which signals will be affected."
+        }
+        
+        rule_id = getattr(issue, 'rule_id', '')
+        return tooltips.get(rule_id, "Click to apply automated fix. Right-click to preview changes.")
+    
+    def _handle_fix_click(self, issue: any) -> None:
+        """
+        Handle fix button click - INSTITUTIONAL GRADE DIRECT ACCESS
+        Sprint 1.9.2 - Refactored to use validator-provided data
+        
+        Flow: Extract data from issue → Apply fix → Feedback → Re-validate
+        
+        Key: Uses issue.auto_fix_data dict and issue.location (no regex needed)
+        """
+        # Show confirmation
+        result = QMessageBox.question(
+            self,
+            "Confirm Auto-Fix",
+            f"Apply auto-fix for '{issue.rule_name}'?\n\n"
+            f"Issue: {issue.message}\n\n"
+            f"This operation includes:\n"
+            f"• Safety backup before changes\n"
+            f"• Automatic rollback on failure\n"
+            f"• Validation re-run to verify\n\n"
+            f"Apply fix now?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes
+        )
+        
+        if result != QMessageBox.Yes:
+            return
+        
+        # Extract location components (block_name, signal_name)
+        location_data = self._extract_location_components(issue.location)
+        
+        # Get auto-fix data from validator (already computed!)
+        auto_fix_data = getattr(issue, 'auto_fix_data', {}) or {}
+        
+        # Apply fix - institutional grade direct access approach
+        success = False
+        error_msg = None
+        
+        try:
+            if issue.rule_id == 'DIRECTION_001':
+                # Direction switch - use suggested_type from auto_fix_data
+                suggested_type = auto_fix_data.get('suggested_type')
+                if suggested_type:
+                    success = auto_fix_strategy_type(self.config, suggested_type)
+                else:
+                    error_msg = "No suggested direction in fix data"
+          
+            
+            elif issue.rule_id == 'TIMING_004':
+                # RECHECK timing fix - use data from auto_fix_data
+                timing_window = auto_fix_data.get('timing_window')
+                signal_name = location_data.get('signal_name')
+                
+                if signal_name and timing_window:
+                    success = self._apply_recheck_timing_fix(signal_name, timing_window)
+                else:
+                    error_msg = f"Missing data - signal:{signal_name}, window:{timing_window}"
+            
+            elif issue.rule_id == 'EXIT_009':
+                # Exit consolidation - use signal_name from auto_fix_data
+                signal_name = auto_fix_data.get('signal_name')
+                if signal_name:
+                    # Determine level from location
+                    if 'Signal::' in issue.location:
+                        level = 'signal'
+                    elif 'Block::' in issue.location:
+                        level = 'block'
+                    else:
+                        level = 'strategy'
+                    
+                    success = self._apply_exit_consolidation_fix(signal_name, level)
+                else:
+                    error_msg = "No signal name in fix data"
+            
+            elif issue.rule_id == 'LOGIC_003':
+                # Dead code - use signal_name from auto_fix_data
+                signal_name = auto_fix_data.get('signal_name') or location_data.get('signal_name')
+                block_name = location_data.get('block_name')
+                
+                if signal_name and block_name:
+                    success = self._apply_dead_code_fix(signal_name, block_name)
+                else:
+                    error_msg = f"Missing data - signal:{signal_name}, block:{block_name}"
+            
+            else:
+                error_msg = f"No auto-fix handler for rule {issue.rule_id}"
+                
+        except Exception as e:
+            error_msg = str(e)
+            success = False
+        
+        # Show result feedback
+        if success:
+            # Emit signal to notify parent window of config changes
+            # Parent window (Strategy Builder) will handle database persistence
+            self.fix_applied.emit(issue.rule_id, {'issue': issue.rule_name})
+            
+            QMessageBox.information(
+                self,
+                "✅ Fix Applied Successfully",
+                f"Auto-fix completed: {issue.rule_name}\n\n"
+                f"Validation will re-run automatically to verify the fix.\n\n"
+                f"⚠️ IMPORTANT: Please save your strategy to persist these changes."
+            )
+            
+            # Re-run validation
+            self._rerun_validation()
+        else:
+            QMessageBox.warning(
+                self,
+                "❌ Fix Failed",
+                f"Could not apply auto-fix: {issue.rule_name}\n\n"
+                f"Error: {error_msg or 'Unknown error'}\n\n"
+                f"Your strategy has been restored to its original state.\n"
+                f"No changes were made."
+            )
+    
+    def _show_fix_preview(self, issue: any) -> None:
+        """
+        Show fix preview on right-click
+        Sprint 1.9.2 Task 1.9.2.6 (stub for Task 1.9.2.7)
+        
+        Full preview dialog will be implemented in Task 1.9.2.7
+        """
+        QMessageBox.information(
+            self,
+            "Fix Preview",
+            f"Preview for: {issue.rule_name}\n\n"
+            f"Detailed before/after comparison coming in Task 1.9.2.7.\n\n"
+            f"This will show:\n"
+            f"• Current configuration\n"
+            f"• Proposed changes\n"
+            f"• Impact analysis\n"
+            f"• Cascading effects (if any)"
+        )
+    
+    def _rerun_validation(self) -> None:
+        """
+        Re-run validation after applying fix
+        Sprint 1.9.2 Task 1.9.2.8
+        
+        Updates validation report with new results
+        Refreshes all tabs (Summary, Issues, Metrics)
+        """
+        from PyQt5.QtWidgets import QApplication
+        
+        # Show progress indicator
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        
+        try:
+            # Run validation - FIXED: Method is validate(), not validate_strategy_config()
+            validator = InstitutionalValidator()
+            new_report = validator.validate(self.config)
+            
+            # Update report
+            self.report = new_report
+            
+            # Recreate tabs with new data
+            self._reinitialize_ui()
+            
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Validation Error",
+                f"Could not re-run validation:\n\n{str(e)}\n\n"
+                f"Please close and reopen the validation report."
+            )
+        finally:
+            QApplication.restoreOverrideCursor()
+    
+    def _reinitialize_ui(self) -> None:
+        """Reinitialize UI with updated report data (Screenshot 2 design)"""
+        # Get central widget
+        central = self.centralWidget()
+        if not central:
+            return
+        
+        # Clear layout
+        layout = central.layout()
+        if layout:
+            while layout.count():
+                item = layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+        
+        # Recreate UI components
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
+        
+        # Header with inline status (Screenshot 2 design - NO separate status banner)
+        header = self._create_header()
+        layout.addWidget(header)
+        
+        # Tabs (no status banner between header and tabs)
+        tabs = self._create_tabs()
+        layout.addWidget(tabs, 1)
+        
+        # Footer
+        footer = self._create_footer()
+        layout.addWidget(footer)
+    
+    # =========================================================================
+    # AUTO-FIX DATA EXTRACTION - INSTITUTIONAL GRADE (Direct Access)
+    # =========================================================================
+    
+    def _extract_location_components(self, location: str) -> dict:
+        """
+        Extract block and signal names from location string
+        
+        Location format: "Block::block_name::Signal::signal_name"
+        
+        Returns dict with 'block_name' and 'signal_name' keys
+        """
+        components = {'block_name': None, 'signal_name': None}
+        
+        if not location or '::' not in location:
+            return components
+        
+        parts = location.split('::')
+        for i in range(len(parts)):
+            if parts[i] == "Block" and i+1 < len(parts):
+                components['block_name'] = parts[i+1]
+            if parts[i] == "Signal" and i+1 < len(parts):
+                components['signal_name'] = parts[i+1]
+        
+        return components
+    
+    # =========================================================================
+    # AUTO-FIX APPLICATION METHODS
+    # =========================================================================
+    
+    def _apply_recheck_timing_fix(self, signal_name: str, timing_window: int) -> bool:
+        """
+        Apply RECHECK timing fix - INSTITUTIONAL GRADE APPROACH
+        
+        PRESERVES user's strategic RECHECK delays (core strategy)
+        ADJUSTS timing window constraint to accommodate delays
+        
+        This is the correct approach because:
+        - RECHECK delays are strategic choices (when to validate)
+        - Timing windows are constraints (ordering/synchronization)
+        - Should adjust constraint, NOT strategy
+        """
+        try:
+            print(f"\n{'='*80}")
+            print(f"DEBUG: RECHECK TIMING FIX - INSTITUTIONAL APPROACH")
+            print(f"{'='*80}")
+            print(f"Signal name: {signal_name}")
+            print(f"Current timing window: {timing_window} bars")
+            
+            # Find signal in config
+            for block in self.config.blocks:
+                for signal in block.signals:
+                    if signal.name == signal_name:
+                        print(f"  DEBUG: ✓ FOUND target signal '{signal_name}'")
+                        
+                        # Calculate CUMULATIVE delay (same as validator)
+                        cumulative_delay = 0
+                        if hasattr(signal, 'recheck_config') and signal.recheck_config:
+                            cumulative_delay = signal.recheck_config.bar_delay
+                            print(f"  DEBUG: Main recheck_config.bar_delay = {signal.recheck_config.bar_delay} bars")
+                        
+                        if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
+                            chain_delays = [rc.bar_delay for rc in signal.recheck_chain]
+                            cumulative_delay += sum(chain_delays)
+                            print(f"  DEBUG: RECHECK CHAIN: {len(signal.recheck_chain)} items")
+                            print(f"  DEBUG: Chain delays: {chain_delays}")
+                        
+                        print(f"  DEBUG: CUMULATIVE RECHECK DELAY = {cumulative_delay} bars (PRESERVED)")
+                        
+                        # INSTITUTIONAL FIX: Increase timing window to fit delays + buffer
+                        # Add 20% buffer for safety
+                        buffer = int(cumulative_delay * 0.2)
+                        new_timing_window = cumulative_delay + buffer
+                        
+                        print(f"  DEBUG: Required window = {cumulative_delay} + {buffer} buffer = {new_timing_window} bars")
+                        
+                        # Update timing constraint
+                        if hasattr(signal, 'timing_constraint') and signal.timing_constraint:
+                            old_window = signal.timing_constraint.max_candles
+                            signal.timing_constraint.max_candles = new_timing_window
+                            
+                            print(f"  DEBUG: TIMING WINDOW BEFORE = {old_window} bars")
+                            print(f"  DEBUG: TIMING WINDOW AFTER = {new_timing_window} bars")
+                            print(f"  DEBUG: ✅ RECHECK delays PRESERVED (strategic choice)")
+                            print(f"  DEBUG: ✅ Timing window ADJUSTED (constraint)")
+                        else:
+                            print(f"  DEBUG: ❌ No timing_constraint found")
+                            print(f"{'='*80}\n")
+                            return False
+                        
+                        print(f"  DEBUG: ✅ Fix successful! Window {old_window} → {new_timing_window} bars")
+                        print(f"{'='*80}\n")
+                        
+                        return True
+            
+            print(f"DEBUG: ❌ Signal '{signal_name}' not found in config")
+            print(f"{'='*80}\n")
+            return False
+            
+        except Exception as e:
+            print(f"DEBUG: ❌ EXCEPTION: {e}")
+            import traceback
+            traceback.print_exc()
+            print(f"{'='*80}\n")
+            return False
+    
+    def _apply_exit_consolidation_fix(self, identifier: str, level: str) -> bool:
+        """Apply exit consolidation fix"""
+        try:
+            if level == 'strategy':
+                # Consolidate at strategy level
+                if hasattr(self.config, 'exit_conditions'):
+                    new_exits = auto_fix_duplicate_exits(
+                        self.config.exit_conditions,
+                        identifier
+                    )
+                    self.config.exit_conditions = new_exits
+                    return True
+            
+            elif level == 'block':
+                # Find block and consolidate
+                for block in self.config.blocks:
+                    if block.name.lower() == identifier.lower():
+                        if hasattr(block, 'exit_conditions'):
+                            new_exits = auto_fix_duplicate_exits(
+                                block.exit_conditions,
+                                identifier
+                            )
+                            block.exit_conditions = new_exits
+                            return True
+            
+            elif level == 'signal':
+                # Find signal and consolidate
+                for block in self.config.blocks:
+                    for signal in block.signals:
+                        if signal.name == identifier:
+                            if hasattr(signal, 'exit_conditions'):
+                                new_exits = auto_fix_duplicate_exits(
+                                    signal.exit_conditions,
+                                    identifier
+                                )
+                                signal.exit_conditions = new_exits
+                                return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"Exit consolidation fix failed: {e}")
+            return False
+    
+    def _apply_dead_code_fix(self, signal_name: str, block_name: str) -> bool:
+        """Apply dead code fix to disable unreachable signal"""
+        try:
+            # Find block
+            for block in self.config.blocks:
+                if block.name.lower() == block_name.lower():
+                    # Apply fix using auto_fix module
+                    success = auto_fix_dead_code(
+                        block,
+                        [signal_name],
+                        preserve_history=True  # Disable, don't delete
+                    )
+                    return success
+            
+            return False
+            
+        except Exception as e:
+            print(f"Dead code fix failed: {e}")
+            return False

@@ -95,6 +95,15 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.validation_passed = False
         self.test_completed = False
         
+        # Flag to prevent validation reset during strategy load
+        self.loading_strategy = False
+        
+        # Track open windows (singleton pattern)
+        self.validation_window: Optional[ValidationReportWindow] = None
+        self.browser_window: Optional[StrategyBrowserDialog] = None
+        self.backtest_window: Optional[BacktestConfigDialog] = None
+        self.log_viewer_window: Optional['LogViewerWindow'] = None
+        
         # Auto-update timers
         self.candle_check_timer: Optional[QTimer] = None
         self.retry_timer: Optional[QTimer] = None
@@ -384,17 +393,29 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         # Strategy name changed: Update window title
         self.info_panel.strategy_name_changed.connect(self._on_strategy_name_changed)
+        
+        # Strategy type changed: Reset validation (requires re-validation)
+        self.info_panel.strategy_type_changed.connect(self._on_strategy_type_changed)
     
     def _on_block_selected(self, block_name: str):
         """Handle block selection from search panel."""
         # NOTE: Blocks are now added via orchestrator.add_block_with_signals()
         # which is called from the search panel. We just need to refresh the display.
         
+        # Save current name if it's blank (user hasn't named strategy yet)
+        current_name = self.info_panel.get_strategy_name()
+        preserve_blank = (current_name == "" or current_name.strip() == "")
+        
         # Refresh blocks panel to show newly added block
         self.blocks_panel.refresh_from_orchestrator()
         
         # Refresh info panel to update description and required signals
         self.info_panel.refresh_from_orchestrator()
+        
+        # CRITICAL: Restore blank name if user hasn't named strategy yet
+        # (refresh pulls "New_Strategy" from config, which should stay hidden from user)
+        if preserve_blank:
+            self.info_panel.set_strategy_name("")
         
         # Mark as added in search panel
         self.search_panel.mark_block_as_added(block_name)
@@ -405,14 +426,53 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.is_modified = True
         self._update_window_title()
     
+    def reset_validation(self):
+        """
+        CENTRAL METHOD: Reset validation state when ANY configuration changes.
+        
+        Called by:
+        - Block changes (add/remove/reorder)
+        - Signal timing/recheck configuration
+        - Exit condition configuration
+        - Strategy name/type changes
+        - Any other strategy mutation
+        
+        Forces user to re-validate after ANY modification.
+        """
+        # FIX: Always reset if step 1 has ANY status (completed or error)
+        # Must clear completed_steps AND force visual button reset FOR STEP 1 ONLY
+        if 1 in self.stepper.completed_steps or 1 in self.stepper.error_steps:
+            self.validation_passed = False
+            # Clear step 1 from sets
+            self.stepper.completed_steps.discard(1)
+            self.stepper.error_steps.discard(1)
+            # Force visual refresh by calling _update_display() which rebuilds button styles
+            self.stepper._update_display()
+    
     def _on_blocks_changed(self):
         """Handle blocks changed event."""
+        # Save current name if it's blank (user hasn't named strategy yet)
+        current_name = self.info_panel.get_strategy_name()
+        preserve_blank = (current_name == "" or current_name.strip() == "")
+        
         # Refresh info panel to update description and required signals
         self.info_panel.refresh_from_orchestrator()
+        
+        # CRITICAL: Restore blank name if user hasn't named strategy yet
+        # (refresh pulls "New_Strategy" from config, which should stay hidden from user)
+        if preserve_blank:
+            self.info_panel.set_strategy_name("")
+        
+        # Sync search panel button states with actual strategy blocks
+        self.search_panel.sync_with_strategy()
         
         # Mark as modified
         self.is_modified = True
         self._update_window_title()
+        
+        # RESET VALIDATION when blocks change (BUT NOT during strategy load)
+        if not self.loading_strategy:
+            self.reset_validation()
         
         # Update status
         block_count = self.blocks_panel.get_block_count()
@@ -422,11 +482,34 @@ class StrategyBuilderMainWindow(QMainWindow):
         """Handle strategy name change."""
         self.is_modified = True
         self._update_window_title()
+        # RESET VALIDATION when strategy name changes (BUT NOT during load)
+        if not self.loading_strategy:
+            self.reset_validation()
+    
+    def _on_strategy_type_changed(self, strategy_type: str):
+        """Handle strategy type change (Bullish/Bearish)."""
+        self.is_modified = True
+        # RESET VALIDATION when strategy type changes (BUT NOT during load)
+        if not self.loading_strategy:
+            self.reset_validation()
+    
+    def _is_strategy_empty(self) -> bool:
+        """
+        Check if strategy is truly empty (nothing worth saving).
+        
+        Returns:
+            True if strategy has no name and no blocks, False otherwise
+        """
+        strategy_name = self.info_panel.get_strategy_name()
+        block_count = self.blocks_panel.get_block_count()
+        
+        # Empty if no name AND no blocks
+        return (not strategy_name or strategy_name.strip() == "") and block_count == 0
     
     def _on_new_strategy(self):
-        """Create a new strategy in database."""
-        # Check if current strategy should be saved
-        if self.is_modified:
+        """Create a new strategy - reset to clean state."""
+        # Check if current strategy should be saved (skip if empty)
+        if self.is_modified and not self._is_strategy_empty():
             reply = ask_question(
                 self,
                 "Unsaved Changes",
@@ -440,51 +523,74 @@ class StrategyBuilderMainWindow(QMainWindow):
             elif reply == 'cancel':
                 return
         
-        # Show new strategy dialog
-        dialog = NewStrategyDialog(self)
-        if dialog.exec_() != NewStrategyDialog.Accepted:
-            return  # User cancelled
+        # Reset strategy in orchestrator with placeholder (allows adding blocks immediately)
+        self.orchestrator.create_strategy("New_Strategy")
         
-        # Get strategy data from dialog
-        data = dialog.get_strategy_data()
+        # Update UI with blank name field (user enters their own name)
+        # The placeholder "New_Strategy" is used internally but hidden from user
+        self.info_panel.set_strategy_name("")
+        self.info_panel.set_description("")
         
-        # Reset strategy in orchestrator (clears all blocks)
-        self.orchestrator.create_strategy(data['name'])
+        # Clear database IDs (new strategy, not saved yet)
+        self.current_strategy_id = None
+        self.current_version_id = None
         
-        # Update UI with new strategy name
-        self.info_panel.set_strategy_name(data['name'])
-        if data.get('description'):
-            self.info_panel.set_description(data['description'])
-        
-        # Track database IDs
-        self.current_strategy_id = data['strategy_id']
-        self.current_version_id = None  # Will be set on first save
-        
-        # Clear file tracking (using database now)
+        # Clear file tracking
         self.current_file = None
-        self.is_modified = True
+        self.is_modified = False  # Clean state, nothing to save yet
         
         # Clear visual markers
         self.search_panel.clear_added_blocks()
         
-        # Refresh panels
+        # Refresh blocks panel to show empty state
         self.blocks_panel.refresh_from_orchestrator()
-        self.info_panel.refresh_from_orchestrator()
+        # NOTE: Don't refresh info_panel - it would pull "New_Strategy" from config
+        # and overwrite the blank name we just set. We already set name/description above.
+        
+        # Reset validation and test states
+        self.validation_passed = False
+        self.test_completed = False
+        self.stepper.reset_all_steps()
         
         # Update UI
         self._update_window_title()
-        self._update_status(f"New strategy created: {data['name']} (database-backed)")
+        self._update_status("New strategy created - Ready to add blocks")
     
     def _on_open_strategy(self):
-        """Open strategy from database using StrategyBrowserDialog."""
+        """Open strategy from database using StrategyBrowserDialog (singleton pattern)."""
+        # Check if browser window already exists and is visible
+        if self.browser_window and self.browser_window.isVisible():
+            # Focus existing window instead of creating new one
+            self.browser_window.raise_()
+            self.browser_window.activateWindow()
+            return
+        
+        # Check if current strategy should be saved (skip if empty)
+        if self.is_modified and not self._is_strategy_empty():
+            reply = ask_question(
+                self,
+                "Unsaved Changes",
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before opening another strategy?"
+            )
+            
+            if reply == 'yes':
+                if not self._on_save_strategy():
+                    return  # Save was cancelled
+            elif reply == 'cancel':
+                return
+        
         # Create and show strategy browser window
-        browser = StrategyBrowserDialog(mode='open', parent=self)
+        self.browser_window = StrategyBrowserDialog(mode='open', parent=self)
         
         # Connect signal for when strategy is selected
-        browser.strategy_selected.connect(self._load_strategy_from_browser)
+        self.browser_window.strategy_selected.connect(self._load_strategy_from_browser)
+        
+        # Clear reference when window is destroyed
+        self.browser_window.destroyed.connect(lambda: setattr(self, 'browser_window', None))
         
         # Show as non-modal window
-        browser.show()
+        self.browser_window.show()
     
     def _load_strategy_from_browser(self, strategy_id: str, version_id: str):
         """Load strategy after selection from browser"""
@@ -501,10 +607,23 @@ class StrategyBuilderMainWindow(QMainWindow):
                 QMessageBox.warning(self, "Load Failed", "Strategy version not found in database")
                 return
             
-            # Reset workflow state
-            self.validation_passed = False
-            self.test_completed = False
-            self.stepper.reset_all_steps()
+            # Load validation status from database and restore stepper state
+            validation_status = version.get('validation_status', 'Un-Validated')
+            
+            if validation_status == 'Pass':
+                self.validation_passed = True
+                self.test_completed = False
+                self.stepper.reset_all_steps()
+                self.stepper.mark_step_complete(1)  # Green check mark
+            elif validation_status == 'Fail':
+                self.validation_passed = False
+                self.test_completed = False
+                self.stepper.reset_all_steps()
+                self.stepper.mark_step_error(1)  # Red X mark
+            else:  # Un-Validated
+                self.validation_passed = False
+                self.test_completed = False
+                self.stepper.reset_all_steps()  # Default state
             
             # Load blocks from database using persistence (SAME AS FILE LOAD)
             blocks_data = version.get('blocks', [])
@@ -518,9 +637,15 @@ class StrategyBuilderMainWindow(QMainWindow):
                 'exit_conditions': exit_conditions_data  # Sprint 1.8: Include exit conditions
             }
             
-            # Use persistence._dict_to_config() - EXACT same as file load
+            # SUPPRESS validation reset during load AND all refresh operations
+            self.loading_strategy = True
+            
             try:
+                # Use persistence._dict_to_config() - EXACT same as file load
                 restored_config = self.orchestrator.persistence._dict_to_config(config_dict)
+                
+                # Add version number to config for UI display
+                restored_config.version = version['version_number']
                 
                 # Assign to config engine (SAME PATTERN as orchestrator.load_strategy)
                 self.orchestrator.config_engine.config = restored_config
@@ -534,7 +659,7 @@ class StrategyBuilderMainWindow(QMainWindow):
                 # Fallback to empty config
                 self.orchestrator.create_strategy(version['name'])
             
-            # Update UI panels with loaded data
+            # Update UI panels with loaded data (STILL loading)
             self.info_panel.set_strategy_name(version['name'])
             if version.get('description'):
                 self.info_panel.set_description(version['description'])
@@ -547,10 +672,16 @@ class StrategyBuilderMainWindow(QMainWindow):
             self.current_file = None
             self.is_modified = False
             
-            # Clear and refresh panels
+            # Clear and refresh panels (refresh can trigger blocks_changed!)
             self.search_panel.clear_added_blocks()
             self.blocks_panel.refresh_from_orchestrator()
             self.info_panel.refresh_from_orchestrator()
+            
+            # CRITICAL FIX: Sync search panel with loaded strategy to update button states
+            self.search_panel.sync_with_strategy()
+            
+            # NOW re-enable validation reset (AFTER all refresh operations)
+            self.loading_strategy = False
             
             # Update UI
             self._update_window_title()
@@ -563,6 +694,16 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_save_strategy(self) -> bool:
         """Save the current strategy to database with proper rollback on failure."""
+        # CRITICAL: Don't create new version if nothing changed
+        if not self.is_modified:
+            QMessageBox.information(
+                self,
+                "No Changes",
+                "No changes detected - strategy is already saved.\n\n"
+                "A new version will only be created if you modify the strategy."
+            )
+            return True  # Not an error, just nothing to do
+        
         db = None
         created_strategy = False
         
@@ -606,17 +747,20 @@ class StrategyBuilderMainWindow(QMainWindow):
                 'tags': []  # Reserved
             }
             
-            # Create new version (THIS IS WHERE IT FAILS)
+            # Create new version
             try:
-                print(f"\n🔍 DEBUG: Attempting to create version...")
-                print(f"   Strategy ID: {version_data['strategy_id']}")
-                print(f"   Name: {version_data['name']}")
-                print(f"   Blocks type: {type(version_data['blocks'])}")
-                print(f"   Blocks length: {len(version_data['blocks']) if isinstance(version_data['blocks'], list) else 'N/A'}")
-                
                 self.current_version_id = db.strategy.create_strategy_version(version_data)
                 
-                print(f"✅ Version created successfully: {self.current_version_id}")
+                # CRITICAL: Get new version number from database and update UI
+                new_version = db.strategy.get_strategy_version(self.current_version_id)
+                if new_version:
+                    new_version_number = new_version['version_number']
+                    
+                    # Update config with new version number
+                    self.orchestrator.config_engine.config.version = new_version_number
+                    
+                    # Refresh info panel to show new version in display
+                    self.info_panel.refresh_from_orchestrator()
                 
             except Exception as version_error:
                 # VERSION CREATION FAILED
@@ -853,10 +997,22 @@ class StrategyBuilderMainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Error validating strategy: {str(e)}")
     
     def _on_run_backtest(self):
-        """Run backtest for the current strategy."""
+        """Run backtest for the current strategy (singleton pattern)."""
         try:
-            dialog = BacktestConfigDialog(self.orchestrator, self)
-            dialog.show()  # Non-modal so user can see strategy
+            # Check if backtest window already exists and is visible
+            if self.backtest_window and self.backtest_window.isVisible():
+                # Focus existing window instead of creating new one
+                self.backtest_window.raise_()
+                self.backtest_window.activateWindow()
+                return
+            
+            # Create and show backtest config dialog
+            self.backtest_window = BacktestConfigDialog(self.orchestrator, self)
+            
+            # Clear reference when window is destroyed
+            self.backtest_window.destroyed.connect(lambda: setattr(self, 'backtest_window', None))
+            
+            self.backtest_window.show()  # Non-modal so user can see strategy
             self._update_status("Backtest configuration opened")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error opening backtest dialog: {str(e)}")
@@ -890,9 +1046,21 @@ class StrategyBuilderMainWindow(QMainWindow):
                 validator = InstitutionalValidator()
                 report = validator.validate(config)
                 
-                # Create and show validation report window
-                window = ValidationReportWindow(report, config, self)
-                window.show()  # QMainWindow uses .show(), not .exec_()
+                # Check if validation window already exists and is visible
+                if self.validation_window and self.validation_window.isVisible():
+                    # Close existing window before showing new validation results
+                    self.validation_window.close()
+                
+                # Create and show validation report window (singleton pattern)
+                self.validation_window = ValidationReportWindow(report, config, self)
+
+                # Connect fix_applied signal to save changes to database
+                self.validation_window.fix_applied.connect(self._on_validation_fix_applied)
+
+                # Clear reference when window is destroyed
+                self.validation_window.destroyed.connect(lambda: setattr(self, 'validation_window', None))
+
+                self.validation_window.show()  # QMainWindow uses .show(), not .exec_()
                 
                 # Update stepper state based on validation result
                 if report.is_valid:
@@ -902,9 +1070,9 @@ class StrategyBuilderMainWindow(QMainWindow):
                     self.stepper.mark_step_complete(1)
                     self._update_status("Strategy validated successfully")
                     
-                    # AUTO-SAVE after validation (if database strategy exists)
-                    if self.current_strategy_id:
-                        self._on_save_strategy()
+                    # PERSIST VALIDATION STATUS TO DATABASE (Sprint 1.9 ORM)
+                    # Update existing version's status (don't create new version)
+                    self._save_validation_status_to_db('Pass')
                 else:
                     self.validation_passed = False
                     # Clear validation status on error
@@ -912,6 +1080,10 @@ class StrategyBuilderMainWindow(QMainWindow):
                         delattr(self.orchestrator.config_engine.config, 'validation_status')
                     self.stepper.mark_step_error(1)
                     self._update_status(f"Strategy validation failed - {report.blocking_issues()} blocking issues")
+                    
+                    # PERSIST FAILURE STATUS TO DATABASE (Sprint 1.9 ORM)
+                    # Update existing version's status (don't create new version)
+                    self._save_validation_status_to_db('Fail')
                     
             except Exception as e:
                 self.validation_passed = False
@@ -1389,6 +1561,197 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Silently fail to avoid disrupting UI
             pass
     
+    def _save_validation_status_to_db(self, status: str):
+        """
+        Persist validation status to database (Sprint 1.9 ORM persistence).
+        
+        Updates the strategy_versions table with validation_status and validation_timestamp.
+        
+        Args:
+            status: 'Pass' or 'Fail'
+        """
+        if not self.current_version_id:
+            return  # No version to update yet (strategy not saved)
+        
+        try:
+            from datetime import datetime
+            from src.optimizer_v3.database.models import StrategyVersion
+            
+            db = get_database_manager()
+            
+            # Get the strategy version using ORM
+            version = db.strategy.session.query(StrategyVersion).filter(
+                StrategyVersion.version_id == self.current_version_id
+            ).first()
+            
+            if version:
+                # Update using ORM
+                version.validation_status = status
+                version.validation_timestamp = datetime.utcnow()
+                db.strategy.session.commit()
+            
+        except Exception as e:
+            # Rollback on error
+            try:
+                db.strategy.session.rollback()
+            except:
+                pass
+            # Don't fail the UI if database save fails - log silently
+            import traceback
+            traceback.print_exc()
+    
+    def _on_validation_fix_applied(self, fix_type: str, fix_data: dict):
+        """
+        Handle auto-fix applied from validation window.
+        
+        Automatically saves updated config to database AND reloads it
+        so main window displays the exact saved version.
+        
+        CRITICAL: Also saves validation status as 'Pass' since fix was successful.
+        
+        Args:
+            fix_type: Type of fix applied (rule_id)
+            fix_data: Dict with fix details
+        """
+        print(f"\n{'='*80}")
+        print(f"AUTO-FIX APPLIED: {fix_type}")
+        print(f"Saving updated configuration to database...")
+        print(f"{'='*80}\n")
+        
+        # Save to database (creates new version with updated config)
+        success = self._on_save_strategy()
+        
+        if success:
+            print(f"✅ Configuration saved to database successfully")
+            
+            # CRITICAL: Save validation status as 'Pass' (fix was applied successfully)
+            # This must happen BEFORE reload so reload sees the Pass status
+            print(f"💾 Saving validation status = 'Pass' to database...")
+            self._save_validation_status_to_db('Pass')
+            print(f"✅ Validation status saved")
+            
+            # CRITICAL: Reload the saved version from database
+            # This ensures main window shows exact config that was saved
+            if self.current_version_id:
+                print(f"🔄 Reloading version {self.current_version_id} from database...")
+                self._reload_current_version()
+            
+            self._update_status(f"Auto-fix applied, saved, and reloaded: {fix_data.get('issue', fix_type)}")
+        else:
+            print(f"❌ Failed to save configuration to database")
+            self._update_status(f"Auto-fix applied but save failed")
+    
+    def _reload_current_version(self):
+        """
+        Reload current strategy version from database.
+        
+        Called after auto-fix to ensure main window displays
+        the exact configuration that was saved.
+        
+        CRITICAL: Also restores validation status so stepper shows correct state.
+        """
+        if not self.current_version_id:
+            return
+        
+        try:
+            # Load from database
+            db = get_database_manager()
+            version = db.strategy.get_strategy_version(self.current_version_id)
+            
+            if not version:
+                print(f"❌ Version {self.current_version_id} not found")
+                return
+            
+            # Extract blocks and exit conditions
+            blocks_data = version.get('blocks', [])
+            exit_conditions_data = version.get('exit_conditions', [])
+            
+            # Build config dict
+            config_dict = {
+                'name': version['name'],
+                'description': version.get('description', ''),
+                'blocks': blocks_data,
+                'exit_conditions': exit_conditions_data
+            }
+            
+            # SUPPRESS validation reset during reload
+            self.loading_strategy = True
+            
+            try:
+                # Restore config using persistence
+                restored_config = self.orchestrator.persistence._dict_to_config(config_dict)
+                
+                # Update orchestrator
+                self.orchestrator.config_engine.config = restored_config
+                
+                print(f"✅ Reloaded {len(restored_config.blocks)} blocks from database")
+                
+                # Refresh all UI panels
+                self.blocks_panel.refresh_from_orchestrator()
+                self.info_panel.refresh_from_orchestrator()
+                self.search_panel.sync_with_strategy()
+                
+                print(f"✅ UI refreshed with reloaded data")
+                
+                # CRITICAL: Restore validation status from database
+                # This updates BOTH the flag AND the stepper to show correct validation state
+                validation_status = version.get('validation_status', 'Un-Validated')
+                
+                print(f"\n{'='*80}")
+                print(f"RESTORING VALIDATION STATUS FROM DATABASE")
+                print(f"{'='*80}")
+                print(f"Database status = '{validation_status}'")
+                
+                if validation_status == 'Pass':
+                    # Set flag FIRST
+                    self.validation_passed = True
+                    print(f"✅ Set validation_passed = True")
+                    
+                    # Clear ALL step states first
+                    self.stepper.completed_steps.clear()
+                    self.stepper.error_steps.clear()
+                    
+                    # Now mark step 1 as complete (GREEN with checkmark)
+                    self.stepper.mark_step_complete(1)
+                    print(f"✅ Stepper step 1 marked COMPLETE (should be GREEN)")
+                    print(f"   completed_steps = {self.stepper.completed_steps}")
+                    print(f"   error_steps = {self.stepper.error_steps}")
+                    
+                elif validation_status == 'Fail':
+                    # Set flag FIRST
+                    self.validation_passed = False
+                    print(f"⚠️ Set validation_passed = False")
+                    
+                    # Clear ALL step states first
+                    self.stepper.completed_steps.clear()
+                    self.stepper.error_steps.clear()
+                    
+                    # Mark step 1 as error (RED with X)
+                    self.stepper.mark_step_error(1)
+                    print(f"❌ Stepper step 1 marked ERROR (should be RED)")
+                    
+                else:  # Un-Validated
+                    # Set flag FIRST
+                    self.validation_passed = False
+                    print(f"ℹ️ Set validation_passed = False (un-validated)")
+                    
+                    # Clear ALL step states - no mark needed (grey default)
+                    self.stepper.completed_steps.clear()
+                    self.stepper.error_steps.clear()
+                    self.stepper._update_display()
+                    print(f"   Stepper reset to default (should be GREY)")
+                
+                print(f"{'='*80}\n")
+                
+            finally:
+                # Re-enable validation reset
+                self.loading_strategy = False
+            
+        except Exception as e:
+            print(f"❌ Error reloading version: {e}")
+            import traceback
+            traceback.print_exc()
+    
     def _check_validation_prerequisites(self) -> bool:
         """Check if validation prerequisites are met (strategy name + blocks)."""
         strategy_name = self.info_panel.get_strategy_name()
@@ -1571,11 +1934,18 @@ class StrategyBuilderMainWindow(QMainWindow):
             )
     
     def _on_view_current_log(self):
-        """Open the most recent log file in professional log viewer."""
+        """Open the most recent log file in professional log viewer (singleton pattern)."""
         from pathlib import Path
         from src.strategy_builder.ui.log_viewer_window import LogViewerWindow
         
         try:
+            # Check if log viewer window already exists and is visible
+            if self.log_viewer_window and self.log_viewer_window.isVisible():
+                # Focus existing window instead of creating new one
+                self.log_viewer_window.raise_()
+                self.log_viewer_window.activateWindow()
+                return
+            
             # Get logs directory
             logs_dir = Path('logs')
             if not logs_dir.exists():
@@ -1603,9 +1973,13 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Get the newest log file
             newest_log = log_files[0]
             
-            # Open in professional log viewer window
-            viewer = LogViewerWindow(newest_log, self)
-            viewer.show()
+            # Create and show log viewer window
+            self.log_viewer_window = LogViewerWindow(newest_log, self)
+            
+            # Clear reference when window is destroyed
+            self.log_viewer_window.destroyed.connect(lambda: setattr(self, 'log_viewer_window', None))
+            
+            self.log_viewer_window.show()
             
             self._update_status(f"Opened log viewer: {newest_log.name}")
             
@@ -1674,7 +2048,8 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def closeEvent(self, event):
         """Handle window close event."""
-        if self.is_modified:
+        # Check if current strategy should be saved (skip if empty)
+        if self.is_modified and not self._is_strategy_empty():
             reply = ask_question(
                 self,
                 "Unsaved Changes",
