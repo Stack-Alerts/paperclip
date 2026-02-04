@@ -694,6 +694,16 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _on_save_strategy(self) -> bool:
         """Save the current strategy to database with proper rollback on failure."""
+        # CRITICAL: Don't create new version if nothing changed
+        if not self.is_modified:
+            QMessageBox.information(
+                self,
+                "No Changes",
+                "No changes detected - strategy is already saved.\n\n"
+                "A new version will only be created if you modify the strategy."
+            )
+            return True  # Not an error, just nothing to do
+        
         db = None
         created_strategy = False
         
