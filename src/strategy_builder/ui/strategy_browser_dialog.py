@@ -96,9 +96,11 @@ class StrategyBrowserDialog(QMainWindow):
     
     Signals:
         strategy_selected: Emitted when strategy selected (strategy_id, version_id)
+        strategy_deleted: Emitted when strategy deleted (strategy_id, was_entire_strategy)
     """
     
     strategy_selected = pyqtSignal(str, str)  # strategy_id, version_id
+    strategy_deleted = pyqtSignal(str, bool)  # strategy_id, was_entire_strategy (True) or version (False)
     
     def __init__(self, parent: Optional[QWidget] = None, mode: str = 'open'):
         """
@@ -1225,11 +1227,11 @@ class StrategyBrowserDialog(QMainWindow):
             dialog = QDialog(self)
             dialog.setWindowTitle("Delete Strategy")
             dialog.setStyleSheet(get_main_stylesheet())
-            dialog.setMinimumWidth(800)
-            dialog.setMinimumHeight(800)
+            dialog.setMinimumWidth(600)
+            dialog.setMinimumHeight(400)
             
             layout = QVBoxLayout(dialog)
-            layout.setSpacing(16)
+            layout.setSpacing(12)
             layout.setContentsMargins(20, 20, 20, 20)
             
             # Title
@@ -1312,6 +1314,9 @@ class StrategyBrowserDialog(QMainWindow):
                 deleted = self.db.strategy.delete_strategy(self.selected_strategy_id)
                 
                 if deleted:
+                    # Emit signal to notify main window (entire strategy deleted)
+                    self.strategy_deleted.emit(str(self.selected_strategy_id), True)
+                    
                     from .alert_dialog import show_success
                     show_success(self, "Delete Strategy", "Success", 
                                f"Strategy '{version['name']}' and all {version_count} version{'s' if version_count != 1 else ''} deleted")
@@ -1343,6 +1348,9 @@ class StrategyBrowserDialog(QMainWindow):
                         print(f"Failed to delete version {version_id}: {e}")
                 
                 if deleted_count > 0:
+                    # Emit signal to notify main window (versions deleted, not entire strategy)
+                    self.strategy_deleted.emit(str(self.selected_strategy_id), False)
+                    
                     from .alert_dialog import show_success
                     show_success(self, "Delete Versions", "Success", 
                                f"Deleted {deleted_count} version{'s' if deleted_count != 1 else ''} successfully")
