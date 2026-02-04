@@ -148,46 +148,74 @@ class ValidationReportWindow(QMainWindow):
         status_layout.setSpacing(0)
         
         if self.report.is_valid:
-            # Container styling (green background + left border)
+            # Container styling (green background)
             status_container.setStyleSheet(f"""
                 QWidget {{
                     background-color: rgba(16, 185, 129, 0.15);
                     border-radius: 4px;
-                    border-left: 4px solid {COLORS['success']};
                 }}
             """)
             
-            # Single combined label with status + separator + description
-            status_text = f"<span style='color: {COLORS['success']}; font-weight: bold;'>  ✅ VALIDATION PASSED  <span style='color: {COLORS['success']};'>|</span>  </span>"
-            desc_text = f"<span style='color: {COLORS['text_primary']};'>Your strategy meets all institutional-grade requirements and is ready for backtesting.</span>"
+            # Left bar - rounded on RIGHT
+            left_bar = QFrame()
+            left_bar.setFixedWidth(4)
+            left_bar.setStyleSheet(f"background-color: {COLORS['success']}; border-radius: 0px 2px 2px 0px;")
+            status_layout.addWidget(left_bar)
             
-            combined_label = QLabel(status_text + desc_text)
-            combined_label.setFont(create_font(11))
-            combined_label.setStyleSheet("background: transparent; padding: 6px 8px;")
-            combined_label.setWordWrap(True)
-            status_layout.addWidget(combined_label, 1)  # Only add ONCE
+            # Status text with icon
+            status_label = QLabel("  ✅ VALIDATION PASSED  ")
+            status_label.setFont(create_font(11, bold=True))
+            status_label.setStyleSheet(f"color: {COLORS['success']}; background: transparent;")
+            status_layout.addWidget(status_label)
+            
+            # Right bar - rounded on LEFT
+            right_bar = QFrame()
+            right_bar.setFixedWidth(4)
+            right_bar.setStyleSheet(f"background-color: {COLORS['success']}; border-radius: 2px 0px 0px 2px;")
+            status_layout.addWidget(right_bar)
+            
+            # Description
+            desc_label = QLabel("  Your strategy meets all institutional-grade requirements and is ready for backtesting.")
+            desc_label.setFont(create_font(11))
+            desc_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+            desc_label.setWordWrap(True)
+            status_layout.addWidget(desc_label, 1)
             
         else:
             blocking = self.report.blocking_issues()
             
-            # Container styling (red background + left border)
+            # Container styling (red background)
             status_container.setStyleSheet(f"""
                 QWidget {{
                     background-color: rgba(220, 53, 69, 0.15);
                     border-radius: 4px;
-                    border-left: 4px solid {COLORS['error']};
                 }}
             """)
             
-            # Single combined label with status + separator + description
-            status_text = f"<span style='color: {COLORS['error']}; font-weight: bold;'>  ❌ VALIDATION FAILED  <span style='color: {COLORS['error']};'>|</span>  </span>"
-            desc_text = f"<span style='color: {COLORS['text_primary']};'>{blocking} blocking issue(s) must be fixed before backtest.</span>"
+            # Left bar - rounded on RIGHT
+            left_bar = QFrame()
+            left_bar.setFixedWidth(4)
+            left_bar.setStyleSheet(f"background-color: {COLORS['error']}; border-radius: 0px 2px 2px 0px;")
+            status_layout.addWidget(left_bar)
             
-            combined_label = QLabel(status_text + desc_text)
-            combined_label.setFont(create_font(11))
-            combined_label.setStyleSheet("background: transparent; padding: 6px 8px;")
-            combined_label.setWordWrap(True)
-            status_layout.addWidget(combined_label, 1)  # Only add ONCE
+            # Status text with icon
+            status_label = QLabel("  ❌ VALIDATION FAILED  ")
+            status_label.setFont(create_font(11, bold=True))
+            status_label.setStyleSheet(f"color: {COLORS['error']}; background: transparent;")
+            status_layout.addWidget(status_label)
+            
+            # Right bar - rounded on LEFT
+            right_bar = QFrame()
+            right_bar.setFixedWidth(4)
+            right_bar.setStyleSheet(f"background-color: {COLORS['error']}; border-radius: 2px 0px 0px 2px;")
+            status_layout.addWidget(right_bar)
+            
+            # Description
+            desc_label = QLabel(f"  {blocking} blocking issue(s) must be fixed before backtest.")
+            desc_label.setFont(create_font(11))
+            desc_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+            desc_label.setWordWrap(True)
+            status_layout.addWidget(desc_label, 1)
         
         info_layout.addWidget(status_container, 1)  # Stretch to take remaining space
         
