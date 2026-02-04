@@ -521,7 +521,11 @@ class StrategyInfoPanel(QWidget):
         try:
             config = self.orchestrator.get_current_config()
             if config and hasattr(config, 'name') and config.name:
-                self.set_strategy_name(config.name)
+                # Include version in display if available
+                display_name = config.name
+                if hasattr(config, 'version') and config.version:
+                    display_name = f"{config.name} (v{config.version})"
+                self.set_strategy_name(display_name)
             
             # CRITICAL: Also load strategy_type from config
             if config and hasattr(config, 'strategy_type'):
