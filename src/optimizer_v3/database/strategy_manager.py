@@ -265,7 +265,10 @@ class StrategyDatabaseManager:
                 'created_by': version.created_by,
                 'notes': version.notes,
                 'tags': version.tags,
-                'config_hash': version.config_hash
+                'config_hash': version.config_hash,
+                # Validation status (Sprint 1.9)
+                'validation_status': version.validation_status,
+                'validation_timestamp': version.validation_timestamp
             }
             
             return version_dict

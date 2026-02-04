@@ -30,7 +30,8 @@ from src.strategy_builder.core.registry_interface import BlockInfo, SearchFilter
 from src.strategy_builder.ui.styles import (
     get_label_style, get_expand_button_style, get_add_button_style,
     get_checkbox_style, get_success_button_stylesheet, get_color,
-    get_exit_button_stylesheet
+    get_exit_button_stylesheet, get_and_button_stylesheet, get_or_button_stylesheet,
+    format_block_name
 )
 
 # Import exit condition dialog
@@ -83,6 +84,12 @@ class BlockListItem(QWidget):
         # Track which signals have been added (to disable them)
         self.added_signals: set = set()
         
+        # Track whether strategy has blocks (for button state management)
+        self.strategy_has_blocks = False
+        
+        # Store parent panel reference (will be set by BlockSearchPanel)
+        self.parent_panel = None
+        
         self._init_ui()
     
     def _init_ui(self):
@@ -97,8 +104,8 @@ class BlockListItem(QWidget):
         info_layout = QVBoxLayout()
         info_layout.setSpacing(4)
         
-        # Name (bold and larger)
-        name_label = QLabel(f"📊 {self.block_info.name}")
+        # Name (bold and larger) - format to title case with "and" lowercase
+        name_label = QLabel(f"📊 {format_block_name(self.block_info.name)}")
         name_font = QFont()
         name_font.setBold(True)
         name_font.setPointSize(12)
@@ -204,12 +211,20 @@ class BlockListItem(QWidget):
             self.signal_checkboxes[signal_info.name] = checkbox
             checkbox_layout.addWidget(checkbox)
             
-            # Add signal description
+            # Add signal description with proper indentation using container
             if hasattr(signal_info, 'description') and signal_info.description:
-                desc_label = QLabel(f"   {signal_info.description}")
+                # Create container widget for indentation
+                desc_container = QWidget()
+                desc_container_layout = QHBoxLayout(desc_container)
+                desc_container_layout.setContentsMargins(40, 0, 0, 0)  # 95px left indent to align properly
+                desc_container_layout.setSpacing(0)
+                
+                desc_label = QLabel(signal_info.description)
                 desc_label.setWordWrap(True)
-                desc_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt; padding: 2px 0 4px 28px; font-style: italic;")
-                checkbox_layout.addWidget(desc_label)
+                desc_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt; font-style: italic;")
+                desc_container_layout.addWidget(desc_label)
+                
+                checkbox_layout.addWidget(desc_container)
             
             signals_layout.addLayout(checkbox_layout)
         
@@ -219,51 +234,17 @@ class BlockListItem(QWidget):
         buttons_layout.setSpacing(10)
         buttons_layout.setContentsMargins(0, 15, 0, 10)
         
-        # Add as AND button (required)
+        # Add as AND button (required) - using centralized style
         self.and_button = QPushButton("➕ Add as AND (Required)")
         self.and_button.setMinimumHeight(40)
-        self.and_button.setStyleSheet("""
-            QPushButton {
-                background-color: #00D9FF;
-                color: #0F1419;
-                font-weight: bold;
-                border: none;
-                border-radius: 6px;
-                padding: 10px 20px;
-                font-size: 10pt;
-            }
-            QPushButton:hover {
-                background-color: #0A7EA4;
-            }
-            QPushButton:disabled {
-                background-color: #374151;
-                color: #94A3B8;
-            }
-        """)
+        self.and_button.setStyleSheet(get_and_button_stylesheet())
         self.and_button.clicked.connect(lambda: self._add_with_logic("AND"))
         buttons_layout.addWidget(self.and_button)
         
-        # Add as OR button (optional/booster)
+        # Add as OR button (optional/booster) - using centralized style
         self.or_button = QPushButton("➕ Add as OR (Optional)")
         self.or_button.setMinimumHeight(40)
-        self.or_button.setStyleSheet("""
-            QPushButton {
-                background-color: #10B981;
-                color: white;
-                font-weight: bold;
-                border: none;
-                border-radius: 6px;
-                padding: 10px 20px;
-                font-size: 10pt;
-            }
-            QPushButton:hover {
-                background-color: #059669;
-            }
-            QPushButton:disabled {
-                background-color: #374151;
-                color: #94A3B8;
-            }
-        """)
+        self.or_button.setStyleSheet(get_or_button_stylesheet())
         self.or_button.clicked.connect(lambda: self._add_with_logic("OR"))
         buttons_layout.addWidget(self.or_button)
         
@@ -469,9 +450,85 @@ class BlockListItem(QWidget):
                                'block': self.block_info.name
                            })
     
-    # NOTE: disable_add_button() and enable_add_button() methods removed
-    # The old "Add to Strategy" button no longer exists
-    # Blocks are now disabled via the expand button after selection
+    def update_button_state(self, strategy_has_blocks: bool):
+        """
+        Update button states based on whether strategy has blocks.
+        
+        Args:
+            strategy_has_blocks: True if strategy has any building blocks, False otherwise
+        """
+        self.strategy_has_blocks = strategy_has_blocks
+        
+        if strategy_has_blocks:
+            # Strategy has blocks - enable all buttons with normal labels
+            self.and_button.setText("➕ Add as AND (Required)")
+            self.or_button.setEnabled(True)
+            self.exit_button.setEnabled(True)
+        else:
+            # Empty strategy - disable OR/Exit, rename AND button
+            self.and_button.setText("➕ Add Required Signal")
+            self.or_button.setEnabled(False)
+            self.exit_button.setEnabled(False)
+    
+    def reset_added_signals(self):
+        """
+        Reset all added signals, making them available again.
+        
+        Called when this block is removed from the strategy.
+        Clears the added_signals set and restores all checkboxes to enabled state.
+        """
+        # Clear all added signals
+        for signal_name in list(self.added_signals):
+            checkbox = self.signal_checkboxes.get(signal_name)
+            if checkbox:
+                # Re-enable checkbox
+                checkbox.setEnabled(True)
+                checkbox.setChecked(False)
+                
+                # Restore normal styling
+                checkbox.setStyleSheet("""
+                    QCheckBox {
+                        color: #A0AEC0;
+                        font-size: 10pt;
+                        font-weight: bold;
+                        padding: 4px;
+                    }
+                    QCheckBox::indicator {
+                        width: 18px;
+                        height: 18px;
+                        border: 2px solid #374151;
+                        border-radius: 4px;
+                        background-color: #1A202C;
+                    }
+                    QCheckBox::indicator:checked {
+                        background-color: #00D9FF;
+                        border-color: #00D9FF;
+                    }
+                    QCheckBox::indicator:hover {
+                        border-color: #00D9FF;
+                    }
+                """)
+        
+        # Clear the added signals set
+        self.added_signals.clear()
+        
+        # Re-enable expand button and action buttons
+        self.expand_button.setEnabled(True)
+        self.and_button.setEnabled(True)
+        self.or_button.setEnabled(True)
+        self.exit_button.setEnabled(True)
+        
+        # Reset expand button text
+        visible_count = len(self.visible_signals)
+        if self.expanded:
+            self.expand_button.setText(f"▼ Hide Signals ({visible_count})")
+        else:
+            self.expand_button.setText(f"▶ Show Signals ({visible_count})")
+        
+        if LOGGER_AVAILABLE and logger:
+            logger.info(LogComponent.SEARCH_PANEL,
+                       f"Reset all signals for block {self.block_info.name}",
+                       {'signals_cleared': len(self.signal_checkboxes)})
 
 
 class BlockSearchPanel(QWidget):
@@ -732,6 +789,9 @@ class BlockSearchPanel(QWidget):
                         # Create block item widget
                         block_item = BlockListItem(block_info)
                         
+                        # Set parent panel reference
+                        block_item.parent_panel = self
+                        
                         # NEW: Connect to signal with AND/OR logic
                         block_item.block_with_signals_selected.connect(self._on_block_with_signals_selected)
                         
@@ -766,6 +826,9 @@ class BlockSearchPanel(QWidget):
             
             for block_type in sorted(types):
                 self.type_filter.addItem(block_type)
+            
+            # Initialize button states (empty strategy = disabled OR/Exit)
+            self.update_all_button_states()
                 
         except Exception as e:
             # Log the error with full details
@@ -854,6 +917,9 @@ class BlockSearchPanel(QWidget):
         if result.success:
             # Mark as added
             self.added_blocks.add(block_name)
+            
+            # Update all button states (enable OR/Exit now that we have blocks)
+            self.update_all_button_states()
             
             # Emit for backward compatibility
             self.block_selected.emit(block_name)
@@ -959,18 +1025,29 @@ class BlockSearchPanel(QWidget):
     
     def mark_block_as_removed(self, block_name: str):
         """
-        Mark a block as removed (would need to re-enable UI).
+        Mark a block as removed and update button states.
         
-        NOTE: Currently blocks can't be removed after adding (buttons stay disabled).
+        BUG FIX: Also reset the signals in the corresponding BlockListItem
+        so they become available again.
         
         Args:
             block_name: Name of the block to mark as removed
         """
         if block_name in self.added_blocks:
             self.added_blocks.remove(block_name)
-        
-        # NOTE: Would need to re-enable the expand button and reset checkboxes
-        # This is a TODO for later - for now blocks remain disabled after adding
+            
+            # CRITICAL FIX: Reset signals in the corresponding BlockListItem
+            if block_name in self.block_items:
+                block_item = self.block_items[block_name]
+                block_item.reset_added_signals()
+                
+                if LOGGER_AVAILABLE and logger:
+                    logger.info(LogComponent.SEARCH_PANEL,
+                               f"Block removed and signals reset",
+                               {'block': block_name})
+            
+            # Update button states - if empty, disable OR/Exit and rename AND button
+            self.update_all_button_states()
     
     def get_added_blocks(self) -> List[str]:
         """
@@ -1001,3 +1078,112 @@ class BlockSearchPanel(QWidget):
     def get_visible_blocks_count(self) -> int:
         """Get the count of currently visible blocks."""
         return sum(1 for item in self.block_items.values() if item.isVisible())
+    
+    def update_all_button_states(self):
+        """
+        Update button states for all block items based on whether strategy has blocks.
+        
+        Called after adding or removing blocks to update UI state.
+        """
+        strategy_has_blocks = len(self.added_blocks) > 0
+        
+        # Update all block items
+        for block_item in self.block_items.values():
+            block_item.update_button_state(strategy_has_blocks)
+    
+    def sync_with_strategy(self):
+        """
+        Synchronize added_blocks with actual strategy blocks from orchestrator.
+        
+        Called when blocks change to ensure UI state matches actual strategy state.
+        This is critical for button state management.
+        
+        BUG FIX: Also resets signals for blocks that were removed and marks signals
+        as added for blocks that are in the strategy.
+        """
+        # Get actual blocks from orchestrator
+        config = self.orchestrator.get_current_config()
+        actual_block_names = set()
+        block_signals_map = {}  # Map of block_name -> list of signal names
+        
+        if config and config.blocks:
+            for block in config.blocks:
+                actual_block_names.add(block.name)
+                # Collect the signals that are in this block
+                signal_names = [signal.name for signal in block.signals]
+                block_signals_map[block.name] = signal_names
+        
+        # CRITICAL FIX: Find blocks that were removed (in added_blocks but not in actual)
+        removed_blocks = self.added_blocks - actual_block_names
+        
+        # Reset signals for removed blocks
+        for block_name in removed_blocks:
+            if block_name in self.block_items:
+                block_item = self.block_items[block_name]
+                block_item.reset_added_signals()
+                
+                if LOGGER_AVAILABLE and logger:
+                    logger.info(LogComponent.SEARCH_PANEL,
+                               f"Block removed via sync - signals reset",
+                               {'block': block_name})
+        
+        # NEW FIX: Mark signals as added for blocks that are in the strategy
+        for block_name in actual_block_names:
+            if block_name in self.block_items:
+                block_item = self.block_items[block_name]
+                signal_names = block_signals_map.get(block_name, [])
+                
+                # Mark each signal as added (same logic as _add_with_logic)
+                for signal_name in signal_names:
+                    if signal_name not in block_item.added_signals:
+                        checkbox = block_item.signal_checkboxes.get(signal_name)
+                        if checkbox:
+                            # Mark as added
+                            block_item.added_signals.add(signal_name)
+                            checkbox.setChecked(False)
+                            checkbox.setEnabled(False)
+                            
+                            # Apply strikethrough styling
+                            checkbox.setStyleSheet("""
+                                QCheckBox {
+                                    color: #666666;
+                                    font-size: 10pt;
+                                    padding: 4px;
+                                    text-decoration: line-through;
+                                }
+                                QCheckBox::indicator {
+                                    width: 18px;
+                                    height: 18px;
+                                    border: 2px solid #3C4149;
+                                    border-radius: 4px;
+                                    background-color: #3C4149;
+                                }
+                            """)
+                
+                # Update expand button text if signals were marked
+                if signal_names:
+                    added_count = len(block_item.added_signals)
+                    total_count = len(block_item.visible_signals)
+                    remaining = total_count - added_count
+                    
+                    if remaining > 0:
+                        if block_item.expanded:
+                            block_item.expand_button.setText(
+                                f"▼ Hide Signals ({remaining} available, {added_count} added)"
+                            )
+                        else:
+                            block_item.expand_button.setText(
+                                f"▶ Show Signals ({remaining} available, {added_count} added)"
+                            )
+                    else:
+                        # All signals added
+                        block_item.expand_button.setText(f"✓ All Signals Added ({added_count})")
+                        block_item.expand_button.setEnabled(False)
+                        block_item.and_button.setEnabled(False)
+                        block_item.or_button.setEnabled(False)
+        
+        # Update added_blocks to match reality
+        self.added_blocks = actual_block_names
+        
+        # Update button states to match new reality
+        self.update_all_button_states()

@@ -451,6 +451,10 @@ class StrategyVersion(Base):
     # Duplicate detection
     config_hash = Column(String(64), index=True)
     
+    # Validation status (Sprint 1.9 - persisted validation state)
+    validation_status = Column(String(20), default='Un-Validated')  # Un-Validated, Pass, Fail
+    validation_timestamp = Column(DateTime)  # When last validated
+    
     # Relationships
     strategy = relationship("Strategy", back_populates="versions")
     block_versions = relationship(

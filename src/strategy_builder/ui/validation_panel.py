@@ -57,6 +57,7 @@ class ValidationPanel(QWidget):
         """
         super().__init__(parent)
         self.orchestrator = orchestrator
+        self.current_version_id = None  # Set externally by main window
         
         # UI Components
         self.status_label: Optional[QLabel] = None
@@ -315,6 +316,9 @@ class ValidationPanel(QWidget):
             # Update display
             self._update_validation_display(result)
             
+            # Persist validation status to database (Sprint 1.9 - ORM persistence)
+            self._save_validation_status(result)
+            
             # Update timestamp
             from datetime import datetime
             now = datetime.now().strftime("%H:%M:%S")
@@ -456,6 +460,51 @@ class ValidationPanel(QWidget):
                 self._update_section(self.warnings_section, f"⚠️ Warnings ({len(result.warnings)})", 
                                    "#FFA500", result.warnings)
                 self.warnings_section.setVisible(True)
+    
+    def _save_validation_status(self, result):
+        """
+        Persist validation status to database (Sprint 1.9 - ORM persistence).
+        
+        Updates the strategy_versions table with validation_status and validation_timestamp.
+        
+        Args:
+            result: Validation result from orchestrator
+        """
+        if not self.current_version_id:
+            return  # No version to update yet (strategy not saved)
+        
+        try:
+            from src.optimizer_v3.database import get_database_manager
+            from datetime import datetime
+            
+            db = get_database_manager()
+            
+            # Determine status: Pass or Fail
+            validation_status = 'Pass' if result.success else 'Fail'
+            
+            # Update the strategy version in database
+            db.strategy.session.execute(
+                """
+                UPDATE strategy_versions
+                SET validation_status = :status,
+                    validation_timestamp = :timestamp
+                WHERE version_id = :version_id
+                """,
+                {
+                    'status': validation_status,
+                    'timestamp': datetime.utcnow(),
+                    'version_id': str(self.current_version_id)
+                }
+            )
+            db.strategy.session.commit()
+            
+            print(f"✅ Validation status saved: {validation_status} for version {self.current_version_id}")
+            
+        except Exception as e:
+            print(f"⚠️ Failed to save validation status: {e}")
+            # Don't fail the UI if database save fails
+            import traceback
+            traceback.print_exc()
     
     def _update_section(self, section: QWidget, title: str, color: str, items: list):
         """
