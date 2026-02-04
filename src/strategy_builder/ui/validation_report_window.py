@@ -1671,9 +1671,9 @@ class ValidationReportWindow(QMainWindow):
         QApplication.setOverrideCursor(Qt.WaitCursor)
         
         try:
-            # Run validation
+            # Run validation - FIXED: Method is validate(), not validate_strategy_config()
             validator = InstitutionalValidator()
-            new_report = validator.validate_strategy_config(self.config)
+            new_report = validator.validate(self.config)
             
             # Update report
             self.report = new_report
