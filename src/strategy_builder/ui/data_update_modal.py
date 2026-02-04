@@ -272,6 +272,13 @@ class DataUpdateModal(QDialog):
         self.countdown_timer.timeout.connect(self._update_countdown)
         self.original_status_text = ""  # Store original message
         
+        # Retry logic for failed updates
+        self.retry_count = 0
+        self.max_retries = 3
+        self.retry_delay = 5  # seconds
+        self.retry_timer = QTimer()
+        self.retry_timer.timeout.connect(self._retry_update)
+        
         self._init_ui()
         self._check_data_gap()
     
@@ -522,12 +529,15 @@ class DataUpdateModal(QDialog):
         """
         Handle completion
         
-        INSTITUTIONAL FIX: Auto-close 3 seconds after successful update
+        INSTITUTIONAL FIX: Auto-close 3 seconds after successful update OR auto-retry on failure
         """
         self.progress_bar.setVisible(False)
         self.progress_label.setVisible(False)
         
         if success:
+            # Reset retry count on success
+            self.retry_count = 0
+            
             self.status_label.setText("✅ Update Complete! - Closing in 3s...")
             self.status_label.setStyleSheet(get_status_label_style('success'))
             
@@ -539,22 +549,65 @@ class DataUpdateModal(QDialog):
             else:
                 # Manual mode - show completion without auto-close
                 message += "\n\nClick 'Continue' to close."
+            
+            self.details_text.setText(message)
+            
+            # Show close button
+            self.update_button.setVisible(False)
+            self.skip_button.setVisible(False)
+            self.close_button.setVisible(True)
         else:
-            self.status_label.setText("❌ Update Failed")
-            self.status_label.setStyleSheet(get_status_label_style('error'))
+            # FAILURE - check if we should retry
+            if self.auto_mode and self.retry_count < self.max_retries:
+                # Auto-retry after delay
+                self.retry_count += 1
+                self.status_label.setText(f"⏳ Update Failed - Auto-retrying in {self.retry_delay}s... (Attempt {self.retry_count + 1}/{self.max_retries + 1})")
+                self.status_label.setStyleSheet(get_status_label_style('warning'))
+                
+                retry_message = (
+                    f"{message}\n\n"
+                    f"🔄 AUTO-RETRY ENABLED\n"
+                    f"Retry attempt {self.retry_count}/{self.max_retries} will start in {self.retry_delay} seconds...\n"
+                    f"(Binance API may be temporarily unavailable)"
+                )
+                self.details_text.setText(retry_message)
+                
+                # Start retry timer (5 seconds)
+                self.retry_timer.start(self.retry_delay * 1000)
+            else:
+                # No retries left or manual mode - show failure
+                if self.retry_count > 0:
+                    self.status_label.setText(f"❌ Update Failed After {self.retry_count} Retries")
+                else:
+                    self.status_label.setText("❌ Update Failed")
+                self.status_label.setStyleSheet(get_status_label_style('error'))
+                
+                self.details_text.setText(message)
+                
+                # Show close button
+                self.update_button.setVisible(False)
+                self.skip_button.setVisible(False)
+                self.close_button.setVisible(True)
+    
+    def _retry_update(self):
+        """
+        INSTITUTIONAL FIX: Retry failed update automatically
+        Called by retry_timer after delay (5 seconds)
+        """
+        self.retry_timer.stop()
         
-        self.details_text.setText(message)
+        # Log retry attempt
+        print(f"🔄 AUTO-RETRY: Attempt {self.retry_count}/{self.max_retries} starting now...")
         
-        # Show close button
-        self.update_button.setVisible(False)
-        self.skip_button.setVisible(False)
-        self.close_button.setVisible(True)
+        # Restart the update process
+        self._start_update()
     
     def _start_countdown(self):
         """Start the countdown timer (3s, 2s, 1s)"""
         self.countdown_seconds = 3
         self._update_countdown()  # Show initial countdown
         self.countdown_timer.start(1000)  # Update every second
+    
     def showEvent(self, event):
         """Called when window is shown - apply hand cursors to all widgets"""
         super().showEvent(event)
