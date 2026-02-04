@@ -17,7 +17,7 @@ from typing import Optional
 from PyQt5.QtWidgets import (
     QDialog, QMainWindow, QVBoxLayout, QPushButton, QHBoxLayout, QLabel,
     QWidget, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMessageBox, QFileDialog, QTabWidget, QTextEdit, QGroupBox
+    QMessageBox, QFileDialog, QTabWidget, QTextEdit, QGroupBox, QFrame
 )
 from PyQt5.QtCore import Qt, QSettings, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QColor
@@ -171,7 +171,7 @@ class ValidationReportWindow(QMainWindow):
             status_layout.addWidget(separator)
             
             # Description label (normal text)
-            desc_label = QLabel("  Your strategy meets all institutional-grade requirements and is ready for backtesting.")
+            desc_label = QLabel("  Your strategy meets all requirements and is ready for backtesting.")
             desc_label.setFont(create_font(11))
             desc_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent; padding: 6px 8px;")
             desc_label.setWordWrap(True)
@@ -229,7 +229,7 @@ class ValidationReportWindow(QMainWindow):
             title.setFont(create_font(14, bold=True))
             title.setStyleSheet(f"color: {COLORS['success']};")
             
-            desc = QLabel("Your strategy meets all institutional-grade requirements and is ready for backtesting.")
+            desc = QLabel("Your strategy meets all requirements and is ready for backtesting.")
             desc.setFont(create_font(11))
             desc.setStyleSheet(f"color: {COLORS['text_secondary']};")
             desc.setWordWrap(True)
