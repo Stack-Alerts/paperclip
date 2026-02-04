@@ -127,7 +127,7 @@ class AIRecommendationsPanel(QWidget):
         layout.addWidget(request_content)
         
         # Statistics summary - use dark theme
-        self.stats_label = QLabel("Statistics: Loading...")
+        self.stats_label = QLabel("Backtest not executed or completed")
         self.stats_label.setStyleSheet(f"background-color: {COLORS['bg_medium']}; color: {COLORS['text_secondary']}; padding: 8px; font-family: 'Courier New';")
         layout.addWidget(self.stats_label)
         
@@ -174,9 +174,9 @@ class AIRecommendationsPanel(QWidget):
         button_layout.addWidget(close_btn)
         
         # Preview AI Request button - NEW (shows the actual formatted prompt)
-        preview_request_btn = QPushButton("🔍 Preview AI Request")
-        preview_request_btn.clicked.connect(self._preview_ai_request)
-        preview_request_btn.setStyleSheet(f"""
+        self.preview_request_btn = QPushButton("🔍 Preview AI Request")
+        self.preview_request_btn.clicked.connect(self._preview_ai_request)
+        self.preview_request_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS['button_primary']};
                 color: white;
@@ -189,8 +189,13 @@ class AIRecommendationsPanel(QWidget):
             QPushButton:hover {{
                 background-color: {COLORS['button_primary_hover']};
             }}
+            QPushButton:disabled {{
+                background-color: #555555;
+                color: #888888;
+            }}
         """)
-        button_layout.addWidget(preview_request_btn)
+        self.preview_request_btn.setEnabled(False)  # Disabled by default until backtest run
+        button_layout.addWidget(self.preview_request_btn)
         
         # Approve button - compact version
         self.approve_btn = QPushButton("✅ Approve & Send to AI")
@@ -208,7 +213,12 @@ class AIRecommendationsPanel(QWidget):
             QPushButton:hover {{
                 background-color: {COLORS['button_success_hover']};
             }}
+            QPushButton:disabled {{
+                background-color: #555555;
+                color: #888888;
+            }}
         """)
+        self.approve_btn.setEnabled(False)  # Disabled by default until backtest run
         button_layout.addWidget(self.approve_btn)
         
         layout.addLayout(button_layout)
@@ -674,7 +684,7 @@ class AIRecommendationsPanel(QWidget):
         self.validation_text.setPlainText(validation)
     
     def _update_statistics(self):
-        """Update statistics label"""
+        """Update statistics label and enable/disable buttons based on data availability"""
         data = self.request_data
         
         strategy_blocks = len(data.get('strategy_config', {}).get('blocks', []))
@@ -683,20 +693,35 @@ class AIRecommendationsPanel(QWidget):
         total_metrics = len(data.get('metrics', {}))
         available_blocks = len(data.get('available_blocks', []))
         
-        # Calculate estimated request size
-        request_json = json.dumps(data, default=str)
-        request_size_kb = len(request_json) / 1024
-        estimated_tokens = len(request_json) / 4  # Rough estimate: 4 chars = 1 token
+        # CRITICAL: Enable buttons only if backtest has been run (trades > 0)
+        has_backtest_data = total_trades > 0 and backtest_days > 0
         
-        stats_text = (
-            f"📊 Request Statistics: "
-            f"Strategy Blocks: {strategy_blocks} | "
-            f"Backtest: {backtest_days} days | "
-            f"Trades: {total_trades} | "
-            f"Metrics: {total_metrics} | "
-            f"Available Blocks: {available_blocks} | "
-            f"Request Size: {request_size_kb:.1f} KB (~{estimated_tokens:.0f} tokens)"
-        )
+        if has_backtest_data:
+            # Calculate estimated request size
+            request_json = json.dumps(data, default=str)
+            request_size_kb = len(request_json) / 1024
+            estimated_tokens = len(request_json) / 4  # Rough estimate: 4 chars = 1 token
+            
+            stats_text = (
+                f"📊 Request Statistics: "
+                f"Strategy Blocks: {strategy_blocks} | "
+                f"Backtest: {backtest_days} days | "
+                f"Trades: {total_trades} | "
+                f"Metrics: {total_metrics} | "
+                f"Available Blocks: {available_blocks} | "
+                f"Request Size: {request_size_kb:.1f} KB (~{estimated_tokens:.0f} tokens)"
+            )
+            
+            # Enable buttons
+            self.preview_request_btn.setEnabled(True)
+            self.approve_btn.setEnabled(True)
+        else:
+            # No backtest data - keep default message and disabled buttons
+            stats_text = "Backtest not executed or completed"
+            
+            # Disable buttons
+            self.preview_request_btn.setEnabled(False)
+            self.approve_btn.setEnabled(False)
         
         self.stats_label.setText(stats_text)
     
