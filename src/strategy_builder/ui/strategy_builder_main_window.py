@@ -1029,10 +1029,13 @@ class StrategyBuilderMainWindow(QMainWindow):
                 
                 # Create and show validation report window (singleton pattern)
                 self.validation_window = ValidationReportWindow(report, config, self)
-                
+
+                # Connect fix_applied signal to save changes to database
+                self.validation_window.fix_applied.connect(self._on_validation_fix_applied)
+
                 # Clear reference when window is destroyed
                 self.validation_window.destroyed.connect(lambda: setattr(self, 'validation_window', None))
-                
+
                 self.validation_window.show()  # QMainWindow uses .show(), not .exec_()
                 
                 # Update stepper state based on validation result
@@ -1572,6 +1575,31 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Don't fail the UI if database save fails - log silently
             import traceback
             traceback.print_exc()
+    
+    def _on_validation_fix_applied(self, fix_type: str, fix_data: dict):
+        """
+        Handle auto-fix applied from validation window.
+        
+        Automatically saves updated config to database so changes persist.
+        
+        Args:
+            fix_type: Type of fix applied (rule_id)
+            fix_data: Dict with fix details
+        """
+        print(f"\n{'='*80}")
+        print(f"AUTO-FIX APPLIED: {fix_type}")
+        print(f"Saving updated configuration to database...")
+        print(f"{'='*80}\n")
+        
+        # Save to database (creates new version with updated config)
+        success = self._on_save_strategy()
+        
+        if success:
+            print(f"✅ Configuration saved to database successfully")
+            self._update_status(f"Auto-fix applied and saved: {fix_data.get('issue', fix_type)}")
+        else:
+            print(f"❌ Failed to save configuration to database")
+            self._update_status(f"Auto-fix applied but save failed")
     
     def _check_validation_prerequisites(self) -> bool:
         """Check if validation prerequisites are met (strategy name + blocks)."""
