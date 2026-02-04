@@ -1713,6 +1713,8 @@ class ValidationReportWindow(QMainWindow):
     
     def _extract_timing_fix_data(self, issue: any) -> tuple:
         """Extract timing fix data from validation issue"""
+        import re
+        
         # Parse location to get signal name
         # Location format: "Block::hod::Signal::BELOW_HOD"
         signal_name = None
@@ -1724,18 +1726,30 @@ class ValidationReportWindow(QMainWindow):
                     break
         
         # Extract timing window and recheck delay from message
-        # Message contains these values
+        # Parse from message text: "RECHECK delay (X bars) exceeds timing window (Y candles)"
         timing_window = None
         recheck_delay = None
         
-        if hasattr(issue, 'context') and issue.context:
-            timing_window = issue.context.get('timing_window')
-            recheck_delay = issue.context.get('recheck_delay')
+        if hasattr(issue, 'message') and issue.message:
+            # Look for timing window pattern
+            window_match = re.search(r'timing window \((\d+)', issue.message)
+            if window_match:
+                timing_window = int(window_match.group(1))
+            
+            # Look for recheck delay pattern  
+            delay_match = re.search(r'RECHECK delay \((\d+)', issue.message)
+            if delay_match:
+                recheck_delay = int(delay_match.group(1))
+        
+        # Debug log
+        print(f"DEBUG: Extracted timing data - signal={signal_name}, window={timing_window}, delay={recheck_delay}")
         
         return (signal_name, timing_window, recheck_delay)
     
     def _extract_exit_fix_data(self, issue: any) -> tuple:
         """Extract exit consolidation data from validation issue"""
+        import re
+        
         signal_name = None
         exit_level = 'strategy'  # Default to strategy level
         
@@ -1757,10 +1771,22 @@ class ValidationReportWindow(QMainWindow):
                         exit_level = 'block'
                         break
         
+        # Also try to extract from message if location parsing failed
+        if not signal_name and hasattr(issue, 'message') and issue.message:
+            # Try to extract signal name from message
+            match = re.search(r"signal[:\s]+['\"]?([A-Z_]+)['\"]?", issue.message, re.IGNORECASE)
+            if match:
+                signal_name = match.group(1)
+        
+        # Debug log
+        print(f"DEBUG: Extracted exit data - signal={signal_name}, level={exit_level}")
+        
         return (signal_name, exit_level)
     
     def _extract_dead_code_data(self, issue: any) -> tuple:
         """Extract dead code signal information"""
+        import re
+        
         signal_name = None
         block_name = None
         
@@ -1771,6 +1797,20 @@ class ValidationReportWindow(QMainWindow):
                     block_name = parts[i+1]
                 if parts[i] == "Signal" and i+1 < len(parts):
                     signal_name = parts[i+1]
+        
+        # Also try to extract from message if location parsing failed
+        if (not signal_name or not block_name) and hasattr(issue, 'message') and issue.message:
+            if not signal_name:
+                sig_match = re.search(r"signal[:\s]+['\"]?([A-Z_]+)['\"]?", issue.message, re.IGNORECASE)
+                if sig_match:
+                    signal_name = sig_match.group(1)
+            if not block_name:
+                block_match = re.search(r"block[:\s]+['\"]?([a-z_]+)['\"]?", issue.message, re.IGNORECASE)
+                if block_match:
+                    block_name = block_match.group(1)
+        
+        # Debug log
+        print(f"DEBUG: Extracted dead code data - signal={signal_name}, block={block_name}")
         
         return (signal_name, block_name)
     
