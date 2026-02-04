@@ -547,13 +547,17 @@ def get_success_button_stylesheet() -> str:
             font-weight: bold;
             padding: 10px 20px;
             border-radius: 6px;
-            min-width: 100px;
+            min-width: 120px;
         }}
         QPushButton:hover {{
             background-color: {COLORS['button_success_hover']};
         }}
         QPushButton:pressed {{
             background-color: {COLORS['button_success']};
+        }}
+        QPushButton:disabled {{
+            background-color: #555555;
+            color: #888888;
         }}
     """
 
@@ -670,12 +674,16 @@ def get_secondary_button_stylesheet() -> str:
             background-color: {COLORS['button_secondary']};
             color: white;
             font-weight: bold;
-            padding: 10px 24px;
-            border-radius: 2px;
-            min-width: 100px;
+            padding: 10px 20px;
+            border-radius: 6px;
+            min-width: 120px;
         }}
         QPushButton:hover {{
             background-color: {COLORS['button_secondary_hover']};
+        }}
+        QPushButton:disabled {{
+            background-color: #555555;
+            color: #888888;
         }}
     """
 
