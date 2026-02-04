@@ -163,11 +163,11 @@ class ValidationReportWindow(QMainWindow):
             status_label.setStyleSheet(f"color: {COLORS['success']}; background: transparent; padding: 6px 8px;")
             status_layout.addWidget(status_label)
             
-            # Separator bar (solid green vertical line)
+            # Separator bar (solid green vertical line - 2px to match left border visually)
             separator = QFrame()
             separator.setFrameShape(QFrame.VLine)
-            separator.setFixedWidth(4)
-            separator.setStyleSheet(f"background-color: {COLORS['success']}; border: none;")
+            separator.setFixedWidth(2)
+            separator.setStyleSheet(f"background-color: {COLORS['success']}; border: none; margin: 0px; padding: 0px;")
             status_layout.addWidget(separator)
             
             # Description label (normal text)
@@ -195,11 +195,11 @@ class ValidationReportWindow(QMainWindow):
             status_label.setStyleSheet(f"color: {COLORS['error']}; background: transparent; padding: 6px 8px;")
             status_layout.addWidget(status_label)
             
-            # Separator bar (solid red vertical line)
+            # Separator bar (solid red vertical line - 2px to match left border visually)
             separator = QFrame()
             separator.setFrameShape(QFrame.VLine)
-            separator.setFixedWidth(4)
-            separator.setStyleSheet(f"background-color: {COLORS['error']}; border: none;")
+            separator.setFixedWidth(2)
+            separator.setStyleSheet(f"background-color: {COLORS['error']}; border: none; margin: 0px; padding: 0px;")
             status_layout.addWidget(separator)
             
             # Description label (normal text)
