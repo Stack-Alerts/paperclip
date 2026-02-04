@@ -295,14 +295,17 @@ class StrategyInfoPanel(QWidget):
     
     def _on_name_changed(self, text: str):
         """
-        Handle strategy name change.
+        Handle strategy name change (triggered by user edits).
         
         Args:
             text: New strategy name (may include version for display)
         """
-        # CRITICAL: Store actual name (strip version if present in display)
-        # User may be editing so we update actual name from input
-        self._actual_strategy_name = text.strip()
+        # CRITICAL: Always strip version pattern when storing actual name
+        # User should never be typing version suffix - it's display-only
+        import re
+        clean_name = text.strip()
+        clean_name = re.sub(r'\s*\(v\d+\)\s*$', '', clean_name)
+        self._actual_strategy_name = clean_name
         
         self.strategy_name_changed.emit(text)
         self._update_status()
@@ -550,7 +553,12 @@ class StrategyInfoPanel(QWidget):
                 display_name = config.name
                 if hasattr(config, 'version') and config.version:
                     display_name = f"{config.name} (v{config.version})"
+                
+                # CRITICAL: Block signals during programmatic update
+                # This prevents _on_name_changed from overwriting _actual_strategy_name
+                self.name_input.blockSignals(True)
                 self.set_strategy_name(display_name)
+                self.name_input.blockSignals(False)
             
             # CRITICAL: Also load strategy_type from config
             if config and hasattr(config, 'strategy_type'):
