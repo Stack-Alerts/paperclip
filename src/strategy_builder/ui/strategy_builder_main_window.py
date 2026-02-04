@@ -1667,17 +1667,24 @@ class StrategyBuilderMainWindow(QMainWindow):
                 
                 if validation_status == 'Pass':
                     self.validation_passed = True
-                    self.stepper.reset_all_steps()
+                    # Don't reset - directly mark step complete
+                    self.stepper.completed_steps.discard(1)  # Clear any old state
+                    self.stepper.error_steps.discard(1)      # Clear any old state
                     self.stepper.mark_step_complete(1)  # Green check mark
                     print(f"✅ Validation status restored: PASS (stepper GREEN)")
                 elif validation_status == 'Fail':
                     self.validation_passed = False
-                    self.stepper.reset_all_steps()
+                    # Don't reset - directly mark step error
+                    self.stepper.completed_steps.discard(1)  # Clear any old state
+                    self.stepper.error_steps.discard(1)      # Clear any old state
                     self.stepper.mark_step_error(1)  # Red X mark
                     print(f"⚠️ Validation status restored: FAIL (stepper RED)")
                 else:  # Un-Validated
                     self.validation_passed = False
-                    self.stepper.reset_all_steps()  # Default state
+                    # Clear step 1 state to show default (grey)
+                    self.stepper.completed_steps.discard(1)
+                    self.stepper.error_steps.discard(1)
+                    self.stepper._update_display()  # Force visual refresh
                     print(f"ℹ️ Validation status: Un-Validated (stepper default)")
                 
             finally:
