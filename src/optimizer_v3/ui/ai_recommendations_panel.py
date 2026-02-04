@@ -194,6 +194,7 @@ class AIRecommendationsPanel(QWidget):
                 padding: 4px 10px;
                 border-radius: 4px;
                 min-width: 120px;
+                max-height: 28px;
                 font-size: 9pt;
             }}
             QPushButton:hover {{
