@@ -135,43 +135,53 @@ class AIRecommendationsPanel(QWidget):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        # Export button - compact version
-        export_btn = QPushButton("💾 Export to JSON")
-        export_btn.clicked.connect(self._export_to_json)
-        export_btn.setStyleSheet(f"""
+        # Export button - same size as others, disabled when no backtest
+        self.export_btn = QPushButton("💾 Export to JSON")
+        self.export_btn.clicked.connect(self._export_to_json)
+        self.export_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS['button_secondary']};
                 color: white;
                 font-weight: normal;
                 padding: 4px 10px;
                 border-radius: 4px;
-                min-width: 80px;
+                min-width: 120px;
                 font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: {COLORS['button_secondary_hover']};
             }}
+            QPushButton:disabled {{
+                background-color: #555555;
+                color: #888888;
+            }}
         """)
-        button_layout.addWidget(export_btn)
+        self.export_btn.setEnabled(False)  # Disabled by default until backtest run
+        button_layout.addWidget(self.export_btn)
         
-        # Close button - compact version
-        close_btn = QPushButton("❌ Close (Don't Send)")
-        close_btn.clicked.connect(self.close)
-        close_btn.setStyleSheet(f"""
+        # Close button - same size as others, disabled when no backtest
+        self.close_btn = QPushButton("❌ Close (Don't Send)")
+        self.close_btn.clicked.connect(self.close)
+        self.close_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS['button_secondary']};
                 color: white;
                 font-weight: normal;
                 padding: 4px 10px;
                 border-radius: 4px;
-                min-width: 80px;
+                min-width: 120px;
                 font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: {COLORS['button_secondary_hover']};
             }}
+            QPushButton:disabled {{
+                background-color: #555555;
+                color: #888888;
+            }}
         """)
-        button_layout.addWidget(close_btn)
+        self.close_btn.setEnabled(False)  # Disabled by default until backtest run
+        button_layout.addWidget(self.close_btn)
         
         # Preview AI Request button - NEW (shows the actual formatted prompt)
         self.preview_request_btn = QPushButton("🔍 Preview AI Request")
@@ -684,7 +694,7 @@ class AIRecommendationsPanel(QWidget):
         self.validation_text.setPlainText(validation)
     
     def _update_statistics(self):
-        """Update statistics label and enable/disable buttons based on data availability"""
+        """Update statistics label and enable/disable ALL buttons based on data availability"""
         data = self.request_data
         
         strategy_blocks = len(data.get('strategy_config', {}).get('blocks', []))
@@ -712,14 +722,18 @@ class AIRecommendationsPanel(QWidget):
                 f"Request Size: {request_size_kb:.1f} KB (~{estimated_tokens:.0f} tokens)"
             )
             
-            # Enable buttons
+            # Enable ALL buttons when backtest data is available
+            self.export_btn.setEnabled(True)
+            self.close_btn.setEnabled(True)
             self.preview_request_btn.setEnabled(True)
             self.approve_btn.setEnabled(True)
         else:
-            # No backtest data - keep default message and disabled buttons
+            # No backtest data - keep default message and disabled ALL buttons
             stats_text = "Backtest not executed or completed"
             
-            # Disable buttons
+            # Disable ALL buttons - show grey
+            self.export_btn.setEnabled(False)
+            self.close_btn.setEnabled(False)
             self.preview_request_btn.setEnabled(False)
             self.approve_btn.setEnabled(False)
         
