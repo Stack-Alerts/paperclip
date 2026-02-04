@@ -1580,7 +1580,8 @@ class StrategyBuilderMainWindow(QMainWindow):
         """
         Handle auto-fix applied from validation window.
         
-        Automatically saves updated config to database so changes persist.
+        Automatically saves updated config to database AND reloads it
+        so main window displays the exact saved version.
         
         Args:
             fix_type: Type of fix applied (rule_id)
@@ -1596,10 +1597,76 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         if success:
             print(f"✅ Configuration saved to database successfully")
-            self._update_status(f"Auto-fix applied and saved: {fix_data.get('issue', fix_type)}")
+            
+            # CRITICAL: Reload the saved version from database
+            # This ensures main window shows exact config that was saved
+            if self.current_version_id:
+                print(f"🔄 Reloading version {self.current_version_id} from database...")
+                self._reload_current_version()
+            
+            self._update_status(f"Auto-fix applied, saved, and reloaded: {fix_data.get('issue', fix_type)}")
         else:
             print(f"❌ Failed to save configuration to database")
             self._update_status(f"Auto-fix applied but save failed")
+    
+    def _reload_current_version(self):
+        """
+        Reload current strategy version from database.
+        
+        Called after auto-fix to ensure main window displays
+        the exact configuration that was saved.
+        """
+        if not self.current_version_id:
+            return
+        
+        try:
+            # Load from database
+            db = get_database_manager()
+            version = db.strategy.get_strategy_version(self.current_version_id)
+            
+            if not version:
+                print(f"❌ Version {self.current_version_id} not found")
+                return
+            
+            # Extract blocks and exit conditions
+            blocks_data = version.get('blocks', [])
+            exit_conditions_data = version.get('exit_conditions', [])
+            
+            # Build config dict
+            config_dict = {
+                'name': version['name'],
+                'description': version.get('description', ''),
+                'blocks': blocks_data,
+                'exit_conditions': exit_conditions_data
+            }
+            
+            # SUPPRESS validation reset during reload
+            self.loading_strategy = True
+            
+            try:
+                # Restore config using persistence
+                restored_config = self.orchestrator.persistence._dict_to_config(config_dict)
+                
+                # Update orchestrator
+                self.orchestrator.config_engine.config = restored_config
+                
+                print(f"✅ Reloaded {len(restored_config.blocks)} blocks from database")
+                
+                # Refresh all UI panels
+                self.blocks_panel.refresh_from_orchestrator()
+                self.info_panel.refresh_from_orchestrator()
+                self.search_panel.sync_with_strategy()
+                
+                print(f"✅ UI refreshed with reloaded data")
+                
+            finally:
+                # Re-enable validation reset
+                self.loading_strategy = False
+            
+        except Exception as e:
+            print(f"❌ Error reloading version: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _check_validation_prerequisites(self) -> bool:
         """Check if validation prerequisites are met (strategy name + blocks)."""
