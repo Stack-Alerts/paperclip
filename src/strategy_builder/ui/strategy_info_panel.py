@@ -171,7 +171,7 @@ class StrategyInfoPanel(QWidget):
         meta_layout.addWidget(sep1)
         
         # Required Signals
-        req_sig_label = QLabel("Required Signals:")
+        req_sig_label = QLabel("Required:")
         req_sig_label.setStyleSheet(get_label_style('muted'))
         req_sig_label.setToolTip("Number of signals required for strategy entry")
         meta_layout.addWidget(req_sig_label)
@@ -190,7 +190,7 @@ class StrategyInfoPanel(QWidget):
         meta_layout.addWidget(sep2)
         
         # Optional Signals
-        opt_sig_label = QLabel("Optional Signals:")
+        opt_sig_label = QLabel("Optional:")
         opt_sig_label.setStyleSheet(get_label_style('muted'))
         opt_sig_label.setToolTip("Number of optional signals (boosters)")
         meta_layout.addWidget(opt_sig_label)
@@ -209,7 +209,7 @@ class StrategyInfoPanel(QWidget):
         meta_layout.addWidget(sep3)
         
         # Rechecked Signals
-        recheck_sig_label = QLabel("Rechecked Signals:")
+        recheck_sig_label = QLabel("Rechecked:")
         recheck_sig_label.setStyleSheet(get_label_style('muted'))
         recheck_sig_label.setToolTip("Number of signals with recheck validation configured")
         meta_layout.addWidget(recheck_sig_label)
