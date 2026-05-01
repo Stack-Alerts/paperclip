@@ -177,12 +177,73 @@
 
 ---
 
-### **PHASE 2: Signal Intelligence & Training** (28 days, 72 tasks)
+### **PHASE 2: Signal Intelligence & Training** (40 days,  96 tasks)
 
-#### **Sprint 2.1: Automated Trainer** (10 days, 20 tasks)
-**File**: `SPRINT_2_1_AUTOMATED_TRAINER.md`  
+#### **Sprint 2.0: Real Data Integration** (10 days, 24 tasks)
+**File**: `SPRINT_2_0_OVERVIEW.md`  
 **Status**: ☐ Not Started  
-**Purpose**: Window 4, forward analysis, training database
+**Priority**: 🔴🔴🔴 CRITICAL - Foundation for ALL Sprint 2.x work  
+**Purpose**: Replace hardcoded backtest system with real data integration  
+**Architecture**: Validated from HOD Rejection v9 (Production Strategy)
+
+**Sub-Sprints**:
+
+##### **Sprint 2.0.1: Data Loading** (2 days, 5 tasks)
+**File**: `SPRINT_2_0_1_DATA_LOADING.md`  
+**Status**: ✅ COMPLETE (5/5 tasks - 2026-02-06)  
+**Purpose**: BacktestDataProvider, load real bars from Parquet/CSV, Mode 1/Mode 2 handling  
+**Progress**:
+- [x] Task 2.0.1.1: Date range UI verification and get_config() update (COMPLETE)
+- [x] Task 2.0.1.2: BacktestDataProvider class (COMPLETE - 19/19 tests passing, 100% coverage)
+- [x] Task 2.0.1.3: DataManager integration (COMPLETE - real bars loading from DataManager)
+- [x] Task 2.0.1.4: Replace hardcoded total_candles (COMPLETE - verified no hardcoded 14040)
+- [x] Task 2.0.1.5: End-to-end testing (COMPLETE - 1,500 real bars loaded successfully)
+
+##### **Sprint 2.0.2: Signal Evaluation** (5 days, 9 tasks)
+**File**: `SPRINT_2_0_2_SIGNAL_EVALUATION.md`  
+**Architecture**: `SPRINT_2_0_2_SIGNAL_EVALUATION_ARCHITECTURE.md` (1,448 lines)  
+**Status**: 🟡 PARTIALLY COMPLETE - Core Foundation Done (2026-02-09)  
+**Purpose**: InstitutionalSignalEvaluator, RECHECK validation (AT/WITHIN modes), TIMING constraints, 3-tier EXIT hierarchy (~1,750 lines)  
+**Progress**:
+- [x] Task 2.0.2.7: Config Integration (COMPLETE - ALL 20+ parameters wired)
+- [x] Task 2.0.2.8: Config Logging (COMPLETE - comprehensive logging at backtest start)
+- [x] Critical Fix: Timing Constraints (COMPLETE - sequential timing working)
+- [ ] Task 2.0.2.1-6, 2.0.2.9-10: Remaining tasks (blocked by Sprint 2.0.3)
+**Current Limitation**: Trade exits not working (Sprint 2.0.3 TP/SL needed)
+**Key Features Completed**:
+- ✅ Config collection from UI (ALL parameters)
+- ✅ Config passing to backtest engine  
+- ✅ Sequential TIMING constraints fixed
+- ✅ Trade entry (confluence-based) working
+- ❌ TP/SL calculation (Sprint 2.0.3 needed)
+- ❌ Exit logic (Sprint 2.0.3 needed)
+**Validated from**: HOD Rejection v9 + 50% Asia Rejection Simple
+**Test Results**: 1 trade entered (7,008 candles), config logged perfectly, timing constraints verified
+**Next**: Sprint 2.0.3 to wire existing TP/SL modules and add exit checks
+
+##### **Sprint 2.0.3: TP/SL Management** (3 days, 6 tasks)
+**File**: `SPRINT_2_0_3_TPSL_MANAGEMENT.md`  
+**Status**: 🟡 IN PROGRESS (2/6 tasks - 2026-02-09)  
+**Purpose**: Institutional TP/SL calculation, partial exits, trailing stops  
+**Progress**:
+- [x] Task 2.0.3.1: TPSLCalculator (COMPLETE - 3 modes: Fib/Hybrid/Fixed, 20/20 tests passing)
+- [x] Task 2.0.3.2: Adaptive SL v2.0 Manager (COMPLETE - Emergency/Adaptive modes, 20/20 tests passing)
+- [ ] Task 2.0.3.3: Config integration
+- [ ] Task 2.0.3.4: Emergency SL (DONE in 2.0.3.2)
+- [ ] Task 2.0.3.5: SL updates per candle  
+- [ ] Task 2.0.3.6: End-to-end testing
+
+##### **Sprint 2.0.4: Exit Testing** (2 days, 7 tasks)
+**File**: `SPRINT_2_0_4_EXIT_TESTING.md`  
+**Status**: ☐ Not Started  
+**Purpose**: Exit condition validation, hierarchy testing, integration with TP/SL
+
+#### **Sprint 2.1: Automated Trainer** (10 days, 25 tasks)
+**File**: `SPRINT_2_1_AUTOMATED_TRAINER.md`  
+**Status**: ✅ COMPLETE (23/25 tasks - 92%)  
+**Progress**: Tasks 2.1.0-2.1.25 COMPLETE (Core Complete - Tasks 2.1.16-17 deferred as optional)  
+**Purpose**: New Tab (Automated Trainer), forward analysis, training database, optimal parameters  
+**Dependencies**: Sprint 2.0 (Real Data Integration) - **BLOCKED**
 
 #### **Sprint 2.2: Signal Intelligence** (12 days, 37 tasks)
 **File**: `SPRINT_2_2_SIGNAL_INTELLIGENCE.md`  
@@ -257,7 +318,12 @@
 - [x] Sprint 1.9.1: Configuration Browser Enhancements (5/6 tasks COMPLETE ✅ - 2026-01-31)
 - [x] Sprint 1.9.2: Auto-Fix Buttons in Validation Report (Core COMPLETE ✅ - 2026-02-04)
 - [ ] Sprint 1.9.3: AI Recommendations Auto-Fix (DEFERRED - Sprint 2+ required)
-- [ ] Sprint 2.1: Automated Trainer (20 tasks, 10 days)
+- [ ] Sprint 2.0: Real Data Integration (10 days, 24 tasks) **← NEW CRITICAL PATH**
+  - [ ] Sprint 2.0.1: Data Loading (2 days, 5 tasks)
+  - [ ] Sprint 2.0.2: Signal Evaluation (5 days, 9 tasks) - Architecture: 1,448 lines
+  - [ ] Sprint 2.0.3: TP/SL Management (3 days, 6 tasks)
+  - [ ] Sprint 2.0.4: Exit Testing (2 days, 7 tasks)
+- [ ] Sprint 2.1: Automated Trainer (10 days, 25 tasks) - BLOCKED by Sprint 2.0
 - [ ] Sprint 2.2: Signal Intelligence + Nested RECHECK Execution (37 tasks, 12 days)
 - [ ] Sprint 2.3: ML Generator (15 tasks, 4 days)
 - [ ] Sprint 2.4: Integration (5 tasks, 2 days)
@@ -268,7 +334,7 @@
 - [ ] Sprint 4.2: Documentation (7 tasks, 2 days)
 - [ ] Sprint 4.3: Production (5 tasks, 1 day)
 
-**Total**: 317 tasks, 72 days
+**Total**: 341 tasks, 82 days (updated 2026-02-06)
 
 ---
 
