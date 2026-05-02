@@ -39,6 +39,7 @@ from src.strategy_builder.ui.validation_report_window import ValidationReportWin
 from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
 from src.optimizer_v3.validation.institutional_validator import InstitutionalValidator
 from src.strategy_builder.ui.data_update_modal import DataUpdateModal
+from src.strategy_builder.ui.data_verify_dialog import DataVerifyDialog
 from src.strategy_builder.ui.alert_dialog import show_warning, ask_question
 from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
 from src.strategy_builder.ui.styles import get_main_stylesheet, apply_hand_cursor_to_buttons
@@ -284,25 +285,16 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Tools Menu
         tools_menu = menu_bar.addMenu("&Tools")
         
-        validate_action = QAction(style.standardIcon(QStyle.SP_DialogApplyButton), "&Validate Strategy", self)
-        validate_action.setStatusTip("Validate the current strategy configuration")
-        validate_action.triggered.connect(self._on_validate)
-        tools_menu.addAction(validate_action)
-        
-        tools_menu.addSeparator()
-        
         update_data_action = QAction(style.standardIcon(QStyle.SP_BrowserReload), "&Update Data...", self)
         update_data_action.setStatusTip("Check for data gaps and update from Binance")
         update_data_action.triggered.connect(self._on_update_data)
         tools_menu.addAction(update_data_action)
-        
-        tools_menu.addSeparator()
-        
-        import_json_action = QAction(style.standardIcon(QStyle.SP_DialogOpenButton), "&Import Strategy from JSON...", self)
-        import_json_action.setStatusTip("Import strategy from JSON file and save to database")
-        import_json_action.triggered.connect(self._on_import_from_json)
-        tools_menu.addAction(import_json_action)
-        
+
+        verify_data_action = QAction(style.standardIcon(QStyle.SP_DialogApplyButton), "&Verify Data...", self)
+        verify_data_action.setStatusTip("Verify data integrity and check for gaps")
+        verify_data_action.triggered.connect(self._on_verify_data)
+        tools_menu.addAction(verify_data_action)
+
         tools_menu.addSeparator()
         
         # Debug Logger submenu
@@ -636,6 +628,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             config_dict = {
                 'name': version['name'],
                 'description': version.get('description', ''),
+                'strategy_type': version.get('strategy_type', 'Bullish'),  # Include strategy type
                 'blocks': blocks_data,
                 'exit_conditions': exit_conditions_data  # Sprint 1.8: Include exit conditions
             }
@@ -670,6 +663,9 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Track database IDs
             self.current_strategy_id = strategy_id
             self.current_version_id = version_id
+            
+            # CRITICAL (Sprint 2.0.2): Tell orchestrator about loaded version for backtest
+            self.orchestrator.current_version_id = version_id
             
             # Clear file tracking
             self.current_file = None
@@ -762,13 +758,22 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Build version data from current config using persistence (SAME AS FILE SAVE)
             config = self.orchestrator.get_current_config()
             
+            # CRITICAL: Update config from UI BEFORE converting to dict (same as file save)
+            strategy_type = self.info_panel.get_strategy_type()
+            if strategy_type and config:
+                config.strategy_type = strategy_type
+            
             # Use persistence._config_to_dict() - EXACT same as file save
             config_dict = self.orchestrator.persistence._config_to_dict(config) if config else {}
+            
+            # DOUBLE-CHECK: Read strategy type directly from UI as final override
+            ui_strategy_type = self.info_panel.get_strategy_type() or 'Bullish'
             
             version_data = {
                 'strategy_id': self.current_strategy_id,
                 'name': strategy_name,
                 'description': description or '',
+                'strategy_type': ui_strategy_type,  # CRITICAL: Use UI value directly, not dict
                 'blocks': config_dict.get('blocks', []),  # Full config with timings/rechecks
                 'signals': {},  # Reserved
                 'parameters': {},  # Reserved
@@ -877,6 +882,7 @@ class StrategyBuilderMainWindow(QMainWindow):
                 'strategy_id': new_strategy_id,  # NEW strategy ID
                 'name': data['name'],
                 'description': data.get('description', ''),
+                'strategy_type': config_dict.get('strategy_type', 'Bullish'),  # Save strategy type
                 'blocks': config_dict.get('blocks', []),  # Full config with timings/rechecks
                 'signals': {},
                 'parameters': {},
@@ -1242,7 +1248,23 @@ class StrategyBuilderMainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error opening data update dialog: {str(e)}")
             self._update_status("Data update check failed")
-    
+
+    def _on_verify_data(self):
+        """
+        Open the Data Verify dialog (read-only integrity check).
+
+        Called from Tools → Verify Data...
+        Runs verify_and_repair(dry_run=True) in a background thread and
+        displays a per-timeframe gap report.  Does not modify any stored data.
+        """
+        try:
+            dialog = DataVerifyDialog(self)
+            dialog.exec_()
+            self._update_status("Data verification complete")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error opening data verify dialog: {str(e)}")
+            self._update_status("Data verification failed")
+
     def _on_about(self):
         """Show about dialog."""
         QMessageBox.about(
@@ -1475,15 +1497,16 @@ class StrategyBuilderMainWindow(QMainWindow):
             from src.data_manager.binance.rest_client import BinanceRestClient
             
             # Check data status
-            manager = UnifiedDataManager()
+            manager = UnifiedDataManager(mode='live')
             status = manager.get_all_data_types_status()
             
             # Check for gaps in trades (15min data)
             trades_status = status.get('trades', {})
             gap_minutes = trades_status.get('gap_minutes', 999)
             
-            # If gap > 20 minutes (more than 1 candle + buffer), download
-            if gap_minutes > 20:
+            # If gap > 15 minutes (1 candle missing), download immediately
+            # For 15min candles: any gap over 15min = candles missing
+            if gap_minutes > 15:
                 # Data needs updating
                 self._update_status(f"Downloading fresh data (gap: {gap_minutes} min)...")
                 
@@ -1520,13 +1543,13 @@ class StrategyBuilderMainWindow(QMainWindow):
                     print(f"Error downloading data: {e}")
                     self._update_status(f"Download error: {str(e)}")
                 
-                # Schedule next check (in 15 minutes)
-                QTimer.singleShot(15 * 60 * 1000, self._schedule_next_check)
+                # Schedule next check at next candle close
+                self._schedule_next_check()
                 
             else:
                 # Data is fresh, schedule next check
                 self._update_status(f"Data is fresh (gap: {gap_minutes} min)")
-                QTimer.singleShot(15 * 60 * 1000, self._schedule_next_check)
+                self._schedule_next_check()
             
         except Exception as e:
             print(f"Error checking/updating data: {e}")
