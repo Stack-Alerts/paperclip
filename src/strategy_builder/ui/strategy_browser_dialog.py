@@ -29,6 +29,7 @@ from .styles import (
     get_table_stylesheet,
     create_font,
     get_color,
+    get_column_title_stylesheet,
     get_exit_icon,
     get_cumulative_exit_color,
     get_recheck_depth_color
@@ -152,7 +153,7 @@ class StrategyBrowserDialog(QMainWindow):
         
         title_label = QLabel("📚 Strategy Browser" if self.mode == 'open' else "💾 Save Strategy As")
         title_label.setFont(create_font(16, bold=True))
-        title_label.setStyleSheet("color: #095983; font-size: 16pt; font-weight: bold;")
+        title_label.setStyleSheet(f"color: {get_color('panel_title')}; font-size: 16pt; font-weight: bold;")
         header_layout.addWidget(title_label)
         
         header_layout.addStretch()
@@ -255,8 +256,7 @@ class StrategyBrowserDialog(QMainWindow):
         # Column 1: Strategy Info
         col1_title = QLabel("📊 STRATEGY INFORMATION")
         col1_title.setFont(create_font(10, bold=True))
-        # Use exact GroupBox title color from styles.py
-        col1_title.setStyleSheet("color: #095983; padding-bottom: 8px;")
+        col1_title.setStyleSheet(get_column_title_stylesheet())
         details_layout.addWidget(col1_title, 0, 0)
         
         self.detail_labels['name'] = QLabel("Select a strategy to view details")
@@ -281,8 +281,7 @@ class StrategyBrowserDialog(QMainWindow):
         # Column 2: Configuration
         col2_title = QLabel("⚙️ CONFIGURATION")
         col2_title.setFont(create_font(10, bold=True))
-        # Use exact GroupBox title color from styles.py
-        col2_title.setStyleSheet("color: #095983; padding-bottom: 8px;")
+        col2_title.setStyleSheet(get_column_title_stylesheet())
         details_layout.addWidget(col2_title, 0, 1)
         
         # Configuration signals - wrap in scroll area for overflow
@@ -311,8 +310,7 @@ class StrategyBrowserDialog(QMainWindow):
         # Column 3: Performance & Metrics
         col3_title = QLabel("📈 PERFORMANCE")
         col3_title.setFont(create_font(10, bold=True))
-        # Use exact GroupBox title color from styles.py
-        col3_title.setStyleSheet("color: #095983; padding-bottom: 8px;")
+        col3_title.setStyleSheet(get_column_title_stylesheet())
         details_layout.addWidget(col3_title, 0, 2)
         
         self.detail_labels['tests'] = QLabel("No tests run")
@@ -376,7 +374,7 @@ class StrategyBrowserDialog(QMainWindow):
                 image: url(none);
             }}
             QSplitter::handle:vertical:hover {{
-                background-color: #095983;
+                background-color: {get_color('panel_title')};
             }}
         """)
         
@@ -1049,30 +1047,31 @@ class StrategyBrowserDialog(QMainWindow):
 
                     _section_style = f"color:{_c_muted};font-size:9px;letter-spacing:1px;"
                     _divider       = f'<hr style="border:none;border-top:1px solid {_c_border};margin:4px 0">'
-                    _tbl_open      = '<table cellpadding="1" cellspacing="0" width="100%">'
+                    _cell_style    = 'style="font-size:11px;white-space:nowrap;word-wrap:break-word;"'
+                    _tbl_open      = '<table cellpadding="0" cellspacing="0">'
                     _tbl_close     = '</table>'
 
                     perf_text = (
                         f'<span style="{_section_style}">TRADE STATS</span>'
                         f'{_tbl_open}'
-                        f'<tr><td>Trades</td><td align="right"><b>{total_trades}</b></td></tr>'
-                        f'<tr><td>Win Rate</td><td align="right"><b style="color:{_win_rate_color}">{win_rate:.1f}%</b></td></tr>'
-                        f'<tr><td>Wins / Losses</td><td align="right">{win_count} / {loss_count}</td></tr>'
+                        f'<tr><td {_cell_style}>Trades</td><td {_cell_style} align="right"><b>&nbsp;{total_trades}</b></td></tr>'
+                        f'<tr><td {_cell_style}>Win Rate</td><td {_cell_style} align="right"><b style="color:{_win_rate_color}">&nbsp;{win_rate:.1f}%</b></td></tr>'
+                        f'<tr><td {_cell_style}>W / L</td><td {_cell_style} align="right">&nbsp;{win_count} / {loss_count}</td></tr>'
                         f'{_tbl_close}'
                         f'{_divider}'
                         f'<span style="{_section_style}">RETURNS</span>'
                         f'{_tbl_open}'
-                        f'<tr><td>Total Return</td><td align="right"><b style="color:{_return_color}">{_return_sign}{total_return_pct:.1f}%</b></td></tr>'
-                        f'<tr><td>Profit Factor</td><td align="right"><b style="color:{_pf_color}">{profit_factor:.2f}</b></td></tr>'
+                        f'<tr><td {_cell_style}>Return</td><td {_cell_style} align="right"><b style="color:{_return_color}">&nbsp;{_return_sign}{total_return_pct:.1f}%</b></td></tr>'
+                        f'<tr><td {_cell_style}>Prof. Factor</td><td {_cell_style} align="right"><b style="color:{_pf_color}">&nbsp;{profit_factor:.2f}</b></td></tr>'
                         f'{_tbl_close}'
                         f'{_divider}'
                         f'<span style="{_section_style}">RISK METRICS</span>'
                         f'{_tbl_open}'
-                        f'<tr><td>Sharpe</td><td align="right"><b style="color:{_sharpe_color}">{sharpe:.2f}</b></td></tr>'
-                        f'<tr><td>Sortino</td><td align="right"><b style="color:{_sortino_color}">{sortino_ratio:.2f}</b></td></tr>'
-                        f'<tr><td>Calmar</td><td align="right"><b style="color:{_calmar_color}">{calmar_ratio:.2f}</b></td></tr>'
-                        f'<tr><td>Max Drawdown</td><td align="right"><b style="color:{_c_error}">{_dd_display}</b></td></tr>'
-                        f'<tr><td>Std Dev</td><td align="right">{std_deviation:.4f}</td></tr>'
+                        f'<tr><td {_cell_style}>Sharpe</td><td {_cell_style} align="right"><b style="color:{_sharpe_color}">&nbsp;{sharpe:.2f}</b></td></tr>'
+                        f'<tr><td {_cell_style}>Sortino</td><td {_cell_style} align="right"><b style="color:{_sortino_color}">&nbsp;{sortino_ratio:.2f}</b></td></tr>'
+                        f'<tr><td {_cell_style}>Calmar</td><td {_cell_style} align="right"><b style="color:{_calmar_color}">&nbsp;{calmar_ratio:.2f}</b></td></tr>'
+                        f'<tr><td {_cell_style}>Max DD</td><td {_cell_style} align="right"><b style="color:{_c_error}">&nbsp;{_dd_display}</b></td></tr>'
+                        f'<tr><td {_cell_style}>Std Dev</td><td {_cell_style} align="right">&nbsp;{std_deviation:.4f}</td></tr>'
                         f'{_tbl_close}'
                     )
                     self.detail_labels['performance'].setText(perf_text)
