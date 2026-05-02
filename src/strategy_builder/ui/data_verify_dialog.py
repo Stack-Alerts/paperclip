@@ -85,7 +85,7 @@ class DataVerifyThread(QThread):
     progress = pyqtSignal(int, int, str)
     finished = pyqtSignal(bool, dict)
 
-    _TIMEFRAMES = ['15m', '1h']
+    _TIMEFRAMES = ['15m', '1h', '1d']
 
     def run(self):
         try:
@@ -151,7 +151,7 @@ class DataRepairThread(QThread):
 
             self.progress.emit(20, 100, "Fetching missing bars from Binance (this may take a moment)…")
             summary = manager.verify_and_repair(
-                timeframes=['15m', '1h'],
+                timeframes=['15m', '1h', '1d'],
                 dry_run=False,
             )
 

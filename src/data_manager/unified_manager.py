@@ -1128,7 +1128,7 @@ class UnifiedDataManager:
             Dict mapping timeframe → list of gap dicts (see detect_gaps_in_binance_files).
         """
         if timeframes is None:
-            timeframes = ['15m', '1h']
+            timeframes = ['15m', '1h', '1d']
 
         report: Dict[str, List[Dict]] = {}
 
@@ -1217,7 +1217,7 @@ class UnifiedDataManager:
             >>> manager.verify_and_repair()               # repair
         """
         if timeframes is None:
-            timeframes = ['15m', '1h']
+            timeframes = ['15m', '1h', '1d']
         if end_date is None:
             end_date = datetime.now()
         if start_date is None:
@@ -1374,7 +1374,7 @@ class UnifiedDataManager:
             Same structure as :meth:`verify_and_repair`.
         """
         if timeframes is None:
-            timeframes = ['15m', '1h']
+            timeframes = ['15m', '1h', '1d']
 
         start_date = datetime.now() - timedelta(days=lookback_days)
         print(f"\n🔍 Startup continuity check (last {lookback_days} days)...")
