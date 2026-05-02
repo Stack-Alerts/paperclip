@@ -1004,11 +1004,9 @@ class StrategyBrowserDialog(QMainWindow):
                     wins = int(total_trades * win_rate / 100) if total_trades > 0 else 0
                     losses = total_trades - wins
                     
-                    # Show trade breakdown
-                    test_text = f"<b>Trades:</b> {total_trades}<br>"
-                    test_text += f"<b>Win:</b> {wins} | <b>Loss:</b> {losses}"
-                    self.detail_labels['tests'].setText(test_text)
-                    
+                    # Show trade breakdown (kept for backward compatibility; content merged into perf panel)
+                    self.detail_labels['tests'].setText(f"<b>Tests run:</b> {test_count}")
+
                     # Read additional metrics from the JSONB metrics dict
                     best_metrics = best.get('metrics') or {}
                     win_count = best_metrics.get('win_count', 0)
@@ -1024,17 +1022,59 @@ class StrategyBrowserDialog(QMainWindow):
                     calmar_ratio = best_metrics.get('calmar_ratio', 0) or 0
                     std_deviation = best_metrics.get('std_deviation', 0) or 0
 
-                    perf_text = f"<b>Best Performance:</b><br>"
-                    perf_text += f"• Trades: {total_trades}<br>"
-                    perf_text += f"• Win Rate: {win_rate:.1f}%<br>"
-                    perf_text += f"• Wins / Losses: {win_count} / {loss_count}<br>"
-                    perf_text += f"• Sharpe: {sharpe:.2f}<br>"
-                    perf_text += f"• Profit Factor: {profit_factor:.2f}<br>"
-                    perf_text += f"• Max Drawdown: {max_drawdown_pct:.1f}%<br>"
-                    perf_text += f"• Total Return: {total_return_pct:.1f}%<br>"
-                    perf_text += f"• Sortino: {sortino_ratio:.2f}<br>"
-                    perf_text += f"• Calmar: {calmar_ratio:.2f}<br>"
-                    perf_text += f"• Std Dev: {std_deviation:.4f}"
+                    # Colour helpers — values fetched from styles palette via get_color()
+                    _c_success = get_color('success')
+                    _c_warning = get_color('warning')
+                    _c_error   = get_color('error')
+                    _c_muted   = get_color('text_muted')
+                    _c_label   = get_color('text_label')
+                    _c_border  = get_color('border')
+
+                    def _ratio_color(val):
+                        """Green >1.0, amber 0.5–1.0, red <0.5."""
+                        if val > 1.0:
+                            return _c_success
+                        elif val >= 0.5:
+                            return _c_warning
+                        return _c_error
+
+                    _win_rate_color  = _c_success if win_rate >= 50 else _c_error
+                    _return_color    = _c_success if total_return_pct >= 0 else _c_error
+                    _pf_color        = _c_success if profit_factor > 1.5 else (_c_warning if profit_factor >= 1.0 else _c_error)
+                    _sharpe_color    = _ratio_color(sharpe)
+                    _sortino_color   = _ratio_color(sortino_ratio)
+                    _calmar_color    = _ratio_color(calmar_ratio)
+                    _return_sign     = '+' if total_return_pct > 0 else ''
+                    _dd_display      = f"-{abs(max_drawdown_pct):.1f}%" if max_drawdown_pct != 0 else "0.0%"
+
+                    _section_style = f"color:{_c_muted};font-size:9px;letter-spacing:1px;"
+                    _divider       = f'<hr style="border:none;border-top:1px solid {_c_border};margin:4px 0">'
+                    _tbl_open      = '<table cellpadding="1" cellspacing="0" width="100%">'
+                    _tbl_close     = '</table>'
+
+                    perf_text = (
+                        f'<span style="{_section_style}">TRADE STATS</span>'
+                        f'{_tbl_open}'
+                        f'<tr><td>Trades</td><td align="right"><b>{total_trades}</b></td></tr>'
+                        f'<tr><td>Win Rate</td><td align="right"><b style="color:{_win_rate_color}">{win_rate:.1f}%</b></td></tr>'
+                        f'<tr><td>Wins / Losses</td><td align="right">{win_count} / {loss_count}</td></tr>'
+                        f'{_tbl_close}'
+                        f'{_divider}'
+                        f'<span style="{_section_style}">RETURNS</span>'
+                        f'{_tbl_open}'
+                        f'<tr><td>Total Return</td><td align="right"><b style="color:{_return_color}">{_return_sign}{total_return_pct:.1f}%</b></td></tr>'
+                        f'<tr><td>Profit Factor</td><td align="right"><b style="color:{_pf_color}">{profit_factor:.2f}</b></td></tr>'
+                        f'{_tbl_close}'
+                        f'{_divider}'
+                        f'<span style="{_section_style}">RISK METRICS</span>'
+                        f'{_tbl_open}'
+                        f'<tr><td>Sharpe</td><td align="right"><b style="color:{_sharpe_color}">{sharpe:.2f}</b></td></tr>'
+                        f'<tr><td>Sortino</td><td align="right"><b style="color:{_sortino_color}">{sortino_ratio:.2f}</b></td></tr>'
+                        f'<tr><td>Calmar</td><td align="right"><b style="color:{_calmar_color}">{calmar_ratio:.2f}</b></td></tr>'
+                        f'<tr><td>Max Drawdown</td><td align="right"><b style="color:{_c_error}">{_dd_display}</b></td></tr>'
+                        f'<tr><td>Std Dev</td><td align="right">{std_deviation:.4f}</td></tr>'
+                        f'{_tbl_close}'
+                    )
                     self.detail_labels['performance'].setText(perf_text)
                     
                     # Quality badge based on Sharpe
