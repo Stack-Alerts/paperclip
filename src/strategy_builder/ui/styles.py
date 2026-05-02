@@ -176,17 +176,17 @@ MAIN_STYLESHEET = """
         color: #9AA0A6;
         border-top: 1px solid #3C4149;
     }
-    QSpinBox {
+    QSpinBox, QDoubleSpinBox {
         background-color: #2A2F3A;
         border: 1px solid #3C4149;
         border-radius: 6px;
         padding: 6px;
         color: #E8EAED;
     }
-    QSpinBox:hover {
+    QSpinBox:hover, QDoubleSpinBox:hover {
         border-color: #2070FF;
     }
-    QSpinBox::up-button {
+    QSpinBox::up-button, QDoubleSpinBox::up-button {
         subcontrol-origin: border;
         subcontrol-position: top right;
         width: 20px;
@@ -194,10 +194,10 @@ MAIN_STYLESHEET = """
         border: none;
         border-radius: 3px;
     }
-    QSpinBox::up-button:hover {
+    QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
         background-color: #4A5058;
     }
-    QSpinBox::up-arrow {
+    QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
         image: none;
         width: 0px;
         height: 0px;
@@ -205,7 +205,7 @@ MAIN_STYLESHEET = """
         border-right: 5px solid transparent;
         border-bottom: 5px solid #6B7280;
     }
-    QSpinBox::down-button {
+    QSpinBox::down-button, QDoubleSpinBox::down-button {
         subcontrol-origin: border;
         subcontrol-position: bottom right;
         width: 20px;
@@ -213,10 +213,10 @@ MAIN_STYLESHEET = """
         border: none;
         border-radius: 3px;
     }
-    QSpinBox::down-button:hover {
+    QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
         background-color: #4A5058;
     }
-    QSpinBox::down-arrow {
+    QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
         image: none;
         width: 0px;
         height: 0px;
@@ -430,6 +430,20 @@ def get_label_style(style_type: str = 'default') -> str:
     return LABEL_STYLES.get(style_type, LABEL_STYLES['default'])
 
 
+def get_italic_label_style(style_type: str = 'muted') -> str:
+    """
+    Get standardized italic label styling.
+
+    Args:
+        style_type: Type of label style ('default', 'muted', 'error', etc.)
+
+    Returns:
+        CSS style string for italic label
+    """
+    base = LABEL_STYLES.get(style_type, LABEL_STYLES['default'])
+    return base + " font-style: italic;"
+
+
 def get_radio_button_style(style_type: str = 'default') -> str:
     """
     Get standardized radio button styling.
@@ -566,9 +580,12 @@ def get_success_button_stylesheet() -> str:
 
 
 def get_spinbox_button_stylesheet() -> str:
-    """Get stylesheet for spinbox up/down buttons - custom blue up, gray down, blue hover."""
+    """Get stylesheet for spinbox up/down buttons - custom blue up, gray down, blue hover.
+    
+    Applies to both QSpinBox and QDoubleSpinBox for UI consistency.
+    """
     return f"""
-        QSpinBox::up-button {{
+        QSpinBox::up-button, QDoubleSpinBox::up-button {{
             background-color: #1e283a;
             border: 1px solid #1e283a;
             border-radius: 2px;
@@ -576,11 +593,11 @@ def get_spinbox_button_stylesheet() -> str:
             subcontrol-origin: border;
             subcontrol-position: top right;
         }}
-        QSpinBox::up-button:hover {{
+        QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
             background-color: {COLORS['button_primary']};
             border-color: {COLORS['button_primary']};
         }}
-        QSpinBox::down-button {{
+        QSpinBox::down-button, QDoubleSpinBox::down-button {{
             background-color: #4A5058;
             border: 1px solid #4A5058;
             border-radius: 2px;
@@ -588,17 +605,17 @@ def get_spinbox_button_stylesheet() -> str:
             subcontrol-origin: border;
             subcontrol-position: bottom right;
         }}
-        QSpinBox::down-button:hover {{
+        QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
             background-color: {COLORS['button_primary']};
             border-color: {COLORS['button_primary']};
         }}
-        QSpinBox::up-arrow {{
+        QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
             image: none;
             width: 0;
             height: 0;
             border: none;
         }}
-        QSpinBox::down-arrow {{
+        QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
             image: none;
             width: 0;
             height: 0;
@@ -1150,6 +1167,11 @@ def apply_hand_cursor_to_buttons(parent_widget):
     ✓ QCheckBox
     ✓ QComboBox  
     ✓ QTabBar
+    ✓ QSpinBox (entire widget including up/down buttons)
+    ✓ QDoubleSpinBox (entire widget including up/down buttons)
+    
+    Note: Spinbox sub-controls (up/down buttons) are not separate widgets,
+    so the cursor applies to the entire spinbox including the text field.
     
     Args:
         parent_widget: Parent widget (QDialog, QMainWindow, etc.)
@@ -1161,7 +1183,7 @@ def apply_hand_cursor_to_buttons(parent_widget):
     """
     from PyQt5.QtWidgets import (
         QToolButton, QPushButton, QRadioButton, 
-        QCheckBox, QComboBox, QTabBar
+        QCheckBox, QComboBox, QTabBar, QSpinBox, QDoubleSpinBox
     )
     from PyQt5.QtCore import Qt
     
@@ -1183,6 +1205,12 @@ def apply_hand_cursor_to_buttons(parent_widget):
     
     for tab in parent_widget.findChildren(QTabBar):
         tab.setCursor(Qt.PointingHandCursor)
+    
+    for spinbox in parent_widget.findChildren(QSpinBox):
+        spinbox.setCursor(Qt.PointingHandCursor)
+    
+    for doublespinbox in parent_widget.findChildren(QDoubleSpinBox):
+        doublespinbox.setCursor(Qt.PointingHandCursor)
 
 
 # =============================================================================
