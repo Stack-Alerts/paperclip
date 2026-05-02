@@ -153,7 +153,25 @@ remote-tracking ref if there is a race condition or background pull. Always run
 
 ---
 
-## 8. Secrets Policy
+## 8. Remote URL — Use SSH, Not HTTPS
+
+The `BTC_Engine_v3` repo remote must be configured with the SSH URL, not HTTPS.
+HTTPS remotes for `github.com/Stack-Alerts/*` return `403 Write access not granted`
+even with a valid token because the SSH key is the authorised credential.
+
+**Check and fix:**
+```bash
+git remote -v   # should show git@github.com:Stack-Alerts/BTC_Engine_v3.git
+
+# If it shows https:// — fix it:
+git remote set-url origin git@github.com:Stack-Alerts/BTC_Engine_v3.git
+```
+
+The `BTC-Trade-Engine-PaperClip` repo is already on SSH and is unaffected.
+
+---
+
+## 9. Secrets Policy
 
 - `.env` is in `.gitignore` — never commit it
 - `.env.example` contains only placeholder values — safe to commit
