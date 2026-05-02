@@ -34,6 +34,7 @@ from src.strategy_builder.ui.styles import (
     get_main_stylesheet,
     get_panel_title_stylesheet,
     get_label_style,
+    get_italic_label_style,
     get_status_label_style,
     get_primary_button_stylesheet,
     get_secondary_button_stylesheet,
@@ -273,9 +274,7 @@ class DataVerifyDialog(QDialog):
 
         self._progress_label = QLabel("")
         self._progress_label.setFont(create_font(size=9))
-        self._progress_label.setStyleSheet(
-            get_label_style('muted') + " font-style: italic;"
-        )
+        self._progress_label.setStyleSheet(get_italic_label_style('muted'))
         self._progress_label.setVisible(False)
         root.addWidget(self._progress_label)
 
@@ -468,6 +467,12 @@ class DataVerifyDialog(QDialog):
             )
             self._summary_label.setStyleSheet(get_status_label_style('warning'))
             self._fix_btn.setVisible(True)    # Fix what we can
+
+        # Force Qt to repaint all inserted rows — without this, the last row(s)
+        # inserted programmatically may not appear until the viewport is scrolled
+        # or the window is resized (known Qt rendering artefact with QTableWidget).
+        self._table.resizeRowsToContents()
+        self._table.viewport().update()
 
     # ------------------------------------------------------------------
     # Repair
