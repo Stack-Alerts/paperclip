@@ -205,9 +205,9 @@ class DataVerifyDialog(QDialog):
             Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint
         )
         self.setModal(True)
-        self.setMinimumWidth(860)
+        self.setMinimumWidth(1100)
         self.setMinimumHeight(580)
-        self.resize(940, 660)
+        self.resize(1160, 660)
         self.setStyleSheet(get_main_stylesheet())
 
         root = QVBoxLayout()
@@ -221,7 +221,7 @@ class DataVerifyDialog(QDialog):
         root.addWidget(header)
 
         subtitle = QLabel(
-            "Checking stored Binance OHLCV data for gaps across all symbols and timeframes."
+            "Checking stored Binance OHLCV data for gaps in BTCUSDT Perpetual across all timeframes."
         )
         subtitle.setFont(create_font(size=9))
         subtitle.setStyleSheet(get_label_style('muted'))
@@ -254,11 +254,8 @@ class DataVerifyDialog(QDialog):
             ["Timeframe", "Status", "Gaps Found", "Missing Bars", "Notes"]
         )
         hdr = self._table.horizontalHeader()
-        hdr.setSectionResizeMode(QHeaderView.Stretch)
-        hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(4, QHeaderView.Stretch)  # Notes gets all remaining space
         self._table.setAlternatingRowColors(True)
         self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self._table.setSelectionMode(QAbstractItemView.SingleSelection)
