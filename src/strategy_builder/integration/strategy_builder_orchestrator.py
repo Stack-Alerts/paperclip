@@ -130,6 +130,14 @@ class StrategyBuilderOrchestrator:
         # Track loaded strategy file path for version control
         self.loaded_strategy_path: Optional[str] = None
         
+        # Track loaded strategy version from database (Sprint 2.0.2)
+        # Set by main window when loading strategy from browser
+        self.current_version_id: Optional[str] = None
+
+        # Track loaded strategy ID from database (BTCAAAAA-33 fix)
+        # Set by main window when loading strategy from browser
+        self.current_strategy_id: Optional[str] = None
+        
     def create_strategy(
         self,
         name: str,
@@ -939,12 +947,205 @@ class StrategyBuilderOrchestrator:
     
     def get_current_config(self) -> StrategyConfig:
         """
-        Get current strategy configuration
+        Get current strategy configuration (in-memory)
         
         Returns:
             Current StrategyConfig
         """
         return self.config_engine.config
+    
+    def serialize_config_for_backtest(self) -> dict:
+        """
+        Serialize in-memory strategy config to plain Dict for backtest execution
+        
+        INSTITUTIONAL PATTERN: Database Isolation
+        - No database access during backtest
+        - Config serialized from validated in-memory state
+        - Pure Dict (no ORM objects, no database connections)
+        
+        Returns:
+            dict: Serialized strategy configuration
+        
+        Raises:
+            ValueError: If strategy not configured or validation failed
+        """
+        config = self.config_engine.config
+        
+        # Validate config exists
+        if not config or not config.name:
+            raise ValueError("No strategy configured - load or create strategy first")
+        
+        # Validate strategy has blocks
+        if not config.blocks:
+            raise ValueError("Strategy has no blocks - add building blocks first")
+        
+        # Serialize to plain dict
+        config_dict = {
+            'name': config.name,
+            'description': getattr(config, 'description', ''),
+            'strategy_type': getattr(config, 'strategy_type', 'Bearish'),
+            'blocks': [],
+            'exit_conditions': [],
+            'parameters': {},
+        }
+        
+        # Serialize blocks
+        for block in config.blocks:
+            block_dict = {
+                'name': block.name,
+                'logic': block.logic,
+                'signals': [],
+                'exit_conditions': []
+            }
+            
+            # Serialize signals
+            for signal in block.signals:
+                signal_dict = {
+                    'name': signal.name,
+                    'logic': signal.logic,
+                    'weight': getattr(signal, 'weight', 10),  # CRITICAL FIX: Add signal weight
+                    'timing_constraint': None,
+                    'exit_conditions': []
+                }
+                
+                # Serialize timing constraint if exists
+                if hasattr(signal, 'timing_constraint') and signal.timing_constraint:
+                    signal_dict['timing_constraint'] = {
+                        'max_candles': signal.timing_constraint.max_candles,
+                        'reference': signal.timing_constraint.reference,
+                        'reference_signal': signal.timing_constraint.reference  # Alias for compatibility
+                    }
+                
+                # Serialize signal-level exit conditions
+                if hasattr(signal, 'exit_conditions'):
+                    for exit_cond in signal.exit_conditions:
+                        signal_dict['exit_conditions'].append({
+                            'signal_name': exit_cond.signal_name,
+                            'percentage': float(exit_cond.percentage),
+                            'exit_mode': getattr(exit_cond, 'exit_mode', 'ABSOLUTE'),
+                            'binding_level': 'SIGNAL',
+                            'recheck_config': {
+                                'enabled': exit_cond.recheck_config.enabled,
+                                'bar_delay': exit_cond.recheck_config.bar_delay,
+                                'validation_mode': getattr(exit_cond.recheck_config, 'validation_mode', 'SIGNAL'),
+                                'reference_type': getattr(exit_cond.recheck_config, 'reference_type', 'PARENT'),
+                                'timing_mode': getattr(exit_cond.recheck_config, 'timing_mode', 'AT')
+                            } if hasattr(exit_cond, 'recheck_config') and exit_cond.recheck_config else None
+                        })
+                
+                block_dict['signals'].append(signal_dict)
+            
+            # Serialize block-level exit conditions
+            if hasattr(block, 'exit_conditions'):
+                for exit_cond in block.exit_conditions:
+                    block_dict['exit_conditions'].append({
+                        'signal_name': exit_cond.signal_name,
+                        'percentage': float(exit_cond.percentage),
+                        'exit_mode': getattr(exit_cond, 'exit_mode', 'ABSOLUTE'),
+                        'binding_level': 'BLOCK',
+                        'recheck_config': {
+                            'enabled': exit_cond.recheck_config.enabled,
+                            'bar_delay': exit_cond.recheck_config.bar_delay,
+                            'validation_mode': getattr(exit_cond.recheck_config, 'validation_mode', 'SIGNAL'),
+                            'reference_type': getattr(exit_cond.recheck_config, 'reference_type', 'PARENT'),
+                            'timing_mode': getattr(exit_cond.recheck_config, 'timing_mode', 'AT')
+                        } if hasattr(exit_cond, 'recheck_config') and exit_cond.recheck_config else None
+                    })
+            
+            config_dict['blocks'].append(block_dict)
+        
+        # Serialize strategy-level exit conditions
+        if hasattr(config, 'exit_conditions'):
+            for exit_cond in config.exit_conditions:
+                config_dict['exit_conditions'].append({
+                    'signal_name': exit_cond.signal_name,
+                    'percentage': float(exit_cond.percentage),
+                    'exit_mode': getattr(exit_cond, 'exit_mode', 'ABSOLUTE'),
+                    'binding_level': 'STRATEGY',
+                    'recheck_config': {
+                        'enabled': exit_cond.recheck_config.enabled,
+                        'bar_delay': exit_cond.recheck_config.bar_delay,
+                        'validation_mode': getattr(exit_cond.recheck_config, 'validation_mode', 'SIGNAL'),
+                        'reference_type': getattr(exit_cond.recheck_config, 'reference_type', 'PARENT'),
+                        'timing_mode': getattr(exit_cond.recheck_config, 'timing_mode', 'AT')
+                    } if hasattr(exit_cond, 'recheck_config') and exit_cond.recheck_config else None
+                })
+        
+        print(f"✅ Serialized strategy config: {config_dict['name']}")
+        print(f"   Blocks: {len(config_dict['blocks'])}")
+        print(f"   Total signals: {sum(len(b['signals']) for b in config_dict['blocks'])}")
+        
+        return config_dict
+    
+    def get_current_strategy_for_backtest(self) -> Optional[Any]:
+        """
+        Get current strategy configuration from DATABASE for backtesting
+        
+        INSTITUTIONAL-GRADE METHOD for Sprint 2.0.2
+        
+        Architecture Decision:
+        - Uses existing StrategyDatabaseManager (already instantiated and tested)
+        - Loads the EXACT version user selected in Strategy Builder
+        - Returns database Dict with all fields (blocks, signals, exits, timing, rechecks)
+        - InstitutionalSignalEvaluator accesses via dict keys: config['blocks'], config['exit_conditions']
+        
+        Key Differences from get_current_config():
+        - get_current_config() → Returns in-memory config (may have 0 blocks during editing)
+        - get_current_strategy_for_backtest() → Loads from PostgreSQL database (complete saved version)
+        
+        Use Cases:
+        - BacktestWorker: Use this method to get complete, validated strategy
+        - UI Editing: Use get_current_config() for in-memory editing
+        
+        Returns:
+            Dict from database with all strategy data, or None if not loaded
+        """
+        # Check if version is tracked
+        if not self.current_version_id:
+            print("❌ No strategy version loaded for backtest")
+            print("   User must open a strategy from Strategy Browser first")
+            return None
+        
+        try:
+            # Use existing database manager (PostgreSQL connection)
+            from src.optimizer_v3.database import get_database_manager
+            
+            db = get_database_manager()
+            
+            # Load strategy version from database
+            # This returns Dict with JSONB fields already deserialized to Python objects
+            version_dict = db.strategy.get_strategy_version(self.current_version_id)
+            
+            if not version_dict:
+                print(f"❌ Strategy version {self.current_version_id} not found in database")
+                return None
+            
+            # Log what was loaded
+            blocks_count = len(version_dict.get('blocks', []))
+            total_signals = sum(len(b.get('signals', [])) for b in version_dict.get('blocks', []))
+            
+            print(f"✅ Loaded strategy for backtest: {version_dict['name']}")
+            print(f"   Version: v{version_dict['version_number']}")
+            print(f"   Blocks: {blocks_count}")
+            print(f"   Total signals: {total_signals}")
+            print(f"   Exit conditions: {len(version_dict.get('exit_conditions', []))}")
+            
+            # CRITICAL FIX: Close PostgreSQL connections BEFORE returning
+            # Multiprocessing fork() will happen next (bar aggregation with 31 CPUs)
+            # SSL connections don't survive fork() - must close in parent process
+            if hasattr(db, 'engine') and db.engine is not None:
+                db.engine.dispose()  # Close all connections in pool
+                print("✅ Closed PostgreSQL connections before multiprocessing")
+            
+            # Return database dict directly
+            # InstitutionalSignalEvaluator will access: config['blocks'], config['exit_conditions']
+            return version_dict
+            
+        except Exception as e:
+            import traceback
+            print(f"❌ ERROR loading strategy from database: {e}")
+            traceback.print_exc()
+            return None
     
     def add_building_block(self, block_name: str) -> bool:
         """

@@ -2625,8 +2625,12 @@ class BacktestConfigPanel(QWidget):
             from src.optimizer_v3.database import get_database_manager
             from datetime import datetime
 
-            strategy_id = getattr(self.parent_window, 'current_strategy_id', None)
-            version_id = getattr(self.parent_window, 'current_version_id', None)
+            # BTCAAAAA-33: Read IDs from orchestrator (set by main window on strategy load).
+            # self.parent_window is BacktestConfigDialog, NOT StrategyBuilderMainWindow,
+            # so the old getattr(self.parent_window, 'current_strategy_id', None) always
+            # returned None and persistence was silently skipped for every test.
+            strategy_id = getattr(self.orchestrator, 'current_strategy_id', None)
+            version_id = getattr(self.orchestrator, 'current_version_id', None)
 
             if strategy_id and version_id:
                 backtest_config = self.get_config()
@@ -2644,10 +2648,15 @@ class BacktestConfigPanel(QWidget):
                     'std_deviation': float(metrics_data.get('std_deviation', 0)),
                 }
 
+                # Determine test_type from mode: Mode 1 (Historical) → walk_forward,
+                # Mode 2 (Live Replay) → backtest (BTCAAAAA-33)
+                test_mode = backtest_config.get('mode', 2)
+                test_type = 'walk_forward' if test_mode == 1 else 'backtest'
+
                 test_data = {
                     'strategy_id': strategy_id,
                     'strategy_version_id': version_id,
-                    'test_type': 'backtest',
+                    'test_type': test_type,
                     'test_config': {
                         'lookback_days': backtest_config.get('lookback_days'),
                         'starting_capital': backtest_config.get('starting_capital'),
