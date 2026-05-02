@@ -324,6 +324,9 @@ COLORS = {
     'error': '#C35252',
     'info': '#2070FF',
     
+    # Panel / column title color (also used by QGroupBox::title and get_panel_title_stylesheet)
+    'panel_title': '#095983',
+
     # Button colors
     'button_primary': '#2a5eb8',  # User specified blue for position numbers and REQUIRED badge
     'button_primary_hover': '#1A3A70',
@@ -627,10 +630,15 @@ def get_spinbox_button_stylesheet() -> str:
 def get_panel_title_stylesheet() -> str:
     """Get stylesheet for panel titles (matches main window 'Strategy Information' style)."""
     return f"""
-        color: #095983;
+        color: {COLORS['panel_title']};
         font-size: 12pt;
         font-weight: bold;
     """
+
+
+def get_column_title_stylesheet() -> str:
+    """Get stylesheet for column/section titles in the Strategy Browser detail panel."""
+    return f"color: {COLORS['panel_title']}; padding-bottom: 8px;"
 
 
 def get_groupbox_header_stylesheet() -> str:
