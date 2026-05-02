@@ -529,6 +529,9 @@ class StrategyBuilderMainWindow(QMainWindow):
         # Clear database IDs (new strategy, not saved yet)
         self.current_strategy_id = None
         self.current_version_id = None
+        # BTCAAAAA-33: Clear orchestrator IDs too so backtest panel sees clean state
+        self.orchestrator.current_strategy_id = None
+        self.orchestrator.current_version_id = None
         
         # Clear file tracking
         self.current_file = None
@@ -669,6 +672,8 @@ class StrategyBuilderMainWindow(QMainWindow):
             
             # CRITICAL (Sprint 2.0.2): Tell orchestrator about loaded version for backtest
             self.orchestrator.current_version_id = version_id
+            # BTCAAAAA-33: Also propagate strategy_id so BacktestConfigPanel can read it
+            self.orchestrator.current_strategy_id = strategy_id
             
             # Clear file tracking
             self.current_file = None
