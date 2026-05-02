@@ -213,15 +213,19 @@ class BlockConfigItem(QWidget):
                 # Check if this signal has dependencies (references previous signals)
                 has_dependency = timing_constraint is not None
                 
-                # Build signal text with dependency arrow if needed
-                if has_dependency and idx > 1:
-                    # Show dependency arrow for non-first signals
-                    signal_text = f"  {idx}. {signal_name} [{signal_logic}] ← depends on previous"
+                # Build signal text with inline timing in orange if present
+                if has_dependency:
+                    ref_signal = timing_constraint.get('reference_signal', 'previous signal')
+                    max_candles = timing_constraint.get('max_candles', 'N/A')
+                    # Use HTML for inline orange timing text
+                    signal_text = f'<span style="color: {logic_color};">{idx}. {signal_name} [{signal_logic}]</span> <span style="color: #FFA500;">⏱️ Within {max_candles} candles of {ref_signal}</span>'
+                    signal_label = QLabel(signal_text)
+                    signal_label.setTextFormat(Qt.RichText)
+                    signal_label.setStyleSheet("font-size: 9pt; margin-left: 0px; padding-left: 0px;")
                 else:
-                    signal_text = f"  {idx}. {signal_name} [{signal_logic}]"
-                
-                signal_label = QLabel(signal_text)
-                signal_label.setStyleSheet(f"color: {logic_color}; font-size: 9pt;")
+                    signal_text = f"{idx}. {signal_name} [{signal_logic}]"
+                    signal_label = QLabel(signal_text)
+                    signal_label.setStyleSheet(f"color: {logic_color}; font-size: 9pt; margin-left: 0px; padding-left: 0px;")
                 
                 # Add tooltip with full signal info
                 tooltip_parts = [f"Signal: {signal_name}", f"Logic: {signal_logic}"]
@@ -261,36 +265,20 @@ class BlockConfigItem(QWidget):
                 
                 signals_layout.addLayout(signal_row_layout)
                 
-                # Hierarchical display of timing constraints and RECHECKs
-                # Level 1: Timing Constraint (if exists)
-                if timing_constraint:
-                    ref_signal = timing_constraint.get('reference_signal', 'previous signal')
-                    max_candles = timing_constraint.get('max_candles', 'N/A')
-                    
-                    timing_text = f"     └── TIME CONSTRAINT"
-                    timing_detail = f"          └── Within {max_candles} candles of {ref_signal}"
-                    timing_label = QLabel(timing_text)
-                    timing_detail_label = QLabel(timing_detail)
-                    timing_label.setStyleSheet(get_label_style('warning') + " font-size: 9pt; font-weight: bold;")
-                    timing_detail_label.setStyleSheet(get_label_style('warning') + " font-size: 9pt;")
-                    timing_label.setToolTip(f"This signal must occur within {max_candles} candles after {ref_signal}")
-                    signals_layout.addWidget(timing_label)
-                    signals_layout.addWidget(timing_detail_label)
-                
+                # Hierarchical display of RECHECKs, EXITs
                 # Level 2: RECHECK configuration (if exists)
                 if signal.get('recheck_config'):
                     recheck_cfg = signal['recheck_config']
                     if recheck_cfg.get('enabled'):
                         bar_delay = recheck_cfg.get('bar_delay', 0)
-                        
-                        # Determine indentation based on whether timing constraint exists
-                        indent = "          " if timing_constraint else "     "
+                        recheck_mode = recheck_cfg.get('mode', 'WITHIN')
                         
                         # Create recheck row with input and buttons
                         recheck_row_layout = QHBoxLayout()
                         recheck_row_layout.setSpacing(8)
                         
-                        recheck_text = f"{indent}└── RECHECK ({bar_delay} bars)"
+                        # FIXED INDENT: 4 spaces (Level 2 - sibling to TIME CONSTRAINT and EXIT)
+                        recheck_text = f"    └── RECHECK ({recheck_mode} {bar_delay} bars)"
                         recheck_label = QLabel(recheck_text)
                         recheck_label.setStyleSheet(get_label_style('success') + " font-size: 9pt; font-weight: bold;")
                         recheck_label.setToolTip(f"This signal must reoccur within {bar_delay} bars for validation")
@@ -334,30 +322,68 @@ class BlockConfigItem(QWidget):
                                 if nested_recheck.get('enabled'):
                                     nested_delay = nested_recheck.get('bar_delay', 0)
                                     validation_mode = nested_recheck.get('validation_mode', 'SIGNAL')
+                                    nested_mode = nested_recheck.get('mode', 'WITHIN')
                                     
                                     # Create nested recheck row
                                     nested_row_layout = QHBoxLayout()
                                     nested_row_layout.setSpacing(8)
                                     
-                                    # Determine validation target description and indentation
+                                    # Determine validation target description
+                                    # FIXED INDENTATION (matching Browser): All nested RECHECKs use same indent level
                                     if validation_mode == "SIGNAL":
-                                        # RECHECKs of Signal are at the same level as the first RECHECK (siblings)
-                                        nested_indent = "          " if timing_constraint else "     "
                                         target_desc = "of Signal"
                                     else:
-                                        # RECHECKs of RECHECK are nested deeper (children of previous RECHECK)
-                                        nested_indent = "               " if timing_constraint else "          "
                                         target_desc = "of RECHECK"
                                     
-                                    nested_text = f"{nested_indent}└── RECHECK {target_desc} ({nested_delay} bars)"
+                                    # Show mode in display: "AT 2 bars" or "WITHIN 2 bars"
+                                    # FIXED INDENT: 8 spaces (Level 3 - matching Browser)
+                                    mode_display = f"{nested_mode} {nested_delay} bars"
+                                    nested_text = f"        └── RECHECK {target_desc} ({mode_display})"
                                     nested_label = QLabel(nested_text)
                                     nested_label.setStyleSheet(get_label_style('info') + " font-size: 9pt;")
                                     nested_label.setToolTip(
                                         f"Nested RECHECK validation\n"
                                         f"Validates against: {'Original Signal' if validation_mode == 'SIGNAL' else 'Previous RECHECK'}\n"
-                                        f"Bar delay: {nested_delay}"
+                                        f"Bar delay: {nested_delay}\n"
+                                        f"Mode: {nested_mode}"
                                     )
                                     nested_row_layout.addWidget(nested_label, stretch=1)
+                                    
+                                    # Add config/duplicate/remove buttons (same as primary RECHECK)
+                                    # Config button
+                                    nested_config_btn = QPushButton("⚙")
+                                    set_hand_cursor(nested_config_btn)
+                                    nested_config_btn.setStyleSheet(get_recheck_gear_button_stylesheet())
+                                    nested_config_btn.setToolTip("Configure nested RECHECK")
+                                    # Connect to handler with chain index
+                                    nested_config_btn.clicked.connect(
+                                        lambda checked, sname=signal_name, idx=chain_idx-1: 
+                                            self._on_nested_recheck_config_clicked(sname, idx)
+                                    )
+                                    nested_row_layout.addWidget(nested_config_btn)
+                                    
+                                    # Duplicate button
+                                    nested_duplicate_btn = QPushButton("⎘")
+                                    set_hand_cursor(nested_duplicate_btn)
+                                    nested_duplicate_btn.setStyleSheet(get_recheck_duplicate_button_stylesheet())
+                                    nested_duplicate_btn.setToolTip("Add another nested RECHECK")
+                                    # Reuse the same handler - it will add another nested RECHECK
+                                    nested_duplicate_btn.clicked.connect(
+                                        lambda checked, sname=signal_name: self._on_recheck_duplicate_clicked(sname)
+                                    )
+                                    nested_row_layout.addWidget(nested_duplicate_btn)
+                                    
+                                    # Remove button
+                                    nested_remove_btn = QPushButton("✕")
+                                    set_hand_cursor(nested_remove_btn)
+                                    nested_remove_btn.setStyleSheet(get_recheck_remove_button_stylesheet())
+                                    nested_remove_btn.setToolTip("Remove this nested RECHECK")
+                                    # Connect to handler with chain index
+                                    nested_remove_btn.clicked.connect(
+                                        lambda checked, sname=signal_name, idx=chain_idx-1:
+                                            self._on_nested_recheck_remove_clicked(sname, idx)
+                                    )
+                                    nested_row_layout.addWidget(nested_remove_btn)
                                     
                                     signals_layout.addLayout(nested_row_layout)
                 
@@ -368,20 +394,6 @@ class BlockConfigItem(QWidget):
                         exit_percentage = exit_cond.get('percentage', 0.5)
                         exit_mode = exit_cond.get('exit_mode', 'ABSOLUTE')
                         
-                        # Determine indentation based on whether timing constraint and recheck exist
-                        if signal.get('recheck_config') and signal['recheck_config'].get('enabled'):
-                            # Has RECHECK - indent further
-                            if timing_constraint:
-                                exit_indent = "               "
-                            else:
-                                exit_indent = "          "
-                        elif timing_constraint:
-                            # Has timing constraint but no RECHECK
-                            exit_indent = "          "
-                        else:
-                            # No timing constraint or RECHECK
-                            exit_indent = "     "
-                        
                         # Format percentage for display (0.5 -> 50%)
                         pct_display = int(exit_percentage * 100)
                         
@@ -389,7 +401,8 @@ class BlockConfigItem(QWidget):
                         exit_row_layout = QHBoxLayout()
                         exit_row_layout.setSpacing(8)
                         
-                        exit_text = f"{exit_indent}└── 🔴 EXIT: {current_exit_signal_name} ({pct_display}%)"
+                        # FIXED INDENT: 4 spaces (same level as primary RECHECK - siblings, not children)
+                        exit_text = f"    └── 🔴 EXIT: {current_exit_signal_name} ({pct_display}%)"
                         exit_label = QLabel(exit_text)
                         exit_label.setStyleSheet(get_exit_tree_item_style() + " font-size: 9pt;")
                         exit_label.setToolTip(
@@ -441,23 +454,14 @@ class BlockConfigItem(QWidget):
                             recheck_cfg = exit_cond['recheck_config']
                             if recheck_cfg.get('enabled'):
                                 bar_delay = recheck_cfg.get('bar_delay', 0)
-                                
-                                # Determine RECHECK indentation (deeper than exit)
-                                if signal.get('recheck_config') and signal['recheck_config'].get('enabled'):
-                                    if timing_constraint:
-                                        recheck_indent = "                    "
-                                    else:
-                                        recheck_indent = "               "
-                                elif timing_constraint:
-                                    recheck_indent = "               "
-                                else:
-                                    recheck_indent = "          "
+                                recheck_mode = recheck_cfg.get('mode', 'WITHIN')
                                 
                                 # Create RECHECK row with buttons
                                 recheck_row_layout = QHBoxLayout()
                                 recheck_row_layout.setSpacing(8)
                                 
-                                recheck_text = f"{recheck_indent}└── RECHECK ({bar_delay} bars)"
+                                # FIXED INDENT: 8 spaces (Level 3 - child of EXIT at Level 2)
+                                recheck_text = f"        └── RECHECK ({recheck_mode} {bar_delay} bars)"
                                 recheck_label = QLabel(recheck_text)
                                 recheck_label.setStyleSheet(get_label_style('success') + " font-size: 9pt; font-weight: bold;")
                                 recheck_label.setToolTip(f"Exit signal must reoccur within {bar_delay} bars for validation")
@@ -591,29 +595,94 @@ class BlockConfigItem(QWidget):
         self.setLayout(layout)
     
     def _on_recheck_clicked(self, signal_name: str):
-        """Handle recheck button click - show dialog to configure bar delay."""
-        from PyQt5.QtWidgets import QInputDialog
+        """Handle recheck button click - show dialog to configure bar delay and mode."""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QSpinBox, QPushButton, QLabel, QRadioButton, QButtonGroup, QFrame
         
-        # Show input dialog for bar delay
-        bar_delay, ok = QInputDialog.getInt(
-            self,
-            "Configure Recheck Validation",
-            f"Signal: {signal_name}\n\nEnter number of bars within which signal must reoccur for validation:",
-            value=3,  # Default value
-            min=1,
-            max=500,
-            step=1
-        )
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Configure RECHECK Validation")
+        dialog.setStyleSheet(get_dialog_stylesheet())
+        layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
         
-        if ok and bar_delay > 0:
+        # Signal name label
+        signal_label = QLabel(f"Signal: {signal_name}")
+        signal_label.setStyleSheet(get_label_style('info') + " font-weight: bold; font-size: 11pt;")
+        layout.addWidget(signal_label)
+        
+        # Description
+        desc = QLabel("Enter number of bars within which signal must reoccur for validation:")
+        desc.setWordWrap(True)
+        desc.setStyleSheet(get_label_style('info'))
+        layout.addWidget(desc)
+        
+        # Bar delay spinner
+        delay_input = QSpinBox()
+        delay_input.setRange(1, 500)
+        delay_input.setValue(3)
+        delay_input.setStyleSheet(get_spinbox_button_stylesheet())
+        layout.addWidget(delay_input)
+        
+        # RECHECK Mode Selection
+        layout.addSpacing(10)
+        mode_label = QLabel("RECHECK Mode:")
+        mode_label.setStyleSheet(get_label_style('info') + " font-weight: bold;")
+        layout.addWidget(mode_label)
+        
+        mode_container = QFrame()
+        mode_container.setStyleSheet(get_radio_container_stylesheet())
+        mode_layout = QVBoxLayout()
+        mode_layout.setSpacing(10)
+        
+        mode_group = QButtonGroup(dialog)
+        
+        within_radio = QRadioButton("WITHIN bar window (signal reoccurs anywhere within N bars)")
+        within_radio.setStyleSheet(get_signal_radio_stylesheet())
+        within_radio.setChecked(True)
+        mode_group.addButton(within_radio)
+        mode_layout.addWidget(within_radio)
+        
+        at_radio = QRadioButton("AT exact bar (signal reoccurs at exactly bar N)")
+        at_radio.setStyleSheet(get_recheck_radio_stylesheet())
+        mode_group.addButton(at_radio)
+        mode_layout.addWidget(at_radio)
+        
+        mode_container.setLayout(mode_layout)
+        layout.addWidget(mode_container)
+        
+        layout.addSpacing(15)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+        
+        cancel_btn = QPushButton("✕ Cancel")
+        set_hand_cursor(cancel_btn)
+        cancel_btn.setStyleSheet(get_danger_button_stylesheet())
+        cancel_btn.clicked.connect(dialog.reject)
+        button_layout.addWidget(cancel_btn)
+        
+        ok_btn = QPushButton("✓ OK")
+        set_hand_cursor(ok_btn)
+        ok_btn.setStyleSheet(get_success_button_stylesheet())
+        ok_btn.clicked.connect(dialog.accept)
+        button_layout.addWidget(ok_btn)
+        
+        layout.addLayout(button_layout)
+        dialog.setLayout(layout)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            bar_delay = delay_input.value()
+            mode = "WITHIN" if within_radio.isChecked() else "AT"
+            
             # Find the StrategyBlocksPanel (traverse up the widget tree)
             panel = self._find_strategy_blocks_panel()
             if panel and hasattr(panel, '_on_signal_recheck_configured'):
-                panel._on_signal_recheck_configured(self.block_name, signal_name, bar_delay)
+                panel._on_signal_recheck_configured(self.block_name, signal_name, bar_delay, mode)
     
     def _on_recheck_config_clicked(self, signal_name: str):
-        """Handle recheck gear icon click - show configuration dialog."""
-        from PyQt5.QtWidgets import QInputDialog
+        """Handle recheck gear icon click - show configuration dialog with mode."""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QSpinBox, QPushButton, QLabel, QRadioButton, QButtonGroup, QFrame
         
         # Get current config
         config = self.orchestrator.get_current_config()
@@ -621,31 +690,100 @@ class BlockConfigItem(QWidget):
             return
             
         # Find current recheck config
-        current_delay = 25  # Default value
+        current_delay = 25
+        current_mode = "WITHIN"  # Default
         for block in config.blocks:
             if block.name == self.block_name:
                 for signal in block.signals:
                     if signal.name == signal_name and signal.recheck_config:
                         current_delay = signal.recheck_config.bar_delay
+                        current_mode = getattr(signal.recheck_config, 'mode', 'WITHIN')
                         break
                 break
         
-        # Show input dialog for bar delay
-        bar_delay, ok = QInputDialog.getInt(
-            self,
-            "Configure RECHECK Validation",
-            f"Signal: {signal_name}\n\nEnter number of bars within which signal must reoccur for validation:",
-            value=current_delay,
-            min=1,
-            max=500,
-            step=1
-        )
+        # Create custom dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Configure RECHECK Validation")
+        dialog.setStyleSheet(get_dialog_stylesheet())
+        layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
         
-        if ok and bar_delay > 0:
+        # Signal name label
+        signal_label = QLabel(f"Signal: {signal_name}")
+        signal_label.setStyleSheet(get_label_style('info') + " font-weight: bold; font-size: 11pt;")
+        layout.addWidget(signal_label)
+        
+        # Description
+        desc = QLabel("Enter number of bars within which signal must reoccur for validation:")
+        desc.setWordWrap(True)
+        desc.setStyleSheet(get_label_style('info'))
+        layout.addWidget(desc)
+        
+        # Bar delay spinner
+        delay_input = QSpinBox()
+        delay_input.setRange(1, 500)
+        delay_input.setValue(current_delay)
+        delay_input.setStyleSheet(get_spinbox_button_stylesheet())
+        layout.addWidget(delay_input)
+        
+        # RECHECK Mode Selection
+        layout.addSpacing(10)
+        mode_label = QLabel("RECHECK Mode:")
+        mode_label.setStyleSheet(get_label_style('info') + " font-weight: bold;")
+        layout.addWidget(mode_label)
+        
+        mode_container = QFrame()
+        mode_container.setStyleSheet(get_radio_container_stylesheet())
+        mode_layout = QVBoxLayout()
+        mode_layout.setSpacing(10)
+        
+        mode_group = QButtonGroup(dialog)
+        
+        within_radio = QRadioButton("WITHIN bar window (signal reoccurs anywhere within N bars)")
+        within_radio.setStyleSheet(get_signal_radio_stylesheet())
+        within_radio.setChecked(current_mode == "WITHIN")
+        mode_group.addButton(within_radio)
+        mode_layout.addWidget(within_radio)
+        
+        at_radio = QRadioButton("AT exact bar (signal reoccurs at exactly bar N)")
+        at_radio.setStyleSheet(get_recheck_radio_stylesheet())
+        at_radio.setChecked(current_mode == "AT")
+        mode_group.addButton(at_radio)
+        mode_layout.addWidget(at_radio)
+        
+        mode_container.setLayout(mode_layout)
+        layout.addWidget(mode_container)
+        
+        layout.addSpacing(15)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+        
+        cancel_btn = QPushButton("✕ Cancel")
+        set_hand_cursor(cancel_btn)
+        cancel_btn.setStyleSheet(get_danger_button_stylesheet())
+        cancel_btn.clicked.connect(dialog.reject)
+        button_layout.addWidget(cancel_btn)
+        
+        ok_btn = QPushButton("✓ OK")
+        set_hand_cursor(ok_btn)
+        ok_btn.setStyleSheet(get_success_button_stylesheet())
+        ok_btn.clicked.connect(dialog.accept)
+        button_layout.addWidget(ok_btn)
+        
+        layout.addLayout(button_layout)
+        dialog.setLayout(layout)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            bar_delay = delay_input.value()
+            mode = "WITHIN" if within_radio.isChecked() else "AT"
+            
             # Find the StrategyBlocksPanel
             panel = self._find_strategy_blocks_panel()
             if panel and hasattr(panel, '_on_signal_recheck_configured'):
-                panel._on_signal_recheck_configured(self.block_name, signal_name, bar_delay)
+                panel._on_signal_recheck_configured(self.block_name, signal_name, bar_delay, mode)
     
     def _on_recheck_duplicate_clicked(self, signal_name: str):
         """Handle recheck duplicate button click - show nested recheck dialog."""
@@ -717,6 +855,35 @@ class BlockConfigItem(QWidget):
         delay_input.setStyleSheet(get_spinbox_button_stylesheet())
         layout.addWidget(delay_input)
         
+        # Add spacing for mode section
+        layout.addSpacing(10)
+        
+        # RECHECK Mode Selection
+        mode_label = QLabel("RECHECK Mode:")
+        mode_label.setStyleSheet(get_label_style('info') + " font-weight: bold;")
+        layout.addWidget(mode_label)
+        
+        mode_container = QFrame()
+        mode_container.setStyleSheet(get_radio_container_stylesheet())
+        mode_layout = QVBoxLayout()
+        mode_layout.setSpacing(10)
+        
+        mode_group = QButtonGroup(dialog)
+        
+        within_radio = QRadioButton("WITHIN bar window (signal reoccurs anywhere within N bars)")
+        within_radio.setStyleSheet(get_signal_radio_stylesheet())
+        within_radio.setChecked(True)
+        mode_group.addButton(within_radio)
+        mode_layout.addWidget(within_radio)
+        
+        at_radio = QRadioButton("AT exact bar (signal reoccurs at exactly bar N)")
+        at_radio.setStyleSheet(get_recheck_radio_stylesheet())
+        mode_group.addButton(at_radio)
+        mode_layout.addWidget(at_radio)
+        
+        mode_container.setLayout(mode_layout)
+        layout.addWidget(mode_container)
+        
         # Add spacing
         layout.addSpacing(15)
         
@@ -744,6 +911,7 @@ class BlockConfigItem(QWidget):
             # Process the nested recheck configuration
             validate_against = "SIGNAL" if signal_radio.isChecked() else "RECHECK"
             bar_delay = delay_input.value()
+            mode = "WITHIN" if within_radio.isChecked() else "AT"
             
             # Find the StrategyBlocksPanel
             panel = self._find_strategy_blocks_panel()
@@ -752,7 +920,8 @@ class BlockConfigItem(QWidget):
                     self.block_name,
                     signal_name,
                     validate_against,
-                    bar_delay
+                    bar_delay,
+                    mode
                 )
     
     def _on_remove_recheck(self, signal_name: str):
@@ -799,8 +968,8 @@ class BlockConfigItem(QWidget):
             panel._on_signal_exit_remove_clicked(block_name, signal_name, exit_signal_name)
     
     def _on_exit_recheck_config_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
-        """Handle config button for exit condition RECHECK - show dialog to update bar delay."""
-        from PyQt5.QtWidgets import QInputDialog
+        """Handle config button for exit condition RECHECK - show full dialog with mode."""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QSpinBox, QPushButton, QLabel, QRadioButton, QButtonGroup, QFrame
         
         # Get current config
         config = self.orchestrator.get_current_config()
@@ -808,7 +977,8 @@ class BlockConfigItem(QWidget):
             return
         
         # Find current exit and its RECHECK config
-        current_delay = 25  # Default value
+        current_delay = 25
+        current_mode = "WITHIN"
         for block in config.blocks:
             if block.name == block_name:
                 for signal in block.signals:
@@ -818,32 +988,253 @@ class BlockConfigItem(QWidget):
                                 if exit_cond.signal_name == exit_signal_name:
                                     if exit_cond.recheck_config:
                                         current_delay = exit_cond.recheck_config.bar_delay
+                                        current_mode = getattr(exit_cond.recheck_config, 'mode', 'WITHIN')
                                     break
                         break
                 break
         
-        # Show input dialog for bar delay
-        bar_delay, ok = QInputDialog.getInt(
-            self,
-            "Configure Exit RECHECK Validation",
-            f"Exit Signal: {exit_signal_name}\n\nEnter number of bars within which exit signal must reoccur for validation:",
-            value=current_delay,
-            min=1,
-            max=500,
-            step=1
-        )
+        # Create full dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Configure Exit RECHECK Validation")
+        dialog.setStyleSheet(get_dialog_stylesheet())
+        layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
         
-        if ok and bar_delay > 0:
+        # Exit signal label
+        signal_label = QLabel(f"Exit Signal: {exit_signal_name}")
+        signal_label.setStyleSheet(get_label_style('info') + " font-weight: bold; font-size: 11pt;")
+        layout.addWidget(signal_label)
+        
+        # Description
+        desc = QLabel("Enter number of bars within which exit signal must reoccur for validation:")
+        desc.setWordWrap(True)
+        desc.setStyleSheet(get_label_style('info'))
+        layout.addWidget(desc)
+        
+        # Bar delay spinner
+        delay_input = QSpinBox()
+        delay_input.setRange(1, 500)
+        delay_input.setValue(current_delay)
+        delay_input.setStyleSheet(get_spinbox_button_stylesheet())
+        layout.addWidget(delay_input)
+        
+        # RECHECK Mode Selection
+        layout.addSpacing(10)
+        mode_label = QLabel("RECHECK Mode:")
+        mode_label.setStyleSheet(get_label_style('info') + " font-weight: bold;")
+        layout.addWidget(mode_label)
+        
+        mode_container = QFrame()
+        mode_container.setStyleSheet(get_radio_container_stylesheet())
+        mode_layout = QVBoxLayout()
+        mode_layout.setSpacing(10)
+        
+        mode_group = QButtonGroup(dialog)
+        
+        within_radio = QRadioButton("WITHIN bar window (signal reoccurs anywhere within N bars)")
+        within_radio.setStyleSheet(get_signal_radio_stylesheet())
+        within_radio.setChecked(current_mode == "WITHIN")
+        mode_group.addButton(within_radio)
+        mode_layout.addWidget(within_radio)
+        
+        at_radio = QRadioButton("AT exact bar (signal reoccurs at exactly bar N)")
+        at_radio.setStyleSheet(get_recheck_radio_stylesheet())
+        at_radio.setChecked(current_mode == "AT")
+        mode_group.addButton(at_radio)
+        mode_layout.addWidget(at_radio)
+        
+        mode_container.setLayout(mode_layout)
+        layout.addWidget(mode_container)
+        
+        layout.addSpacing(15)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+        
+        cancel_btn = QPushButton("✕ Cancel")
+        set_hand_cursor(cancel_btn)
+        cancel_btn.setStyleSheet(get_danger_button_stylesheet())
+        cancel_btn.clicked.connect(dialog.reject)
+        button_layout.addWidget(cancel_btn)
+        
+        ok_btn = QPushButton("✓ OK")
+        set_hand_cursor(ok_btn)
+        ok_btn.setStyleSheet(get_success_button_stylesheet())
+        ok_btn.clicked.connect(dialog.accept)
+        button_layout.addWidget(ok_btn)
+        
+        layout.addLayout(button_layout)
+        dialog.setLayout(layout)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            bar_delay = delay_input.value()
+            mode = "WITHIN" if within_radio.isChecked() else "AT"
+            
             # Update via panel method
             panel = self._find_strategy_blocks_panel()
             if panel and hasattr(panel, '_on_exit_recheck_configured'):
-                panel._on_exit_recheck_configured(block_name, signal_name, exit_signal_name, bar_delay)
+                panel._on_exit_recheck_configured(block_name, signal_name, exit_signal_name, bar_delay, mode)
     
     def _on_exit_recheck_remove_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
         """Handle remove button for exit condition RECHECK."""
         panel = self._find_strategy_blocks_panel()
         if panel and hasattr(panel, '_on_exit_recheck_removed'):
             panel._on_exit_recheck_removed(block_name, signal_name, exit_signal_name)
+    
+    def _on_nested_recheck_config_clicked(self, signal_name: str, chain_index: int):
+        """Handle config button for nested RECHECK - show dialog to edit."""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QSpinBox, QPushButton, QLabel, QRadioButton, QButtonGroup, QFrame
+        
+        # Get current config
+        config = self.orchestrator.get_current_config()
+        if not config:
+            return
+        
+        # Find nested RECHECK in chain
+        current_delay = 25
+        current_mode = "WITHIN"
+        current_validation_mode = "SIGNAL"
+        
+        for block in config.blocks:
+            if block.name == self.block_name:
+                for signal in block.signals:
+                    if signal.name == signal_name:
+                        if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
+                            if 0 <= chain_index < len(signal.recheck_chain):
+                                nested = signal.recheck_chain[chain_index]
+                                current_delay = nested.bar_delay
+                                current_mode = getattr(nested, 'mode', 'WITHIN')
+                                current_validation_mode = getattr(nested, 'validation_mode', 'SIGNAL')
+                        break
+                break
+        
+        # Create dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Configure Nested RECHECK")
+        dialog.setStyleSheet(get_dialog_stylesheet())
+        layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Signal label
+        signal_label = QLabel(f"Nested RECHECK for: {signal_name}")
+        signal_label.setStyleSheet(get_label_style('info') + " font-weight: bold; font-size: 11pt;")
+        layout.addWidget(signal_label)
+        
+        # Validate against selector
+        target_label = QLabel("Validate Against:")
+        target_label.setStyleSheet(get_label_style('info') + " font-weight: bold;")
+        layout.addWidget(target_label)
+        
+        radio_container = QFrame()
+        radio_container.setStyleSheet(get_radio_container_stylesheet())
+        radio_layout = QVBoxLayout()
+        radio_layout.setSpacing(10)
+        
+        target_group = QButtonGroup(dialog)
+        
+        signal_radio = QRadioButton("Original Signal")
+        signal_radio.setStyleSheet(get_signal_radio_stylesheet())
+        signal_radio.setChecked(current_validation_mode == "SIGNAL")
+        target_group.addButton(signal_radio)
+        radio_layout.addWidget(signal_radio)
+        
+        recheck_radio = QRadioButton("Previous RECHECK")
+        recheck_radio.setStyleSheet(get_recheck_radio_stylesheet())
+        recheck_radio.setChecked(current_validation_mode == "RECHECK")
+        target_group.addButton(recheck_radio)
+        radio_layout.addWidget(recheck_radio)
+        
+        radio_container.setLayout(radio_layout)
+        layout.addWidget(radio_container)
+        
+        layout.addSpacing(10)
+        
+        # Bar delay
+        delay_label = QLabel("Bar Delay:")
+        delay_label.setStyleSheet(get_label_style('info') + " font-weight: bold;")
+        layout.addWidget(delay_label)
+        
+        delay_input = QSpinBox()
+        delay_input.setRange(1, 500)
+        delay_input.setValue(current_delay)
+        delay_input.setStyleSheet(get_spinbox_button_stylesheet())
+        layout.addWidget(delay_input)
+        
+        layout.addSpacing(10)
+        
+        # Mode selector
+        mode_label = QLabel("RECHECK Mode:")
+        mode_label.setStyleSheet(get_label_style('info') + " font-weight: bold;")
+        layout.addWidget(mode_label)
+        
+        mode_container = QFrame()
+        mode_container.setStyleSheet(get_radio_container_stylesheet())
+        mode_layout = QVBoxLayout()
+        mode_layout.setSpacing(10)
+        
+        mode_group = QButtonGroup(dialog)
+        
+        within_radio = QRadioButton("WITHIN bar window (signal reoccurs anywhere within N bars)")
+        within_radio.setStyleSheet(get_signal_radio_stylesheet())
+        within_radio.setChecked(current_mode == "WITHIN")
+        mode_group.addButton(within_radio)
+        mode_layout.addWidget(within_radio)
+        
+        at_radio = QRadioButton("AT exact bar (signal reoccurs at exactly bar N)")
+        at_radio.setStyleSheet(get_recheck_radio_stylesheet())
+        at_radio.setChecked(current_mode == "AT")
+        mode_group.addButton(at_radio)
+        mode_layout.addWidget(at_radio)
+        
+        mode_container.setLayout(mode_layout)
+        layout.addWidget(mode_container)
+        
+        layout.addSpacing(15)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+        
+        cancel_btn = QPushButton("✕ Cancel")
+        set_hand_cursor(cancel_btn)
+        cancel_btn.setStyleSheet(get_danger_button_stylesheet())
+        cancel_btn.clicked.connect(dialog.reject)
+        button_layout.addWidget(cancel_btn)
+        
+        ok_btn = QPushButton("✓ OK")
+        set_hand_cursor(ok_btn)
+        ok_btn.setStyleSheet(get_success_button_stylesheet())
+        ok_btn.clicked.connect(dialog.accept)
+        button_layout.addWidget(ok_btn)
+        
+        layout.addLayout(button_layout)
+        dialog.setLayout(layout)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            validate_against = "SIGNAL" if signal_radio.isChecked() else "RECHECK"
+            bar_delay = delay_input.value()
+            mode = "WITHIN" if within_radio.isChecked() else "AT"
+            
+            # Update the nested RECHECK in chain
+            panel = self._find_strategy_blocks_panel()
+            if panel and hasattr(panel, '_on_nested_recheck_updated'):
+                panel._on_nested_recheck_updated(
+                    self.block_name,
+                    signal_name,
+                    chain_index,
+                    validate_against,
+                    bar_delay,
+                    mode
+                )
+    
+    def _on_nested_recheck_remove_clicked(self, signal_name: str, chain_index: int):
+        """Handle remove button for nested RECHECK."""
+        panel = self._find_strategy_blocks_panel()
+        if panel and hasattr(panel, '_on_nested_recheck_removed'):
+            panel._on_nested_recheck_removed(self.block_name, signal_name, chain_index)
     
     def _find_strategy_blocks_panel(self):
         """Find the StrategyBlocksPanel by traversing up the widget tree."""
@@ -1058,7 +1449,8 @@ class StrategyBlocksPanel(QWidget):
                         signal_dict['recheck_chain'].append({
                             'enabled': nested.enabled,
                             'bar_delay': nested.bar_delay,
-                            'validation_mode': nested.validation_mode
+                            'validation_mode': nested.validation_mode,
+                            'mode': getattr(nested, 'mode', 'WITHIN')  # Add mode with default
                         })
                 
                 # Sprint 1.8 Task 1.8.48: Add exit conditions data if present (with RECHECK support)
@@ -1075,6 +1467,7 @@ class StrategyBlocksPanel(QWidget):
                         # Add RECHECK config if present on the exit condition
                         if exit_cond.recheck_config:
                             exit_dict['recheck_config'] = {
+                                'mode': getattr(exit_cond.recheck_config, 'mode', 'WITHIN'),
                                 'enabled': exit_cond.recheck_config.enabled,
                                 'bar_delay': exit_cond.recheck_config.bar_delay
                             }
@@ -1396,7 +1789,7 @@ class StrategyBlocksPanel(QWidget):
         except Exception as e:
             print(f"Error removing block: {e}")
     
-    def _on_signal_recheck_configured(self, block_name: str, signal_name: str, bar_delay: int):
+    def _on_signal_recheck_configured(self, block_name: str, signal_name: str, bar_delay: int, mode: str = "WITHIN"):
         """
         Handle recheck configuration for a signal.
         
@@ -1404,6 +1797,7 @@ class StrategyBlocksPanel(QWidget):
             block_name: Block name
             signal_name: Signal name
             bar_delay: Number of bars for recheck validation
+            mode: "AT" or "WITHIN" (default: WITHIN)
         """
         try:
             # Get current config
@@ -1419,9 +1813,9 @@ class StrategyBlocksPanel(QWidget):
                 if block.name == block_name:
                     for signal in block.signals:
                         if signal.name == signal_name:
-                            # Set recheck config
-                            signal.recheck_config = RecheckConfig(enabled=True, bar_delay=bar_delay)
-                            print(f"Recheck configured for {block_name}::{signal_name} - {bar_delay} bars")
+                            # Set recheck config with mode
+                            signal.recheck_config = RecheckConfig(enabled=True, bar_delay=bar_delay, mode=mode)
+                            print(f"Recheck configured for {block_name}::{signal_name} - {bar_delay} bars, mode={mode}")
                             
                             # Refresh display
                             self._refresh_blocks()
@@ -1440,7 +1834,8 @@ class StrategyBlocksPanel(QWidget):
         block_name: str,
         signal_name: str,
         validate_against: str,
-        bar_delay: int
+        bar_delay: int,
+        mode: str = "WITHIN"
     ):
         """
         Handle configuration of a nested RECHECK validation.
@@ -1450,6 +1845,7 @@ class StrategyBlocksPanel(QWidget):
             signal_name: Signal name
             validate_against: "SIGNAL" or "RECHECK"
             bar_delay: Number of bars for validation
+            mode: "AT" or "WITHIN" (default: WITHIN)
         """
         try:
             # Get current config
@@ -1469,11 +1865,12 @@ class StrategyBlocksPanel(QWidget):
                                 print(f"No base RECHECK found for {block_name}::{signal_name}")
                                 return
                                 
-                            # Create nested recheck config
+                            # Create nested recheck config with mode
                             nested_recheck = RecheckConfig(
                                 enabled=True,
                                 bar_delay=bar_delay,
-                                validation_mode=validate_against
+                                validation_mode=validate_against,
+                                mode=mode
                             )
                             
                             # Add to recheck chain
@@ -1483,7 +1880,7 @@ class StrategyBlocksPanel(QWidget):
                             
                             print(
                                 f"Nested RECHECK configured for {block_name}::{signal_name} "
-                                f"- {bar_delay} bars, validating against {validate_against}"
+                                f"- {bar_delay} bars, validating against {validate_against}, mode={mode}"
                             )
                             
                             # Refresh display
@@ -2091,9 +2488,9 @@ class StrategyBlocksPanel(QWidget):
             import traceback
             traceback.print_exc()
     
-    def _on_exit_recheck_configured(self, block_name: str, signal_name: str, exit_signal_name: str, bar_delay: int):
+    def _on_exit_recheck_configured(self, block_name: str, signal_name: str, exit_signal_name: str, bar_delay: int, mode: str = "WITHIN"):
         """Handle RECHECK configuration for an exit condition."""
-        print(f"DEBUG: _on_exit_recheck_configured called: block='{block_name}', signal='{signal_name}', exit='{exit_signal_name}', bars={bar_delay}")
+        print(f"DEBUG: _on_exit_recheck_configured called: block='{block_name}', signal='{signal_name}', exit='{exit_signal_name}', bars={bar_delay}, mode={mode}")
         try:
             # Get current config
             config = self.orchestrator.get_current_config()
@@ -2111,9 +2508,9 @@ class StrategyBlocksPanel(QWidget):
                             if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
                                 for exit_cond in signal.exit_conditions:
                                     if exit_cond.signal_name == exit_signal_name:
-                                        # Set RECHECK config for this exit
-                                        exit_cond.recheck_config = RecheckConfig(enabled=True, bar_delay=bar_delay)
-                                        print(f"RECHECK configured for exit {exit_signal_name} - {bar_delay} bars")
+                                        # Set RECHECK config for this exit with mode
+                                        exit_cond.recheck_config = RecheckConfig(enabled=True, bar_delay=bar_delay, mode=mode)
+                                        print(f"RECHECK configured for exit {exit_signal_name} - {bar_delay} bars, mode={mode}")
                                         
                                         # Refresh display
                                         self._refresh_blocks()
@@ -2156,5 +2553,76 @@ class StrategyBlocksPanel(QWidget):
             print(f"Exit condition {exit_signal_name} not found in {block_name}::{signal_name}")
         except Exception as e:
             print(f"Error removing exit RECHECK: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_nested_recheck_updated(
+        self,
+        block_name: str,
+        signal_name: str,
+        chain_index: int,
+        validate_against: str,
+        bar_delay: int,
+        mode: str = "WITHIN"
+    ):
+        """Handle update of existing nested RECHECK in chain."""
+        try:
+            config = self.orchestrator.get_current_config()
+            if not config:
+                print("No configuration available")
+                return
+            
+            from src.strategy_builder.core.strategy_config_engine import RecheckConfig
+            
+            for block in config.blocks:
+                if block.name == block_name:
+                    for signal in block.signals:
+                        if signal.name == signal_name:
+                            if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
+                                if 0 <= chain_index < len(signal.recheck_chain):
+                                    # Update the nested RECHECK at this index
+                                    signal.recheck_chain[chain_index] = RecheckConfig(
+                                        enabled=True,
+                                        bar_delay=bar_delay,
+                                        validation_mode=validate_against,
+                                        mode=mode
+                                    )
+                                    print(f"Nested RECHECK updated for {block_name}::{signal_name} at index {chain_index}")
+                                    
+                                    self._refresh_blocks()
+                                    self.blocks_changed.emit()
+                                    return
+            
+            print(f"Nested RECHECK not found at index {chain_index} for {block_name}::{signal_name}")
+        except Exception as e:
+            print(f"Error updating nested recheck: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_nested_recheck_removed(self, block_name: str, signal_name: str, chain_index: int):
+        """Handle removal of nested RECHECK from chain."""
+        try:
+            config = self.orchestrator.get_current_config()
+            if not config:
+                print("No configuration available")
+                return
+            
+            for block in config.blocks:
+                if block.name == block_name:
+                    for signal in block.signals:
+                        if signal.name == signal_name:
+                            if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
+                                if 0 <= chain_index < len(signal.recheck_chain):
+                                    # Remove this nested RECHECK from chain
+                                    signal.recheck_chain.pop(chain_index)
+                                    print(f"Nested RECHECK removed from {block_name}::{signal_name} at index {chain_index}")
+                                    
+                                    self._refresh_blocks()
+                                    self.blocks_changed.emit()
+                                    return
+            
+            print(f"Nested RECHECK not found at index {chain_index} for {block_name}::{signal_name}")
+        except Exception as e:
+            print(f"Error removing nested recheck: {e}")
             import traceback
             traceback.print_exc()

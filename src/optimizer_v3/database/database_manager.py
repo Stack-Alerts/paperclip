@@ -78,6 +78,15 @@ class DatabaseManager:
             pool_pre_ping=True  # Verify connections before using
         )
         
+        # CRITICAL: Register fork handler to dispose engine in child processes
+        # When ProcessPoolExecutor forks, child processes inherit the connection pool
+        # but cannot use it (SSL errors). Dispose immediately after fork.
+        import os
+        if hasattr(os, 'register_at_fork'):
+            os.register_at_fork(
+                after_in_child=self._dispose_engine_after_fork
+            )
+        
         # Create session factory
         self.SessionLocal = sessionmaker(
             autocommit=False,
@@ -184,6 +193,20 @@ class DatabaseManager:
             'pool_size': self.engine.pool.size(),
             'pool_overflow': self.engine.pool.overflow()
         }
+    
+    def _dispose_engine_after_fork(self):
+        """
+        Fork handler: Dispose engine in child process
+        
+        Called automatically by os.register_at_fork() when ProcessPoolExecutor
+        forks child processes. Disposes inherited connection pool to prevent
+        SSL errors when child processes exit.
+        
+        INSTITUTIONAL PATTERN: Proper multiprocessing database isolation
+        """
+        if self.engine is not None:
+            self.engine.dispose()
+            self.logger.debug("Engine disposed in forked child process")
 
 
 class DatabaseManagerFactory:

@@ -534,8 +534,13 @@ class StrategyInfoPanel(QWidget):
                 self.name_input.blockSignals(False)
             
             # CRITICAL: Also load strategy_type from config
+            # Block signals during programmatic update to prevent triggering change events
             if config and hasattr(config, 'strategy_type'):
+                self.bullish_radio.blockSignals(True)
+                self.bearish_radio.blockSignals(True)
                 self.set_strategy_type(config.strategy_type)
+                self.bullish_radio.blockSignals(False)
+                self.bearish_radio.blockSignals(False)
         except Exception:
             pass  # Gracefully handle if config not available
 

@@ -47,16 +47,36 @@ class NumericTableWidgetItem(QTableWidgetItem):
     """
     Custom QTableWidgetItem that implements proper numeric comparison.
     
-    This ensures ID column sorts numerically (1,2,3...10,11,12...)
-    instead of as strings (1,10,11,12...2,20,21...).
+    This ensures ID column sorts numerically with dot notation support:
+    - Simple: 1, 2, 3...10, 11, 12... (not 1, 10, 11, 12...2, 20, 21...)
+    - Dot notation: 1.1, 1.2, 2.1, 3.1, 3.2, 3.3 (not 1.1, 10.1, 100.1, 101.1...)
     """
     
     def __lt__(self, other):
-        """Less than comparison using numeric value"""
+        """Less than comparison using numeric value with dot notation support"""
         try:
-            return int(self.text()) < int(other.text())
-        except ValueError:
-            # Fallback to string comparison if not numeric
+            # Parse dot notation: "5.1" -> (5, 1)
+            self_text = self.text()
+            other_text = other.text()
+            
+            if '.' in self_text or '.' in other_text:
+                # Handle dot notation (e.g., "1.1", "1.2", "2.1")
+                def parse_id(text):
+                    if '.' in text:
+                        parts = text.split('.')
+                        return (int(parts[0]), int(parts[1]))
+                    else:
+                        # Legacy integer: "5" -> (5, 0)
+                        return (int(text), 0)
+                
+                self_tuple = parse_id(self_text)
+                other_tuple = parse_id(other_text)
+                return self_tuple < other_tuple
+            else:
+                # Simple integer comparison
+                return int(self_text) < int(other_text)
+        except (ValueError, IndexError):
+            # Fallback to string comparison if parsing fails
             return super().__lt__(other)
 
 
@@ -202,13 +222,13 @@ class TradesPanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 15, 10, 10)
         
-        # Create table - Sprint 1.8 Task 1.8.72: Added exit condition columns
+        # Create table
         self.table = QTableWidget()
-        self.table.setColumnCount(15)  # 12 original + 3 exit condition columns
+        self.table.setColumnCount(13)  # Removed Exit Type & Exit Condition (redundant with Notes)
         self.table.setHorizontalHeaderLabels([
             'ID', 'Time', 'Symbol', 'Side', 'Size', 'Entry', 
             'Exit', 'Duration', 'P&L', 'P&L %', 'Status',
-            'Exit Type', 'Exit Condition', 'Partial %', 'Notes'  # Sprint 1.8: Exit columns
+            'Partial %', 'Notes'  # Exit Type/Condition removed
         ])
         
         # Table styling - using helper function from styles.py (ZERO hardcoded styles)
@@ -224,15 +244,15 @@ class TradesPanel(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.verticalHeader().setVisible(False)
         
-        # Set column widths - Sprint 1.8 Task 1.8.72: Updated for exit columns
-        # ID=115px (fixed), Notes=500px (fixed), Exit Type/Condition/Partial%=120px each, others stretch
-        # Columns: ID, Time, Symbol, Side, Size, Entry, Exit, Duration, P&L, P&L%, Status, Exit Type, Exit Condition, Partial%, Notes
-        column_widths = [115, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 500]
+        # Set column widths - UPDATED: Removed Exit Type/Condition columns
+        # Columns: ID, Time, Symbol, Side, Size, Entry, Exit, Duration, P&L, P&L%, Status, Partial%, Notes
+        # ID=115px (fixed), Partial%=360px (wider, reclaimed from removed columns), Notes=500px (fixed)
+        column_widths = [115, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 360, 500]
         for i, width in enumerate(column_widths):
             self.table.setColumnWidth(i, width)
         
         # Set stretch on standard columns (1-10) to fill window equally
-        # ID (0), Exit Type (11), Exit Condition (12), Partial% (13), and Notes (14) stay fixed
+        # ID (0), Partial% (11), and Notes (12) stay fixed
         for i in range(1, 11):  # Columns 1-10 (Time through Status)
             self.table.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
         
@@ -282,6 +302,55 @@ class TradesPanel(QWidget):
         
         return layout
     
+    def sync_from_registry(self) -> None:
+        """
+        Sync trades from TradeRegistry (single source of truth)
+        
+        CRITICAL FIX: Instead of accumulating trades from signals (which contain duplicates),
+        we pull from the TradeRegistry which has already deduplicated.
+        
+        Call this method after backtest completion to display final unique trades.
+        """
+        from src.optimizer_v3.core.trade_registry import get_trade_registry
+        
+        registry = get_trade_registry()
+        unique_trades = registry.get_all_trades()
+        
+        # Convert registry format to panel format
+        self.trades.clear()
+        for trade in unique_trades:
+            # Map registry keys to panel keys
+            panel_trade = {
+                'id': str(trade.get('trade_id', '')),
+                'timestamp': trade.get('entry_timestamp'),
+                'symbol': 'BTC.P/USDT',
+                'side': trade.get('side', 'LONG'),
+                # ✅ FIX: Get actual position_size from registry, NOT hardcoded 0.1
+                'position_size': trade.get('position_size'),
+                'partial_size': trade.get('partial_size'),
+                'size': trade.get('size', 0.1),  # Legacy fallback
+                'entry_price': trade.get('entry_price', 0),
+                'exit_price': trade.get('exit_price', 0),
+                'duration': self._format_duration(trade),
+                'pnl': trade.get('pnl', 0),
+                'pnl_pct': trade.get('pnl_pct', 0),
+                'status': trade.get('status', 'CLOSED'),
+                'notes': self._format_notes(trade),
+                'exit_condition_name': trade.get('exit_condition_name'),
+                'exit_type': trade.get('exit_type')
+            }
+            self.trades.append(panel_trade)
+        
+        self.filtered_trades = self.trades.copy()
+        self._update_table()
+        self._update_metrics()
+        
+        print(f"✅ Synced {len(self.trades)} unique trades from TradeRegistry")
+        self.logger._write_log(
+            f"📊 Synced trades from registry: {len(unique_trades)} unique trades loaded",
+            force=True
+        )
+    
     def clear_trades(self) -> None:
         """Clear all trades from panel (call at start of new backtest)"""
         # Log snapshot of all trades before clearing
@@ -297,10 +366,10 @@ class TradesPanel(QWidget):
     
     def add_trade(self, trade_data: Dict) -> None:
         """
-        Add trade to panel with duplicate protection.
+        Add trade to panel - SUPPORTS PARTIAL EXITS (multiple records same ID).
         
-        INSTITUTIONAL-GRADE: Prevents duplicate IDs by checking existing trades first.
-       If trade ID already exists, updates it instead of adding duplicate.
+        CRITICAL: Partial exits (TP1, TP2, TP3) with same entry ID are APPENDED,
+        not updated, so aggregation can group them later.
         
         Args:
             trade_data: Dictionary with trade information
@@ -308,45 +377,45 @@ class TradesPanel(QWidget):
                 Optional keys: exit_price, exit_timestamp, pnl, status, notes
         """
         trade_id = trade_data.get('id')
+        exit_condition = trade_data.get('exit_condition_name', '')
         
         # Log attempt to add trade
         self.logger.log_trade_opened(trade_id, trade_data, location="add_trade()")
         
-        # CRITICAL: Check if trade with this ID already exists
+        # CRITICAL: For PARTIAL EXITS, always append (don't update)
+        # Each partial exit (TP1, TP2, TP3) is a separate record to aggregate later
+        if exit_condition in ['TP1', 'TP2', 'TP3', 'SL']:
+            print(f"➕ Adding partial exit #{trade_id} ({exit_condition})")
+            self.trades.append(trade_data)
+            self.filtered_trades = self.trades.copy()
+            self._update_table()
+            self._update_metrics()
+            return
+        
+        # For OPEN status or non-partial exits, check for duplicates
         trade_id_str = str(trade_id)
         for i, existing_trade in enumerate(self.trades):
             if str(existing_trade.get('id')) == trade_id_str:
-                # Trade exists - UPDATE it instead of adding duplicate
+                # Duplicate OPEN/CLOSED (not partial) - update instead
                 self.logger.log_trade_updated(
                     trade_id,
                     old_data=existing_trade,
                     new_data=trade_data,
-                    location="add_trade() - duplicate ID detected"
+                    location="add_trade() - duplicate non-partial"
                 )
-                print(f"🔄 Trade #{trade_id} already exists - updating instead of adding")
+                print(f"🔄 Trade #{trade_id} non-partial - updating")
                 self.trades[i].update(trade_data)
                 self.filtered_trades = self.trades.copy()
                 self._update_table()
                 self._update_metrics()
-                
-                # Log all open positions to verify state
-                open_positions = [t for t in self.trades if t.get('status') == 'OPEN']
-                if len(open_positions) > 0:
-                    self.logger.log_multiple_positions(open_positions, location="add_trade() - after update")
                 return
         
-        # Trade doesn't exist - safe to add
+        # Trade doesn't exist - add it
         print(f"➕ Adding new trade #{trade_id}")
         self.trades.append(trade_data)
         self.filtered_trades = self.trades.copy()
         self._update_table()
         self._update_metrics()
-        
-        # Log all open positions to monitor multiple simultaneous positions
-        open_positions = [t for t in self.trades if t.get('status') == 'OPEN']
-        if len(open_positions) > 1:
-            # MULTIPLE OPEN POSITIONS - Log for verification
-            self.logger.log_multiple_positions(open_positions, location="add_trade() - multiple open")
     
     def update_trade(self, trade_id, trade_data: Dict) -> None:
         """
@@ -414,15 +483,46 @@ class TradesPanel(QWidget):
         self.add_trade(trade_data)
     
     def _update_table(self) -> None:
-        """Update table with current trades - INSTITUTIONAL REFRESH"""
+        """Update table with current trades - GROUP BY TRADE_ID FOR PARTIAL EXITS"""
         # Disable sorting during update to prevent visual artifacts
         was_sorting_enabled = self.table.isSortingEnabled()
         if was_sorting_enabled:
             self.table.setSortingEnabled(False)
         
-        self.table.setRowCount(len(self.filtered_trades))
+        # CRITICAL: Group trades by trade_id (1 entry can have multiple exits)
+        grouped_trades = {}
+        for trade in self.filtered_trades:
+            trade_id = trade.get('id')
+            if trade_id not in grouped_trades:
+                grouped_trades[trade_id] = []
+            grouped_trades[trade_id].append(trade)
         
-        for row, trade in enumerate(self.filtered_trades):
+        # Display one row per unique trade_id (grouped by entry)
+        display_trades = []
+        for trade_id, exits in grouped_trades.items():
+            # Aggregate all exits for this trade_id
+            aggregated_trade = self._aggregate_exits(exits)
+            display_trades.append(aggregated_trade)
+        
+        # Sort by trade_id for chronological order (supports dot notation "5.1", "5.2")
+        def sort_key(trade):
+            trade_id = str(trade.get('id', '0'))
+            if '.' in trade_id:
+                # Dot notation: "5.1" -> (5, 1)
+                parts = trade_id.split('.')
+                return (int(parts[0]), int(parts[1]))
+            else:
+                # Legacy integer: "5" -> (5, 0)
+                try:
+                    return (int(trade_id), 0)
+                except ValueError:
+                    return (0, 0)
+        
+        display_trades.sort(key=sort_key)
+        
+        self.table.setRowCount(len(display_trades))
+        
+        for row, trade in enumerate(display_trades):
             # ID - Use NumericTableWidgetItem for proper numeric sorting
             id_item = NumericTableWidgetItem(str(trade.get('id', '')))
             id_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -445,9 +545,23 @@ class TradesPanel(QWidget):
                 side_item.setForeground(QColor(get_color('error')))  # Red for SHORT
             self.table.setItem(row, 3, side_item)
             
-            # Size
-            size = trade.get('size', '0.0')
-            self.table.setItem(row, 4, self._create_item(f"{float(size):.4f}"))
+            # Size - ✅ INSTITUTIONAL FIX: Display actual position_size with fallback
+            # Priority: partial_size (for this specific exit) > position_size (total) > legacy 'size' field
+            partial_size = trade.get('partial_size')
+            position_size = trade.get('position_size')
+            legacy_size = trade.get('size', '0.0')
+            
+            # Use partial_size if available (most accurate for this specific exit)
+            # Otherwise use position_size (total position)
+            # Fall back to legacy 'size' field for backward compatibility
+            if partial_size is not None:
+                size_display = partial_size
+            elif position_size is not None:
+                size_display = position_size
+            else:
+                size_display = float(legacy_size)
+            
+            self.table.setItem(row, 4, self._create_item(f"{float(size_display):.4f}"))
             
             # Entry Price
             entry = trade.get('entry_price', '0.0')
@@ -491,43 +605,124 @@ class TradesPanel(QWidget):
                 status_item.setForeground(QColor(get_color('success')))
             self.table.setItem(row, 10, status_item)
             
-            # Sprint 1.8 Task 1.8.73: Exit condition columns
-            # Exit Type (TP1/TP2/TP3/SL/EXIT_CONDITION)
-            exit_type = trade.get('exit_type', '-')
-            exit_type_item = self._create_item(exit_type)
-            if exit_type == 'EXIT_CONDITION':
-                exit_type_item.setForeground(QColor(get_color('error')))  # Red for exit conditions
-            elif exit_type in ['TP1', 'TP2', 'TP3']:
-                exit_type_item.setForeground(QColor(get_color('success')))  # Green for TPs
-            elif exit_type == 'SL':
-                exit_type_item.setForeground(QColor(get_color('error')))  # Red for SL
-            self.table.setItem(row, 11, exit_type_item)
+            # Partial Exit Breakdown (aggregated: "TP1: $X | TP2: $Y | TP3: $Z")
+            # Column 11 (Exit Type/Condition removed)
+            partial_breakdown = trade.get('partial_exit_breakdown', '-')
+            partial_item = self._create_item(str(partial_breakdown))
+            # Color based on total PnL, not just existence
+            if partial_breakdown != '-':
+                if float(pnl) > 0:
+                    partial_item.setForeground(QColor(get_color('success')))  # Green for profit
+                else:
+                    partial_item.setForeground(QColor(get_color('error')))  # Red for loss
+            self.table.setItem(row, 11, partial_item)
             
-            # Exit Condition Name (only if exit_type = EXIT_CONDITION)
-            exit_condition_name = trade.get('exit_condition_name', '-')
-            exit_condition_item = self._create_item(exit_condition_name)
-            if exit_condition_name != '-':
-                exit_condition_item.setForeground(QColor(get_color('error')))  # Red for exit condition names
-            self.table.setItem(row, 12, exit_condition_item)
-            
-            # Partial Exit Percentage (if partial exit was used)
-            partial_pct = trade.get('partial_exit_percentage', '')
-            if partial_pct:
-                partial_item = self._create_item(f"{float(partial_pct):.1f}%")
-                partial_item.setForeground(QColor(get_color('warning')))  # Orange for partial exits
-                self.table.setItem(row, 13, partial_item)
-            else:
-                self.table.setItem(row, 13, self._create_item('-'))
-            
-            # Notes
+            # Notes (aggregated: "ALL TP Exits" or specific exit info)
+            # Column 12
             notes = trade.get('notes', '')
-            self.table.setItem(row, 14, self._create_item(str(notes)))
+            notes_item = self._create_item(str(notes))
+            
+            # Add tooltip explaining dynamic TP behavior (Fibonacci mode)
+            if 'TP' in notes:
+                notes_item.setToolTip(
+                    "⚠️ DYNAMIC TP ORDERING (Fibonacci Mode)\n\n"
+                    "TPs may hit out of numerical order (e.g., TP2 before TP1).\n"
+                    "This is CORRECT institutional behavior:\n\n"
+                    "• TPs use dynamic Fibonacci calculations (0.382, 0.618, 1.0)\n"
+                    "• TP placement based on market structure (S&D zones, swings)\n"
+                    "• System exits at BEST available levels, not fixed percentages\n"
+                    "• TP2 might be closer than TP1 based on Fibonacci analysis\n\n"
+                    "This ensures optimal profit-taking at key market levels.\n"
+                    "For fixed TP order, use 'PERCENTAGE' mode instead of 'FIBONACCI'."
+                )
+            
+            self.table.setItem(row, 12, notes_item)
         
         # Re-enable sorting and apply default sort (ID ascending for chronological order)
         if was_sorting_enabled:
             self.table.setSortingEnabled(True)
             # Sort by ID column (ascending) for chronological order
             self.table.sortItems(0, Qt.SortOrder.AscendingOrder)
+    
+    def _aggregate_exits(self, exits: List[Dict]) -> Dict:
+        """
+        Aggregate multiple exits for the same trade_id into single display row.
+        
+        Args:
+            exits: List of exit records for same entry (same trade_id)
+        
+        Returns:
+            Aggregated trade dict with formatted Partial % and Notes
+        """
+        # Use first exit as base (has entry data)
+        base_trade = exits[0].copy()
+        
+        # Aggregate PnL from all exits
+        total_pnl = sum(float(e.get('pnl', 0)) for e in exits)
+        total_pnl_pct = sum(float(e.get('pnl_pct', 0)) for e in exits)
+        
+        # Build Partial % breakdown: "TP1: $X | TP2: $Y | TP3: $Z"
+        tp_breakdown = []
+        tp_counts = {'TP1': 0, 'TP2': 0, 'TP3': 0, 'SL': 0, 'MAX_BARS': 0}
+        max_bars_pnl = 0.0  # Track MAX_BARS PnL separately (can be duplicated in data)
+        
+        for exit_record in exits:
+            exit_cond = exit_record.get('exit_condition_name', '')
+            exit_type = exit_record.get('exit_type', '')
+            pnl = float(exit_record.get('pnl', 0))
+            
+            if exit_cond in ['TP1', 'TP2', 'TP3']:
+                tp_breakdown.append(f"{exit_cond}: ${pnl:.2f}")
+                tp_counts[exit_cond] += 1
+            elif exit_cond == 'SL':
+                tp_breakdown.append(f"SL: ${pnl:.2f}")
+                tp_counts['SL'] += 1
+            elif exit_cond == 'MAX_BARS' or exit_type == 'TIME_LIMIT':
+                # MAX_BARS exit detected - DEDUPLICATE (backtest emits multiple times)
+                if tp_counts['MAX_BARS'] == 0:
+                    # First MAX_BARS - add it
+                    max_bars_pnl = pnl
+                    tp_breakdown.append(f"Max Bars: ${pnl:.2f}")
+                    tp_counts['MAX_BARS'] = 1
+                # else: Skip duplicate MAX_BARS emissions
+        
+        # CRITICAL: If MAX_BARS or SL present, they dominate (terminal exits)
+        # Remove any TP exits when terminal exit exists
+        if tp_counts['MAX_BARS'] > 0:
+            # MAX_BARS is terminal - ONLY show MAX_BARS, ignore TP exits
+            partial_display = f"Max Bars: ${max_bars_pnl:.2f}"
+            notes = "Max Bars Exit"
+        elif tp_counts['SL'] > 0:
+            # SL is terminal - ONLY show SL exits
+            sl_breakdown = [item for item in tp_breakdown if item.startswith('SL:')]
+            partial_display = " | ".join(sl_breakdown)
+            notes = f"Stop Loss Hit ({tp_counts['SL']} exits)"
+        else:
+            # Normal partial exits (TPs only)
+            partial_display = " | ".join(tp_breakdown) if tp_breakdown else "-"
+            
+            # Determine Notes based on exits hit
+            if tp_counts['TP1'] > 0 and tp_counts['TP2'] > 0 and tp_counts['TP3'] > 0:
+                notes = "ALL TP Exits"
+            elif len(exits) > 1:
+                hit_tps = [tp for tp, count in tp_counts.items() if count > 0 and tp not in ['SL', 'MAX_BARS']]
+                notes = f"Partial Exits: {', '.join(hit_tps)}"
+            else:
+                notes = exits[0].get('notes', '')
+        
+        # Update aggregated trade
+        base_trade['pnl'] = total_pnl
+        base_trade['pnl_pct'] = total_pnl_pct
+        base_trade['partial_exit_breakdown'] = partial_display
+        base_trade['notes'] = notes
+        
+        # Use last exit's data for exit price, duration, status
+        last_exit = exits[-1]
+        base_trade['exit_price'] = last_exit.get('exit_price')
+        base_trade['duration'] = last_exit.get('duration')
+        base_trade['status'] = last_exit.get('status')
+        
+        return base_trade
     
     def _create_item(self, text: str) -> QTableWidgetItem:
         """Create centered table item"""
@@ -816,36 +1011,87 @@ class TradesPanel(QWidget):
             print(f"❌ Copy failed: {str(e)}")
     
     def _export_trades(self) -> None:
-        """Export trades to Excel/CSV"""
+        """
+        Export trades to CSV - READS FROM TRADEREGISTRY (single source of truth)
+        
+        CRITICAL FIX: Export from TradeRegistry, NOT from panel's list
+        Panel list may contain duplicates from multicore worker messages.
+        """
+        from src.optimizer_v3.core.trade_registry import get_trade_registry
+        
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"trades_export_{timestamp}.csv"
         
         try:
+            # Get unique trades from registry
+            registry = get_trade_registry()
+            unique_trades = registry.get_all_trades()
+            
+            if not unique_trades:
+                print("⚠️ No trades in registry to export")
+                return
+            
             with open(filename, 'w') as f:
-                # Write header
-                f.write("ID,Time,Symbol,Side,Size,Entry,Exit,Duration,P&L,P&L %,Status,Notes\n")
-                
-                # Write trades
-                for trade in self.trades:
+                # Write header - INSTITUTIONAL GRADE: Added Exit Time for precise verification
+                f.write("ID,Time,Symbol,Side,Size,Entry,Exit,Exit Time,Duration,P&L,P&L %,Status,Notes\n")
+
+                # Write trades from registry (guaranteed unique)
+                for trade in unique_trades:
                     f.write(
-                        f"{trade.get('id', '')},"
-                        f"{trade.get('timestamp', '')},"
-                        f"{trade.get('symbol', '')},"
+                        f"{trade.get('trade_id', trade.get('id', ''))},"
+                        f"{trade.get('entry_timestamp', trade.get('timestamp', ''))},"
+                        f"BTC.P/USDT,"
                         f"{trade.get('side', '')},"
-                        f"{trade.get('size', '')},"
+                        f"0.1,"
                         f"{trade.get('entry_price', '')},"
                         f"{trade.get('exit_price', '')},"
-                        f"{trade.get('duration', '')},"
+                        f"{trade.get('exit_timestamp', '')},"  # ✅ INSTITUTIONAL FIX: Exact exit timestamp
+                        f"{self._format_duration(trade)},"
                         f"{trade.get('pnl', '')},"
                         f"{trade.get('pnl_pct', '')},"
                         f"{trade.get('status', '')},"
-                        f"{trade.get('notes', '')}\n"
+                        f"{self._format_notes(trade)}\n"
                     )
             
-            print(f"✅ Trades exported to {filename}")
+            print(f"✅ {len(unique_trades)} unique trades exported to {filename} (from TradeRegistry)")
             
         except Exception as e:
             print(f"❌ Export failed: {str(e)}")
+    
+    def _format_duration(self, trade: Dict) -> str:
+        """Format trade duration from bars_held"""
+        bars_held = trade.get('bars_held', 0)
+        if bars_held == 0:
+            return '-'
+        
+        # Assuming 15m timeframe
+        total_minutes = bars_held * 15
+        
+        if total_minutes < 60:
+            return f"{total_minutes}m"
+        elif total_minutes < 1440:  # Less than 1 day
+            hours = total_minutes // 60
+            mins = total_minutes % 60
+            return f"{hours}h {mins}m" if mins > 0 else f"{hours}h"
+        else:  # 1 day or more
+            days = total_minutes // 1440
+            hours = (total_minutes % 1440) // 60
+            return f"{days}d {hours}h" if hours > 0 else f"{days}d"
+    
+    def _format_notes(self, trade: Dict) -> str:
+        """Format trade notes from exit_condition_name and exit_reason"""
+        exit_cond = trade.get('exit_condition_name', '')
+        exit_reason = trade.get('exit_reason', '')
+        
+        if exit_cond in ['TP1', 'TP2', 'TP3']:
+            return f"{exit_cond} Hit"
+        elif exit_cond == 'SL':
+            return "Stop Loss Hit"
+        elif exit_cond == 'MAX_BARS':
+            return f"Max Hold Time ({trade.get('bars_held', 0)} bars)"
+        elif exit_reason:
+            return exit_reason
+        return '-'
     
     def get_trades(self) -> List[Dict]:
         """Get all trades"""

@@ -22,6 +22,7 @@ class RecheckConfig:
     bar_delay: int = 0  # Number of bars within which signal must reoccur
     parent_signal: Optional[str] = None  # Signal this recheck validates
     validation_mode: str = "SIGNAL"  # "SIGNAL" or "RECHECK"
+    mode: str = "WITHIN"  # "AT" (exact bar) or "WITHIN" (within bar window)
 
 
 @dataclass
@@ -88,6 +89,7 @@ class StrategyConfig:
     required_signals: int = 0
     name: str = ""
     description: str = ""
+    strategy_type: str = "Bullish"  # "Bullish" or "Bearish"
     exit_conditions: List[ExitCondition] = field(default_factory=list)
     
     def get_block(self, name: str) -> Optional[BlockConfig]:
