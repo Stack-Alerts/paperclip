@@ -223,6 +223,16 @@ def test_single_config(args):
             working_sl = sl_result.working_sl      # Tight optimization (after delay)
             sl = emergency_sl  # Start with emergency SL
             
+            # DEBUG: Log TP values for forensic analysis
+            print(f"\n🔍 TP CALC DEBUG | Entry: ${entry_price:.2f} | Side: {config.side}")
+            print(f"   TP1 = ${tp1:.2f} (should be closest,  {abs((entry_price-tp1)/entry_price*100):.2f}% away)")
+            print(f"   TP2 = ${tp2:.2f} (should be middle,   {abs((entry_price-tp2)/entry_price*100):.2f}% away)")
+            print(f"   TP3 = ${tp3:.2f} (should be furthest, {abs((entry_price-tp3)/entry_price*100):.2f}% away)")
+            if config.side == 'SHORT':
+                print(f"   ORDER CHECK (SHORT): tp1 > tp2 > tp3? {tp1:.2f} > {tp2:.2f} > {tp3:.2f} = {tp1 > tp2 > tp3}")
+            else:
+                print(f"   ORDER CHECK (LONG):  tp1 < tp2 < tp3? {tp1:.2f} < {tp2:.2f} < {tp3:.2f} = {tp1 < tp2 < tp3}")
+            
             # Get partial exit percentages from config
             exit_pct_tp1 = config.partial_exit_pcts.get('tp1', 50)
             exit_pct_tp2 = config.partial_exit_pcts.get('tp2', 30)
@@ -320,70 +330,69 @@ def test_single_config(args):
                 if bar['low'] < current_position['best_price']:
                     current_position['best_price'] = bar['low']
                 
-                # Check TP levels (price going DOWN) - ONLY if enabled!
-                if current_position['use_tp1'] and bar['low'] <= current_position['tp1'] and current_position['remaining_pct'] >= current_position['exit_pct_tp1']:
-                    # TP1 hit - use config's exit percentage
-                    exit_price = current_position['tp1']
-                    exit_reason = 'TP1_PARTIAL'
-                    exit_pct = current_position['exit_pct_tp1']
-                    current_position['exits'].append({
-                        'price': exit_price,
-                        'pct': exit_pct,
-                        'reason': exit_reason
-                    })
-                    current_position['remaining_pct'] -= exit_pct
-                    current_position['tp1_hit'] = True
+                # Check TP levels in PRICE ORDER (highest to lowest for SHORT)
+                # Create list of TPs with their info, sorted by price (descending for SHORT)
+                tp_checks = []
+                if current_position['use_tp1']:
+                    tp_checks.append((current_position['tp1'], current_position['exit_pct_tp1'], 'tp1_hit'))
+                if current_position['use_tp2']:
+                    tp_checks.append((current_position['tp2'], current_position['exit_pct_tp2'], 'tp2_hit'))
+                if current_position['use_tp3']:
+                    tp_checks.append((current_position['tp3'], current_position['exit_pct_tp3'], 'tp3_hit'))
+                
+                # Sort by price DESCENDING (highest price first for SHORT = closest to entry)
+                tp_checks.sort(key=lambda x: x[0], reverse=True)
+                
+                # Assign TP labels based on ORDER (1st hit = TP1, 2nd hit = TP2, 3rd hit = TP3)
+                tp_names = ['TP1_PARTIAL', 'TP2_PARTIAL', 'TP3_HIT']
+                
+                # Check TPs in price order
+                for idx, (tp_price, exit_pct, hit_flag) in enumerate(tp_checks):
+                    if bar['low'] <= tp_price and current_position['remaining_pct'] >= exit_pct:
+                        # TP hit - use ACTUAL bar close price (institutional grade)
+                        exit_price = bar['close']
+                        exit_reason = tp_names[idx]  # Assign label based on hit ORDER, not original name
+                        tp_label = f"TP{idx+1}"
+                        print(f"🎯 {tp_label} HIT! Bar low: ${bar['low']:.2f} <= Price: ${tp_price:.2f} | Exit: ${exit_price:.2f} | Exit%: {exit_pct}%")
+                        current_position['exits'].append({
+                            'price': exit_price,
+                            'pct': exit_pct,
+                            'reason': exit_reason
+                        })
+                        current_position['remaining_pct'] -= exit_pct
+                        current_position[hit_flag] = True
                     
-                    # Move SL to breakeven after TP1 if configured
-                    if config.breakeven_after_tp1 and not current_position.get('breakeven_set', False):
-                        # Use THIS strategy's config values
-                        leverage = config.max_leverage
-                        starting_capital = config.starting_capital
-                        risk_per_trade_pct = config.risk_per_trade_pct
-                        position_pct = risk_per_trade_pct / 100.0
-                        margin_per_trade = starting_capital * position_pct
-                        entry_notional = margin_per_trade * leverage
-                        position_size = entry_notional / current_position['entry_price']
-                        breakeven_sl = calculate_breakeven_sl(
-                            current_position['entry_price'],
-                            config.side,
-                            entry_notional,
-                            position_size
-                        )
-                        # Only update if better than current SL
-                        if config.side == 'SHORT':
-                            if breakeven_sl < current_position['sl']:
-                                current_position['sl'] = breakeven_sl
-                                current_position['breakeven_set'] = True
-                        else:
-                            if breakeven_sl > current_position['sl']:
-                                current_position['sl'] = breakeven_sl
-                                current_position['breakeven_set'] = True
-                    
-                if current_position['use_tp2'] and bar['low'] <= current_position['tp2'] and current_position['remaining_pct'] >= current_position['exit_pct_tp2']:
-                    # TP2 hit - use config's exit percentage
-                    exit_price = current_position['tp2']
-                    exit_reason = 'TP2_PARTIAL'
-                    exit_pct = current_position['exit_pct_tp2']
-                    current_position['exits'].append({
-                        'price': exit_price,
-                        'pct': exit_pct,
-                        'reason': exit_reason
-                    })
-                    current_position['remaining_pct'] -= exit_pct
-                    current_position['tp2_hit'] = True
-                    
-                if current_position['use_tp3'] and bar['low'] <= current_position['tp3'] and current_position['remaining_pct'] > 0:
-                    # TP3 hit - close remaining position
-                    exit_price = current_position['tp3']
-                    exit_reason = 'TP3_HIT'
-                    current_position['exits'].append({
-                        'price': exit_price,
-                        'pct': current_position['remaining_pct'],
-                        'reason': exit_reason
-                    })
-                    current_position['remaining_pct'] = 0
-                    exit_occurred = True
+                        
+                        # Move SL to breakeven after TP1 if configured
+                        if 'TP1' in exit_reason and config.breakeven_after_tp1 and not current_position.get('breakeven_set', False):
+                            # Use THIS strategy's config values
+                            leverage = config.max_leverage
+                            starting_capital = config.starting_capital
+                            risk_per_trade_pct = config.risk_per_trade_pct
+                            position_pct = risk_per_trade_pct / 100.0
+                            margin_per_trade = starting_capital * position_pct
+                            entry_notional = margin_per_trade * leverage
+                            position_size = entry_notional / current_position['entry_price']
+                            breakeven_sl = calculate_breakeven_sl(
+                                current_position['entry_price'],
+                                config.side,
+                                entry_notional,
+                                position_size
+                            )
+                            # Only update if better than current SL
+                            if config.side == 'SHORT':
+                                if breakeven_sl < current_position['sl']:
+                                    current_position['sl'] = breakeven_sl
+                                    current_position['breakeven_set'] = True
+                            else:
+                                if breakeven_sl > current_position['sl']:
+                                    current_position['sl'] = breakeven_sl
+                                    current_position['breakeven_set'] = True
+                        
+                        # Check if this was the final TP
+                        if current_position['remaining_pct'] == 0:
+                            exit_occurred = True
+                        break  # Only process one TP per bar
                 
                 # Check trailing stop after TP2 (if configured)
                 if config.use_trailing and current_position.get('tp2_hit', False):
@@ -399,9 +408,17 @@ def test_single_config(args):
                 
                 # Check SL (price going UP)
                 if bar['high'] >= current_position['sl'] and not exit_occurred:
-                    # Stop loss hit - close entire position
-                    exit_price = current_position['sl']
+                    # Stop loss hit - use ACTUAL bar close price (institutional grade)
+                    exit_price = bar['close']
                     exit_reason = 'SL_HIT'
+                    
+                    # INSTITUTIONAL DEBUG: Log SL exit details for Adaptive SL forensics
+                    print(f"🔍 SL_HIT (SHORT) | Bar {bars_held} | remaining_pct={current_position['remaining_pct']:.4f}% | "
+                          f"Entry=${current_position['entry_price']:.2f} | Exit=${exit_price:.2f} | "
+                          f"SL_mode={current_position.get('sl_method', 'UNKNOWN')} | "
+                          f"TP1_hit={current_position.get('tp1_hit', False)} | "
+                          f"TP2_hit={current_position.get('tp2_hit', False)}")
+                    
                     current_position['exits'].append({
                         'price': exit_price,
                         'pct': current_position['remaining_pct'],
@@ -415,70 +432,68 @@ def test_single_config(args):
                 if bar['high'] > current_position['best_price']:
                     current_position['best_price'] = bar['high']
                 
-                # Check TP levels (price going UP) - ONLY if enabled!
-                if current_position['use_tp1'] and bar['high'] >= current_position['tp1'] and current_position['remaining_pct'] >= current_position['exit_pct_tp1']:
-                    # TP1 hit - use config's exit percentage
-                    exit_price = current_position['tp1']
-                    exit_reason = 'TP1_PARTIAL'
-                    exit_pct = current_position['exit_pct_tp1']
-                    current_position['exits'].append({
-                        'price': exit_price,
-                        'pct': exit_pct,
-                        'reason': exit_reason
-                    })
-                    current_position['remaining_pct'] -= exit_pct
-                    current_position['tp1_hit'] = True
+                # Check TP levels in PRICE ORDER (lowest to highest for LONG)
+                # Create list of TPs with their info, sorted by price (ascending for LONG)
+                tp_checks = []
+                if current_position['use_tp1']:
+                    tp_checks.append((current_position['tp1'], current_position['exit_pct_tp1'], 'tp1_hit'))
+                if current_position['use_tp2']:
+                    tp_checks.append((current_position['tp2'], current_position['exit_pct_tp2'], 'tp2_hit'))
+                if current_position['use_tp3']:
+                    tp_checks.append((current_position['tp3'], current_position['exit_pct_tp3'], 'tp3_hit'))
+                
+                # Sort by price ASCENDING (lowest price first for LONG = closest to entry)
+                tp_checks.sort(key=lambda x: x[0])
+                
+                # Assign TP labels based on ORDER (1st hit = TP1, 2nd hit = TP2, 3rd hit = TP3)
+                tp_names = ['TP1_PARTIAL', 'TP2_PARTIAL', 'TP3_HIT']
+                
+                # Check TPs in price order
+                for idx, (tp_price, exit_pct, hit_flag) in enumerate(tp_checks):
+                    if bar['high'] >= tp_price and current_position['remaining_pct'] >= exit_pct:
+                        # TP hit - use ACTUAL bar close price (institutional grade)
+                        exit_price = bar['close']
+                        exit_reason = tp_names[idx]  # Assign label based on hit ORDER, not original name
+                        tp_label = f"TP{idx+1}"
+                        print(f"🎯 {tp_label} HIT! Bar high: ${bar['high']:.2f} >= Price: ${tp_price:.2f} | Exit: ${exit_price:.2f} | Exit%: {exit_pct}%")
+                        current_position['exits'].append({
+                            'price': exit_price,
+                            'pct': exit_pct,
+                            'reason': exit_reason
+                        })
+                        current_position['remaining_pct'] -= exit_pct
+                        current_position[hit_flag] = True
                     
-                    # Move SL to breakeven after TP1 if configured
-                    if config.breakeven_after_tp1 and not current_position.get('breakeven_set', False):
-                        # Use THIS strategy's config values
-                        leverage = config.max_leverage
-                        starting_capital = config.starting_capital
-                        risk_per_trade_pct = config.risk_per_trade_pct
-                        position_pct = risk_per_trade_pct / 100.0
-                        margin_per_trade = starting_capital * position_pct
-                        entry_notional = margin_per_trade * leverage
-                        position_size = entry_notional / current_position['entry_price']
-                        breakeven_sl = calculate_breakeven_sl(
-                            current_position['entry_price'],
-                            config.side,
-                            entry_notional,
-                            position_size
-                        )
-                        # Only update if better than current SL
-                        if config.side == ' SHORT':
-                            if breakeven_sl < current_position['sl']:
-                                current_position['sl'] = breakeven_sl
-                                current_position['breakeven_set'] = True
-                        else:
-                            if breakeven_sl > current_position['sl']:
-                                current_position['sl'] = breakeven_sl
-                                current_position['breakeven_set'] = True
-                    
-                if current_position['use_tp2'] and bar['high'] >= current_position['tp2'] and current_position['remaining_pct'] >= current_position['exit_pct_tp2']:
-                    # TP2 hit - use config's exit percentage
-                    exit_price = current_position['tp2']
-                    exit_reason = 'TP2_PARTIAL'
-                    exit_pct = current_position['exit_pct_tp2']
-                    current_position['exits'].append({
-                        'price': exit_price,
-                        'pct': exit_pct,
-                        'reason': exit_reason
-                    })
-                    current_position['remaining_pct'] -= exit_pct
-                    current_position['tp2_hit'] = True
-                    
-                if current_position['use_tp3'] and bar['high'] >= current_position['tp3'] and current_position['remaining_pct'] > 0:
-                    # TP3 hit - close remaining position
-                    exit_price = current_position['tp3']
-                    exit_reason = 'TP3_HIT'
-                    current_position['exits'].append({
-                        'price': exit_price,
-                        'pct': current_position['remaining_pct'],
-                        'reason': exit_reason
-                    })
-                    current_position['remaining_pct'] = 0
-                    exit_occurred = True
+                        # Move SL to breakeven after TP1 if configured
+                        if 'TP1' in exit_reason and config.breakeven_after_tp1 and not current_position.get('breakeven_set', False):
+                            # Use THIS strategy's config values
+                            leverage = config.max_leverage
+                            starting_capital = config.starting_capital
+                            risk_per_trade_pct = config.risk_per_trade_pct
+                            position_pct = risk_per_trade_pct / 100.0
+                            margin_per_trade = starting_capital * position_pct
+                            entry_notional = margin_per_trade * leverage
+                            position_size = entry_notional / current_position['entry_price']
+                            breakeven_sl = calculate_breakeven_sl(
+                                current_position['entry_price'],
+                                config.side,
+                                entry_notional,
+                                position_size
+                            )
+                            # Only update if better than current SL
+                            if config.side == 'SHORT':
+                                if breakeven_sl < current_position['sl']:
+                                    current_position['sl'] = breakeven_sl
+                                    current_position['breakeven_set'] = True
+                            else:
+                                if breakeven_sl > current_position['sl']:
+                                    current_position['sl'] = breakeven_sl
+                                    current_position['breakeven_set'] = True
+                        
+                        # Check if this was the final TP
+                        if current_position['remaining_pct'] == 0:
+                            exit_occurred = True
+                        break  # Only process one TP per bar
                 
                 # Check trailing stop after TP2 (if configured)
                 if config.use_trailing and current_position.get('tp2_hit', False):
@@ -494,8 +509,17 @@ def test_single_config(args):
                 
                 # Check SL (price going DOWN)
                 if bar['low'] <= current_position['sl'] and not exit_occurred:
-                    exit_price = current_position['sl']
+                    # Stop loss hit - use ACTUAL bar close price (institutional grade)
+                    exit_price = bar['close']
                     exit_reason = 'SL_HIT'
+                    
+                    # INSTITUTIONAL DEBUG: Log SL exit details for Adaptive SL forensics
+                    print(f"🔍 SL_HIT (LONG) | Bar {bars_held} | remaining_pct={current_position['remaining_pct']:.4f}% | "
+                          f"Entry=${current_position['entry_price']:.2f} | Exit=${exit_price:.2f} | "
+                          f"SL_mode={current_position.get('sl_method', 'UNKNOWN')} | "
+                          f"TP1_hit={current_position.get('tp1_hit', False)} | "
+                          f"TP2_hit={current_position.get('tp2_hit', False)}")
+                    
                     current_position['exits'].append({
                         'price': exit_price,
                         'pct': current_position['remaining_pct'],
@@ -529,7 +553,7 @@ def test_single_config(args):
                 current_position['remaining_pct'] = 0  # CRITICAL FIX
                 exit_occurred = True
             
-            # Process trade if fully closed (weighted average of all exits)
+            # Process trade if fully closed - CREATE SEPARATE RECORDS FOR EACH PARTIAL EXIT
             if exit_occurred and current_position['remaining_pct'] == 0:
                 exit_time = test_df.iloc[bar_idx]['timestamp']
                 
@@ -545,14 +569,17 @@ def test_single_config(args):
                 entry_price_val = current_position['entry_price']
                 position_size = notional_per_trade / entry_price_val  # ~0.263 BTC @ $95K
                 
-                # Calculate weighted average exit price from all partial exits
-                total_pnl = 0
-                total_fees = 0
-                exit_prices_weighted = []
+                # Calculate total funding fees (will be prorated across exits)
+                entry_notional = entry_price_val * position_size
+                funding_periods = bars_held // 32  # 32 bars = 8 hours at 15min bars
+                total_funding_fee = entry_notional * 0.0001 * funding_periods if funding_periods > 0 else 0
                 
+                # CREATE SEPARATE TRADE RECORD FOR EACH PARTIAL EXIT
+                # This allows proper tracking of TP1, TP2, TP3 hits in trade_registry
                 for exit_info in current_position['exits']:
                     exit_pct = exit_info['pct']
                     exit_price_partial = exit_info['price']
+                    exit_reason_partial = exit_info['reason']
                     
                     # Size for this partial exit
                     partial_size = position_size * (exit_pct / 100.0)
@@ -564,45 +591,51 @@ def test_single_config(args):
                     else:
                         partial_pnl = (entry_price_val - exit_price_partial) * partial_size
                     
-                    # Fees for this partial exit
+                    # Fees for this partial exit (prorated)
                     exit_notional_partial = exit_price_partial * partial_size
                     fee_entry_partial = partial_notional * 0.0005  # Entry fee (prorated)
                     fee_exit_partial = exit_notional_partial * 0.0005  # Exit fee
                     partial_fee = fee_entry_partial + fee_exit_partial
                     
-                    total_pnl += partial_pnl
-                    total_fees += partial_fee
-                    exit_prices_weighted.append((exit_price_partial, exit_pct))
-                
-                # Calculate weighted average exit price for reporting
-                weighted_avg_exit = sum(p * (w/100) for p, w in exit_prices_weighted)
-                
-                # Add funding fees (based on total hold time)
-                entry_notional = entry_price_val * position_size
-                funding_periods = bars_held // 32  # 32 bars = 8 hours at 15min bars
-                funding_fee = entry_notional * 0.0001 * funding_periods if funding_periods > 0 else 0
-                total_fees += funding_fee
-                
-                net_pnl = total_pnl - total_fees
-                
-                # Create exit reason string
-                exit_reasons = [f"{e['reason']} @ ${e['price']:.2f} ({e['pct']:.0f}%)" 
-                               for e in current_position['exits']]
-                reason_str = "; ".join(exit_reasons)
-                
-                trades.append({
-                    'entry_time': current_position['entry_time'],
-                    'exit_time': exit_time,
-                    'entry_price': current_position['entry_price'],
-                    'exit_price': weighted_avg_exit,  # Weighted average
-                    'pnl': total_pnl,
-                    'fee': total_fees,
-                    'net_pnl': net_pnl,
-                    'bars_held': bars_held,
-                    'confluence': current_position['confluence'],
-                    'exit_reason': reason_str,  # Detailed exit info
-                    'partial_exits': len(current_position['exits'])  # Track # of exits
-                })
+                    # Add prorated funding fees
+                    funding_fee_partial = total_funding_fee * (exit_pct / 100.0)
+                    partial_fee += funding_fee_partial
+                    
+                    net_pnl_partial = partial_pnl - partial_fee
+                    
+                    # Map exit reason to exit condition name for trade_registry
+                    if 'TP1' in exit_reason_partial:
+                        exit_condition = 'TP1'
+                    elif 'TP2' in exit_reason_partial:
+                        exit_condition = 'TP2'
+                    elif 'TP3' in exit_reason_partial:
+                        exit_condition = 'TP3'
+                    elif 'SL' in exit_reason_partial:
+                        exit_condition = 'SL'
+                    elif 'MAX_HOLD' in exit_reason_partial:
+                        exit_condition = 'MAX_BARS'
+                    else:
+                        exit_condition = 'OTHER'
+                    
+                    # Create separate trade record for this partial exit
+                    trades.append({
+                        'entry_time': current_position['entry_time'],
+                        'exit_time': exit_time,
+                        'entry_price': current_position['entry_price'],
+                        'exit_price': exit_price_partial,  # Actual exit price for this partial
+                        'pnl': partial_pnl,
+                        'fee': partial_fee,
+                        'net_pnl': net_pnl_partial,
+                        'bars_held': bars_held,
+                        'confluence': current_position['confluence'],
+                        'exit_reason': exit_reason_partial,
+                        'exit_condition_name': exit_condition,  # For trade_registry categorization
+                        'exit_type': 'TAKE_PROFIT' if 'TP' in exit_condition else 'STOP_LOSS' if exit_condition == 'SL' else 'TIME_LIMIT',
+                        'partial_exit': exit_pct < 100,  # True if partial (< 100%), False if full close
+                        'exit_percentage': exit_pct / 100.0,  # Convert to decimal (50% → 0.5)
+                        'position_size': position_size,  # ✅ INSTITUTIONAL FIX: Actual total position size in BTC
+                        'partial_size': partial_size,  # ✅ Size of this specific partial exit in BTC
+                    })
                 
                 current_position = None
     

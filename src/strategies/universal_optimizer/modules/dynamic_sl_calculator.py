@@ -163,6 +163,11 @@ class AdaptiveSLCalculator:
         # Step 1: Calculate volatility-based minimum
         volatility_pct = self._calculate_volatility_minimum(df, entry_bar)
         
+        # CRITICAL FIX: Handle None from volatility calculation
+        if volatility_pct is None:
+            print(f"[STOP LOSS] [WARNING] Volatility calculation returned None - using emergency SL")
+            volatility_pct = self.emergency_sl_pct  # Fallback to emergency SL
+
         if debugger:
             debugger.log_action(
                 action='Volatility Minimum Calculated',
@@ -173,7 +178,7 @@ class AdaptiveSLCalculator:
                     'multiplier': self.volatility_multiplier
                 }
             )
-        
+
         # Step 2: Calculate min/max bounds
         min_sl_pct = volatility_pct * self.working_sl_multiplier
         min_sl_pct = max(min_sl_pct, self.absolute_min_pct)
@@ -304,6 +309,11 @@ class AdaptiveSLCalculator:
             # No delay, use working SL immediately
             return sl_result.working_sl
         
+        # CRITICAL: Defensive check for None delay_bars
+        if sl_result.delay_bars is None:
+            print(f"Warning: delay_bars is None, using working SL immediately")
+            return sl_result.working_sl
+        
         if bars_held < sl_result.delay_bars:
             # Still in delay period, use emergency SL
             return sl_result.emergency_sl
@@ -331,7 +341,14 @@ class AdaptiveSLCalculator:
         
         # Calculate typical bar range as % of close
         bar_ranges = (recent_bars['high'] - recent_bars['low']) / recent_bars['close']
-        avg_range_pct = bar_ranges.mean() * 100  # Convert to percentage
+        avg_range = bar_ranges.mean()
+        
+        # CRITICAL FIX: Handle None/NaN from mean()
+        if avg_range is None or pd.isna(avg_range):
+            print(f"[STOP LOSS] [WARNING] Bar range mean is None/NaN - using default 1.0%")
+            return 1.0
+        
+        avg_range_pct = avg_range * 100  # Convert to percentage
         
         # Minimum SL = multiplier * average range
         # Default multiplier 1.2 = room for 1 normal wick
