@@ -472,6 +472,12 @@ class DataVerifyDialog(QDialog):
         # inserted programmatically may not appear until the viewport is scrolled
         # or the window is resized (known Qt rendering artefact with QTableWidget).
         self._table.resizeRowsToContents()
+        # Auto-size table height to show all rows without scrolling
+        total_row_height = sum(
+            self._table.rowHeight(r) for r in range(self._table.rowCount())
+        )
+        header_height = self._table.horizontalHeader().height()
+        self._table.setFixedHeight(total_row_height + header_height + 4)
         self._table.viewport().update()
 
     # ------------------------------------------------------------------
