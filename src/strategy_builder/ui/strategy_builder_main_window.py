@@ -135,8 +135,11 @@ class StrategyBuilderMainWindow(QMainWindow):
         self._restore_settings()
         self._restore_debug_settings()
         
-        # Show data update modal on startup (after window is shown)
-        QTimer.singleShot(500, self._show_data_update_modal)
+        # BUG D FIX: 500ms was too short — OS network stack / DNS resolver may
+        # not be ready yet, causing the first Binance request to return an empty
+        # response that the old code misdiagnosed as an API failure.
+        # 2000ms gives the network stack enough time to initialise on slow boots.
+        QTimer.singleShot(2000, self._show_data_update_modal)
         
         # Start automatic data update system (after modal shown)
         QTimer.singleShot(1500, self._start_auto_update_system)

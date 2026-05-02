@@ -52,7 +52,7 @@ class DataUpdateThread(QThread):
         super().__init__()
         self.start_date = start_date
         self.end_date = end_date
-        self.manager = UnifiedDataManager()
+        self.manager = UnifiedDataManager(mode='live')  # CRITICAL: Use 'live' mode for API updates!
         self.max_retries = 3
         self.retry_delays = [10, 20, 30]  # Seconds between retries
     
@@ -65,8 +65,26 @@ class DataUpdateThread(QThread):
         try:
             from pathlib import Path
             import time
-            
+            import requests as _requests
+
             self.progress.emit(0, 100, "Initializing Binance connection...")
+
+            # BUG D FIX: Lightweight network readiness pre-check before the
+            # first real klines call.  On some systems/boots the network stack
+            # or DNS resolver is not ready immediately after the window is shown.
+            # A failed ping here gives a descriptive error rather than an
+            # empty klines response that looks like a data API failure.
+            try:
+                ping_resp = _requests.get(
+                    "https://api.binance.com/api/v3/ping", timeout=3
+                )
+                ping_resp.raise_for_status()
+                self.progress.emit(5, 100, "✅ Binance reachable — starting download...")
+            except Exception as ping_exc:
+                raise ConnectionError(
+                    f"Binance API unreachable (network not ready?): {ping_exc}\n\n"
+                    "Check your internet connection and try again."
+                )
             
             # INSTITUTIONAL: Download with retry logic for delayed candles
             self.progress.emit(15, 100, "Downloading 15min bars from Binance (with retry logic)...")
@@ -131,7 +149,12 @@ class DataUpdateThread(QThread):
         """
         import time
         
+        last_error = None
         for attempt in range(self.max_retries + 1):
+            # Reset client on each retry so a degraded connection is never reused
+            if attempt > 0:
+                self.manager.reset_client()
+
             # Download data
             bars = self.manager.get_bars(
                 timeframe=timeframe,
@@ -139,10 +162,25 @@ class DataUpdateThread(QThread):
                 end_date=end_date,
                 source=DataSource.BINANCE
             )
-            
+
+            # BUG A FIX: empty response triggers a retry, not an immediate raise
             if len(bars) == 0:
-                raise ValueError(f"No {timeframe} bars received from Binance")
-            
+                last_error = f"No {timeframe} bars received from Binance (attempt {attempt + 1})"
+                self.progress.emit(
+                    0, 100,
+                    f"⚠️  {timeframe} empty response on attempt {attempt + 1}/{self.max_retries + 1} — retrying..."
+                )
+                if attempt < self.max_retries:
+                    retry_delay = self.retry_delays[attempt]
+                    self.progress.emit(
+                        0, 100,
+                        f"⏳ Waiting {retry_delay}s before retry {attempt + 2}/{self.max_retries + 1}..."
+                    )
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    raise ValueError(last_error)
+
             # Check freshness (how old is the latest candle?)
             latest_candle = pd.to_datetime(bars['timestamp'].iloc[-1])
             delay_minutes = (datetime.now() - latest_candle).total_seconds() / 60
@@ -257,7 +295,7 @@ class DataUpdateModal(QDialog):
         """
         super().__init__(parent)
         
-        self.manager = UnifiedDataManager()
+        self.manager = UnifiedDataManager(mode='live')  # CRITICAL: Use 'live' mode for API updates!
         self.update_thread: Optional[DataUpdateThread] = None
         self.gap_days = 0
         self.lakeapi_end: Optional[datetime] = None
@@ -507,9 +545,23 @@ class DataUpdateModal(QDialog):
         self.progress_label.setVisible(True)
         self.progress_label.setText("Starting download with retry logic...")
         
+        # BUG B FIX: For 1h timeframe the query window must be ≥ 1 hour so that
+        # at least one complete candle falls within the range.  When lakeapi_end
+        # is very recent (within the last hour) the gap is sub-1h and Binance
+        # legitimately returns 0 bars — this is NOT a network failure.
+        # Widen the start date backward by 2 hours to guarantee coverage.
+        start_date = self.lakeapi_end
+        gap_seconds = (self.current_time - start_date).total_seconds()
+        if gap_seconds < 3600:  # less than 1 hour
+            start_date = self.current_time - timedelta(hours=2)
+            print(
+                f"[DataUpdateModal] BUG-B: sub-1h gap ({gap_seconds:.0f}s) — "
+                f"widening 1h query start to {start_date} to ensure ≥1 closed candle"
+            )
+        
         # Create and start update thread (with retry logic!)
         self.update_thread = DataUpdateThread(
-            self.lakeapi_end,
+            start_date,
             self.current_time
         )
         

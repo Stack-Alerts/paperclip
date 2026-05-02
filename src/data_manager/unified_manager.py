@@ -116,6 +116,22 @@ class UnifiedDataManager:
         if self.binance_client is None:
             self.binance_client = BinanceRestClient()
         return self.binance_client
+
+    def reset_client(self) -> None:
+        """
+        BUG C FIX: Discard the cached BinanceRestClient.
+
+        Within a single DataUpdateThread run the manager reuses the same
+        BinanceRestClient instance.  If the 15m download leaves the client in a
+        degraded state (e.g. rate-limiter window, stale TCP keepalive), the 1h
+        download silently fails through the same broken connection.
+
+        Call this before each retry attempt so the next call to
+        _get_binance_client() creates a fresh, uncontaminated instance.
+        """
+        if self.binance_client is not None:
+            logger.debug("UnifiedDataManager.reset_client(): discarding cached BinanceRestClient")
+        self.binance_client = None
     
     def _normalize_timeframe(self, timeframe: str) -> str:
         """
