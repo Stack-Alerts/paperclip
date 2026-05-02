@@ -1009,9 +1009,7 @@ class UnifiedDataManager:
                 'close_time', 'quote_volume', 'trades', 'taker_buy_base',
                 'taker_buy_quote', 'ignore',
             ])
-            batch['timestamp'] = batch['open_time'].apply(
-                lambda x: datetime.fromtimestamp(x / 1000)
-            )
+            batch['timestamp'] = pd.to_datetime(batch['open_time'], unit='ms', utc=True).dt.tz_localize(None)
             for col in ('open', 'high', 'low', 'close', 'volume', 'quote_volume'):
                 batch[col] = batch[col].astype(float)
             batch['trades'] = batch['trades'].astype(int)
