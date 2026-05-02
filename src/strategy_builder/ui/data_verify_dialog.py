@@ -4,14 +4,21 @@ Data Verify Dialog - Data Integrity Check UI
 Shows per-symbol/timeframe gap analysis for stored Binance OHLCV data.
 Called from Tools → Verify Data...
 
-Uses verify_and_repair(dry_run=True) to detect gaps without modifying any data.
-If gaps are found, offers a "Fix Gaps" button that opens DataUpdateModal.
+Verification uses verify_and_repair(dry_run=True) combined with
+detect_gaps_in_binance_files() to show per-gap detail without modifying data.
+
+Repair uses verify_and_repair(dry_run=False) to fetch and fill each specific
+gap from Binance directly — NOT the general DataUpdateModal date-range download.
+
+After repair completes the dialog automatically re-runs verification so the
+user can confirm the data is now clean.
 
 Author: Strategy Builder Team
 Date: 2026-05-02
 """
 
-from typing import Optional, Dict
+from datetime import datetime, timedelta
+from typing import Optional, Dict, List
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QProgressBar, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -35,35 +42,69 @@ from src.strategy_builder.ui.styles import (
 )
 
 
+# ---------------------------------------------------------------------------
+# Background threads
+# ---------------------------------------------------------------------------
+
 class DataVerifyThread(QThread):
     """
-    Background thread for running data integrity verification.
+    Background thread: detect gaps without modifying any stored data.
 
-    Calls UnifiedDataManager.verify_and_repair(dry_run=True) — never modifies
-    stored data; reports gaps only.
+    Calls detect_gaps_in_binance_files() for each timeframe to obtain the
+    full per-gap detail list, then returns a structured report that the dialog
+    uses to populate the results table.
 
     Signals:
-        progress(int, int, str): (current, total, message) incremental status
-        finished(bool, dict): (success, report) where report is the dict from
-            verify_and_repair or an empty dict on error, and success indicates
-            whether the call completed without exception.
+        progress(int, int, str): (current, total, message)
+        finished(bool, dict): (success, report)
+
+    Report structure::
+
+        {
+            '15m': {
+                'gaps': [
+                    {
+                        'gap_start': datetime,
+                        'gap_end':   datetime,
+                        'duration':  timedelta,
+                        'missing_bars': int,
+                        'timeframe': str,
+                    },
+                    ...
+                ],
+                'gaps_found': int,
+                'total_missing_bars': int,
+            },
+            ...
+            '_error': str,   # only present on exception
+        }
     """
 
     progress = pyqtSignal(int, int, str)
     finished = pyqtSignal(bool, dict)
 
+    _TIMEFRAMES = ['15m', '1h']
+
     def run(self):
-        """Execute dry-run verification in background."""
         try:
-            self.progress.emit(10, 100, "Initializing data manager...")
+            self.progress.emit(10, 100, "Initialising data manager…")
             manager = UnifiedDataManager(mode='live')
 
-            self.progress.emit(30, 100, "Scanning 15m data for gaps...")
-            # dry_run=True → read-only; no files are written
-            report = manager.verify_and_repair(
-                timeframes=['15m', '1h'],
-                dry_run=True,
-            )
+            report: Dict = {}
+            steps = len(self._TIMEFRAMES)
+            for i, tf in enumerate(self._TIMEFRAMES):
+                pct_start = 20 + int(i * 70 / steps)
+                pct_end = 20 + int((i + 1) * 70 / steps)
+                self.progress.emit(pct_start, 100, f"Scanning {tf} data for gaps…")
+
+                gaps: List[Dict] = manager.detect_gaps_in_binance_files(tf)
+                total_missing = sum(g['missing_bars'] for g in gaps)
+                report[tf] = {
+                    'gaps': gaps,
+                    'gaps_found': len(gaps),
+                    'total_missing_bars': total_missing,
+                }
+                self.progress.emit(pct_end, 100, f"{tf}: {len(gaps)} gap(s) found.")
 
             self.progress.emit(100, 100, "Verification complete.")
             self.finished.emit(True, report)
@@ -72,52 +113,97 @@ class DataVerifyThread(QThread):
             self.finished.emit(False, {'_error': str(exc)})
 
 
+class DataRepairThread(QThread):
+    """
+    Background thread: repair detected gaps by fetching missing bars from Binance.
+
+    Calls verify_and_repair(dry_run=False) which targets each specific gap
+    range rather than a broad date-range download.
+
+    Signals:
+        progress(int, int, str): (current, total, message)
+        finished(bool, dict): (success, repair_summary)
+            repair_summary matches the verify_and_repair() return format.
+    """
+
+    progress = pyqtSignal(int, int, str)
+    finished = pyqtSignal(bool, dict)
+
+    def run(self):
+        try:
+            self.progress.emit(5, 100, "Starting gap repair via Binance…")
+            manager = UnifiedDataManager(mode='live')
+
+            # verify_and_repair with dry_run=False fetches each gap individually
+            self.progress.emit(20, 100, "Fetching missing bars from Binance (this may take a moment)…")
+            summary = manager.verify_and_repair(
+                timeframes=['15m', '1h'],
+                dry_run=False,
+            )
+
+            self.progress.emit(100, 100, "Repair complete.")
+            self.finished.emit(True, summary)
+
+        except Exception as exc:
+            self.finished.emit(False, {'_error': str(exc)})
+
+
+# ---------------------------------------------------------------------------
+# Dialog
+# ---------------------------------------------------------------------------
+
 class DataVerifyDialog(QDialog):
     """
-    Dialog for verifying data integrity across all stored timeframes.
+    Dialog for verifying (and repairing) data integrity.
+
+    States
+    ------
+    - idle       — initial / after close
+    - verifying  — DataVerifyThread running
+    - results    — table populated, Fix Gaps visible if gaps exist
+    - repairing  — DataRepairThread running
+    - done       — repair finished, re-verification auto-started
 
     Layout
     ------
-    - Header label
-    - Summary banner (green = clean, amber = gaps found)
-    - Results table  (Symbol | Timeframe | Status | Gaps Found | Missing Bars)
-    - Progress bar   (visible during scan only)
-    - Button row     (Run Verification | Fix Gaps [conditional] | Close)
+    Header
+    Subtitle
+    [Summary GroupBox]  ← banner: green or amber
+    [Results GroupBox]  ← QTableWidget
+    ProgressBar + label (hidden when idle)
+    [Run Verification] [Fix Gaps (conditional)] [Close]
     """
+
+    # ------------------------------------------------------------------
+    # Construction
+    # ------------------------------------------------------------------
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._verify_thread: Optional[DataVerifyThread] = None
+        self._repair_thread: Optional[DataRepairThread] = None
         self._last_report: Dict = {}
         self._has_gaps: bool = False
 
         self._init_ui()
-        # Auto-start verification immediately on open
         self._start_verification()
 
-    # ------------------------------------------------------------------
-    # UI construction
-    # ------------------------------------------------------------------
-
     def _init_ui(self):
-        """Build the dialog widget hierarchy."""
         self.setWindowTitle("Verify Data — Data Integrity Check")
         self.setWindowFlags(
-            Qt.Window
-            | Qt.WindowTitleHint
-            | Qt.WindowCloseButtonHint
+            Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint
         )
         self.setModal(True)
-        self.setMinimumWidth(820)
-        self.setMinimumHeight(560)
-        self.resize(900, 620)
+        self.setMinimumWidth(860)
+        self.setMinimumHeight(580)
+        self.resize(940, 640)
         self.setStyleSheet(get_main_stylesheet())
 
         root = QVBoxLayout()
         root.setSpacing(12)
         root.setContentsMargins(20, 20, 20, 20)
 
-        # ── Header ──────────────────────────────────────────────────────
+        # Header
         header = QLabel("Data Integrity Verification")
         header.setFont(create_font(size=14, bold=True))
         header.setStyleSheet(get_panel_title_stylesheet())
@@ -131,7 +217,7 @@ class DataVerifyDialog(QDialog):
         subtitle.setWordWrap(True)
         root.addWidget(subtitle)
 
-        # ── Summary banner ───────────────────────────────────────────────
+        # Summary banner
         summary_group = QGroupBox("Summary")
         summary_layout = QVBoxLayout()
         summary_layout.setContentsMargins(10, 4, 10, 8)
@@ -147,7 +233,7 @@ class DataVerifyDialog(QDialog):
         summary_group.setLayout(summary_layout)
         root.addWidget(summary_group)
 
-        # ── Results table ────────────────────────────────────────────────
+        # Results table — 6 columns now includes Missing Bars with real counts
         results_group = QGroupBox("Results")
         results_layout = QVBoxLayout()
         results_layout.setContentsMargins(10, 10, 10, 10)
@@ -156,11 +242,12 @@ class DataVerifyDialog(QDialog):
         self._table.setHorizontalHeaderLabels(
             ["Timeframe", "Status", "Gaps Found", "Missing Bars", "Notes"]
         )
-        self._table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self._table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        hdr = self._table.horizontalHeader()
+        hdr.setSectionResizeMode(QHeaderView.Stretch)
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self._table.setAlternatingRowColors(True)
         self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self._table.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -171,7 +258,7 @@ class DataVerifyDialog(QDialog):
         results_group.setLayout(results_layout)
         root.addWidget(results_group)
 
-        # ── Progress bar ─────────────────────────────────────────────────
+        # Progress
         self._progress_bar = QProgressBar()
         self._progress_bar.setVisible(False)
         root.addWidget(self._progress_bar)
@@ -186,12 +273,12 @@ class DataVerifyDialog(QDialog):
 
         root.addStretch()
 
-        # ── Buttons ──────────────────────────────────────────────────────
+        # Buttons
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
         self._run_btn = QPushButton("Run Verification")
-        self._run_btn.setMinimumWidth(150)
+        self._run_btn.setMinimumWidth(160)
         self._run_btn.setMinimumHeight(38)
         self._run_btn.setStyleSheet(get_secondary_button_stylesheet())
         self._run_btn.clicked.connect(self._start_verification)
@@ -201,7 +288,7 @@ class DataVerifyDialog(QDialog):
         self._fix_btn.setMinimumWidth(130)
         self._fix_btn.setMinimumHeight(38)
         self._fix_btn.setStyleSheet(get_primary_button_stylesheet())
-        self._fix_btn.clicked.connect(self._on_fix_gaps)
+        self._fix_btn.clicked.connect(self._start_repair)
         self._fix_btn.setVisible(False)
         btn_row.addWidget(self._fix_btn)
 
@@ -216,49 +303,36 @@ class DataVerifyDialog(QDialog):
         self.setLayout(root)
 
     # ------------------------------------------------------------------
-    # Verification logic
+    # Verification
     # ------------------------------------------------------------------
 
     def _start_verification(self):
-        """Kick off the background verification thread."""
-        if self._verify_thread and self._verify_thread.isRunning():
+        """Kick off DataVerifyThread (read-only gap scan)."""
+        if (self._verify_thread and self._verify_thread.isRunning()) or \
+           (self._repair_thread and self._repair_thread.isRunning()):
             return
 
-        # Reset UI
         self._table.setRowCount(0)
         self._has_gaps = False
         self._fix_btn.setVisible(False)
         self._run_btn.setEnabled(False)
         self._summary_label.setText("Verification in progress…")
         self._summary_label.setStyleSheet(get_status_label_style('default'))
-        self._progress_bar.setValue(0)
-        self._progress_bar.setVisible(True)
-        self._progress_label.setVisible(True)
-        self._progress_label.setText("Initializing…")
+        self._show_progress(True, "Initialising…")
 
         self._verify_thread = DataVerifyThread()
         self._verify_thread.progress.connect(self._on_progress)
-        self._verify_thread.finished.connect(self._on_finished)
+        self._verify_thread.finished.connect(self._on_verify_finished)
         self._verify_thread.start()
 
-    def _on_progress(self, current: int, total: int, message: str):
-        """Handle incremental progress updates."""
-        self._progress_bar.setMaximum(total)
-        self._progress_bar.setValue(current)
-        self._progress_label.setText(message)
-
-    def _on_finished(self, success: bool, report: Dict):
-        """Populate results table and update summary banner."""
-        self._progress_bar.setVisible(False)
-        self._progress_label.setVisible(False)
+    def _on_verify_finished(self, success: bool, report: Dict):
+        self._show_progress(False)
         self._run_btn.setEnabled(True)
         self._last_report = report
 
         if not success:
             error_msg = report.get('_error', 'Unknown error')
-            self._summary_label.setText(
-                f"Verification failed: {error_msg}"
-            )
+            self._summary_label.setText(f"Verification failed: {error_msg}")
             self._summary_label.setStyleSheet(get_status_label_style('error'))
             self._add_error_row(error_msg)
             return
@@ -266,85 +340,156 @@ class DataVerifyDialog(QDialog):
         self._populate_table(report)
 
     def _populate_table(self, report: Dict):
-        """Fill the QTableWidget from verify_and_repair's report dict."""
+        """Fill the results table from the DataVerifyThread report."""
         self._table.setRowCount(0)
 
         total_gaps = 0
         total_missing = 0
+        affected_timeframes = 0
 
         for tf, tf_data in report.items():
             if tf.startswith('_'):
-                continue  # skip internal keys
+                continue
 
             gaps_found: int = tf_data.get('gaps_found', 0)
-            gaps_repaired: int = tf_data.get('gaps_repaired', 0)
-            gaps_too_old: int = tf_data.get('gaps_too_old', 0)
-            bars_fetched: int = tf_data.get('bars_fetched', 0)
-            errors = tf_data.get('errors', [])
+            missing_bars: int = tf_data.get('total_missing_bars', 0)
+            gaps: List[Dict] = tf_data.get('gaps', [])
 
             total_gaps += gaps_found
+            total_missing += missing_bars
+            if gaps_found > 0:
+                affected_timeframes += 1
+                self._has_gaps = True
 
-            # Derive status label and colour
+            # Status
             if gaps_found == 0:
                 status_text = "Clean"
                 status_color = COLORS['success']
-            elif gaps_too_old > 0 and gaps_found == gaps_too_old:
-                status_text = "Gaps (too old to repair)"
-                status_color = COLORS['warning']
-                self._has_gaps = True
+                notes = "No action required"
             else:
                 status_text = "Gaps Found"
                 status_color = COLORS['error']
-                self._has_gaps = True
-
-            # Notes column — surface repair hints or errors
-            if errors:
-                notes = "; ".join(errors[:2])
-            elif gaps_too_old > 0:
-                notes = f"{gaps_too_old} gap(s) older than Binance API horizon"
-            elif gaps_found == 0:
-                notes = "No action required"
-            else:
-                notes = "Use Fix Gaps to repair"
+                # Show earliest gap date as a hint
+                if gaps:
+                    earliest = min(g['gap_start'] for g in gaps)
+                    notes = f"Earliest: {earliest.strftime('%Y-%m-%d %H:%M')}"
+                else:
+                    notes = "Use Fix Gaps to repair"
 
             row = self._table.rowCount()
             self._table.insertRow(row)
 
-            def cell(text: str, color: Optional[str] = None) -> QTableWidgetItem:
+            def cell(text: str, color: Optional[str] = None, bold: bool = False) -> QTableWidgetItem:
                 item = QTableWidgetItem(str(text))
                 item.setTextAlignment(Qt.AlignCenter)
                 if color:
                     item.setForeground(QColor(color))
+                if bold:
+                    item.setFont(create_font(size=9, bold=True))
                 return item
 
             self._table.setItem(row, 0, cell(tf))
-            status_item = cell(status_text, status_color)
-            status_item.setFont(create_font(size=9, bold=True))
-            self._table.setItem(row, 1, status_item)
+            self._table.setItem(row, 1, cell(status_text, status_color, bold=True))
             self._table.setItem(row, 2, cell(str(gaps_found)))
-            self._table.setItem(row, 3, cell("—" if gaps_found == 0 else "see logs"))
+            # Real missing bar count — was "see logs", now shows actual number
+            self._table.setItem(row, 3, cell("—" if missing_bars == 0 else str(missing_bars)))
             self._table.setItem(row, 4, cell(notes))
 
-        # Update summary banner
+        # Summary banner
         if total_gaps == 0:
             self._summary_label.setText(
                 "All data is complete — no gaps found"
             )
             self._summary_label.setStyleSheet(get_status_label_style('success'))
+            self._fix_btn.setVisible(False)
         else:
-            affected = sum(
-                1 for tf, d in report.items()
-                if not tf.startswith('_') and d.get('gaps_found', 0) > 0
-            )
             self._summary_label.setText(
-                f"{total_gaps} gap(s) found across {affected} timeframe(s) "
-                "— use Fix Gaps to repair"
+                f"{total_gaps} gap(s) found across {affected_timeframes} timeframe(s) "
+                f"({total_missing} missing bars) — use Fix Gaps to repair"
             )
             self._summary_label.setStyleSheet(get_status_label_style('warning'))
             self._fix_btn.setVisible(True)
 
+    # ------------------------------------------------------------------
+    # Repair
+    # ------------------------------------------------------------------
+
+    def _start_repair(self):
+        """
+        Kick off DataRepairThread.
+
+        Calls verify_and_repair(dry_run=False) which fetches each detected
+        gap from Binance individually.  After repair finishes, automatically
+        re-runs verification so the user can confirm the data is clean.
+        """
+        if self._repair_thread and self._repair_thread.isRunning():
+            return
+
+        self._fix_btn.setVisible(False)
+        self._run_btn.setEnabled(False)
+        self._summary_label.setText("Repairing gaps — fetching missing bars from Binance…")
+        self._summary_label.setStyleSheet(get_status_label_style('info'))
+        self._show_progress(True, "Starting repair…")
+
+        self._repair_thread = DataRepairThread()
+        self._repair_thread.progress.connect(self._on_progress)
+        self._repair_thread.finished.connect(self._on_repair_finished)
+        self._repair_thread.start()
+
+    def _on_repair_finished(self, success: bool, summary: Dict):
+        self._show_progress(False)
+
+        if not success:
+            error_msg = summary.get('_error', 'Unknown error')
+            self._summary_label.setText(f"Repair failed: {error_msg}")
+            self._summary_label.setStyleSheet(get_status_label_style('error'))
+            self._run_btn.setEnabled(True)
+            return
+
+        # Build a quick human-readable repair result
+        repaired = sum(v.get('gaps_repaired', 0) for k, v in summary.items() if not k.startswith('_'))
+        too_old = sum(v.get('gaps_too_old', 0) for k, v in summary.items() if not k.startswith('_'))
+        bars = sum(v.get('bars_fetched', 0) for k, v in summary.items() if not k.startswith('_'))
+        errors = [e for k, v in summary.items() if not k.startswith('_') for e in v.get('errors', [])]
+
+        if errors:
+            self._summary_label.setText(
+                f"Repair completed with warnings: {repaired} gap(s) fixed, "
+                f"{len(errors)} error(s) — re-verifying…"
+            )
+            self._summary_label.setStyleSheet(get_status_label_style('warning'))
+        elif too_old > 0 and repaired == 0:
+            self._summary_label.setText(
+                f"Gaps are older than the Binance API horizon — cannot auto-repair. "
+                f"Re-verifying to confirm…"
+            )
+            self._summary_label.setStyleSheet(get_status_label_style('warning'))
+        else:
+            self._summary_label.setText(
+                f"Repair done: {repaired} gap(s) fixed, {bars} bars fetched — re-verifying…"
+            )
+            self._summary_label.setStyleSheet(get_status_label_style('success'))
+
+        # Always re-run verification so the user sees the current state
+        self._start_verification()
+
+    # ------------------------------------------------------------------
+    # Shared helpers
+    # ------------------------------------------------------------------
+
+    def _on_progress(self, current: int, total: int, message: str):
+        self._progress_bar.setMaximum(total)
+        self._progress_bar.setValue(current)
+        self._progress_label.setText(message)
+
+    def _show_progress(self, visible: bool, message: str = ""):
+        self._progress_bar.setVisible(visible)
+        self._progress_label.setVisible(visible)
+        if visible:
+            self._progress_label.setText(message)
+            self._progress_bar.setValue(0)
+
     def _add_error_row(self, error_msg: str):
-        """Insert a single error row into the table."""
         self._table.setRowCount(1)
         item = QTableWidgetItem(error_msg)
         item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -352,28 +497,17 @@ class DataVerifyDialog(QDialog):
         self._table.setItem(0, 4, item)
 
     # ------------------------------------------------------------------
-    # Actions
-    # ------------------------------------------------------------------
-
-    def _on_fix_gaps(self):
-        """Open the DataUpdateModal to repair detected gaps."""
-        from src.strategy_builder.ui.data_update_modal import DataUpdateModal
-        modal = DataUpdateModal(self.parent(), auto_mode=False)
-        modal.exec_()
-
-    # ------------------------------------------------------------------
     # Qt overrides
     # ------------------------------------------------------------------
 
     def showEvent(self, event):
-        """Apply hand cursors to buttons after the dialog is shown."""
         super().showEvent(event)
         from PyQt5.QtCore import QTimer
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
 
     def closeEvent(self, event):
-        """Stop the background thread if still running on close."""
-        if self._verify_thread and self._verify_thread.isRunning():
-            self._verify_thread.quit()
-            self._verify_thread.wait(2000)
+        for thread in (self._verify_thread, self._repair_thread):
+            if thread and thread.isRunning():
+                thread.quit()
+                thread.wait(2000)
         super().closeEvent(event)
