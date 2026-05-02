@@ -490,20 +490,20 @@ class DynamicTPCalculator:
             tp2_distance_pct = ((tp_levels.tp2 - entry_price) / entry_price) * 100
             tp3_distance_pct = ((tp_levels.tp3 - entry_price) / entry_price) * 100
         
-        # Rule 1: TP1 always used if reasonable (0.5-2%)
-        tp_levels.use_tp1 = 0.5 <= tp1_distance_pct <= 2.0
+        # Rule 1: TP1 always used if reasonable (0.5-4%) - WIDENED for Fibonacci extensions
+        tp_levels.use_tp1 = 0.5 <= tp1_distance_pct <= 4.0
         
-        # Rule 2: TP2 used if confident and reasonable (1-4%)
+        # Rule 2: TP2 used if confident and reasonable (1-8%) - WIDENED for Fibonacci extensions
         tp_levels.use_tp2 = (
             tp_levels.confidence >= 60 and
-            1.0 <= tp2_distance_pct <= 4.0 and
+            1.0 <= tp2_distance_pct <= 8.0 and
             tp_levels.use_tp1  # Only if TP1 also valid
         )
         
-        # Rule 3: TP3 used only if very confident and reasonable (2-6%)
+        # Rule 3: TP3 used only if very confident and reasonable (2-12%) - WIDENED for Fibonacci extensions
         tp_levels.use_tp3 = (
             tp_levels.confidence >= 70 and
-            2.0 <= tp3_distance_pct <= 6.0 and
+            2.0 <= tp3_distance_pct <= 12.0 and
             tp_levels.use_tp2  # Only if TP2 also valid
         )
         
