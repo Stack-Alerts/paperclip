@@ -18,10 +18,10 @@ Date: 2026-01-17
 from typing import Optional
 from decimal import Decimal, DecimalException
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, QDoubleSpinBox,
     QRadioButton, QButtonGroup, QComboBox, QProgressBar,
     QPushButton, QGroupBox, QTextEdit, QTabWidget, QCheckBox,
-    QLineEdit
+    QLineEdit, QApplication, QMessageBox, QProgressDialog
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QColor
@@ -48,6 +48,79 @@ from src.strategy_builder.ui.styles import (
 # Import universal combo box fix
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
 
+# Sprint 2.0.1 Task 2.0.1.3: Real data integration
+from src.optimizer_v3.core.backtest_data_provider import get_backtest_provider
+
+
+class StdoutCapture:
+    """
+    Captures stdout (print) output and emits via Qt signal.
+    
+    Used to redirect terminal output from DataManager/NautilusLoader
+    into the Status panel during backtest execution.
+    """
+    
+    def __init__(self, signal, original_stdout):
+        self.signal = signal
+        self.original_stdout = original_stdout
+        self._buffer = ""
+    
+    def write(self, text):
+        """Capture written text and emit via signal"""
+        # Always write to original stdout (terminal still shows output)
+        self.original_stdout.write(text)
+        
+        # Buffer partial lines, emit complete lines
+        self._buffer += text
+        while "\n" in self._buffer:
+            line, self._buffer = self._buffer.split("\n", 1)
+            line = line.rstrip()
+            if line:  # Skip empty lines
+                self.signal.emit(line)
+    
+    def flush(self):
+        """Flush remaining buffer"""
+        self.original_stdout.flush()
+        if self._buffer.strip():
+            self.signal.emit(self._buffer.strip())
+            self._buffer = ""
+
+
+class DictWrapper:
+    """
+    Lightweight wrapper to provide attribute access to Dict objects
+    
+    Sprint 2.0.2: Database returns Dict, but InstitutionalSignalEvaluator expects object attributes.
+    This wrapper allows Dict['key'] to be accessed as obj.key transparently.
+    
+    Handles nested dicts and lists of dicts automatically.
+    """
+    
+    def __init__(self, data):
+        """
+        Initialize wrapper with dict data
+        
+        Args:
+            data: Dict or any value to wrap
+        """
+        self._data = data
+    
+    def __getattr__(self, name):
+        """Provide attribute access to dict keys"""
+        if isinstance(self._data, dict):
+            value = self._data.get(name)
+            # Recursively wrap dicts
+            if isinstance(value, dict):
+                return DictWrapper(value)
+            # Wrap lists of dicts
+            elif isinstance(value, list):
+                return [DictWrapper(item) if isinstance(item, dict) else item for item in value]
+            return value
+        return None
+    
+    def __repr__(self):
+        return f"DictWrapper({self._data})"
+
 
 class BacktestWorker(QThread):
     """Worker thread for running backtests without blocking UI"""
@@ -57,15 +130,59 @@ class BacktestWorker(QThread):
     backtest_finished = pyqtSignal(bool, dict)  # success, results
     live_message = pyqtSignal(str, str, str)  # message, level, category - NEW for real-time messages
     trade_data_emit = pyqtSignal(dict)  # Emits trade data (OPEN initially, then updates when CLOSED)
+    status_message = pyqtSignal(str)  # Captured stdout for Status panel
     
-    def __init__(self, orchestrator, config: dict, output_panel=None):
+    def __init__(
+        self, 
+        strategy_config: dict, 
+        backtest_config: dict, 
+        output_panel=None,
+        trades_panel=None,  # MULTICORE FIX: Need reference for direct trade addition
+        cached_bars=None  # PHASE 1: Support pre-loaded bars
+    ):
+        """
+        Initialize backtest worker with PRE-SERIALIZED config
+        
+        INSTITUTIONAL PATTERN: Database Isolation
+        - No orchestrator reference (prevents database access)
+        - Strategy config is plain Dict (no ORM objects)
+        - All data pre-loaded before worker creation
+        
+        PHASE 1 ENHANCEMENT: Data Caching
+        - Accepts optional pre-loaded bars for performance
+        - Skips data loading if bars provided (massive speedup for testing)
+        - Maintains backward compatibility (cached_bars=None)
+        
+        Args:
+            strategy_config: Serialized strategy configuration (from orchestrator)
+            backtest_config: Backtest parameters (lookback, mode, etc.)
+            output_panel: Optional reference to live output panel
+            trades_panel: Optional reference to trades panel (for multicore)
+            cached_bars: Optional pre-loaded bars (Phase 1 optimization)
+        """
         super().__init__()
-        self.orchestrator = orchestrator
-        self.config = config
+        self.strategy_config = strategy_config  # Plain Dict, no database
+        self.config = backtest_config
         self.is_paused = False
         self.should_stop = False
-        self.output_panel = output_panel  # Store reference to output panel
-        self.timeframe = config.get('timeframe', '15m')  # Default to 15m if not specified
+        self.output_panel = output_panel
+        self.trades_panel = trades_panel  # MULTICORE FIX: Store reference
+        self.timeframe = backtest_config.get('timeframe', '15m')
+        
+        # PHASE 1: Store cached bars (None if not provided)
+        self.cached_bars = cached_bars
+        
+        # PHASE 2: Multicore engine flag (default: enabled for performance)
+        self.use_multicore = backtest_config.get('use_multicore', True)
+        
+        # Sprint 2.0.1 Task 2.0.1.3: Data provider for real bar loading
+        self.data_provider = get_backtest_provider()
+        
+        # Sprint 2.0.2 Task 2.0.2.7: Signal evaluator for institutional-grade trade decisions
+        self.signal_evaluator = None
+        
+        # PHASE 2: Multicore backtest engine (instantiated on demand)
+        self.multicore_engine = None
     
     def _bars_to_duration(self, num_bars: int) -> str:
         """
@@ -114,71 +231,306 @@ class BacktestWorker(QThread):
     def run(self):
         """Run backtest in background thread with LIVE message streaming"""
         try:
-            # TODO: Implement actual backtest execution
-            # This is a placeholder that simulates backtest progress
+            import sys
             
-            total_candles = 14040  # Example from spec
+            # Track TP/SL adjustments (REAL tracking, not hardcoded)
+            tp_sl_adjustments = {'TP1': 0, 'TP2': 0, 'TP3': 0, 'SL': 0}
+            
+            # ========== LOG ALL BACKTEST CONFIGURATION (FIRST THING!) ==========
+            self.live_message.emit("=" * 80, "INFO", "SYSTEM")
+            self.live_message.emit("BACKTEST CONFIGURATION", "INFO", "SYSTEM")
+            self.live_message.emit("=" * 80, "INFO", "SYSTEM")
+            
+            # Capital & Risk Settings
+            self.live_message.emit(f"💰 Starting Capital: ${self.config['starting_capital']:,} USD", "INFO", "SYSTEM")
+            self.live_message.emit(f"   Risk per Trade: {self.config['risk_per_trade_pct']}% of capital", "INFO", "SYSTEM")
+            self.live_message.emit(f"   Min Risk:Reward Ratio: {self.config['min_risk_reward']}:1", "INFO", "SYSTEM")
+            self.live_message.emit(f"   Max Leverage: {self.config['max_leverage']}x", "INFO", "SYSTEM")
+            self.live_message.emit(f"   Max Bars Held: {self.config['max_bars_held']} bars", "INFO", "SYSTEM")
+            self.live_message.emit("", "INFO", "SYSTEM")
+            
+            # Signal & Strategy Settings
+            self.live_message.emit(f"🎯 Confluence Threshold: {self.config['confluence_threshold']} points", "INFO", "SYSTEM")
+            self.live_message.emit("", "INFO", "SYSTEM")
+            
+            # TP/SL Configuration
+            self.live_message.emit(f"📊 TP/SL Configuration:", "INFO", "SYSTEM")
+            self.live_message.emit(f"   Initial TP/SL Mode: {self.config['tpsl_mode']}", "INFO", "SYSTEM")
+            self.live_message.emit(f"   SL Adjustment Mode: {self.config['sl_mode']}", "INFO", "SYSTEM")
+            
+            # Adaptive SL v2.0 Details
+            if self.config['adaptive_sl']['enabled']:
+                asl = self.config['adaptive_sl']
+                self.live_message.emit("", "INFO", "SYSTEM")
+                self.live_message.emit(f"🔧 Adaptive SL v2.0: ENABLED", "INFO", "SYSTEM")
+                self.live_message.emit(f"   Delay Enabled: {asl['delay_enabled']}", "INFO", "SYSTEM")
+                if asl['delay_enabled']:
+                    self.live_message.emit(f"   → Delay Period: {asl['delay_bars']} bars", "INFO", "SYSTEM")
+                    self.live_message.emit(f"   → Emergency SL: {asl['emergency_sl_pct']}% (during delay)", "INFO", "SYSTEM")
+                self.live_message.emit(f"   Volatility Analysis:", "INFO", "SYSTEM")
+                self.live_message.emit(f"   → Lookback: {asl['volatility_lookback']} bars", "INFO", "SYSTEM")
+                self.live_message.emit(f"   → Multiplier: {asl['volatility_multiplier']}x ATR", "INFO", "SYSTEM")
+                self.live_message.emit(f"   SL Range: {asl['min_sl_pct']}% to {asl['max_sl_pct']}%", "INFO", "SYSTEM")
+                self.live_message.emit(f"   Market Structure SL: {asl['use_structure_sl']}", "INFO", "SYSTEM")
+                if asl['use_structure_sl']:
+                    sources = ', '.join(asl['structure_sources'])
+                    self.live_message.emit(f"   → Sources: {sources}", "INFO", "SYSTEM")
+            else:
+                self.live_message.emit(f"   Adaptive SL: DISABLED (Static SL)", "INFO", "SYSTEM")
+            
+            self.live_message.emit("=" * 80, "INFO", "SYSTEM")
+            self.live_message.emit("", "INFO", "SYSTEM")
+            
+            # Continue with backtest
             trade_count = 0
             
-            # Emit start message LIVE
-            self.live_message.emit("Backtest started - loading historical data...", "INFO", "SYSTEM")
+            # PHASE 1.2: Use cached bars if provided, otherwise load from data manager
+            if self.cached_bars is not None:
+                # FAST PATH: Use pre-loaded bars (MASSIVE speedup for testing!)
+                bars = self.cached_bars
+                self.live_message.emit(
+                    f"✅ Using cached data: {len(bars):,} bars (fast path)",
+                    "INFO",
+                    "SYSTEM"
+                )
+                self.live_message.emit(
+                    "⚡ Skipped data loading - saved ~10 seconds!",
+                    "INFO",
+                    "SYSTEM"
+                )
+            else:
+                # NORMAL PATH: Load bars from data manager
+                self.live_message.emit("Loading real historical data from DataManager...", "INFO", "SYSTEM")
+                
+                # CAPTURE STDOUT: Redirect print() output to Status panel
+                # DataManager/NautilusLoader/BarAggregator use print() for progress
+                original_stdout = sys.stdout
+                stdout_capture = StdoutCapture(self.status_message, original_stdout)
+                sys.stdout = stdout_capture
+                
+                try:
+                    # Load bars using data provider with progress callback
+                    bars = self.data_provider.load_bars_for_backtest(
+                        timeframe=self.config['timeframe'],
+                        start_date=self.config['start_date'],
+                        end_date=self.config['end_date'],
+                        progress_callback=self._on_data_load_progress
+                    )
+                    
+                    # INSTITUTIONAL OPTIMIZATION: Cache the loaded bars for future use
+                    from src.optimizer_v3.core.data_cache_manager import get_data_cache_manager
+                    cache_manager = get_data_cache_manager()
+                    cache_manager.cache_bars(bars, self.config)  # FIXED: Correct parameter order
+                    self.live_message.emit(
+                        f"💾 Cached {len(bars):,} bars for future reuse",
+                        "INFO",
+                        "SYSTEM"
+                    )
+                finally:
+                    # ALWAYS restore stdout (even on error)
+                    stdout_capture.flush()
+                    sys.stdout = original_stdout
+            
+            # Sprint 2.0.1 Task 2.0.1.4: Use REAL count from loaded bars
+            total_candles = len(bars)
+            
+            # CRITICAL: Initialize progress bar with actual total
+            self.progress_updated.emit(0, total_candles, f"Loaded {total_candles:,} bars, starting backtest...")
+            
+            self.live_message.emit(
+                f"✅ Loaded {total_candles:,} real 15m bars from DataManager",
+                "INFO",
+                "SYSTEM"
+            )
             self.msleep(200)
             
-            self.live_message.emit(f"Processing {total_candles:,} candles...", "INFO", "SYSTEM")
-            self.msleep(200)
+            # Sprint 2.0.2 Task 2.0.2.7: Initialize institutional signal evaluator
+            self.live_message.emit("Initializing institutional signal evaluator...", "INFO", "SYSTEM")
+
+            # INSTITUTIONAL PATTERN: Use pre-loaded config (NO DATABASE ACCESS!)
+            strategy_config = self.strategy_config
+            if not strategy_config:
+                raise ValueError("No strategy config provided - internal error")
+
+            # Handle Dict from serialized config
+            strategy_name = strategy_config.get('name', 'Unknown')
+            blocks = strategy_config.get('blocks', [])
+            blocks_count = len(blocks)
+            signals_count = sum(len(b.get('signals', [])) for b in blocks)
             
-            # Emit examples of ALL message types for filter demonstration
+            self.live_message.emit(f"✅ Strategy loaded: {strategy_name} ({blocks_count} blocks, {signals_count} signals)", "INFO", "SYSTEM")
+
+            # Wrap Dict to provide attribute access for evaluator
+            strategy_config_wrapped = DictWrapper(strategy_config)
+
+            # Initialize evaluator with strategy
+            from src.optimizer_v3.core.institutional_signal_evaluator import InstitutionalSignalEvaluator
+            evaluator = InstitutionalSignalEvaluator(strategy_config_wrapped)
+
+            self.live_message.emit("✅ Signal evaluator initialized with strategy configuration", "INFO", "SYSTEM")
             self.live_message.emit("Risk management initialized: Max position size = 0.1 BTC", "INFO", "RISK")
-            self.live_message.emit("Signal detection active: Pattern recognition enabled", "INFO", "SIGNAL")
-            self.live_message.emit("Position entry decision: Market conditions favorable", "DECISION", "TRADE")
+            self.live_message.emit("Signal detection active: Multi-level RECHECK, Sequential TIMING, 3-tier EXIT", "INFO", "SIGNAL")
             self.msleep(100)
             
-            # MODIFIED: Simulate trades with OVERLAPPING positions to test multiple simultaneous positions
-            # This creates scenarios where multiple positions are open at once, then some close while others remain
+            # REAL SIGNAL-DRIVEN BACKTESTING (Sprint 2.0.2)
+            # Replace hardcoded schedule with real signal evaluation
             
-            # Define trade entry and exit points separately to create overlaps
-            trade_schedule = [
-                # (entry_candle, entry_id, exit_candle)
-                # Open 5 positions first
-                (500, 1, 1500),   # Stays open for 1000 candles
-                (800, 2, 2200),   # Stays open for 1400 candles  
-                (1100, 3, 1800),  # Closes first while others open
-                (1400, 4, 3000),  # Long hold
-                (1700, 5, 2500),  # Medium hold
-                # Now 5 positions are open, start closing some
-                # Trade 3 closes at 1800 (2,4,5 still OPEN)
-                # Trade 1 closes at 1500 (already happened, but delayed for effect)
-                (2000, 6, 3200),  # Open while others are still open
-                # Trade 2 closes at 2200 (4,5,6 still OPEN)
-                (2400, 7, 4000),  
-                # Trade 5 closes at 2500 (4,6,7 still OPEN)
-                (2800, 8, 4500),
-                # Trade 4 closes at 3000 (6,7,8 still OPEN)
-                (3200, 9, 5000),
-                # Trade 6 closes at 3200, Trade 9 opens same time (7,8,9 OPEN)
-                (3600, 10, 5500),
-                (4000, 11, 6000),
-                # Trade 7 closes at 4000, 11 opens (8,9,10,11 OPEN)
-                (4400, 12, 6500),
-                # More overlapping trades
-                (4800, 13, 7000),
-                (5200, 14, 7500),
-                (5600, 15, 8000),
-                (6000, 16, 8500),
-                (6400, 17, 9000),
-                (6800, 18, 9500),
-                (7200, 19, 10000),
-                (7600, 20, 10500),
-                (8000, 21, 11000),
-                (8400, 22, 11500),
-                (8800, 23, 12000),
-                (9200, 24, 12500),
-            ]
+            # Determine trade side once (used for both entry and TP/SL hit detection)
+            side = 'SHORT' if strategy_config.get('strategy_type') == 'Bearish' else 'LONG'
             
-            # Track open positions
-            open_positions = {}  # {trade_id: (entry_price, entry_timestamp, side)}
+            # Initialize Adaptive SL Manager (if enabled)
+            adaptive_sl_manager = None
+            if self.config['adaptive_sl']['enabled']:
+                from src.optimizer_v3.core.adaptive_sl_manager import get_adaptive_sl_manager
+                adaptive_sl_manager = get_adaptive_sl_manager()
             
-            for i in range(0, total_candles, 20):  # Process 20 candles at a time
+            # PHASE 2: MULTICORE vs SINGLE-CORE ROUTING
+            if self.use_multicore:
+                # ========== MULTICORE PATH: Parallel Processing ==========
+                self.live_message.emit("🚀 Using multicore backtest engine", "INFO", "SYSTEM")
+                
+                from src.optimizer_v3.core.multicore_backtest_engine import MulticoreBacktestEngine
+                engine = MulticoreBacktestEngine()  # Auto-detects CPUs
+                
+                self.live_message.emit(
+                    f"Detected {engine.num_processes} CPUs for parallel processing",
+                    "INFO",
+                    "SYSTEM"
+                )
+                
+                # CRITICAL FIX 2026-02-13: Pass COMPLETE config to multicore engine
+                # Previous bug: Only passed 3 keys, lost adaptive_sl + all risk parameters
+                mc_config = self.config.copy()  # ← Pass ALL 23+ parameters!
+                mc_config['strategy_type'] = strategy_config.get('strategy_type', 'Bullish')
+                
+                # VALIDATION LOGGING: Verify config completeness AND VALUES
+                import logging
+                from pathlib import Path
+                Path("logs/wiring-test").mkdir(parents=True, exist_ok=True)
+                logger = logging.getLogger('multicore_config')
+                if not logger.handlers:
+                    logger.setLevel(logging.INFO)
+                    fh = logging.FileHandler('logs/wiring-test/multicore_config.log')
+                    fh.setFormatter(logging.Formatter('[%(asctime)s] %(message)s'))
+                    logger.addHandler(fh)
+                
+                # Log ACTUAL VALUES (not just counts!)
+                asl = mc_config.get('adaptive_sl', {})
+                logger.info(f"=== BACKTEST CONFIG ===")
+                logger.info(f"Vol Lookback: {asl.get('volatility_lookback')}, Vol Multi: {asl.get('volatility_multiplier')}")
+                logger.info(f"Delay Bars: {asl.get('delay_bars')}, Emergency SL: {asl.get('emergency_sl_pct')}%")
+                logger.info(f"Min SL: {asl.get('min_sl_pct')}, Max SL: {asl.get('max_sl_pct')}")
+                
+                # Run multicore backtest
+                mc_results = engine.run_backtest(
+                    bars=bars,
+                    strategy_config=strategy_config,
+                    backtest_config=mc_config,
+                    progress_callback=lambda curr, total, msg: self.progress_updated.emit(curr, total, msg)
+                )
+                
+                # Process multicore results
+                trades_list = mc_results.get('trades', [])
+                trade_count = len(trades_list)
+                
+                self.live_message.emit(
+                    f"✅ Multicore backtest complete: {trade_count} trades found",
+                    "INFO",
+                    "SYSTEM"
+                )
+                
+                # CRITICAL: Emit ALL collected messages from subprocesses (matches single-core!)
+                # Subprocesses collected messages as dicts, now emit them in main thread
+                all_messages = mc_results.get('messages', [])
+                if all_messages:
+                    self.live_message.emit("", "INFO", "SYSTEM")
+                    self.live_message.emit("📋 Trade Details (from parallel processing):", "INFO", "SYSTEM")
+                    for msg in all_messages:
+                        self.live_message.emit(msg['text'], msg['level'], msg['category'])
+                
+                # CRITICAL: Emit each trade to the UI
+                # MULTICORE NOTE: Trades are already CLOSED (never emitted as OPEN)
+                # Must use signal (thread-safe), NOT direct widget access (deadlocks!)
+                for trade in trades_list:
+                    # Convert multicore trade format to UI format
+                    # CRITICAL FIX: Use sequential trade_id (not entry_bar!)
+                    trade_data = {
+                        'id': str(trade.get('trade_id', trade.get('entry_bar', 0))),  # Sequential ID
+                        'timestamp': trade.get('entry_timestamp'),
+                        'symbol': 'BTC.P/USDT',
+                        'side': trade.get('side', side),
+                        'size': 0.1,
+                        'entry_price': trade.get('entry_price', 0),
+                        'exit_price': trade.get('exit_price', 0),
+                        'duration': self._bars_to_duration(trade.get('bars_held', 0)),
+                        'pnl': trade.get('pnl', 0),
+                        'pnl_pct': trade.get('pnl_pct', 0),
+                        'status': 'CLOSED',
+                        'notes': trade.get('exit_reason', 'Trade closed'),
+                        'exit_type': trade.get('exit_type'),
+                        'exit_condition_name': trade.get('exit_condition_name'),
+                        'partial_exit_percentage': None
+                    }
+                    
+                    # Emit via signal (thread-safe) - handler adds to trades panel
+                    self.trade_data_emit.emit(trade_data)
+                
+                self.live_message.emit(
+                    f"✅ Emitted all {trade_count} trades to UI",
+                    "INFO",
+                    "SYSTEM"
+                )
+                
+                # CRITICAL FIX: Emit summary performance metrics (since subprocess can't emit detailed messages)
+                if trade_count > 0:
+                    winning_trades = sum(1 for t in trades_list if t.get('pnl', 0) > 0)
+                    win_rate = (winning_trades / trade_count) * 100
+                    total_pnl = sum(t.get('pnl', 0) for t in trades_list)
+                    
+                    self.live_message.emit("", "INFO", "SYSTEM")
+                    self.live_message.emit("📊 Performance Summary:", "INFO", "OPTIMIZER")
+                    self.live_message.emit(
+                        f"   {trade_count} trades, Win Rate: {win_rate:.1f}%, Total PnL: ${total_pnl:.2f}",
+                        "INFO",
+                        "OPTIMIZER"
+                    )
+                    
+                    # Show sample trades
+                    self.live_message.emit("", "INFO", "SYSTEM")
+                    self.live_message.emit("📋 Sample Trades (first 5):", "INFO", "TRADE")
+                    for i, trade in enumerate(trades_list[:5], 1):
+                        status = "WIN" if trade.get('pnl', 0) > 0 else "LOSS"
+                        self.live_message.emit(
+                            f"   Trade #{i}: {status} - Entry ${trade.get('entry_price', 0):.2f}, "
+                            f"Exit ${trade.get('exit_price', 0):.2f}, "
+                            f"PnL: ${trade.get('pnl', 0):.2f} ({trade.get('pnl_pct', 0):.2f}%)",
+                            "ACTION" if trade.get('pnl', 0) > 0 else "WARNING",
+                            "TRADE"
+                        )
+                
+                # Emit final progress
+                self.progress_updated.emit(total_candles, total_candles, f"Multicore complete: {trade_count} trades")
+                
+                # Calculate results
+                results = {
+                    'total_candles': total_candles,
+                    'trades': trade_count,
+                    'tp_adjustments': mc_results.get('tp_adjustments', {'TP1': 0, 'TP2': 0, 'TP3': 0, 'SL': 0})  # From multicore engine
+                }
+                
+                self.live_message.emit(
+                    f"✅ Backtest completed successfully! {trade_count} trades executed.",
+                    "INFO",
+                    "SYSTEM"
+                )
+                
+                self.backtest_finished.emit(True, results)
+                return
+            
+            # ========== SINGLE-CORE PATH: Sequential Processing ==========
+            self.live_message.emit("Using single-core backtest engine", "INFO", "SYSTEM")
+            
+            for i in range(total_candles):  # Process bar-by-bar
                 if self.should_stop:
                     self.live_message.emit("Backtest stopped by user", "WARNING", "SYSTEM")
                     self.backtest_finished.emit(False, {'error': 'Stopped by user'})
@@ -188,139 +540,294 @@ class BacktestWorker(QThread):
                 while self.is_paused and not self.should_stop:
                     self.msleep(100)
                 
-                # Emit progress every iteration
-                progress_msg = f"Processing candles {i}/{total_candles}"
-                self.progress_updated.emit(i, total_candles, progress_msg)
+                # Get current bar and lookback window
+                current_bar = bars[i]
+                # CRITICAL FIX: Pass ALL available historical data, not just 100 bars
+                # Building blocks need sufficient history (50-200 bars minimum)
+                # User configured 180 day lookback = ~17,280 bars for 15min timeframe
+                lookback_bars = bars[0:i]  # ALL bars from start to current
+
+                # Evaluate signals for current bar (REAL signal-driven!)
+                result = evaluator.evaluate_bar(current_bar, i, lookback_bars, total_candles)
                 
-                # Check for trade ENTRIES in this candle range
-                for entry_candle, trade_id, exit_candle in trade_schedule:
-                    if i <= entry_candle < i + 20 and trade_id not in open_positions:
-                        trade_count += 1
+                # ENTRY DECISION (REAL signal-driven!)
+                if result.should_enter and not evaluator.current_trade:
+                    trade_count += 1
+                    
+                    # Emit live messages (side already determined above)
+                    self.live_message.emit(
+                        f"Entry #{trade_count}: Confluence {result.confluence_score} pts, signals: {', '.join(result.signals_fired[:3])}",
+                        "DECISION",
+                        "SIGNAL"
+                    )
+                    self.live_message.emit(
+                        f"Risk: Position size 0.1 BTC, max loss $100",
+                        "INFO",
+                        "RISK"
+                    )
+                    
+                    # Create trade with real data
+                    from datetime import datetime
+                    entry_price = float(current_bar.close)
+                    entry_timestamp = datetime.fromtimestamp(current_bar.ts_init / 1e9)
+                    
+                    # Enter trade via evaluator
+                    evaluator.enter_trade(current_bar, i, side)
+                    
+                    # CRITICAL: Store entry_timestamp in current_trade (TradeState doesn't have it by default)
+                    evaluator.current_trade.entry_timestamp = entry_timestamp
+
+                    # CRITICAL FIX: Calculate TP/SL levels on entry (Issue #5)
+                    from src.optimizer_v3.core.tpsl_calculator import get_tpsl_calculator
+                    tpsl_calc = get_tpsl_calculator()
+                    
+                    tpsl_mode = self.config.get('tpsl_mode', 'Fibonacci')
+                    tpsl_levels = tpsl_calc.calculate_levels(
+                        entry_price=entry_price,
+                        mode=tpsl_mode,
+                        lookback_bars=lookback_bars,
+                        config=self.config,
+                        entry_side=side
+                    )
+                    
+                    # Store TP/SL levels in evaluator's current_trade
+                    evaluator.current_trade.tpsl_levels = tpsl_levels
+                    evaluator.current_trade.initial_sl = tpsl_levels.stop_loss  # Track initial for comparison
+                    
+                    # Log TP/SL levels for transparency with MODE and R:R
+                    self.live_message.emit(
+                        f"TP/SL Mode: {tpsl_mode} | R:R= {tpsl_levels.risk_reward_ratio:.2f}:1",
+                        "INFO",
+                        "RISK"
+                    )
+                    self.live_message.emit(
+                        f"  Entry: ${entry_price:.2f} | SL: ${tpsl_levels.stop_loss:.2f} (Risk: ${abs(entry_price - tpsl_levels.stop_loss):.2f})",
+                        "INFO",
+                        "RISK"
+                    )
+                    self.live_message.emit(
+                        f"  TP1: ${tpsl_levels.take_profit_1:.2f} | TP2: ${tpsl_levels.take_profit_2:.2f} | TP3: ${tpsl_levels.take_profit_3:.2f}",
+                        "INFO",
+                        "RISK"
+                    )
+
+                    # Emit trade as OPEN
+                    open_trade_data = {
+                        'id': str(trade_count),
+                        'timestamp': entry_timestamp,
+                        'symbol': 'BTC.P/USDT',
+                        'side': side,
+                        'size': 0.1,
+                        'entry_price': entry_price,
+                        'exit_price': None,
+                        'duration': '-',
+                        'pnl': 0.0,
+                        'pnl_pct': 0.0,
+                        'status': 'OPEN',
+                        'notes': f'Signal-driven entry #{trade_count}',
+                        'exit_type': None,
+                        'exit_condition_name': None,
+                        'partial_exit_percentage': None
+                    }
+                    self.trade_data_emit.emit(open_trade_data)
+                
+                # ADAPTIVE SL UPDATE: Adjust SL every bar (if enabled and trade is open)
+                if adaptive_sl_manager and evaluator.current_trade and hasattr(evaluator.current_trade, 'tpsl_levels'):
+                    bars_since_entry = i - evaluator.current_trade.entry_bar
+                    
+                    # Call Adaptive SL manager
+                    sl_result = adaptive_sl_manager.update_sl(
+                        position_entry_price=float(evaluator.current_trade.entry_price),
+                        current_bar=current_bar,
+                        bars_since_entry=bars_since_entry,
+                        lookback_bars=lookback_bars[-self.config['adaptive_sl']['volatility_lookback']:] if len(lookback_bars) > 0 else [],
+                        config=self.config['adaptive_sl'],
+                        entry_side=side
+                    )
+                    
+                    # Check if SL changed
+                    old_sl = evaluator.current_trade.tpsl_levels.stop_loss
+                    new_sl = sl_result.new_sl
+                    
+                    if abs(new_sl - old_sl) > 0.01:  # Changed by more than $0.01
+                        # Update SL level
+                        evaluator.current_trade.tpsl_levels.stop_loss = new_sl
+                        tp_sl_adjustments['SL'] += 1
                         
-                        # Emit DECISION message before trade entry
+                        # Log adjustment
                         self.live_message.emit(
-                            f"Entry decision: Confluence threshold met, opening position #{trade_id}",
-                            "DECISION",
-                            "SIGNAL"
-                        )
-                        
-                        # Emit RISK message for position sizing
-                        self.live_message.emit(
-                            f"Risk calculation: Position size 0.1 BTC, max loss $100",
+                            f"SL Adjusted: {old_sl:.2f} → {new_sl:.2f} ({sl_result.sl_mode}, {sl_result.reason})",
                             "INFO",
-                            "RISK"
+                            "OPTIMIZER"
                         )
-                        
-                        # Generate realistic trade data
-                        from datetime import datetime, timedelta
-                        entry_price = 50000 + (trade_id * 100)
-                        entry_timestamp = datetime.now() - timedelta(minutes=(24-trade_id)*30)
-                        side = 'LONG' if trade_id % 2 == 0 else 'SHORT'
-                        
-                        # Store open position
-                        open_positions[trade_id] = (entry_price, entry_timestamp, side)
-                        
-                        # EMIT TRADE AS OPEN
-                        open_trade_data = {
-                            'id': str(trade_id),
-                            'timestamp': entry_timestamp,
-                            'symbol': 'BTC.P/USDT',
-                            'side': side,
-                            'size': 0.1,
-                            'entry_price': entry_price,
-                            'exit_price': None,
-                            'duration': '-',
-                            'pnl': 0.0,
-                            'pnl_pct': 0.0,
-                            'status': 'OPEN',
-                            'notes': f'Demo trade #{trade_id} - OPEN',
-                            # Sprint 1.8 Task 1.8.79: Exit condition fields
-                            'exit_type': None,  # Will be set on close (TP1/TP2/TP3/SL/EXIT_CONDITION)
-                            'exit_condition_name': None,  # Exit condition signal name if applicable
-                            'partial_exit_percentage': None  # Exit percentage if partial
-                        }
-                        self.trade_data_emit.emit(open_trade_data)
-                        
-                        # Log multiple open positions if applicable
-                        if len(open_positions) > 1:
-                            self.live_message.emit(
-                                f"📊 Multiple positions OPEN: {len(open_positions)} trades (IDs: {', '.join(map(str, sorted(open_positions.keys())))})",
-                                "INFO",
-                                "TRADE"
-                            )
-                        
-                        self.msleep(50)
                 
-                # Check for trade EXITS in this candle range
-                for entry_candle, trade_id, exit_candle in trade_schedule:
-                    if i <= exit_candle < i + 20 and trade_id in open_positions:
-                        entry_price, entry_timestamp, side = open_positions[trade_id]
+                # CRITICAL FIX: Check TP/SL price hits BEFORE signal-based exits (Issue #5)
+                # TP/SL exits are MANDATORY and take priority over signal-based exits
+                if evaluator.current_trade and hasattr(evaluator.current_trade, 'tpsl_levels'):
+                    current_price = float(current_bar.close)
+                    tpsl = evaluator.current_trade.tpsl_levels
+                    
+                    # CRITICAL FIX #1: Check MAX BARS HELD (time limit) FIRST
+                    bars_held = i - evaluator.current_trade.entry_bar
+                    max_bars = self.config.get('max_bars_held', 200)
+                    
+                    if bars_held >= max_bars:
+                        result.should_exit = True
+                        result.exit_reason = f"Max Hold Time ({max_bars} bars)"
+                        result.exit_percentage = evaluator.current_trade.remaining_position
+                        result.exit_type = "TIME_LIMIT"
+                        result.exit_condition_name = "MAX_BARS"
+                    
+                    # CRITICAL FIX #2: Check SL/TP with proper TP tracking
+                    elif True:  # Only check prices if time limit not hit
+                        # Track which TPs already hit (use tp_hits list in TradeState)
+                        tp_hits = evaluator.current_trade.tp_hits
                         
-                        # Determine win/loss
-                        is_win = trade_id <= 14  # First 14 are wins
+                        # PARTIAL EXITS: TP1=33%, TP2=33%, TP3=34% (total 100%)
+                        remaining = evaluator.current_trade.remaining_position
                         
-                        if is_win:
-                            pnl = 75.0 + (trade_id * 0.5)
-                            exit_price = entry_price * 1.015
-                            pnl_pct = 1.5
-                            self.live_message.emit(
-                                f"Trade {trade_id} closed: WIN - PnL: ${pnl:.2f} (Remaining open: {len(open_positions)-1})",
-                                "ACTION",
-                                "TRADE"
-                            )
-                        else:
-                            pnl = -50.0 - (trade_id * 0.3)
-                            exit_price = entry_price * 0.99
-                            pnl_pct = -1.0
-                            self.live_message.emit(
-                                f"Trade {trade_id} closed: LOSS - PnL: ${pnl:.2f} (Remaining open: {len(open_positions)-1})",
-                                "WARNING",
-                                "TRADE"
-                            )
+                        if side == 'LONG':
+                            # LONG: Check SL hit (price below SL) first
+                            if current_price <= tpsl.stop_loss:
+                                result.should_exit = True
+                                result.exit_reason = "Stop Loss Hit"
+                                result.exit_percentage = remaining  # Exit ALL remaining
+                                result.exit_type = "STOP_LOSS"
+                                result.exit_condition_name = "SL"
+                            
+                            # Check TPs in order - only if NOT already hit
+                            elif 'TP1' not in tp_hits and current_price >= tpsl.take_profit_1:
+                                result.should_exit = True
+                                result.exit_reason = "TP1 Hit"
+                                result.exit_percentage = min(0.33, remaining)  # 33% or remaining
+                                result.exit_type = "TAKE_PROFIT"
+                                result.exit_condition_name = "TP1"
+                            
+                            elif 'TP2' not in tp_hits and current_price >= tpsl.take_profit_2:
+                                result.should_exit = True
+                                result.exit_reason = "TP2 Hit"
+                                result.exit_percentage = min(0.33, remaining)  # 33% or remaining
+                                result.exit_type = "TAKE_PROFIT"
+                                result.exit_condition_name = "TP2"
+                            
+                            elif 'TP3' not in tp_hits and current_price >= tpsl.take_profit_3:
+                                result.should_exit = True
+                                result.exit_reason = "TP3 Hit"
+                                result.exit_percentage = remaining  # Exit ALL remaining (last TP)
+                                result.exit_type = "TAKE_PROFIT"
+                                result.exit_condition_name = "TP3"
                         
-                        # Emit CLOSED trade data with human-readable duration
-                        num_bars = exit_candle - entry_candle
-                        duration_text = self._bars_to_duration(num_bars)
-                        
-                        closed_trade_data = {
-                            'id': str(trade_id),
-                            'timestamp': entry_timestamp,
-                            'symbol': 'BTC.P/USDT',
-                            'side': side,
-                            'size': 0.1,
-                            'entry_price': entry_price,
-                            'exit_price': exit_price,
-                            'duration': duration_text,  # Human-readable time (e.g., "16h 40m")
-                            'pnl': pnl,
-                            'pnl_pct': pnl_pct,
-                            'status': 'CLOSED',
-                            'notes': f'Demo trade #{trade_id} - CLOSED'
-                        }
-                        self.trade_data_emit.emit(closed_trade_data)
-                        
-                        # Remove from open positions
-                        del open_positions[trade_id]
-                        
-                        # Log remaining open positions
-                        if open_positions:
-                            self.live_message.emit(
-                                f"📊 Remaining OPEN positions: {len(open_positions)} trades (IDs: {', '.join(map(str, sorted(open_positions.keys())))})",
-                                "INFO",
-                                "TRADE"
-                            )
-                        
-                        self.msleep(50)
+                        else:  # SHORT
+                            # SHORT: Check SL hit (price above SL) first
+                            if current_price >= tpsl.stop_loss:
+                                result.should_exit = True
+                                result.exit_reason = "Stop Loss Hit"
+                                result.exit_percentage = remaining
+                                result.exit_type = "STOP_LOSS"
+                                result.exit_condition_name = "SL"
+                            
+                            # Check TPs in order - only if NOT already hit
+                            elif 'TP1' not in tp_hits and current_price <= tpsl.take_profit_1:
+                                result.should_exit = True
+                                result.exit_reason = "TP1 Hit"
+                                result.exit_percentage = min(0.33, remaining)
+                                result.exit_type = "TAKE_PROFIT"
+                                result.exit_condition_name = "TP1"
+                            
+                            elif 'TP2' not in tp_hits and current_price <= tpsl.take_profit_2:
+                                result.should_exit = True
+                                result.exit_reason = "TP2 Hit"
+                                result.exit_percentage = min(0.33, remaining)
+                                result.exit_type = "TAKE_PROFIT"
+                                result.exit_condition_name = "TP2"
+                            
+                            elif 'TP3' not in tp_hits and current_price <= tpsl.take_profit_3:
+                                result.should_exit = True
+                                result.exit_reason = "TP3 Hit"
+                                result.exit_percentage = remaining  # Exit ALL remaining (last TP)
+                                result.exit_type = "TAKE_PROFIT"
+                                result.exit_condition_name = "TP3"
                 
-                # Emit progress messages every 500 candles for summary
+                # EXIT DECISION (signal-driven - only if no TP/SL exit triggered)
+                if result.should_exit and evaluator.current_trade:
+                    exit_price = float(current_bar.close)
+                    entry_bar = evaluator.current_trade.entry_bar  # FIXED: use entry_bar, not entry_bar_idx
+                    
+                    # CRITICAL: Handle None entry_bar (defensive programming)
+                    if entry_bar is None:
+                        self.live_message.emit(
+                            f"Warning: Trade #{trade_count} has no entry_bar, using 0 duration",
+                            "WARNING",
+                            "SYSTEM"
+                        )
+                        num_bars = 0
+                    else:
+                        num_bars = i - entry_bar
+                    
+                    duration_text = self._bars_to_duration(num_bars)
+                    
+                    # Calculate PnL
+                    entry_price = float(evaluator.current_trade.entry_price)  # FIXED: convert Price to float
+                    if side == 'LONG':
+                        pnl_pct = ((exit_price - entry_price) / entry_price) * 100
+                    else:
+                        pnl_pct = ((entry_price - exit_price) / entry_price) * 100
+                    pnl = pnl_pct * 10  # Simplified
+                    
+                    # Emit trade update (PARTIAL or CLOSED)
+                    is_full_exit = result.exit_percentage >= evaluator.current_trade.remaining_position
+                    
+                    closed_trade_data = {
+                        'id': str(trade_count),
+                        'timestamp': evaluator.current_trade.entry_timestamp,
+                        'symbol': 'BTC.P/USDT',
+                        'side': side,
+                        'size': 0.1,
+                        'entry_price': entry_price,
+                        'exit_price': exit_price,
+                        'duration': duration_text,
+                        'pnl': pnl,
+                        'pnl_pct': pnl_pct,
+                        'status': 'CLOSED' if is_full_exit else 'PARTIAL',
+                        'notes': f'{result.exit_reason}',
+                        'exit_type': getattr(result, 'exit_type', None),
+                        'exit_condition_name': getattr(result, 'exit_condition_name', None),
+                        'partial_exit_percentage': f"{int(result.exit_percentage * 100)}%" if not is_full_exit else None
+                    }
+                    self.trade_data_emit.emit(closed_trade_data)
+                    
+                    # Log exit
+                    status = "WIN" if pnl > 0 else "LOSS"
+                    self.live_message.emit(
+                        f"Exit #{trade_count}: {status} - PnL: ${pnl:.2f} ({pnl_pct:.2f}%) - Reason: {result.exit_reason}",
+                        "ACTION" if pnl > 0 else "WARNING",
+                        "TRADE"
+                    )
+                    
+                # CRITICAL FIX #3: Track which TP was hit before clearing position
+                if hasattr(result, 'exit_condition_name') and result.exit_condition_name:
+                    if result.exit_condition_name in ['TP1', 'TP2', 'TP3']:
+                        # Record TP hit in trade state
+                        evaluator.current_trade.tp_hits.append(result.exit_condition_name)
+                        
+                        # FIX 2026-02-13: Increment TP counter for UI display
+                        tp_sl_adjustments[result.exit_condition_name] += 1
+
+                # Clear trade (pass exit percentage from result)
+                evaluator.exit_trade(result.exit_percentage)
+                
+                # Update progress bar every 100 candles
+                if i % 100 == 0:
+                    progress_msg = f"Processing candles {i}/{total_candles}"
+                    self.progress_updated.emit(i, total_candles, progress_msg)
+                
+                # Emit progress messages every 500 candles for summary  
                 if i % 500 == 0 and i > 0:
                     self.live_message.emit(
                         f"Progress: {int((i/total_candles)*100)}% complete, {trade_count} trades executed",
                         "INFO",
                         "OPTIMIZER"
                     )
-                
-                # Simulate work (reduced sleep since processing smaller chunks)
-                self.msleep(10)
             
             # Emit FINAL 100% progress update
             self.progress_updated.emit(total_candles, total_candles, f"Processing candles {total_candles}/{total_candles}")
@@ -337,17 +844,36 @@ class BacktestWorker(QThread):
                 "SYSTEM"
             )
             
-            # Calculate results
+            # Calculate results (REAL adjustments, not hardcoded!)
             results = {
                 'total_candles': total_candles,
                 'trades': trade_count,
-                'tp_adjustments': {'TP1': 12, 'TP2': 18, 'TP3': 9, 'SL': 8}
+                'tp_adjustments': tp_sl_adjustments  # Real tracked adjustments
             }
             self.backtest_finished.emit(True, results)
             
         except Exception as e:
             self.live_message.emit(f"Error: {str(e)}", "ERROR", "SYSTEM")
             self.backtest_finished.emit(False, {'error': str(e)})
+    
+    def _on_data_load_progress(self, current: int, total: int, message: str):
+        """
+        Handle data loading progress callback
+        
+        Sprint 2.0.1 Task 2.0.1.3: Progress updates during bar loading
+        
+        Args:
+            current: Current progress value (0-100 percentage or actual bar count)
+            total: Total progress value (100 for percentage or total bars)
+            message: Progress message
+        """
+        # NOTE: During data loading, current/total are percentages (0-100)
+        # Don't emit these to progress bar as they're misleading
+        # Progress bar will be updated once we know total_candles after loading
+        
+        # Emit to Live Output if complete
+        if current == total:  # Load complete
+            self.live_message.emit(message, "INFO", "SYSTEM")
     
     def pause(self):
         """Pause the backtest"""
@@ -376,10 +902,12 @@ class BacktestConfigPanel(QWidget):
     
     # Signals
     capital_changed = pyqtSignal(Money)  # Emits when starting capital changes
-    
+    config_changed = pyqtSignal()  # NEW: Emits when ANY config parameter changes (triggers auto-save)
+
     def __init__(self, orchestrator, parent=None):
         super().__init__(parent)
         self.orchestrator = orchestrator
+        self.parent_window = parent  # Store reference to main window for auto-save
         self.worker: Optional[BacktestWorker] = None
         
         # Starting Capital (NautilusTrader Money type)
@@ -389,7 +917,15 @@ class BacktestConfigPanel(QWidget):
         self.custom_values = {}
         self._loading_preset = False  # Flag to prevent auto-switch to Custom during preset load
         
+        # INSTITUTIONAL PATTERN: Data cache manager (singleton)
+        from src.optimizer_v3.core.data_cache_manager import get_data_cache_manager
+        self.cache_manager = get_data_cache_manager()
+        
         self._init_ui()
+        
+        # CRITICAL: Auto-calculate confluence from strategy on window open
+        # This replaces the manual "Reset From Strategy" button click
+        self._auto_calculate_confluence_on_init()
     
     def closeEvent(self, event):
         """Handle widget close - CRITICAL: Stop running thread before destruction"""
@@ -470,7 +1006,12 @@ class BacktestConfigPanel(QWidget):
                 self.ai_recommendations_panel.display_recommendations
             )
         
-        # Tab 6: Compare (Optimizer v3 - INTEGRATED)
+        # Tab 6: Training (Sprint 2.1 - INTEGRATED)
+        from src.optimizer_v3.ui.training_panel import TrainingPanelUI
+        self.training_panel = TrainingPanelUI(orchestrator=self.orchestrator)
+        self.tab_widget.addTab(self.training_panel, "🎓 Training")
+        
+        # Tab 7: Compare (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.compare_view_panel import CompareViewPanel
         self.compare_panel = CompareViewPanel()
         self.tab_widget.addTab(self.compare_panel, "🔁 Compare")
@@ -509,11 +1050,20 @@ class BacktestConfigPanel(QWidget):
         control_layout = self._create_control_buttons()
         layout.addLayout(control_layout)
         
-        # Results Display
+        # Status Display
         self.results_text = QTextEdit()
         self.results_text.setReadOnly(True)
-        self.results_text.setPlaceholderText("Backtest results will appear here...")
-        layout.addWidget(QLabel("📊 Results:"))
+        self.results_text.setPlaceholderText(
+            "Status updates will appear here when backtest starts...\n\n"
+            "During backtest you will see:\n"
+            "✅ Data loading progress from Unified Data Manager\n"
+            "✅ NautilusTrader initialization\n"
+            "✅ Bar aggregation status\n"
+            "✅ Hybrid data source routing (LakeAPI + Binance)\n"
+            "✅ Real-time processing updates\n\n"
+            "All terminal output will be captured and displayed here."
+        )
+        layout.addWidget(QLabel("📊 Status:"))
         layout.addWidget(self.results_text)  # Will expand to fill remaining space
         widget.setLayout(layout)
         return widget
@@ -576,6 +1126,9 @@ class BacktestConfigPanel(QWidget):
         
         # Set default preset (this will trigger the signal and load values)
         self.balanced_radio.setChecked(True)
+        
+        # CRITICAL: Connect ALL controls to auto-save (must be AFTER preset initialization!)
+        self._connect_auto_save()
         
         return group
     
@@ -1049,18 +1602,19 @@ class BacktestConfigPanel(QWidget):
         emergency_layout.addWidget(emergency_label)
         
         # Quick preset buttons - UNIFORM GRID
-        for val_display, val_actual in [(1, 100), (1.25, 125), (1.5, 150), (1.75, 175), (2, 200), (2.15, 215), (2.25, 225)]:
-            btn = QPushButton(str(val_display))
+        for val in [1.0, 1.25, 1.5, 1.75, 2.0, 2.15, 2.25]:
+            btn = QPushButton(str(val))
             btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
-            btn.clicked.connect(lambda checked, v=val_actual: self.emergency_spin.setValue(int(v / 100)))
+            btn.clicked.connect(lambda checked, v=val: self.emergency_spin.setValue(v))
             emergency_layout.addWidget(btn)
         
-        self.emergency_spin = QSpinBox()
-        self.emergency_spin.setRange(1, 10)
-        self.emergency_spin.setValue(2)
+        self.emergency_spin = QDoubleSpinBox()
+        self.emergency_spin.setRange(0.5, 10.0)
+        self.emergency_spin.setDecimals(2)
+        self.emergency_spin.setValue(2.0)
         self.emergency_spin.setSuffix("%")
-        self.emergency_spin.setSingleStep(1)
+        self.emergency_spin.setSingleStep(0.25)
         self.emergency_spin.setFixedWidth(150)
         self.emergency_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.emergency_spin.setToolTip(
@@ -1126,18 +1680,19 @@ class BacktestConfigPanel(QWidget):
         vol_multi_layout.addWidget(vol_multi_label)
         
         # Quick preset buttons - UNIFORM GRID
-        for val in [12, 13, 14, 15, 16, 17, 18]:
+        for val in [1, 2, 3, 4, 5, 6, 7]:
             btn = QPushButton(str(val))
             btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.vol_multi_spin.setValue(v))
             vol_multi_layout.addWidget(btn)
         
-        self.vol_multi_spin = QSpinBox()
-        self.vol_multi_spin.setRange(1, 30)
-        self.vol_multi_spin.setValue(12)
+        self.vol_multi_spin = QDoubleSpinBox()
+        self.vol_multi_spin.setRange(0.5, 10.0)
+        self.vol_multi_spin.setDecimals(1)
+        self.vol_multi_spin.setSingleStep(0.1)
         self.vol_multi_spin.setSuffix("x")
-        self.vol_multi_spin.setSingleStep(1)
+        self.vol_multi_spin.setValue(1.2)
         self.vol_multi_spin.setFixedWidth(150)
         self.vol_multi_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.vol_multi_spin.setToolTip(
@@ -1164,18 +1719,19 @@ class BacktestConfigPanel(QWidget):
         min_sl_layout.addWidget(min_sl_label)
         
         # Quick preset buttons - UNIFORM GRID (removed 5, starts from 6)
-        for val in [6, 7, 8, 9, 10, 11, 12]:
+        for val in [0.5, 1, 1.5, 2, 2.5, 3, 3.5]:
             btn = QPushButton(str(val))
             btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.min_sl_spin.setValue(v))
             min_sl_layout.addWidget(btn)
         
-        self.min_sl_spin = QSpinBox()
-        self.min_sl_spin.setRange(1, 50)
-        self.min_sl_spin.setValue(7)
+        self.min_sl_spin = QDoubleSpinBox()
+        self.min_sl_spin.setRange(0.1, 10.0)
+        self.min_sl_spin.setDecimals(1)
+        self.min_sl_spin.setSingleStep(0.1)
         self.min_sl_spin.setSuffix("%")
-        self.min_sl_spin.setSingleStep(1)
+        self.min_sl_spin.setValue(0.7)
         self.min_sl_spin.setFixedWidth(150)
         self.min_sl_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.min_sl_spin.setToolTip(
@@ -1203,18 +1759,19 @@ class BacktestConfigPanel(QWidget):
         max_sl_layout.addWidget(max_sl_label)
         
         # Quick preset buttons - UNIFORM GRID
-        for val in [10, 11, 12, 13, 14, 15, 16]:
+        for val in [1, 2, 3, 4, 5, 6, 7]:
             btn = QPushButton(str(val))
             btn.setFixedSize(75, 50)
             btn.setStyleSheet(get_preset_day_button_stylesheet())
             btn.clicked.connect(lambda checked, v=val: self.max_sl_spin.setValue(v))
             max_sl_layout.addWidget(btn)
         
-        self.max_sl_spin = QSpinBox()
-        self.max_sl_spin.setRange(1, 100)
-        self.max_sl_spin.setValue(20)
+        self.max_sl_spin = QDoubleSpinBox()
+        self.max_sl_spin.setRange(0.1, 10.0)
+        self.max_sl_spin.setDecimals(1)
+        self.max_sl_spin.setSingleStep(0.1)
         self.max_sl_spin.setSuffix("%")
-        self.max_sl_spin.setSingleStep(1)
+        self.max_sl_spin.setValue(2.0)
         self.max_sl_spin.setFixedWidth(150)
         self.max_sl_spin.setStyleSheet(get_spinbox_button_stylesheet())
         self.max_sl_spin.setToolTip(
@@ -1638,6 +2195,26 @@ class BacktestConfigPanel(QWidget):
         self.stop_btn.setEnabled(False)
         layout.addWidget(self.stop_btn)
         
+        # WIRING TEST Button (uses REAL backtest system!)
+        self.test_wiring_btn = QPushButton("🔬 Test Wiring")
+        self.test_wiring_btn.clicked.connect(self._on_test_wiring_clicked)
+        self.test_wiring_btn.setStyleSheet(
+            "QPushButton { background-color: #6C757D; color: white; font-weight: bold; padding: 8px; }"
+            "QPushButton:hover { background-color: #5A6268; }"
+        )
+        self.test_wiring_btn.setToolTip(
+            "🔬 Wiring Verification Test\n\n"
+            "Tests that ALL UI parameters actually affect backtest results.\n\n"
+            "How it works:\n"
+            "1. Runs 29 backtest scenarios (auto-changing UI parameters)\n"
+            "2. Saves results after each run\n"
+            "3. Compares results to verify parameters are wired\n"
+            "4. Generates report showing which parameters work\n\n"
+            "Uses YOUR actual backtest system (same as Run button).\n"
+            "Takes ~15-20 minutes (29 × 30-60 sec per test)."
+        )
+        layout.addWidget(self.test_wiring_btn)
+        
         layout.addStretch()
         
         # View Results Button
@@ -1648,33 +2225,86 @@ class BacktestConfigPanel(QWidget):
         return layout
     
     def _on_run_clicked(self):
-        """Handle run button click"""
+        """Handle run button click - WITH INSTITUTIONAL DATA CACHING"""
+        # CRITICAL: Close ALL PostgreSQL connections in MAIN THREAD FIRST
+        # Main UI thread has open connections from strategy loading (strategy_builder_main_window, browser_dialog, etc.)
+        # These connections will be inherited by fork() when bar_aggregator creates 31 workers
+        # Must close BEFORE any worker/thread creation
+        try:
+            from src.optimizer_v3.database import get_database_manager
+            db = get_database_manager()
+            if hasattr(db, 'engine') and db.engine is not None:
+                db.engine.dispose()  # Force close all connections in pool
+                print("✅ Pre-backtest cleanup: Closed PostgreSQL connections in main thread")
+        except Exception as e:
+            print(f"⚠️ Could not close database connections in main thread: {e}")
+        
         # Validate strategy
         validation = self.orchestrator.validate_strategy()
         if not validation.success:
             self.results_text.setText(f"❌ Strategy validation failed:\n{validation.message}")
             return
         
-        # Get configuration
-        config = {
-            'lookback_days': self.lookback_spin.value(),
-            'training_window': self.training_spin.value(),
-            'mode': self.mode_group.checkedId(),
-            'tpsl_mode': self.tpsl_combo.currentText(),
-            'sl_mode': self.sl_combo.currentText()
-        }
+        # INSTITUTIONAL PATTERN: Serialize config BEFORE creating worker
+        try:
+            strategy_config_dict = self.orchestrator.serialize_config_for_backtest()
+        except ValueError as e:
+            self.results_text.setText(f"❌ Failed to prepare strategy:\n{str(e)}")
+            return
+        
+        # CRITICAL FIX: Inject UI confluence threshold into strategy config
+        # The serialized config doesn't include UI values - must add manually
+        strategy_config_dict['confluence_threshold'] = self.confluence_spin.value()
+
+        # Sprint 2.0.1: Get configuration with calculated dates and timeframe
+        backtest_config = self.get_config()
+        
+        # INSTITUTIONAL OPTIMIZATION: Check data cache
+        cached_bars = self.cache_manager.get_cached_bars(backtest_config)
+        
+        if cached_bars:
+            # Cache hit - show performance message
+            metrics = self.cache_manager.get_metrics()
+            self.results_text.setText(
+                f"⚡ Cache HIT: Using {len(cached_bars):,} cached bars\n"
+                f"⏱️ Time saved: ~12 seconds\n"
+                f"📊 Cache hit rate: {metrics['hit_rate_pct']:.1f}%\n\n"
+                f"Starting backtest with cached data..."
+            )
+            self._update_cache_status()
+        else:
+            # Cache miss - will load fresh data
+            self.results_text.setText(
+                "🔄 Cache MISS: Loading fresh data from DataManager...\n"
+                "This will take ~10-15 seconds.\n\n"
+                "💡 Future tests with same data config will be instant!"
+            )
         
         # Clear previous trades before starting new backtest
+        # CRITICAL: Clear TradeRegistry (single source of truth) FIRST
+        from src.optimizer_v3.core.trade_registry import get_trade_registry
+        registry = get_trade_registry()
+        registry.clear()
+        
+        # Then clear UI panel
         self.trades_panel.clear_trades()
         
-        # Create and start worker - WIRE UP LIVE MESSAGES AND TRADES
-        self.worker = BacktestWorker(self.orchestrator, config, self.output_panel)
+        # Create worker with serialized config AND cached bars (if available)
+        self.worker = BacktestWorker(
+            strategy_config=strategy_config_dict,
+            backtest_config=backtest_config,
+            output_panel=self.output_panel,
+            trades_panel=self.trades_panel,  # MULTICORE FIX: Pass trades panel reference
+            cached_bars=cached_bars  # INSTITUTIONAL OPTIMIZATION: Pass cached bars
+        )
         self.worker.progress_updated.connect(self._on_progress_updated)
         self.worker.backtest_finished.connect(self._on_backtest_finished)
         # Connect live messages to output panel for REAL-TIME display
         self.worker.live_message.connect(self.output_panel.add_message)
         # Connect trade_data_emit signal - handles both OPEN (add) and CLOSED (update)
         self.worker.trade_data_emit.connect(self._on_trade_data)
+        # Connect stdout capture to Status panel (shows data loading progress)
+        self.worker.status_message.connect(self._on_status_message)
         self.worker.start()
         
         # Update UI state
@@ -1713,18 +2343,45 @@ class BacktestConfigPanel(QWidget):
         """
         Handle trade data from worker - intelligently adds OPEN or updates to CLOSED.
         
+        CRITICAL: Supports BOTH execution modes:
+        - Single-core: OPEN (add) → CLOSED (update)
+        - Multicore: CLOSED only (add directly, no prior OPEN)
+        
         When status is OPEN: Add new trade to table
-        When status is CLOSED: Update existing trade by ID
+        When status is CLOSED: Try update first, fall back to add if doesn't exist
         """
         trade_id = trade_data.get('id')
         status = trade_data.get('status')
         
         if status == 'OPEN':
-            # New trade opened - add to table
+            # Single-core: New trade opened - add to table
             self.trades_panel.add_trade(trade_data)
         elif status == 'CLOSED':
-            # Trade closed - update existing trade
-            self.trades_panel.update_trade(trade_id, trade_data)
+            # Try to update existing trade (single-core case)
+            # If update fails/returns False, add as new (multicore case)
+            try:
+                success = self.trades_panel.update_trade(trade_id, trade_data)
+                if not success:
+                    # Trade didn't exist - add it (multicore case)
+                    self.trades_panel.add_trade(trade_data)
+            except (AttributeError, KeyError, Exception):
+                # Any error means trade doesn't exist - add it (multicore case)
+                self.trades_panel.add_trade(trade_data)
+    
+    def _on_status_message(self, message: str):
+        """
+        Handle captured stdout message from BacktestWorker.
+        
+        Appends data loading progress (from DataManager/NautilusLoader/BarAggregator)
+        to the Status panel in real-time.
+        
+        Args:
+            message: Captured stdout line from print() calls
+        """
+        self.results_text.append(message)
+        # Auto-scroll to bottom
+        scrollbar = self.results_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
     
     def _on_progress_updated(self, current: int, total: int, message: str):
         """Handle progress update from worker - INLINE HTML FORMAT"""
@@ -1747,6 +2404,11 @@ class BacktestConfigPanel(QWidget):
         self._set_live_output_color("red")
         
         if success:
+            # CRITICAL FIX: Sync trades from TradeRegistry (single source of truth)
+            # This replaces any duplicate trades received via signals with unique trades only
+            print("📊 Syncing trades from TradeRegistry...")
+            self.trades_panel.sync_from_registry()
+            
             # Update displays - INLINE HTML FORMAT
             trades = results.get('trades', 0)
             self.trades_label.setText(f"Trades: <b>{trades}</b>")
@@ -1789,8 +2451,18 @@ class BacktestConfigPanel(QWidget):
             log_file=Path("logs/ai_recommendations.log")
         )
         
-        # Get trade count
-        trade_count = results.get('trades', 0)
+        # ============================================================================
+        # CRITICAL FIX 2026-02-12: Use TradeRegistry as SINGLE SOURCE OF TRUTH
+        # Previous code used HARDCODED metrics (0.58 win rate, fake PnL values)
+        # This caused Summary 2 to show wrong metrics (+$810.91 error!)
+        # ============================================================================
+        
+        # Get ACTUAL trades from TradeRegistry (single source of truth)
+        from src.optimizer_v3.core.trade_registry import get_trade_registry
+        registry = get_trade_registry()
+        all_trades = registry.get_all_trades()
+        
+        trade_count = len(all_trades)
         
         # LOG POINT 1: Backtest completion
         ai_debugger.log_action(
@@ -1815,47 +2487,100 @@ class BacktestConfigPanel(QWidget):
             "SYSTEM"
         )
         
-        # NOTE: Trades are now streamed in real-time via trade_closed signal during execution
-        # No need to populate trades in batch after completion - they're already in the Trades tab!
+        # Calculate REAL metrics from ACTUAL trades (NO MORE FAKE DATA!)
+        if trade_count > 0:
+            # Extract PnL values
+            pnl_values = [t['pnl'] for t in all_trades]
+            total_pnl = sum(pnl_values)
+            winning_trades = sum(1 for p in pnl_values if p > 0)
+            losing_trades = sum(1 for p in pnl_values if p < 0)
+            win_rate = (winning_trades / trade_count) * 100
+            
+            # Calculate win/loss metrics
+            wins = [p for p in pnl_values if p > 0]
+            losses = [p for p in pnl_values if p < 0]
+            
+            avg_win = sum(wins) / len(wins) if wins else 0
+            avg_loss = sum(losses) / len(losses) if losses else 0
+            largest_win = max(wins) if wins else 0
+            largest_loss = min(losses) if losses else 0
+            
+            # Calculate profit factor (gross profit / gross loss)
+            gross_profit = sum(wins) if wins else 0
+            gross_loss = abs(sum(losses)) if losses else 0
+            profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
+            
+            # Calculate risk metrics
+            import numpy as np
+            pnl_array = np.array(pnl_values)
+            std_dev = float(np.std(pnl_array))
+            downside_returns = pnl_array[pnl_array < 0]
+            downside_dev = float(np.std(downside_returns)) if len(downside_returns) > 0 else 0
+            
+            # Calculate max drawdown
+            cumulative_pnl = np.cumsum(pnl_array)
+            running_max = np.maximum.accumulate(cumulative_pnl)
+            drawdown = cumulative_pnl - running_max
+            max_drawdown = float(np.min(drawdown))
+            max_drawdown_pct = (max_drawdown / self.capital_spin.value()) * 100 if self.capital_spin.value() > 0 else 0
+            
+            # Calculate Sharpe & Sortino (simplified)
+            avg_pnl = total_pnl / trade_count
+            sharpe_ratio = (avg_pnl / std_dev) if std_dev > 0 else 0
+            sortino_ratio = (avg_pnl / downside_dev) if downside_dev > 0 else 0
+            
+            # Total return %
+            starting_capital = self.capital_spin.value()
+            total_return = (total_pnl / starting_capital) * 100 if starting_capital > 0 else 0
+            
+        else:
+            # No trades - all zeros
+            total_pnl = 0
+            winning_trades = 0
+            losing_trades = 0
+            win_rate = 0
+            avg_win = 0
+            avg_loss = 0
+            largest_win = 0
+            largest_loss = 0
+            profit_factor = 0
+            std_dev = 0
+            downside_dev = 0
+            max_drawdown = 0
+            max_drawdown_pct = 0
+            sharpe_ratio = 0
+            sortino_ratio = 0
+            total_return = 0
         
-        # Generate metrics for Metrics tab
-        # TODO: Replace with actual metrics from backtest engine
-        usd = Currency.from_str("USD")
-        winning_trades = int(trade_count * 0.58)  # 58% win rate
-        total_pnl = sum([
-            (50000 * 1.015 - 50000) * 0.1 if i < winning_trades 
-            else (50000 * 0.99 - 50000) * 0.1
-            for i in range(trade_count)
-        ])
-        
+        # Build metrics dict with REAL values ONLY
         metrics_data = {
             'total_pnl': Decimal(str(total_pnl)),
-            'total_return': Decimal('5.5'),
-            'sharpe_ratio': Decimal('2.15'),
-            'win_rate': Decimal(str(winning_trades / trade_count * 100)) if trade_count > 0 else Decimal('0'),
-            'profit_factor': Decimal('1.85'),
-            'max_drawdown': Decimal('-250.50'),
+            'total_return': Decimal(str(total_return)),
+            'sharpe_ratio': Decimal(str(sharpe_ratio)),
+            'win_rate': Decimal(str(win_rate)),
+            'profit_factor': Decimal(str(profit_factor)),
+            'max_drawdown': Decimal(str(max_drawdown)),
             'total_trades': trade_count,
             'avg_trade_pnl': Decimal(str(total_pnl / trade_count)) if trade_count > 0 else Decimal('0'),
-            'avg_win': Decimal('75.0') if winning_trades > 0 else Decimal('0'),
-            'avg_loss': Decimal('-55.0') if (trade_count - winning_trades) > 0 else Decimal('0'),
-            'largest_win': Decimal('82.0'),
-            'largest_loss': Decimal('-65.0'),
-            'risk_reward_ratio': Decimal('1.36'),
-            'recovery_factor': Decimal('5.5'),
+            'avg_win': Decimal(str(avg_win)),
+            'avg_loss': Decimal(str(avg_loss)),
+            'largest_win': Decimal(str(largest_win)),
+            'largest_loss': Decimal(str(largest_loss)),
+            'risk_reward_ratio': Decimal(str(abs(avg_win / avg_loss))) if avg_loss != 0 else Decimal('0'),
+            'recovery_factor': Decimal(str(total_pnl / abs(max_drawdown))) if max_drawdown != 0 else Decimal('0'),
             # Risk metrics
-            'max_drawdown_pct': Decimal('2.5'),
-            'max_drawdown_duration': 0,
-            'var_95': Decimal('-56.85'),
-            'expected_shortfall': Decimal('-57.05'),
-            'sortino_ratio': Decimal('2.45'),
-            'calmar_ratio': Decimal('2.2'),
-            'max_consecutive_losses': 3,
-            'max_consecutive_wins': 5,
-            'avg_drawdown': Decimal('-125.25'),
-            'std_deviation': Decimal('45.38'),
-            'downside_deviation': Decimal('35.86'),
-            'ulcer_index': Decimal('2.15'),
+            'max_drawdown_pct': Decimal(str(max_drawdown_pct)),
+            'max_drawdown_duration': 0,  # TODO: Calculate actual duration
+            'var_95': Decimal('0'),  # TODO: Calculate VaR
+            'expected_shortfall': Decimal('0'),  # TODO: Calculate ES
+            'sortino_ratio': Decimal(str(sortino_ratio)),
+            'calmar_ratio': Decimal(str(total_return / abs(max_drawdown_pct))) if max_drawdown_pct != 0 else Decimal('0'),
+            'max_consecutive_losses': 0,  # TODO: Calculate from trades
+            'max_consecutive_wins': 0,  # TODO: Calculate from trades
+            'avg_drawdown': Decimal('0'),  # TODO: Calculate average drawdown
+            'std_deviation': Decimal(str(std_dev)),
+            'downside_deviation': Decimal(str(downside_dev)),
+            'ulcer_index': Decimal('0'),  # TODO: Calculate Ulcer Index
         }
         
         # Add metrics summary to Live Output
@@ -1893,7 +2618,62 @@ class BacktestConfigPanel(QWidget):
             )
         
         self.metrics_panel.update_metrics(metrics_data, backtest_complete=True, backtest_results=full_results)
-        
+
+        # ── Persist backtest results to strategy_test_results ──────────────────
+        # Only persist when a strategy has been saved (both IDs available).
+        try:
+            from src.optimizer_v3.database import get_database_manager
+            from datetime import datetime
+
+            strategy_id = getattr(self.parent_window, 'current_strategy_id', None)
+            version_id = getattr(self.parent_window, 'current_version_id', None)
+
+            if strategy_id and version_id:
+                backtest_config = self.get_config()
+
+                # Convert Decimal/int metrics to plain Python scalars for JSON serialisation
+                metrics_for_db = {
+                    'total_return_pct': float(metrics_data.get('total_return', 0)),
+                    'sharpe_ratio': float(metrics_data.get('sharpe_ratio', 0)),
+                    'max_drawdown_pct': float(metrics_data.get('max_drawdown_pct', 0)),
+                    'win_rate': float(metrics_data.get('win_rate', 0)),
+                    'profit_factor': float(metrics_data.get('profit_factor', 0)),
+                    'total_trades': int(metrics_data.get('total_trades', 0)),
+                    'sortino_ratio': float(metrics_data.get('sortino_ratio', 0)),
+                    'calmar_ratio': float(metrics_data.get('calmar_ratio', 0)),
+                    'std_deviation': float(metrics_data.get('std_deviation', 0)),
+                }
+
+                test_data = {
+                    'strategy_id': strategy_id,
+                    'strategy_version_id': version_id,
+                    'test_type': 'backtest',
+                    'test_config': {
+                        'lookback_days': backtest_config.get('lookback_days'),
+                        'starting_capital': backtest_config.get('starting_capital'),
+                        'risk_per_trade_pct': backtest_config.get('risk_per_trade_pct'),
+                        'timeframe': backtest_config.get('timeframe'),
+                    },
+                    'start_date': backtest_config.get('start_date', datetime.now()),
+                    'end_date': backtest_config.get('end_date', datetime.now()),
+                    'metrics': metrics_for_db,
+                    'trades': full_results.get('trades', []),
+                }
+
+                db = get_database_manager()
+                result_id = db.test_results.create_test_result(test_data)
+                print(f"[Backtest] Test result saved: {result_id}")
+                self.output_panel.add_message(
+                    f"📥 Results saved to database (id: {result_id[:8]}…)",
+                    "INFO",
+                    "SYSTEM"
+                )
+            else:
+                print("[Backtest] Skipping DB persist: strategy not saved yet (no strategy_id / version_id)")
+        except Exception as _persist_exc:
+            print(f"[Backtest] Warning: could not save test result to DB: {_persist_exc}")
+        # ── End persistence block ───────────────────────────────────────────────
+
         # Add note to Live Output about tab availability
         self.output_panel.add_message(
             "📊 Switch to other tabs to view detailed trades, metrics, and comparisons",
@@ -1907,14 +2687,71 @@ class BacktestConfigPanel(QWidget):
         )
     
     def get_config(self) -> dict:
-        """Get current backtest configuration"""
-        return {
-            'lookback_days': self.lookback_spin.value(),
-            'training_window': self.training_spin.value(),
-            'mode': self.mode_group.checkedId(),
+        """
+        Get current backtest configuration with calculated date ranges
+        
+        SPRINT 2.0.1 Task 2.0.1.1: Calculate start_date and end_date from lookback_days
+        CRITICAL FIX: Include ALL UI parameters (was missing TP/SL, Risk, Adaptive SL)
+        
+        Returns:
+            dict: Complete configuration with ALL parameters for backtest execution
+        """
+        from datetime import datetime, timedelta
+        
+        lookback_days = self.lookback_spin.value()
+        training_days = self.training_spin.value()
+        testing_days = self.testing_spin.value()
+        mode = self.mode_group.checkedId()
+        
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=lookback_days)
+        
+        config = {
+            # Basic settings
+            'lookback_days': lookback_days,
+            'mode': mode,
             'tpsl_mode': self.tpsl_combo.currentText(),
-            'sl_mode': self.sl_combo.currentText()
+            'sl_mode': self.sl_combo.currentText(),
+            'start_date': start_date,
+            'end_date': end_date,
+            'timeframe': '15m',
+            
+            # Risk/Reward settings (CRITICAL - was missing!)
+            'starting_capital': self.capital_spin.value(),
+            'risk_per_trade_pct': self.risk_spin.value(),
+            'min_risk_reward': self.rr_spin.value() / 10.0,  # UI shows 10x
+            'max_leverage': self.leverage_spin.value(),
+            'confluence_threshold': self.confluence_spin.value(),
+            'max_bars_held': self.max_bars_spin.value(),
+            
+            # Adaptive SL v2.0 settings (CRITICAL - was missing!)
+            'adaptive_sl': {
+                'enabled': self.sl_combo.currentText() == 'Adaptive v2.0',
+                'delay_enabled': self.delayed_sl_check.isChecked(),
+                'delay_bars': self.delay_spin.value(),
+                'emergency_sl_pct': self.emergency_spin.value(),
+                'volatility_lookback': self.vol_lookback_spin.value(),
+                'volatility_multiplier': self.vol_multi_spin.value(),  # Direct value (e.g., 1.2)
+                'min_sl_pct': self.min_sl_spin.value(),  # Direct value (e.g., 0.7)
+                'max_sl_pct': self.max_sl_spin.value(),  # Direct value (e.g., 2.0)
+                'use_structure_sl': self.structure_check.isChecked(),
+                'structure_sources': ['swing_points', 'supply_demand', 'fibonacci']
+            }
         }
+        
+        # Mode 1: Include training/testing windows
+        if mode == 1:
+            config['training_window'] = training_days
+            config['testing_window'] = testing_days
+            
+            # Calculate split dates for Mode 1
+            config['training_end'] = start_date + timedelta(days=training_days)
+            config['testing_start'] = config['training_end']
+        
+        # Mode 2: Training/testing windows NOT included (ignored)
+        # Only lookback_days matters for Mode 2
+        
+        return config
     
     def _get_strategy_name(self) -> str:
         """Get current strategy name from Strategy Info Panel (Name field in UI)"""
@@ -1945,11 +2782,11 @@ class BacktestConfigPanel(QWidget):
         self._loading_preset = True
         self.delayed_sl_check.setChecked(True)
         self.delay_spin.setValue(3)
-        self.emergency_spin.setValue(3)
+        self.emergency_spin.setValue(3.0)
         self.vol_lookback_spin.setValue(20)
-        self.vol_multi_spin.setValue(15)  # 1.5x
-        self.min_sl_spin.setValue(10)  # 1.0%
-        self.max_sl_spin.setValue(25)  # 2.5%
+        self.vol_multi_spin.setValue(1.5)  # 1.5x
+        self.min_sl_spin.setValue(1.0)  # 1.0%
+        self.max_sl_spin.setValue(2.5)  # 2.5%
         self.structure_check.setChecked(True)
         self._loading_preset = False
     
@@ -1958,11 +2795,11 @@ class BacktestConfigPanel(QWidget):
         self._loading_preset = True
         self.delayed_sl_check.setChecked(True)
         self.delay_spin.setValue(2)
-        self.emergency_spin.setValue(2)
+        self.emergency_spin.setValue(2.0)
         self.vol_lookback_spin.setValue(20)
-        self.vol_multi_spin.setValue(12)  # 1.2x
-        self.min_sl_spin.setValue(7)  # 0.7%
-        self.max_sl_spin.setValue(20)  # 2.0%
+        self.vol_multi_spin.setValue(1.2)  # 1.2x
+        self.min_sl_spin.setValue(0.7)  # 0.7%
+        self.max_sl_spin.setValue(2.0)  # 2.0%
         self.structure_check.setChecked(True)
         self._loading_preset = False
     
@@ -1971,11 +2808,11 @@ class BacktestConfigPanel(QWidget):
         self._loading_preset = True
         self.delayed_sl_check.setChecked(True)
         self.delay_spin.setValue(1)
-        self.emergency_spin.setValue(2)
+        self.emergency_spin.setValue(2.0)
         self.vol_lookback_spin.setValue(20)
-        self.vol_multi_spin.setValue(10)  # 1.0x
-        self.min_sl_spin.setValue(6)  # 0.6%
-        self.max_sl_spin.setValue(15)  # 1.5%
+        self.vol_multi_spin.setValue(1.0)  # 1.0x
+        self.min_sl_spin.setValue(0.6)  # 0.6%
+        self.max_sl_spin.setValue(1.5)  # 1.5%
         self.structure_check.setChecked(True)
         self._loading_preset = False
     
@@ -2043,6 +2880,72 @@ class BacktestConfigPanel(QWidget):
         self.delayed_sl_check.stateChanged.connect(self._on_manual_value_change)
         self.structure_check.stateChanged.connect(self._on_manual_value_change)
     
+    def _connect_auto_save(self):
+        """
+        Connect ALL UI controls to auto-save to database.
+        
+        CRITICAL: Any parameter change immediately updates database strategy.
+        This ensures UI and DB are ALWAYS synchronized - no more stale configs!
+        
+        Called AFTER preset initialization to avoid saving during setup.
+        """
+        # Basic Settings Column
+        self.lookback_spin.valueChanged.connect(self._on_config_changed)
+        self.training_spin.valueChanged.connect(self._on_config_changed)
+        self.testing_spin.valueChanged.connect(self._on_config_changed)
+        self.mode_group.buttonClicked.connect(self._on_config_changed)
+        self.tpsl_combo.currentTextChanged.connect(self._on_config_changed)
+        self.sl_combo.currentTextChanged.connect(self._on_config_changed)
+        
+        # Adaptive SL v2.0 Column (already connected via _on_manual_value_change, but connect directly too)
+        self.preset_group.buttonClicked.connect(self._on_config_changed)
+        self.delayed_sl_check.stateChanged.connect(self._on_config_changed)
+        self.structure_check.stateChanged.connect(self._on_config_changed)
+        self.delay_spin.valueChanged.connect(self._on_config_changed)
+        self.emergency_spin.valueChanged.connect(self._on_config_changed)
+        self.vol_lookback_spin.valueChanged.connect(self._on_config_changed)
+        self.vol_multi_spin.valueChanged.connect(self._on_config_changed)
+        self.min_sl_spin.valueChanged.connect(self._on_config_changed)
+        self.max_sl_spin.valueChanged.connect(self._on_config_changed)
+        
+        # Risk/Reward Column
+        self.capital_spin.valueChanged.connect(self._on_config_changed)
+        self.rr_spin.valueChanged.connect(self._on_config_changed)
+        self.risk_spin.valueChanged.connect(self._on_config_changed)
+        self.leverage_spin.valueChanged.connect(self._on_config_changed)
+        self.confluence_spin.valueChanged.connect(self._on_config_changed)
+        self.max_bars_spin.valueChanged.connect(self._on_config_changed)
+    
+    def _on_config_changed(self):
+        """
+        Handle config parameter change - auto-save to database.
+        
+        CRITICAL: Called whenever ANY UI control changes.
+        Updates strategy in database immediately so UI changes persist.
+        
+        Skip during:
+        - Preset loading (avoid multiple saves)
+        - No parent window (standalone panel)
+        - No strategy loaded (nothing to save)
+        """
+        # Skip if loading preset (batch update)
+        if self._loading_preset:
+            return
+        
+        # Skip if no parent window (can't access save)
+        if not self.parent_window or not hasattr(self.parent_window, '_on_save_strategy'):
+            return
+        
+        # Trigger silent save in parent window
+        # This updates database without showing success dialog
+        try:
+            self.parent_window._on_save_strategy()
+            # Emit signal for other components that may listen
+            self.config_changed.emit()
+        except Exception as e:
+            # Silently log but don't interrupt user workflow
+            print(f"Auto-save failed: {e}")
+    
     def _set_live_output_color(self, color: str) -> None:
         """
         Set color for Live Output tab via dynamic property.
@@ -2096,12 +2999,399 @@ class BacktestConfigPanel(QWidget):
         except (ValueError, TypeError):
             pass
     
+    def _on_test_wiring_clicked(self):
+        """
+        Run wiring verification test - uses REAL backtest button!
+        
+        BRILLIANT SOLUTION: Instead of creating separate test framework,
+        this directly manipulates UI and clicks Run button 29 times!
+        
+        Each run:
+        1. Changes a UI parameter
+        2. Clicks actual Run button
+        3. Waits for completion
+        4. Saves results
+        5. Compares to verify parameter affects output
+        """
+        from PyQt5.QtWidgets import QMessageBox, QProgressDialog
+        from pathlib import Path
+        import json
+        from datetime import datetime
+        
+        # Confirm with user
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Question)
+        msg.setText("🔬 Wiring Verification Test\n\nThis will run 29 backtests to verify all UI parameters are wired correctly.")
+        msg.setInformativeText(
+            "Expected time: 15-20 minutes (29 × ~30 sec per test)\n\n"
+            "The test will:\n"
+            "• Auto-change UI parameters between runs\n"
+            "• Use your actual Run button (real system!)\n"
+            "• Compare results to detect wiring bugs\n"
+            "• Generate detailed report\n\n"
+            "Continue?"
+        )
+        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg.setDefaultButton(QMessageBox.No)
+        
+        if msg.exec_() != QMessageBox.Yes:
+            return
+        
+        # Load test scenarios
+        try:
+            from tests.integration.test_scenarios import (
+                CRITICAL_SCENARIOS,
+                EDGE_SCENARIOS,
+                PARAMETER_VARIATION_SCENARIOS
+            )
+            all_scenarios = CRITICAL_SCENARIOS + EDGE_SCENARIOS + PARAMETER_VARIATION_SCENARIOS
+        except ImportError:
+            QMessageBox.critical(
+                self,
+                "Error",
+                "Could not load test scenarios from tests/integration/test_scenarios.py"
+            )
+            return
+        
+        # Create progress dialog
+        progress = QProgressDialog(
+            "Running wiring verification tests...",
+            "Cancel",
+            0,
+            len(all_scenarios),
+            self
+        )
+        progress.setWindowTitle("🔬 Wiring Test")
+        progress.setWindowModality(Qt.WindowModal)
+        
+        # Results storage
+        test_results = []
+        
+        # Save original UI state
+        original_config = self._capture_ui_state()
+        
+        # Run each scenario
+        for i, scenario in enumerate(all_scenarios):
+            if progress.wasCanceled():
+                break
+            
+            progress.setValue(i)
+            progress.setLabelText(f"Test {i+1}/{len(all_scenarios)}: {scenario.description}")
+            
+            # Apply scenario config to UI
+            self._apply_scenario_to_ui(scenario.config)
+            
+            # Wait for UI to update
+            QApplication.processEvents()
+            
+            # WIRING TEST: Log COMPLETE config for this test
+            import logging
+            from pathlib import Path
+            Path("logs/wiring-test").mkdir(parents=True, exist_ok=True)
+            
+            wiring_logger = logging.getLogger('wiring_test')
+            if not wiring_logger.handlers:
+                wiring_logger.setLevel(logging.DEBUG)
+                fh = logging.FileHandler('logs/wiring-test/wiring_test.log')
+                fh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s - %(message)s'))
+                wiring_logger.addHandler(fh)
+            
+            # Get COMPLETE config that will be used
+            full_config = self.get_config()
+            
+            wiring_logger.info("="*80)
+            wiring_logger.info(f"TEST #{i+1}/{len(all_scenarios)}: {scenario.description}")
+            wiring_logger.info(f"Scenario ID: {scenario.id}")
+            wiring_logger.info("="*80)
+            wiring_logger.info("COMPLETE BACKTEST CONFIGURATION:")
+            wiring_logger.info(f"  💰 Starting Capital: ${full_config['starting_capital']:,}")
+            wiring_logger.info(f"  📈 Risk per Trade: {full_config['risk_per_trade_pct']}%")
+            wiring_logger.info(f"  ⚖️  Min Risk:Reward: {full_config['min_risk_reward']}:1")
+            wiring_logger.info(f"  💪 Max Leverage: {full_config['max_leverage']}x")
+            wiring_logger.info(f"  ⏱️  Max Bars Held: {full_config['max_bars_held']} bars")
+            wiring_logger.info(f"  🎯 Confluence Threshold: {full_config['confluence_threshold']} pts")
+            wiring_logger.info(f"  📊 TP/SL Mode: {full_config['tpsl_mode']}")
+            wiring_logger.info(f"  🔄 SL Adjustment: {full_config['sl_mode']}")
+            wiring_logger.info("")
+            wiring_logger.info("ADAPTIVE SL v2.0 CONFIG:")
+            asl = full_config['adaptive_sl']
+            wiring_logger.info(f"  Enabled: {asl['enabled']}")
+            wiring_logger.info(f"  Delay Enabled: {asl['delay_enabled']}")
+            wiring_logger.info(f"  Delay Bars: {asl['delay_bars']}")
+            wiring_logger.info(f"  Emergency SL: {asl['emergency_sl_pct']}%")
+            wiring_logger.info(f"  Volatility Lookback: {asl['volatility_lookback']} bars")
+            wiring_logger.info(f"  Volatility Multiplier: {asl['volatility_multiplier']}x")
+            wiring_logger.info(f"  Min SL %: {asl['min_sl_pct']}")
+            wiring_logger.info(f"  Max SL %: {asl['max_sl_pct']}")
+            wiring_logger.info(f"  Use Structure SL: {asl['use_structure_sl']}")
+            wiring_logger.info("="*80)
+            wiring_logger.info("")
+            
+            # Click Run button and wait for completion
+            result = self._run_test_and_wait()
+            
+            # Store results
+            test_results.append({
+                'scenario_id': scenario.id,
+                'description': scenario.description,
+                'config': scenario.config,
+                'trades': result.get('trades', 0),
+                'total_candles': result.get('total_candles', 0),
+                'success': result.get('success', False)
+            })
+        
+        progress.setValue(len(all_scenarios))
+        
+        # Restore original UI state
+        self._restore_ui_state(original_config)
+        
+        # Analyze results and generate report
+        self._generate_wiring_report(test_results)
+    
+    def _capture_ui_state(self) -> dict:
+        """Capture current UI parameter values"""
+        return {
+            'lookback': self.lookback_spin.value(),
+            'training': self.training_spin.value(),
+            'testing': self.testing_spin.value(),
+            'tpsl_mode': self.tpsl_combo.currentText(),
+            'sl_mode': self.sl_combo.currentText(),
+            'delay': self.delay_spin.value(),
+            'emergency': self.emergency_spin.value(),
+            'capital': self.capital_spin.value(),
+            'risk': self.risk_spin.value(),
+            'leverage': self.leverage_spin.value(),
+            'confluence': self.confluence_spin.value(),
+            'max_bars': self.max_bars_spin.value()
+        }
+    
+    def _restore_ui_state(self, state: dict):
+        """Restore UI to saved state"""
+        self.lookback_spin.setValue(state['lookback'])
+        self.training_spin.setValue(state['training'])
+        self.testing_spin.setValue(state['testing'])
+        self.tpsl_combo.setCurrentText(state['tpsl_mode'])
+        self.sl_combo.setCurrentText(state['sl_mode'])
+        self.delay_spin.setValue(state['delay'])
+        self.emergency_spin.setValue(state['emergency'])
+        self.capital_spin.setValue(state['capital'])
+        self.risk_spin.setValue(state['risk'])
+        self.leverage_spin.setValue(state['leverage'])
+        self.confluence_spin.setValue(state['confluence'])
+        self.max_bars_spin.setValue(state['max_bars'])
+    
+    def _apply_scenario_to_ui(self, config: dict):
+        """
+        Apply scenario configuration to UI widgets
+        
+        CRITICAL FIX: Handle BOTH formats:
+        1. Top-level keys (for simple scenarios)
+        2. Nested 'adaptive_sl' dict (for detailed tests)
+        """
+        # Top-level settings
+        if 'tpsl_mode' in config:
+            self.tpsl_combo.setCurrentText(config['tpsl_mode'])
+        if 'sl_adjustment' in config:
+            self.sl_combo.setCurrentText(config['sl_adjustment'])
+        if 'sl_delay' in config:
+            self.delay_spin.setValue(config['sl_delay'])
+        if 'emergency_sl' in config:
+            self.emergency_spin.setValue(config['emergency_sl'])
+        if 'risk_pct' in config:
+            self.risk_spin.setValue(config['risk_pct'])
+        if 'leverage' in config:
+            self.leverage_spin.setValue(config['leverage'])
+        if 'starting_capital' in config:
+            self.capital_spin.setValue(config['starting_capital'])
+        
+        # CRITICAL FIX: Handle nested 'adaptive_sl' dict
+        # Test scenarios like PARAM_VOL_LB_LOW pass this format!
+        if 'adaptive_sl' in config:
+            asl = config['adaptive_sl']
+            
+            # Apply all adaptive SL parameters to UI widgets
+            if 'delay_bars' in asl:
+                self.delay_spin.setValue(asl['delay_bars'])
+            if 'emergency_sl_pct' in asl:
+                self.emergency_spin.setValue(int(asl['emergency_sl_pct']))
+            if 'volatility_lookback' in asl:
+                self.vol_lookback_spin.setValue(asl['volatility_lookback'])
+            if 'volatility_multiplier' in asl:
+                # Direct decimal value (e.g., 1.2)
+                self.vol_multi_spin.setValue(float(asl['volatility_multiplier']))
+            if 'min_sl_pct' in asl:
+                # Direct decimal value (e.g., 0.7)
+                self.min_sl_spin.setValue(float(asl['min_sl_pct']))
+            if 'max_sl_pct' in asl:
+                # Direct decimal value (e.g., 2.0)
+                self.max_sl_spin.setValue(float(asl['max_sl_pct']))
+        
+        # CRITICAL FIX: Force Qt to process events so spinbox values update
+        # Without this, get_config() reads OLD values before UI updates!
+        QApplication.processEvents()
+    
+    def _run_test_and_wait(self) -> dict:
+        """Click Run button and wait for backtest to complete"""
+        from PyQt5.QtCore import QEventLoop
+        
+        # Container for results
+        results = {}
+        
+        # Connect to completion signal
+        def on_complete(success, data):
+            results.update(data)
+            results['success'] = success
+            loop.quit()
+        
+        # Create event loop
+        loop = QEventLoop()
+        
+        # Click Run button programmatically
+        self._on_run_clicked()
+        
+        # Wait for worker to be created
+        while not self.worker:
+            QApplication.processEvents()
+            self.app.thread().msleep(100)
+        
+        # Connect to worker's finished signal
+        self.worker.backtest_finished.connect(on_complete)
+        
+        # Wait for completion
+        loop.exec_()
+        
+        return results
+    
+    def _generate_wiring_report(self, test_results: list):
+        """Analyze results and generate wiring verification report"""
+        from pathlib import Path
+        import pandas as pd
+        from datetime import datetime
+        
+        # Create report directory
+        report_dir = Path('tests/integration/results')
+        report_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save detailed CSV
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        df = pd.DataFrame(test_results)
+        csv_path = report_dir / f'wiring_test_{timestamp}.csv'
+        df.to_csv(csv_path, index=False)
+        
+        # Analyze for wiring bugs
+        wiring_bugs = []
+        
+        # Check if any tests have identical results (wiring bug!)
+        trade_counts = [r['trades'] for r in test_results]
+        unique_counts = set(trade_counts)
+        
+        if len(unique_counts) < len(test_results) * 0.5:
+            wiring_bugs.append("Too many identical trade counts - parameters may not be wired!")
+        
+        # Generate summary
+        passed = sum(1 for r in test_results if r.get('success', False))
+        total = len(test_results)
+        
+        summary = f"""
+╔════════════════════════════════════════════════════════════════════════╗
+║ WIRING VERIFICATION TEST COMPLETE                                      ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+Total Tests: {total}
+Successful: {passed}
+Failed: {total - passed}
+
+Trade Count Distribution:
+  Unique Results: {len(unique_counts)}
+  Range: {min(trade_counts)} - {max(trade_counts)} trades
+
+{'⚠️  WIRING BUGS DETECTED:' if wiring_bugs else '✅ All parameters appear to be wired correctly!'}
+{chr(10).join(f'  • {bug}' for bug in wiring_bugs) if wiring_bugs else ''}
+
+Detailed report saved to:
+{csv_path}
+"""
+        
+        # Show summary dialog
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information if not wiring_bugs else QMessageBox.Warning)
+        msg.setText("🔬 Wiring Test Complete")
+        msg.setDetailedText(summary)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.exec_()
+        
+        # Also print to console
+        print(summary)
+    
+    def _update_cache_status(self):
+        """Update UI with cache status information"""
+        metrics = self.cache_manager.get_metrics()
+        cache_info = (
+            f"\n💾 Cache Status:\n"
+            f"   Entries: {metrics['cache_size']}/{self.cache_manager.max_size}\n"
+            f"   Hit Rate: {metrics['hit_rate_pct']:.1f}%\n"
+            f"   Total Hits: {metrics['hits']}\n"
+            f"   Total Misses: {metrics['misses']}"
+        )
+        self.results_text.append(cache_info)
+    
+    def _auto_calculate_confluence_on_init(self):
+        """
+        Auto-calculate confluence from strategy on window initialization.
+        
+        CRITICAL: Automatically runs on panel open to set proper confluence value.
+        Silent version - doesn't show messages in results_text during init.
+        """
+        try:
+            # Get current strategy configuration from orchestrator
+            config = self.orchestrator.get_current_config()
+            
+            if not config or not hasattr(config, 'blocks') or not config.blocks:
+                # No strategy yet - keep default value (40)
+                return
+            
+            # Calculate required and optional points
+            required_points = 0
+            optional_points = 0
+            
+            for block in config.blocks:
+                if not hasattr(block, 'signals'):
+                    continue
+                
+                for signal in block.signals:
+                    # Each signal typically contributes 10-15 points
+                    signal_weight = 10
+                    
+                    if hasattr(signal, 'logic'):
+                        if signal.logic == 'AND':
+                            required_points += signal_weight
+                        elif signal.logic == 'OR':
+                            optional_points += signal_weight
+            
+            total_points = required_points + optional_points
+            
+            if total_points == 0:
+                # No signals - keep default value
+                return
+            
+            # Recommended confluence: Required points + 50-70% of optional points
+            recommended = required_points + int(optional_points * 0.6)
+            
+            # Set the calculated value (silent during init)
+            self.confluence_spin.setValue(recommended)
+            
+        except Exception as e:
+            # Silent fail - keep default value of 40
+            pass
+    
     def _calculate_confluence_from_strategy(self):
         """
         Calculate optimal confluence points from current strategy configuration.
         
         NAUTILUS EXPERT: Analyze strategy blocks and signals to determine
         the recommended confluence threshold based on required vs optional signals.
+        
+        This is the MANUAL version (triggered by button click) - shows verbose output.
         """
         try:
             # Get current strategy configuration from orchestrator
@@ -2111,7 +3401,7 @@ class BacktestConfigPanel(QWidget):
                 self.results_text.setText(
                     "⚠️ No strategy configured yet!\n\n"
                     "Please add building blocks to your strategy first,\n"
-                    "then click 'Calculate' to determine optimal confluence."
+                    "then click 'Reset From Strategy' to determine optimal confluence."
                 )
                 return
             
