@@ -4,10 +4,12 @@ Data Verify Dialog - Data Integrity Check UI
 Shows per-symbol/timeframe gap analysis for stored Binance OHLCV data.
 Called from Tools → Verify Data...
 
-Verification uses verify_and_repair(dry_run=True) combined with
-detect_gaps_in_binance_files() to show per-gap detail without modifying data.
+Verification calls detect_gaps_in_binance_files() for each timeframe, then
+classifies every gap as either:
+  - repairable  — gap_start is within the Binance API 90-day horizon
+  - too_old     — gap_start predates the horizon; requires LakeAPI backfill
 
-Repair uses verify_and_repair(dry_run=False) to fetch and fill each specific
+Repair uses verify_and_repair(dry_run=False) to fetch and fill each repairable
 gap from Binance directly — NOT the general DataUpdateModal date-range download.
 
 After repair completes the dialog automatically re-runs verification so the
@@ -41,6 +43,10 @@ from src.strategy_builder.ui.styles import (
     COLORS,
 )
 
+# Binance free API only serves the last N days — gaps older than this cannot
+# be repaired from Binance and require a LakeAPI backfill.
+_BINANCE_HORIZON_DAYS = 90
+
 
 # ---------------------------------------------------------------------------
 # Background threads
@@ -48,11 +54,11 @@ from src.strategy_builder.ui.styles import (
 
 class DataVerifyThread(QThread):
     """
-    Background thread: detect gaps without modifying any stored data.
+    Background thread: detect and classify gaps without modifying any data.
 
-    Calls detect_gaps_in_binance_files() for each timeframe to obtain the
-    full per-gap detail list, then returns a structured report that the dialog
-    uses to populate the results table.
+    For each timeframe calls detect_gaps_in_binance_files(), then splits
+    each gap into 'repairable' (within the 90-day Binance horizon) or
+    'too_old' (predates the horizon — LakeAPI backfill needed).
 
     Signals:
         progress(int, int, str): (current, total, message)
@@ -62,21 +68,17 @@ class DataVerifyThread(QThread):
 
         {
             '15m': {
-                'gaps': [
-                    {
-                        'gap_start': datetime,
-                        'gap_end':   datetime,
-                        'duration':  timedelta,
-                        'missing_bars': int,
-                        'timeframe': str,
-                    },
-                    ...
-                ],
-                'gaps_found': int,
-                'total_missing_bars': int,
+                'repairable': [gap_dict, ...],   # within Binance horizon
+                'too_old':    [gap_dict, ...],   # older than horizon
+                'gaps_found': int,               # repairable + too_old
+                'repairable_count': int,
+                'too_old_count': int,
+                'total_missing_bars': int,       # across all gaps
+                'repairable_missing_bars': int,
+                'too_old_missing_bars': int,
             },
             ...
-            '_error': str,   # only present on exception
+            '_error': str,  # only present on exception
         }
     """
 
@@ -89,6 +91,7 @@ class DataVerifyThread(QThread):
         try:
             self.progress.emit(10, 100, "Initialising data manager…")
             manager = UnifiedDataManager(mode='live')
+            horizon_cutoff = datetime.utcnow() - timedelta(days=_BINANCE_HORIZON_DAYS)
 
             report: Dict = {}
             steps = len(self._TIMEFRAMES)
@@ -97,14 +100,26 @@ class DataVerifyThread(QThread):
                 pct_end = 20 + int((i + 1) * 70 / steps)
                 self.progress.emit(pct_start, 100, f"Scanning {tf} data for gaps…")
 
-                gaps: List[Dict] = manager.detect_gaps_in_binance_files(tf)
-                total_missing = sum(g['missing_bars'] for g in gaps)
+                all_gaps: List[Dict] = manager.detect_gaps_in_binance_files(tf)
+
+                repairable = [g for g in all_gaps if g['gap_start'] >= horizon_cutoff]
+                too_old = [g for g in all_gaps if g['gap_start'] < horizon_cutoff]
+
                 report[tf] = {
-                    'gaps': gaps,
-                    'gaps_found': len(gaps),
-                    'total_missing_bars': total_missing,
+                    'repairable': repairable,
+                    'too_old': too_old,
+                    'gaps_found': len(all_gaps),
+                    'repairable_count': len(repairable),
+                    'too_old_count': len(too_old),
+                    'total_missing_bars': sum(g['missing_bars'] for g in all_gaps),
+                    'repairable_missing_bars': sum(g['missing_bars'] for g in repairable),
+                    'too_old_missing_bars': sum(g['missing_bars'] for g in too_old),
                 }
-                self.progress.emit(pct_end, 100, f"{tf}: {len(gaps)} gap(s) found.")
+                self.progress.emit(
+                    pct_end, 100,
+                    f"{tf}: {len(all_gaps)} gap(s) "
+                    f"({len(repairable)} repairable, {len(too_old)} too old)."
+                )
 
             self.progress.emit(100, 100, "Verification complete.")
             self.finished.emit(True, report)
@@ -115,15 +130,15 @@ class DataVerifyThread(QThread):
 
 class DataRepairThread(QThread):
     """
-    Background thread: repair detected gaps by fetching missing bars from Binance.
+    Background thread: repair repairable gaps by fetching missing bars from Binance.
 
     Calls verify_and_repair(dry_run=False) which targets each specific gap
-    range rather than a broad date-range download.
+    within the Binance API horizon rather than a broad date-range download.
+    Gaps older than the horizon are automatically skipped by the backend.
 
     Signals:
         progress(int, int, str): (current, total, message)
         finished(bool, dict): (success, repair_summary)
-            repair_summary matches the verify_and_repair() return format.
     """
 
     progress = pyqtSignal(int, int, str)
@@ -134,7 +149,6 @@ class DataRepairThread(QThread):
             self.progress.emit(5, 100, "Starting gap repair via Binance…")
             manager = UnifiedDataManager(mode='live')
 
-            # verify_and_repair with dry_run=False fetches each gap individually
             self.progress.emit(20, 100, "Fetching missing bars from Binance (this may take a moment)…")
             summary = manager.verify_and_repair(
                 timeframes=['15m', '1h'],
@@ -158,20 +172,17 @@ class DataVerifyDialog(QDialog):
 
     States
     ------
-    - idle       — initial / after close
     - verifying  — DataVerifyThread running
-    - results    — table populated, Fix Gaps visible if gaps exist
+    - results    — table populated
+      - Fix Gaps shown  → at least one repairable gap exists
+      - Fix Gaps hidden → all gaps are too old, or no gaps
     - repairing  — DataRepairThread running
     - done       — repair finished, re-verification auto-started
 
-    Layout
-    ------
-    Header
-    Subtitle
-    [Summary GroupBox]  ← banner: green or amber
-    [Results GroupBox]  ← QTableWidget
-    ProgressBar + label (hidden when idle)
-    [Run Verification] [Fix Gaps (conditional)] [Close]
+    Each timeframe renders as one or two rows:
+      Row A (always): overall status — Clean | Repairable Gaps | Too Old (LakeAPI)
+      When both repairable AND too-old gaps exist, a second row shows the
+      too-old count so the user knows how many Binance can't fix.
     """
 
     # ------------------------------------------------------------------
@@ -183,7 +194,7 @@ class DataVerifyDialog(QDialog):
         self._verify_thread: Optional[DataVerifyThread] = None
         self._repair_thread: Optional[DataRepairThread] = None
         self._last_report: Dict = {}
-        self._has_gaps: bool = False
+        self._has_repairable_gaps: bool = False
 
         self._init_ui()
         self._start_verification()
@@ -196,7 +207,7 @@ class DataVerifyDialog(QDialog):
         self.setModal(True)
         self.setMinimumWidth(860)
         self.setMinimumHeight(580)
-        self.resize(940, 640)
+        self.resize(940, 660)
         self.setStyleSheet(get_main_stylesheet())
 
         root = QVBoxLayout()
@@ -233,7 +244,7 @@ class DataVerifyDialog(QDialog):
         summary_group.setLayout(summary_layout)
         root.addWidget(summary_group)
 
-        # Results table — 6 columns now includes Missing Bars with real counts
+        # Results table
         results_group = QGroupBox("Results")
         results_layout = QVBoxLayout()
         results_layout.setContentsMargins(10, 10, 10, 10)
@@ -313,7 +324,7 @@ class DataVerifyDialog(QDialog):
             return
 
         self._table.setRowCount(0)
-        self._has_gaps = False
+        self._has_repairable_gaps = False
         self._fix_btn.setVisible(False)
         self._run_btn.setEnabled(False)
         self._summary_label.setText("Verification in progress…")
@@ -340,75 +351,126 @@ class DataVerifyDialog(QDialog):
         self._populate_table(report)
 
     def _populate_table(self, report: Dict):
-        """Fill the results table from the DataVerifyThread report."""
+        """Fill the results table with per-timeframe gap classification."""
         self._table.setRowCount(0)
 
-        total_gaps = 0
-        total_missing = 0
-        affected_timeframes = 0
+        total_repairable = 0
+        total_too_old = 0
+        total_repairable_missing = 0
+        total_too_old_missing = 0
+
+        def cell(text: str, color: Optional[str] = None, bold: bool = False) -> QTableWidgetItem:
+            item = QTableWidgetItem(str(text))
+            item.setTextAlignment(Qt.AlignCenter)
+            if color:
+                item.setForeground(QColor(color))
+            if bold:
+                item.setFont(create_font(size=9, bold=True))
+            return item
 
         for tf, tf_data in report.items():
             if tf.startswith('_'):
                 continue
 
-            gaps_found: int = tf_data.get('gaps_found', 0)
-            missing_bars: int = tf_data.get('total_missing_bars', 0)
-            gaps: List[Dict] = tf_data.get('gaps', [])
+            r_count: int = tf_data.get('repairable_count', 0)
+            o_count: int = tf_data.get('too_old_count', 0)
+            r_missing: int = tf_data.get('repairable_missing_bars', 0)
+            o_missing: int = tf_data.get('too_old_missing_bars', 0)
+            r_gaps: List[Dict] = tf_data.get('repairable', [])
+            o_gaps: List[Dict] = tf_data.get('too_old', [])
 
-            total_gaps += gaps_found
-            total_missing += missing_bars
-            if gaps_found > 0:
-                affected_timeframes += 1
-                self._has_gaps = True
+            total_repairable += r_count
+            total_too_old += o_count
+            total_repairable_missing += r_missing
+            total_too_old_missing += o_missing
 
-            # Status
+            if r_count > 0:
+                self._has_repairable_gaps = True
+
+            gaps_found = r_count + o_count
+
+            # --- Primary row ---
             if gaps_found == 0:
                 status_text = "Clean"
                 status_color = COLORS['success']
+                gaps_cell = "0"
+                missing_cell = "—"
                 notes = "No action required"
-            else:
+            elif r_count > 0 and o_count == 0:
+                # Only repairable gaps
                 status_text = "Gaps Found"
                 status_color = COLORS['error']
-                # Show earliest gap date as a hint
-                if gaps:
-                    earliest = min(g['gap_start'] for g in gaps)
-                    notes = f"Earliest: {earliest.strftime('%Y-%m-%d %H:%M')}"
-                else:
-                    notes = "Use Fix Gaps to repair"
+                gaps_cell = str(r_count)
+                missing_cell = str(r_missing)
+                earliest = min(g['gap_start'] for g in r_gaps)
+                notes = f"Earliest: {earliest.strftime('%Y-%m-%d %H:%M')}"
+            elif r_count == 0 and o_count > 0:
+                # Only too-old gaps — Binance cannot fix these
+                status_text = "Too Old — LakeAPI needed"
+                status_color = COLORS['warning']
+                gaps_cell = str(o_count)
+                missing_cell = str(o_missing)
+                earliest = min(g['gap_start'] for g in o_gaps)
+                notes = f"From {earliest.strftime('%Y-%m-%d')} — beyond {_BINANCE_HORIZON_DAYS}d horizon"
+            else:
+                # Mixed: some repairable, some too old
+                status_text = "Mixed Gaps"
+                status_color = COLORS['warning']
+                gaps_cell = str(gaps_found)
+                missing_cell = str(r_missing + o_missing)
+                notes = f"{r_count} fixable, {o_count} need LakeAPI"
 
             row = self._table.rowCount()
             self._table.insertRow(row)
-
-            def cell(text: str, color: Optional[str] = None, bold: bool = False) -> QTableWidgetItem:
-                item = QTableWidgetItem(str(text))
-                item.setTextAlignment(Qt.AlignCenter)
-                if color:
-                    item.setForeground(QColor(color))
-                if bold:
-                    item.setFont(create_font(size=9, bold=True))
-                return item
-
             self._table.setItem(row, 0, cell(tf))
             self._table.setItem(row, 1, cell(status_text, status_color, bold=True))
-            self._table.setItem(row, 2, cell(str(gaps_found)))
-            # Real missing bar count — was "see logs", now shows actual number
-            self._table.setItem(row, 3, cell("—" if missing_bars == 0 else str(missing_bars)))
+            self._table.setItem(row, 2, cell(gaps_cell))
+            self._table.setItem(row, 3, cell(missing_cell))
             self._table.setItem(row, 4, cell(notes))
 
-        # Summary banner
-        if total_gaps == 0:
-            self._summary_label.setText(
-                "All data is complete — no gaps found"
-            )
+            # --- Secondary row for mixed case: detail the too-old portion ---
+            if r_count > 0 and o_count > 0:
+                row2 = self._table.rowCount()
+                self._table.insertRow(row2)
+                earliest_old = min(g['gap_start'] for g in o_gaps)
+                self._table.setItem(row2, 0, cell(f"{tf} (old)"))
+                self._table.setItem(row2, 1, cell("Too Old — LakeAPI needed", COLORS['warning'], bold=True))
+                self._table.setItem(row2, 2, cell(str(o_count)))
+                self._table.setItem(row2, 3, cell(str(o_missing)))
+                self._table.setItem(
+                    row2, 4,
+                    cell(f"From {earliest_old.strftime('%Y-%m-%d')} — beyond {_BINANCE_HORIZON_DAYS}d horizon")
+                )
+
+        # --- Summary banner ---
+        if total_repairable == 0 and total_too_old == 0:
+            self._summary_label.setText("All data is complete — no gaps found")
             self._summary_label.setStyleSheet(get_status_label_style('success'))
             self._fix_btn.setVisible(False)
-        else:
+        elif total_repairable > 0 and total_too_old == 0:
             self._summary_label.setText(
-                f"{total_gaps} gap(s) found across {affected_timeframes} timeframe(s) "
-                f"({total_missing} missing bars) — use Fix Gaps to repair"
+                f"{total_repairable} gap(s) found ({total_repairable_missing} missing bars) "
+                f"— use Fix Gaps to repair from Binance"
             )
             self._summary_label.setStyleSheet(get_status_label_style('warning'))
             self._fix_btn.setVisible(True)
+        elif total_repairable == 0 and total_too_old > 0:
+            self._summary_label.setText(
+                f"{total_too_old} gap(s) found ({total_too_old_missing} missing bars) are older "
+                f"than the {_BINANCE_HORIZON_DAYS}-day Binance horizon — LakeAPI backfill needed"
+            )
+            self._summary_label.setStyleSheet(get_status_label_style('warning'))
+            self._fix_btn.setVisible(False)   # Fix Gaps can't help here
+        else:
+            # Mixed
+            self._summary_label.setText(
+                f"{total_repairable} gap(s) fixable via Binance "
+                f"({total_repairable_missing} bars) + "
+                f"{total_too_old} gap(s) need LakeAPI backfill "
+                f"({total_too_old_missing} bars)"
+            )
+            self._summary_label.setStyleSheet(get_status_label_style('warning'))
+            self._fix_btn.setVisible(True)    # Fix what we can
 
     # ------------------------------------------------------------------
     # Repair
@@ -418,9 +480,11 @@ class DataVerifyDialog(QDialog):
         """
         Kick off DataRepairThread.
 
-        Calls verify_and_repair(dry_run=False) which fetches each detected
-        gap from Binance individually.  After repair finishes, automatically
-        re-runs verification so the user can confirm the data is clean.
+        Calls verify_and_repair(dry_run=False) which fetches each gap within
+        the Binance API horizon individually. Gaps older than the horizon are
+        skipped by the backend with a warning.
+
+        After repair finishes, automatically re-runs verification.
         """
         if self._repair_thread and self._repair_thread.isRunning():
             return
@@ -446,31 +510,34 @@ class DataVerifyDialog(QDialog):
             self._run_btn.setEnabled(True)
             return
 
-        # Build a quick human-readable repair result
         repaired = sum(v.get('gaps_repaired', 0) for k, v in summary.items() if not k.startswith('_'))
         too_old = sum(v.get('gaps_too_old', 0) for k, v in summary.items() if not k.startswith('_'))
         bars = sum(v.get('bars_fetched', 0) for k, v in summary.items() if not k.startswith('_'))
         errors = [e for k, v in summary.items() if not k.startswith('_') for e in v.get('errors', [])]
 
         if errors:
-            self._summary_label.setText(
+            msg = (
                 f"Repair completed with warnings: {repaired} gap(s) fixed, "
                 f"{len(errors)} error(s) — re-verifying…"
             )
             self._summary_label.setStyleSheet(get_status_label_style('warning'))
         elif too_old > 0 and repaired == 0:
-            self._summary_label.setText(
-                f"Gaps are older than the Binance API horizon — cannot auto-repair. "
-                f"Re-verifying to confirm…"
+            msg = (
+                f"All gaps are older than {_BINANCE_HORIZON_DAYS} days — "
+                f"Binance cannot repair them (LakeAPI backfill needed) — re-verifying…"
+            )
+            self._summary_label.setStyleSheet(get_status_label_style('warning'))
+        elif too_old > 0:
+            msg = (
+                f"Repair done: {repaired} gap(s) fixed ({bars} bars), "
+                f"{too_old} gap(s) still need LakeAPI backfill — re-verifying…"
             )
             self._summary_label.setStyleSheet(get_status_label_style('warning'))
         else:
-            self._summary_label.setText(
-                f"Repair done: {repaired} gap(s) fixed, {bars} bars fetched — re-verifying…"
-            )
+            msg = f"Repair done: {repaired} gap(s) fixed, {bars} bars fetched — re-verifying…"
             self._summary_label.setStyleSheet(get_status_label_style('success'))
 
-        # Always re-run verification so the user sees the current state
+        self._summary_label.setText(msg)
         self._start_verification()
 
     # ------------------------------------------------------------------
