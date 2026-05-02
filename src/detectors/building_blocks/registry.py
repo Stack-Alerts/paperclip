@@ -371,6 +371,64 @@ class BlockRegistry:
         return list(set(meta.category for meta in cls._blocks.values()))
     
     @classmethod
+    def get_blocks_for_signal(cls, signal_name: str) -> List[str]:
+        """
+        Find all blocks that can provide a specific signal
+        
+        INSTITUTIONAL-GRADE AUTO-DISCOVERY (2026-02-16):
+        For given signal, searches registry to find which blocks emit it.
+        Used by signal evaluator to auto-load blocks for exit conditions.
+        
+        Args:
+            signal_name: Signal to search for (e.g., 'BULLISH', 'BULLISH_CROSS')
+        
+        Returns:
+            List of block names that can provide this signal, ordered by:
+            1. Category priority (OSCILLATORS first for OVERSOLD/BULLISH)
+            2. Default weight (higher = more reliable)
+        
+        Example:
+            blocks = BlockRegistry.get_blocks_for_signal('BULLISH')
+            # Returns: ['rsi', 'macd', 'stoch', ...] (all blocks that emit BULLISH)
+            
+            blocks = BlockRegistry.get_blocks_for_signal('BULLISH_CROSS')
+            # Returns: ['macd_cross', 'ema_crossover', ...] (cross-specific blocks)
+        """
+        capable_blocks = []
+        
+        # Search all registered blocks
+        for block_name, metadata in cls._blocks.items():
+            if signal_name in metadata.valid_signals:
+                capable_blocks.append({
+                    'name': block_name,
+                    'category': metadata.category,
+                    'weight': metadata.default_weight
+                })
+        
+        # Sort by priority:
+        # 1. Category priority (oscillators/indicators first for signals like BULLISH, OVERSOLD)
+        # 2. Weight (higher = more reliable)
+        category_priority = {
+            'OSCILLATORS': 1,  # RSI, MACD, Stoch - primary for OVERSOLD/BULLISH
+            'TREND': 2,  # ADX, EMA - for BULLISH/BEARISH
+            'INSTITUTIONAL': 3,  # VWAP, Order Flow
+            'PRICE_ACTION': 4,  # Breakers, Order Blocks
+            'SMC_ICT': 5,  # ICT concepts
+            'PATTERNS': 6,  # Chart patterns
+        }
+        
+        def sort_key(block):
+            return (
+                category_priority.get(block['category'], 99),  # Category first
+                -block['weight']  # Then weight (negative for descending)
+            )
+        
+        capable_blocks.sort(key=sort_key)
+        
+        # Return just the names
+        return [b['name'] for b in capable_blocks]
+    
+    @classmethod
     def get_stats(cls) -> Dict[str, Any]:
         """Get registry statistics"""
         categories = {}
