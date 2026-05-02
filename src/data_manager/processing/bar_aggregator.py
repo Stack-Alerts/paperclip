@@ -12,6 +12,9 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, Union, List
 import gc
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import partial
 
 from ..config import RAW_DATA_DIR, TIMEFRAME_MAPPING, TIMEFRAMES
 
@@ -137,16 +140,21 @@ class BarAggregator:
         data_type: str,
         start_date: datetime,
         end_date: datetime,
-        timeframe: str = '15min'
+        timeframe: str = '15min',
+        use_parallel: bool = True
     ) -> pd.DataFrame:
         """
-        Aggregate data across multiple months
+        Aggregate data across multiple months (PARALLEL PROCESSING)
+        
+        Uses 98% of available CPUs (31 of 32 cores on production server)
+        to process month files in parallel for massive speedup.
         
         Args:
             data_type: Data type ('trades')
             start_date: Start date
             end_date: End date
             timeframe: Timeframe for bars
+            use_parallel: Use parallel processing (default: True)
         
         Returns:
             DataFrame with OHLCV bars spanning date range
@@ -164,25 +172,31 @@ class BarAggregator:
         current = start_date.replace(day=1)
         end_month = end_date.replace(day=1)
         
-        all_bars = []
-        
+        months_to_process = []
         while current <= end_month:
-            try:
-                month_bars = self.aggregate_month(
-                    data_type,
-                    current.year,
-                    current.month,
-                    timeframe
-                )
-                all_bars.append(month_bars)
-            except FileNotFoundError:
-                print(f"⚠️  No data for {current.year}-{current.month:02d}")
-            
+            months_to_process.append((current.year, current.month))
             # Next month
             if current.month == 12:
                 current = current.replace(year=current.year + 1, month=1)
             else:
                 current = current.replace(month=current.month + 1)
+        
+        # Use parallel processing if multiple months and enabled
+        if use_parallel and len(months_to_process) > 1:
+            all_bars = self._aggregate_months_parallel(
+                data_type,
+                months_to_process,
+                timeframe
+            )
+        else:
+            # Sequential processing (single month or parallel disabled)
+            all_bars = []
+            for year, month in months_to_process:
+                try:
+                    month_bars = self.aggregate_month(data_type, year, month, timeframe)
+                    all_bars.append(month_bars)
+                except FileNotFoundError:
+                    print(f"⚠️  No data for {year}-{month:02d}")
         
         if not all_bars:
             raise ValueError(f"No data found for date range")
@@ -197,6 +211,70 @@ class BarAggregator:
         ].copy()
         
         return bars
+    
+    def _aggregate_months_parallel(
+        self,
+        data_type: str,
+        months: List[tuple],
+        timeframe: str,
+        progress_queue=None
+    ) -> List[pd.DataFrame]:
+        """
+        Process multiple month files in parallel using 98% of available CPUs
+        
+        ENHANCED: Queue-based progress reporting for multiprocess stdout capture
+        
+        Args:
+            data_type: Data type ('trades')
+            months: List of (year, month) tuples
+            timeframe: Timeframe for bars
+            progress_queue: Optional Queue for progress messages from workers
+        
+        Returns:
+            List of DataFrames (one per month)
+        """
+        # Calculate number of workers: 98% of available CPUs
+        # Leave 1-2 cores for system (on 32-core: use 31 cores)
+        total_cpus = os.cpu_count() or 4
+        max_workers = max(1, int(total_cpus * 0.98))
+        
+        msg = f"   ⚡ Parallel processing: {len(months)} months using {max_workers}/{total_cpus} CPUs"
+        print(msg)
+        if progress_queue:
+            progress_queue.put(msg)
+        
+        # Create partial function with fixed arguments including queue
+        process_func = partial(
+            _process_single_month,
+            data_type=data_type,
+            timeframe=timeframe,
+            progress_queue=progress_queue
+        )
+        
+        results = []
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_month = {
+                executor.submit(process_func, year, month): (year, month)
+                for year, month in months
+            }
+            
+            # Collect results as they complete
+            for future in as_completed(future_to_month):
+                year, month = future_to_month[future]
+                try:
+                    month_bars = future.result()
+                    if month_bars is not None:
+                        results.append((year, month, month_bars))
+                except Exception as e:
+                    error_msg = f"   ❌ Error processing {year}-{month:02d}: {e}"
+                    print(error_msg)
+                    if progress_queue:
+                        progress_queue.put(error_msg)
+        
+        # Sort by month order and extract DataFrames
+        results.sort(key=lambda x: (x[0], x[1]))
+        return [bars for _, _, bars in results]
     
     def _aggregate_trades(
         self,
@@ -445,6 +523,70 @@ class BarAggregator:
         
         file_size = output_path.stat().st_size / 1024 / 1024
         print(f"💾 Saved {len(bars):,} bars to {output_path.name} ({file_size:.1f} MB)")
+
+
+# Module-level worker function for multiprocessing (must be picklable)
+def _process_single_month(
+    year: int,
+    month: int,
+    data_type: str,
+    timeframe: str,
+    progress_queue=None
+) -> Optional[pd.DataFrame]:
+    """
+    Worker function to process a single month in parallel
+    
+    ENHANCED: Queue-based progress reporting to parent process
+    
+    Args:
+        year: Year
+        month: Month
+        data_type: Data type ('trades')
+        timeframe: Timeframe for bars
+        progress_queue: Optional Queue for sending progress messages
+    
+    Returns:
+        DataFrame with bars or None if file not found
+    """
+    # NOTE: Database fork handling now done via os.register_at_fork() in DatabaseManager
+    # No manual cleanup needed here - fork handler automatically disposes engine in child processes
+    
+    try:
+        # Send start message
+        msg = f"📊 Aggregating BTC-USDT_trades_{year}-{month:02d}.parquet to {timeframe} bars..."
+        print(msg)
+        if progress_queue:
+            progress_queue.put(msg)
+        
+        # Note: We can't easily redirect the detailed progress from aggregate_month
+        # because it uses print() statements. To fully capture, we'd need to
+        # restructure to use logging or capture stdout in each worker.
+        # For now, just send start/end messages.
+        
+        agg = BarAggregator()
+        result = agg.aggregate_month(data_type, year, month, timeframe)
+        
+        # Send completion message
+        if result is not None:
+            completion_msg = f"   ✅ {year}-{month:02d}: {len(result):,} bars loaded"
+            print(completion_msg)
+            if progress_queue:
+                progress_queue.put(completion_msg)
+        
+        return result
+        
+    except FileNotFoundError:
+        msg = f"   ⚠️  No data for {year}-{month:02d}"
+        print(msg)
+        if progress_queue:
+            progress_queue.put(msg)
+        return None
+    except Exception as e:
+        msg = f"   ❌ Error processing {year}-{month:02d}: {e}"
+        print(msg)
+        if progress_queue:
+            progress_queue.put(msg)
+        return None
 
 
 def aggregate_and_save_month(
