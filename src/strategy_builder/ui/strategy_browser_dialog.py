@@ -62,12 +62,25 @@ class HTMLDelegate(QStyledItemDelegate):
         # Draw background and borders
         options.widget.style().drawControl(options.widget.style().ControlElement.CE_ItemViewItem, options, painter)
         
-        # Draw HTML text
-        painter.translate(options.rect.left(), options.rect.top())
-        clip = options.rect.adjusted(0, 0, -options.rect.left(), -options.rect.top())
-        doc.setTextWidth(clip.width())
-        # Convert QRect to QRectF for drawContents
-        doc.drawContents(painter, QRectF(clip))
+        # Check if this item should be centered (based on alignment flag)
+        alignment = index.data(Qt.ItemDataRole.TextAlignmentRole)
+        
+        # Get natural width of content (without width constraint)
+        doc.setTextWidth(-1)  # -1 means no width constraint
+        natural_width = doc.idealWidth()
+        
+        # Calculate horizontal offset for centering
+        x_offset = 0
+        if alignment and (int(alignment) & int(Qt.AlignmentFlag.AlignHCenter)):
+            # Center the content horizontally
+            x_offset = (options.rect.width() - natural_width) / 2
+        
+        # Draw HTML text with offset, vertically centered too
+        y_offset = (options.rect.height() - doc.size().height()) / 2
+        
+        painter.translate(options.rect.left() + x_offset, options.rect.top() + y_offset)
+        clip = QRectF(0, 0, natural_width, doc.size().height())
+        doc.drawContents(painter, clip)
         
         painter.restore()
     
@@ -211,8 +224,9 @@ class StrategyBrowserDialog(QMainWindow):
         # Enable sorting (clickable headers with sort indicators)
         self.table.setSortingEnabled(True)
         
-        # Set HTML delegate for name column (column 0) to render rich text
+        # Set HTML delegate for name and type columns to render rich text
         self.table.setItemDelegateForColumn(0, HTMLDelegate(self.table))
+        self.table.setItemDelegateForColumn(1, HTMLDelegate(self.table))  # Type column needs HTML for colored emojis
         
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.table.itemDoubleClicked.connect(self._on_double_click)
@@ -249,6 +263,7 @@ class StrategyBrowserDialog(QMainWindow):
         self.detail_labels['name'].setFont(create_font(10))
         self.detail_labels['name'].setStyleSheet(f"color: {get_color('text_primary')}; padding: 4px 0px;")
         self.detail_labels['name'].setWordWrap(True)
+        self.detail_labels['name'].setTextFormat(Qt.TextFormat.RichText)  # Enable HTML rendering
         details_layout.addWidget(self.detail_labels['name'], 1, 0, 1, 1)
         
         self.detail_labels['description'] = QLabel("Description will appear here")
@@ -495,27 +510,8 @@ class StrategyBrowserDialog(QMainWindow):
                                 if len(blocks_data) > 3:
                                     blocks_summary += f" + {len(blocks_data) - 3} more"
                         
-                        # Detect strategy type from name (comprehensive keyword matching)
-                        name_upper = latest['name'].upper()
-                        
-                        # Bullish keywords
-                        bullish_keywords = ['BULLISH', 'BULL', 'LONG', 'BUY', 'LOD', 'LOW', 'SUPPORT', 'BOUNCE', 'BOTTOM']
-                        # Bearish keywords  
-                        bearish_keywords = ['BEARISH', 'BEAR', 'SHORT', 'SELL', 'HOD', 'HIGH', 'RESISTANCE', 'REJECTION', 'TOP']
-                        
-                        # Check for bullish indicators
-                        is_bullish = any(keyword in name_upper for keyword in bullish_keywords)
-                        # Check for bearish indicators
-                        is_bearish = any(keyword in name_upper for keyword in bearish_keywords)
-                        
-                        # Determine strategy type (bearish takes precedence if both match)
-                        if is_bearish:
-                            strategy_type = "Bearish"
-                        elif is_bullish:
-                            strategy_type = "Bullish"
-                        else:
-                            # Default to Bearish if no keywords found (most strategies are bearish/short)
-                            strategy_type = "Bearish"
+                        # Read strategy_type directly from database
+                        strategy_type = latest.get('strategy_type', 'Unknown')
                         
                         # Build enriched display name with HTML color coding
                         display_name = latest['name']
@@ -590,9 +586,18 @@ class StrategyBrowserDialog(QMainWindow):
             name_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             self.table.setItem(row, 0, name_item)
             
-            # Type - Show Bullish/Bearish from stored strategy_type (centered)
+            # Type - Show Bullish/Bearish from stored strategy_type with colored indicator (centered)
             strategy_type = strategy.get('strategy_type', 'Unknown')
-            type_item = QTableWidgetItem(strategy_type)
+            # Use HTML with colored bullets and gray text (NO div wrapper - use Qt alignment instead)
+            if strategy_type == 'Bullish':
+                type_display = '<span style="color: #7cc27a;">●</span> <span style="color: #9CA3AF;">Bullish&nbsp;&nbsp;</span>'
+            elif strategy_type == 'Bearish':
+                type_display = '<span style="color: #c35252;">●</span> <span style="color: #9CA3AF;">Bearish</span>'
+            else:
+                type_display = f'<span style="color: #9CA3AF;">{strategy_type}</span>'
+            
+            type_item = QTableWidgetItem(type_display)
+            # Use Qt native alignment (like Validation and Published columns)
             type_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(row, 1, type_item)
             
@@ -805,17 +810,19 @@ class StrategyBrowserDialog(QMainWindow):
                     recheck_cfg = signal['recheck_config']
                     if recheck_cfg.get('enabled'):
                         bar_delay = recheck_cfg.get('bar_delay', 0)
-                        recheck_line = f'<span style="color: #4ADE80;">&nbsp;&nbsp;&nbsp;&nbsp;└── RECHECK ({bar_delay} bars)</span>'
+                        recheck_mode = recheck_cfg.get('mode', 'WITHIN')
+                        recheck_line = f'<span style="color: #4ADE80;">&nbsp;&nbsp;&nbsp;&nbsp;└── RECHECK ({recheck_mode} {bar_delay} bars)</span>'
                         html_lines.append(recheck_line)
-                        
+
                         # Nested RECHECKs (if exist)
                         if signal.get('recheck_chain'):
                             for nested in signal['recheck_chain']:
                                 if nested.get('enabled'):
                                     nested_delay = nested.get('bar_delay', 0)
+                                    nested_mode = nested.get('mode', 'WITHIN')
                                     validation_mode = nested.get('validation_mode', 'SIGNAL')
                                     target = "of RECHECK" if validation_mode == "RECHECK" else "of Signal"
-                                    nested_line = f'<span style="color: #60A5FA;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── RECHECK {target} ({nested_delay} bars)</span>'
+                                    nested_line = f'<span style="color: #60A5FA;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── RECHECK {target} ({nested_mode} {nested_delay} bars)</span>'
                                     html_lines.append(nested_line)
                 
                 # SIGNAL-LEVEL EXIT CONDITIONS ONLY (shown under each signal)
@@ -841,6 +848,15 @@ class StrategyBrowserDialog(QMainWindow):
                         color = '#FF6B6B'
                         exit_line = f'<span style="color: {color};">&nbsp;&nbsp;&nbsp;&nbsp;└── {exit_icon} EXIT: {exit_signal_name} - {mode_label} [🟡 SIGNAL]</span>'
                         html_lines.append(exit_line)
+                        
+                        # EXIT RECHECK (if exists on this exit condition)
+                        if exit_cond.get('recheck_config'):
+                            exit_recheck = exit_cond['recheck_config']
+                            if exit_recheck.get('enabled'):
+                                exit_bar_delay = exit_recheck.get('bar_delay', 0)
+                                exit_recheck_mode = exit_recheck.get('mode', 'WITHIN')
+                                exit_recheck_line = f'<span style="color: #4ADE80;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── RECHECK ({exit_recheck_mode} {exit_bar_delay} bars)</span>'
+                                html_lines.append(exit_recheck_line)
                 
                 signal_counter += 1
             
@@ -897,21 +913,17 @@ class StrategyBrowserDialog(QMainWindow):
             if not version:
                 return
             
-            # Detect strategy type from version name
-            name_upper = version['name'].upper()
-            if 'BULLISH' in name_upper:
-                strategy_type = "Bullish"
-            elif 'BEARISH' in name_upper:
-                strategy_type = "Bearish"
-            elif 'HOD' in name_upper or 'HIGH' in name_upper or 'RESISTANCE' in name_upper:
-                strategy_type = "Bearish"  # HOD rejection is bearish
-            elif 'LOD' in name_upper or 'LOW' in name_upper or 'SUPPORT' in name_upper:
-                strategy_type = "Bullish"  # LOD rejection is bullish
-            else:
-                strategy_type = "Unknown"
+            # Read strategy type directly from database
+            strategy_type = version.get('strategy_type', 'Unknown')
             
-            # Column 1: Strategy Info
-            type_badge = f"{'🟢' if strategy_type == 'Bullish' else '🔴'} {strategy_type}"
+            # Column 1: Strategy Info  
+            # Use HTML with colored bullets (2x font-size for icon, nudged down to align with text)
+            if strategy_type == 'Bullish':
+                type_badge = f'<span style="color: #7cc27a; font-size: 17pt;">●</span> {strategy_type}'
+            elif strategy_type == 'Bearish':
+                type_badge = f'<span style="color: #c35252; font-size: 17pt;">●</span> {strategy_type}'
+            else:
+                type_badge = strategy_type
             self.detail_labels['name'].setText(f"{version['name']} ({type_badge})")
             
             desc = version.get('description', 'No description')
@@ -997,9 +1009,32 @@ class StrategyBrowserDialog(QMainWindow):
                     test_text += f"<b>Win:</b> {wins} | <b>Loss:</b> {losses}"
                     self.detail_labels['tests'].setText(test_text)
                     
+                    # Read additional metrics from the JSONB metrics dict
+                    best_metrics = best.get('metrics') or {}
+                    win_count = best_metrics.get('win_count', 0)
+                    loss_count = best_metrics.get('loss_count', 0)
+                    # Fall back to deriving counts from win_rate if not persisted yet
+                    if win_count == 0 and loss_count == 0 and total_trades > 0:
+                        win_count = round(total_trades * win_rate / 100)
+                        loss_count = total_trades - win_count
+                    profit_factor = best.get('profit_factor') or best_metrics.get('profit_factor', 0) or 0
+                    max_drawdown_pct = best.get('max_drawdown_pct') or best_metrics.get('max_drawdown_pct', 0) or 0
+                    total_return_pct = best.get('total_return_pct') or best_metrics.get('total_return_pct', 0) or 0
+                    sortino_ratio = best_metrics.get('sortino_ratio', 0) or 0
+                    calmar_ratio = best_metrics.get('calmar_ratio', 0) or 0
+                    std_deviation = best_metrics.get('std_deviation', 0) or 0
+
                     perf_text = f"<b>Best Performance:</b><br>"
+                    perf_text += f"• Trades: {total_trades}<br>"
+                    perf_text += f"• Win Rate: {win_rate:.1f}%<br>"
+                    perf_text += f"• Wins / Losses: {win_count} / {loss_count}<br>"
                     perf_text += f"• Sharpe: {sharpe:.2f}<br>"
-                    perf_text += f"• Win Rate: {win_rate:.1f}%"
+                    perf_text += f"• Profit Factor: {profit_factor:.2f}<br>"
+                    perf_text += f"• Max Drawdown: {max_drawdown_pct:.1f}%<br>"
+                    perf_text += f"• Total Return: {total_return_pct:.1f}%<br>"
+                    perf_text += f"• Sortino: {sortino_ratio:.2f}<br>"
+                    perf_text += f"• Calmar: {calmar_ratio:.2f}<br>"
+                    perf_text += f"• Std Dev: {std_deviation:.4f}"
                     self.detail_labels['performance'].setText(perf_text)
                     
                     # Quality badge based on Sharpe

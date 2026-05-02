@@ -2636,13 +2636,20 @@ class BacktestConfigPanel(QWidget):
                 backtest_config = self.get_config()
 
                 # Convert Decimal/int metrics to plain Python scalars for JSON serialisation
+                _total_trades = int(metrics_data.get('total_trades', 0))
+                _win_rate = float(metrics_data.get('win_rate', 0))
+                # Derive win/loss counts from total_trades and win_rate (win_rate is a percentage)
+                _win_count = round(_total_trades * _win_rate / 100) if _total_trades > 0 else 0
+                _loss_count = _total_trades - _win_count
                 metrics_for_db = {
                     'total_return_pct': float(metrics_data.get('total_return', 0)),
                     'sharpe_ratio': float(metrics_data.get('sharpe_ratio', 0)),
                     'max_drawdown_pct': float(metrics_data.get('max_drawdown_pct', 0)),
-                    'win_rate': float(metrics_data.get('win_rate', 0)),
+                    'win_rate': _win_rate,
                     'profit_factor': float(metrics_data.get('profit_factor', 0)),
-                    'total_trades': int(metrics_data.get('total_trades', 0)),
+                    'total_trades': _total_trades,
+                    'win_count': _win_count,
+                    'loss_count': _loss_count,
                     'sortino_ratio': float(metrics_data.get('sortino_ratio', 0)),
                     'calmar_ratio': float(metrics_data.get('calmar_ratio', 0)),
                     'std_deviation': float(metrics_data.get('std_deviation', 0)),
