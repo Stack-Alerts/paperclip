@@ -285,6 +285,7 @@ class StrategyPersistence:
         data = {
             'name': config.name,
             'description': config.description,
+            'strategy_type': config.strategy_type,  # Save strategy type
             'blocks': []
         }
         
@@ -369,6 +370,7 @@ class StrategyPersistence:
         config = StrategyConfig()
         config.name = data.get('name', '')
         config.description = data.get('description', '')
+        config.strategy_type = data.get('strategy_type', 'Bullish')  # Load strategy type
         
         # Parse strategy-level exit conditions
         if data.get('exit_conditions'):

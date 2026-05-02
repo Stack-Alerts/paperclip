@@ -189,10 +189,28 @@ class LogViewerWindow(QDialog):
             self._display_content(tab_idx, type_content)
             tab_idx += 1
         
-        # Add tab for AI recommendations log (prefer production, fall back to test)
+        # Add tabs for special root-level log files
         root_log_files = [f for f in self.all_log_files if f.parent == self.logs_base_dir]
         
-        # Find ai_recommendations.log or test_ai_recommendations.log (prefer production)
+        # 1. Signal Evaluator Log (Sprint 2.0.2 - Signal debugging)
+        signal_log = None
+        for log_file in root_log_files:
+            if log_file.name == 'signal_evaluator.log' and log_file.exists():
+                signal_log = log_file
+                break
+        
+        if signal_log:
+            log_widget = self._create_log_panel()
+            self.tabs.addTab(log_widget, "🔍 Signal Evaluator")
+            
+            with open(signal_log, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+            
+            self.tab_data[tab_idx] = {'content': content, 'widget': log_widget}
+            self._display_content(tab_idx, content)
+            tab_idx += 1
+        
+        # 2. AI Recommendations Log
         ai_log = None
         for log_file in root_log_files:
             if log_file.name == 'ai_recommendations.log' and log_file.exists():

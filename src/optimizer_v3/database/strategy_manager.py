@@ -157,6 +157,7 @@ class StrategyDatabaseManager:
             version_number=version_number,
             name=strategy_data['name'],
             description=strategy_data.get('description', ''),
+            strategy_type=strategy_data.get('strategy_type', 'Bullish'),  # Sprint 1.9: Bullish/Bearish
             # Required JSONB fields - SQLAlchemy handles serialization
             blocks=strategy_data['blocks'],
             signals=strategy_data['signals'],
@@ -268,7 +269,9 @@ class StrategyDatabaseManager:
                 'config_hash': version.config_hash,
                 # Validation status (Sprint 1.9)
                 'validation_status': version.validation_status,
-                'validation_timestamp': version.validation_timestamp
+                'validation_timestamp': version.validation_timestamp,
+                # Strategy type (Sprint 1.9)
+                'strategy_type': version.strategy_type
             }
             
             return version_dict

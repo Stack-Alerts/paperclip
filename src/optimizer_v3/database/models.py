@@ -455,6 +455,9 @@ class StrategyVersion(Base):
     validation_status = Column(String(20), default='Un-Validated')  # Un-Validated, Pass, Fail
     validation_timestamp = Column(DateTime)  # When last validated
     
+    # Strategy type (Sprint 1.9 - Bullish/Bearish classification)
+    strategy_type = Column(String(20), default='Bullish')  # Bullish, Bearish
+    
     # Relationships
     strategy = relationship("Strategy", back_populates="versions")
     block_versions = relationship(
