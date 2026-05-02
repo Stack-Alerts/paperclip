@@ -84,3 +84,25 @@ Thumbs.db
 
 # Security - .env contains sensitive credentials and MUST be ignored
 # Use .env.example as a template
+
+# Optimizer output files (large run artifacts)
+optimizer_output_*.txt
+
+# Debug and trace scripts in root (one-off diagnostics, not production code)
+debug_*.py
+trace_*.py
+deep_nan_trace.py
+test_backtest_trace.py
+test_data_availability.py
+test_signal_evaluation_trace.py
+test_timing_display.py
+test_unified_manager_data_for_NautilusTrader_backtest.py
+
+# Scratch/temp files
+0
+
+# Integration test results (generated output)
+tests/integration/results/
+
+# Lake cache
+.lake_cache/
