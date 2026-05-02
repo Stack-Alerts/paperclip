@@ -1047,31 +1047,34 @@ class StrategyBrowserDialog(QMainWindow):
 
                     _section_style = f"color:{_c_muted};font-size:9px;letter-spacing:1px;"
                     _divider       = f'<hr style="border:none;border-top:1px solid {_c_border};margin:4px 0">'
-                    _cell_style    = 'style="font-size:11px;white-space:nowrap;word-wrap:break-word;"'
-                    _tbl_open      = '<table cellpadding="0" cellspacing="0">'
+                    # Fixed-width label column (120px) keeps label flush against the value column;
+                    # value column expands to fill remaining space.
+                    _lbl_style     = 'width="120" style="font-size:11px;white-space:nowrap;"'
+                    _val_style     = 'style="font-size:11px;white-space:nowrap;"'
+                    _tbl_open      = '<table cellpadding="0" cellspacing="0" width="100%">'
                     _tbl_close     = '</table>'
 
                     perf_text = (
                         f'<span style="{_section_style}">TRADE STATS</span>'
                         f'{_tbl_open}'
-                        f'<tr><td {_cell_style}>Trades</td><td {_cell_style} align="right"><b>&nbsp;{total_trades}</b></td></tr>'
-                        f'<tr><td {_cell_style}>Win Rate</td><td {_cell_style} align="right"><b style="color:{_win_rate_color}">&nbsp;{win_rate:.1f}%</b></td></tr>'
-                        f'<tr><td {_cell_style}>W / L</td><td {_cell_style} align="right">&nbsp;{win_count} / {loss_count}</td></tr>'
+                        f'<tr><td {_lbl_style}>Trades</td><td {_val_style} align="right"><b>{total_trades}</b></td></tr>'
+                        f'<tr><td {_lbl_style}>Win Rate</td><td {_val_style} align="right"><b style="color:{_win_rate_color}">{win_rate:.1f}%</b></td></tr>'
+                        f'<tr><td {_lbl_style}>W / L</td><td {_val_style} align="right">{win_count} / {loss_count}</td></tr>'
                         f'{_tbl_close}'
                         f'{_divider}'
                         f'<span style="{_section_style}">RETURNS</span>'
                         f'{_tbl_open}'
-                        f'<tr><td {_cell_style}>Return</td><td {_cell_style} align="right"><b style="color:{_return_color}">&nbsp;{_return_sign}{total_return_pct:.1f}%</b></td></tr>'
-                        f'<tr><td {_cell_style}>Prof. Factor</td><td {_cell_style} align="right"><b style="color:{_pf_color}">&nbsp;{profit_factor:.2f}</b></td></tr>'
+                        f'<tr><td {_lbl_style}>Return</td><td {_val_style} align="right"><b style="color:{_return_color}">{_return_sign}{total_return_pct:.1f}%</b></td></tr>'
+                        f'<tr><td {_lbl_style}>Prof. Factor</td><td {_val_style} align="right"><b style="color:{_pf_color}">{profit_factor:.2f}</b></td></tr>'
                         f'{_tbl_close}'
                         f'{_divider}'
                         f'<span style="{_section_style}">RISK METRICS</span>'
                         f'{_tbl_open}'
-                        f'<tr><td {_cell_style}>Sharpe</td><td {_cell_style} align="right"><b style="color:{_sharpe_color}">&nbsp;{sharpe:.2f}</b></td></tr>'
-                        f'<tr><td {_cell_style}>Sortino</td><td {_cell_style} align="right"><b style="color:{_sortino_color}">&nbsp;{sortino_ratio:.2f}</b></td></tr>'
-                        f'<tr><td {_cell_style}>Calmar</td><td {_cell_style} align="right"><b style="color:{_calmar_color}">&nbsp;{calmar_ratio:.2f}</b></td></tr>'
-                        f'<tr><td {_cell_style}>Max DD</td><td {_cell_style} align="right"><b style="color:{_c_error}">&nbsp;{_dd_display}</b></td></tr>'
-                        f'<tr><td {_cell_style}>Std Dev</td><td {_cell_style} align="right">&nbsp;{std_deviation:.4f}</td></tr>'
+                        f'<tr><td {_lbl_style}>Sharpe</td><td {_val_style} align="right"><b style="color:{_sharpe_color}">{sharpe:.2f}</b></td></tr>'
+                        f'<tr><td {_lbl_style}>Sortino</td><td {_val_style} align="right"><b style="color:{_sortino_color}">{sortino_ratio:.2f}</b></td></tr>'
+                        f'<tr><td {_lbl_style}>Calmar</td><td {_val_style} align="right"><b style="color:{_calmar_color}">{calmar_ratio:.2f}</b></td></tr>'
+                        f'<tr><td {_lbl_style}>Max DD</td><td {_val_style} align="right"><b style="color:{_c_error}">{_dd_display}</b></td></tr>'
+                        f'<tr><td {_lbl_style}>Std Dev</td><td {_val_style} align="right">{std_deviation:.4f}</td></tr>'
                         f'{_tbl_close}'
                     )
                     self.detail_labels['performance'].setText(perf_text)
