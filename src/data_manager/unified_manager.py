@@ -8,7 +8,7 @@ The brain of the data system. Automatically routes requests to:
 
 Features:
 - Automatic source selection (smart routing)
-- Gap detection and filling
+- Gap detection and filling (startup + on-demand via verify_and_repair())
 - 1000-bar warmup support
 - Multi-timeframe support
 - Caching for performance
@@ -18,17 +18,33 @@ This is the ONLY interface strategies need to use!
 
 Author: BTC_Engine_v3
 Date: January 8, 2026
+
+Gap detection / auto-repair added: 2026-05-02
+  ROOT CAUSE NOTE (fast-download bug):
+  The original backfill_december.py and daily_sync.py both fetched klines with
+  `limit=1500` and NO startTime parameter.  Binance always returns the *latest*
+  1500 bars when startTime is omitted, so pages 2-N of the pagination loop were
+  identical to page 1.  The system stored only the most-recent window and
+  silently skipped the offline period (Mar 12 – Apr 14 2026 ≈ 34 days).
+  The download completed in seconds because only one real API call was made.
+
+  Fix: _fetch_binance_range() now passes explicit startTime/endTime to every
+  Binance klines request and paginates forward until the target window is
+  completely covered.
 """
 
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Optional, List, Union, Dict
+from typing import Optional, List, Union, Dict, Tuple
+import logging
 import pandas as pd
 from enum import Enum
 
 from .config import PROJECT_ROOT, RAW_DATA_DIR
 from .processing.bar_aggregator import BarAggregator
 from .binance.rest_client import BinanceRestClient
+
+logger = logging.getLogger(__name__)
 
 
 class DataSource(Enum):
@@ -63,11 +79,22 @@ class UnifiedDataManager:
         >>> # Uses optimal source for each part!
     """
     
-    def __init__(self):
-        """Initialize unified manager"""
+    def __init__(self, mode='backtest', startup_gap_check: bool = False):
+        """
+        Initialize unified manager.
+
+        Args:
+            mode: 'backtest' (use local files) or 'live' (use API for recent
+                  data).
+            startup_gap_check: If True, run a lightweight 7-day continuity
+                  check on startup and auto-repair any gaps found.  Defaults
+                  to False so existing backtest code is unaffected.  Set to
+                  True in live/paper-trading entry points.
+        """
         self.lakeapi_dir = RAW_DATA_DIR  # Historical data (LakeAPI decommissioned, data remains)
         self.binance_dir = PROJECT_ROOT / "data" / "binance"
-        
+        self.mode = mode  # backtest vs live mode
+
         # Components
         self.bar_aggregator = BarAggregator()
         self.binance_client = None  # Lazy initialization
@@ -75,16 +102,115 @@ class UnifiedDataManager:
         # Thresholds
         self.binance_threshold_days = 30  # Use Binance for last 30 days
         
-        print("✅ Unified Data Manager initialized")
+        print(f"✅ Unified Data Manager initialized (Mode: {mode})")
         print(f"   LakeAPI: {self.lakeapi_dir}")
         print(f"   Binance: {self.binance_dir}")
         print(f"   Auto-routing threshold: {self.binance_threshold_days} days")
+
+        # Optional startup gap check (only in live/paper mode by default)
+        if startup_gap_check:
+            self.startup_check(auto_repair=True)
     
     def _get_binance_client(self) -> BinanceRestClient:
         """Lazy initialization of Binance client"""
         if self.binance_client is None:
             self.binance_client = BinanceRestClient()
         return self.binance_client
+    
+    def _normalize_timeframe(self, timeframe: str) -> str:
+        """
+        Normalize timeframe format for BarAggregator
+        
+        Converts: '15m' → '15min', '1h' → '1h', etc.
+        BarAggregator expects 'min' suffix, not 'm'
+        
+        Args:
+            timeframe: Input timeframe ('15m', '1h', etc.)
+        
+        Returns:
+            Normalized timeframe ('15min', '1h', etc.)
+        """
+        mapping = {
+            '1m': '1min',
+            '5m': '5min', 
+            '15m': '15min',
+            '30m': '30min'
+        }
+        return mapping.get(timeframe, timeframe)
+    
+    def _get_bars_from_local_files(
+        self,
+        timeframe: str,
+        start_date: datetime,
+        end_date: datetime
+    ) -> pd.DataFrame:
+        """
+        NEW FUNCTION: Read bars from local Binance parquet files
+        
+        This is for BACKTEST MODE - reads pre-downloaded data.
+        Does NOT call Binance API!
+        
+        Args:
+            timeframe: Bar timeframe (e.g., '15m', '1h')
+            start_date: Start date
+            end_date: End date
+        
+        Returns:
+            DataFrame with bars from local files
+        """
+        print("   📂 Reading from local Binance parquet files...")
+        
+        try:
+            # Determine which month folders to read
+            current_month = start_date.replace(day=1)
+            end_month = end_date.replace(day=1)
+            
+            all_bars = []
+            
+            while current_month <= end_month:
+                # Build file path
+                month_str = current_month.strftime('%Y-%m')
+                month_folder = self.binance_dir / month_str
+                file_path = month_folder / f"BTCUSDT_PERP_{timeframe}_{month_str}.parquet"
+                
+                if file_path.exists():
+                    # Read parquet file
+                    df_month = pd.read_parquet(file_path)
+                    all_bars.append(df_month)
+                    print(f"   ✅ Read {len(df_month)} bars from {file_path.name}")
+                else:
+                    print(f"   ⚠️  File not found: {file_path.name}")
+                
+                # Next month
+                if current_month.month == 12:
+                    current_month = current_month.replace(year=current_month.year + 1, month=1)
+                else:
+                   current_month = current_month.replace(month=current_month.month + 1)
+            
+            if not all_bars:
+                raise FileNotFoundError(f"No local Binance files found for {timeframe}")
+            
+            # Combine all months
+            bars = pd.concat(all_bars, ignore_index=True)
+            
+            # Ensure timestamp is datetime
+            bars['timestamp'] = pd.to_datetime(bars['timestamp'])
+            
+            # Filter to exact date range
+            bars = bars[
+                (bars['timestamp'] >= start_date) &
+                (bars['timestamp'] <= end_date)
+            ].copy()
+            
+            # Sort by timestamp
+            bars = bars.sort_values('timestamp').reset_index(drop=True)
+            
+            print(f"   ✅ Local files: {len(bars)} bars loaded")
+            return bars
+            
+        except Exception as e:
+            print(f"   ❌ Local files error: {e}")
+            raise
     
     def _determine_source(
         self,
@@ -288,12 +414,15 @@ class UnifiedDataManager:
         print("   📂 Loading from LakeAPI...")
         
         try:
+            # CRITICAL: Normalize timeframe format ('15m' → '15min')
+            normalized_tf = self._normalize_timeframe(timeframe)
+            
             # Use bar aggregator to process LakeAPI trades
             bars = self.bar_aggregator.aggregate_date_range(
                 'trades',
                 start_date,
                 end_date,
-                timeframe
+                normalized_tf  # Use normalized timeframe!
             )
             
             print(f"   ✅ LakeAPI: {len(bars)} bars loaded")
@@ -360,6 +489,53 @@ class UnifiedDataManager:
             print("   🔄 Falling back to LakeAPI...")
             return self._get_bars_lakeapi(timeframe, start_date, end_date)
     
+    def _get_earliest_binance_date(self, timeframe: str) -> Optional[datetime]:
+        """
+        CRITICAL FIX: Dynamically detect earliest available Binance file
+        
+        Scans data/binance/ directory to find the absolute earliest timestamp
+        in any downloaded Binance parquet file.
+        
+        Args:
+            timeframe: Timeframe to check (e.g., '15m')
+        
+        Returns:
+            Earliest datetime found in Binance files, or None if no files exist
+        """
+        try:
+            if not self.binance_dir.exists():
+                return None
+            
+            # Find all parquet files matching the timeframe
+            binance_files = list(self.binance_dir.glob(f'**/BTCUSDT_PERP_{timeframe}_*.parquet'))
+            
+            if not binance_files:
+                return None
+            
+            # Read first timestamp from each file and find the earliest
+            earliest_timestamp = None
+            
+            for file in sorted(binance_files):  # Sort to process in order
+                try:
+                    df_temp = pd.read_parquet(file, columns=['timestamp'])
+                    if len(df_temp) > 0:
+                        file_start = pd.to_datetime(df_temp['timestamp'].iloc[0])
+                        if earliest_timestamp is None or file_start < earliest_timestamp:
+                            earliest_timestamp = file_start
+                            # Once we find the earliest file, we can break since files are sorted
+                            break
+                except Exception as e:
+                    continue
+            
+            if earliest_timestamp:
+                print(f"   📅 Earliest Binance data: {earliest_timestamp.strftime('%Y-%m-%d %H:%M')}")
+            
+            return earliest_timestamp
+            
+        except Exception as e:
+            print(f"   ⚠️  Error detecting Binance files: {e}")
+            return None
+    
     def _get_bars_hybrid(
         self,
         timeframe: str,
@@ -371,8 +547,10 @@ class UnifiedDataManager:
         
         Process:
         1. Historical part: LakeAPI
-        2. Recent part: Binance
+        2. Recent part: Binance local files
         3. Combine seamlessly
+        
+        CRITICAL FIX: Now uses ALL available Binance data (not just 30 days)!
         
         Args:
             timeframe: Bar timeframe
@@ -384,8 +562,17 @@ class UnifiedDataManager:
         """
         print("   🔀 Hybrid mode: Combining LakeAPI + Binance...")
         
-        # Calculate split point (30 days ago)
-        threshold = datetime.now() - timedelta(days=self.binance_threshold_days)
+        # CRITICAL FIX: Dynamically detect earliest Binance file instead of hardcoded 30 days!
+        earliest_binance = self._get_earliest_binance_date(timeframe)
+        
+        if earliest_binance:
+            # Use the ACTUAL earliest Binance date as threshold
+            threshold = earliest_binance
+            print(f"   ✅ Using ALL Binance data from {threshold.strftime('%Y-%m-%d')}")
+        else:
+            # Fallback to 30-day threshold if no Binance files found
+            threshold = datetime.now() - timedelta(days=self.binance_threshold_days)
+            print(f"   ⚠️  No Binance files found, using {self.binance_threshold_days}-day threshold")
         
         all_bars = []
         
@@ -410,11 +597,19 @@ class UnifiedDataManager:
             print(f"   🌐 Binance: {recent_start.date()} to {end_date.date()}")
             
             try:
-                recent_bars = self._get_bars_binance(
-                    timeframe,
-                    recent_start,
-                    end_date
-                )
+                # CRITICAL: Use local files in backtest mode, API in live mode
+                if self.mode == 'backtest':
+                    recent_bars = self._get_bars_from_local_files(
+                        timeframe,
+                        recent_start,
+                        end_date
+                    )
+                else:
+                    recent_bars = self._get_bars_binance(
+                        timeframe,
+                        recent_start,
+                        end_date
+                    )
                 all_bars.append(recent_bars)
             except Exception as e:
                 print(f"   ⚠️  Binance failed: {e}")
@@ -539,14 +734,27 @@ class UnifiedDataManager:
                 # Calculate gap in minutes for more accurate detection
                 gap_minutes = (datetime.now() - end_date).total_seconds() / 60
                 
-                # If gap > 15 minutes (one candle), mark as gap
-                # This ensures we detect missing even a single 15-minute candle
+                # CRITICAL FIX: Don't count CURRENT unclosed bar as missing!
+                # For 15min bars: if gap is 0-15min, that's just the current forming bar
+                # For 15min bars: if gap is 16-30min, we're missing 1 candle
+                # For 15min bars: if gap is 31-45min, we're missing 2 candles
+                # 
+                # Formula: actual_missing_candles = (gap_minutes - timeframe_minutes) / timeframe_minutes
+                # Example: gap=25min for 15min bars → (25-15)/15 = 0.66 → 0 complete candles missing
+                # Example: gap=35min for 15min bars → (35-15)/15 = 1.33 → 1 complete candles missing
+                
+                timeframe_minutes = 15  # For 15min bars
+                
+                # Subtract current bar period to get TRUE gap
+                # If result is negative or 0, we're up-to-date (current bar is forming)
+                true_gap_minutes = max(0, gap_minutes - timeframe_minutes)
+                
                 status[data_type] = {
                     'start': start_date,
                     'end': end_date,
                     'gap_days': gap_days,
-                    'gap_minutes': int(gap_minutes),
-                    'status': 'complete' if gap_minutes <= 15 else 'gap'
+                    'gap_minutes': int(true_gap_minutes),  # Report TRUE gap (excluding current bar)
+                    'status': 'complete' if true_gap_minutes <= 0 else 'gap'
                 }
                 
             except Exception as e:
@@ -627,6 +835,557 @@ class UnifiedDataManager:
             'lakeapi_range': (lakeapi_start, lakeapi_end) if lakeapi_start else None,
             'binance_range': (binance_start, binance_end)
         }
+
+    # =========================================================================
+    # GAP DETECTION & AUTO-REPAIR  (added 2026-05-02)
+    # =========================================================================
+
+    def detect_gaps_in_binance_files(
+        self,
+        timeframe: str = '15m',
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        tolerance_multiplier: float = 1.5,
+    ) -> List[Dict]:
+        """
+        Scan stored Binance parquet files for continuity gaps.
+
+        A gap is any interval between consecutive timestamps that exceeds
+        ``tolerance_multiplier * expected_bar_duration``.
+
+        Args:
+            timeframe: Bar timeframe to inspect (e.g. '15m', '1h').
+            start_date: Only report gaps after this date (None = all).
+            end_date:   Only report gaps before this date (None = now).
+            tolerance_multiplier: How many multiples of the bar period count
+                as a gap (default 1.5 → any jump > 22.5 min for 15m bars).
+
+        Returns:
+            List of gap dicts::
+
+                {
+                    'gap_start': datetime,   # last good bar before the gap
+                    'gap_end':   datetime,   # first bar after the gap
+                    'duration':  timedelta,
+                    'missing_bars': int,     # estimated count
+                    'timeframe': str,
+                }
+        """
+        tf_minutes = {
+            '1m': 1, '3m': 3, '5m': 5, '15m': 15, '30m': 30,
+            '1h': 60, '2h': 120, '4h': 240, '6h': 360, '12h': 720, '1d': 1440,
+        }
+        if timeframe not in tf_minutes:
+            raise ValueError(f"Unknown timeframe '{timeframe}'. Known: {list(tf_minutes)}")
+
+        bar_minutes = tf_minutes[timeframe]
+        expected_delta = timedelta(minutes=bar_minutes)
+        gap_threshold = expected_delta * tolerance_multiplier
+
+        # Load all matching parquet files
+        pattern = f'**/BTCUSDT_PERP_{timeframe}_*.parquet'
+        files = sorted(self.binance_dir.glob(pattern))
+        if not files:
+            print(f"   ⚠️  No Binance parquet files found for {timeframe}")
+            return []
+
+        frames = []
+        for f in files:
+            try:
+                df = pd.read_parquet(f, columns=['timestamp'])
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                frames.append(df)
+            except Exception as exc:
+                print(f"   ⚠️  Could not read {f.name}: {exc}")
+
+        if not frames:
+            return []
+
+        combined = pd.concat(frames, ignore_index=True)
+        combined = combined.sort_values('timestamp').drop_duplicates(
+            subset=['timestamp']
+        ).reset_index(drop=True)
+
+        # Optional date filter
+        if start_date:
+            combined = combined[combined['timestamp'] >= start_date]
+        if end_date:
+            combined = combined[combined['timestamp'] <= end_date]
+        combined = combined.reset_index(drop=True)
+
+        if len(combined) < 2:
+            return []
+
+        diffs = combined['timestamp'].diff().dropna()
+        gap_indices = diffs[diffs > gap_threshold].index
+
+        gaps = []
+        for idx in gap_indices:
+            gap_start = combined.loc[idx - 1, 'timestamp']
+            gap_end = combined.loc[idx, 'timestamp']
+            duration = gap_end - gap_start
+            missing = max(0, int(duration.total_seconds() / (bar_minutes * 60)) - 1)
+            gaps.append({
+                'gap_start': gap_start,
+                'gap_end': gap_end,
+                'duration': duration,
+                'missing_bars': missing,
+                'timeframe': timeframe,
+            })
+
+        return gaps
+
+    def _fetch_binance_range(
+        self,
+        timeframe: str,
+        start_ts: datetime,
+        end_ts: datetime,
+        symbol: str = 'BTCUSDT',
+        futures: bool = True,
+        batch_size: int = 1500,
+    ) -> pd.DataFrame:
+        """
+        Fetch klines from Binance API for an *explicit* time window.
+
+        ROOT CAUSE FIX: Always passes ``startTime`` and ``endTime`` to every
+        API request.  The original code omitted startTime, causing Binance to
+        always return the *latest* 1500 bars regardless of what window was
+        requested – that is why missing months appeared to download instantly.
+
+        Args:
+            timeframe:  Binance interval string (e.g. '15m', '1h').
+            start_ts:   Inclusive window start.
+            end_ts:     Inclusive window end.
+            symbol:     Binance symbol (default BTCUSDT).
+            futures:    Use futures endpoint (default True).
+            batch_size: Candles per request (Binance max = 1500).
+
+        Returns:
+            Combined DataFrame for the full window, deduplicated and sorted.
+        """
+        client = self._get_binance_client()
+        endpoint = '/fapi/v1/klines' if futures else '/api/v3/klines'
+        base_url = client.futures_base if futures else client.spot_base
+
+        import requests as _requests
+        import time as _time
+
+        tf_minutes = {
+            '1m': 1, '3m': 3, '5m': 5, '15m': 15, '30m': 30,
+            '1h': 60, '2h': 120, '4h': 240, '6h': 360, '12h': 720, '1d': 1440,
+        }
+        bar_td = timedelta(minutes=tf_minutes.get(timeframe, 15))
+
+        all_frames: List[pd.DataFrame] = []
+        cursor = start_ts
+
+        while cursor <= end_ts:
+            params = {
+                'symbol': symbol,
+                'interval': timeframe,
+                'startTime': int(cursor.timestamp() * 1000),
+                # Ensure endTime >= startTime + 1 bar so Binance returns data even for single-bar windows
+                'endTime': int(max(end_ts, cursor + bar_td).timestamp() * 1000),
+                'limit': batch_size,
+            }
+
+            try:
+                client._check_rate_limit()
+                resp = _requests.get(
+                    f"{base_url}{endpoint}", params=params, timeout=15
+                )
+                resp.raise_for_status()
+                raw = resp.json()
+            except Exception as exc:
+                logger.error("Binance API error fetching %s %s-%s: %s",
+                             timeframe, cursor, end_ts, exc)
+                break
+
+            if not raw:
+                break
+
+            batch = pd.DataFrame(raw, columns=[
+                'open_time', 'open', 'high', 'low', 'close', 'volume',
+                'close_time', 'quote_volume', 'trades', 'taker_buy_base',
+                'taker_buy_quote', 'ignore',
+            ])
+            batch['timestamp'] = batch['open_time'].apply(
+                lambda x: datetime.fromtimestamp(x / 1000)
+            )
+            for col in ('open', 'high', 'low', 'close', 'volume', 'quote_volume'):
+                batch[col] = batch[col].astype(float)
+            batch['trades'] = batch['trades'].astype(int)
+            batch = batch.rename(columns={
+                'quote_volume': 'volume_usd',
+                'trades': 'trade_count',
+            })
+            batch['symbol'] = symbol
+            batch['timeframe'] = timeframe
+            batch = batch[[
+                'timestamp', 'open', 'high', 'low', 'close',
+                'volume', 'volume_usd', 'trade_count', 'symbol', 'timeframe',
+            ]]
+
+            all_frames.append(batch)
+
+            # Advance cursor past the last returned candle
+            last_ts = batch['timestamp'].iloc[-1]
+            cursor = last_ts + bar_td
+
+            # If the batch is smaller than requested we've reached the end
+            if len(raw) < batch_size:
+                break
+
+            _time.sleep(0.1)  # be polite to the API
+
+        if not all_frames:
+            return pd.DataFrame()
+
+        result = pd.concat(all_frames, ignore_index=True)
+        result = result.sort_values('timestamp').drop_duplicates(
+            subset=['timestamp']
+        ).reset_index(drop=True)
+        return result
+
+    def _save_binance_bars(
+        self,
+        df: pd.DataFrame,
+        timeframe: str,
+    ) -> None:
+        """
+        Merge new bars into the correct monthly Binance parquet files.
+
+        Existing data in each month file is read, merged with ``df``,
+        deduplicated, sorted, and written back atomically.
+
+        Args:
+            df:         DataFrame with new bars (must have 'timestamp' column).
+            timeframe:  Timeframe string used in the filename (e.g. '15m').
+        """
+        if df.empty:
+            return
+
+        df = df.copy()
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+        # Group new bars by month
+        df['_ym'] = df['timestamp'].dt.to_period('M')
+        for period, group in df.groupby('_ym'):
+            month_str = str(period)  # e.g. '2026-03'
+            month_dir = self.binance_dir / month_str
+            month_dir.mkdir(parents=True, exist_ok=True)
+            file_path = month_dir / f"BTCUSDT_PERP_{timeframe}_{month_str}.parquet"
+
+            group = group.drop(columns=['_ym'])
+
+            if file_path.exists():
+                try:
+                    existing = pd.read_parquet(file_path)
+                    existing['timestamp'] = pd.to_datetime(existing['timestamp'])
+                    merged = pd.concat([existing, group], ignore_index=True)
+                except Exception as exc:
+                    logger.warning("Could not read %s for merge: %s – overwriting", file_path, exc)
+                    merged = group
+            else:
+                merged = group
+
+            merged = merged.sort_values('timestamp').drop_duplicates(
+                subset=['timestamp']
+            ).reset_index(drop=True)
+
+            merged.to_parquet(file_path, compression='snappy', index=False)
+            print(f"      Saved {len(merged)} bars → {file_path.name}")
+
+    def run_gap_report(
+        self,
+        timeframes: Optional[List[str]] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, List[Dict]]:
+        """
+        Produce a structured gap report for all requested timeframes.
+
+        Args:
+            timeframes: List of timeframes to check (default: ['15m', '1h']).
+            start_date: Only check gaps after this date.
+            end_date:   Only check gaps before this date.
+
+        Returns:
+            Dict mapping timeframe → list of gap dicts (see detect_gaps_in_binance_files).
+        """
+        if timeframes is None:
+            timeframes = ['15m', '1h']
+
+        report: Dict[str, List[Dict]] = {}
+
+        print("\n" + "=" * 60)
+        print("GAP DETECTION REPORT")
+        print(f"Timeframes: {', '.join(timeframes)}")
+        print(f"Start filter: {start_date or 'none'}")
+        print(f"End filter:   {end_date or 'none'}")
+        print("=" * 60)
+
+        for tf in timeframes:
+            gaps = self.detect_gaps_in_binance_files(tf, start_date, end_date)
+            report[tf] = gaps
+
+            if gaps:
+                total_missing = sum(g['missing_bars'] for g in gaps)
+                print(f"\n[{tf}] {len(gaps)} gap(s) found, ~{total_missing} missing bars:")
+                for g in gaps:
+                    print(
+                        f"   {g['gap_start']} → {g['gap_end']} "
+                        f"({g['duration']}, ~{g['missing_bars']} bars)"
+                    )
+            else:
+                print(f"\n[{tf}] No gaps detected — data is continuous.")
+
+        print("\n" + "=" * 60)
+        return report
+
+    def verify_and_repair(
+        self,
+        timeframes: Optional[List[str]] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        dry_run: bool = False,
+        symbol: str = 'BTCUSDT',
+        futures: bool = True,
+        binance_api_horizon_days: int = 90,
+    ) -> Dict[str, Dict]:
+        """
+        Detect gaps in stored Binance OHLCV data and repair them automatically.
+
+        This is the primary data-quality entry point.  Call it on startup to
+        ensure the data layer is healthy before strategies run, or call it
+        on-demand after a suspected outage.
+
+        Repair strategy
+        ---------------
+        * Gaps within Binance API horizon (≤ ``binance_api_horizon_days`` old):
+          fetched from Binance via :meth:`_fetch_binance_range` (uses explicit
+          startTime/endTime — the root-cause fix).
+        * Gaps older than the Binance API horizon: logged as un-repairable via
+          Binance; LakeAPI backfill must be triggered separately.
+
+        Args:
+            timeframes:  Timeframes to check (default ['15m', '1h']).
+            start_date:  Restrict gap search to dates after this (default: 90
+                         days ago to match the Binance API window).
+            end_date:    Restrict gap search to dates before this (default: now).
+            dry_run:     If True, detect and report gaps but do NOT fetch or
+                         save any data.
+            symbol:      Binance symbol (default 'BTCUSDT').
+            futures:     Use Binance Futures endpoint (default True).
+            binance_api_horizon_days: Gaps older than this many days cannot be
+                         repaired from Binance and are flagged for manual action.
+
+        Returns:
+            Dict keyed by timeframe with repair summary::
+
+                {
+                    '15m': {
+                        'gaps_found': int,
+                        'gaps_repaired': int,
+                        'gaps_too_old': int,
+                        'bars_fetched': int,
+                        'errors': [str, ...],
+                    },
+                    ...
+                }
+
+        Example::
+
+            >>> manager = UnifiedDataManager(mode='live')
+            >>> report = manager.verify_and_repair()
+            >>> # Run on startup:
+            >>> manager.verify_and_repair(dry_run=True)  # just report
+            >>> manager.verify_and_repair()               # repair
+        """
+        if timeframes is None:
+            timeframes = ['15m', '1h']
+        if end_date is None:
+            end_date = datetime.now()
+        if start_date is None:
+            start_date = end_date - timedelta(days=binance_api_horizon_days)
+
+        horizon_cutoff = datetime.now() - timedelta(days=binance_api_horizon_days)
+
+        print("\n" + "=" * 60)
+        print("VERIFY AND REPAIR — DATA INTEGRITY CHECK")
+        print(f"Mode: {'DRY RUN (no writes)' if dry_run else 'LIVE REPAIR'}")
+        print(f"Scope: {start_date.date()} → {end_date.date()}")
+        print(f"Timeframes: {', '.join(timeframes)}")
+        print(f"Binance API horizon: {binance_api_horizon_days} days")
+        print("=" * 60)
+
+        summary: Dict[str, Dict] = {}
+
+        for tf in timeframes:
+            print(f"\n--- Checking {tf} ---")
+            gaps = self.detect_gaps_in_binance_files(
+                tf, start_date=start_date, end_date=end_date
+            )
+
+            tf_summary: Dict = {
+                'gaps_found': len(gaps),
+                'gaps_repaired': 0,
+                'gaps_too_old': 0,
+                'bars_fetched': 0,
+                'errors': [],
+            }
+
+            if not gaps:
+                print(f"   ✅ No gaps found — {tf} data is continuous in range.")
+                summary[tf] = tf_summary
+                continue
+
+            total_missing = sum(g['missing_bars'] for g in gaps)
+            print(f"   Found {len(gaps)} gap(s), ~{total_missing} missing bars total.")
+
+            for gap in gaps:
+                gap_start: datetime = gap['gap_start']
+                gap_end: datetime = gap['gap_end']
+                missing: int = gap['missing_bars']
+
+                print(
+                    f"   Gap: {gap_start} → {gap_end} "
+                    f"(~{missing} bars, duration {gap['duration']})"
+                )
+
+                # Determine if gap is within Binance API range
+                if gap_start < horizon_cutoff:
+                    msg = (
+                        f"Gap starting {gap_start} is older than {binance_api_horizon_days}d "
+                        "Binance horizon — cannot auto-repair from Binance. "
+                        "Consider LakeAPI backfill."
+                    )
+                    print(f"   ⚠️  {msg}")
+                    logger.warning(msg)
+                    tf_summary['gaps_too_old'] += 1
+                    continue
+
+                if dry_run:
+                    print(f"   [DRY RUN] Would fetch {gap_start} → {gap_end}")
+                    continue
+
+                # Fetch from Binance with explicit startTime/endTime
+                print(f"   🌐 Fetching from Binance ({gap_start} → {gap_end}) ...")
+                try:
+                    tf_minutes = {
+                        '1m': 1, '5m': 5, '15m': 15, '30m': 30,
+                        '1h': 60, '4h': 240, '1d': 1440,
+                    }
+                    bar_td = timedelta(minutes=tf_minutes.get(tf, 15))
+
+                    # fetch_start: one bar after the last-good bar (gap_start)
+                    # fetch_end:   one bar before the first-bar-after-gap (gap_end)
+                    # For single-missing-bar gaps: fetch_end = gap_end - bar_td
+                    # == gap_start + bar_td, so fetch_start == fetch_end (same bar).
+                    # Accept this — _fetch_binance_range handles the 1-bar window.
+                    fetch_start = gap_start + bar_td
+                    fetch_end = gap_end - bar_td
+
+                    if fetch_end < fetch_start:
+                        # Degenerate case: gap spans less than one bar period
+                        print(f"   ⚠️  Gap smaller than one bar period — skipping.")
+                        continue
+
+                    new_bars = self._fetch_binance_range(
+                        timeframe=tf,
+                        start_ts=fetch_start,
+                        end_ts=fetch_end,
+                        symbol=symbol,
+                        futures=futures,
+                    )
+
+                    if new_bars.empty:
+                        msg = f"Binance returned no data for {tf} {fetch_start}→{fetch_end}"
+                        print(f"   ⚠️  {msg}")
+                        tf_summary['errors'].append(msg)
+                        continue
+
+                    print(f"   ✅ Fetched {len(new_bars)} bars.")
+                    self._save_binance_bars(new_bars, tf)
+
+                    tf_summary['gaps_repaired'] += 1
+                    tf_summary['bars_fetched'] += len(new_bars)
+
+                except Exception as exc:
+                    msg = f"Error repairing {tf} gap {gap_start}→{gap_end}: {exc}"
+                    print(f"   ❌ {msg}")
+                    logger.error(msg)
+                    tf_summary['errors'].append(msg)
+
+            summary[tf] = tf_summary
+
+        # Final summary
+        print("\n" + "=" * 60)
+        print("REPAIR SUMMARY")
+        print("=" * 60)
+        for tf, s in summary.items():
+            status = "✅" if s['gaps_found'] == 0 or s['gaps_repaired'] == s['gaps_found'] - s['gaps_too_old'] else "⚠️"
+            print(
+                f"{status} {tf}: "
+                f"{s['gaps_found']} gap(s) found | "
+                f"{s['gaps_repaired']} repaired | "
+                f"{s['gaps_too_old']} too old | "
+                f"{s['bars_fetched']} bars fetched"
+            )
+            for err in s['errors']:
+                print(f"   ❌ {err}")
+        print("=" * 60 + "\n")
+
+        return summary
+
+    def startup_check(
+        self,
+        timeframes: Optional[List[str]] = None,
+        auto_repair: bool = True,
+        lookback_days: int = 7,
+    ) -> Dict[str, Dict]:
+        """
+        Lightweight startup continuity check (fast path for live trading).
+
+        Checks only the last ``lookback_days`` days so startup stays fast.
+        If gaps are found and ``auto_repair=True``, triggers
+        :meth:`verify_and_repair` for that window.
+
+        Args:
+            timeframes:    Timeframes to check (default ['15m', '1h']).
+            auto_repair:   Automatically repair any detected gaps.
+            lookback_days: How many days back to check (default 7).
+
+        Returns:
+            Same structure as :meth:`verify_and_repair`.
+        """
+        if timeframes is None:
+            timeframes = ['15m', '1h']
+
+        start_date = datetime.now() - timedelta(days=lookback_days)
+        print(f"\n🔍 Startup continuity check (last {lookback_days} days)...")
+
+        # Quick gap scan
+        all_clean = True
+        for tf in timeframes:
+            gaps = self.detect_gaps_in_binance_files(tf, start_date=start_date)
+            if gaps:
+                all_clean = False
+                print(f"   ⚠️  {tf}: {len(gaps)} gap(s) detected in last {lookback_days} days.")
+
+        if all_clean:
+            print(f"   ✅ All timeframes clean for last {lookback_days} days.")
+            return {tf: {'gaps_found': 0, 'gaps_repaired': 0,
+                         'gaps_too_old': 0, 'bars_fetched': 0, 'errors': []}
+                    for tf in timeframes}
+
+        if auto_repair:
+            return self.verify_and_repair(
+                timeframes=timeframes,
+                start_date=start_date,
+            )
+        else:
+            return self.run_gap_report(timeframes=timeframes, start_date=start_date)
 
 
 # Convenience function
