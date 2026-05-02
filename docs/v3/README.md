@@ -2,6 +2,12 @@
 
 Navigation index for all v3 documentation.
 
+## Git & Contribution Workflow
+
+| Document | Description |
+|----------|-------------|
+| [`GIT_WORKFLOW.md`](GIT_WORKFLOW.md) | **Mandatory git push protocol, branch strategy, commit format, and definition of done** |
+
 ## Architecture
 
 | Document | Description |
