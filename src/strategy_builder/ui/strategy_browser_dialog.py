@@ -319,7 +319,6 @@ class StrategyBrowserDialog(QMainWindow):
         details_layout.addWidget(self.detail_labels['tests'], 1, 2, 1, 1)
         
         self.detail_labels['performance'] = QLabel("Run backtest to see metrics")
-        self.detail_labels['performance'].setFont(create_font(9))
         self.detail_labels['performance'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 0px;")
         self.detail_labels['performance'].setWordWrap(True)
         self.detail_labels['performance'].setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
@@ -1045,12 +1044,12 @@ class StrategyBrowserDialog(QMainWindow):
                     _return_sign     = '+' if total_return_pct > 0 else ''
                     _dd_display      = f"-{abs(max_drawdown_pct):.1f}%" if max_drawdown_pct != 0 else "0.0%"
 
-                    _section_style = f"color:{_c_muted};font-size:9px;letter-spacing:1px;"
+                    _section_style = f"color:{_c_muted};letter-spacing:1px;"
                     _divider       = f'<hr style="border:none;border-top:1px solid {_c_border};margin:4px 0">'
                     # Fixed-width label column (120px) keeps label flush against the value column;
                     # value column expands to fill remaining space.
-                    _lbl_style     = 'width="120" style="font-size:11px;white-space:nowrap;"'
-                    _val_style     = 'style="font-size:11px;white-space:nowrap;"'
+                    _lbl_style     = 'width="120" style="white-space:nowrap;"'
+                    _val_style     = 'style="white-space:nowrap;"'
                     _tbl_open      = '<table cellpadding="0" cellspacing="0" width="100%">'
                     _tbl_close     = '</table>'
 
