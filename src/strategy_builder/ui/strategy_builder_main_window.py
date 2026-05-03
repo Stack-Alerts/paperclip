@@ -1466,7 +1466,7 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _start_auto_update_system(self):
         """
         Start automatic data update system.
-        
+
         Updates every 15 minutes:
         - Checks 0.2s after candle close
         - Retries every 2s until data is fresh
@@ -1474,118 +1474,176 @@ class StrategyBuilderMainWindow(QMainWindow):
         try:
             # Calculate time until next candle close (15-min candles)
             now = datetime.now()
-            
+
             # Next 15-min boundary
             minutes_to_next = 15 - (now.minute % 15)
             seconds_to_next = (minutes_to_next * 60) - now.second
-            
+
+            # BUG 4 FIX: clamp near-exact-boundary edge case (max valid wait is 900s).
+            # When called at exactly minute=0/15/30/45, second=0 the formula yields 900s
+            # which is correct. Guard against any arithmetic producing > 900s.
+            if seconds_to_next > 900:
+                seconds_to_next = 1
+
             # Add 0.2s delay after candle close
             ms_until_check = (seconds_to_next * 1000) + 200
-            
-            # Schedule first check
-            QTimer.singleShot(ms_until_check, self._check_and_update_data)
-            
+
+            # Schedule first check and store handle so it can be inspected / cancelled
+            self.candle_check_timer = QTimer(self)
+            self.candle_check_timer.setSingleShot(True)
+            self.candle_check_timer.timeout.connect(self._check_and_update_data)
+            self.candle_check_timer.start(ms_until_check)
+
             self._update_status(f"Auto-update system started - Next check in {seconds_to_next}s")
-            
+
         except Exception as e:
             print(f"Error starting auto-update system: {e}")
+            # BUG 3 FIX: retry system startup rather than silently dying
+            print("Retrying auto-update system startup in 60s...")
+            QTimer.singleShot(60 * 1000, self._start_auto_update_system)
     
     def _check_and_update_data(self):
         """
         Check if data needs updating and update if necessary.
-        
+
         Called 0.2s after each 15-min candle close.
         Retries every 2s until data is fresh.
         """
         try:
             self._update_status("Checking for data updates...")
-            
+
             # Import unified manager and Binance client
             from src.data_manager.unified_manager import UnifiedDataManager
             from src.data_manager.binance.rest_client import BinanceRestClient
-            
+
             # Check data status
             manager = UnifiedDataManager(mode='live')
             status = manager.get_all_data_types_status()
-            
+
             # Check for gaps in trades (15min data)
             trades_status = status.get('trades', {})
             gap_minutes = trades_status.get('gap_minutes', 999)
-            
+
             # If gap > 15 minutes (1 candle missing), download immediately
             # For 15min candles: any gap over 15min = candles missing
             if gap_minutes > 15:
                 # Data needs updating
                 self._update_status(f"Downloading fresh data (gap: {gap_minutes} min)...")
-                
+
                 try:
-                    # Use Binance client to download and save
-                    client = BinanceRestClient()
-                    bars = client.get_klines('15m', limit=100, futures=True)
-                    
-                    if len(bars) > 0:
+                    # BUG 5 FIX: simple 3-attempt retry with 5s sleep between attempts.
+                    # Previously a bare single call with no retry.
+                    _max_retries = 3
+                    _retry_delay_s = 5
+                    bars = None
+                    last_download_error = None
+
+                    for _attempt in range(_max_retries):
+                        try:
+                            client = BinanceRestClient()
+                            bars = client.get_klines('15m', limit=100, futures=True)
+                            if bars is not None and len(bars) > 0:
+                                break  # success
+                            last_download_error = f"Empty response on attempt {_attempt + 1}"
+                            print(f"Warning: {last_download_error}")
+                        except Exception as _dl_err:
+                            last_download_error = str(_dl_err)
+                            print(f"Download attempt {_attempt + 1}/{_max_retries} failed: {_dl_err}")
+
+                        if _attempt < _max_retries - 1:
+                            import time as _time
+                            print(f"Retrying in {_retry_delay_s}s...")
+                            _time.sleep(_retry_delay_s)
+
+                    if bars is not None and len(bars) > 0:
                         # Save to Binance directory
                         now = datetime.now()
                         month_dir = manager.binance_dir / f"{now.year}-{now.month:02d}"
                         month_dir.mkdir(parents=True, exist_ok=True)
-                        
+
                         # Save with month-level filename
                         output_file = month_dir / f"BTCUSDT_PERP_15m_{now.year}-{now.month:02d}.parquet"
-                        
+
                         # If file exists, merge with existing data
                         if output_file.exists():
                             existing = pd.read_parquet(output_file)
                             bars = pd.concat([existing, bars], ignore_index=True)
                             bars = bars.drop_duplicates(subset=['timestamp'], keep='last')
                             bars = bars.sort_values('timestamp')
-                        
+
                         # Save merged data
                         bars.to_parquet(output_file, index=False)
-                        
+
                         self.last_update_time = datetime.now()
                         self._update_status(f"Data updated at {self.last_update_time.strftime('%H:%M:%S')}")
                     else:
-                        self._update_status("No data received from Binance")
-                        
+                        self._update_status(
+                            f"No data received from Binance after {_max_retries} attempts"
+                            + (f": {last_download_error}" if last_download_error else "")
+                        )
+
                 except Exception as e:
                     print(f"Error downloading data: {e}")
                     self._update_status(f"Download error: {str(e)}")
-                
+
                 # Schedule next check at next candle close
                 self._schedule_next_check()
-                
+
             else:
                 # Data is fresh, schedule next check
                 self._update_status(f"Data is fresh (gap: {gap_minutes} min)")
                 self._schedule_next_check()
-            
+
         except Exception as e:
             print(f"Error checking/updating data: {e}")
             import traceback
             traceback.print_exc()
             self._update_status(f"Data update error: {str(e)}")
-            # Schedule next check anyway
-            QTimer.singleShot(15 * 60 * 1000, self._schedule_next_check)
+            # BUG 2 FIX: call _schedule_next_check() directly instead of
+            # pre-waiting 15 min flat before calling it (which produced up to
+            # 30 min total delay). _schedule_next_check aligns to the real next
+            # boundary and is itself guarded against exceptions (see BUG 1 fix).
+            self._schedule_next_check()
     
     def _schedule_next_check(self):
         """Schedule the next data check at 0.2s after next candle close."""
+        _FALLBACK_MS = 15 * 60 * 1000  # 15-minute fallback if boundary calc fails
         try:
             # Calculate time until next 15-min candle close
             now = datetime.now()
             minutes_to_next = 15 - (now.minute % 15)
             seconds_to_next = (minutes_to_next * 60) - now.second
-            
+
+            # BUG 4 FIX: clamp to avoid spurious >900s waits at exact boundaries
+            if seconds_to_next > 900:
+                seconds_to_next = 1
+
             # Add 0.2s delay after candle close
             ms_until_check = (seconds_to_next * 1000) + 200
-            
-            # Schedule check
-            QTimer.singleShot(ms_until_check, self._check_and_update_data)
-            
+
+            # Schedule check and store handle for inspection / cancellation
+            self.candle_check_timer = QTimer(self)
+            self.candle_check_timer.setSingleShot(True)
+            self.candle_check_timer.timeout.connect(self._check_and_update_data)
+            self.candle_check_timer.start(ms_until_check)
+
             # Save next check time for countdown
             self.next_check_time = now + timedelta(seconds=seconds_to_next)
-            
+
         except Exception as e:
-            print(f"Error scheduling next check: {e}")
+            # BUG 1 FIX: always reschedule even when boundary calculation throws.
+            # Previously the chain died permanently on any exception here.
+            print(f"Error scheduling next check: {e} — falling back to {_FALLBACK_MS // 1000}s fixed delay")
+            try:
+                self.candle_check_timer = QTimer(self)
+                self.candle_check_timer.setSingleShot(True)
+                self.candle_check_timer.timeout.connect(self._check_and_update_data)
+                self.candle_check_timer.start(_FALLBACK_MS)
+                self.next_check_time = datetime.now() + timedelta(milliseconds=_FALLBACK_MS)
+            except Exception as inner_e:
+                # Last resort: bare singleShot — cannot die here
+                print(f"Fallback schedule also failed: {inner_e} — using QTimer.singleShot")
+                QTimer.singleShot(_FALLBACK_MS, self._check_and_update_data)
     
     def _update_countdown_status(self):
         """Update status bar with live countdown to next data check."""
