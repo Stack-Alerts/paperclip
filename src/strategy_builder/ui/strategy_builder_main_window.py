@@ -111,6 +111,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.last_update_time: Optional[datetime] = None
         self.retry_count = 0
         self.next_check_time: Optional[datetime] = None
+        self._in_quick_retry = False  # guard: only one quick-retry per cycle failure
         
         # Countdown timer for status bar
         self.countdown_timer = QTimer()
@@ -1495,12 +1496,15 @@ class StrategyBuilderMainWindow(QMainWindow):
             self.candle_check_timer.start(ms_until_check)
 
             self._update_status(f"Auto-update system started - Next check in {seconds_to_next}s")
+            self.retry_count = 0  # reset on successful startup
 
         except Exception as e:
             print(f"Error starting auto-update system: {e}")
-            # BUG 3 FIX: retry system startup rather than silently dying
-            print("Retrying auto-update system startup in 60s...")
-            QTimer.singleShot(60 * 1000, self._start_auto_update_system)
+            # Exponential backoff: 2, 4, 8, 16, 30, 30, ... seconds (capped at 30s)
+            delay_s = min(2 * (2 ** self.retry_count), 30)
+            self.retry_count += 1
+            print(f"Retrying auto-update startup in {delay_s}s (attempt {self.retry_count})...")
+            QTimer.singleShot(delay_s * 1000, self._start_auto_update_system)
     
     def _check_and_update_data(self):
         """
@@ -1531,10 +1535,10 @@ class StrategyBuilderMainWindow(QMainWindow):
                 self._update_status(f"Downloading fresh data (gap: {gap_minutes} min)...")
 
                 try:
-                    # BUG 5 FIX: simple 3-attempt retry with 5s sleep between attempts.
+                    # BUG 5 FIX: simple retry with 2s sleep between attempts.
                     # Previously a bare single call with no retry.
-                    _max_retries = 3
-                    _retry_delay_s = 5
+                    _max_retries = 5
+                    _retry_delay_s = 2
                     bars = None
                     last_download_error = None
 
@@ -1576,15 +1580,33 @@ class StrategyBuilderMainWindow(QMainWindow):
 
                         self.last_update_time = datetime.now()
                         self._update_status(f"Data updated at {self.last_update_time.strftime('%H:%M:%S')}")
+                        self._in_quick_retry = False  # successful download clears the guard
                     else:
                         self._update_status(
                             f"No data received from Binance after {_max_retries} attempts"
                             + (f": {last_download_error}" if last_download_error else "")
                         )
+                        # Quick-retry path: fire once within 12s before surrendering to boundary
+                        if not self._in_quick_retry:
+                            self._in_quick_retry = True
+                            print("Download failed — scheduling quick retry in 12s...")
+                            QTimer.singleShot(12 * 1000, self._check_and_update_data)
+                            return  # do not also call _schedule_next_check
+                        else:
+                            # Second failure in quick-retry cycle — hand off to boundary
+                            self._in_quick_retry = False
 
                 except Exception as e:
                     print(f"Error downloading data: {e}")
                     self._update_status(f"Download error: {str(e)}")
+                    # Quick-retry path: fire once within 12s before surrendering to boundary
+                    if not self._in_quick_retry:
+                        self._in_quick_retry = True
+                        print("Download exception — scheduling quick retry in 12s...")
+                        QTimer.singleShot(12 * 1000, self._check_and_update_data)
+                        return  # do not also call _schedule_next_check
+                    else:
+                        self._in_quick_retry = False
 
                 # Schedule next check at next candle close
                 self._schedule_next_check()
@@ -1599,11 +1621,20 @@ class StrategyBuilderMainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             self._update_status(f"Data update error: {str(e)}")
-            # BUG 2 FIX: call _schedule_next_check() directly instead of
-            # pre-waiting 15 min flat before calling it (which produced up to
-            # 30 min total delay). _schedule_next_check aligns to the real next
-            # boundary and is itself guarded against exceptions (see BUG 1 fix).
-            self._schedule_next_check()
+            # Quick-retry path: fire once within 12s before surrendering to boundary.
+            # Guard against cascading storms — only one quick retry per cycle failure.
+            if not self._in_quick_retry:
+                self._in_quick_retry = True
+                print("Cycle exception — scheduling quick retry in 12s...")
+                QTimer.singleShot(12 * 1000, self._check_and_update_data)
+            else:
+                # Second failure in quick-retry cycle — fall back to boundary schedule
+                self._in_quick_retry = False
+                # BUG 2 FIX: call _schedule_next_check() directly instead of
+                # pre-waiting 15 min flat before calling it (which produced up to
+                # 30 min total delay). _schedule_next_check aligns to the real next
+                # boundary and is itself guarded against exceptions (see BUG 1 fix).
+                self._schedule_next_check()
     
     def _schedule_next_check(self):
         """Schedule the next data check at 0.2s after next candle close."""
