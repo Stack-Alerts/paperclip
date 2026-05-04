@@ -78,7 +78,7 @@ class AutoFixSafety:
         Tooltip: "Institutional-grade verification after every fix.
                  Ensures fix didn't break your strategy."
         """
-        report = self.validator.validate_strategy_config(config)
+        report = self.validator.validate(config)
         blocking = report.blocking_issues()
         
         if blocking > 0:
