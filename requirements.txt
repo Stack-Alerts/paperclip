@@ -37,6 +37,10 @@ pylint>=2.15.0
 # Configuration Management
 python-dotenv>=0.21.0
 
+# Security: OS keyring for secrets storage, bcrypt for PIN hashing
+keyring>=24.0.0
+bcrypt>=4.0.0
+
 # Development Tools (Optional)
 # jupyter>=1.0.0
 # ipython>=8.7.0
