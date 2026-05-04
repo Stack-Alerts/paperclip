@@ -432,7 +432,9 @@ class ExitConditionDialog(QMainWindow):
             proximity_row.addWidget(btn)
         
         proximity_row.addStretch()
-        flexible_params_layout.addLayout(proximity_row)
+        self.proximity_widget = QWidget()
+        self.proximity_widget.setLayout(proximity_row)
+        flexible_params_layout.addWidget(self.proximity_widget)
         
         # Reversal Trigger
         reversal_row = QHBoxLayout()
@@ -475,7 +477,9 @@ class ExitConditionDialog(QMainWindow):
             reversal_row.addWidget(btn)
         
         reversal_row.addStretch()
-        flexible_params_layout.addLayout(reversal_row)
+        self.reversal_widget = QWidget()
+        self.reversal_widget.setLayout(reversal_row)
+        flexible_params_layout.addWidget(self.reversal_widget)
         
         self.flexible_params_group.setLayout(flexible_params_layout)
         layout.addWidget(self.flexible_params_group)
@@ -851,6 +855,12 @@ class ExitConditionDialog(QMainWindow):
             1 if accepted, 0 if rejected
         """
         from PyQt5.QtWidgets import QDialog
+        # Re-entrancy guard: if already visible, bring to front and return Rejected
+        # to prevent duplicate dialog instances from accumulating.
+        if self.isVisible():
+            self.raise_()
+            self.activateWindow()
+            return QDialog.Rejected
         self.setWindowModality(Qt.ApplicationModal)
         self.show()
         
