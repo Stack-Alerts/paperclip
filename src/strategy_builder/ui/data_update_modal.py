@@ -113,14 +113,28 @@ class DataUpdateThread(QThread):
             # INSTITUTIONAL: SAVE TO DISK!
             self.progress.emit(85, 100, "Saving 1h bars to disk...")
             saved_files_1h = self._save_bars_to_disk(bars_1h, '1h')
-            
+
+            # INSTITUTIONAL: Download 1d bars with retry logic
+            self.progress.emit(88, 100, "Downloading 1d bars from Binance...")
+            bars_1d = self._download_with_retry(
+                timeframe='1d',
+                start_date=self.start_date,
+                end_date=self.end_date
+            )
+            self.progress.emit(92, 100, f"Downloaded {len(bars_1d)} bars (1d)")
+
+            # INSTITUTIONAL: SAVE TO DISK!
+            self.progress.emit(94, 100, "Saving 1d bars to disk...")
+            saved_files_1d = self._save_bars_to_disk(bars_1d, '1d')
+
             # Success!
             self.progress.emit(100, 100, "Download complete!")
             self.finished.emit(
                 True,
                 f"✅ Successfully updated!\n\n"
                 f"15min bars: {len(bars_15m)} ({len(saved_files_15m)} files saved)\n"
-                f"1h bars: {len(bars_1h)} ({len(saved_files_1h)} files saved)\n\n"
+                f"1h bars: {len(bars_1h)} ({len(saved_files_1h)} files saved)\n"
+                f"1d bars: {len(bars_1d)} ({len(saved_files_1d)} files saved)\n\n"
                 f"Files saved to: data/binance/\n"
                 f"Latest timestamp: {bars_15m['timestamp'].iloc[-1]}"
             )
@@ -185,9 +199,13 @@ class DataUpdateThread(QThread):
             latest_candle = pd.to_datetime(bars['timestamp'].iloc[-1])
             delay_minutes = (datetime.now() - latest_candle).total_seconds() / 60
             
-            # For 15min timeframe: acceptable if < 20 min delay
-            # For 1h timeframe: acceptable if < 65 min delay
-            acceptable_delay = 20 if timeframe == '15m' else 65
+            # Per-timeframe staleness thresholds
+            if timeframe == '15m':
+                acceptable_delay = 20
+            elif timeframe == '1h':
+                acceptable_delay = 65
+            else:  # 1d and others
+                acceptable_delay = 1500
             
             if delay_minutes <= acceptable_delay:
                 # Data is fresh enough!
