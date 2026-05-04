@@ -13,6 +13,7 @@ Author: BTC_Engine_v3
 Date: 2026-01-30 (Redesigned)
 """
 
+from copy import deepcopy
 from typing import Optional
 from PyQt5.QtWidgets import (
     QDialog, QMainWindow, QVBoxLayout, QPushButton, QHBoxLayout, QLabel,
@@ -1788,11 +1789,17 @@ class ValidationReportWindow(QMainWindow):
         if not dialog.user_confirmed:
             return
 
+        # Capture pre-fix snapshot for undo support
+        pre_fix_snapshot = deepcopy(self.config)
+
         # Extract location components (block_name, signal_name)
         location_data = self._extract_location_components(issue.location)
         
         # Get auto-fix data from validator (already computed!)
         auto_fix_data = getattr(issue, 'auto_fix_data', {}) or {}
+
+        # Capture user options from dialog (e.g. disable_only for LOGIC_003)
+        user_options = dialog.user_options
         
         # Apply fix - institutional grade direct access approach
         success = False
@@ -1838,9 +1845,12 @@ class ValidationReportWindow(QMainWindow):
                 # Dead code - use signal_name from auto_fix_data
                 signal_name = auto_fix_data.get('signal_name') or location_data.get('signal_name')
                 block_name = location_data.get('block_name')
+                # Honour user choice: disable_only=True → preserve_history=True (disable),
+                #                     disable_only=False → preserve_history=False (remove)
+                disable_only = user_options.get('disable_only', True)
                 
                 if signal_name and block_name:
-                    success = self._apply_dead_code_fix(signal_name, block_name)
+                    success = self._apply_dead_code_fix(signal_name, block_name, preserve_history=disable_only)
                 else:
                     error_msg = f"Missing data - signal:{signal_name}, block:{block_name}"
             
@@ -2173,8 +2183,15 @@ class ValidationReportWindow(QMainWindow):
             print(f"Exit consolidation fix failed: {e}")
             return False
     
-    def _apply_dead_code_fix(self, signal_name: str, block_name: str) -> bool:
-        """Apply dead code fix to disable unreachable signal"""
+    def _apply_dead_code_fix(self, signal_name: str, block_name: str, preserve_history: bool = True) -> bool:
+        """Apply dead code fix to disable (or remove) unreachable signal.
+
+        Args:
+            signal_name: Name of the unreachable signal.
+            block_name: Name of the block containing the signal.
+            preserve_history: If True, disable the signal (keep for audit);
+                              if False, permanently remove it.
+        """
         try:
             # Find block
             for block in self.config.blocks:
@@ -2183,7 +2200,7 @@ class ValidationReportWindow(QMainWindow):
                     success = auto_fix_dead_code(
                         block,
                         [signal_name],
-                        preserve_history=True  # Disable, don't delete
+                        preserve_history=preserve_history
                     )
                     return success
             
