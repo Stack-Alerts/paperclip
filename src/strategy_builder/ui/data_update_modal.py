@@ -13,6 +13,7 @@ Date: 2026-01-17
 
 from datetime import datetime, timedelta
 from typing import Optional
+import os
 import pandas as pd
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -22,7 +23,9 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont
 
 # Import UnifiedDataManager - THE ONLY DATA SOURCE!
-from src.data_manager.unified_manager import UnifiedDataManager, DataSource
+from src.data_manager.unified_manager import UnifiedDataManager, DataSource, _get_parquet_lock
+# Bug 1 fix: import PROJECT_ROOT so base_dir is always absolute.
+from src.data_manager.config import PROJECT_ROOT
 # Import centralized styles
 from src.strategy_builder.ui.styles import (
     get_main_stylesheet, get_panel_title_stylesheet, 
@@ -243,7 +246,10 @@ class DataUpdateThread(QThread):
             return []
         
         saved_files = []
-        base_dir = Path("data/binance")
+        # Bug 1 fix: use absolute PROJECT_ROOT so this is always the same
+        # directory that UnifiedDataManager._save_binance_bars writes to,
+        # regardless of the CWD when the app is launched.
+        base_dir = PROJECT_ROOT / "data" / "binance"
         base_dir.mkdir(parents=True, exist_ok=True)
         
         # Group bars by month
@@ -260,29 +266,39 @@ class DataUpdateThread(QThread):
             
             month_data_clean = month_data.drop(columns=['month'])
             
-            # INSTITUTIONAL: Merge with existing data if file exists
-            if filepath.exists():
-                try:
-                    # Read existing data
-                    existing_data = pd.read_parquet(filepath)
-                    
-                    # Combine old + new
-                    combined = pd.concat([existing_data, month_data_clean], ignore_index=True)
-                    
-                    # Remove duplicates (keep latest)
-                    combined = combined.sort_values('timestamp').drop_duplicates(subset=['timestamp'], keep='last')
-                    
-                    # Save merged data
-                    combined.to_parquet(filepath, index=False)
-                    print(f"   💾 Updated: {filepath} ({len(existing_data)} → {len(combined)} bars, +{len(combined)-len(existing_data)} new)")
-                except Exception as e:
-                    print(f"   ⚠️  Could not merge, overwriting: {e}")
-                    month_data_clean.to_parquet(filepath, index=False)
-                    print(f"   💾 Saved: {filepath} ({len(month_data_clean)} bars)")
-            else:
-                # New file - just save
-                month_data_clean.to_parquet(filepath, index=False)
-                print(f"   💾 Created: {filepath} ({len(month_data_clean)} bars)")
+            # Bug 2 fix: serialize concurrent writers on the same file with a lock.
+            file_lock = _get_parquet_lock(filepath)
+            with file_lock:
+                # INSTITUTIONAL: Merge with existing data if file exists
+                if filepath.exists():
+                    try:
+                        # Read existing data
+                        existing_data = pd.read_parquet(filepath)
+                        n_existing = len(existing_data)
+                        
+                        # Combine old + new
+                        combined = pd.concat([existing_data, month_data_clean], ignore_index=True)
+                        
+                        # Remove duplicates (keep latest)
+                        combined = combined.sort_values('timestamp').drop_duplicates(subset=['timestamp'], keep='last')
+                        
+                        # Bug 2 fix: atomic write via temp file + os.replace.
+                        tmp_path = filepath.with_suffix('.parquet.tmp')
+                        combined.to_parquet(tmp_path, index=False)
+                        os.replace(tmp_path, filepath)
+                        print(f"   💾 Updated: {filepath} ({n_existing} → {len(combined)} bars, +{len(combined)-n_existing} new)")
+                    except Exception as e:
+                        print(f"   ⚠️  Could not merge, overwriting: {e}")
+                        tmp_path = filepath.with_suffix('.parquet.tmp')
+                        month_data_clean.to_parquet(tmp_path, index=False)
+                        os.replace(tmp_path, filepath)
+                        print(f"   💾 Saved: {filepath} ({len(month_data_clean)} bars)")
+                else:
+                    # New file — atomic write.
+                    tmp_path = filepath.with_suffix('.parquet.tmp')
+                    month_data_clean.to_parquet(tmp_path, index=False)
+                    os.replace(tmp_path, filepath)
+                    print(f"   💾 Created: {filepath} ({len(month_data_clean)} bars)")
             
             saved_files.append(str(filepath))
         
