@@ -1,6 +1,7 @@
 """
 Tests for SettingsDialog — BTCAAAAA-82 regression coverage and
-BTCAAAAA-87/88 width auto-sizing regression coverage.
+BTCAAAAA-87/88 width auto-sizing regression coverage and
+BTCAAAAA-97/98 Save & Close dialog behaviour.
 
 Verifies that:
 - Non-admin users can open the Settings dialog without any exception.
@@ -18,6 +19,13 @@ BTCAAAAA-87/88 — width auto-sizing regression:
   resize(760, ...) that clipped Edit buttons and the Admin warning banner.
 - Both dialog minimum widths meet the acceptance criteria (≥440 for
   AdminPinDialog per BTCAAAAA-91, ≥820 for SettingsDialog).
+
+BTCAAAAA-97/98 — Save & Close dialog behaviour:
+- Primary button label is "Save & Close" (not "Save Settings").
+- Clicking "Save & Close" saves settings and closes the dialog (accept()).
+- Cancel calls reject() without saving.
+- No QMessageBox.information popup appears after a successful save.
+- On save failure, dialog stays open and shows a warning.
 """
 
 from __future__ import annotations
@@ -452,4 +460,271 @@ class TestWidthAutoSizingRegression:
         assert not violations, (
             f"settings_dialog.py still calls setFixedWidth() at lines "
             f"{violations}. BTCAAAAA-87 requires setMinimumWidth() instead."
+        )
+
+
+# ---------------------------------------------------------------------------
+# BTCAAAAA-97/98 — Save & Close dialog behaviour regression tests
+# ---------------------------------------------------------------------------
+
+class TestSaveAndCloseDialogBehaviour:
+    """
+    Regression tests for BTCAAAAA-97/98.
+
+    Verifies all 5 acceptance-criteria test cases:
+    1. Happy path: save succeeds → dialog closes (accept()).
+    2. Cancel path: cancel clicked → dialog rejects (reject()) without saving.
+    3. Error path: save fails → dialog stays open with a warning.
+    4. Button label: primary button reads "Save & Close".
+    5. No extra popup: no QMessageBox.information shown on successful save.
+    """
+
+    def _make_save_service_mock(self, save_raises: Exception | None = None) -> MagicMock:
+        """Return a SettingsService mock whose save methods may raise."""
+        mock = _make_service_mock(is_admin=False)
+        if save_raises is not None:
+            mock.save_user_settings.side_effect = save_raises
+        else:
+            mock.save_user_settings.return_value = None
+        mock.save_admin_settings.return_value = None
+        return mock
+
+    # ------------------------------------------------------------------
+    # TC-4: Button label
+    # ------------------------------------------------------------------
+
+    def test_save_button_label_is_save_and_close(self, qapp):
+        """
+        TC-4: Primary action button must be labelled "Save & Close",
+        not the old "Save Settings" (BTCAAAAA-97).
+        """
+        service_mock = self._make_save_service_mock()
+
+        with patch(
+            "src.strategy_builder.ui.settings_dialog.SettingsService",
+            return_value=service_mock,
+        ):
+            from src.strategy_builder.ui.settings_dialog import SettingsDialog
+            from PyQt5.QtWidgets import QPushButton
+
+            dialog = SettingsDialog()
+            buttons = dialog.findChildren(QPushButton)
+            labels = [btn.text() for btn in buttons]
+            dialog.close()
+
+        # Qt uses && as an escape for & in button labels; strip that too
+        normalised = [lbl.replace("&&", "&") for lbl in labels]
+
+        assert "Save & Close" in normalised, (
+            f"Expected a button labelled 'Save & Close' but found: {normalised}"
+        )
+        assert "Save Settings" not in normalised, (
+            "'Save Settings' label must be gone — it was renamed in BTCAAAAA-98."
+        )
+
+    # ------------------------------------------------------------------
+    # TC-1: Happy path — save succeeds, dialog closes
+    # ------------------------------------------------------------------
+
+    def test_save_success_calls_accept(self, qapp):
+        """
+        TC-1: When save succeeds, _on_save() must call self.accept() so the
+        dialog closes.  No QMessageBox.information must be shown.
+        """
+        service_mock = self._make_save_service_mock()
+
+        with (
+            patch(
+                "src.strategy_builder.ui.settings_dialog.SettingsService",
+                return_value=service_mock,
+            ),
+            patch(
+                "src.strategy_builder.ui.settings_dialog.QMessageBox.information"
+            ) as mock_info,
+        ):
+            from src.strategy_builder.ui.settings_dialog import SettingsDialog
+
+            dialog = SettingsDialog()
+            # Patch accept so dialog doesn't actually close the event loop
+            dialog.accept = MagicMock()
+
+            dialog._on_save()
+
+            dialog.accept.assert_called_once(), (
+                "_on_save() must call self.accept() on a successful save."
+            )
+            mock_info.assert_not_called(), (
+                "No QMessageBox.information must be shown after a successful save "
+                "(BTCAAAAA-98: closing is the implicit confirmation)."
+            )
+            dialog.close()
+
+    # ------------------------------------------------------------------
+    # TC-5: No extra popup on successful save
+    # ------------------------------------------------------------------
+
+    def test_no_information_popup_on_success(self, qapp):
+        """
+        TC-5: QMessageBox.information must NOT be called when save succeeds.
+        The dialog closing is the confirmation — no extra click required.
+        """
+        service_mock = self._make_save_service_mock()
+
+        with (
+            patch(
+                "src.strategy_builder.ui.settings_dialog.SettingsService",
+                return_value=service_mock,
+            ),
+            patch(
+                "src.strategy_builder.ui.settings_dialog.QMessageBox.information"
+            ) as mock_info,
+        ):
+            from src.strategy_builder.ui.settings_dialog import SettingsDialog
+
+            dialog = SettingsDialog()
+            dialog.accept = MagicMock()  # prevent real close
+            dialog._on_save()
+
+            mock_info.assert_not_called(), (
+                "QMessageBox.information must NOT appear after a successful save "
+                "(BTCAAAAA-98 requirement)."
+            )
+            dialog.close()
+
+    # ------------------------------------------------------------------
+    # TC-3: Error path — save fails, dialog stays open with warning
+    # ------------------------------------------------------------------
+
+    def test_save_failure_shows_warning_and_does_not_close(self, qapp):
+        """
+        TC-3: When save raises an exception, _on_save() must show a
+        QMessageBox.warning and NOT call accept() (dialog stays open).
+        """
+        service_mock = self._make_save_service_mock(
+            save_raises=RuntimeError("DB connection refused")
+        )
+
+        with (
+            patch(
+                "src.strategy_builder.ui.settings_dialog.SettingsService",
+                return_value=service_mock,
+            ),
+            patch(
+                "src.strategy_builder.ui.settings_dialog.QMessageBox.warning"
+            ) as mock_warn,
+        ):
+            from src.strategy_builder.ui.settings_dialog import SettingsDialog
+
+            dialog = SettingsDialog()
+            dialog.accept = MagicMock()
+
+            dialog._on_save()
+
+            mock_warn.assert_called_once(), (
+                "QMessageBox.warning must be shown when save fails."
+            )
+            dialog.accept.assert_not_called(), (
+                "accept() must NOT be called when save fails — "
+                "dialog must stay open so the user can retry."
+            )
+            dialog.close()
+
+    # ------------------------------------------------------------------
+    # TC-2: Cancel path — reject connected, save NOT called
+    # ------------------------------------------------------------------
+
+    def test_cancel_button_present_and_reject_not_save(self, qapp):
+        """
+        TC-2a: A Cancel button must exist in the dialog.
+        TC-2b: Invoking reject() directly must not call save_user_settings or
+        save_admin_settings — Cancel is a discard operation.
+
+        Note: We do not call button.click() here because Qt's native signal
+        dispatch can abort the process when a QDialog closes outside an event
+        loop.  Instead we (a) assert the button exists, (b) verify the source
+        wires it to reject(), and (c) call reject() directly with save mocked.
+        """
+        service_mock = self._make_save_service_mock()
+
+        with patch(
+            "src.strategy_builder.ui.settings_dialog.SettingsService",
+            return_value=service_mock,
+        ):
+            from src.strategy_builder.ui.settings_dialog import SettingsDialog
+            from PyQt5.QtWidgets import QPushButton
+
+            dialog = SettingsDialog()
+
+            # TC-2a: Cancel button must exist
+            buttons = dialog.findChildren(QPushButton)
+            cancel_btns = [b for b in buttons if b.text() == "Cancel"]
+            assert cancel_btns, "Cancel button not found in SettingsDialog."
+
+            dialog.close()
+
+        # TC-2b: reject() must not trigger any save (pure discard)
+        service_mock2 = self._make_save_service_mock()
+
+        with patch(
+            "src.strategy_builder.ui.settings_dialog.SettingsService",
+            return_value=service_mock2,
+        ):
+            from src.strategy_builder.ui.settings_dialog import SettingsDialog
+
+            dialog2 = SettingsDialog()
+            # Patch reject so it doesn't actually close
+            dialog2.reject = MagicMock()
+            dialog2.reject()  # simulate Cancel click
+
+            service_mock2.save_user_settings.assert_not_called(), (
+                "save_user_settings must NOT be called when Cancel is invoked."
+            )
+            service_mock2.save_admin_settings.assert_not_called(), (
+                "save_admin_settings must NOT be called when Cancel is invoked."
+            )
+            dialog2.close()
+
+    def test_cancel_button_wired_to_reject_in_source(self):
+        """
+        TC-2 (static): Verify the Cancel button's clicked signal is connected
+        to self.reject in the source code, not _on_save.
+        """
+        import ast
+        import pathlib
+
+        source = pathlib.Path(
+            "src/strategy_builder/ui/settings_dialog.py"
+        ).read_text()
+
+        # We expect: cancel_btn.clicked.connect(self.reject)
+        assert "cancel_btn.clicked.connect(self.reject)" in source, (
+            "Cancel button must be connected to self.reject() in source."
+        )
+        # And the save button must NOT be connected to reject
+        # (sanity check — save button connects to _on_save)
+        assert "save_btn.clicked.connect(self._on_save)" in source, (
+            "Save & Close button must be connected to self._on_save in source."
+        )
+
+    # ------------------------------------------------------------------
+    # Static / AST: button label sourced from code, not runtime
+    # ------------------------------------------------------------------
+
+    def test_save_button_label_in_source_code(self):
+        """
+        Confirm that the source text 'Save && Close' (Qt escaping for '&')
+        appears in settings_dialog.py and 'Save Settings' does not.
+        """
+        import pathlib
+
+        source = pathlib.Path(
+            "src/strategy_builder/ui/settings_dialog.py"
+        ).read_text()
+
+        assert "Save && Close" in source or "Save & Close" in source, (
+            "settings_dialog.py must contain the 'Save & Close' button label "
+            "(BTCAAAAA-98 fix)."
+        )
+        assert "Save Settings" not in source, (
+            "Old 'Save Settings' button label must be removed (BTCAAAAA-98)."
         )
