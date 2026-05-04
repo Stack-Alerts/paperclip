@@ -1822,7 +1822,17 @@ class StrategyBuilderMainWindow(QMainWindow):
             if self.current_version_id:
                 print(f"🔄 Reloading version {self.current_version_id} from database...")
                 self._reload_current_version()
-            
+
+            # BTCAAAAA-133: Push freshly-reloaded config to the validation window so
+            # _rerun_validation() does not operate on the now-stale original reference.
+            # _reload_current_version() replaces orchestrator.config_engine.config with
+            # a new object; ValidationReportWindow still holds the old reference unless
+            # we update it here.  This call is safe when validation_window is None.
+            if self.validation_window and self.orchestrator and self.orchestrator.config_engine and self.orchestrator.config_engine.config:
+                print(f"🔄 Pushing reloaded config to ValidationReportWindow (BTCAAAAA-133)")
+                self.validation_window.update_config(self.orchestrator.config_engine.config)
+                print(f"✅ ValidationReportWindow config reference updated")
+
             self._update_status(f"Auto-fix applied, saved, and reloaded: {fix_data.get('issue', fix_type)}")
         else:
             print(f"❌ Failed to save configuration to database")
