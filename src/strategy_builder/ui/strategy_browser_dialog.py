@@ -261,21 +261,21 @@ class StrategyBrowserDialog(QMainWindow):
         
         self.detail_labels['name'] = QLabel("Select a strategy to view details")
         self.detail_labels['name'].setFont(create_font(10))
-        self.detail_labels['name'].setStyleSheet(f"color: {get_color('text_primary')}; padding: 4px 0px;")
+        self.detail_labels['name'].setStyleSheet(f"color: {get_color('text_primary')}; padding: 4px 6px;")
         self.detail_labels['name'].setWordWrap(True)
         self.detail_labels['name'].setTextFormat(Qt.TextFormat.RichText)  # Enable HTML rendering
         details_layout.addWidget(self.detail_labels['name'], 1, 0, 1, 1)
         
         self.detail_labels['description'] = QLabel("Description will appear here")
         self.detail_labels['description'].setFont(create_font(9))
-        self.detail_labels['description'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 0px;")
+        self.detail_labels['description'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 6px;")
         self.detail_labels['description'].setWordWrap(True)
         self.detail_labels['description'].setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         details_layout.addWidget(self.detail_labels['description'], 2, 0, 1, 1)
         
         self.detail_labels['meta'] = QLabel("No metadata")
         self.detail_labels['meta'].setFont(create_font(9))
-        self.detail_labels['meta'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
+        self.detail_labels['meta'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 6px;")
         details_layout.addWidget(self.detail_labels['meta'], 3, 0, 1, 1)
         
         # Column 2: Configuration
@@ -294,7 +294,7 @@ class StrategyBrowserDialog(QMainWindow):
         
         self.detail_labels['blocks'] = QLabel("No blocks configured")
         self.detail_labels['blocks'].setFont(create_font(9))
-        self.detail_labels['blocks'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 0px;")
+        self.detail_labels['blocks'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 6px;")
         self.detail_labels['blocks'].setWordWrap(True)
         self.detail_labels['blocks'].setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         
@@ -303,7 +303,7 @@ class StrategyBrowserDialog(QMainWindow):
         
         self.detail_labels['signals'] = QLabel("No signals configured")
         self.detail_labels['signals'].setFont(create_font(9))
-        self.detail_labels['signals'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
+        self.detail_labels['signals'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 6px;")
         self.detail_labels['signals'].setWordWrap(True)
         details_layout.addWidget(self.detail_labels['signals'], 3, 1, 1, 1)
         
