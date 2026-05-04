@@ -216,8 +216,11 @@ class AdminPinDialog(QDialog):
         # BTCAAAAA-87: Use layout-driven sizing — setMinimumWidth as a floor
         # only; let Qt measure the layout for actual width and height.
         # setup_mode adds a Confirm PIN field so needs a taller floor.
+        # BTCAAAAA-91: Raised minimum width from 360 → 440 so the full title
+        # "Admin Authentication", instruction text, PIN input, and both
+        # "Cancel" / "Authenticate" buttons are visible without clipping.
         min_h = 220 if setup_mode else 180
-        self.setMinimumWidth(360)
+        self.setMinimumWidth(440)
         self.setMinimumHeight(min_h)
         self.setStyleSheet(get_main_stylesheet())
 

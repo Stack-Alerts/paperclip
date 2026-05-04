@@ -16,8 +16,8 @@ BTCAAAAA-87/88 — width auto-sizing regression:
   the same value for both dimensions (which would hard-lock the width).
 - SettingsDialog uses setMinimumWidth(820) + adjustSize(), NOT the old
   resize(760, ...) that clipped Edit buttons and the Admin warning banner.
-- Both dialog minimum widths meet the acceptance criteria (≥360 for
-  AdminPinDialog, ≥820 for SettingsDialog).
+- Both dialog minimum widths meet the acceptance criteria (≥440 for
+  AdminPinDialog per BTCAAAAA-91, ≥820 for SettingsDialog).
 """
 
 from __future__ import annotations
@@ -270,14 +270,15 @@ class TestSettingsServiceCheckAccess:
 
 class TestWidthAutoSizingRegression:
     """
-    Regression guard for BTCAAAAA-87.
+    Regression guard for BTCAAAAA-87 and BTCAAAAA-91.
 
     Ensures that:
     - No setFixedWidth() call is used anywhere in settings_dialog.py
       (all have been replaced with setMinimumWidth() so widgets can grow).
     - SettingsDialog minimum width is ≥ 820px (not the old too-narrow 760px).
-    - AdminPinDialog minimum width is ≥ 360px (not the old fixed 400px
-      that still clipped the title bar).
+    - AdminPinDialog minimum width is ≥ 440px (raised from 360 in
+      BTCAAAAA-91 to prevent clipping of title, instruction text, and
+      "Authenticate" button at default size).
     - Both dialogs instantiate correctly with the new layout-driven sizing.
     """
 
@@ -349,10 +350,11 @@ class TestWidthAutoSizingRegression:
             f"SettingsDialog minimumHeight() is {min_h}px — must be ≥ 600px."
         )
 
-    def test_admin_pin_dialog_auth_mode_minimum_width_at_least_360(self, qapp):
+    def test_admin_pin_dialog_auth_mode_minimum_width_at_least_440(self, qapp):
         """
-        AdminPinDialog (authentication mode) minimum width must be ≥ 360px
-        so the 'Authenticate' button label is not clipped (BTCAAAAA-87).
+        AdminPinDialog (authentication mode) minimum width must be ≥ 440px
+        so the full title, instruction text, and 'Authenticate' button label
+        are not clipped (BTCAAAAA-91).
         """
         with patch(
             "src.strategy_builder.ui.settings_dialog.SettingsService",
@@ -362,15 +364,16 @@ class TestWidthAutoSizingRegression:
             min_w = dialog.minimumWidth()
             dialog.close()
 
-        assert min_w >= 360, (
+        assert min_w >= 440, (
             f"AdminPinDialog (auth mode) minimumWidth() is {min_w}px — "
-            "must be ≥ 360px (BTCAAAAA-87)."
+            "must be ≥ 440px to prevent content clipping (BTCAAAAA-91)."
         )
 
-    def test_admin_pin_dialog_setup_mode_minimum_width_at_least_360(self, qapp):
+    def test_admin_pin_dialog_setup_mode_minimum_width_at_least_440(self, qapp):
         """
         AdminPinDialog (setup/Set Admin PIN mode) minimum width must be
-        ≥ 360px so the title 'Set Admin PIN' is not clipped (BTCAAAAA-87).
+        ≥ 440px so the title 'Set Admin PIN', instruction text, and both
+        PIN fields are not clipped (BTCAAAAA-91).
         """
         with patch(
             "src.strategy_builder.ui.settings_dialog.SettingsService",
@@ -380,9 +383,9 @@ class TestWidthAutoSizingRegression:
             min_w = dialog.minimumWidth()
             dialog.close()
 
-        assert min_w >= 360, (
+        assert min_w >= 440, (
             f"AdminPinDialog (setup mode) minimumWidth() is {min_w}px — "
-            "must be ≥ 360px (BTCAAAAA-87)."
+            "must be ≥ 440px to prevent content clipping (BTCAAAAA-91)."
         )
 
     def test_admin_pin_dialog_auth_mode_title(self, qapp):
