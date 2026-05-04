@@ -204,10 +204,17 @@ class AdminPinDialog(QDialog):
     """Simple PIN entry dialog for admin authentication / PIN setup."""
 
     def __init__(self, setup_mode: bool = False, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
+        # Defect 5: Create as independent top-level window so dragging does not
+        # move the Strategy Browser.  Qt.Tool keeps it always-on-top of the app
+        # without parenting it into the main-window widget tree.
+        super().__init__(None, Qt.Tool)
         self.setWindowTitle("Admin Authentication" if not setup_mode else "Set Admin PIN")
         self.setModal(True)
-        self.setFixedSize(360, 200)
+        # Defect 4: Use a minimum size that fits all content at default scale;
+        # setup_mode adds a Confirm PIN field so needs more height.
+        min_h = 280 if setup_mode else 240
+        self.setMinimumSize(400, min_h)
+        self.resize(400, min_h)
         self.setStyleSheet(get_main_stylesheet())
 
         layout = QVBoxLayout(self)
@@ -268,15 +275,21 @@ class SettingsDialog(QDialog):
     Main Settings dialog opened via Tools → Settings...
 
     Tab layout:
-      - "API Keys & User"  — always visible, user-editable fields
-      - "Admin"            — HIDDEN until PIN verified; shown/hidden on role change
+      - "API Keys"     — always visible, secret API key fields with Show/Edit
+      - "Preferences"  — always visible, non-secret user preferences
+      - "Admin"        — HIDDEN until PIN verified; shown/hidden on role change
     """
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
+        # Defect 5: Use Qt.Tool so the Settings window is an independent
+        # top-level window — dragging it does NOT move the Strategy Browser.
+        super().__init__(None, Qt.Tool)
         self.setWindowTitle("Settings")
         self.setModal(True)
-        self.setMinimumSize(640, 520)
+        # Defect 1: Increase minimum size so all content is visible without
+        # scrolling at default scale, and make the window resizable.
+        self.setMinimumSize(720, 640)
+        self.resize(760, 680)
         self.setStyleSheet(get_main_stylesheet())
 
         self._service = SettingsService()
@@ -312,13 +325,16 @@ class SettingsDialog(QDialog):
         self._tabs.setStyleSheet(get_tab_widget_stylesheet())
         root.addWidget(self._tabs, stretch=1)
 
-        # Tab 1: API Keys & User settings
-        self._tabs.addTab(self._build_user_tab(), "API Keys & Preferences")
+        # Tab 1: API Keys (user-editable secret fields)
+        self._tabs.addTab(self._build_api_keys_tab(), "API Keys")
 
-        # Tab 2: Admin (hidden until PIN)
+        # Tab 2: Preferences (non-secret user settings)
+        self._tabs.addTab(self._build_preferences_tab(), "Preferences")
+
+        # Tab 3: Admin (hidden until PIN)
         admin_tab = self._build_admin_tab()
         self._tabs.addTab(admin_tab, "Admin")
-        self._admin_tab_index = 1
+        self._admin_tab_index = 2  # Tab 0=API Keys, 1=Preferences, 2=Admin
         self._tabs.setTabVisible(self._admin_tab_index, False)
 
         # Admin access row
@@ -354,8 +370,8 @@ class SettingsDialog(QDialog):
 
     # ------------------------------------------------------------------
 
-    def _build_user_tab(self) -> QWidget:
-        """User-visible settings: API keys and preferences."""
+    def _build_api_keys_tab(self) -> QWidget:
+        """User-visible API key settings — secret fields with Show/Edit."""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet(get_transparent_scroll_area_stylesheet())
@@ -391,6 +407,22 @@ class SettingsDialog(QDialog):
         api_form.addRow(self._make_label("LakeAPI Secret:"), self._secret_widgets["LAKEAPI_SECRET"])
 
         layout.addWidget(api_group)
+        layout.addStretch()
+        scroll.setWidget(container)
+        return scroll
+
+    # ------------------------------------------------------------------
+
+    def _build_preferences_tab(self) -> QWidget:
+        """User-editable preferences — non-secret settings."""
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet(get_transparent_scroll_area_stylesheet())
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setSpacing(16)
+        layout.setContentsMargins(16, 16, 16, 16)
 
         # --- Preferences group ---
         pref_group = QGroupBox("Preferences")
@@ -566,17 +598,19 @@ class SettingsDialog(QDialog):
 
         layout.addStretch()
 
-        self._admin_auth_btn = QPushButton("Unlock Admin…")
+        # Defect 3: Use clear, unambiguous labels; setMinimumWidth prevents
+        # truncation while allowing the button to grow with content.
+        self._admin_auth_btn = QPushButton("Unlock Admin")
         self._admin_auth_btn.setFont(create_font(9))
         self._admin_auth_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        self._admin_auth_btn.setFixedWidth(140)
+        self._admin_auth_btn.setMinimumWidth(130)
         self._admin_auth_btn.clicked.connect(self._on_admin_auth)
         layout.addWidget(self._admin_auth_btn)
 
         self._admin_lock_btn = QPushButton("Lock Admin")
         self._admin_lock_btn.setFont(create_font(9))
         self._admin_lock_btn.setStyleSheet(get_danger_button_stylesheet())
-        self._admin_lock_btn.setFixedWidth(100)
+        self._admin_lock_btn.setMinimumWidth(110)
         self._admin_lock_btn.hide()
         self._admin_lock_btn.clicked.connect(self._on_admin_lock)
         layout.addWidget(self._admin_lock_btn)
