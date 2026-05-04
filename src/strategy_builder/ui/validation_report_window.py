@@ -46,6 +46,7 @@ from src.strategy_builder.validation.auto_fix import (
     auto_fix_dead_code,
     AutoFixSafety
 )
+from src.strategy_builder.validation.undo_manager import UndoManager
 from src.strategy_builder.ui.auto_fix_confirm_dialog import AutoFixConfirmDialog
 
 
@@ -70,6 +71,7 @@ class ValidationReportWindow(QMainWindow):
         super().__init__(parent)
         self.report = report
         self.config = config
+        self.undo_manager = UndoManager()
         
         self._init_ui()
         self._restore_geometry()
@@ -789,6 +791,17 @@ class ValidationReportWindow(QMainWindow):
         layout.addWidget(export_btn)
         
         layout.addStretch()
+        
+        # Undo button — enabled only when undo_manager.can_undo() is True
+        self.undo_btn = QPushButton("↩ Undo Last Fix")
+        set_hand_cursor(self.undo_btn)
+        self.undo_btn.setFont(create_font(11))
+        self.undo_btn.setMinimumWidth(140)
+        self.undo_btn.setEnabled(False)
+        self.undo_btn.setStyleSheet(get_secondary_button_stylesheet())
+        self.undo_btn.setToolTip("Revert the most recently applied auto-fix and re-run validation")
+        self.undo_btn.clicked.connect(self._handle_undo_click)
+        layout.addWidget(self.undo_btn)
         
         # Close button
         close_btn = QPushButton("Close")
@@ -1610,33 +1623,171 @@ class ValidationReportWindow(QMainWindow):
         rule_id = getattr(issue, 'rule_id', '')
         return tooltips.get(rule_id, "Click to apply automated fix. Right-click to preview changes.")
     
+    def _build_fix_dialog_args(self, issue: any) -> dict:
+        """
+        Build AutoFixConfirmDialog constructor arguments from a ValidationIssue.
+
+        Returns a dict with keys: fix_type, fix_description, before_state,
+        after_state, impact_analysis, options.
+        """
+        auto_fix_data = getattr(issue, 'auto_fix_data', {}) or {}
+        rule_id = getattr(issue, 'rule_id', '')
+
+        if rule_id == 'DIRECTION_001':
+            current_type = auto_fix_data.get('current_type', 'Unknown')
+            suggested_type = auto_fix_data.get('suggested_type', 'Unknown')
+            return {
+                'fix_type': 'Switch Direction',
+                'fix_description': (
+                    f"Switch strategy direction from '{current_type}' to '{suggested_type}' "
+                    f"to match the majority signal bias."
+                ),
+                'before_state': {
+                    'strategy_type': current_type,
+                    'issue': issue.message,
+                },
+                'after_state': {
+                    'strategy_type': suggested_type,
+                    'issue': 'Resolved — direction matches signal bias',
+                },
+                'impact_analysis': (
+                    f"Strategy type will be changed from '{current_type}' to '{suggested_type}'. "
+                    f"All existing signals and blocks are preserved. "
+                    f"Re-validation will run automatically to confirm the fix."
+                ),
+                'options': None,
+            }
+
+        elif rule_id == 'TIMING_004':
+            timing_window = auto_fix_data.get('timing_window', 'N/A')
+            current_delay = auto_fix_data.get('current_delay', 'N/A')
+            suggested_delay = auto_fix_data.get('suggested_delay', 'N/A')
+            signal_name = getattr(issue, 'location', '').split('::')[-1] if '::' in getattr(issue, 'location', '') else 'Unknown'
+            return {
+                'fix_type': 'Reduce RECHECK Delay',
+                'fix_description': (
+                    f"Reduce RECHECK delay for signal '{signal_name}' from {current_delay} bars "
+                    f"to {suggested_delay} bars (timing window: {timing_window} candles)."
+                ),
+                'before_state': {
+                    'signal': signal_name,
+                    'recheck_delay': f"{current_delay} bars",
+                    'timing_window': f"{timing_window} candles",
+                    'status': 'NEVER TRIGGERS — delay exceeds window',
+                },
+                'after_state': {
+                    'signal': signal_name,
+                    'recheck_delay': f"{suggested_delay} bars",
+                    'timing_window': f"{timing_window} candles",
+                    'status': 'Will trigger within window',
+                },
+                'impact_analysis': (
+                    f"RECHECK delay reduced from {current_delay} to {suggested_delay} bars "
+                    f"(75% of the {timing_window}-candle timing window). "
+                    f"Signal will now be reachable within the configured timing window."
+                ),
+                'options': None,
+            }
+
+        elif rule_id == 'EXIT_009':
+            signal_name = auto_fix_data.get('signal_name', 'Unknown')
+            return {
+                'fix_type': 'Consolidate Exit Conditions',
+                'fix_description': (
+                    f"Merge conflicting exit conditions for signal '{signal_name}' "
+                    f"into a single consistent exit mode."
+                ),
+                'before_state': {
+                    'signal': signal_name,
+                    'exit_modes': 'Multiple conflicting modes',
+                    'issue': issue.message,
+                },
+                'after_state': {
+                    'signal': signal_name,
+                    'exit_modes': 'Single consolidated mode',
+                    'issue': 'Resolved',
+                },
+                'impact_analysis': (
+                    f"Duplicate/conflicting exit conditions for '{signal_name}' will be merged. "
+                    f"The dominant exit mode will be retained. "
+                    f"Re-validation runs automatically to confirm."
+                ),
+                'options': None,
+            }
+
+        elif rule_id == 'LOGIC_003':
+            signal_name = auto_fix_data.get('signal_name', 'Unknown')
+            return {
+                'fix_type': 'Disable Dead Code Signal',
+                'fix_description': (
+                    f"Disable unreachable signal '{signal_name}' "
+                    f"which references a future signal and can never trigger."
+                ),
+                'before_state': {
+                    'signal': signal_name,
+                    'status': 'Active (but unreachable — dead code)',
+                    'issue': issue.message,
+                },
+                'after_state': {
+                    'signal': signal_name,
+                    'status': 'Disabled (removed from active evaluation)',
+                    'issue': 'Resolved',
+                },
+                'impact_analysis': (
+                    f"Signal '{signal_name}' will be disabled. "
+                    f"It currently has impossible timing (references a future signal) "
+                    f"and will never evaluate. Disabling removes it from active logic without deleting it."
+                ),
+                'options': {
+                    'disable_only': {
+                        'label': 'Disable only (keep signal for reference)',
+                        'default': True,
+                        'tooltip': 'Signal is disabled but preserved in the config — safer option',
+                    },
+                },
+            }
+
+        else:
+            # Generic fallback for unrecognised rules
+            return {
+                'fix_type': issue.rule_name,
+                'fix_description': issue.message,
+                'before_state': {'rule': rule_id, 'status': 'Issue detected', 'message': issue.message},
+                'after_state': {'rule': rule_id, 'status': 'Fixed'},
+                'impact_analysis': (
+                    f"Auto-fix will be applied for rule '{rule_id}'. "
+                    f"A safety backup is created before any changes. "
+                    f"Validation re-runs automatically to confirm the result."
+                ),
+                'options': None,
+            }
+
     def _handle_fix_click(self, issue: any) -> None:
         """
         Handle fix button click - INSTITUTIONAL GRADE DIRECT ACCESS
         Sprint 1.9.2 - Refactored to use validator-provided data
-        
-        Flow: Extract data from issue → Apply fix → Feedback → Re-validate
-        
+
+        Flow: Extract data from issue → Show AutoFixConfirmDialog → Apply fix
+              → Feedback → Re-validate
+
         Key: Uses issue.auto_fix_data dict and issue.location (no regex needed)
         """
-        # Show confirmation
-        result = QMessageBox.question(
-            self,
-            "Confirm Auto-Fix",
-            f"Apply auto-fix for '{issue.rule_name}'?\n\n"
-            f"Issue: {issue.message}\n\n"
-            f"This operation includes:\n"
-            f"• Safety backup before changes\n"
-            f"• Automatic rollback on failure\n"
-            f"• Validation re-run to verify\n\n"
-            f"Apply fix now?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes
+        # Build and show the institutional-grade confirmation dialog
+        dialog_args = self._build_fix_dialog_args(issue)
+        dialog = AutoFixConfirmDialog(
+            fix_type=dialog_args['fix_type'],
+            fix_description=dialog_args['fix_description'],
+            before_state=dialog_args['before_state'],
+            after_state=dialog_args['after_state'],
+            impact_analysis=dialog_args['impact_analysis'],
+            options=dialog_args['options'],
+            parent=self,
         )
-        
-        if result != QMessageBox.Yes:
+        dialog.exec_()
+
+        if not dialog.user_confirmed:
             return
-        
+
         # Extract location components (block_name, signal_name)
         location_data = self._extract_location_components(issue.location)
         
@@ -1702,6 +1853,10 @@ class ValidationReportWindow(QMainWindow):
         
         # Show result feedback
         if success:
+            # Record snapshot into undo history so the fix can be reverted
+            self.undo_manager.record_fix(pre_fix_snapshot, label=issue.rule_name)
+            self._refresh_undo_button()
+            
             # Emit signal to notify parent window of config changes
             # Parent window (Strategy Builder) will handle database persistence
             self.fix_applied.emit(issue.rule_id, {'issue': issue.rule_name})
@@ -1724,6 +1879,61 @@ class ValidationReportWindow(QMainWindow):
                 f"Error: {error_msg or 'Unknown error'}\n\n"
                 f"Your strategy has been restored to its original state.\n"
                 f"No changes were made."
+            )
+    
+    def _refresh_undo_button(self) -> None:
+        """Update Undo button enabled/disabled state to match undo_manager."""
+        if hasattr(self, 'undo_btn'):
+            can_undo = self.undo_manager.can_undo()
+            self.undo_btn.setEnabled(can_undo)
+            label = self.undo_manager.peek_last_label()
+            if can_undo and label:
+                self.undo_btn.setToolTip(f"Undo: {label}")
+            else:
+                self.undo_btn.setToolTip("No fixes to undo")
+    
+    def _handle_undo_click(self) -> None:
+        """
+        Handle Undo button click — revert most recent auto-fix and re-run validation.
+        
+        Flow: restore config from snapshot → update undo stack →
+              refresh Undo button state → re-run validation.
+        """
+        if not self.undo_manager.can_undo():
+            return
+        
+        label = self.undo_manager.peek_last_label()
+        result = QMessageBox.question(
+            self,
+            "Confirm Undo",
+            f"Undo the fix for '{label}'?\n\n"
+            f"The strategy will be restored to the state before this fix was applied.\n\n"
+            f"Proceed?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        
+        if result != QMessageBox.Yes:
+            return
+        
+        success = self.undo_manager.undo_last_fix(self.config)
+        
+        if success:
+            self._refresh_undo_button()
+            QMessageBox.information(
+                self,
+                "↩ Undo Successful",
+                f"Fix '{label}' has been reverted.\n\n"
+                f"Validation will re-run to reflect the restored strategy.\n\n"
+                f"⚠️ IMPORTANT: Please save your strategy to persist this change.",
+            )
+            self._rerun_validation()
+        else:
+            QMessageBox.warning(
+                self,
+                "Undo Failed",
+                "Could not restore the previous strategy state.\n\n"
+                "No changes were made.",
             )
     
     def _show_fix_preview(self, issue: any) -> None:
@@ -1809,6 +2019,9 @@ class ValidationReportWindow(QMainWindow):
         # Footer
         footer = self._create_footer()
         layout.addWidget(footer)
+        
+        # Sync Undo button state with current undo history
+        self._refresh_undo_button()
     
     # =========================================================================
     # AUTO-FIX DATA EXTRACTION - INSTITUTIONAL GRADE (Direct Access)
