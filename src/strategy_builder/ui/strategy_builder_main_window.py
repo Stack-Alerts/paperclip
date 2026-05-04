@@ -1650,7 +1650,8 @@ class StrategyBuilderMainWindow(QMainWindow):
 
     def _schedule_next_check(self):
         """Schedule the next data check at 0.2s after next candle close."""
-        _FALLBACK_MS = 15 * 60 * 1000  # 15-minute fallback if boundary calc fails
+        _FALLBACK_MS = 5 * 60 * 1000  # 5-minute fallback if boundary calc fails
+        MAX_WAIT_MS = 5 * 60 * 1000   # 5-minute hard cap — prevents 38+ min gaps
         try:
             # Calculate time until next 15-min candle close
             now = datetime.now()
@@ -1664,6 +1665,10 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Add 0.2s delay after candle close
             ms_until_check = (seconds_to_next * 1000) + 200
 
+            # Cap to MAX_WAIT_MS so skipped cycles (thread still running) never
+            # push the next attempt more than 5 min into the future.
+            ms_until_check = min(ms_until_check, MAX_WAIT_MS)
+
             # Schedule check and store handle for inspection / cancellation
             self.candle_check_timer = QTimer(self)
             self.candle_check_timer.setSingleShot(True)
@@ -1671,7 +1676,9 @@ class StrategyBuilderMainWindow(QMainWindow):
             self.candle_check_timer.start(ms_until_check)
 
             # Save next check time for countdown
-            self.next_check_time = now + timedelta(seconds=seconds_to_next)
+            self.next_check_time = now + timedelta(milliseconds=ms_until_check)
+
+            print(f"[RuntimeSchedule] Next check in {ms_until_check/1000:.1f}s (at {self.next_check_time.strftime('%H:%M:%S')})")
 
         except Exception as e:
             # BUG 1 FIX: always reschedule even when boundary calculation throws.
@@ -1683,6 +1690,7 @@ class StrategyBuilderMainWindow(QMainWindow):
                 self.candle_check_timer.timeout.connect(self._check_and_update_data)
                 self.candle_check_timer.start(_FALLBACK_MS)
                 self.next_check_time = datetime.now() + timedelta(milliseconds=_FALLBACK_MS)
+                print(f"[RuntimeSchedule] Fallback: Next check in {_FALLBACK_MS/1000:.1f}s (at {self.next_check_time.strftime('%H:%M:%S')})")
             except Exception as inner_e:
                 # Last resort: bare singleShot — cannot die here
                 print(f"Fallback schedule also failed: {inner_e} — using QTimer.singleShot")
