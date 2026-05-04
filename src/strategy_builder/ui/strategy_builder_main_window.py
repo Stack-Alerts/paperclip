@@ -68,6 +68,10 @@ class _RuntimeCandleUpdateThread(QThread):
     does not complete within the deadline, the thread emits finished(False,
     'timeout') and returns so the next cycle is never permanently blocked.
 
+    RC4 FIX: Scan from session_start_time instead of now-2h so gaps older
+    than 2 hours are never silently hidden.  The window is capped at 24h to
+    prevent excessively long scans on very long sessions.
+
     Signals:
         finished(success: bool, message: str)
     """
@@ -75,6 +79,13 @@ class _RuntimeCandleUpdateThread(QThread):
 
     # Hard wall-clock deadline for one full update cycle (seconds).
     TIMEOUT_SECONDS = 60
+
+    # Maximum lookback from session start (prevents multi-day scan debt).
+    MAX_SESSION_LOOKBACK_HOURS = 24
+
+    def __init__(self, parent=None, session_start_time=None):
+        super().__init__(parent)
+        self._session_start_time = session_start_time
 
     def run(self) -> None:
         import time as _time
@@ -93,10 +104,26 @@ class _RuntimeCandleUpdateThread(QThread):
             print(f"[RuntimeUpdate] cycle start")
             manager = UnifiedDataManager(mode='live')
 
-            # Cover the last 2 hours so we catch any 1h boundary that fired
-            # since the previous cycle, plus the usual 15m updates.
             now = datetime.now()
-            start_date = now - timedelta(hours=2)
+
+            # RC4 FIX: scan from session_start_time so gaps older than 2h are
+            # never hidden by a rolling window.  Fall back to now-2h only if no
+            # session start is known (should not happen in normal operation).
+            # Cap at MAX_SESSION_LOOKBACK_HOURS to bound scan cost on long sessions.
+            if self._session_start_time is not None:
+                max_lookback = now - timedelta(hours=self.MAX_SESSION_LOOKBACK_HOURS)
+                start_date = max(self._session_start_time, max_lookback)
+                print(
+                    f"[RuntimeUpdate] scan window: {start_date.strftime('%H:%M:%S')} "
+                    f"(session_start) → {now.strftime('%H:%M:%S')}"
+                )
+            else:
+                # Fallback: 2h rolling window (old behaviour — should not reach here).
+                start_date = now - timedelta(hours=2)
+                print(
+                    f"[RuntimeUpdate] WARNING: no session_start_time; "
+                    f"falling back to 2h rolling window"
+                )
 
             # Early timeout check before the expensive verify_and_repair call.
             if _timed_out():
@@ -202,6 +229,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.next_check_time: Optional[datetime] = None
         self._in_quick_retry = False  # guard: only one quick-retry per cycle failure
         self._runtime_update_thread: Optional[_RuntimeCandleUpdateThread] = None  # background update thread
+        self._session_start_time: Optional[datetime] = None  # RC4: scan lower bound for verify_and_repair
         
         # Countdown timer for status bar
         self.countdown_timer = QTimer()
@@ -1609,6 +1637,13 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Calculate time until next candle close (15-min candles)
             now = datetime.now()
 
+            # RC4 FIX: Record session start time the first time the auto-update
+            # system initialises.  This is the lower bound for verify_and_repair
+            # so gaps that predate the 2h rolling window are never hidden.
+            if self._session_start_time is None:
+                self._session_start_time = now
+                print(f"[AutoUpdate] session_start_time set to {now.strftime('%Y-%m-%d %H:%M:%S')}")
+
             # Next 15-min boundary
             minutes_to_next = 15 - (now.minute % 15)
             seconds_to_next = (minutes_to_next * 60) - now.second
@@ -1660,7 +1695,7 @@ class StrategyBuilderMainWindow(QMainWindow):
 
             # --- Kick off the background update for all managed timeframes ---
             self._update_status("Updating candle data (15m + 1h) in background...")
-            thread = _RuntimeCandleUpdateThread(self)
+            thread = _RuntimeCandleUpdateThread(self, session_start_time=self._session_start_time)
             thread.finished.connect(self._on_runtime_update_finished)
             self._runtime_update_thread = thread
             thread.start()
