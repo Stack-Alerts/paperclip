@@ -951,7 +951,7 @@ class UnifiedDataManager:
             combined = combined[combined['timestamp'] <= end_date]
         combined = combined.reset_index(drop=True)
 
-        if len(combined) < 2:
+        if len(combined) == 0:
             return []
 
         diffs = combined['timestamp'].diff().dropna()
@@ -970,6 +970,52 @@ class UnifiedDataManager:
                 'missing_bars': missing,
                 'timeframe': timeframe,
             })
+
+        # ------------------------------------------------------------------
+        # Trailing-edge gap detection (BTCAAAAA-115)
+        # diff() only detects gaps *between* existing rows; it never catches
+        # the case where the last bar on disk is stale relative to end_date.
+        # We compute the last CLOSED bar boundary and compare it to the last
+        # stored timestamp.
+        # ------------------------------------------------------------------
+        if end_date is not None and len(combined) >= 1:
+            last_bar_ts = combined['timestamp'].max()
+            if isinstance(last_bar_ts, pd.Timestamp):
+                last_bar_ts = last_bar_ts.to_pydatetime()
+
+            # Floor end_date to the last fully-closed bar boundary.
+            # e.g. for 15m: truncate minutes to :00/:15/:30/:45
+            def _floor_to_bar(dt: datetime, minutes: int) -> datetime:
+                return dt - timedelta(
+                    minutes=dt.minute % minutes,
+                    seconds=dt.second,
+                    microseconds=dt.microsecond,
+                )
+
+            last_closed = _floor_to_bar(end_date, bar_minutes)
+
+            # If end_date is exactly on a bar boundary the bar at that
+            # timestamp is still forming — step back one bar so we only
+            # reference closed candles.
+            if last_closed >= end_date:
+                last_closed = last_closed - expected_delta
+
+            # Allow 10% clock-skew slop before calling it a trailing gap
+            slop = expected_delta * 0.9
+            if last_closed > last_bar_ts + slop:
+                trailing_missing = max(
+                    1,
+                    int((last_closed - last_bar_ts).total_seconds() / (bar_minutes * 60)),
+                )
+                gaps.append({
+                    'gap_start': last_bar_ts,
+                    # open-ended: fetch window runs from last_bar_ts+1bar up to
+                    # and including last_closed
+                    'gap_end': last_closed + expected_delta,
+                    'duration': last_closed - last_bar_ts,
+                    'missing_bars': trailing_missing,
+                    'timeframe': timeframe,
+                })
 
         return gaps
 

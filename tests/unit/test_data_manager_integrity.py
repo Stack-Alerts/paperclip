@@ -994,6 +994,178 @@ class TestGetKlines1dNotFlaggedStale:
         )
 
 
+# ===========================================================================
+# 8. TRAILING-EDGE GAP DETECTION (BTCAAAAA-115)
+# ===========================================================================
+
+class TestTrailingEdgeGapDetection:
+    """
+    Tests for the trailing-edge check added to detect_gaps_in_binance_files().
+
+    Root cause: diff() only finds gaps between existing rows; when the last bar
+    on disk is stale relative to end_date the function returned 0 gaps even
+    though new closed candles exist.  These tests verify the trailing-edge
+    check catches that scenario (BUG-B fix).
+    """
+
+    # --------------------------------------------------------------------- #
+    # 8a. Stale last bar triggers trailing-edge gap
+    # --------------------------------------------------------------------- #
+    def test_stale_last_bar_triggers_trailing_gap(self, manager):
+        """
+        Data on disk ends 30 minutes before end_date (two 15m bars behind).
+        detect_gaps_in_binance_files must return ≥1 gap that covers the
+        trailing window.
+        """
+        # Anchor to a round time so floor_to_bar is deterministic
+        end_date = datetime(2026, 5, 4, 12, 0, 0)   # exactly on :00 boundary
+        # Last bar on disk is T-30m (two closed 15m bars behind)
+        last_bar_ts = end_date - timedelta(minutes=30)
+        # Write 8 consecutive bars ending at last_bar_ts
+        start = last_bar_ts - timedelta(minutes=15 * 7)
+        df = _make_ohlcv(start, n=8, freq_minutes=15, timeframe="15m")
+        _write_month_file(manager.binance_dir, "2026-05", df, "15m")
+
+        gaps = manager.detect_gaps_in_binance_files(
+            "15m", end_date=end_date
+        )
+
+        assert len(gaps) >= 1, (
+            f"Expected at least 1 trailing-edge gap when last bar is 30 min stale; "
+            f"got {gaps}"
+        )
+        trailing = gaps[-1]
+        assert trailing["gap_start"] == df.iloc[-1]["timestamp"], (
+            "gap_start must be the last bar on disk"
+        )
+        assert trailing["missing_bars"] >= 1, (
+            "trailing gap must report ≥1 missing bar"
+        )
+        assert trailing["timeframe"] == "15m"
+
+    # --------------------------------------------------------------------- #
+    # 8b. Up-to-date data does NOT produce a false trailing-edge gap
+    # --------------------------------------------------------------------- #
+    def test_current_data_no_trailing_gap(self, manager):
+        """
+        When the last bar on disk is within the slop window of end_date
+        no trailing gap should be emitted.
+        """
+        # end_date = T, last bar = T - 13m (within 10% slop of 15m = 13.5 min)
+        end_date = datetime(2026, 5, 4, 12, 13, 0)
+        last_bar_ts = datetime(2026, 5, 4, 12, 0, 0)   # one bar behind :13
+        start = last_bar_ts - timedelta(minutes=15 * 7)
+        df = _make_ohlcv(start, n=8, freq_minutes=15, timeframe="15m")
+        _write_month_file(manager.binance_dir, "2026-05", df, "15m")
+
+        gaps = manager.detect_gaps_in_binance_files("15m", end_date=end_date)
+
+        assert len(gaps) == 0, (
+            f"Up-to-date data (last bar within slop) must not produce trailing gap; "
+            f"got {gaps}"
+        )
+
+    # --------------------------------------------------------------------- #
+    # 8c. verify_and_repair with trailing gap fetches and saves bars
+    # --------------------------------------------------------------------- #
+    def test_verify_and_repair_repairs_trailing_gap(self, manager):
+        """
+        verify_and_repair() must detect the trailing gap and call
+        _fetch_binance_range / _save_binance_bars for it.
+        """
+        end_date = datetime(2026, 5, 4, 12, 0, 0)
+        last_bar_ts = end_date - timedelta(minutes=30)
+        start = last_bar_ts - timedelta(minutes=15 * 7)
+        df = _make_ohlcv(start, n=8, freq_minutes=15, timeframe="15m")
+        _write_month_file(manager.binance_dir, "2026-05", df, "15m")
+
+        fetched_df = _make_ohlcv(
+            last_bar_ts + timedelta(minutes=15), n=2, freq_minutes=15, timeframe="15m"
+        )
+        with patch.object(manager, "_fetch_binance_range", return_value=fetched_df) as mock_fetch, \
+             patch.object(manager, "_save_binance_bars") as mock_save:
+            result = manager.verify_and_repair(
+                timeframes=["15m"],
+                start_date=start,
+                end_date=end_date,
+            )
+
+        mock_fetch.assert_called_once()
+        mock_save.assert_called_once()
+        assert result["15m"]["gaps_found"] >= 1
+        assert result["15m"]["gaps_repaired"] >= 1
+        assert result["15m"]["bars_fetched"] == 2
+
+    # --------------------------------------------------------------------- #
+    # 8d. dry_run=True detects trailing gap but writes nothing
+    # --------------------------------------------------------------------- #
+    def test_dry_run_trailing_gap_detected_no_write(self, manager):
+        end_date = datetime(2026, 5, 4, 12, 0, 0)
+        last_bar_ts = end_date - timedelta(minutes=30)
+        start = last_bar_ts - timedelta(minutes=15 * 7)
+        df = _make_ohlcv(start, n=8, freq_minutes=15, timeframe="15m")
+        _write_month_file(manager.binance_dir, "2026-05", df, "15m")
+
+        with patch.object(manager, "_fetch_binance_range") as mock_fetch, \
+             patch.object(manager, "_save_binance_bars") as mock_save:
+            result = manager.verify_and_repair(
+                timeframes=["15m"],
+                start_date=start,
+                end_date=end_date,
+                dry_run=True,
+            )
+
+        mock_fetch.assert_not_called()
+        mock_save.assert_not_called()
+        assert result["15m"]["gaps_found"] >= 1, (
+            "dry_run must still report trailing gaps found"
+        )
+
+    # --------------------------------------------------------------------- #
+    # 8e. Single-bar window: trailing-edge check works with one row on disk
+    # --------------------------------------------------------------------- #
+    def test_single_bar_on_disk_trailing_gap_detected(self, manager):
+        """
+        Regression: the old early-return guard (len < 2) would skip trailing-
+        edge detection for windows with only one stored bar.  Verify the new
+        guard (len == 0) allows single-bar files to trigger a trailing gap.
+        """
+        end_date = datetime(2026, 5, 4, 12, 0, 0)
+        last_bar_ts = end_date - timedelta(minutes=60)  # 4 bars behind
+        df = _make_ohlcv(last_bar_ts, n=1, freq_minutes=15, timeframe="15m")
+        _write_month_file(manager.binance_dir, "2026-05", df, "15m")
+
+        gaps = manager.detect_gaps_in_binance_files(
+            "15m", end_date=end_date
+        )
+
+        assert len(gaps) >= 1, (
+            "Single-bar window must still produce a trailing-edge gap"
+        )
+
+    # --------------------------------------------------------------------- #
+    # 8f. Internal gap + trailing gap: both reported
+    # --------------------------------------------------------------------- #
+    def test_internal_gap_plus_trailing_gap_both_reported(self, manager):
+        """
+        A file with both an internal gap and a stale trailing edge must report
+        both gaps — the trailing-edge fix must not suppress internal gaps.
+        """
+        end_date = datetime(2026, 5, 4, 12, 0, 0)
+        # Build 20-bar segment, drop bar 10 (internal gap), last bar 30 min before end_date
+        last_bar_ts = end_date - timedelta(minutes=30)
+        start = last_bar_ts - timedelta(minutes=15 * 19)
+        df = _make_ohlcv(start, n=20, freq_minutes=15, timeframe="15m")
+        df_gapped = df.drop(index=10).reset_index(drop=True)
+        _write_month_file(manager.binance_dir, "2026-05", df_gapped, "15m")
+
+        gaps = manager.detect_gaps_in_binance_files("15m", end_date=end_date)
+
+        assert len(gaps) >= 2, (
+            f"Expected at least 2 gaps (1 internal + 1 trailing), got {len(gaps)}: {gaps}"
+        )
+
+
 class TestDataUpdateThreadDownloads1d:
     """
     Regression guard: DataUpdateThread.run() must download AND save 1d bars
