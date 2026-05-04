@@ -1867,17 +1867,27 @@ class ValidationReportWindow(QMainWindow):
             self.undo_manager.record_fix(pre_fix_snapshot, label=issue.rule_name)
             self._refresh_undo_button()
             
-            # Emit signal to notify parent window of config changes
-            # Parent window (Strategy Builder) will handle database persistence
-            self.fix_applied.emit(issue.rule_id, {'issue': issue.rule_name})
-            
-            QMessageBox.information(
-                self,
-                "✅ Fix Applied Successfully",
+            # CRITICAL FIX (BTCAAAAA-125): Show success dialog BEFORE emitting the
+            # fix_applied signal. Previously the signal was emitted first, which
+            # synchronously called _on_save_strategy() in the parent window — that
+            # could show its own "No Changes" dialog — and only then the success
+            # dialog appeared here, giving the user two sequential message boxes.
+            # Showing our dialog first ensures the user sees exactly one box.
+            msg = QMessageBox(self)
+            msg.setWindowTitle("✅ Fix Applied Successfully")
+            msg.setText(
                 f"Auto-fix completed: {issue.rule_name}\n\n"
                 f"Validation will re-run automatically to verify the fix.\n\n"
-                f"⚠️ IMPORTANT: Please save your strategy to persist these changes."
+                f"The fix will be saved to the database automatically."
             )
+            msg.setIcon(QMessageBox.Information)
+            msg.setMinimumWidth(400)
+            msg.exec_()
+            
+            # Emit signal to notify parent window of config changes.
+            # Parent window (Strategy Builder) handles database persistence.
+            # Emitting AFTER the dialog ensures only one message box appears.
+            self.fix_applied.emit(issue.rule_id, {'issue': issue.rule_name})
             
             # Re-run validation
             self._rerun_validation()
