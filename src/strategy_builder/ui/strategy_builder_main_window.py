@@ -72,6 +72,14 @@ class _RuntimeCandleUpdateThread(QThread):
     than 2 hours are never silently hidden.  The window is capped at 24h to
     prevent excessively long scans on very long sessions.
 
+    RC4b FIX (BTCAAAAA-160): Use last_bar_on_disk as the scan anchor instead
+    of session_start_time.  session_start_time can be *after* last_bar_on_disk
+    (e.g. app starts at 19:15; last disk bar is 19:00).  When detect_gaps
+    filters with start_date=19:15, the 19:00 bar is excluded from `combined`
+    so the trailing-edge check never fires and the 19:15, 19:30, … bars are
+    never written.  The fix reads get_last_bar_timestamp() and begins the
+    scan one 15m period before that anchor.
+
     Signals:
         finished(success: bool, message: str)
     """
@@ -106,24 +114,60 @@ class _RuntimeCandleUpdateThread(QThread):
 
             now = datetime.now()
 
-            # RC4 FIX: scan from session_start_time so gaps older than 2h are
-            # never hidden by a rolling window.  Fall back to now-2h only if no
-            # session start is known (should not happen in normal operation).
-            # Cap at MAX_SESSION_LOOKBACK_HOURS to bound scan cost on long sessions.
-            if self._session_start_time is not None:
-                max_lookback = now - timedelta(hours=self.MAX_SESSION_LOOKBACK_HOURS)
-                start_date = max(self._session_start_time, max_lookback)
+            # RC4b FIX: anchor the scan window to last_bar_on_disk rather than
+            # session_start_time.
+            #
+            # Root cause (BTCAAAAA-160): RC4 used session_start_time as the
+            # lower bound.  When the app starts at T and the last bar on disk
+            # is at T-15m, detect_gaps receives start_date=T (session_start).
+            # After filtering, the T-15m bar is excluded from `combined`, so
+            # the trailing-edge check sees an empty or wrong last_bar_ts and
+            # never fires.  The T, T+15, T+30 … bars are therefore never
+            # written during the session.
+            #
+            # Fix: start one 15m bar BEFORE the last bar actually on disk so
+            # the trailing-edge detector in detect_gaps always sees the
+            # boundary correctly.  Fall back to session_start_time-15m when
+            # no bars exist on disk yet, and to now-2h when session_start is
+            # also unknown.
+            #
+            # Cap at MAX_SESSION_LOOKBACK_HOURS to prevent multi-day scan debt.
+            max_lookback = now - timedelta(hours=self.MAX_SESSION_LOOKBACK_HOURS)
+            try:
+                last_15m = manager.get_last_bar_timestamp('15m')
+                last_1h  = manager.get_last_bar_timestamp('1h')
+                known_ts = [t for t in [last_15m, last_1h] if t is not None]
+                if known_ts:
+                    # Use the EARLIEST last bar across both timeframes so we
+                    # never under-scan one of them.
+                    oldest_last_bar = min(known_ts)
+                    # Step back one 15m period to include the boundary bar in
+                    # the detect_gaps scan window.
+                    start_date = oldest_last_bar - timedelta(minutes=15)
+                    print(
+                        f"[RuntimeUpdate] RC4b scan anchor: last_bar={oldest_last_bar.strftime('%H:%M:%S')}"
+                        f" → scan_start={start_date.strftime('%H:%M:%S')}"
+                        f" → now={now.strftime('%H:%M:%S')}"
+                    )
+                else:
+                    # No bars on disk yet — fall back to session_start - 15m
+                    fallback_base = self._session_start_time if self._session_start_time is not None else now
+                    start_date = fallback_base - timedelta(minutes=15)
+                    print(
+                        f"[RuntimeUpdate] RC4b: no bars on disk; "
+                        f"falling back to session_start-15m → {start_date.strftime('%H:%M:%S')}"
+                    )
+            except Exception as _anchor_exc:
+                # Defensive: if get_last_bar_timestamp raises, fall back
+                # gracefully to session_start_time or 2h window.
+                fallback_base = self._session_start_time if self._session_start_time is not None else now
+                start_date = fallback_base - timedelta(minutes=15)
                 print(
-                    f"[RuntimeUpdate] scan window: {start_date.strftime('%H:%M:%S')} "
-                    f"(session_start) → {now.strftime('%H:%M:%S')}"
+                    f"[RuntimeUpdate] RC4b anchor lookup failed ({_anchor_exc}); "
+                    f"falling back to {start_date.strftime('%H:%M:%S')}"
                 )
-            else:
-                # Fallback: 2h rolling window (old behaviour — should not reach here).
-                start_date = now - timedelta(hours=2)
-                print(
-                    f"[RuntimeUpdate] WARNING: no session_start_time; "
-                    f"falling back to 2h rolling window"
-                )
+            # Apply hard lookback cap.
+            start_date = max(start_date, max_lookback)
 
             # Early timeout check before the expensive verify_and_repair call.
             if _timed_out():

@@ -892,6 +892,54 @@ class UnifiedDataManager:
             'binance_range': (binance_start, binance_end)
         }
 
+    def get_last_bar_timestamp(self, timeframe: str = '15m') -> Optional[datetime]:
+        """
+        Return the timestamp of the most recent bar stored on disk for
+        *timeframe*, or ``None`` if no local Binance parquet files exist.
+
+        This is a lightweight read: only the ``timestamp`` column of the
+        chronologically latest monthly parquet file is loaded so the call
+        adds minimal I/O overhead to the runtime update cycle.
+
+        Used by :class:`_RuntimeCandleUpdateThread` (RC4b fix) to anchor the
+        scan window at the last known bar rather than at ``session_start_time``
+        — which can be *after* ``last_bar_on_disk`` and would therefore clip
+        the very bars that need filling.
+
+        Args:
+            timeframe: Timeframe to check (e.g. ``'15m'``, ``'1h'``).
+
+        Returns:
+            Timezone-naive ``datetime`` of the last stored bar, or ``None``.
+        """
+        import pandas as pd
+
+        pattern = f'**/BTCUSDT_PERP_{timeframe}_*.parquet'
+        all_files = sorted(self.binance_dir.glob(pattern))
+        if not all_files:
+            return None
+
+        # Walk from newest to oldest until we find a readable file with rows.
+        for fp in reversed(all_files):
+            try:
+                df = pd.read_parquet(fp, columns=['timestamp'])
+                if df.empty:
+                    continue
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                last_ts = df['timestamp'].max()
+                if pd.isna(last_ts):
+                    continue
+                result = last_ts.to_pydatetime()
+                # Strip timezone info to stay consistent with the rest of the codebase
+                if result.tzinfo is not None:
+                    result = result.replace(tzinfo=None)
+                return result
+            except Exception as exc:
+                print(f"   [get_last_bar_timestamp/{timeframe}] could not read {fp.name}: {exc}")
+                continue
+
+        return None
+
     # =========================================================================
     # GAP DETECTION & AUTO-REPAIR  (added 2026-05-02)
     # =========================================================================
