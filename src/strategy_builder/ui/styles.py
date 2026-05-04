@@ -1156,6 +1156,22 @@ def create_font(size: int = 10, bold: bool = False):
     return font
 
 
+def create_monospace_font(size: int = 9):
+    """
+    Create a monospace QFont for code / log display areas.
+
+    Uses the same font-family stack as get_text_edit_stylesheet().
+
+    Args:
+        size: Font size in points (default: 9)
+
+    Returns:
+        QFont object with monospace family
+    """
+    from PyQt5.QtGui import QFont
+    return QFont("Consolas, Monaco, Courier New", size)
+
+
 def set_hand_cursor(widget):
     """
     Set hand cursor for clickable widget.
