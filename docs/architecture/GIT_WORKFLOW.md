@@ -204,3 +204,51 @@ When a Paperclip agent completes work and marks an issue `done`:
 5. Only then mark the Paperclip issue as `done`
 
 This ensures GitHub always reflects the actual state of completed work.
+
+---
+
+## 11. Automated Push-Sync Gate (BTCAAAAA-76)
+
+Two enforcement mechanisms are installed to prevent the "committed but not pushed" failure mode.
+
+### 11a. post-commit Hook (auto-push)
+
+A `post-commit` git hook automatically pushes the current branch to `origin` after
+every commit. It is installed in `.git/hooks/post-commit`.
+
+**Install on a fresh clone:**
+```bash
+cp scripts/hooks/post-commit .git/hooks/post-commit
+chmod +x .git/hooks/post-commit
+```
+
+**Opt out for a single commit (emergency only):**
+```bash
+NO_AUTO_PUSH=1 git commit -m "feat: ..."
+```
+
+The hook is non-blocking: if `git push` fails it prints a warning and exits 0 so the
+commit is not aborted. Agents must resolve push failures before closing any issue.
+
+### 11b. verify-push-sync.sh (pre-close gate)
+
+Run this script **before** marking any Paperclip issue as `done`:
+
+```bash
+scripts/verify-push-sync.sh
+```
+
+Exit codes:
+- `0` — remote is in sync (pushed successfully if needed)
+- `1` — push failed or remote is ahead (diverged)
+- `2` — uncommitted changes present (commit first)
+
+**Check-only mode** (no push, just report):
+```bash
+scripts/verify-push-sync.sh --check-only
+```
+
+**Revised agent close sequence:**
+1. Commit with proper type prefix + issue ref + Co-Authored-By footer
+2. Run `scripts/verify-push-sync.sh` — gate must exit 0
+3. Only then mark the Paperclip issue as `done`

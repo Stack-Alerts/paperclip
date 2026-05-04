@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# .git/hooks/post-commit — auto-push after every commit
+#
+# PURPOSE: Prevent the "committed but not pushed" failure mode.
+#          Immediately pushes the current branch to origin after each commit.
+#
+# GITHUB_EXPERT protocol: §10 Agent Push Protocol
+# BTC Trade Engine — installed by RepoSteward (BTCAAAAA-76)
+#
+# To disable temporarily (single commit):
+#   NO_AUTO_PUSH=1 git commit -m "..."
+#
+# To install on a fresh clone:
+#   cp scripts/hooks/post-commit .git/hooks/post-commit
+#   chmod +x .git/hooks/post-commit
+
+set -euo pipefail
+
+# Honour opt-out env var
+if [[ "${NO_AUTO_PUSH:-}" == "1" ]]; then
+  echo "[post-commit] NO_AUTO_PUSH=1 — skipping auto-push."
+  exit 0
+fi
+
+BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo "")"
+
+if [[ -z "$BRANCH" ]]; then
+  echo "[post-commit] Detached HEAD — skipping auto-push."
+  exit 0
+fi
+
+# Check remote exists
+if ! git remote get-url origin &>/dev/null; then
+  echo "[post-commit] No remote 'origin' configured — skipping auto-push."
+  exit 0
+fi
+
+echo "[post-commit] Auto-pushing $BRANCH to origin..."
+if git push origin "$BRANCH"; then
+  # Refresh remote-tracking ref
+  git fetch origin "$BRANCH" --quiet 2>/dev/null || true
+  REMOTE_SHA="$(git rev-parse "origin/$BRANCH" 2>/dev/null || echo "")"
+  LOCAL_SHA="$(git rev-parse HEAD)"
+  if [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]; then
+    echo "[post-commit] Push verified — origin/$BRANCH matches local HEAD ($LOCAL_SHA)."
+  else
+    echo "[post-commit] WARNING: push reported OK but remote SHA differs." >&2
+    echo "  Local : $LOCAL_SHA" >&2
+    echo "  Remote: $REMOTE_SHA" >&2
+  fi
+else
+  echo "[post-commit] WARNING: git push failed. Run manually: git push origin $BRANCH" >&2
+  # Do NOT exit 1 — failing the hook would abort the commit workflow confusingly.
+  # The commit succeeded; push failure is logged as a warning.
+fi
+
+exit 0
