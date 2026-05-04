@@ -1989,6 +1989,11 @@ class ValidationReportWindow(QMainWindow):
             # Recreate tabs with new data
             self._reinitialize_ui()
             
+            # Navigate to Issues tab (index 1) so user can confirm the fix
+            # was applied and see remaining issues (or empty table if all resolved).
+            if hasattr(self, 'tabs'):
+                self.tabs.setCurrentIndex(1)
+            
         except Exception as e:
             QMessageBox.warning(
                 self,
@@ -2024,6 +2029,7 @@ class ValidationReportWindow(QMainWindow):
         
         # Tabs (no status banner between header and tabs)
         tabs = self._create_tabs()
+        self.tabs = tabs  # Store reference so callers can navigate after reinit
         layout.addWidget(tabs, 1)
         
         # Footer
