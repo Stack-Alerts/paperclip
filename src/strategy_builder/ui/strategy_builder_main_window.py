@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QAction, QToolBar, QStatusBar, QFileDialog, QMessageBox, QLabel
 )
-from PyQt5.QtCore import Qt, QSize, QSettings, QTimer
+from PyQt5.QtCore import Qt, QSize, QSettings, QTimer, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon, QKeySequence, QFont
 from PyQt5.QtWidgets import QApplication, QStyle
 from datetime import datetime, timedelta
@@ -54,6 +54,59 @@ try:
     BLOCK_REGISTRY_ADAPTER_AVAILABLE = True
 except ImportError:
     BLOCK_REGISTRY_ADAPTER_AVAILABLE = False
+
+
+class _RuntimeCandleUpdateThread(QThread):
+    """
+    Background QThread for the runtime candle auto-update cycle.
+
+    Fetches and persists the latest candles for *all* managed timeframes
+    (15m and 1h) without blocking the Qt event loop.
+
+    Signals:
+        finished(success: bool, message: str)
+    """
+    finished = pyqtSignal(bool, str)
+
+    def run(self) -> None:
+        try:
+            from datetime import datetime, timedelta
+            from src.data_manager.unified_manager import UnifiedDataManager
+
+            manager = UnifiedDataManager(mode='live')
+
+            # Cover the last 2 hours so we catch any 1h boundary that fired
+            # since the previous cycle, plus the usual 15m updates.
+            now = datetime.now()
+            start_date = now - timedelta(hours=2)
+
+            summary = manager.verify_and_repair(
+                timeframes=['15m', '1h'],
+                start_date=start_date,
+                end_date=now,
+            )
+
+            tf_lines = []
+            any_error = False
+            for tf, s in summary.items():
+                if s['errors']:
+                    any_error = True
+                    tf_lines.append(
+                        f"{tf}: {s['gaps_repaired']}/{s['gaps_found']} gaps repaired"
+                        f" | errors: {'; '.join(s['errors'])}"
+                    )
+                else:
+                    tf_lines.append(
+                        f"{tf}: {s['gaps_repaired']}/{s['gaps_found']} gaps repaired"
+                        f" ({s['bars_fetched']} bars)"
+                    )
+
+            msg = "Runtime update complete — " + " | ".join(tf_lines)
+            self.finished.emit(not any_error, msg)
+
+        except Exception as exc:
+            import traceback
+            self.finished.emit(False, f"Runtime update error: {exc}\n{traceback.format_exc()}")
 
 
 class StrategyBuilderMainWindow(QMainWindow):
@@ -113,6 +166,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.retry_count = 0
         self.next_check_time: Optional[datetime] = None
         self._in_quick_retry = False  # guard: only one quick-retry per cycle failure
+        self._runtime_update_thread: Optional[_RuntimeCandleUpdateThread] = None  # background update thread
         
         # Countdown timer for status bar
         self.countdown_timer = QTimer()
@@ -1526,116 +1580,36 @@ class StrategyBuilderMainWindow(QMainWindow):
     
     def _check_and_update_data(self):
         """
-        Check if data needs updating and update if necessary.
+        Check if data needs updating and trigger a background update if so.
 
-        Called 0.2s after each 15-min candle close.
-        Retries every 2s until data is fresh.
+        Called 0.2s after each 15-min candle close.  All blocking I/O runs in
+        _RuntimeCandleUpdateThread to avoid stalling the Qt event loop.
+
+        Covers BOTH 15m AND 1h timeframes — the previous implementation only
+        updated 15m data, leaving 1h candles perpetually stale at runtime.
         """
         try:
             self._update_status("Checking for data updates...")
 
-            # Import unified manager and Binance client
-            from src.data_manager.unified_manager import UnifiedDataManager
-            from src.data_manager.binance.rest_client import BinanceRestClient
-
-            # Check data status
-            manager = UnifiedDataManager(mode='live')
-            status = manager.get_all_data_types_status()
-
-            # Check for gaps in trades (15min data)
-            trades_status = status.get('trades', {})
-            gap_minutes = trades_status.get('gap_minutes', 999)
-
-            # If gap > 15 minutes (1 candle missing), download immediately
-            # For 15min candles: any gap over 15min = candles missing
-            if gap_minutes > 15:
-                # Data needs updating
-                self._update_status(f"Downloading fresh data (gap: {gap_minutes} min)...")
-
-                try:
-                    # BUG 5 FIX: simple retry with 2s sleep between attempts.
-                    # Previously a bare single call with no retry.
-                    _max_retries = 5
-                    _retry_delay_s = 2
-                    bars = None
-                    last_download_error = None
-
-                    for _attempt in range(_max_retries):
-                        try:
-                            client = BinanceRestClient()
-                            bars = client.get_klines('15m', limit=100, futures=True)
-                            if bars is not None and len(bars) > 0:
-                                break  # success
-                            last_download_error = f"Empty response on attempt {_attempt + 1}"
-                            print(f"Warning: {last_download_error}")
-                        except Exception as _dl_err:
-                            last_download_error = str(_dl_err)
-                            print(f"Download attempt {_attempt + 1}/{_max_retries} failed: {_dl_err}")
-
-                        if _attempt < _max_retries - 1:
-                            import time as _time
-                            print(f"Retrying in {_retry_delay_s}s...")
-                            _time.sleep(_retry_delay_s)
-
-                    if bars is not None and len(bars) > 0:
-                        # Save to Binance directory
-                        now = datetime.now()
-                        month_dir = manager.binance_dir / f"{now.year}-{now.month:02d}"
-                        month_dir.mkdir(parents=True, exist_ok=True)
-
-                        # Save with month-level filename
-                        output_file = month_dir / f"BTCUSDT_PERP_15m_{now.year}-{now.month:02d}.parquet"
-
-                        # If file exists, merge with existing data
-                        if output_file.exists():
-                            existing = pd.read_parquet(output_file)
-                            bars = pd.concat([existing, bars], ignore_index=True)
-                            bars = bars.drop_duplicates(subset=['timestamp'], keep='last')
-                            bars = bars.sort_values('timestamp')
-
-                        # Save merged data
-                        bars.to_parquet(output_file, index=False)
-
-                        self.last_update_time = datetime.now()
-                        self._update_status(f"Data updated at {self.last_update_time.strftime('%H:%M:%S')}")
-                        self._in_quick_retry = False  # successful download clears the guard
-                    else:
-                        self._update_status(
-                            f"No data received from Binance after {_max_retries} attempts"
-                            + (f": {last_download_error}" if last_download_error else "")
-                        )
-                        # Quick-retry path: fire once within 12s before surrendering to boundary
-                        if not self._in_quick_retry:
-                            self._in_quick_retry = True
-                            print("Download failed — scheduling quick retry in 12s...")
-                            QTimer.singleShot(12 * 1000, self._check_and_update_data)
-                            return  # do not also call _schedule_next_check
-                        else:
-                            # Second failure in quick-retry cycle — hand off to boundary
-                            self._in_quick_retry = False
-
-                except Exception as e:
-                    print(f"Error downloading data: {e}")
-                    self._update_status(f"Download error: {str(e)}")
-                    # Quick-retry path: fire once within 12s before surrendering to boundary
-                    if not self._in_quick_retry:
-                        self._in_quick_retry = True
-                        print("Download exception — scheduling quick retry in 12s...")
-                        QTimer.singleShot(12 * 1000, self._check_and_update_data)
-                        return  # do not also call _schedule_next_check
-                    else:
-                        self._in_quick_retry = False
-
-                # Schedule next check at next candle close
+            # --- Guard: skip if a previous update cycle is still running ---
+            if self._runtime_update_thread is not None and self._runtime_update_thread.isRunning():
+                print("Runtime update thread still running — skipping this cycle trigger.")
                 self._schedule_next_check()
+                return
 
-            else:
-                # Data is fresh, schedule next check
-                self._update_status(f"Data is fresh (gap: {gap_minutes} min)")
-                self._schedule_next_check()
+            # --- Kick off the background update for all managed timeframes ---
+            self._update_status("Updating candle data (15m + 1h) in background...")
+            thread = _RuntimeCandleUpdateThread(self)
+            thread.finished.connect(self._on_runtime_update_finished)
+            self._runtime_update_thread = thread
+            thread.start()
+
+            # Schedule the next check immediately (the thread runs independently).
+            # The _on_runtime_update_finished slot updates the status bar when done.
+            self._schedule_next_check()
 
         except Exception as e:
-            print(f"Error checking/updating data: {e}")
+            print(f"Error launching runtime update thread: {e}")
             import traceback
             traceback.print_exc()
             self._update_status(f"Data update error: {str(e)}")
@@ -1648,12 +1622,32 @@ class StrategyBuilderMainWindow(QMainWindow):
             else:
                 # Second failure in quick-retry cycle — fall back to boundary schedule
                 self._in_quick_retry = False
-                # BUG 2 FIX: call _schedule_next_check() directly instead of
-                # pre-waiting 15 min flat before calling it (which produced up to
-                # 30 min total delay). _schedule_next_check aligns to the real next
-                # boundary and is itself guarded against exceptions (see BUG 1 fix).
                 self._schedule_next_check()
-    
+
+    def _on_runtime_update_finished(self, success: bool, message: str) -> None:
+        """
+        Slot called when _RuntimeCandleUpdateThread finishes.
+
+        Updates the status bar and resets state.  Schedules a quick retry on
+        failure (honouring the same single-retry guard as before).
+        """
+        print(f"[RuntimeUpdate] {'OK' if success else 'FAIL'}: {message}")
+        if success:
+            self.last_update_time = datetime.now()
+            self._in_quick_retry = False
+            self._update_status(
+                f"Data updated at {self.last_update_time.strftime('%H:%M:%S')}"
+            )
+        else:
+            self._update_status(f"Update failed: {message[:120]}")
+            if not self._in_quick_retry:
+                self._in_quick_retry = True
+                print("Update failed — scheduling quick retry in 12s...")
+                QTimer.singleShot(12 * 1000, self._check_and_update_data)
+            else:
+                self._in_quick_retry = False
+
+
     def _schedule_next_check(self):
         """Schedule the next data check at 0.2s after next candle close."""
         _FALLBACK_MS = 15 * 60 * 1000  # 15-minute fallback if boundary calc fails
