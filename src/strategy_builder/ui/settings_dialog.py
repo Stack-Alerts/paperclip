@@ -383,7 +383,7 @@ class SettingsDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        save_btn = QPushButton("Save Settings")
+        save_btn = QPushButton("Save && Close")
         save_btn.setFont(create_font(10, bold=True))
         save_btn.setStyleSheet(get_primary_button_stylesheet())
         save_btn.clicked.connect(self._on_save)
@@ -795,10 +795,10 @@ class SettingsDialog(QDialog):
                 "Some settings could not be saved:\n\n" + "\n".join(errors)
             )
         else:
-            # Reset all secret widgets to masked display
+            # Reset all secret widgets to masked display, then close the dialog.
             for widget in self._secret_widgets.values():
                 widget.clear_edit()
-            QMessageBox.information(self, "Settings Saved", "Settings saved successfully.")
+            self.accept()  # BTCAAAAA-98: close dialog on successful save
 
     # ------------------------------------------------------------------
     # Change PIN
