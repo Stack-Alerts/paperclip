@@ -667,7 +667,7 @@ class UnifiedDataManager:
         
         # Combine results
         combined = pd.concat(all_bars, ignore_index=True)
-        combined = combined.sort_values('timestamp').drop_duplicates(subset=['timestamp'])
+        combined = combined.sort_values('timestamp').drop_duplicates(subset=['timestamp'], keep='last')
         
         print(f"   ✅ Hybrid: {len(combined)} total bars")
         return combined
@@ -957,7 +957,7 @@ class UnifiedDataManager:
 
         combined = pd.concat(frames, ignore_index=True)
         combined = combined.sort_values('timestamp').drop_duplicates(
-            subset=['timestamp']
+            subset=['timestamp'], keep='last'
         ).reset_index(drop=True)
 
         # Optional date filter
@@ -1141,7 +1141,7 @@ class UnifiedDataManager:
 
         result = pd.concat(all_frames, ignore_index=True)
         result = result.sort_values('timestamp').drop_duplicates(
-            subset=['timestamp']
+            subset=['timestamp'], keep='last'
         ).reset_index(drop=True)
         return result
 
@@ -1209,7 +1209,7 @@ class UnifiedDataManager:
                     merged = group
 
                 merged = merged.sort_values('timestamp').drop_duplicates(
-                    subset=['timestamp']
+                    subset=['timestamp'], keep='last'
                 ).reset_index(drop=True)
 
                 # Bug 2 fix: atomic write via temp file + os.replace (POSIX atomic).
