@@ -349,9 +349,14 @@ class BinanceRestClient:
         if len(df) > 0:
             latest = pd.to_datetime(df['timestamp'].iloc[-1])
             delay_minutes = (datetime.now() - latest).total_seconds() / 60
-            
-            # If delay > 20 minutes, use direct fallback
-            if delay_minutes > 20:
+
+            # Per-interval stale thresholds — avoids false-positive stale warnings
+            # for low-frequency bars (e.g. 1d) that are naturally hours old.
+            _stale_thresholds = {"1m": 2, "5m": 6, "15m": 20, "1h": 65, "4h": 260, "1d": 1500}
+            stale_threshold = _stale_thresholds.get(interval, 20)
+
+            # If delay > threshold, use direct fallback
+            if delay_minutes > stale_threshold:
                 print(f"   ⚠️  Data stale ({delay_minutes:.0f} min delay)")
                 print(f"   🔄 Using direct fallback for fresh data...")
                 
