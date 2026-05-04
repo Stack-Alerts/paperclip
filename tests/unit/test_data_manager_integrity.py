@@ -476,12 +476,12 @@ class TestVerifyAndRepair:
     # --------------------------------------------------------------------- #
     def test_return_structure_complete(self, manager):
         result = manager.verify_and_repair(
-            timeframes=["15m", "1h"],
+            timeframes=["15m", "1h", "1d"],
             start_date=datetime(2026, 1, 1),
             end_date=datetime(2026, 1, 2),
         )
-        for tf in ["15m", "1h"]:
-            assert tf in result
+        for tf in ["15m", "1h", "1d"]:
+            assert tf in result, f"Timeframe '{tf}' missing from result keys"
             for key in ("gaps_found", "gaps_repaired", "gaps_too_old",
                         "bars_fetched", "errors"):
                 assert key in result[tf], f"Missing key '{key}' for timeframe {tf}"
@@ -783,3 +783,321 @@ class TestOHLCVDataValidation:
         df.loc[3, "volume"] = 0.0
         with pytest.raises(AssertionError):
             assert (df["volume"] > 0).all(), "Zero volume found"
+
+
+# ===========================================================================
+# 7. 1D PIPELINE REGRESSION GUARD (BTCAAAAA-67)
+# ===========================================================================
+
+class TestDownloadWithRetry1dStaleness:
+    """
+    Regression guard: _download_with_retry() must use a staleness threshold
+    of ≥ 1440 minutes for 1d bars, not the 65-minute fallback used for 1h.
+
+    A closed daily candle is naturally many hours old; treating anything older
+    than 65 minutes as stale would continuously trigger unnecessary retries.
+    """
+
+    def test_1d_staleness_threshold_is_at_least_1440_minutes(self, tmp_path):
+        """
+        Verify that _download_with_retry(timeframe='1d') accepts a bar whose
+        latest timestamp is 900 minutes old — well past the 1h threshold (65 min)
+        but well within the 1d threshold (≥ 1440 min).
+
+        Arrange: mock get_bars() to return a DataFrame whose latest timestamp is
+        900 minutes in the past.  If the staleness check incorrectly uses the
+        65-minute 1h threshold, the thread would retry (or raise) instead of
+        returning the data immediately on the first attempt.
+
+        Assert: _download_with_retry returns the bars on the first attempt
+        (get_bars called exactly once, no retries).
+        """
+        from src.strategy_builder.ui.data_update_modal import DataUpdateThread
+        from src.data_manager.unified_manager import UnifiedDataManager, DataSource
+
+        start_date = datetime(2026, 4, 1, 0, 0)
+        end_date = datetime(2026, 4, 30, 0, 0)
+        thread = DataUpdateThread(start_date=start_date, end_date=end_date)
+
+        # Build a 1d DataFrame whose last bar is 900 minutes old
+        stale_minutes = 900  # older than 65-min 1h threshold, fresh for 1d
+        bars_1d = _make_ohlcv(
+            start=datetime.now() - timedelta(minutes=stale_minutes + 10),
+            n=5,
+            freq_minutes=1440,
+            timeframe="1d",
+        )
+        # Ensure the latest timestamp is exactly `stale_minutes` ago
+        bars_1d.iloc[-1, bars_1d.columns.get_loc("timestamp")] = (
+            pd.Timestamp(datetime.now() - timedelta(minutes=stale_minutes))
+        )
+
+        call_count = {"n": 0}
+
+        def fake_get_bars(timeframe, start_date, end_date, source):
+            call_count["n"] += 1
+            return bars_1d
+
+        with patch.object(thread.manager, "get_bars", side_effect=fake_get_bars):
+            result = thread._download_with_retry(
+                timeframe="1d",
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+        assert call_count["n"] == 1, (
+            f"Expected exactly 1 call to get_bars (data accepted as fresh), "
+            f"but got {call_count['n']} — the 1d staleness threshold is too low"
+        )
+        assert len(result) == 5, "Expected 5 bars to be returned"
+
+    def test_1h_threshold_does_not_apply_to_1d(self, tmp_path):
+        """
+        Complementary test: the 65-minute 1h threshold must NOT be used for 1d.
+
+        If _download_with_retry mistakenly applies the 1h threshold (65 min) to
+        a 1d request, a bar that is 70 minutes old would be treated as stale and
+        trigger a retry.  With the correct threshold (≥ 1440 min), 70 minutes is
+        fresh and no retry should happen.
+        """
+        from src.strategy_builder.ui.data_update_modal import DataUpdateThread
+
+        start_date = datetime(2026, 4, 1, 0, 0)
+        end_date = datetime(2026, 4, 30, 0, 0)
+        thread = DataUpdateThread(start_date=start_date, end_date=end_date)
+
+        # Bar is 70 minutes old — stale for 1h (65 min threshold), fresh for 1d
+        bars_1d = _make_ohlcv(
+            start=datetime.now() - timedelta(minutes=80),
+            n=3,
+            freq_minutes=1440,
+            timeframe="1d",
+        )
+        bars_1d.iloc[-1, bars_1d.columns.get_loc("timestamp")] = (
+            pd.Timestamp(datetime.now() - timedelta(minutes=70))
+        )
+
+        call_count = {"n": 0}
+
+        def fake_get_bars(timeframe, start_date, end_date, source):
+            call_count["n"] += 1
+            return bars_1d
+
+        with patch.object(thread.manager, "get_bars", side_effect=fake_get_bars):
+            result = thread._download_with_retry(
+                timeframe="1d",
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+        assert call_count["n"] == 1, (
+            f"A 70-min-old 1d bar should be fresh (threshold ≥ 1440 min), "
+            f"but get_bars was called {call_count['n']} time(s) — threshold is wrong"
+        )
+
+
+class TestGetKlines1dNotFlaggedStale:
+    """
+    Regression guard: BinanceRestClient.get_klines(interval='1d') must NOT
+    trigger the direct_fallback for a bar that is naturally hundreds of minutes
+    old (e.g. 900 minutes).
+
+    The stale threshold for '1d' must be ≥ 1440 minutes (the issue description
+    calls out the old 65-minute fallback as the root-cause defect to prevent
+    from recurring).
+    """
+
+    @staticmethod
+    def _make_raw_klines_response(bar_timestamp: datetime, n: int = 1) -> list:
+        """
+        Build a minimal raw Binance klines list-of-lists response.
+
+        Each row: [open_time_ms, open, high, low, close, volume,
+                   close_time_ms, quote_vol, trades, taker_buy_base,
+                   taker_buy_quote, ignore]
+
+        The 'open_time' column is what get_klines() parses for the timestamp.
+        """
+        rows = []
+        for i in range(n):
+            ts = bar_timestamp + timedelta(minutes=1440 * i)
+            open_time_ms = int(ts.timestamp() * 1000)
+            close_time_ms = open_time_ms + 1440 * 60_000 - 1
+            rows.append([
+                open_time_ms, "30000.00", "30500.00", "29500.00", "30200.00",
+                "10.5",       # volume
+                close_time_ms, "315000.00", 500, "5.25", "157500.00", "0",
+            ])
+        return rows
+
+    def test_900_minute_old_1d_bar_does_not_trigger_fallback(self):
+        """
+        A 1d bar that is 900 minutes old (15 hours) is perfectly normal — the
+        daily candle for 'today' closes at midnight UTC and will always be many
+        hours old when read during the trading day.
+
+        Verify that the direct_fallback is NOT invoked for such a bar.
+        """
+        from src.data_manager.binance.rest_client import BinanceRestClient
+
+        client = BinanceRestClient()
+
+        # Bar whose open_time is 900 minutes ago
+        bar_ts = datetime.now() - timedelta(minutes=900)
+        raw_response = self._make_raw_klines_response(bar_ts, n=1)
+
+        with patch.object(client, "_request", return_value=raw_response), \
+             patch(
+                 "src.data_manager.binance.rest_client.get_fresh_klines_direct",
+                 create=True,
+             ) as mock_fallback, \
+             patch(
+                 "src.data_manager.binance.direct_fallback.get_fresh_klines_direct",
+                 create=True,
+             ) as mock_fallback2:
+            result = client.get_klines(interval="1d", symbol="BTCUSDT", limit=1)
+
+        assert mock_fallback.call_count == 0 and mock_fallback2.call_count == 0, (
+            "direct_fallback must NOT be triggered for a 900-min-old 1d bar; "
+            "the 1d staleness threshold must be ≥ 1440 minutes"
+        )
+
+    def test_1d_stale_threshold_in_dict_is_at_least_1440(self):
+        """
+        White-box: confirm the '_stale_thresholds' dict inside get_klines()
+        maps '1d' to a value ≥ 1440 minutes.
+
+        We do this by placing a bar that is exactly 1439 minutes old
+        (just under 24 hours) and verifying the fallback is not triggered.
+        """
+        from src.data_manager.binance.rest_client import BinanceRestClient
+
+        client = BinanceRestClient()
+
+        bar_ts = datetime.now() - timedelta(minutes=1439)
+        raw_response = self._make_raw_klines_response(bar_ts, n=1)
+
+        with patch.object(client, "_request", return_value=raw_response), \
+             patch(
+                 "src.data_manager.binance.rest_client.get_fresh_klines_direct",
+                 create=True,
+             ) as mock_fallback, \
+             patch(
+                 "src.data_manager.binance.direct_fallback.get_fresh_klines_direct",
+                 create=True,
+             ) as mock_fallback2:
+            client.get_klines(interval="1d", symbol="BTCUSDT", limit=1)
+
+        assert mock_fallback.call_count == 0 and mock_fallback2.call_count == 0, (
+            "A 1439-min-old 1d bar should be fresh (threshold ≥ 1440 min), "
+            "but direct_fallback was triggered — threshold too low"
+        )
+
+
+class TestDataUpdateThreadDownloads1d:
+    """
+    Regression guard: DataUpdateThread.run() must download AND save 1d bars
+    in every execution — the original bug was the 1d download being absent
+    from the active code path entirely.
+    """
+
+    def _build_mock_bars(self, timeframe: str, n: int = 5) -> pd.DataFrame:
+        """Return a small clean DataFrame with a very recent latest timestamp."""
+        start = datetime.now() - timedelta(minutes=5)
+        df = _make_ohlcv(start, n=n, freq_minutes={"15m": 15, "1h": 60, "1d": 1440}[timeframe],
+                         timeframe=timeframe)
+        # Ensure the latest bar is fresh (< 20 min old for 15m, < 65 for 1h, < 1500 for 1d)
+        df.iloc[-1, df.columns.get_loc("timestamp")] = pd.Timestamp(datetime.now() - timedelta(minutes=1))
+        return df
+
+    def test_run_calls_download_with_retry_for_1d(self):
+        """
+        DataUpdateThread.run() must call _download_with_retry(timeframe='1d').
+
+        We mock _download_with_retry and _save_bars_to_disk to avoid live API
+        calls and filesystem writes, then assert on the captured call arguments.
+        """
+        from src.strategy_builder.ui.data_update_modal import DataUpdateThread
+
+        start_date = datetime(2026, 4, 1, 0, 0)
+        end_date = datetime(2026, 4, 30, 0, 0)
+        thread = DataUpdateThread(start_date=start_date, end_date=end_date)
+
+        bars_15m = self._build_mock_bars("15m")
+        bars_1h = self._build_mock_bars("1h")
+        bars_1d = self._build_mock_bars("1d")
+
+        download_calls: list[dict] = []
+        save_calls: list[dict] = []
+
+        def fake_download(timeframe, start_date, end_date):
+            download_calls.append({"timeframe": timeframe})
+            return {"15m": bars_15m, "1h": bars_1h, "1d": bars_1d}[timeframe]
+
+        def fake_save(bars, timeframe):
+            save_calls.append({"timeframe": timeframe})
+            return [f"fake_file_{timeframe}.parquet"]
+
+        # Patch the Binance ping so run() doesn't need network
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(thread, "_download_with_retry", side_effect=fake_download), \
+             patch.object(thread, "_save_bars_to_disk", side_effect=fake_save), \
+             patch("requests.get", return_value=mock_response):
+            thread.run()
+
+        downloaded_timeframes = [c["timeframe"] for c in download_calls]
+        saved_timeframes = [c["timeframe"] for c in save_calls]
+
+        assert "1d" in downloaded_timeframes, (
+            f"DataUpdateThread.run() did not call _download_with_retry for '1d'. "
+            f"Timeframes downloaded: {downloaded_timeframes}"
+        )
+        assert "1d" in saved_timeframes, (
+            f"DataUpdateThread.run() did not call _save_bars_to_disk for '1d'. "
+            f"Timeframes saved: {saved_timeframes}"
+        )
+
+    def test_run_downloads_all_three_timeframes(self):
+        """
+        DataUpdateThread.run() must call _download_with_retry for all three
+        timeframes: 15m, 1h, and 1d — in that order.
+        """
+        from src.strategy_builder.ui.data_update_modal import DataUpdateThread
+
+        start_date = datetime(2026, 4, 1, 0, 0)
+        end_date = datetime(2026, 4, 30, 0, 0)
+        thread = DataUpdateThread(start_date=start_date, end_date=end_date)
+
+        bars_15m = self._build_mock_bars("15m")
+        bars_1h = self._build_mock_bars("1h")
+        bars_1d = self._build_mock_bars("1d")
+
+        download_calls: list[str] = []
+
+        def fake_download(timeframe, start_date, end_date):
+            download_calls.append(timeframe)
+            return {"15m": bars_15m, "1h": bars_1h, "1d": bars_1d}[timeframe]
+
+        def fake_save(bars, timeframe):
+            return [f"fake_{timeframe}.parquet"]
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(thread, "_download_with_retry", side_effect=fake_download), \
+             patch.object(thread, "_save_bars_to_disk", side_effect=fake_save), \
+             patch("requests.get", return_value=mock_response):
+            thread.run()
+
+        assert set(download_calls) == {"15m", "1h", "1d"}, (
+            f"Expected downloads for 15m, 1h, and 1d, but got: {download_calls}"
+        )
+        # Order: 15m first, then 1h, then 1d
+        assert download_calls.index("15m") < download_calls.index("1h"), (
+            "15m should be downloaded before 1h"
+        )
+        assert download_calls.index("1h") < download_calls.index("1d"), (
+            "1h should be downloaded before 1d"
+        )
