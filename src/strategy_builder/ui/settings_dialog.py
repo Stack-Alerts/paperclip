@@ -298,7 +298,10 @@ class SettingsDialog(QDialog):
         # setMinimumWidth/Height are floors only; adjustSize() (called after
         # _build_ui populates all tabs) lets Qt expand to fit the content,
         # preventing horizontal scrollbars and clipped banners/buttons.
-        self.setMinimumWidth(820)
+        # BTCAAAAA-90: Raised minimum width floor from 820 to 860px to ensure
+        # the widest row ("OpenRouter AI Key: (not set) | Show 10s | Edit")
+        # fits with comfortable padding at default size.
+        self.setMinimumWidth(860)
         self.setMinimumHeight(600)
         self.setStyleSheet(get_main_stylesheet())
 
@@ -337,6 +340,11 @@ class SettingsDialog(QDialog):
         self._tabs = QTabWidget()
         self._tabs.setFont(create_font(10))
         self._tabs.setStyleSheet(get_tab_widget_stylesheet())
+        # BTCAAAAA-92: resize the window when the user switches tabs so that
+        # the Admin tab (which has more content than API Keys / Preferences)
+        # never clips its contents.  adjustSize() asks Qt to recompute the
+        # ideal window size from the current sizeHint of visible widgets.
+        self._tabs.currentChanged.connect(lambda _index: QTimer.singleShot(0, self.adjustSize))
         root.addWidget(self._tabs, stretch=1)
 
         # Tab 1: API Keys (user-editable secret fields)
@@ -388,6 +396,9 @@ class SettingsDialog(QDialog):
         """User-visible API key settings — secret fields with Show/Edit."""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        # BTCAAAAA-90: suppress horizontal scrollbar artifact — content areas
+        # in this dialog must never show a horizontal scrollbar.
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setStyleSheet(get_transparent_scroll_area_stylesheet())
 
         container = QWidget()
@@ -431,6 +442,8 @@ class SettingsDialog(QDialog):
         """User-editable preferences — non-secret settings."""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        # BTCAAAAA-90: suppress horizontal scrollbar artifact.
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setStyleSheet(get_transparent_scroll_area_stylesheet())
 
         container = QWidget()
@@ -485,6 +498,8 @@ class SettingsDialog(QDialog):
         """
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        # BTCAAAAA-90: suppress horizontal scrollbar artifact.
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setStyleSheet(get_transparent_scroll_area_stylesheet())
 
         container = QWidget()
@@ -705,6 +720,10 @@ class SettingsDialog(QDialog):
         # Populate admin fields with live values now that role is elevated.
         self._populate_admin_fields()
         self._tabs.setTabVisible(self._admin_tab_index, True)
+        # BTCAAAAA-92: switch to the Admin tab and let adjustSize expand the
+        # window to accommodate its extra content (badge, DB fields, etc.).
+        self._tabs.setCurrentIndex(self._admin_tab_index)
+        QTimer.singleShot(0, self.adjustSize)
         self._admin_status_label.setText("Admin access: unlocked")
         self._admin_status_label.setStyleSheet(
             f"color: {COLORS['warning']}; font-weight: bold;"
