@@ -37,6 +37,8 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, List, Union, Dict, Tuple
 import logging
+import os
+import threading
 import pandas as pd
 from enum import Enum
 
@@ -45,6 +47,20 @@ from .processing.bar_aggregator import BarAggregator
 from .binance.rest_client import BinanceRestClient
 
 logger = logging.getLogger(__name__)
+
+# Per-file write locks to prevent concurrent write races on the same parquet file.
+# Key: absolute file path string → threading.Lock()
+_parquet_write_locks: Dict[str, threading.Lock] = {}
+_parquet_write_locks_mutex = threading.Lock()
+
+
+def _get_parquet_lock(file_path: Path) -> threading.Lock:
+    """Return (creating if needed) the per-file write lock for *file_path*."""
+    key = str(file_path.resolve())
+    with _parquet_write_locks_mutex:
+        if key not in _parquet_write_locks:
+            _parquet_write_locks[key] = threading.Lock()
+        return _parquet_write_locks[key]
 
 
 class DataSource(Enum):
@@ -1160,23 +1176,66 @@ class UnifiedDataManager:
 
             group = group.drop(columns=['_ym'])
 
-            if file_path.exists():
-                try:
-                    existing = pd.read_parquet(file_path)
-                    existing['timestamp'] = pd.to_datetime(existing['timestamp'])
-                    merged = pd.concat([existing, group], ignore_index=True)
-                except Exception as exc:
-                    logger.warning("Could not read %s for merge: %s – overwriting", file_path, exc)
+            # Bug 5 fix: assert no cross-month bars are written to this file.
+            expected_period = period
+            cross_month = group[group['timestamp'].dt.to_period('M') != expected_period]
+            if not cross_month.empty:
+                logger.error(
+                    "Cross-month bars detected for %s: %d bars have wrong month (%s). "
+                    "Run scripts/fix_month_boundary_parquet.py to repair existing files.",
+                    file_path.name, len(cross_month),
+                    cross_month['timestamp'].dt.to_period('M').unique().tolist(),
+                )
+                raise ValueError(
+                    f"Attempted to write {len(cross_month)} cross-month bars into {file_path.name}. "
+                    "This would contaminate the file. Aborting write."
+                )
+
+            # Bug 2 fix: serialize concurrent writers on the same file with a lock.
+            file_lock = _get_parquet_lock(file_path)
+            with file_lock:
+                if file_path.exists():
+                    try:
+                        existing = pd.read_parquet(file_path)
+                        existing['timestamp'] = pd.to_datetime(existing['timestamp'])
+                        n_existing = len(existing)
+                        merged = pd.concat([existing, group], ignore_index=True)
+                    except Exception as exc:
+                        logger.warning("Could not read %s for merge: %s – overwriting", file_path, exc)
+                        n_existing = 0
+                        merged = group
+                else:
+                    n_existing = 0
                     merged = group
-            else:
-                merged = group
 
-            merged = merged.sort_values('timestamp').drop_duplicates(
-                subset=['timestamp']
-            ).reset_index(drop=True)
+                merged = merged.sort_values('timestamp').drop_duplicates(
+                    subset=['timestamp']
+                ).reset_index(drop=True)
 
-            merged.to_parquet(file_path, compression='snappy', index=False)
-            print(f"      Saved {len(merged)} bars → {file_path.name}")
+                # Bug 2 fix: atomic write via temp file + os.replace (POSIX atomic).
+                tmp_path = file_path.with_suffix('.parquet.tmp')
+                merged.to_parquet(tmp_path, compression='snappy', index=False)
+                os.replace(tmp_path, file_path)
+
+                # Bug 3 fix: log delta (+N new) not just total.
+                n_new = len(merged) - n_existing
+                print(f"      Saved {len(merged)} bars (+{n_new} new) → {file_path.name}")
+
+                # Bug 4 fix: read-back verification — catch silent write failures immediately.
+                verify_df = pd.read_parquet(file_path)
+                if len(verify_df) != len(merged):
+                    raise RuntimeError(
+                        f"Write FAILED for {file_path.name}: "
+                        f"wrote {len(merged)} bars but disk has {len(verify_df)}"
+                    )
+                verify_last = pd.to_datetime(verify_df['timestamp']).max()
+                merged_last = pd.to_datetime(merged['timestamp']).max()
+                if verify_last != merged_last:
+                    raise RuntimeError(
+                        f"Write FAILED for {file_path.name}: "
+                        f"last timestamp mismatch — expected {merged_last}, got {verify_last}"
+                    )
+                print(f"      Verified {len(verify_df)} bars on disk, last={verify_last}")
 
     def run_gap_report(
         self,
