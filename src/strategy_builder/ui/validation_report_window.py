@@ -2170,46 +2170,65 @@ class ValidationReportWindow(QMainWindow):
             print(f"{'='*80}\n")
             return False
     
-    def _apply_exit_consolidation_fix(self, identifier: str, level: str) -> bool:
-        """Apply exit consolidation fix"""
+    def _apply_exit_consolidation_fix(self, signal_name: str, level: str) -> bool:
+        """Apply exit consolidation fix across ALL levels for a given signal_name.
+
+        EXIT_009 fires when the same signal_name has conflicting exit modes
+        (ABSOLUTE vs FLEXIBLE) across any binding level (strategy, block, or signal).
+        The previous per-level approach failed for cross-level conflicts because
+        auto_fix_duplicate_exits only saw one entry per level and returned unchanged.
+
+        This implementation collects ALL exit conditions for signal_name from every
+        level, determines the canonical mode (ABSOLUTE beats FLEXIBLE), and updates
+        every matching condition in-place so re-validation no longer sees a conflict.
+
+        The ``level`` parameter is retained in the signature for backward compatibility
+        but is intentionally unused — the cross-level scan supersedes it.
+        """
         try:
-            if level == 'strategy':
-                # Consolidate at strategy level
-                if hasattr(self.config, 'exit_conditions'):
-                    new_exits = auto_fix_duplicate_exits(
-                        self.config.exit_conditions,
-                        identifier
-                    )
-                    self.config.exit_conditions = new_exits
-                    return True
-            
-            elif level == 'block':
-                # Find block and consolidate
+            # Collect all exit condition objects for this signal across every level.
+            # We mutate them in-place rather than rebuilding lists so references held
+            # elsewhere in the config remain valid.
+            all_matching = []
+
+            # Strategy level
+            if hasattr(self.config, 'exit_conditions'):
+                for ec in self.config.exit_conditions:
+                    if ec.signal_name == signal_name:
+                        all_matching.append(ec)
+
+            # Block level and signal level
+            if hasattr(self.config, 'blocks'):
                 for block in self.config.blocks:
-                    if block.name.lower() == identifier.lower():
-                        if hasattr(block, 'exit_conditions'):
-                            new_exits = auto_fix_duplicate_exits(
-                                block.exit_conditions,
-                                identifier
-                            )
-                            block.exit_conditions = new_exits
-                            return True
-            
-            elif level == 'signal':
-                # Find signal and consolidate
-                for block in self.config.blocks:
-                    for signal in block.signals:
-                        if signal.name == identifier:
+                    if hasattr(block, 'exit_conditions'):
+                        for ec in block.exit_conditions:
+                            if ec.signal_name == signal_name:
+                                all_matching.append(ec)
+                    if hasattr(block, 'signals'):
+                        for signal in block.signals:
                             if hasattr(signal, 'exit_conditions'):
-                                new_exits = auto_fix_duplicate_exits(
-                                    signal.exit_conditions,
-                                    identifier
-                                )
-                                signal.exit_conditions = new_exits
-                                return True
-            
-            return False
-            
+                                for ec in signal.exit_conditions:
+                                    if ec.signal_name == signal_name:
+                                        all_matching.append(ec)
+
+            if not all_matching:
+                return False
+
+            # Determine canonical mode: ABSOLUTE takes priority over FLEXIBLE,
+            # matching the merge rule used by auto_fix_duplicate_exits.
+            canonical_mode = (
+                "ABSOLUTE"
+                if any(ec.exit_mode == "ABSOLUTE" for ec in all_matching)
+                else "FLEXIBLE"
+            )
+
+            # Apply the canonical mode to every exit condition for this signal
+            # at every level so re-validation sees a consistent single mode.
+            for ec in all_matching:
+                ec.exit_mode = canonical_mode
+
+            return True
+
         except Exception as e:
             print(f"Exit consolidation fix failed: {e}")
             return False
