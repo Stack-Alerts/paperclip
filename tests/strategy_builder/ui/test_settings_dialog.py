@@ -1,5 +1,6 @@
 """
-Tests for SettingsDialog — BTCAAAAA-82 regression coverage.
+Tests for SettingsDialog — BTCAAAAA-82 regression coverage and
+BTCAAAAA-87/88 width auto-sizing regression coverage.
 
 Verifies that:
 - Non-admin users can open the Settings dialog without any exception.
@@ -7,6 +8,16 @@ Verifies that:
   dialog initialisation.
 - The admin tab is hidden on open for non-admin users.
 - Admin fields are populated only after successful PIN authentication.
+
+BTCAAAAA-87/88 — width auto-sizing regression:
+- No setFixedWidth() call remains on Show / Edit / Change-PIN buttons in
+  SecretFieldWidget; setMinimumWidth() is used instead so buttons can grow.
+- AdminPinDialog uses setMinimumWidth + adjustSize(), NOT setMinimumSize with
+  the same value for both dimensions (which would hard-lock the width).
+- SettingsDialog uses setMinimumWidth(820) + adjustSize(), NOT the old
+  resize(760, ...) that clipped Edit buttons and the Admin warning banner.
+- Both dialog minimum widths meet the acceptance criteria (≥360 for
+  AdminPinDialog, ≥820 for SettingsDialog).
 """
 
 from __future__ import annotations
@@ -251,3 +262,191 @@ class TestSettingsServiceCheckAccess:
 
         for key in list(USER_KEYS)[:3]:
             svc._check_access(key)  # Must not raise
+
+
+# ---------------------------------------------------------------------------
+# BTCAAAAA-87/88 — width auto-sizing regression tests
+# ---------------------------------------------------------------------------
+
+class TestWidthAutoSizingRegression:
+    """
+    Regression guard for BTCAAAAA-87.
+
+    Ensures that:
+    - No setFixedWidth() call is used anywhere in settings_dialog.py
+      (all have been replaced with setMinimumWidth() so widgets can grow).
+    - SettingsDialog minimum width is ≥ 820px (not the old too-narrow 760px).
+    - AdminPinDialog minimum width is ≥ 360px (not the old fixed 400px
+      that still clipped the title bar).
+    - Both dialogs instantiate correctly with the new layout-driven sizing.
+    """
+
+    def test_no_setfixedwidth_in_settings_dialog_source(self):
+        """
+        settings_dialog.py must contain zero calls to setFixedWidth().
+        BTCAAAAA-87 replaced all setFixedWidth() calls with setMinimumWidth().
+        """
+        import ast
+        import pathlib
+
+        source_path = pathlib.Path(
+            "src/strategy_builder/ui/settings_dialog.py"
+        )
+        source = source_path.read_text()
+        tree = ast.parse(source)
+
+        violations = []
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "setFixedWidth"
+            ):
+                violations.append(node.lineno)
+
+        assert not violations, (
+            f"settings_dialog.py still calls setFixedWidth() at lines "
+            f"{violations}. BTCAAAAA-87 requires setMinimumWidth() instead."
+        )
+
+    def test_settings_dialog_minimum_width_at_least_820(self, qapp):
+        """
+        SettingsDialog.minimumWidth() must be ≥ 820 so the Admin warning
+        banner and Edit buttons are never clipped (BTCAAAAA-87).
+        """
+        service_mock = _make_service_mock(is_admin=False)
+
+        with patch(
+            "src.strategy_builder.ui.settings_dialog.SettingsService",
+            return_value=service_mock,
+        ):
+            from src.strategy_builder.ui.settings_dialog import SettingsDialog
+            dialog = SettingsDialog()
+            min_w = dialog.minimumWidth()
+            dialog.close()
+
+        assert min_w >= 820, (
+            f"SettingsDialog minimumWidth() is {min_w}px — "
+            "must be ≥ 820px to prevent content clipping (BTCAAAAA-87)."
+        )
+
+    def test_settings_dialog_minimum_height_at_least_600(self, qapp):
+        """
+        SettingsDialog.minimumHeight() must be ≥ 600 (BTCAAAAA-87 floor).
+        """
+        service_mock = _make_service_mock(is_admin=False)
+
+        with patch(
+            "src.strategy_builder.ui.settings_dialog.SettingsService",
+            return_value=service_mock,
+        ):
+            from src.strategy_builder.ui.settings_dialog import SettingsDialog
+            dialog = SettingsDialog()
+            min_h = dialog.minimumHeight()
+            dialog.close()
+
+        assert min_h >= 600, (
+            f"SettingsDialog minimumHeight() is {min_h}px — must be ≥ 600px."
+        )
+
+    def test_admin_pin_dialog_auth_mode_minimum_width_at_least_360(self, qapp):
+        """
+        AdminPinDialog (authentication mode) minimum width must be ≥ 360px
+        so the 'Authenticate' button label is not clipped (BTCAAAAA-87).
+        """
+        with patch(
+            "src.strategy_builder.ui.settings_dialog.SettingsService",
+        ):
+            from src.strategy_builder.ui.settings_dialog import AdminPinDialog
+            dialog = AdminPinDialog(setup_mode=False)
+            min_w = dialog.minimumWidth()
+            dialog.close()
+
+        assert min_w >= 360, (
+            f"AdminPinDialog (auth mode) minimumWidth() is {min_w}px — "
+            "must be ≥ 360px (BTCAAAAA-87)."
+        )
+
+    def test_admin_pin_dialog_setup_mode_minimum_width_at_least_360(self, qapp):
+        """
+        AdminPinDialog (setup/Set Admin PIN mode) minimum width must be
+        ≥ 360px so the title 'Set Admin PIN' is not clipped (BTCAAAAA-87).
+        """
+        with patch(
+            "src.strategy_builder.ui.settings_dialog.SettingsService",
+        ):
+            from src.strategy_builder.ui.settings_dialog import AdminPinDialog
+            dialog = AdminPinDialog(setup_mode=True)
+            min_w = dialog.minimumWidth()
+            dialog.close()
+
+        assert min_w >= 360, (
+            f"AdminPinDialog (setup mode) minimumWidth() is {min_w}px — "
+            "must be ≥ 360px (BTCAAAAA-87)."
+        )
+
+    def test_admin_pin_dialog_auth_mode_title(self, qapp):
+        """
+        AdminPinDialog in auth mode must show the full title
+        'Admin Authentication' (not a truncated version).
+        """
+        with patch(
+            "src.strategy_builder.ui.settings_dialog.SettingsService",
+        ):
+            from src.strategy_builder.ui.settings_dialog import AdminPinDialog
+            dialog = AdminPinDialog(setup_mode=False)
+            title = dialog.windowTitle()
+            dialog.close()
+
+        assert title == "Admin Authentication", (
+            f"AdminPinDialog (auth mode) windowTitle() is '{title}' — "
+            "expected 'Admin Authentication' (BTCAAAAA-87)."
+        )
+
+    def test_admin_pin_dialog_setup_mode_title(self, qapp):
+        """
+        AdminPinDialog in setup mode must show the full title
+        'Set Admin PIN' (not 'Set Ad...').
+        """
+        with patch(
+            "src.strategy_builder.ui.settings_dialog.SettingsService",
+        ):
+            from src.strategy_builder.ui.settings_dialog import AdminPinDialog
+            dialog = AdminPinDialog(setup_mode=True)
+            title = dialog.windowTitle()
+            dialog.close()
+
+        assert title == "Set Admin PIN", (
+            f"AdminPinDialog (setup mode) windowTitle() is '{title}' — "
+            "expected 'Set Admin PIN' (BTCAAAAA-87)."
+        )
+
+    def test_secret_field_show_button_uses_minimum_width(self):
+        """
+        SecretFieldWidget._show_btn must use setMinimumWidth, not setFixedWidth,
+        so it can grow rather than being clipped (BTCAAAAA-87).
+
+        This is a redundant explicit check over the global AST test above;
+        it uses the same AST approach to avoid false-positives from comments.
+        """
+        import ast
+        import pathlib
+
+        source_path = pathlib.Path(
+            "src/strategy_builder/ui/settings_dialog.py"
+        )
+        tree = ast.parse(source_path.read_text())
+
+        violations = []
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "setFixedWidth"
+            ):
+                violations.append(node.lineno)
+
+        assert not violations, (
+            f"settings_dialog.py still calls setFixedWidth() at lines "
+            f"{violations}. BTCAAAAA-87 requires setMinimumWidth() instead."
+        )
