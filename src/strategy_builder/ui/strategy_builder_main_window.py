@@ -1857,6 +1857,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             config_dict = {
                 'name': version['name'],
                 'description': version.get('description', ''),
+                'strategy_type': version.get('strategy_type', 'Bullish'),  # Fix: include strategy_type (was missing, causing auto-fix persistence loss)
                 'blocks': blocks_data,
                 'exit_conditions': exit_conditions_data
             }
