@@ -1755,18 +1755,29 @@ class StrategyBrowserDialog(QMainWindow):
         version_id = version_combo.itemData(index)
         
         if version_id:
-            # Update the selected version_id for this row
+            # Update the stored version_id for this row
             name_item = self.table.item(row, 0)
             if name_item:
                 strategy_data = name_item.data(Qt.ItemDataRole.UserRole)
                 strategy_data['version_id'] = version_id
                 name_item.setData(Qt.ItemDataRole.UserRole, strategy_data)
-                
-                # If this row is selected, update the selected_version_id AND refresh panel
-                if row == self.table.currentRow():
-                    self.selected_version_id = version_id
-                    # Refresh details panel with new version
-                    self._populate_details_panel(version_id)
+            
+            # Determine if this row is currently selected.
+            # Use selectedItems() rather than currentRow() because currentRow() can
+            # become stale (-1) when the combo popup takes focus away from the table.
+            selected_rows = {item.row() for item in self.table.selectedItems()}
+            row_is_selected = (row in selected_rows)
+            
+            if row_is_selected:
+                # Row is selected: update the open-target version and refresh details
+                self.selected_version_id = version_id
+                self._populate_details_panel(version_id)
+            else:
+                # Row is not yet selected but user is interacting with its combo.
+                # Always refresh the details panel so the user can preview the new
+                # version, but do NOT update selected_version_id (which tracks the
+                # strategy that will be opened when "Open" is clicked).
+                self._populate_details_panel(version_id)
     
     def _on_version_changed(self, index: int):
         """Handle version selector change"""

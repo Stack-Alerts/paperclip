@@ -229,6 +229,12 @@ class StrategyDatabaseManager:
         # Import StrategyVersion ORM model
         from src.optimizer_v3.database.models import StrategyVersion
         
+        # CRITICAL: Rollback any previous failed transaction before querying.
+        # Consistent with get_strategy_versions() and get_latest_version() which both
+        # rollback first; without this the ORM session can return stale identity-map
+        # data instead of issuing a fresh SELECT when the session is in a bad state.
+        self.session.rollback()
+        
         try:
             # Query using ORM
             version = self.session.query(StrategyVersion).filter_by(
