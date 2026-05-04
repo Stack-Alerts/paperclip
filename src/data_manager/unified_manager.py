@@ -38,6 +38,8 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Union, Dict, Tuple
 import logging
 import os
+import re
+import time as _time_mod
 import threading
 import pandas as pd
 from enum import Enum
@@ -938,11 +940,44 @@ class UnifiedDataManager:
 
         # Load all matching parquet files
         pattern = f'**/BTCUSDT_PERP_{timeframe}_*.parquet'
-        files = sorted(self.binance_dir.glob(pattern))
-        if not files:
+        all_files = sorted(self.binance_dir.glob(pattern))
+        if not all_files:
             print(f"   ⚠️  No Binance parquet files found for {timeframe}")
             return []
 
+        # RC3 PERF FIX: Skip files whose month is entirely outside [start_date, end_date].
+        # File names encode the month as YYYY-MM (e.g. BTCUSDT_PERP_15m_2026-03.parquet).
+        # Skipping out-of-range files eliminates the dominant I/O cost when the runtime
+        # window is only 2 hours but the data directory spans many months.
+        _month_re = re.compile(r'(\d{4}-\d{2})\.parquet$')
+
+        def _file_in_range(fp: Path) -> bool:
+            """Return True if this month-file could contain rows in [start_date, end_date]."""
+            if start_date is None and end_date is None:
+                return True
+            m = _month_re.search(fp.name)
+            if not m:
+                return True  # unknown naming — keep to be safe
+            try:
+                from calendar import monthrange
+                year, month = int(m.group(1)[:4]), int(m.group(1)[5:])
+                file_month_start = datetime(year, month, 1)
+                last_day = monthrange(year, month)[1]
+                file_month_end = datetime(year, month, last_day, 23, 59, 59)
+                if start_date is not None and file_month_end < start_date:
+                    return False
+                if end_date is not None and file_month_start > end_date:
+                    return False
+            except Exception:
+                pass
+            return True
+
+        files = [f for f in all_files if _file_in_range(f)]
+        if not files:
+            # No files in range → no gaps to report
+            return []
+
+        t0_load = _time_mod.monotonic()
         frames = []
         for f in files:
             try:
@@ -954,6 +989,8 @@ class UnifiedDataManager:
 
         if not frames:
             return []
+
+        print(f"   [detect_gaps/{timeframe}] loaded {len(files)} file(s) in {_time_mod.monotonic() - t0_load:.2f}s")
 
         combined = pd.concat(frames, ignore_index=True)
         combined = combined.sort_values('timestamp').drop_duplicates(
@@ -1192,8 +1229,13 @@ class UnifiedDataManager:
                 )
 
             # Bug 2 fix: serialize concurrent writers on the same file with a lock.
+            # RC3 FIX: the lock now covers ONLY the read-merge-write sequence.
+            # The post-write read-back verification is done OUTSIDE the lock so
+            # that other threads are not blocked during the (slow) verification read.
+            t0_lock = _time_mod.monotonic()
             file_lock = _get_parquet_lock(file_path)
             with file_lock:
+                t_lock_acquired = _time_mod.monotonic()
                 if file_path.exists():
                     try:
                         existing = pd.read_parquet(file_path)
@@ -1219,23 +1261,30 @@ class UnifiedDataManager:
 
                 # Bug 3 fix: log delta (+N new) not just total.
                 n_new = len(merged) - n_existing
-                print(f"      Saved {len(merged)} bars (+{n_new} new) → {file_path.name}")
+                t_lock_released = _time_mod.monotonic()
+                print(
+                    f"      Saved {len(merged)} bars (+{n_new} new) → {file_path.name} "
+                    f"(lock_wait={t_lock_acquired - t0_lock:.2f}s, "
+                    f"write={t_lock_released - t_lock_acquired:.2f}s)"
+                )
 
-                # Bug 4 fix: read-back verification — catch silent write failures immediately.
-                verify_df = pd.read_parquet(file_path)
-                if len(verify_df) != len(merged):
-                    raise RuntimeError(
-                        f"Write FAILED for {file_path.name}: "
-                        f"wrote {len(merged)} bars but disk has {len(verify_df)}"
-                    )
-                verify_last = pd.to_datetime(verify_df['timestamp']).max()
-                merged_last = pd.to_datetime(merged['timestamp']).max()
-                if verify_last != merged_last:
-                    raise RuntimeError(
-                        f"Write FAILED for {file_path.name}: "
-                        f"last timestamp mismatch — expected {merged_last}, got {verify_last}"
-                    )
-                print(f"      Verified {len(verify_df)} bars on disk, last={verify_last}")
+            # Bug 4 fix: read-back verification — done OUTSIDE the lock so other
+            # threads can acquire it immediately after the write completes.
+            # RC3 FIX: moved from inside the lock to reduce lock contention.
+            verify_df = pd.read_parquet(file_path)
+            if len(verify_df) != len(merged):
+                raise RuntimeError(
+                    f"Write FAILED for {file_path.name}: "
+                    f"wrote {len(merged)} bars but disk has {len(verify_df)}"
+                )
+            verify_last = pd.to_datetime(verify_df['timestamp']).max()
+            merged_last = pd.to_datetime(merged['timestamp']).max()
+            if verify_last != merged_last:
+                raise RuntimeError(
+                    f"Write FAILED for {file_path.name}: "
+                    f"last timestamp mismatch — expected {merged_last}, got {verify_last}"
+                )
+            print(f"      Verified {len(verify_df)} bars on disk, last={verify_last}")
 
     def run_gap_report(
         self,
@@ -1352,6 +1401,7 @@ class UnifiedDataManager:
 
         horizon_cutoff = datetime.now() - timedelta(days=binance_api_horizon_days)
 
+        t0_total = _time_mod.monotonic()
         print("\n" + "=" * 60)
         print("VERIFY AND REPAIR — DATA INTEGRITY CHECK")
         print(f"Mode: {'DRY RUN (no writes)' if dry_run else 'LIVE REPAIR'}")
@@ -1363,10 +1413,13 @@ class UnifiedDataManager:
         summary: Dict[str, Dict] = {}
 
         for tf in timeframes:
+            t0_tf = _time_mod.monotonic()
             print(f"\n--- Checking {tf} ---")
+            t0_detect = _time_mod.monotonic()
             gaps = self.detect_gaps_in_binance_files(
                 tf, start_date=start_date, end_date=end_date
             )
+            print(f"   [timing] detect_gaps/{tf}: {_time_mod.monotonic() - t0_detect:.2f}s")
 
             tf_summary: Dict = {
                 'gaps_found': len(gaps),
@@ -1432,6 +1485,7 @@ class UnifiedDataManager:
                         print(f"   ⚠️  Gap smaller than one bar period — skipping.")
                         continue
 
+                    t0_fetch = _time_mod.monotonic()
                     new_bars = self._fetch_binance_range(
                         timeframe=tf,
                         start_ts=fetch_start,
@@ -1439,6 +1493,7 @@ class UnifiedDataManager:
                         symbol=symbol,
                         futures=futures,
                     )
+                    print(f"   [timing] fetch/{tf}: {_time_mod.monotonic() - t0_fetch:.2f}s")
 
                     if new_bars.empty:
                         msg = f"Binance returned no data for {tf} {fetch_start}→{fetch_end}"
@@ -1447,7 +1502,9 @@ class UnifiedDataManager:
                         continue
 
                     print(f"   ✅ Fetched {len(new_bars)} bars.")
+                    t0_save = _time_mod.monotonic()
                     self._save_binance_bars(new_bars, tf)
+                    print(f"   [timing] save/{tf}: {_time_mod.monotonic() - t0_save:.2f}s")
 
                     tf_summary['gaps_repaired'] += 1
                     tf_summary['bars_fetched'] += len(new_bars)
@@ -1459,10 +1516,11 @@ class UnifiedDataManager:
                     tf_summary['errors'].append(msg)
 
             summary[tf] = tf_summary
+            print(f"   [timing] total/{tf}: {_time_mod.monotonic() - t0_tf:.2f}s")
 
         # Final summary
         print("\n" + "=" * 60)
-        print("REPAIR SUMMARY")
+        print(f"REPAIR SUMMARY (total wall-clock: {_time_mod.monotonic() - t0_total:.2f}s)")
         print("=" * 60)
         for tf, s in summary.items():
             status = "✅" if s['gaps_found'] == 0 or s['gaps_repaired'] == s['gaps_found'] - s['gaps_too_old'] else "⚠️"
