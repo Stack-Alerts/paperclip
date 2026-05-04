@@ -18,7 +18,8 @@ from typing import Optional
 from PyQt5.QtWidgets import (
     QDialog, QMainWindow, QVBoxLayout, QPushButton, QHBoxLayout, QLabel,
     QWidget, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMessageBox, QFileDialog, QTabWidget, QTextEdit, QGroupBox, QFrame
+    QMessageBox, QFileDialog, QTabWidget, QTextEdit, QGroupBox, QFrame,
+    QSizePolicy
 )
 from PyQt5.QtCore import Qt, QSettings, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QColor
@@ -553,6 +554,8 @@ class ValidationReportWindow(QMainWindow):
                 # Create clickable fix button
                 fix_btn = QPushButton("🔧 Fix Now")
                 fix_btn.setFont(create_font(9))
+                fix_btn.setMinimumWidth(110)  # enough for emoji + text
+                fix_btn.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
                 fix_btn.setStyleSheet(get_auto_fix_button_style())
                 fix_btn.setCursor(Qt.PointingHandCursor)
                 fix_btn.setToolTip(self._get_fix_button_tooltip(issue))
