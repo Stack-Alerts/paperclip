@@ -515,6 +515,7 @@ class BacktestWorker(QThread):
                 results = {
                     'total_candles': total_candles,
                     'trades': trade_count,
+                    'trades_list': trades_list,  # PHASE 1.1: Full per-trade data for discovery metrics
                     'tp_adjustments': mc_results.get('tp_adjustments', {'TP1': 0, 'TP2': 0, 'TP3': 0, 'SL': 0})  # From multicore engine
                 }
                 
@@ -2214,6 +2215,23 @@ class BacktestConfigPanel(QWidget):
             "Takes ~15-20 minutes (29 × 30-60 sec per test)."
         )
         layout.addWidget(self.test_wiring_btn)
+
+        # CONFIG DISCOVERY Button — Phase 3 launcher
+        self.config_discovery_btn = QPushButton("Config Discovery")
+        self.config_discovery_btn.clicked.connect(self._on_config_discovery_clicked)
+        self.config_discovery_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        self.config_discovery_btn.setToolTip(
+            "Config Discovery\n\n"
+            "Runs N permutations of strategy parameters and shows ranked results.\n\n"
+            "Metrics per run:\n"
+            "  Total PnL, Win Rate, Sharpe Ratio\n"
+            "  Exit Type Distribution (TP1/TP2/TP3/SL/Time)\n"
+            "  Avg PnL per Trade, Avg Bars Held\n\n"
+            "Shows gold/silver/bronze badges for:\n"
+            "  Most Profitable, Best Sharpe, Most Frequent\n\n"
+            "Uses cached bars for speed (no repeated data loading)."
+        )
+        layout.addWidget(self.config_discovery_btn)
         
         layout.addStretch()
         
@@ -3152,6 +3170,7 @@ class BacktestConfigPanel(QWidget):
                 'description': scenario.description,
                 'config': scenario.config,
                 'trades': result.get('trades', 0),
+                'trades_list': result.get('trades_list', []),  # PHASE 1.1: Full trade data
                 'total_candles': result.get('total_candles', 0),
                 'success': result.get('success', False)
             })
@@ -3279,65 +3298,166 @@ class BacktestConfigPanel(QWidget):
         return results
     
     def _generate_wiring_report(self, test_results: list):
-        """Analyze results and generate wiring verification report"""
+        """
+        Wiring verification report — preserved for backwards compat.
+        
+        UPGRADED: Now delegates to _generate_discovery_report() which
+        produces full per-trade exit metrics (Phase 1.2).
+        Existing CSV output and 23-scenario behaviour are preserved.
+        """
+        self._generate_discovery_report(test_results, mode='wiring')
+
+    def _generate_discovery_report(self, test_results: list, mode: str = 'wiring'):
+        """
+        Generate enhanced Config Discovery report with per-trade exit metrics.
+        
+        Phase 1.2 implementation: aggregates total_pnl, win_rate, sharpe,
+        avg_pnl_per_trade, exit_type_distribution per scenario.
+        
+        Args:
+            test_results: List of dicts with scenario results (includes trades_list).
+            mode: 'wiring' (CSV + dialog) or 'discovery' (show ConfigDiscoveryResultsDialog).
+        """
         from pathlib import Path
         import pandas as pd
         from datetime import datetime
-        
+        from src.strategy_builder.ui.config_permutation_engine import aggregate_metrics, DiscoveryScenario
+        from src.strategy_builder.ui.config_discovery_results_dialog import ConfigDiscoveryResultsDialog
+
         # Create report directory
         report_dir = Path('tests/integration/results')
         report_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Save detailed CSV
+
+        # Build DiscoveryResult objects from test_results
+        discovery_results = []
+        for r in test_results:
+            scenario = DiscoveryScenario(
+                scenario_id=r.get('scenario_id', 'UNKNOWN'),
+                description=r.get('description', ''),
+                config_delta=r.get('config', {}),
+                param_labels=[],
+            )
+            trades_list = r.get('trades_list', [])
+            error = None if r.get('success', False) or trades_list else 'Backtest failed or no trades'
+            dr = aggregate_metrics(scenario, trades_list, error=error)
+            discovery_results.append(dr)
+
+        # Save enhanced CSV
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        df = pd.DataFrame(test_results)
+        rows = []
+        for dr in discovery_results:
+            rows.append({
+                'scenario_id': dr.scenario_id,
+                'description': dr.description,
+                'trade_count': dr.trade_count,
+                'win_rate_pct': round(dr.win_rate, 2),
+                'total_pnl': round(dr.total_pnl, 2),
+                'avg_pnl_per_trade': round(dr.avg_pnl_per_trade, 2),
+                'sharpe_ratio': round(dr.sharpe_ratio, 3),
+                'exit_tp1': dr.exit_tp1,
+                'exit_tp2': dr.exit_tp2,
+                'exit_tp3': dr.exit_tp3,
+                'exit_sl': dr.exit_sl,
+                'exit_time': dr.exit_time,
+                'avg_bars_held': round(dr.avg_bars_held, 1),
+                'max_drawdown': round(dr.max_drawdown, 2),
+            })
+        df = pd.DataFrame(rows)
         csv_path = report_dir / f'wiring_test_{timestamp}.csv'
         df.to_csv(csv_path, index=False)
-        
-        # Analyze for wiring bugs
+
+        # Analyze for wiring bugs (preserve original logic)
         wiring_bugs = []
-        
-        # Check if any tests have identical results (wiring bug!)
-        trade_counts = [r['trades'] for r in test_results]
+        trade_counts = [r.get('trades', 0) for r in test_results]
         unique_counts = set(trade_counts)
-        
         if len(unique_counts) < len(test_results) * 0.5:
             wiring_bugs.append("Too many identical trade counts - parameters may not be wired!")
-        
+
         # Generate summary
         passed = sum(1 for r in test_results if r.get('success', False))
         total = len(test_results)
-        
-        summary = f"""
-╔════════════════════════════════════════════════════════════════════════╗
-║ WIRING VERIFICATION TEST COMPLETE                                      ║
-╚════════════════════════════════════════════════════════════════════════╝
+        total_pnl_sum = sum(dr.total_pnl for dr in discovery_results)
+        avg_win_rate = (sum(dr.win_rate for dr in discovery_results) / total) if total else 0
 
-Total Tests: {total}
-Successful: {passed}
-Failed: {total - passed}
+        summary = f"""
+\u2554{'='*72}\u2557
+\u2551 WIRING VERIFICATION TEST COMPLETE                                        \u2551
+\u255a{'='*72}\u255d
+
+Total Tests:   {total}
+Successful:    {passed}
+Failed:        {total - passed}
+
+Enhanced Metrics:
+  Combined PnL:   ${total_pnl_sum:.2f}
+  Avg Win Rate:   {avg_win_rate:.1f}%
 
 Trade Count Distribution:
   Unique Results: {len(unique_counts)}
   Range: {min(trade_counts)} - {max(trade_counts)} trades
 
-{'⚠️  WIRING BUGS DETECTED:' if wiring_bugs else '✅ All parameters appear to be wired correctly!'}
-{chr(10).join(f'  • {bug}' for bug in wiring_bugs) if wiring_bugs else ''}
+{'WARNING: WIRING BUGS DETECTED:' if wiring_bugs else 'All parameters appear to be wired correctly!'}
+{chr(10).join(f'  - {bug}' for bug in wiring_bugs) if wiring_bugs else ''}
 
 Detailed report saved to:
 {csv_path}
 """
-        
-        # Show summary dialog
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Information if not wiring_bugs else QMessageBox.Warning)
-        msg.setText("🔬 Wiring Test Complete")
-        msg.setDetailedText(summary)
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.exec_()
-        
-        # Also print to console
+
+        # Show in discovery results dialog if mode is 'discovery', else handle other modes
+        if mode == 'csv_only':
+            # CSV already saved above; no dialog action needed
+            print(summary)
+        elif mode == 'discovery':
+            def apply_cb(delta):
+                self._apply_discovery_config_to_ui(delta)
+
+            dialog = ConfigDiscoveryResultsDialog(
+                apply_config_callback=apply_cb,
+                parent=self,
+            )
+            dialog.set_results(discovery_results)
+            dialog.show()
+            print(summary)
+        else:
+            # Legacy wiring report dialog
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Information if not wiring_bugs else QMessageBox.Warning)
+            msg.setText("Wiring Test Complete")
+            msg.setDetailedText(summary)
+            msg.setStandardButtons(QMessageBox.Ok)
+            msg.exec_()
+
         print(summary)
+
+    def _apply_discovery_config_to_ui(self, config_delta: dict):
+        """
+        Apply a Config Discovery result delta to the UI widgets.
+        
+        Translates dot-notation keys (e.g. 'adaptive_sl.volatility_lookback')
+        to the appropriate widget update calls.
+        
+        Phase 3.3: Called when user clicks "Apply Config" in the results dialog.
+        """
+        # Flatten nested keys: 'adaptive_sl.volatility_lookback' → 'adaptive_sl' sub-dict
+        top_level = {}
+        nested = {}
+        for key, val in config_delta.items():
+            if '.' in key:
+                parts = key.split('.', 1)
+                if parts[0] not in nested:
+                    nested[parts[0]] = {}
+                nested[parts[0]][parts[1]] = val
+            else:
+                top_level[key] = val
+
+        # Apply top-level keys (same as _apply_scenario_to_ui)
+        self._apply_scenario_to_ui({**top_level, **nested})
+
+        # Show brief confirmation
+        self.results_text.append(
+            "\n[Config Discovery] Applied config delta from selected scenario.\n"
+            + "\n".join(f"  {k}: {v}" for k, v in config_delta.items())
+        )
     
     def _update_cache_status(self):
         """Update UI with cache status information"""
@@ -3477,3 +3597,177 @@ Detailed report saved to:
                 "Using default value of 40 pts."
             )
             self.confluence_spin.setValue(40)
+
+    def _on_config_discovery_clicked(self):
+        """
+        Launch Config Discovery run.
+        
+        Phase 2+3 implementation:
+        1. Confirms with user (shows estimated scenario count)
+        2. Loads bars ONCE via data provider
+        3. Builds scenario permutations via ConfigPermutationEngine
+        4. Runs all scenarios using cached bars (fast path)
+        5. Streams results live into ConfigDiscoveryResultsDialog
+        6. User can sort by metric, apply best config, export CSV
+        
+        Preserves existing wiring test functionality — this is an ADDITIONAL
+        button that does not replace or change the "Test Wiring" flow.
+        """
+        from PyQt5.QtWidgets import QMessageBox, QProgressDialog
+        from src.strategy_builder.ui.config_permutation_engine import (
+            ConfigPermutationEngine,
+            DEFAULT_PARAMETER_RANGES,
+            aggregate_metrics,
+            DiscoveryScenario,
+        )
+        from src.strategy_builder.ui.config_discovery_results_dialog import (
+            ConfigDiscoveryResultsDialog,
+        )
+
+        # Estimate scenario count
+        total_values = sum(len(r.get_values()) for r in DEFAULT_PARAMETER_RANGES)
+        est_secs = total_values * 5  # ~5 seconds per scenario with multicore
+
+        # Confirm with user
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Question)
+        msg.setText("Config Discovery")
+        msg.setInformativeText(
+            f"Run {total_values} parameter permutations?\n\n"
+            f"  Strategy: {getattr(self.orchestrator.get_current_config(), 'name', 'Current')}\n"
+            f"  Scenarios: {total_values} (single-axis sweep)\n"
+            f"  Est. time: ~{est_secs // 60} min {est_secs % 60} sec\n\n"
+            "Bars are loaded once and reused for all runs (cached).\n\n"
+            "Continue?"
+        )
+        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg.setDefaultButton(QMessageBox.No)
+        if msg.exec_() != QMessageBox.Yes:
+            return
+
+        # Load strategy config
+        try:
+            strategy_config = self.orchestrator.serialize_config_for_backtest()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not serialize strategy config:\n{e}")
+            return
+
+        # Load bars ONCE (Phase 1.3 bar caching)
+        self.results_text.append("\n[Config Discovery] Loading bars (once for all scenarios)...")
+        QApplication.processEvents()
+        try:
+            backtest_config = self.get_config()
+            bars = self.data_provider.load_bars_for_backtest(
+                timeframe=backtest_config['timeframe'],
+                start_date=backtest_config['start_date'],
+                end_date=backtest_config['end_date'],
+            )
+            self.results_text.append(f"[Config Discovery] Loaded {len(bars):,} bars (cached for all runs)")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not load bars:\n{e}")
+            return
+
+        # Run baseline (current config) first — used as comparison row
+        self.results_text.append("[Config Discovery] Running baseline scenario...")
+        QApplication.processEvents()
+        try:
+            baseline_result = self._run_test_and_wait()
+            baseline_trades = baseline_result.get('trades_list', [])
+            baseline_scenario = DiscoveryScenario(
+                scenario_id='BASELINE',
+                description='[BASELINE] Current config',
+                config_delta={},
+                param_labels=[],
+            )
+            baseline_dr = aggregate_metrics(baseline_scenario, baseline_trades)
+            baseline_dr.scenario_id = 'BASELINE'
+        except Exception as e:
+            baseline_dr = None
+            self.results_text.append(f"[Config Discovery] Baseline failed: {e}")
+
+        # Build permutation scenarios
+        engine = ConfigPermutationEngine(
+            base_strategy_config=strategy_config,
+            base_backtest_config=backtest_config,
+            cached_bars=bars,
+        )
+        scenarios = engine.build_scenarios(
+            ranges=DEFAULT_PARAMETER_RANGES,
+            strategy='single_axis',
+        )
+
+        # Open results dialog
+        def apply_cb(delta):
+            self._apply_discovery_config_to_ui(delta)
+
+        results_dialog = ConfigDiscoveryResultsDialog(
+            apply_config_callback=apply_cb,
+            parent=self,
+        )
+        if baseline_dr:
+            results_dialog.set_baseline(baseline_dr)
+        results_dialog.show()
+        QApplication.processEvents()
+
+        # Create and start worker
+        worker = engine.create_worker(scenarios, parent=self)
+        results_dialog.set_worker(worker)
+
+        # Wire signals
+        worker.scenario_complete.connect(results_dialog.append_result)
+        worker.progress_updated.connect(
+            lambda curr, total, msg: results_dialog.set_progress(curr, total, msg)
+        )
+        worker.discovery_complete.connect(
+            lambda all_results: self._on_discovery_complete(all_results, results_dialog)
+        )
+        worker.error_occurred.connect(
+            lambda err: QMessageBox.warning(self, "Discovery Error", err)
+        )
+
+        # Store worker reference to prevent GC
+        self._discovery_worker = worker
+        worker.start()
+
+        self.results_text.append(
+            f"[Config Discovery] Running {len(scenarios)} scenarios in background...\n"
+            "Results dialog is open — rows populate live as each scenario completes."
+        )
+
+    def _on_discovery_complete(self, all_results: list, dialog=None):
+        """
+        Called when all Config Discovery scenarios have finished.
+        
+        Phase 3: Final summary appended to results pane.
+        """
+        total = len(all_results)
+        errors = sum(1 for r in all_results if r.error)
+        if total > 0:
+            best = max((r for r in all_results if not r.error), key=lambda r: r.total_pnl, default=None)
+        else:
+            best = None
+
+        self.results_text.append(
+            f"\n[Config Discovery] Complete — {total} scenarios, {errors} errors."
+        )
+        if best:
+            self.results_text.append(
+                f"Best PnL:  {best.description}\n"
+                f"  PnL: ${best.total_pnl:.2f}  Win Rate: {best.win_rate:.1f}%  Sharpe: {best.sharpe_ratio:.3f}"
+            )
+
+        # Save enhanced CSV via discovery report helper
+        self._generate_discovery_report(
+            [
+                {
+                    'scenario_id': r.scenario_id,
+                    'description': r.description,
+                    'config': r.config_delta,
+                    'trades': r.trade_count,
+                    'trades_list': r.raw_trades,
+                    'success': not bool(r.error),
+                }
+                for r in all_results
+            ],
+            mode='csv_only',  # Don't reopen dialog; it's already showing
+        )
