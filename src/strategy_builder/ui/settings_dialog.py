@@ -90,7 +90,9 @@ class SecretFieldWidget(QWidget):
         self._show_btn = QPushButton("Show 10s")
         self._show_btn.setFont(create_font(9))
         self._show_btn.setStyleSheet(get_secondary_button_stylesheet())
-        self._show_btn.setFixedWidth(80)
+        # BTCAAAAA-87: setMinimumWidth instead of setFixedWidth so button can
+        # grow with content / DPI scaling rather than being clipped.
+        self._show_btn.setMinimumWidth(80)
         self._show_btn.clicked.connect(self._on_show)
         layout.addWidget(self._show_btn)
 
@@ -98,7 +100,8 @@ class SecretFieldWidget(QWidget):
         self._edit_btn = QPushButton("Edit")
         self._edit_btn.setFont(create_font(9))
         self._edit_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
-        self._edit_btn.setFixedWidth(60)
+        # BTCAAAAA-87: setMinimumWidth instead of setFixedWidth.
+        self._edit_btn.setMinimumWidth(60)
         self._edit_btn.clicked.connect(self._on_edit_toggle)
         layout.addWidget(self._edit_btn)
 
@@ -210,11 +213,12 @@ class AdminPinDialog(QDialog):
         super().__init__(None, Qt.Tool)
         self.setWindowTitle("Admin Authentication" if not setup_mode else "Set Admin PIN")
         self.setModal(True)
-        # Defect 4: Use a minimum size that fits all content at default scale;
-        # setup_mode adds a Confirm PIN field so needs more height.
-        min_h = 280 if setup_mode else 240
-        self.setMinimumSize(400, min_h)
-        self.resize(400, min_h)
+        # BTCAAAAA-87: Use layout-driven sizing — setMinimumWidth as a floor
+        # only; let Qt measure the layout for actual width and height.
+        # setup_mode adds a Confirm PIN field so needs a taller floor.
+        min_h = 220 if setup_mode else 180
+        self.setMinimumWidth(360)
+        self.setMinimumHeight(min_h)
         self.setStyleSheet(get_main_stylesheet())
 
         layout = QVBoxLayout(self)
@@ -257,6 +261,10 @@ class AdminPinDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        # BTCAAAAA-87: Let Qt size the window to fit the layout; the minimum
+        # size set above acts as a floor, not the final size.
+        QTimer.singleShot(0, self.adjustSize)
+
     def get_pin(self) -> str:
         return self._pin_field.text()
 
@@ -286,10 +294,12 @@ class SettingsDialog(QDialog):
         super().__init__(None, Qt.Tool)
         self.setWindowTitle("Settings")
         self.setModal(True)
-        # Defect 1: Increase minimum size so all content is visible without
-        # scrolling at default scale, and make the window resizable.
-        self.setMinimumSize(720, 640)
-        self.resize(760, 680)
+        # BTCAAAAA-87: Replace fixed pixel size with layout-driven sizing.
+        # setMinimumWidth/Height are floors only; adjustSize() (called after
+        # _build_ui populates all tabs) lets Qt expand to fit the content,
+        # preventing horizontal scrollbars and clipped banners/buttons.
+        self.setMinimumWidth(820)
+        self.setMinimumHeight(600)
         self.setStyleSheet(get_main_stylesheet())
 
         self._service = SettingsService()
@@ -303,6 +313,10 @@ class SettingsDialog(QDialog):
 
         self._build_ui()
         self._check_env_permissions()
+        # BTCAAAAA-87: Size the window to its content after layout is built.
+        # The minimum sizes set above act as floors; adjustSize() lets Qt
+        # compute the ideal size so content is never clipped.
+        QTimer.singleShot(0, self.adjustSize)
 
     # ------------------------------------------------------------------
     # UI construction
@@ -571,7 +585,9 @@ class SettingsDialog(QDialog):
         change_pin_btn = QPushButton("Change Admin PIN…")
         change_pin_btn.setFont(create_font(9))
         change_pin_btn.setStyleSheet(get_secondary_button_stylesheet())
-        change_pin_btn.setFixedWidth(200)
+        # BTCAAAAA-87: setMinimumWidth instead of setFixedWidth so button
+        # can grow with content / DPI scaling.
+        change_pin_btn.setMinimumWidth(200)
         change_pin_btn.clicked.connect(self._on_change_pin)
         pin_layout.addWidget(change_pin_btn)
 
