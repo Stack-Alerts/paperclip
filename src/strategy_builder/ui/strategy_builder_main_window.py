@@ -191,14 +191,23 @@ class StrategyBuilderMainWindow(QMainWindow):
         self._restore_settings()
         self._restore_debug_settings()
         
-        # BUG D FIX: 500ms was too short — OS network stack / DNS resolver may
-        # not be ready yet, causing the first Binance request to return an empty
-        # response that the old code misdiagnosed as an API failure.
-        # 2000ms gives the network stack enough time to initialise on slow boots.
-        QTimer.singleShot(2000, self._show_data_update_modal)
-        
-        # Start automatic data update system (after modal shown)
-        QTimer.singleShot(1500, self._start_auto_update_system)
+        # RC2 FIX: Sequence modal BEFORE auto-update to eliminate startup race condition.
+        #
+        # BEFORE (broken — race condition):
+        #   QTimer.singleShot(1500, self._start_auto_update_system)  # fires at t+1500ms
+        #   QTimer.singleShot(2000, self._show_data_update_modal)    # fires at t+2000ms
+        #   → auto-update thread starts 500ms before modal is done writing parquet files.
+        #     If the first 15-min boundary falls inside the modal write window, both
+        #     threads write the same file concurrently and the stale bar wins.
+        #
+        # AFTER (correct — exec_() blocks until modal closes, then auto-update starts):
+        #   Single QTimer fires _on_app_start() at t+2000ms.
+        #   _show_data_update_modal() calls exec_() which blocks until the modal is closed.
+        #   _start_auto_update_system() is called only after modal fully completes.
+        #
+        # BUG D FIX preserved: 2000ms delay gives the OS network stack / DNS resolver
+        # enough time to initialise on slow boots before the first Binance request.
+        QTimer.singleShot(2000, self._on_app_start)
     
     def _init_ui(self):
         """Initialize the user interface layout."""
@@ -1521,6 +1530,18 @@ class StrategyBuilderMainWindow(QMainWindow):
             print(f"Error checking strategy type match: {e}")
             return True
     
+    def _on_app_start(self):
+        """
+        RC2 FIX: Single sequenced startup entry point.
+
+        Runs the data-update modal first (exec_() blocks until the modal closes),
+        then starts the auto-update system.  This eliminates the startup race
+        condition where the auto-update thread was starting 500ms before the modal
+        finished writing parquet files (BTCAAAAA-143).
+        """
+        self._show_data_update_modal()   # exec_() blocks until modal is closed
+        self._start_auto_update_system() # only starts after modal fully completes
+
     def _show_data_update_modal(self):
         """
         Show the data update modal on startup (auto mode - auto-close).
