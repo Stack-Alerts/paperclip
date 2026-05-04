@@ -1537,6 +1537,7 @@ class StrategyBrowserDialog(QMainWindow):
                     'strategy_id': self.selected_strategy_id,  # SAME strategy
                     'name': version['name'],  # Keep same name
                     'description': version.get('description', ''),
+                    'strategy_type': version.get('strategy_type', 'Bullish'),
                     'blocks': version['blocks'],
                     'signals': version['signals'],
                     'parameters': version['parameters'],
@@ -1566,6 +1567,7 @@ class StrategyBrowserDialog(QMainWindow):
                     'strategy_id': new_strategy_id,  # NEW strategy
                     'name': new_name,
                     'description': version.get('description', ''),
+                    'strategy_type': version.get('strategy_type', 'Bullish'),
                     'blocks': version['blocks'],
                     'signals': version['signals'],
                     'parameters': version['parameters'],
