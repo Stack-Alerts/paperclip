@@ -18,6 +18,7 @@ Author: Strategy Builder Team
 Date: 2026-01-16
 """
 
+import copy
 from typing import Optional
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
@@ -854,11 +855,14 @@ class StrategyBuilderMainWindow(QMainWindow):
                 'name': strategy_name,
                 'description': description or '',
                 'strategy_type': ui_strategy_type,  # CRITICAL: Use UI value directly, not dict
-                'blocks': config_dict.get('blocks', []),  # Full config with timings/rechecks
+                # CRITICAL: deepcopy JSONB fields so each saved version row holds an
+                # independent snapshot — prevents shared Python list/dict references from
+                # silently polluting other version rows via the SQLAlchemy session.
+                'blocks': copy.deepcopy(config_dict.get('blocks', [])),
                 'signals': {},  # Reserved
                 'parameters': {},  # Reserved
                 'entry_conditions': {},  # Reserved
-                'exit_conditions': config_dict.get('exit_conditions', []),  # Sprint 1.8: Get from config
+                'exit_conditions': copy.deepcopy(config_dict.get('exit_conditions', [])),  # Sprint 1.8
                 'risk_management': {},  # Reserved
                 'backtest_config': {},  # Reserved
                 'tags': []  # Reserved
@@ -963,11 +967,13 @@ class StrategyBuilderMainWindow(QMainWindow):
                 'name': data['name'],
                 'description': data.get('description', ''),
                 'strategy_type': config_dict.get('strategy_type', 'Bullish'),  # Save strategy type
-                'blocks': config_dict.get('blocks', []),  # Full config with timings/rechecks
+                # CRITICAL: deepcopy JSONB fields so this version row holds an
+                # independent snapshot; also fixes missing exit_conditions (was {}).
+                'blocks': copy.deepcopy(config_dict.get('blocks', [])),
                 'signals': {},
                 'parameters': {},
                 'entry_conditions': {},
-                'exit_conditions': {},
+                'exit_conditions': copy.deepcopy(config_dict.get('exit_conditions', [])),
                 'risk_management': {},
                 'backtest_config': {},
                 'tags': []
