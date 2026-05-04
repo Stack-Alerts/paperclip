@@ -493,7 +493,23 @@ class UnifiedDataManager:
             # INSTITUTIONAL: Don't filter by end_date too strictly!
             # Binance returns ALL available candles including current forming one
             # We want everything >= start_date (don't cut off recent data)
-            bars = bars[bars['timestamp'] >= start_date].copy()
+            #
+            # FIX: Floor start_date to the timeframe boundary before filtering.
+            # Coarse bars (1d, 4h, 1h) have open_time at the START of the period
+            # (e.g. daily bar opens at 00:00 UTC). If start_date is an intraday
+            # 15m timestamp (e.g. 08:45 UTC), filtering >= 08:45 would drop every
+            # daily bar whose open_time is 00:00 UTC on the same day, yielding 0
+            # bars even though the data was successfully fetched. Flooring to the
+            # period boundary ensures we keep all bars that include start_date.
+            if timeframe == '1d':
+                start_date_floored = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif timeframe == '4h':
+                start_date_floored = start_date.replace(hour=(start_date.hour // 4) * 4, minute=0, second=0, microsecond=0)
+            elif timeframe == '1h':
+                start_date_floored = start_date.replace(minute=0, second=0, microsecond=0)
+            else:
+                start_date_floored = start_date  # 15m and smaller: existing behaviour is correct
+            bars = bars[bars['timestamp'] >= start_date_floored].copy()
             
             print(f"   ✅ Binance: {len(bars)} bars loaded")
             return bars
@@ -770,7 +786,13 @@ class UnifiedDataManager:
                     'end': end_date,
                     'gap_days': gap_days,
                     'gap_minutes': int(true_gap_minutes),  # Report TRUE gap (excluding current bar)
-                    'status': 'complete' if true_gap_minutes <= 0 else 'gap'
+                    # FIX: threshold must be < timeframe_minutes (15), not <= 0.
+                    # true_gap_minutes = max(0, gap_minutes - 15). During the 1–14
+                    # minutes while the next candle is forming, true_gap_minutes is
+                    # 1–14 (> 0), but int(true_gap_minutes / 15) == 0 means zero
+                    # complete bars are missing — data is current. The old <= 0
+                    # threshold incorrectly flagged these as DATA GAPS.
+                    'status': 'complete' if true_gap_minutes < timeframe_minutes else 'gap'
                 }
                 
             except Exception as e:
