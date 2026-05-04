@@ -77,7 +77,19 @@ class ValidationReportWindow(QMainWindow):
         self._init_ui()
         self._restore_geometry()
         self._populate_data()
-    
+
+    def update_config(self, new_config) -> None:
+        """Update the config reference after parent window reloads from database.
+
+        Called by strategy_builder_main_window after _reload_current_version()
+        replaces orchestrator.config_engine.config with a freshly-restored object.
+        Without this, _rerun_validation() would validate the now-stale original
+        reference and the fixed issue would appear not to have been resolved.
+
+        Refs: BTCAAAAA-133
+        """
+        self.config = new_config
+
     def _init_ui(self):
         """Initialize UI with professional styling - QMainWindow is NON-BLOCKING by default"""
         self.setWindowTitle("BTC Engine v3 - Validation Report")
