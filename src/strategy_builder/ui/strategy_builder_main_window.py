@@ -64,16 +64,33 @@ class _RuntimeCandleUpdateThread(QThread):
     Fetches and persists the latest candles for *all* managed timeframes
     (15m and 1h) without blocking the Qt event loop.
 
+    RC3 FIX: Added hard 60-second wall-clock timeout.  If verify_and_repair
+    does not complete within the deadline, the thread emits finished(False,
+    'timeout') and returns so the next cycle is never permanently blocked.
+
     Signals:
         finished(success: bool, message: str)
     """
     finished = pyqtSignal(bool, str)
 
+    # Hard wall-clock deadline for one full update cycle (seconds).
+    TIMEOUT_SECONDS = 60
+
     def run(self) -> None:
+        import time as _time
+        t_start = _time.monotonic()
+
+        def _elapsed() -> float:
+            return _time.monotonic() - t_start
+
+        def _timed_out() -> bool:
+            return _elapsed() > self.TIMEOUT_SECONDS
+
         try:
             from datetime import datetime, timedelta
             from src.data_manager.unified_manager import UnifiedDataManager
 
+            print(f"[RuntimeUpdate] cycle start")
             manager = UnifiedDataManager(mode='live')
 
             # Cover the last 2 hours so we catch any 1h boundary that fired
@@ -81,11 +98,26 @@ class _RuntimeCandleUpdateThread(QThread):
             now = datetime.now()
             start_date = now - timedelta(hours=2)
 
+            # Early timeout check before the expensive verify_and_repair call.
+            if _timed_out():
+                self.finished.emit(False, f"timeout before verify_and_repair ({_elapsed():.1f}s elapsed)")
+                return
+
+            t_repair = _time.monotonic()
             summary = manager.verify_and_repair(
                 timeframes=['15m', '1h'],
                 start_date=start_date,
                 end_date=now,
             )
+            print(f"[RuntimeUpdate] verify_and_repair completed in {_time.monotonic() - t_repair:.2f}s")
+
+            # Timeout check after the (potentially slow) repair.
+            if _timed_out():
+                self.finished.emit(
+                    False,
+                    f"timeout after verify_and_repair ({_elapsed():.1f}s elapsed — limit {self.TIMEOUT_SECONDS}s)"
+                )
+                return
 
             tf_lines = []
             any_error = False
@@ -102,7 +134,9 @@ class _RuntimeCandleUpdateThread(QThread):
                         f" ({s['bars_fetched']} bars)"
                     )
 
-            msg = "Runtime update complete — " + " | ".join(tf_lines)
+            total_elapsed = _elapsed()
+            msg = f"Runtime update complete ({total_elapsed:.1f}s) — " + " | ".join(tf_lines)
+            print(f"[RuntimeUpdate] {msg}")
             self.finished.emit(not any_error, msg)
 
         except Exception as exc:
