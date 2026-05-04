@@ -315,18 +315,18 @@ class StrategyBrowserDialog(QMainWindow):
         
         self.detail_labels['tests'] = QLabel("No tests run")
         self.detail_labels['tests'].setFont(create_font(9))
-        self.detail_labels['tests'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
+        self.detail_labels['tests'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 6px;")
         details_layout.addWidget(self.detail_labels['tests'], 1, 2, 1, 1)
         
         self.detail_labels['performance'] = QLabel("Run backtest to see metrics")
-        self.detail_labels['performance'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 0px;")
+        self.detail_labels['performance'].setStyleSheet(f"color: {get_color('text_secondary')}; padding: 4px 6px;")
         self.detail_labels['performance'].setWordWrap(True)
         self.detail_labels['performance'].setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         details_layout.addWidget(self.detail_labels['performance'], 2, 2, 1, 1)
         
         self.detail_labels['status'] = QLabel("Status: Unknown")
         self.detail_labels['status'].setFont(create_font(9))
-        self.detail_labels['status'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 0px;")
+        self.detail_labels['status'].setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px 6px;")
         details_layout.addWidget(self.detail_labels['status'], 3, 2, 1, 1)
         
         # Set column stretches to match screenshot 1 proportions
