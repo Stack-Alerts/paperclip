@@ -1100,6 +1100,16 @@ def get_scroll_area_stylesheet() -> str:
     """
 
 
+def get_transparent_scroll_area_stylesheet() -> str:
+    """
+    Get stylesheet for borderless, transparent QScrollArea.
+
+    Use inside dialogs/tabs where the scroll area background should inherit
+    from the parent widget rather than adding its own border.
+    """
+    return "QScrollArea { border: none; background: transparent; }"
+
+
 def get_input_field_stylesheet() -> str:
     """
     Get stylesheet for QLineEdit input fields.

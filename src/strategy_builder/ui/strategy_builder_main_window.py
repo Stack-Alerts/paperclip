@@ -46,6 +46,7 @@ from src.strategy_builder.ui.styles import get_main_stylesheet, apply_hand_curso
 from src.strategy_builder.ui.new_strategy_dialog import NewStrategyDialog
 from src.strategy_builder.ui.strategy_browser_dialog import StrategyBrowserDialog
 from src.optimizer_v3.database import get_database_manager
+from src.strategy_builder.ui.settings_dialog import SettingsDialog
 
 # Import real block registry adapter
 try:
@@ -298,6 +299,13 @@ class StrategyBuilderMainWindow(QMainWindow):
         verify_data_action.setStatusTip("Verify data integrity and check for gaps")
         verify_data_action.triggered.connect(self._on_verify_data)
         tools_menu.addAction(verify_data_action)
+
+        tools_menu.addSeparator()
+
+        settings_action = QAction(style.standardIcon(QStyle.SP_FileDialogDetailedView), "&Settings...", self)
+        settings_action.setStatusTip("Edit application settings (API keys, preferences, admin options)")
+        settings_action.triggered.connect(self._on_settings)
+        tools_menu.addAction(settings_action)
 
         tools_menu.addSeparator()
         
@@ -1273,6 +1281,16 @@ class StrategyBuilderMainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error opening data verify dialog: {str(e)}")
             self._update_status("Data verification failed")
+
+    def _on_settings(self):
+        """Open the Settings dialog (Tools → Settings...)."""
+        try:
+            dialog = SettingsDialog(self)
+            dialog.exec_()
+            self._update_status("Settings closed")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error opening Settings dialog:\n\n{str(e)}")
+            self._update_status("Failed to open Settings dialog")
 
     def _on_about(self):
         """Show about dialog."""
