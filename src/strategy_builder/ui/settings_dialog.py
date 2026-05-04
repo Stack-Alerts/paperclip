@@ -107,7 +107,17 @@ class SecretFieldWidget(QWidget):
     # ------------------------------------------------------------------
 
     def _refresh_display(self) -> None:
-        masked = self._service.get_masked(self._key)
+        try:
+            masked = self._service.get_masked(self._key)
+        except PermissionError:
+            # Admin-only field accessed before auth — show locked indicator.
+            # This is safe: the widget is inside the admin tab which is hidden
+            # until PIN is verified.
+            self._display_label.setText("(locked — admin access required)")
+            self._display_label.setStyleSheet(
+                f"color: {COLORS['text_muted']}; font-family: monospace;"
+            )
+            return
         if masked:
             self._display_label.setText(masked)
         else:
@@ -416,7 +426,17 @@ class SettingsDialog(QDialog):
     # ------------------------------------------------------------------
 
     def _build_admin_tab(self) -> QWidget:
-        """Admin-only settings: DB, performance, logging."""
+        """Admin-only settings: DB, performance, logging.
+
+        IMPORTANT: this method must NOT call self._service.get() or
+        get_with_default() for any admin-only key.  Those calls go through
+        _check_access() which raises PermissionError for non-admin sessions
+        and would crash the dialog on open (BTCAAAAA-82).
+
+        Fields are initialised with static placeholder defaults here and
+        populated with live values only after PIN authentication succeeds
+        in _populate_admin_fields().
+        """
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet(get_transparent_scroll_area_stylesheet())
@@ -445,6 +465,8 @@ class SettingsDialog(QDialog):
         db_form.setSpacing(10)
         db_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
+        # Use static defaults — do NOT call service.get*() here (role not yet
+        # elevated; admin keys raise PermissionError for non-admin users).
         for key, label, placeholder in [
             ("POSTGRES_HOST", "Host:", "localhost"),
             ("POSTGRES_PORT", "Port:", "5432"),
@@ -452,9 +474,7 @@ class SettingsDialog(QDialog):
             ("POSTGRES_USER", "User:", "optimizer_admin"),
         ]:
             self._plain_fields[key] = QLineEdit()
-            self._plain_fields[key].setText(
-                self._service.get_with_default(key, placeholder)
-            )
+            self._plain_fields[key].setText(placeholder)
             self._plain_fields[key].setStyleSheet(get_input_field_stylesheet())
             self._plain_fields[key].setFont(create_font(10))
             db_form.addRow(self._make_label(label), self._plain_fields[key])
@@ -479,9 +499,7 @@ class SettingsDialog(QDialog):
             ("LAKEAPI_LIMIT_GB", "Monthly Limit (GB):", "300"),
         ]:
             self._plain_fields[key] = QLineEdit()
-            self._plain_fields[key].setText(
-                self._service.get_with_default(key, placeholder)
-            )
+            self._plain_fields[key].setText(placeholder)
             self._plain_fields[key].setStyleSheet(get_input_field_stylesheet())
             self._plain_fields[key].setFont(create_font(10))
             lake_form.addRow(self._make_label(label), self._plain_fields[key])
@@ -496,9 +514,7 @@ class SettingsDialog(QDialog):
         sys_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
         self._plain_fields["LOG_LEVEL"] = QLineEdit()
-        self._plain_fields["LOG_LEVEL"].setText(
-            self._service.get_with_default("LOG_LEVEL", "INFO")
-        )
+        self._plain_fields["LOG_LEVEL"].setText("INFO")
         self._plain_fields["LOG_LEVEL"].setStyleSheet(get_input_field_stylesheet())
         self._plain_fields["LOG_LEVEL"].setFont(create_font(10))
         sys_form.addRow(self._make_label("Log Level:"), self._plain_fields["LOG_LEVEL"])
@@ -608,7 +624,36 @@ class SettingsDialog(QDialog):
         self._service.drop_admin()
         self._conceal_admin_tab()
 
+    def _populate_admin_fields(self) -> None:
+        """Load live admin setting values into the admin tab fields.
+
+        Must only be called after PIN authentication (role == ADMIN).
+        Using the service before auth raises PermissionError for admin keys.
+        """
+        admin_plain_defaults = {
+            "POSTGRES_HOST": "localhost",
+            "POSTGRES_PORT": "5432",
+            "POSTGRES_DB": "optimizer_v3",
+            "POSTGRES_USER": "optimizer_admin",
+            "LAKEAPI_REGION": "eu-west-1",
+            "LAKEAPI_LIMIT_GB": "300",
+            "LOG_LEVEL": "INFO",
+        }
+        for key, default in admin_plain_defaults.items():
+            if key in self._plain_fields:
+                try:
+                    value = self._service.get_with_default(key, default)
+                except PermissionError:
+                    value = default
+                self._plain_fields[key].setText(value)
+
+        # Refresh the secret display for POSTGRES_PASSWORD now that admin is active
+        if "POSTGRES_PASSWORD" in self._secret_widgets:
+            self._secret_widgets["POSTGRES_PASSWORD"]._refresh_display()
+
     def _reveal_admin_tab(self) -> None:
+        # Populate admin fields with live values now that role is elevated.
+        self._populate_admin_fields()
         self._tabs.setTabVisible(self._admin_tab_index, True)
         self._admin_status_label.setText("Admin access: unlocked")
         self._admin_status_label.setStyleSheet(
