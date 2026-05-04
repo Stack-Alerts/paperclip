@@ -1790,16 +1790,17 @@ class StrategyBuilderMainWindow(QMainWindow):
         print(f"Saving updated configuration to database...")
         print(f"{'='*80}\n")
         
-        # CRITICAL FIX (BTCAAAAA-125): Sync fixed config values back to UI panel
-        # before saving. Without this, _on_save_strategy() reads stale UI values and
-        # overwrites the fix that was just applied inside ValidationReportWindow.
-        if fix_type == 'DIRECTION_001' and self.validation_window:
-            fixed_type = getattr(self.validation_window.config, 'strategy_type', None)
+        # CRITICAL FIX (BTCAAAAA-135): Sync the full fixed config from validation_window
+        # into the orchestrator for ALL fix types, not just DIRECTION_001.
+        # Without this, _on_save_strategy() reads orchestrator's stale config and saves
+        # the unfixed version (root cause of EXIT_009, LOGIC_003, TIMING_004 not persisting).
+        if self.validation_window and self.orchestrator and self.orchestrator.config_engine:
+            fixed_config = self.validation_window.config
+            self.orchestrator.config_engine.config = fixed_config
+            # Also sync strategy_type to info_panel so UI reflects the change
+            fixed_type = getattr(fixed_config, 'strategy_type', None)
             if fixed_type:
-                print(f"🔄 Syncing fixed strategy_type '{fixed_type}' back to info_panel")
                 self.info_panel.set_strategy_type(fixed_type)
-                if self.orchestrator and self.orchestrator.config_engine:
-                    self.orchestrator.config_engine.config.strategy_type = fixed_type
         
         # CRITICAL FIX (BTCAAAAA-125): Mark as modified so _on_save_strategy() does
         # not short-circuit via the "No Changes" early-return path at line 797.
