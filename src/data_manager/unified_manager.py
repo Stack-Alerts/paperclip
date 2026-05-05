@@ -34,7 +34,7 @@ Gap detection / auto-repair added: 2026-05-02
 """
 
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Union, Dict, Tuple
 import logging
 import os
@@ -1170,13 +1170,24 @@ class UnifiedDataManager:
         all_frames: List[pd.DataFrame] = []
         cursor = start_ts
 
+        # RC1b FIX (BTCAAAAA-167): All timestamps in parquet are stored as
+        # naive UTC (tz marker stripped after download).  Python's
+        # datetime.timestamp() interprets naive datetimes as *local* time.
+        # On machines set to CEST (UTC+2) this sends startTime 2 hours too
+        # early, causing Binance to return bars that are already on disk and
+        # producing "+0 new" even after a successful 3-bar fetch.
+        # Fix: attach UTC tzinfo before calling .timestamp() so Python
+        # converts correctly regardless of the machine's local timezone.
+        def _to_ms_utc(dt: datetime) -> int:
+            return int(dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
+
         while cursor <= end_ts:
             params = {
                 'symbol': symbol,
                 'interval': timeframe,
-                'startTime': int(cursor.timestamp() * 1000),
+                'startTime': _to_ms_utc(cursor),
                 # Ensure endTime >= startTime + 1 bar so Binance returns data even for single-bar windows
-                'endTime': int(max(end_ts, cursor + bar_td).timestamp() * 1000),
+                'endTime': _to_ms_utc(max(end_ts, cursor + bar_td)),
                 'limit': batch_size,
             }
 
