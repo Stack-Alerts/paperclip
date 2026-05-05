@@ -3606,28 +3606,41 @@ Detailed report saved to:
 
     def _on_config_discovery_clicked(self):
         """
-        Launch Config Discovery: runs the same 23 wiring-test scenarios as
-        _on_test_wiring_clicked but surfaces graded results in
-        ConfigDiscoveryResultsDialog.
+        Launch Config Discovery run using BacktestWorker via _run_test_and_wait().
 
-        CRITICAL: Uses the SAME execution path as the wiring test —
-        _apply_scenario_to_ui() + _run_test_and_wait() — so that every run
-        goes through BacktestWorker and produces Live Output.
+        Replaces the broken ConfigPermutationWorker path which bypassed
+        BacktestWorker and produced 0 trades.  This implementation uses
+        the identical execution path as _on_test_wiring_clicked so every
+        scenario goes through the real BacktestWorker, emits Live Output,
+        and returns genuine trade data.
 
-        DO NOT use ConfigPermutationWorker or MulticoreBacktestEngine here;
-        that path bypasses BacktestWorker and produces no Live Output or trades.
+        Threading contract:
+        - All Qt widget access (_apply_scenario_to_ui, _run_test_and_wait,
+          results_dialog.append_result) runs on the main thread.
+        - QProgressDialog + QApplication.processEvents() keeps the UI
+          responsive between sequential scenario runs.
+        - _run_test_and_wait() uses QEventLoop internally; no blocking I/O.
 
         Flow:
-        1. Load CRITICAL_SCENARIOS + EDGE_SCENARIOS + PARAMETER_VARIATION_SCENARIOS
-        2. Confirm with user
-        3. Open ConfigDiscoveryResultsDialog (maximised)
-        4. Save original UI state
-        5. Loop: _apply_scenario_to_ui → _run_test_and_wait → stream result to dialog
-        6. Restore original UI state
-        7. Finalise dialog and write CSV
+        1. Load 23 scenarios (CRITICAL + EDGE + PARAMETER_VARIATION)
+        2. Confirm with user (count + estimated time)
+        3. Save current UI state
+        4. Capture baseline result (current config, no UI change)
+        5. Open ConfigDiscoveryResultsDialog immediately (maximised)
+        6. Loop over each scenario on main thread:
+              a. _apply_scenario_to_ui(scenario.config)
+              b. QApplication.processEvents()
+              c. result = _run_test_and_wait()
+              d. build DiscoveryResult via aggregate_metrics()
+              e. results_dialog.append_result(dr)
+              f. update progress dialog
+        7. Restore UI state
+        8. Finalise dialog + generate CSV report
+
+        Does NOT modify _on_test_wiring_clicked.
+        Does NOT use ConfigPermutationWorker or MulticoreBacktestEngine.
         """
         from PyQt5.QtWidgets import QMessageBox, QProgressDialog
-        from PyQt5.QtCore import Qt
         from src.strategy_builder.ui.config_permutation_engine import (
             DiscoveryScenario,
             aggregate_metrics,
@@ -3637,7 +3650,7 @@ Detailed report saved to:
         )
 
         # ------------------------------------------------------------------
-        # Step 1: Load the wiring test scenarios
+        # Step 1: Load the wiring test scenarios (same set as wiring test)
         # ------------------------------------------------------------------
         try:
             from tests.integration.test_scenarios import (
@@ -3658,7 +3671,7 @@ Detailed report saved to:
             return
 
         total_scenarios = len(all_scenarios)
-        est_secs = total_scenarios * 30  # ~30 sec per scenario (real backtest)
+        est_mins = max(1, (total_scenarios * 30) // 60)
 
         # ------------------------------------------------------------------
         # Step 2: Confirm with user
@@ -3666,15 +3679,14 @@ Detailed report saved to:
         msg = QMessageBox(self)
         msg.setStyleSheet(MAIN_STYLESHEET)
         msg.setIcon(QMessageBox.Question)
-        msg.setText("Config Discovery — Wiring Scenarios")
+        msg.setText("Config Discovery — BacktestWorker Execution")
         msg.setInformativeText(
             f"Run {total_scenarios} wiring test scenarios?\n\n"
-            f"  Strategy: {getattr(self.orchestrator.get_current_config(), 'name', 'Current')}\n"
             f"  Scenarios: {total_scenarios} (from tests/integration/test_scenarios.py)\n"
-            f"  Est. time: ~{est_secs // 60} min\n\n"
-            "Each scenario runs through the full backtest engine.\n"
-            "Live Output shows activity for each run.\n"
-            "Results dialog opens immediately — rows populate live.\n\n"
+            f"  Est. time: ~{est_mins} min ({total_scenarios} × ~30 sec each)\n\n"
+            "Each scenario runs through the real BacktestWorker (same as\n"
+            "Run button) so Live Output is produced for every run.\n\n"
+            "Results populate live in the results dialog.\n\n"
             "Continue?"
         )
         msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
@@ -3683,7 +3695,33 @@ Detailed report saved to:
             return
 
         # ------------------------------------------------------------------
-        # Step 3: Open results dialog immediately (maximised)
+        # Step 3: Save current UI state so we can restore it after all runs
+        # ------------------------------------------------------------------
+        original_config = self._capture_ui_state()
+
+        # ------------------------------------------------------------------
+        # Step 4: Capture baseline — run once with current UI config
+        # ------------------------------------------------------------------
+        baseline_result = None
+        try:
+            baseline_raw = self._run_test_and_wait()
+            baseline_scenario = DiscoveryScenario(
+                scenario_id='BASELINE',
+                description='[BASELINE] Current config before discovery',
+                config_delta={},
+                param_labels=[],
+            )
+            baseline_result = aggregate_metrics(
+                baseline_scenario,
+                baseline_raw.get('trades_list', []),
+                error=None if baseline_raw.get('success', False) else 'Baseline backtest failed',
+            )
+        except Exception as exc:
+            # Non-fatal — proceed without baseline
+            self.results_text.append(f"[Config Discovery] Baseline run failed: {exc}")
+
+        # ------------------------------------------------------------------
+        # Step 5: Open results dialog immediately (maximised)
         # ------------------------------------------------------------------
         def apply_cb(delta):
             self._apply_discovery_config_to_ui(delta)
@@ -3692,16 +3730,13 @@ Detailed report saved to:
             apply_config_callback=apply_cb,
             parent=self,
         )
+        if baseline_result is not None:
+            results_dialog.set_baseline(baseline_result)
         results_dialog.showMaximized()
 
-        # ------------------------------------------------------------------
-        # Step 4: Save original UI state
-        # ------------------------------------------------------------------
-        original_config = self._capture_ui_state()
-
-        # Progress dialog
+        # Progress dialog so the user sees per-scenario status
         progress = QProgressDialog(
-            "Running Config Discovery…",
+            "Running Config Discovery...",
             "Cancel",
             0,
             total_scenarios,
@@ -3710,18 +3745,10 @@ Detailed report saved to:
         progress.setWindowTitle("Config Discovery")
         progress.setWindowModality(Qt.WindowModal)
 
-        self.results_text.append(
-            f"\n[Config Discovery] Starting {total_scenarios} scenarios…\n"
-            "Each run uses the full backtest engine — Live Output active.\n"
-            "Scenarios sourced from: tests/integration/test_scenarios.py\n"
-        )
-
         # ------------------------------------------------------------------
-        # Step 5: Run each scenario using the SAME path as the wiring test.
-        #         _apply_scenario_to_ui sets UI widgets on the main thread.
-        #         _run_test_and_wait fires BacktestWorker → populates Live Output.
+        # Step 6: Loop over each scenario on the main thread
         # ------------------------------------------------------------------
-        all_discovery_results = []
+        test_results = []
 
         for i, scenario in enumerate(all_scenarios):
             if progress.wasCanceled():
@@ -3733,52 +3760,70 @@ Detailed report saved to:
             )
             results_dialog.set_progress(i, total_scenarios, scenario.description)
 
-            self.results_text.append(
-                f"\n── Scenario {i + 1}/{total_scenarios}: {scenario.description}"
-            )
-
-            # Apply this scenario's config to the UI (same as wiring test)
+            # a. Apply scenario config to UI widgets
             self._apply_scenario_to_ui(scenario.config)
+
+            # b. Allow Qt to process widget updates before running backtest
             QApplication.processEvents()
 
-            # Run full backtest via BacktestWorker (populates Live Output)
-            raw_result = self._run_test_and_wait()
+            # c. Run backtest via BacktestWorker (same path as Run button)
+            try:
+                result = self._run_test_and_wait()
+            except Exception as exc:
+                result = {'trades': 0, 'trades_list': [], 'total_candles': 0, 'success': False}
+                self.results_text.append(
+                    f"[Config Discovery] Scenario '{scenario.description}' failed: {exc}"
+                )
 
-            # Build DiscoveryScenario for metrics aggregation
+            # d. Build DiscoveryResult using aggregate_metrics (same as
+            #    _generate_discovery_report uses for the wiring test)
             disc_scenario = DiscoveryScenario(
                 scenario_id=scenario.id,
                 description=scenario.description,
                 config_delta=scenario.config,
                 param_labels=[(k, str(v)) for k, v in scenario.config.items()],
             )
+            error = None if result.get('success', False) else 'Backtest failed or no trades'
+            dr = aggregate_metrics(
+                disc_scenario,
+                result.get('trades_list', []),
+                error=error,
+            )
 
-            trades_list = raw_result.get('trades_list', [])
-            error = None if raw_result.get('success', False) else 'Backtest failed or no trades'
-            discovery_result = aggregate_metrics(disc_scenario, trades_list, error=error)
+            # e. Stream result live into the results dialog
+            results_dialog.append_result(dr)
 
-            all_discovery_results.append(discovery_result)
+            # Keep raw dict for CSV generation later
+            test_results.append({
+                'scenario_id': scenario.id,
+                'description': scenario.description,
+                'config': scenario.config,
+                'trades': result.get('trades', 0),
+                'trades_list': result.get('trades_list', []),
+                'total_candles': result.get('total_candles', 0),
+                'success': result.get('success', False),
+            })
 
-            # Stream result live into the dialog
-            if i == 0:
-                # First result doubles as baseline for the comparison column
-                results_dialog.set_baseline(discovery_result)
-            results_dialog.append_result(discovery_result)
+            # f. Keep UI responsive
+            QApplication.processEvents()
 
         progress.setValue(total_scenarios)
+        results_dialog.set_progress(total_scenarios, total_scenarios, "Complete")
 
         # ------------------------------------------------------------------
-        # Step 6: Restore original UI state
+        # Step 7: Restore original UI state
         # ------------------------------------------------------------------
         self._restore_ui_state(original_config)
 
         # ------------------------------------------------------------------
-        # Step 7: Finalise
+        # Step 8: Generate CSV report (non-blocking — data already in dialog)
         # ------------------------------------------------------------------
-        self._on_discovery_complete(all_discovery_results, results_dialog)
+        self._generate_discovery_report(test_results, mode='csv_only')
 
         self.results_text.append(
-            f"\n[Config Discovery] Complete — {total_scenarios} scenarios finished.\n"
-            "Results dialog shows ranked results. Select a row and click Apply to use that config.\n"
+            f"\n[Config Discovery] Complete — {len(test_results)} scenarios run.\n"
+            "Results dialog shows ranked scenarios.\n"
+            "Select a row and click 'Apply Config' to use that config."
         )
 
     def _on_discovery_complete(self, all_results: list, dialog=None):
