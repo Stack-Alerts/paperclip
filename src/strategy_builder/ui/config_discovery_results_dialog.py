@@ -385,6 +385,9 @@ class ConfigDiscoveryResultsDialog(QDialog):
         self.setWindowTitle("Config Discovery Results")
         self.setMinimumSize(900, 600)
         self.setModal(False)
+        # Qt.Window flag required for maximize to work on all platforms —
+        # QDialog defaults to Qt.Dialog which may suppress the maximize button
+        self.setWindowFlags(Qt.Window)
 
         # Apply global dark stylesheet
         self.setStyleSheet(MAIN_STYLESHEET)
@@ -462,8 +465,8 @@ class ConfigDiscoveryResultsDialog(QDialog):
         self._summary_text.setReadOnly(True)
         self._summary_text.setMaximumHeight(180)
         self._summary_text.setStyleSheet(get_text_edit_stylesheet())
-        # Monospace font for detail pane — via create_monospace_font() from styles.py
-        self._summary_text.setFont(create_monospace_font(9))
+        # Monospace font for detail pane — minimum 12pt per UX spec
+        self._summary_text.setFont(create_monospace_font(12))
         summary_layout.addWidget(self._summary_text)
         splitter.addWidget(summary_group)
 

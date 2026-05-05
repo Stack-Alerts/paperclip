@@ -1071,9 +1071,10 @@ def get_table_view_stylesheet() -> str:
     Get stylesheet for QTableView data tables (model/view architecture).
 
     Matches the Trades Panel reference design:
-    - Bold white header text with comfortable padding
+    - Bold white header text on neutral dark background (never blue)
+    - Sorted column indicator: slightly lighter background, not the selection colour
     - Alternating row backgrounds
-    - High-contrast selection highlight
+    - High-contrast selection highlight on data rows only
     - Row height via padding on items
 
     Returns:
@@ -1100,6 +1101,9 @@ def get_table_view_stylesheet() -> str:
             background-color: {COLORS['stepper_active']};
             color: {COLORS['text_primary']};
         }}
+        QHeaderView {{
+            background-color: {COLORS['bg_secondary']};
+        }}
         QHeaderView::section {{
             background-color: {COLORS['bg_secondary']};
             color: {COLORS['text_primary']};
@@ -1109,9 +1113,11 @@ def get_table_view_stylesheet() -> str:
         }}
         QHeaderView::section:hover {{
             background-color: {COLORS['bg_light']};
+            color: {COLORS['text_primary']};
         }}
         QHeaderView::section:checked {{
-            background-color: {COLORS['stepper_active']};
+            background-color: {COLORS['bg_light']};
+            color: {COLORS['text_primary']};
         }}
         QScrollBar:vertical {{
             background: {COLORS['bg_dark']};
