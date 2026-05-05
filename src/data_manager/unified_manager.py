@@ -55,6 +55,12 @@ logger = logging.getLogger(__name__)
 _parquet_write_locks: Dict[str, threading.Lock] = {}
 _parquet_write_locks_mutex = threading.Lock()
 
+# Binance API propagation buffer: after a candle closes, Binance takes 1–2 seconds
+# to finalize and expose the bar via the REST API.  Using fetch_start = gap_start +
+# bar_td *without* this buffer causes the repair cycle to fire before the bar is
+# available, returning 0 bars and leaving the gap unrepaired until the next cycle.
+BINANCE_PROPAGATION_BUFFER = timedelta(seconds=2)
+
 
 def _get_parquet_lock(file_path: Path) -> threading.Lock:
     """Return (creating if needed) the per-file write lock for *file_path*."""
@@ -1525,7 +1531,12 @@ class UnifiedDataManager:
                     # For single-missing-bar gaps: fetch_end = gap_end - bar_td
                     # == gap_start + bar_td, so fetch_start == fetch_end (same bar).
                     # Accept this — _fetch_binance_range handles the 1-bar window.
-                    fetch_start = gap_start + bar_td
+                    #
+                    # BINANCE_PROPAGATION_BUFFER: Binance takes 1–2 s after candle
+                    # close to finalize the bar.  Without this offset the cycle that
+                    # fires immediately after candle close sends startTime=<exact
+                    # close epoch> and receives 0 bars, leaving the gap unrepaired.
+                    fetch_start = gap_start + bar_td + BINANCE_PROPAGATION_BUFFER
                     fetch_end = gap_end - bar_td
 
                     if fetch_end < fetch_start:
