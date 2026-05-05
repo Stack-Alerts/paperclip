@@ -134,27 +134,30 @@ class _RuntimeCandleUpdateThread(QThread):
             # Cap at MAX_SESSION_LOOKBACK_HOURS to prevent multi-day scan debt.
             max_lookback = now - timedelta(hours=self.MAX_SESSION_LOOKBACK_HOURS)
             try:
+                # RC4c FIX (BTCAAAAA-167): Use only the 15m last bar as the
+                # scan anchor.  The previous RC4b logic used min(last_15m,
+                # last_1h) which incorrectly picked the 1h timestamp when 1h
+                # was older than 15m — causing the anchor to be set too far
+                # back (e.g. 07:00 instead of 07:30).  Because 15m is the
+                # finest-grained timeframe, if 15m is current then 1h is
+                # always current too.  Using only the 15m anchor is both
+                # correct and simpler.
                 last_15m = manager.get_last_bar_timestamp('15m')
-                last_1h  = manager.get_last_bar_timestamp('1h')
-                known_ts = [t for t in [last_15m, last_1h] if t is not None]
-                if known_ts:
-                    # Use the EARLIEST last bar across both timeframes so we
-                    # never under-scan one of them.
-                    oldest_last_bar = min(known_ts)
+                if last_15m is not None:
                     # Step back one 15m period to include the boundary bar in
                     # the detect_gaps scan window.
-                    start_date = oldest_last_bar - timedelta(minutes=15)
+                    start_date = last_15m - timedelta(minutes=15)
                     print(
-                        f"[RuntimeUpdate] RC4b scan anchor: last_bar={oldest_last_bar.strftime('%H:%M:%S')}"
+                        f"[RuntimeUpdate] RC4c scan anchor: last_15m={last_15m.strftime('%H:%M:%S')}"
                         f" → scan_start={start_date.strftime('%H:%M:%S')}"
                         f" → now={now.strftime('%H:%M:%S')}"
                     )
                 else:
-                    # No bars on disk yet — fall back to session_start - 15m
+                    # No 15m bars on disk yet — fall back to session_start - 15m
                     fallback_base = self._session_start_time if self._session_start_time is not None else now
                     start_date = fallback_base - timedelta(minutes=15)
                     print(
-                        f"[RuntimeUpdate] RC4b: no bars on disk; "
+                        f"[RuntimeUpdate] RC4c: no 15m bars on disk; "
                         f"falling back to session_start-15m → {start_date.strftime('%H:%M:%S')}"
                     )
             except Exception as _anchor_exc:
@@ -163,7 +166,7 @@ class _RuntimeCandleUpdateThread(QThread):
                 fallback_base = self._session_start_time if self._session_start_time is not None else now
                 start_date = fallback_base - timedelta(minutes=15)
                 print(
-                    f"[RuntimeUpdate] RC4b anchor lookup failed ({_anchor_exc}); "
+                    f"[RuntimeUpdate] RC4c anchor lookup failed ({_anchor_exc}); "
                     f"falling back to {start_date.strftime('%H:%M:%S')}"
                 )
             # Apply hard lookback cap.

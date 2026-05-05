@@ -1295,18 +1295,67 @@ class UnifiedDataManager:
                         existing = pd.read_parquet(file_path)
                         existing['timestamp'] = pd.to_datetime(existing['timestamp'])
                         n_existing = len(existing)
-                        merged = pd.concat([existing, group], ignore_index=True)
+
+                        # RC1b FIX (BTCAAAAA-167): Normalize timestamp dtypes
+                        # before concat to prevent +0 new after a successful
+                        # fetch.  Two root causes:
+                        #   1. existing parquet has datetime64[ns] (old pyarrow
+                        #      default) while group has datetime64[us] (pandas
+                        #      2.0+ default).  drop_duplicates() comparing
+                        #      ns vs us values can miss matches when the
+                        #      nanosecond bits differ.
+                        #   2. group timestamps may be tz-aware (UTC from
+                        #      pd.to_datetime(..., utc=True)) while existing is
+                        #      tz-naive, producing a mixed-tz Series where
+                        #      equality never matches.
+                        # Solution: strip tz from group if present, then cast
+                        # both sides to datetime64[us] before concat so
+                        # drop_duplicates works on identical dtypes/values.
+                        group = group.copy()
+                        if group['timestamp'].dt.tz is not None:
+                            group['timestamp'] = group['timestamp'].dt.tz_localize(None)
+                        existing['timestamp'] = existing['timestamp'].astype('datetime64[us]')
+                        group['timestamp'] = group['timestamp'].astype('datetime64[us]')
+
+                        # merge_debug: keep until board confirms +N new is
+                        # correct on consecutive cycles (BTCAAAAA-167 AC5).
+                        print(
+                            f"   [merge_debug] existing: n={n_existing},"
+                            f" dtype={existing['timestamp'].dtype},"
+                            f" last={existing['timestamp'].max()}"
+                        )
+                        print(
+                            f"   [merge_debug] group:    n={len(group)},"
+                            f" dtype={group['timestamp'].dtype},"
+                            f" first={group['timestamp'].min()},"
+                            f" last={group['timestamp'].max()}"
+                        )
+
+                        merged_before_dedup = pd.concat([existing, group], ignore_index=True)
+                        print(
+                            f"   [merge_debug] merged:   n={len(merged_before_dedup)},"
+                            f" after_dedup=<computing>"
+                        )
+                        merged = merged_before_dedup
                     except Exception as exc:
                         logger.warning("Could not read %s for merge: %s – overwriting", file_path, exc)
                         n_existing = 0
                         merged = group
                 else:
                     n_existing = 0
+                    # Ensure new-file group also has tz stripped and us dtype.
+                    group = group.copy()
+                    if group['timestamp'].dt.tz is not None:
+                        group['timestamp'] = group['timestamp'].dt.tz_localize(None)
+                    group['timestamp'] = group['timestamp'].astype('datetime64[us]')
                     merged = group
 
                 merged = merged.sort_values('timestamp').drop_duplicates(
                     subset=['timestamp'], keep='last'
                 ).reset_index(drop=True)
+                if n_existing > 0:
+                    # Emit final dedup count only when we did a merge.
+                    print(f"   [merge_debug] after_dedup={len(merged)}")
 
                 # Bug 2 fix: atomic write via temp file + os.replace (POSIX atomic).
                 tmp_path = file_path.with_suffix('.parquet.tmp')
