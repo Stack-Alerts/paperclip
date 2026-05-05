@@ -31,6 +31,7 @@ from nautilus_trader.model.objects import Money, Currency
 
 # Import centralized styles
 from src.strategy_builder.ui.styles import (
+    MAIN_STYLESHEET,
     get_label_style,
     get_radio_button_style,
     get_checkbox_style,
@@ -921,6 +922,9 @@ class BacktestConfigPanel(QWidget):
         # INSTITUTIONAL PATTERN: Data cache manager (singleton)
         from src.optimizer_v3.core.data_cache_manager import get_data_cache_manager
         self.cache_manager = get_data_cache_manager()
+        
+        # Data provider for Config Discovery and bar loading
+        self.data_provider = get_backtest_provider()
         
         self._init_ui()
         
@@ -3053,7 +3057,8 @@ class BacktestConfigPanel(QWidget):
         from datetime import datetime
         
         # Confirm with user
-        msg = QMessageBox()
+        msg = QMessageBox(self)
+        msg.setStyleSheet(MAIN_STYLESHEET)
         msg.setIcon(QMessageBox.Question)
         msg.setText("🔬 Wiring Verification Test\n\nThis will run 29 backtests to verify all UI parameters are wired correctly.")
         msg.setInformativeText(
@@ -3420,7 +3425,8 @@ Detailed report saved to:
             print(summary)
         else:
             # Legacy wiring report dialog
-            msg = QMessageBox()
+            msg = QMessageBox(self)
+            msg.setStyleSheet(MAIN_STYLESHEET)
             msg.setIcon(QMessageBox.Information if not wiring_bugs else QMessageBox.Warning)
             msg.setText("Wiring Test Complete")
             msg.setDetailedText(summary)
@@ -3629,7 +3635,8 @@ Detailed report saved to:
         est_secs = total_values * 5  # ~5 seconds per scenario with multicore
 
         # Confirm with user
-        msg = QMessageBox()
+        msg = QMessageBox(self)
+        msg.setStyleSheet(MAIN_STYLESHEET)
         msg.setIcon(QMessageBox.Question)
         msg.setText("Config Discovery")
         msg.setInformativeText(
