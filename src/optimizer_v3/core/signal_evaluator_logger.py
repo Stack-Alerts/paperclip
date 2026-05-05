@@ -38,9 +38,8 @@ class SignalEvaluatorLogger:
     
     def clear_log(self):
         """Clear existing log file"""
-        if self.log_file.exists():
-            self.log_file.unlink()
-        
+        self.log_file.unlink(missing_ok=True)
+
         # Write header
         self._write_raw("=" * 100)
         self._write_raw(f"SIGNAL EVALUATOR DEBUG LOG - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
