@@ -351,17 +351,23 @@ def aggregate_metrics(
 
 class ConfigPermutationWorker(QThread):
     """
-    QThread that runs N permutation scenarios sequentially using cached bars.
+    QThread that runs N permutation scenarios sequentially.
+
+    If *data_provider* is supplied (and cached_bars is None), the worker loads
+    bars itself at the start of run() — keeping the main UI thread unblocked.
+    A baseline backtest is also run inside the thread when *run_baseline* is True.
 
     Signals:
         scenario_complete(DiscoveryResult)  — emitted after each scenario
         progress_updated(int, int, str)     — current, total, message
+        baseline_ready(object)              — DiscoveryResult for the baseline row
         discovery_complete(list)            — all DiscoveryResult objects when done
         error_occurred(str)                 — emitted on fatal error
     """
 
     scenario_complete = pyqtSignal(object)   # DiscoveryResult
     progress_updated = pyqtSignal(int, int, str)
+    baseline_ready = pyqtSignal(object)      # DiscoveryResult (baseline)
     discovery_complete = pyqtSignal(list)    # List[DiscoveryResult]
     error_occurred = pyqtSignal(str)
 
@@ -370,7 +376,9 @@ class ConfigPermutationWorker(QThread):
         scenarios: List[DiscoveryScenario],
         base_strategy_config: Dict[str, Any],
         base_backtest_config: Dict[str, Any],
-        cached_bars: Any,           # List[Bar] pre-loaded
+        cached_bars: Any = None,        # List[Bar] — if None, loaded from data_provider
+        data_provider: Any = None,      # BacktestDataProvider — used when cached_bars is None
+        run_baseline: bool = True,      # Run baseline (current config) before permutations
         parent=None,
     ):
         super().__init__(parent)
@@ -378,6 +386,8 @@ class ConfigPermutationWorker(QThread):
         self.base_strategy_config = base_strategy_config
         self.base_backtest_config = base_backtest_config
         self.cached_bars = cached_bars
+        self.data_provider = data_provider
+        self.run_baseline = run_baseline
         self._should_stop = False
 
     def stop(self):
@@ -385,14 +395,70 @@ class ConfigPermutationWorker(QThread):
         self._should_stop = True
 
     def run(self):
-        """Run all scenarios, emit results."""
+        """Load bars (if needed), run baseline, then run all scenarios."""
         from src.optimizer_v3.core.multicore_backtest_engine import MulticoreBacktestEngine
         from src.optimizer_v3.core.trade_registry import get_trade_registry
+        import copy
 
-        results: List[DiscoveryResult] = []
-        total = len(self.scenarios)
+        # ----------------------------------------------------------------
+        # Step 1: Load bars off main thread if not already cached
+        # ----------------------------------------------------------------
+        bars = self.cached_bars
+        if bars is None:
+            if self.data_provider is None:
+                self.error_occurred.emit(
+                    "ConfigPermutationWorker: cached_bars is None and no data_provider supplied."
+                )
+                return
+            try:
+                self.progress_updated.emit(0, 1, "Loading bars (once for all scenarios)…")
+                bars = self.data_provider.load_bars_for_backtest(
+                    timeframe=self.base_backtest_config.get('timeframe', '15m'),
+                    start_date=self.base_backtest_config['start_date'],
+                    end_date=self.base_backtest_config['end_date'],
+                )
+            except Exception as exc:
+                import traceback
+                self.error_occurred.emit(
+                    f"Failed to load bars for Config Discovery:\n{traceback.format_exc()}"
+                )
+                return
 
         engine = MulticoreBacktestEngine()
+
+        # ----------------------------------------------------------------
+        # Step 2: Baseline run (current config — comparison row)
+        # ----------------------------------------------------------------
+        if self.run_baseline and not self._should_stop:
+            self.progress_updated.emit(0, len(self.scenarios) + 1, "Running baseline scenario…")
+            baseline_scenario = DiscoveryScenario(
+                scenario_id='BASELINE',
+                description='[BASELINE] Current config',
+                config_delta={},
+                param_labels=[],
+            )
+            try:
+                get_trade_registry().clear()
+                bl_mc = engine.run_backtest(
+                    bars=bars,
+                    strategy_config=self.base_strategy_config,
+                    backtest_config=copy.deepcopy(self.base_backtest_config),
+                    progress_callback=None,
+                )
+                bl_trades = bl_mc.get('trades', [])
+                baseline_dr = aggregate_metrics(baseline_scenario, bl_trades)
+            except Exception as exc:
+                import traceback
+                baseline_dr = aggregate_metrics(baseline_scenario, [], error=str(exc))
+                baseline_dr.error = traceback.format_exc()
+            baseline_dr.scenario_id = 'BASELINE'
+            self.baseline_ready.emit(baseline_dr)
+
+        # ----------------------------------------------------------------
+        # Step 3: Permutation scenarios
+        # ----------------------------------------------------------------
+        results: List[DiscoveryResult] = []
+        total = len(self.scenarios)
 
         for i, scenario in enumerate(self.scenarios):
             if self._should_stop:
@@ -405,17 +471,15 @@ class ConfigPermutationWorker(QThread):
 
             try:
                 # Build merged backtest config: base + delta overrides
-                import copy
                 bc = copy.deepcopy(self.base_backtest_config)
                 for key, val in scenario.config_delta.items():
                     bc = _set_nested(bc, key, val)
 
-                # Reset trade registry between runs (avoid cross-contamination)
-                registry = get_trade_registry()
-                registry.reset()
+                # Clear trade registry between runs (avoid cross-contamination)
+                get_trade_registry().clear()
 
                 mc_results = engine.run_backtest(
-                    bars=self.cached_bars,
+                    bars=bars,
                     strategy_config=self.base_strategy_config,
                     backtest_config=bc,
                     progress_callback=None,  # No per-bar progress for discovery runs
@@ -444,30 +508,40 @@ class ConfigPermutationEngine:
     """
     High-level facade used by BacktestConfigPanel to launch Config Discovery.
 
-    Usage:
+    Usage (off-main-thread bar loading — preferred):
         engine = ConfigPermutationEngine(
             base_strategy_config=...,
             base_backtest_config=...,
-            cached_bars=...,
+            data_provider=self.data_provider,   # bars loaded inside worker
         )
         scenarios = engine.build_scenarios(
             ranges=DEFAULT_PARAMETER_RANGES,
-            strategy='single_axis',  # or 'pairwise'
+            strategy='single_axis',
         )
         worker = engine.create_worker(scenarios)
+        worker.baseline_ready.connect(dialog.set_baseline)
         worker.discovery_complete.connect(on_complete)
         worker.start()
+
+    Legacy usage (pre-loaded bars):
+        engine = ConfigPermutationEngine(
+            base_strategy_config=...,
+            base_backtest_config=...,
+            cached_bars=pre_loaded_bars,
+        )
     """
 
     def __init__(
         self,
         base_strategy_config: Dict[str, Any],
         base_backtest_config: Dict[str, Any],
-        cached_bars: Any,
+        cached_bars: Any = None,
+        data_provider: Any = None,
     ):
         self.base_strategy_config = base_strategy_config
         self.base_backtest_config = base_backtest_config
         self.cached_bars = cached_bars
+        self.data_provider = data_provider
 
     def build_scenarios(
         self,
@@ -502,15 +576,22 @@ class ConfigPermutationEngine:
     def create_worker(
         self,
         scenarios: List[DiscoveryScenario],
+        run_baseline: bool = True,
         parent=None,
     ) -> ConfigPermutationWorker:
         """
         Create (but do not start) a worker thread for the given scenarios.
+
+        If *data_provider* was supplied to this engine, the worker loads bars
+        on its own thread (preferred — avoids UI freeze).  Otherwise the worker
+        uses *cached_bars* directly.
         """
         return ConfigPermutationWorker(
             scenarios=scenarios,
             base_strategy_config=self.base_strategy_config,
             base_backtest_config=self.base_backtest_config,
             cached_bars=self.cached_bars,
+            data_provider=self.data_provider,
+            run_baseline=run_baseline,
             parent=parent,
         )

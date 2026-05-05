@@ -1066,6 +1066,76 @@ def get_table_stylesheet() -> str:
     """
 
 
+def get_table_view_stylesheet() -> str:
+    """
+    Get stylesheet for QTableView data tables (model/view architecture).
+
+    Matches the Trades Panel reference design:
+    - Bold white header text with comfortable padding
+    - Alternating row backgrounds
+    - High-contrast selection highlight
+    - Row height via padding on items
+
+    Returns:
+        Complete QTableView stylesheet string.
+    """
+    return f"""
+        QTableView {{
+            background-color: {COLORS['bg_dark']};
+            alternate-background-color: {COLORS['bg_medium']};
+            color: {COLORS['text_primary']};
+            border: 1px solid {COLORS['border']};
+            gridline-color: {COLORS['border']};
+            selection-background-color: {COLORS['stepper_active']};
+            selection-color: {COLORS['text_primary']};
+        }}
+        QTableView::item {{
+            padding: 10px 8px;
+            background-color: transparent;
+        }}
+        QTableView::item:hover {{
+            background-color: {COLORS['bg_light']};
+        }}
+        QTableView::item:selected {{
+            background-color: {COLORS['stepper_active']};
+            color: {COLORS['text_primary']};
+        }}
+        QHeaderView::section {{
+            background-color: {COLORS['bg_secondary']};
+            color: {COLORS['text_primary']};
+            padding: 12px 10px;
+            border: 1px solid {COLORS['border']};
+            font-weight: 700;
+        }}
+        QHeaderView::section:hover {{
+            background-color: {COLORS['bg_light']};
+        }}
+        QHeaderView::section:checked {{
+            background-color: {COLORS['stepper_active']};
+        }}
+        QScrollBar:vertical {{
+            background: {COLORS['bg_dark']};
+            width: 8px;
+            border: none;
+        }}
+        QScrollBar::handle:vertical {{
+            background: {COLORS['border']};
+            border-radius: 4px;
+            min-height: 20px;
+        }}
+        QScrollBar:horizontal {{
+            background: {COLORS['bg_dark']};
+            height: 8px;
+            border: none;
+        }}
+        QScrollBar::handle:horizontal {{
+            background: {COLORS['border']};
+            border-radius: 4px;
+            min-width: 20px;
+        }}
+    """
+
+
 def get_text_edit_stylesheet() -> str:
     """
     Get stylesheet for QTextEdit output displays.

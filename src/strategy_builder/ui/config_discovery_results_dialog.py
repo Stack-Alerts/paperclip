@@ -44,7 +44,7 @@ from src.strategy_builder.ui.styles import (
     get_primary_button_stylesheet,
     get_secondary_button_stylesheet,
     get_success_button_stylesheet,
-    get_table_stylesheet,
+    get_table_view_stylesheet,
     get_text_edit_stylesheet,
     MAIN_STYLESHEET,
 )
@@ -383,13 +383,15 @@ class ConfigDiscoveryResultsDialog(QDialog):
         self._worker: Optional[QThread] = None
 
         self.setWindowTitle("Config Discovery Results")
-        self.setMinimumSize(1200, 700)
+        self.setMinimumSize(900, 600)
         self.setModal(False)
 
         # Apply global dark stylesheet
         self.setStyleSheet(MAIN_STYLESHEET)
 
         self._build_ui()
+        # Open maximized so all columns have room to display
+        self.showMaximized()
 
     # ------------------------------------------------------------------
     # UI construction
@@ -442,9 +444,13 @@ class ConfigDiscoveryResultsDialog(QDialog):
         self._table.setSortingEnabled(True)
         self._table.setAlternatingRowColors(True)
         self._table.verticalHeader().setVisible(False)
-        self._table.horizontalHeader().setStretchLastSection(False)
-        self._table.horizontalHeader().setSectionResizeMode(COL_SCENARIO, QHeaderView.Stretch)
-        self._table.setStyleSheet(get_table_stylesheet())
+        # Column sizing: Scenario column stretches to fill; others resize to content
+        header = self._table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(COL_SCENARIO, QHeaderView.Stretch)
+        header.setMinimumSectionSize(50)
+        self._table.setStyleSheet(get_table_view_stylesheet())
         self._table.selectionModel().selectionChanged.connect(self._on_selection_changed)
         splitter.addWidget(self._table)
 
@@ -568,11 +574,18 @@ class ConfigDiscoveryResultsDialog(QDialog):
     def set_progress(self, current: int, total: int, message: str = ''):
         """Update the progress bar (0–100 based on current/total)."""
         self._progress_bar.setVisible(True)
-        if total > 0:
-            pct = int((current / total) * 100)
-            self._progress_bar.setValue(pct)
+        if total == 1 and current == 0:
+            # Indeterminate: bar loading phase
+            self._progress_bar.setRange(0, 0)  # indeterminate spinner
+        else:
+            self._progress_bar.setRange(0, 100)
+            if total > 0:
+                pct = int((current / total) * 100)
+                self._progress_bar.setValue(pct)
         self._status_label.setText(message or f"{current}/{total}")
-        if current >= total:
+        if current >= total and total > 1:
+            self._progress_bar.setRange(0, 100)
+            self._progress_bar.setValue(100)
             self._progress_bar.setVisible(False)
             self._status_label.setText(f"Complete — {len(self._results)} scenarios")
 

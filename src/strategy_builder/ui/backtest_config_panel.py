@@ -3606,25 +3606,24 @@ Detailed report saved to:
 
     def _on_config_discovery_clicked(self):
         """
-        Launch Config Discovery run.
-        
-        Phase 2+3 implementation:
+        Launch Config Discovery run (non-blocking).
+
+        Phase 2+3 implementation — UI-thread-safe:
         1. Confirms with user (shows estimated scenario count)
-        2. Loads bars ONCE via data provider
-        3. Builds scenario permutations via ConfigPermutationEngine
-        4. Runs all scenarios using cached bars (fast path)
-        5. Streams results live into ConfigDiscoveryResultsDialog
+        2. Serialises strategy + backtest config on the main thread (fast, no I/O)
+        3. Opens the results dialog IMMEDIATELY (maximised) with indeterminate progress
+        4. Starts ConfigPermutationWorker — bar loading AND baseline run happen
+           inside the worker thread; the main thread is never blocked
+        5. Streams results live into ConfigDiscoveryResultsDialog as each scenario finishes
         6. User can sort by metric, apply best config, export CSV
-        
+
         Preserves existing wiring test functionality — this is an ADDITIONAL
         button that does not replace or change the "Test Wiring" flow.
         """
-        from PyQt5.QtWidgets import QMessageBox, QProgressDialog
+        from PyQt5.QtWidgets import QMessageBox
         from src.strategy_builder.ui.config_permutation_engine import (
             ConfigPermutationEngine,
             DEFAULT_PARAMETER_RANGES,
-            aggregate_metrics,
-            DiscoveryScenario,
         )
         from src.strategy_builder.ui.config_discovery_results_dialog import (
             ConfigDiscoveryResultsDialog,
@@ -3652,58 +3651,28 @@ Detailed report saved to:
         if msg.exec_() != QMessageBox.Yes:
             return
 
-        # Load strategy config
+        # Load strategy config (fast — no I/O)
         try:
             strategy_config = self.orchestrator.serialize_config_for_backtest()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not serialize strategy config:\n{e}")
             return
 
-        # Load bars ONCE (Phase 1.3 bar caching)
-        self.results_text.append("\n[Config Discovery] Loading bars (once for all scenarios)...")
-        QApplication.processEvents()
-        try:
-            backtest_config = self.get_config()
-            bars = self.data_provider.load_bars_for_backtest(
-                timeframe=backtest_config['timeframe'],
-                start_date=backtest_config['start_date'],
-                end_date=backtest_config['end_date'],
-            )
-            self.results_text.append(f"[Config Discovery] Loaded {len(bars):,} bars (cached for all runs)")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Could not load bars:\n{e}")
-            return
+        # Load backtest config (fast — reads UI widgets)
+        backtest_config = self.get_config()
 
-        # Run baseline (current config) first — used as comparison row
-        self.results_text.append("[Config Discovery] Running baseline scenario...")
-        QApplication.processEvents()
-        try:
-            baseline_result = self._run_test_and_wait()
-            baseline_trades = baseline_result.get('trades_list', [])
-            baseline_scenario = DiscoveryScenario(
-                scenario_id='BASELINE',
-                description='[BASELINE] Current config',
-                config_delta={},
-                param_labels=[],
-            )
-            baseline_dr = aggregate_metrics(baseline_scenario, baseline_trades)
-            baseline_dr.scenario_id = 'BASELINE'
-        except Exception as e:
-            baseline_dr = None
-            self.results_text.append(f"[Config Discovery] Baseline failed: {e}")
-
-        # Build permutation scenarios
-        engine = ConfigPermutationEngine(
+        # Build permutation scenarios (fast — no I/O)
+        perm_engine = ConfigPermutationEngine(
             base_strategy_config=strategy_config,
             base_backtest_config=backtest_config,
-            cached_bars=bars,
+            data_provider=self.data_provider,  # bars loaded inside worker thread
         )
-        scenarios = engine.build_scenarios(
+        scenarios = perm_engine.build_scenarios(
             ranges=DEFAULT_PARAMETER_RANGES,
             strategy='single_axis',
         )
 
-        # Open results dialog
+        # Open results dialog immediately (maximised) — no waiting for bars
         def apply_cb(delta):
             self._apply_discovery_config_to_ui(delta)
 
@@ -3711,16 +3680,16 @@ Detailed report saved to:
             apply_config_callback=apply_cb,
             parent=self,
         )
-        if baseline_dr:
-            results_dialog.set_baseline(baseline_dr)
-        results_dialog.show()
-        QApplication.processEvents()
+        results_dialog.showMaximized()
 
-        # Create and start worker
-        worker = engine.create_worker(scenarios, parent=self)
+        # Create and start worker — bar loading + baseline run inside thread
+        worker = perm_engine.create_worker(scenarios, run_baseline=True, parent=self)
         results_dialog.set_worker(worker)
 
         # Wire signals
+        worker.baseline_ready.connect(
+            lambda bl: (results_dialog.set_baseline(bl), results_dialog._refresh_table())
+        )
         worker.scenario_complete.connect(results_dialog.append_result)
         worker.progress_updated.connect(
             lambda curr, total, msg: results_dialog.set_progress(curr, total, msg)
@@ -3737,8 +3706,9 @@ Detailed report saved to:
         worker.start()
 
         self.results_text.append(
-            f"[Config Discovery] Running {len(scenarios)} scenarios in background...\n"
-            "Results dialog is open — rows populate live as each scenario completes."
+            f"[Config Discovery] Running {len(scenarios)} scenarios in background…\n"
+            "Results dialog is open — rows populate live as each scenario completes.\n"
+            "Bar loading and baseline run are happening in the background thread."
         )
 
     def _on_discovery_complete(self, all_results: list, dialog=None):
