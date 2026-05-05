@@ -3606,44 +3606,74 @@ Detailed report saved to:
 
     def _on_config_discovery_clicked(self):
         """
-        Launch Config Discovery run (non-blocking).
+        Launch Config Discovery run (non-blocking) using the same 18+ wiring
+        test scenarios defined in tests/integration/test_scenarios.py.
 
-        Phase 2+3 implementation — UI-thread-safe:
-        1. Confirms with user (shows estimated scenario count)
-        2. Serialises strategy + backtest config on the main thread (fast, no I/O)
-        3. Opens the results dialog IMMEDIATELY (maximised) with indeterminate progress
-        4. Starts ConfigPermutationWorker — bar loading AND baseline run happen
-           inside the worker thread; the main thread is never blocked
-        5. Streams results live into ConfigDiscoveryResultsDialog as each scenario finishes
-        6. User can sort by metric, apply best config, export CSV
+        Replaces the old parameter-sweep approach (DEFAULT_PARAMETER_RANGES).
+        Runs the same scenario set as _on_test_wiring_clicked, but surfaces
+        results in ConfigDiscoveryResultsDialog instead of a wiring report.
 
-        Preserves existing wiring test functionality — this is an ADDITIONAL
-        button that does not replace or change the "Test Wiring" flow.
+        Flow:
+        1. Import CRITICAL_SCENARIOS + EDGE_SCENARIOS + PARAMETER_VARIATION_SCENARIOS
+        2. Confirm with user (show scenario count + estimated time)
+        3. Serialise strategy + backtest config on the main thread (fast, no I/O)
+        4. Convert BacktestScenario objects → DiscoveryScenario objects
+        5. Open ConfigDiscoveryResultsDialog immediately (maximised)
+        6. Start ConfigPermutationWorker — bar loading + all scenario runs happen
+           in the background thread; UI thread is never blocked
+        7. Results stream live into the dialog as each scenario finishes
+        8. User can sort by metric, select a row, and apply that config to the UI
+
+        Does NOT break or modify _on_test_wiring_clicked.
+        Does NOT delete ConfigPermutationEngine or DEFAULT_PARAMETER_RANGES.
         """
         from PyQt5.QtWidgets import QMessageBox
         from src.strategy_builder.ui.config_permutation_engine import (
-            ConfigPermutationEngine,
-            DEFAULT_PARAMETER_RANGES,
+            ConfigPermutationWorker,
+            DiscoveryScenario,
         )
         from src.strategy_builder.ui.config_discovery_results_dialog import (
             ConfigDiscoveryResultsDialog,
         )
 
-        # Estimate scenario count
-        total_values = sum(len(r.get_values()) for r in DEFAULT_PARAMETER_RANGES)
-        est_secs = total_values * 5  # ~5 seconds per scenario with multicore
+        # ------------------------------------------------------------------
+        # Step 1: Load the wiring test scenarios
+        # ------------------------------------------------------------------
+        try:
+            from tests.integration.test_scenarios import (
+                CRITICAL_SCENARIOS,
+                EDGE_SCENARIOS,
+                PARAMETER_VARIATION_SCENARIOS,
+            )
+            all_scenarios = CRITICAL_SCENARIOS + EDGE_SCENARIOS + PARAMETER_VARIATION_SCENARIOS
+        except ImportError:
+            QMessageBox.critical(
+                self,
+                "Config Discovery Error",
+                "Could not load test scenarios.\n\n"
+                "Expected: tests/integration/test_scenarios.py\n"
+                "Ensure the file defines CRITICAL_SCENARIOS, EDGE_SCENARIOS, "
+                "and PARAMETER_VARIATION_SCENARIOS.",
+            )
+            return
 
-        # Confirm with user
+        total_scenarios = len(all_scenarios)
+        est_secs = total_scenarios * 30  # ~30 sec per scenario (real backtest)
+
+        # ------------------------------------------------------------------
+        # Step 2: Confirm with user
+        # ------------------------------------------------------------------
         msg = QMessageBox(self)
         msg.setStyleSheet(MAIN_STYLESHEET)
         msg.setIcon(QMessageBox.Question)
-        msg.setText("Config Discovery")
+        msg.setText("Config Discovery — Wiring Scenarios")
         msg.setInformativeText(
-            f"Run {total_values} parameter permutations?\n\n"
+            f"Run {total_scenarios} wiring test scenarios?\n\n"
             f"  Strategy: {getattr(self.orchestrator.get_current_config(), 'name', 'Current')}\n"
-            f"  Scenarios: {total_values} (single-axis sweep)\n"
-            f"  Est. time: ~{est_secs // 60} min {est_secs % 60} sec\n\n"
-            "Bars are loaded once and reused for all runs (cached).\n\n"
+            f"  Scenarios: {total_scenarios} (from tests/integration/test_scenarios.py)\n"
+            f"  Est. time: ~{est_secs // 60} min\n\n"
+            "Bars are loaded once and reused for all runs.\n"
+            "Results dialog opens immediately — rows populate live.\n\n"
             "Continue?"
         )
         msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
@@ -3651,28 +3681,78 @@ Detailed report saved to:
         if msg.exec_() != QMessageBox.Yes:
             return
 
-        # Load strategy config (fast — no I/O)
+        # ------------------------------------------------------------------
+        # Step 3: Serialise configs on the main thread (fast — no I/O)
+        # ------------------------------------------------------------------
         try:
             strategy_config = self.orchestrator.serialize_config_for_backtest()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Could not serialize strategy config:\n{e}")
+            QMessageBox.critical(self, "Config Discovery Error",
+                                 f"Could not serialize strategy config:\n{e}")
             return
 
-        # Load backtest config (fast — reads UI widgets)
         backtest_config = self.get_config()
 
-        # Build permutation scenarios (fast — no I/O)
-        perm_engine = ConfigPermutationEngine(
-            base_strategy_config=strategy_config,
-            base_backtest_config=backtest_config,
-            data_provider=self.data_provider,  # bars loaded inside worker thread
-        )
-        scenarios = perm_engine.build_scenarios(
-            ranges=DEFAULT_PARAMETER_RANGES,
-            strategy='single_axis',
-        )
+        # ------------------------------------------------------------------
+        # Step 4: Convert BacktestScenario → DiscoveryScenario
+        #
+        # BacktestScenario.config uses the same keys that _apply_scenario_to_ui
+        # understands.  ConfigPermutationWorker merges config_delta on top of
+        # base_backtest_config, so we remap to the get_config() key names:
+        #   'sl_adjustment'  → 'sl_mode'
+        #   'risk_pct'       → 'risk_per_trade_pct'
+        #   'leverage'       → 'max_leverage'
+        #   'sl_delay'       → 'adaptive_sl.delay_bars'   (dot notation)
+        #   'emergency_sl'   → 'adaptive_sl.emergency_sl_pct' (dot notation)
+        #   'tpsl_mode'      → 'tpsl_mode'               (unchanged)
+        #   'max_bars_held'  → 'max_bars_held'            (unchanged)
+        #   'adaptive_sl'    → 'adaptive_sl'              (nested dict, merged)
+        # Keys not listed here are passed through unchanged.
+        # ------------------------------------------------------------------
+        _KEY_MAP = {
+            'sl_adjustment': 'sl_mode',
+            'risk_pct': 'risk_per_trade_pct',
+            'leverage': 'max_leverage',
+        }
+        _NESTED_KEYS = {
+            'sl_delay': ('adaptive_sl', 'delay_bars'),
+            'emergency_sl': ('adaptive_sl', 'emergency_sl_pct'),
+        }
 
-        # Open results dialog immediately (maximised) — no waiting for bars
+        def _build_config_delta(scenario_config: dict) -> dict:
+            """Map BacktestScenario.config keys to get_config() key names."""
+            delta: dict = {}
+            for k, v in scenario_config.items():
+                if k in _KEY_MAP:
+                    delta[_KEY_MAP[k]] = v
+                elif k in _NESTED_KEYS:
+                    parent, child = _NESTED_KEYS[k]
+                    # Use dot-notation so _set_nested handles the merge correctly
+                    delta[f'{parent}.{child}'] = v
+                elif k == 'adaptive_sl' and isinstance(v, dict):
+                    # Flatten nested adaptive_sl dict into dot-notation keys
+                    for sub_k, sub_v in v.items():
+                        delta[f'adaptive_sl.{sub_k}'] = sub_v
+                elif k == 'adaptive_preset':
+                    # Preset name is informational — not a direct config key; skip
+                    pass
+                else:
+                    delta[k] = v
+            return delta
+
+        discovery_scenarios = [
+            DiscoveryScenario(
+                scenario_id=s.id,
+                description=s.description,
+                config_delta=_build_config_delta(s.config),
+                param_labels=[(k, str(v)) for k, v in s.config.items()],
+            )
+            for s in all_scenarios
+        ]
+
+        # ------------------------------------------------------------------
+        # Step 5: Open results dialog immediately (maximised)
+        # ------------------------------------------------------------------
         def apply_cb(delta):
             self._apply_discovery_config_to_ui(delta)
 
@@ -3682,11 +3762,20 @@ Detailed report saved to:
         )
         results_dialog.showMaximized()
 
-        # Create and start worker — bar loading + baseline run inside thread
-        worker = perm_engine.create_worker(scenarios, run_baseline=True, parent=self)
+        # ------------------------------------------------------------------
+        # Step 6: Start background worker — bar loading + scenario runs
+        # ------------------------------------------------------------------
+        worker = ConfigPermutationWorker(
+            scenarios=discovery_scenarios,
+            base_strategy_config=strategy_config,
+            base_backtest_config=backtest_config,
+            data_provider=self.data_provider,  # bars loaded inside worker thread
+            run_baseline=True,
+            parent=self,
+        )
         results_dialog.set_worker(worker)
 
-        # Wire signals
+        # Wire signals — results stream live into the dialog
         worker.baseline_ready.connect(
             lambda bl: (results_dialog.set_baseline(bl), results_dialog._refresh_table())
         )
@@ -3698,7 +3787,7 @@ Detailed report saved to:
             lambda all_results: self._on_discovery_complete(all_results, results_dialog)
         )
         worker.error_occurred.connect(
-            lambda err: QMessageBox.warning(self, "Discovery Error", err)
+            lambda err: QMessageBox.warning(self, "Config Discovery Error", err)
         )
 
         # Store worker reference to prevent GC
@@ -3706,9 +3795,9 @@ Detailed report saved to:
         worker.start()
 
         self.results_text.append(
-            f"[Config Discovery] Running {len(scenarios)} scenarios in background…\n"
+            f"[Config Discovery] Running {total_scenarios} wiring scenarios in background…\n"
             "Results dialog is open — rows populate live as each scenario completes.\n"
-            "Bar loading and baseline run are happening in the background thread."
+            "Scenarios sourced from: tests/integration/test_scenarios.py"
         )
 
     def _on_discovery_complete(self, all_results: list, dialog=None):
