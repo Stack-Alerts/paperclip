@@ -121,6 +121,9 @@ def assign_badges(results: List[DiscoveryResult]) -> Dict[str, Dict[str, str]]:
       - most_frequent   (highest trade_count)
       - best_sharpe     (highest sharpe_ratio)
 
+    Only scenarios with total_pnl > 0 are eligible for any badge tier.
+    A money-losing scenario receives no badge regardless of trade count or Sharpe.
+
     Returns:
         {scenario_id: {'most_profitable': 'gold'|'silver'|'bronze'|'none', ...}}
     """
@@ -129,17 +132,18 @@ def assign_badges(results: List[DiscoveryResult]) -> Dict[str, Dict[str, str]]:
         for r in results
     }
 
-    def rank_category(key: str, attr: str):
+    def rank_category(key: str, attr: str, require_positive_pnl: bool = True):
+        candidates = [r for r in results if r.total_pnl > 0] if require_positive_pnl else results
         sorted_ids = [
             r.scenario_id
-            for r in sorted(results, key=lambda r: getattr(r, attr), reverse=True)
+            for r in sorted(candidates, key=lambda r: getattr(r, attr), reverse=True)
         ]
         for tier, sid in zip(['gold', 'silver', 'bronze'], sorted_ids[:3]):
             badges[sid][key] = tier
 
-    rank_category('most_profitable', 'total_pnl')
-    rank_category('most_frequent', 'trade_count')
-    rank_category('best_sharpe', 'sharpe_ratio')
+    rank_category('most_profitable', 'total_pnl', require_positive_pnl=True)
+    rank_category('most_frequent', 'trade_count', require_positive_pnl=True)
+    rank_category('best_sharpe', 'sharpe_ratio', require_positive_pnl=True)
 
     return badges
 
