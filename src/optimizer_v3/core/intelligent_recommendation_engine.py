@@ -146,6 +146,11 @@ class IntelligentRecommendationEngine:
         """
         return self.ai_enhancer.last_full_analysis
     
+    @property
+    def log(self):
+        """Expose module logger as instance attribute for convenience."""
+        return logger
+
     def _default_status(self, message: str):
         """Default status callback (prints to console)"""
         logger.info(message)
@@ -537,6 +542,201 @@ class IntelligentRecommendationEngine:
         
         return "\n".join(lines)
     
+    def apply_recommendations(
+        self,
+        strategy_config: Dict,
+        recommendations: List['IntegratedRecommendation'],
+    ) -> Dict:
+        """
+        Apply a list of recommendations to a strategy config dict.
+
+        Mutates the strategy config in-place for each supported recommendation
+        type and returns a result summary so callers can log and display
+        per-recommendation outcomes without coupling to the UI layer.
+
+        Supported recommendation types
+        --------------------------------
+        - ``ADD_BLOCK``    — append a new block (with its signals) to ``config['blocks']``
+        - ``ADJUST_PARAM`` — set a top-level parameter on the strategy config
+        - ``ADD_RECHECK``  — attach a ``recheck`` sub-config to a matching signal
+        - ``ADD_TIMING``   — attach a ``timing`` sub-config to a matching block
+
+        Args:
+            strategy_config: Strategy configuration dict (will be mutated in-place).
+            recommendations: List of :class:`IntegratedRecommendation` objects.
+
+        Returns:
+            A dict with keys:
+
+            .. code-block:: python
+
+                {
+                    "applied": [<rec>, ...],    # successfully applied recs
+                    "skipped": [<rec>, ...],    # skipped (e.g. block already present)
+                    "failed":  [<rec>, ...],    # failed due to unexpected error
+                    "errors":  {rec: str, ...}, # error messages keyed by rec object id
+                }
+        """
+        result: Dict = {"applied": [], "skipped": [], "failed": [], "errors": {}}
+
+        existing_block_names: set = {
+            b.get("name", "") for b in strategy_config.get("blocks", [])
+        }
+
+        for rec in recommendations:
+            try:
+                rec_type = getattr(rec, "type", None)
+
+                if rec_type == "ADD_BLOCK":
+                    block_name = getattr(rec, "block_name", None)
+                    if not block_name:
+                        self.log.warning(f"ADD_BLOCK rec has no block_name — skipping")
+                        result["skipped"].append(rec)
+                        continue
+
+                    if block_name in existing_block_names:
+                        self.log.warning(
+                            f"ADD_BLOCK skipped: block '{block_name}' already present"
+                        )
+                        result["skipped"].append(rec)
+                        continue
+
+                    # Build minimal block dict from rec data
+                    new_block: Dict = {"name": block_name, "signals": []}
+                    configuration = getattr(rec, "configuration", {}) or {}
+                    if configuration:
+                        new_block["parameters"] = configuration
+
+                    strategy_config.setdefault("blocks", []).append(new_block)
+                    existing_block_names.add(block_name)
+                    result["applied"].append(rec)
+                    self.log.info(
+                        f"Applied ADD_BLOCK: added '{block_name}' to strategy config"
+                    )
+
+                elif rec_type == "ADJUST_PARAM":
+                    param_name = getattr(rec, "parameter_name", None)
+                    configuration = getattr(rec, "configuration", {}) or {}
+                    new_value = configuration.get("new_value")
+
+                    if not param_name:
+                        self.log.warning("ADJUST_PARAM rec has no parameter_name — skipping")
+                        result["skipped"].append(rec)
+                        continue
+
+                    if new_value is None:
+                        self.log.warning(
+                            f"ADJUST_PARAM '{param_name}' has no new_value in configuration — skipping"
+                        )
+                        result["skipped"].append(rec)
+                        continue
+
+                    old_value = strategy_config.get(param_name)
+                    strategy_config[param_name] = new_value
+                    result["applied"].append(rec)
+                    self.log.info(
+                        f"Applied ADJUST_PARAM: {param_name} {old_value!r} → {new_value!r}"
+                    )
+
+                elif rec_type == "ADD_RECHECK":
+                    block_name = getattr(rec, "block_name", None)
+                    signal_name = getattr(rec, "signal_name", None)
+                    configuration = getattr(rec, "configuration", {}) or {}
+
+                    if not block_name or not signal_name:
+                        self.log.warning(
+                            "ADD_RECHECK rec missing block_name or signal_name — skipping"
+                        )
+                        result["skipped"].append(rec)
+                        continue
+
+                    target_signal = self._find_signal_in_config(
+                        strategy_config, block_name, signal_name
+                    )
+                    if target_signal is None:
+                        self.log.warning(
+                            f"ADD_RECHECK: signal '{block_name}::{signal_name}' not found — skipping"
+                        )
+                        result["skipped"].append(rec)
+                        continue
+
+                    target_signal["recheck"] = configuration
+                    result["applied"].append(rec)
+                    self.log.info(
+                        f"Applied ADD_RECHECK to {block_name}::{signal_name}: {configuration}"
+                    )
+
+                elif rec_type == "ADD_TIMING":
+                    block_name = getattr(rec, "block_name", None)
+                    configuration = getattr(rec, "configuration", {}) or {}
+
+                    if not block_name:
+                        self.log.warning("ADD_TIMING rec has no block_name — skipping")
+                        result["skipped"].append(rec)
+                        continue
+
+                    target_block = next(
+                        (b for b in strategy_config.get("blocks", [])
+                         if b.get("name") == block_name),
+                        None,
+                    )
+                    if target_block is None:
+                        self.log.warning(
+                            f"ADD_TIMING: block '{block_name}' not found in strategy — skipping"
+                        )
+                        result["skipped"].append(rec)
+                        continue
+
+                    target_block["timing"] = configuration
+                    result["applied"].append(rec)
+                    self.log.info(
+                        f"Applied ADD_TIMING to block '{block_name}': {configuration}"
+                    )
+
+                else:
+                    self.log.warning(
+                        f"Unknown recommendation type '{rec_type}' — skipping"
+                    )
+                    result["skipped"].append(rec)
+
+            except Exception as exc:
+                self.log.error(
+                    f"Failed to apply recommendation (type={getattr(rec, 'type', '?')},"
+                    f" block={getattr(rec, 'block_name', '?')}): {exc}"
+                )
+                result["failed"].append(rec)
+                result["errors"][id(rec)] = str(exc)
+
+        self.log.info(
+            f"apply_recommendations complete — applied={len(result['applied'])},"
+            f" skipped={len(result['skipped'])}, failed={len(result['failed'])}"
+        )
+        return result
+
+    def _find_signal_in_config(
+        self,
+        strategy_config: Dict,
+        block_name: str,
+        signal_name: str,
+    ) -> Optional[Dict]:
+        """
+        Locate a signal dict inside strategy_config['blocks'].
+
+        Args:
+            strategy_config: Strategy configuration dict.
+            block_name: Name of the block that contains the signal.
+            signal_name: Name of the signal to find.
+
+        Returns:
+            The signal dict (mutable reference) if found, else ``None``.
+        """
+        for block in strategy_config.get("blocks", []):
+            if block.get("name") == block_name:
+                for signal in block.get("signals", []):
+                    if signal.get("name") == signal_name:
+                        return signal
+        return None
+
     def get_summary_stats(self) -> Dict:
         """Get summary statistics about engine state"""
         intel_db = self.intelligence_extractor.get_all_intelligence()
