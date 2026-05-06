@@ -291,7 +291,7 @@ class AIRecommendationEnhancer:
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
                     "HTTP-Referer": "https://github.com/btc-engine-v3",
-                    "X-Title": "BTC Engine v3 - Strategy Optimizer"
+                    "X-Title": "BTC Trade Engine - Strategy Optimizer"
                 },
                 json=request_payload,
                 timeout=30
