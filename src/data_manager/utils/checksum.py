@@ -1,9 +1,13 @@
 """Checksum utilities for file integrity verification"""
 
 import hashlib
+import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 import json
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_checksum(file_path: Path, algorithm: str = 'sha256') -> str:
@@ -99,8 +103,6 @@ def save_checksum_metadata(file_path: Path, metadata_file: Optional[Path] = None
     Note:
         Saves metadata as JSON file for later verification
     """
-    from datetime import datetime
-    
     if not file_path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
     
@@ -221,7 +223,7 @@ def batch_calculate_checksums(directory: Path, pattern: str = "*.parquet") -> Di
                 checksum = calculate_checksum(file_path)
                 checksums[file_path.name] = checksum
             except Exception as e:
-                print(f"Error calculating checksum for {file_path}: {e}")
+                logger.error(f"Error calculating checksum for {file_path}: {e}")
     
     return checksums
 

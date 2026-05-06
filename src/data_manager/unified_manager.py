@@ -126,10 +126,10 @@ class UnifiedDataManager:
         # Thresholds
         self.binance_threshold_days = 30  # Use Binance for last 30 days
         
-        print(f"✅ Unified Data Manager initialized (Mode: {mode})")
-        print(f"   LakeAPI: {self.lakeapi_dir}")
-        print(f"   Binance: {self.binance_dir}")
-        print(f"   Auto-routing threshold: {self.binance_threshold_days} days")
+        logger.info(f"✅ Unified Data Manager initialized (Mode: {mode})")
+        logger.info(f"   LakeAPI: {self.lakeapi_dir}")
+        logger.info(f"   Binance: {self.binance_dir}")
+        logger.info(f"   Auto-routing threshold: {self.binance_threshold_days} days")
 
         # Optional startup gap check (only in live/paper mode by default)
         if startup_gap_check:
@@ -198,7 +198,7 @@ class UnifiedDataManager:
         Returns:
             DataFrame with bars from local files
         """
-        print("   📂 Reading from local Binance parquet files...")
+        logger.info("   📂 Reading from local Binance parquet files...")
         
         try:
             # Determine which month folders to read
@@ -217,9 +217,9 @@ class UnifiedDataManager:
                     # Read parquet file
                     df_month = pd.read_parquet(file_path)
                     all_bars.append(df_month)
-                    print(f"   ✅ Read {len(df_month)} bars from {file_path.name}")
+                    logger.info(f"   ✅ Read {len(df_month)} bars from {file_path.name}")
                 else:
-                    print(f"   ⚠️  File not found: {file_path.name}")
+                    logger.warning(f"   ⚠️  File not found: {file_path.name}")
                 
                 # Next month
                 if current_month.month == 12:
@@ -245,11 +245,11 @@ class UnifiedDataManager:
             # Sort by timestamp
             bars = bars.sort_values('timestamp').reset_index(drop=True)
             
-            print(f"   ✅ Local files: {len(bars)} bars loaded")
+            logger.info(f"   ✅ Local files: {len(bars)} bars loaded")
             return bars
             
         except Exception as e:
-            print(f"   ❌ Local files error: {e}")
+            logger.error(f"   ❌ Local files error: {e}")
             raise
     
     def _determine_source(
@@ -361,7 +361,7 @@ class UnifiedDataManager:
         if end_date is None:
             end_date = datetime.now()
         
-        print(f"📊 Getting last {count} {timeframe} bars...")
+        logger.info(f"📊 Getting last {count} {timeframe} bars...")
         
         # Estimate required date range
         timeframe_minutes = {
@@ -380,10 +380,10 @@ class UnifiedDataManager:
         # Return last N bars
         if len(bars) >= count:
             result = bars.tail(count).copy()
-            print(f"✅ Returned {len(result)} bars")
+            logger.info(f"✅ Returned {len(result)} bars")
             return result
         else:
-            print(f"⚠️  Only {len(bars)} bars available (requested {count})")
+            logger.warning(f"⚠️  Only {len(bars)} bars available (requested {count})")
             return bars
     
     def _get_bars_by_range(
@@ -417,7 +417,7 @@ class UnifiedDataManager:
         if source == DataSource.AUTO:
             source = self._determine_source(start_date, end_date)
         
-        print(f"📊 Source: {source.value} | Range: {start_date.date()} to {end_date.date()}")
+        logger.info(f"📊 Source: {source.value} | Range: {start_date.date()} to {end_date.date()}")
         
         # Route to appropriate source
         if source == DataSource.LAKEAPI:
@@ -451,7 +451,7 @@ class UnifiedDataManager:
         Returns:
             DataFrame with bars
         """
-        print("   📂 Loading from LakeAPI...")
+        logger.info("   📂 Loading from LakeAPI...")
         
         try:
             # CRITICAL: Normalize timeframe format ('15m' → '15min')
@@ -465,14 +465,14 @@ class UnifiedDataManager:
                 normalized_tf  # Use normalized timeframe!
             )
             
-            print(f"   ✅ LakeAPI: {len(bars)} bars loaded")
+            logger.info(f"   ✅ LakeAPI: {len(bars)} bars loaded")
             return bars
             
         except Exception as e:
-            print(f"   ❌ LakeAPI error: {e}")
+            logger.error(f"   ❌ LakeAPI error: {e}")
             
             # Fallback to Binance if LakeAPI fails
-            print("   🔄 Falling back to Binance...")
+            logger.info("   🔄 Falling back to Binance...")
             return self._get_bars_binance(timeframe, start_date, end_date)
     
     def _get_bars_binance(
@@ -494,7 +494,7 @@ class UnifiedDataManager:
         Returns:
             DataFrame with bars
         """
-        print("   🌐 Loading from Binance...")
+        logger.info("   🌐 Loading from Binance...")
         
         try:
             client = self._get_binance_client()
@@ -535,14 +535,14 @@ class UnifiedDataManager:
                 start_date_floored = start_date  # 15m and smaller: existing behaviour is correct
             bars = bars[bars['timestamp'] >= start_date_floored].copy()
             
-            print(f"   ✅ Binance: {len(bars)} bars loaded")
+            logger.info(f"   ✅ Binance: {len(bars)} bars loaded")
             return bars
             
         except Exception as e:
-            print(f"   ❌ Binance error: {e}")
+            logger.error(f"   ❌ Binance error: {e}")
             
             # If Binance fails, try LakeAPI as fallback
-            print("   🔄 Falling back to LakeAPI...")
+            logger.info("   🔄 Falling back to LakeAPI...")
             return self._get_bars_lakeapi(timeframe, start_date, end_date)
     
     def _get_earliest_binance_date(self, timeframe: str) -> Optional[datetime]:
@@ -584,12 +584,12 @@ class UnifiedDataManager:
                     continue
             
             if earliest_timestamp:
-                print(f"   📅 Earliest Binance data: {earliest_timestamp.strftime('%Y-%m-%d %H:%M')}")
+                logger.info(f"   📅 Earliest Binance data: {earliest_timestamp.strftime('%Y-%m-%d %H:%M')}")
             
             return earliest_timestamp
             
         except Exception as e:
-            print(f"   ⚠️  Error detecting Binance files: {e}")
+            logger.error(f"   ⚠️  Error detecting Binance files: {e}")
             return None
     
     def _get_bars_hybrid(
@@ -616,7 +616,7 @@ class UnifiedDataManager:
         Returns:
             DataFrame with combined bars
         """
-        print("   🔀 Hybrid mode: Combining LakeAPI + Binance...")
+        logger.info("   🔀 Hybrid mode: Combining LakeAPI + Binance...")
         
         # CRITICAL FIX: Dynamically detect earliest Binance file instead of hardcoded 30 days!
         earliest_binance = self._get_earliest_binance_date(timeframe)
@@ -624,18 +624,18 @@ class UnifiedDataManager:
         if earliest_binance:
             # Use the ACTUAL earliest Binance date as threshold
             threshold = earliest_binance
-            print(f"   ✅ Using ALL Binance data from {threshold.strftime('%Y-%m-%d')}")
+            logger.info(f"   ✅ Using ALL Binance data from {threshold.strftime('%Y-%m-%d')}")
         else:
             # Fallback to 30-day threshold if no Binance files found
             threshold = datetime.now() - timedelta(days=self.binance_threshold_days)
-            print(f"   ⚠️  No Binance files found, using {self.binance_threshold_days}-day threshold")
+            logger.warning(f"   ⚠️  No Binance files found, using {self.binance_threshold_days}-day threshold")
         
         all_bars = []
         
         # Part 1: Historical from LakeAPI
         if start_date < threshold:
             historical_end = min(threshold, end_date)
-            print(f"   📂 LakeAPI: {start_date.date()} to {historical_end.date()}")
+            logger.info(f"   📂 LakeAPI: {start_date.date()} to {historical_end.date()}")
             
             try:
                 historical_bars = self._get_bars_lakeapi(
@@ -645,12 +645,12 @@ class UnifiedDataManager:
                 )
                 all_bars.append(historical_bars)
             except Exception as e:
-                print(f"   ⚠️  LakeAPI failed: {e}")
+                logger.error(f"   ⚠️  LakeAPI failed: {e}")
         
         # Part 2: Recent from Binance
         if end_date > threshold:
             recent_start = max(threshold, start_date)
-            print(f"   🌐 Binance: {recent_start.date()} to {end_date.date()}")
+            logger.info(f"   🌐 Binance: {recent_start.date()} to {end_date.date()}")
             
             try:
                 # CRITICAL: Use local files in backtest mode, API in live mode
@@ -668,7 +668,7 @@ class UnifiedDataManager:
                     )
                 all_bars.append(recent_bars)
             except Exception as e:
-                print(f"   ⚠️  Binance failed: {e}")
+                logger.error(f"   ⚠️  Binance failed: {e}")
         
         if not all_bars:
             raise ValueError("No data available from any source")
@@ -677,7 +677,7 @@ class UnifiedDataManager:
         combined = pd.concat(all_bars, ignore_index=True)
         combined = combined.sort_values('timestamp').drop_duplicates(subset=['timestamp'], keep='last')
         
-        print(f"   ✅ Hybrid: {len(combined)} total bars")
+        logger.info(f"   ✅ Hybrid: {len(combined)} total bars")
         return combined
     
     def get_all_data_types_status(self) -> Dict[str, Dict]:
@@ -782,7 +782,7 @@ class UnifiedDataManager:
                             if latest_timestamp and latest_timestamp > end_date:
                                 end_date = latest_timestamp
                                 gap_days = (datetime.now() - end_date).days
-                                print(f"   ✅ Downloaded Binance: last candle at {latest_timestamp} (gap: {gap_days}d)")
+                                logger.info(f"   ✅ Downloaded Binance: last candle at {latest_timestamp} (gap: {gap_days}d)")
                     except Exception as e:
                         pass
                 
@@ -820,7 +820,7 @@ class UnifiedDataManager:
                 }
                 
             except Exception as e:
-                print(f"Error checking {data_type}: {e}")
+                logger.error(f"Error checking {data_type}: {e}")
                 status[data_type] = {
                     'status': 'error',
                     'gap_days': 999,
@@ -875,7 +875,7 @@ class UnifiedDataManager:
                         raise Exception("Could not read timestamp from any column")
                         
                 except Exception as e:
-                    print(f"Warning: Could not read last timestamp from {last_parquet}: {e}")
+                    logger.warning(f"Warning: Could not read last timestamp from {last_parquet}: {e}")
                     # Fallback to filename
                     last_file = parquet_files[-1].stem.split('_')[-1]
                     year, month = map(int, last_file.split('-'))
@@ -941,7 +941,7 @@ class UnifiedDataManager:
                     result = result.replace(tzinfo=None)
                 return result
             except Exception as exc:
-                print(f"   [get_last_bar_timestamp/{timeframe}] could not read {fp.name}: {exc}")
+                logger.warning(f"   [get_last_bar_timestamp/{timeframe}] could not read {fp.name}: {exc}")
                 continue
 
         return None
@@ -996,7 +996,7 @@ class UnifiedDataManager:
         pattern = f'**/BTCUSDT_PERP_{timeframe}_*.parquet'
         all_files = sorted(self.binance_dir.glob(pattern))
         if not all_files:
-            print(f"   ⚠️  No Binance parquet files found for {timeframe}")
+            logger.warning(f"   ⚠️  No Binance parquet files found for {timeframe}")
             return []
 
         # RC3 PERF FIX: Skip files whose month is entirely outside [start_date, end_date].
@@ -1039,12 +1039,12 @@ class UnifiedDataManager:
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
                 frames.append(df)
             except Exception as exc:
-                print(f"   ⚠️  Could not read {f.name}: {exc}")
+                logger.warning(f"   ⚠️  Could not read {f.name}: {exc}")
 
         if not frames:
             return []
 
-        print(f"   [detect_gaps/{timeframe}] loaded {len(files)} file(s) in {_time_mod.monotonic() - t0_load:.2f}s")
+        logger.info(f"   [detect_gaps/{timeframe}] loaded {len(files)} file(s) in {_time_mod.monotonic() - t0_load:.2f}s")
 
         combined = pd.concat(frames, ignore_index=True)
         combined = combined.sort_values('timestamp').drop_duplicates(
@@ -1372,11 +1372,9 @@ class UnifiedDataManager:
                 # Bug 3 fix: log delta (+N new) not just total.
                 n_new = len(merged) - n_existing
                 t_lock_released = _time_mod.monotonic()
-                print(
-                    f"      Saved {len(merged)} bars (+{n_new} new) → {file_path.name} "
+                logger.info(f"      Saved {len(merged)} bars (+{n_new} new) → {file_path.name} "
                     f"(lock_wait={t_lock_acquired - t0_lock:.2f}s, "
-                    f"write={t_lock_released - t_lock_acquired:.2f}s)"
-                )
+                    f"write={t_lock_released - t_lock_acquired:.2f}s)")
 
             # Bug 4 fix: read-back verification — done OUTSIDE the lock so other
             # threads can acquire it immediately after the write completes.
@@ -1394,7 +1392,7 @@ class UnifiedDataManager:
                     f"Write FAILED for {file_path.name}: "
                     f"last timestamp mismatch — expected {merged_last}, got {verify_last}"
                 )
-            print(f"      Verified {len(verify_df)} bars on disk, last={verify_last}")
+            logger.info(f"      Verified {len(verify_df)} bars on disk, last={verify_last}")
 
     def run_gap_report(
         self,
@@ -1418,12 +1416,12 @@ class UnifiedDataManager:
 
         report: Dict[str, List[Dict]] = {}
 
-        print("\n" + "=" * 60)
-        print("GAP DETECTION REPORT")
-        print(f"Timeframes: {', '.join(timeframes)}")
-        print(f"Start filter: {start_date or 'none'}")
-        print(f"End filter:   {end_date or 'none'}")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("GAP DETECTION REPORT")
+        logger.info(f"Timeframes: {', '.join(timeframes)}")
+        logger.info(f"Start filter: {start_date or 'none'}")
+        logger.info(f"End filter:   {end_date or 'none'}")
+        logger.info("=" * 60)
 
         for tf in timeframes:
             gaps = self.detect_gaps_in_binance_files(tf, start_date, end_date)
@@ -1431,16 +1429,14 @@ class UnifiedDataManager:
 
             if gaps:
                 total_missing = sum(g['missing_bars'] for g in gaps)
-                print(f"\n[{tf}] {len(gaps)} gap(s) found, ~{total_missing} missing bars:")
+                logger.info(f"\n[{tf}] {len(gaps)} gap(s) found, ~{total_missing} missing bars:")
                 for g in gaps:
-                    print(
-                        f"   {g['gap_start']} → {g['gap_end']} "
-                        f"({g['duration']}, ~{g['missing_bars']} bars)"
-                    )
+                    logger.info(f"   {g['gap_start']} → {g['gap_end']} "
+                        f"({g['duration']}, ~{g['missing_bars']} bars)")
             else:
-                print(f"\n[{tf}] No gaps detected — data is continuous.")
+                logger.info(f"\n[{tf}] No gaps detected — data is continuous.")
 
-        print("\n" + "=" * 60)
+        logger.info("\n" + "=" * 60)
         return report
 
     def verify_and_repair(
@@ -1512,24 +1508,24 @@ class UnifiedDataManager:
         horizon_cutoff = datetime.now() - timedelta(days=binance_api_horizon_days)
 
         t0_total = _time_mod.monotonic()
-        print("\n" + "=" * 60)
-        print("VERIFY AND REPAIR — DATA INTEGRITY CHECK")
-        print(f"Mode: {'DRY RUN (no writes)' if dry_run else 'LIVE REPAIR'}")
-        print(f"Scope: {start_date.date()} → {end_date.date()}")
-        print(f"Timeframes: {', '.join(timeframes)}")
-        print(f"Binance API horizon: {binance_api_horizon_days} days")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("VERIFY AND REPAIR — DATA INTEGRITY CHECK")
+        logger.info(f"Mode: {'DRY RUN (no writes)' if dry_run else 'LIVE REPAIR'}")
+        logger.info(f"Scope: {start_date.date()} → {end_date.date()}")
+        logger.info(f"Timeframes: {', '.join(timeframes)}")
+        logger.info(f"Binance API horizon: {binance_api_horizon_days} days")
+        logger.info("=" * 60)
 
         summary: Dict[str, Dict] = {}
 
         for tf in timeframes:
             t0_tf = _time_mod.monotonic()
-            print(f"\n--- Checking {tf} ---")
+            logger.info(f"\n--- Checking {tf} ---")
             t0_detect = _time_mod.monotonic()
             gaps = self.detect_gaps_in_binance_files(
                 tf, start_date=start_date, end_date=end_date
             )
-            print(f"   [timing] detect_gaps/{tf}: {_time_mod.monotonic() - t0_detect:.2f}s")
+            logger.info(f"   [timing] detect_gaps/{tf}: {_time_mod.monotonic() - t0_detect:.2f}s")
 
             tf_summary: Dict = {
                 'gaps_found': len(gaps),
@@ -1540,22 +1536,20 @@ class UnifiedDataManager:
             }
 
             if not gaps:
-                print(f"   ✅ No gaps found — {tf} data is continuous in range.")
+                logger.info(f"   ✅ No gaps found — {tf} data is continuous in range.")
                 summary[tf] = tf_summary
                 continue
 
             total_missing = sum(g['missing_bars'] for g in gaps)
-            print(f"   Found {len(gaps)} gap(s), ~{total_missing} missing bars total.")
+            logger.info(f"   Found {len(gaps)} gap(s), ~{total_missing} missing bars total.")
 
             for gap in gaps:
                 gap_start: datetime = gap['gap_start']
                 gap_end: datetime = gap['gap_end']
                 missing: int = gap['missing_bars']
 
-                print(
-                    f"   Gap: {gap_start} → {gap_end} "
-                    f"(~{missing} bars, duration {gap['duration']})"
-                )
+                logger.info(f"   Gap: {gap_start} → {gap_end} "
+                    f"(~{missing} bars, duration {gap['duration']})")
 
                 # Determine if gap is within Binance API range
                 if gap_start < horizon_cutoff:
@@ -1564,17 +1558,17 @@ class UnifiedDataManager:
                         "Binance horizon — cannot auto-repair from Binance. "
                         "Consider LakeAPI backfill."
                     )
-                    print(f"   ⚠️  {msg}")
+                    logger.warning(f"   ⚠️  {msg}")
                     logger.warning(msg)
                     tf_summary['gaps_too_old'] += 1
                     continue
 
                 if dry_run:
-                    print(f"   [DRY RUN] Would fetch {gap_start} → {gap_end}")
+                    logger.info(f"   [DRY RUN] Would fetch {gap_start} → {gap_end}")
                     continue
 
                 # Fetch from Binance with explicit startTime/endTime
-                print(f"   🌐 Fetching from Binance ({gap_start} → {gap_end}) ...")
+                logger.info(f"   🌐 Fetching from Binance ({gap_start} → {gap_end}) ...")
                 try:
                     tf_minutes = {
                         '1m': 1, '5m': 5, '15m': 15, '30m': 30,
@@ -1595,9 +1589,13 @@ class UnifiedDataManager:
                     fetch_start = gap_start + bar_td + BINANCE_PROPAGATION_BUFFER
                     fetch_end = gap_end - bar_td
 
-                    if fetch_end < fetch_start:
-                        # Degenerate case: gap spans less than one bar period
-                        print(f"   ⚠️  Gap smaller than one bar period — skipping.")
+                    if fetch_end < fetch_start - BINANCE_PROPAGATION_BUFFER:
+                        # Degenerate case: gap spans less than one bar period.
+                        # Exclude BINANCE_PROPAGATION_BUFFER from the size check —
+                        # without this a one-bar gap at the trailing edge produces
+                        # fetch_end (11:45:00) < fetch_start (11:45:02) and is
+                        # falsely skipped (off-by-2 s).
+                        logger.warning(f"   ⚠️  Gap smaller than one bar period — skipping.")
                         continue
 
                     t0_fetch = _time_mod.monotonic()
@@ -1608,47 +1606,45 @@ class UnifiedDataManager:
                         symbol=symbol,
                         futures=futures,
                     )
-                    print(f"   [timing] fetch/{tf}: {_time_mod.monotonic() - t0_fetch:.2f}s")
+                    logger.info(f"   [timing] fetch/{tf}: {_time_mod.monotonic() - t0_fetch:.2f}s")
 
                     if new_bars.empty:
                         msg = f"Binance returned no data for {tf} {fetch_start}→{fetch_end}"
-                        print(f"   ⚠️  {msg}")
+                        logger.warning(f"   ⚠️  {msg}")
                         tf_summary['errors'].append(msg)
                         continue
 
-                    print(f"   ✅ Fetched {len(new_bars)} bars.")
+                    logger.info(f"   ✅ Fetched {len(new_bars)} bars.")
                     t0_save = _time_mod.monotonic()
                     self._save_binance_bars(new_bars, tf)
-                    print(f"   [timing] save/{tf}: {_time_mod.monotonic() - t0_save:.2f}s")
+                    logger.info(f"   [timing] save/{tf}: {_time_mod.monotonic() - t0_save:.2f}s")
 
                     tf_summary['gaps_repaired'] += 1
                     tf_summary['bars_fetched'] += len(new_bars)
 
                 except Exception as exc:
                     msg = f"Error repairing {tf} gap {gap_start}→{gap_end}: {exc}"
-                    print(f"   ❌ {msg}")
+                    logger.error(f"   ❌ {msg}")
                     logger.error(msg)
                     tf_summary['errors'].append(msg)
 
             summary[tf] = tf_summary
-            print(f"   [timing] total/{tf}: {_time_mod.monotonic() - t0_tf:.2f}s")
+            logger.info(f"   [timing] total/{tf}: {_time_mod.monotonic() - t0_tf:.2f}s")
 
         # Final summary
-        print("\n" + "=" * 60)
-        print(f"REPAIR SUMMARY (total wall-clock: {_time_mod.monotonic() - t0_total:.2f}s)")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info(f"REPAIR SUMMARY (total wall-clock: {_time_mod.monotonic() - t0_total:.2f}s)")
+        logger.info("=" * 60)
         for tf, s in summary.items():
             status = "✅" if s['gaps_found'] == 0 or s['gaps_repaired'] == s['gaps_found'] - s['gaps_too_old'] else "⚠️"
-            print(
-                f"{status} {tf}: "
+            logger.info(f"{status} {tf}: "
                 f"{s['gaps_found']} gap(s) found | "
                 f"{s['gaps_repaired']} repaired | "
                 f"{s['gaps_too_old']} too old | "
-                f"{s['bars_fetched']} bars fetched"
-            )
+                f"{s['bars_fetched']} bars fetched")
             for err in s['errors']:
-                print(f"   ❌ {err}")
-        print("=" * 60 + "\n")
+                logger.error(f"   ❌ {err}")
+        logger.info("=" * 60 + "\n")
 
         return summary
 
@@ -1676,9 +1672,9 @@ class UnifiedDataManager:
         if timeframes is None:
             timeframes = ['15m', '1h', '1d']
 
-        start_date = datetime.utcnow() - timedelta(days=lookback_days)
-        end_date = datetime.utcnow()
-        print(f"\n🔍 Startup continuity check (last {lookback_days} days)...")
+        start_date = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).replace(tzinfo=None)
+        end_date = datetime.now(timezone.utc).replace(tzinfo=None)
+        logger.info(f"\n🔍 Startup continuity check (last {lookback_days} days)...")
 
         # Quick gap scan — pass end_date so trailing-edge gaps (last bar on disk
         # vs. now) are included in the detection window.
@@ -1687,10 +1683,10 @@ class UnifiedDataManager:
             gaps = self.detect_gaps_in_binance_files(tf, start_date=start_date, end_date=end_date)
             if gaps:
                 all_clean = False
-                print(f"   ⚠️  {tf}: {len(gaps)} gap(s) detected in last {lookback_days} days.")
+                logger.warning(f"   ⚠️  {tf}: {len(gaps)} gap(s) detected in last {lookback_days} days.")
 
         if all_clean:
-            print(f"   ✅ All timeframes clean for last {lookback_days} days.")
+            logger.info(f"   ✅ All timeframes clean for last {lookback_days} days.")
             return {tf: {'gaps_found': 0, 'gaps_repaired': 0,
                          'gaps_too_old': 0, 'bars_fetched': 0, 'errors': []}
                     for tf in timeframes}
