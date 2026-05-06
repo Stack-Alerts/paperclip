@@ -418,7 +418,8 @@ class StrategyDatabaseManager:
         # Allowed update fields (not core configuration)
         allowed_fields = [
             'description', 'notes', 'tags', 'backtest_results',
-            'metrics', 'trades', 'equity_curve'
+            'metrics', 'trades', 'equity_curve', 'backtest_config',
+            'validation_status',
         ]
         
         # Filter to allowed fields only
@@ -430,7 +431,7 @@ class StrategyDatabaseManager:
             return False
         
         # JSON encode list/dict fields
-        json_fields = ['tags', 'backtest_results', 'metrics', 'trades', 'equity_curve']
+        json_fields = ['tags', 'backtest_results', 'metrics', 'trades', 'equity_curve', 'backtest_config']
         for field in json_fields:
             if field in filtered_updates and filtered_updates[field] is not None:
                 filtered_updates[field] = json.dumps(filtered_updates[field])
@@ -456,7 +457,51 @@ class StrategyDatabaseManager:
             self.logger.info(f"Updated strategy version: {version_id}")
         
         return updated
-    
+
+    def save_backtest_config_for_version(
+        self,
+        version_id: str,
+        config: Dict[str, Any],
+        source: str = 'manual',
+    ) -> bool:
+        """
+        Persist a backtest configuration snapshot for a specific strategy version.
+
+        Stores a serialisable subset of the BacktestConfigPanel's config dict
+        so that it can be automatically restored the next time this version is
+        opened.  Non-serialisable values (datetime objects) are converted to
+        ISO-8601 strings before storage.
+
+        Args:
+            version_id: UUID of the strategy version to update.
+            config:     Dict returned by BacktestConfigPanel.get_config().
+            source:     Human-readable label for the save trigger
+                        ('test_run', 'config_discovery', 'manual').
+
+        Returns:
+            True if the row was updated, False if version_id was not found.
+        """
+        from datetime import datetime as _dt
+
+        # Serialise any datetime values so they survive JSON round-trip
+        serialisable = {}
+        for k, v in config.items():
+            if isinstance(v, _dt):
+                serialisable[k] = v.isoformat()
+            elif isinstance(v, dict):
+                inner = {}
+                for ik, iv in v.items():
+                    inner[ik] = iv.isoformat() if isinstance(iv, _dt) else iv
+                serialisable[k] = inner
+            else:
+                serialisable[k] = v
+
+        # Tag the snapshot with its save source and timestamp
+        serialisable['_saved_at'] = _dt.utcnow().isoformat()
+        serialisable['_save_source'] = source
+
+        return self.update_strategy_version(version_id, {'backtest_config': serialisable})
+
     def delete_strategy(self, strategy_id: str) -> bool:
         """
         Delete entire strategy and all its versions
