@@ -24,6 +24,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='adr',
@@ -736,27 +738,27 @@ if __name__ == "__main__":
     adr_block = ADR(period=14, timeframe='1D')
     result = adr_block.analyze(df)
     
-    print("=" * 80)
-    print("ADR (AVERAGE DAILY RANGE) BUILDING BLOCK - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"\nADR Analysis:")
-    print(f"  ADR Value: ${result['metadata']['adr_value']:.2f}")
-    print(f"  ADR %: {result['metadata']['adr_percent']:.2f}%")
-    print(f"  Current Range: ${result['metadata']['current_range']:.2f}")
-    print(f"  Current Range %: {result['metadata']['current_range_percent']:.2f}%")
-    print(f"  Current Price: ${result['metadata']['current_price']:.2f}")
-    print(f"\nClassification:")
-    print(f"  Range Classification: {result['metadata']['range_classification']}")
-    print(f"  Range Percentile: {result['metadata']['range_percentile']:.1f}th")
-    print(f"  Range Trend: {result['metadata']['range_trend']}")
-    print(f"\nPosition Sizing:")
-    print(f"  Factor: {result['metadata']['position_sizing_factor']}x")
-    print(f"\nProfit Targets:")
+    logger.info("=" * 80)
+    logger.info("ADR (AVERAGE DAILY RANGE) BUILDING BLOCK - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"\nADR Analysis:")
+    logger.info(f"  ADR Value: ${result['metadata']['adr_value']:.2f}")
+    logger.info(f"  ADR %: {result['metadata']['adr_percent']:.2f}%")
+    logger.info(f"  Current Range: ${result['metadata']['current_range']:.2f}")
+    logger.info(f"  Current Range %: {result['metadata']['current_range_percent']:.2f}%")
+    logger.info(f"  Current Price: ${result['metadata']['current_price']:.2f}")
+    logger.info(f"\nClassification:")
+    logger.info(f"  Range Classification: {result['metadata']['range_classification']}")
+    logger.info(f"  Range Percentile: {result['metadata']['range_percentile']:.1f}th")
+    logger.info(f"  Range Trend: {result['metadata']['range_trend']}")
+    logger.info(f"\nPosition Sizing:")
+    logger.info(f"  Factor: {result['metadata']['position_sizing_factor']}x")
+    logger.info(f"\nProfit Targets:")
     for target_name, target_data in result['metadata']['targets'].items():
-        print(f"  {target_name}: ${target_data['long_target']:.2f} (+{target_data['percent']:.1f}%)")
-    print(f"\nConfluence Factors:")
+        logger.info(f"  {target_name}: ${target_data['long_target']:.2f} (+{target_data['percent']:.1f}%)")
+    logger.info(f"\nConfluence Factors:")
     for factor in result['confluence_factors']:
-        print(f"  - {factor}")
-    print("=" * 80)
+        logger.info(f"  - {factor}")
+    logger.info("=" * 80)

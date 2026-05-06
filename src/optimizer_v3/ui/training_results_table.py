@@ -41,6 +41,10 @@ from src.strategy_builder.ui.styles import (
     get_color
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class NumericTableWidgetItem(QTableWidgetItem):
     """
@@ -193,7 +197,7 @@ class TrainingResultsTable(QWidget):
         """Clear all results from panel"""
         self.results.clear()
         self._update_table()
-        print("🧹 Training results cleared")
+        logger.info("🧹 Training results cleared")
     
     def add_result(self, result_data: Dict) -> None:
         """
@@ -220,13 +224,13 @@ class TrainingResultsTable(QWidget):
             existing_key = f"{existing['signal_name']}_{existing['timeframe']}"
             if existing_key == signal_key:
                 # Update existing result
-                print(f"🔄 Result for {signal_key} already exists - updating")
+                logger.info(f"🔄 Result for {signal_key} already exists - updating")
                 self.results[i].update(result_data)
                 self._update_table()
                 return
         
         # Add new result
-        print(f"➕ Adding new result for {signal_key}")
+        logger.info(f"➕ Adding new result for {signal_key}")
         self.results.append(result_data)
         self._update_table()
     
@@ -313,7 +317,7 @@ class TrainingResultsTable(QWidget):
         
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
-            print("⚠️ No results selected - select rows with Ctrl+Click")
+            logger.warning("⚠️ No results selected - select rows with Ctrl+Click")
             return
         
         try:
@@ -347,17 +351,16 @@ class TrainingResultsTable(QWidget):
             clipboard = QApplication.clipboard()
             clipboard.setText(content)
             
-            print(f"✅ {len(selected_results)} selected results copied to clipboard")
+            logger.info(f"✅ {len(selected_results)} selected results copied to clipboard")
             
         except Exception as e:
-            print(f"❌ Copy selection failed: {str(e)}")
+            logger.error(f"❌ Copy selection failed: {str(e)}")
     
     def _copy_results(self) -> None:
         """Copy all results - REUSED FROM TRADESPANEL._copy_trades()"""
         from PyQt6.QtWidgets import QApplication
-        
         if not self.results:
-            print("⚠️ No results to copy")
+            logger.warning("⚠️ No results to copy")
             return
         
         try:
@@ -387,10 +390,10 @@ class TrainingResultsTable(QWidget):
             clipboard = QApplication.clipboard()
             clipboard.setText(content)
             
-            print(f"✅ {len(self.results)} results copied to clipboard")
+            logger.info(f"✅ {len(self.results)} results copied to clipboard")
             
         except Exception as e:
-            print(f"❌ Copy failed: {str(e)}")
+            logger.error(f"❌ Copy failed: {str(e)}")
     
     def _export_results(self) -> None:
         """Export results to CSV - REUSED FROM TRADESPANEL._export_trades()"""
@@ -417,10 +420,10 @@ class TrainingResultsTable(QWidget):
                         f"\"{result.get('reasoning', '')}\"\n"
                     )
             
-            print(f"✅ Training results exported to {filename}")
+            logger.info(f"✅ Training results exported to {filename}")
             
         except Exception as e:
-            print(f"❌ Export failed: {str(e)}")
+            logger.error(f"❌ Export failed: {str(e)}")
     
     def get_results(self) -> List[Dict]:
         """Get all results"""

@@ -17,6 +17,8 @@ Sprint: 1.6 (Intelligent Recommendations - Task 1.6.1)
 
 from typing import Dict, List, Any
 
+import logging
+logger = logging.getLogger(__name__)
 
 # Building Block Intelligence Mapping
 # ====================================
@@ -665,20 +667,20 @@ def print_summary():
     """Print summary of intelligence database"""
     stats = get_stats()
     
-    print("=" * 80)
-    print("BUILDING BLOCKS INTELLIGENCE DATABASE")
-    print("=" * 80)
-    print(f"\nTotal Blocks with Intelligence: {stats['total_blocks']}")
+    logger.info("=" * 80)
+    logger.info("BUILDING BLOCKS INTELLIGENCE DATABASE")
+    logger.info("=" * 80)
+    logger.info(f"\nTotal Blocks with Intelligence: {stats['total_blocks']}")
     
-    print("\nBlocks by Type:")
+    logger.info("\nBlocks by Type:")
     for block_type, count in sorted(stats['by_type'].items()):
-        print(f"  {block_type:25s}: {count:3d} blocks")
+        logger.info(f"  {block_type:25s}: {count:3d} blocks")
     
-    print("\nBlocks by Category:")
+    logger.info("\nBlocks by Category:")
     for category, count in sorted(stats['by_category'].items()):
-        print(f"  {category:25s}: {count:3d} blocks")
+        logger.info(f"  {category:25s}: {count:3d} blocks")
     
-    print("=" * 80)
+    logger.info("=" * 80)
 
 
 # Print summary when module is imported

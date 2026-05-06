@@ -26,6 +26,8 @@ from enum import Enum
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 class TrendDirection(Enum):
     """Trend direction classification."""
@@ -482,6 +484,6 @@ class PowerHourTrends:
 
 
 if __name__ == "__main__":
-    print("Power Hour Trends - Building Block")
-    print("MARKET STRUCTURE BLOCK - Institutional trading hour analysis")
-    print("Based on LuxAlgo Power Hour Trendlines")
+    logger.info("Power Hour Trends - Building Block")
+    logger.info("MARKET STRUCTURE BLOCK - Institutional trading hour analysis")
+    logger.info("Based on LuxAlgo Power Hour Trendlines")

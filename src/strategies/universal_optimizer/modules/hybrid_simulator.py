@@ -24,6 +24,8 @@ from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from .data_classes import OptimizationConfig, ConfigPerformance
 
+import logging
+logger = logging.getLogger(__name__)
 
 def test_single_config(args):
     """
@@ -201,7 +203,7 @@ class HybridConfigSimulator:
             num_cores: Number of CPU cores to use (default: all available)
         """
         self.num_cores = num_cores or cpu_count()
-        print(f"   Hybrid Mode: Using {self.num_cores} CPU cores for config testing")
+        logger.info(f"   Hybrid Mode: Using {self.num_cores} CPU cores for config testing")
     
     def optimize(
         self,
@@ -225,8 +227,8 @@ class HybridConfigSimulator:
         from .data_loader import get_strategy_class
         
         # PHASE 1: Pre-compute building blocks (single-core)
-        print(f"\n🔄 PHASE 1: Pre-computing building blocks...")
-        print(f"   Processing {len(test_df)} bars ONCE (this takes ~60 seconds)")
+        logger.info(f"\n🔄 PHASE 1: Pre-computing building blocks...")
+        logger.info(f"   Processing {len(test_df)} bars ONCE (this takes ~60 seconds)")
         
         # Debug log file
         import os
@@ -239,7 +241,7 @@ class HybridConfigSimulator:
             with open(log_file, 'a') as f:
                 timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                 f.write(f"[{timestamp}] {message}\n")
-            print(f"   DEBUG: {message}")
+            logger.debug(f"   DEBUG: {message}")
         
         log_debug(f"Starting Phase 1: {len(test_df)} test bars to process")
         log_debug(f"Strategy: {strategy_module_name}")
@@ -313,7 +315,7 @@ class HybridConfigSimulator:
             # Print every 2000 bars
             if bar_num % 2000 == 0:
                 pct = bar_num / len(test_df) * 100
-                print(f"   Phase 1 progress: {pct:.1f}%...")
+                logger.info(f"   Phase 1 progress: {pct:.1f}%...")
             
             if bar_num == 0:
                 log_debug("Processing first bar...")
@@ -342,11 +344,11 @@ class HybridConfigSimulator:
         
         log_debug(f"Bar processing complete: {len(all_building_block_results)} results stored")
         
-        print(f"   ✅ Phase 1 complete: {len(all_building_block_results)} bars processed")
+        logger.info(f"   ✅ Phase 1 complete: {len(all_building_block_results)} bars processed")
         
         # PHASE 2: Parallel config testing (32-core)
-        print(f"\n⚡ PHASE 2: Testing {len(configs)} configs across {self.num_cores} cores...")
-        print(f"   This is FAST - just lightweight confluence math!")
+        logger.info(f"\n⚡ PHASE 2: Testing {len(configs)} configs across {self.num_cores} cores...")
+        logger.info(f"   This is FAST - just lightweight confluence math!")
         
         # Prepare arguments for parallel processing
         test_args = [(config, all_building_block_results, test_df) for config in configs]
@@ -355,6 +357,6 @@ class HybridConfigSimulator:
         with Pool(processes=self.num_cores) as pool:
             results = pool.map(test_single_config, test_args)
         
-        print(f"   ✅ Phase 2 complete: All {len(configs)} configs tested")
+        logger.info(f"   ✅ Phase 2 complete: All {len(configs)} configs tested")
         
         return results

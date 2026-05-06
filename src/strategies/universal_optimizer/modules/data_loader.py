@@ -10,6 +10,8 @@ import inspect
 from pathlib import Path
 from typing import Tuple
 
+import logging
+logger = logging.getLogger(__name__)
 
 def load_btc_data(test_days: int = 180, warmup_bars: int = 5000) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -54,7 +56,7 @@ def load_btc_data(test_days: int = 180, warmup_bars: int = 5000) -> Tuple[pd.Dat
     total_bars_needed = warmup_bars + test_bars
     
     if len(df) < total_bars_needed:
-        print(f"⚠️  Warning: Only {len(df)} bars available, need {total_bars_needed}")
+        logger.warning(f"⚠️  Warning: Only {len(df)} bars available, need {total_bars_needed}")
         warmup_bars = min(warmup_bars, len(df) // 2)
         test_bars = len(df) - warmup_bars
     

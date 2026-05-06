@@ -8,6 +8,8 @@ Shows iteration suggestions after cycle 5.
 from typing import List
 from .data_classes import ConfigPerformance, OptimizationConfig
 
+import logging
+logger = logging.getLogger(__name__)
 
 def display_top_5_configs(results: List[ConfigPerformance], iteration: int, test_days: int, configs: List[OptimizationConfig] = None):
     """
@@ -19,10 +21,10 @@ def display_top_5_configs(results: List[ConfigPerformance], iteration: int, test
         test_days: Test period in days (for accurate reporting)
         configs: All optimization configs (to extract actual risk params)
     """
-    print("\n" + "="*80)
-    print("OPTIMIZATION RESULTS - INSTITUTIONAL GRADE REPORT")
-    print("="*80)
-    print(f"\nIteration: {iteration} of 5")
+    logger.info("\n" + "="*80)
+    logger.info("OPTIMIZATION RESULTS - INSTITUTIONAL GRADE REPORT")
+    logger.info("="*80)
+    logger.info(f"\nIteration: {iteration} of 5")
     
     # Extract actual risk params from configs (NO HARDCODING!)
     if configs and len(configs) > 0:
@@ -42,23 +44,23 @@ def display_top_5_configs(results: List[ConfigPerformance], iteration: int, test
     btc_position_size = notional_per_trade / 95000.0  # Approximate @ $95K BTC
     
     # Display test parameters (USING ACTUAL CONFIG VALUES)
-    print("\n" + "-"*80)
-    print("TEST PARAMETERS:")
-    print("-"*80)
-    print(f"   ├─ Market: BTC/USDT Perpetual (Binance Futures)")
-    print(f"   ├─ Starting Capital: ${starting_capital:,.2f} USDT")
-    print(f"   ├─ Position Sizing:")
-    print(f"   │  ├─ Risk per trade: {risk_per_trade_pct}% of capital = ${margin_per_trade:,.2f} margin")
-    print(f"   │  ├─ Leverage: {max_leverage:.0f}x")
-    print(f"   │  ├─ Notional per trade: ${margin_per_trade:,.2f} × {max_leverage:.0f} = ${notional_per_trade:,.2f}")
-    print(f"   │  └─ BTC Position: ~{btc_position_size:.3f} BTC @ $95K BTC (${notional_per_trade:,.2f} notional)")
-    print(f"   ├─ Timeframe: 15-minute bars (primary trading timeframe)")
-    print(f"   ├─ Fee Structure (Binance Perpetual):")
-    print(f"   │  ├─ Maker Fee: -0.01% (rebate)")
-    print(f"   │  └─ Taker Fee: 0.05%")
-    print(f"   ├─ Order Type: Market Orders (Taker fees)")
-    print(f"   ├─ Test Period: {test_days} days")
-    print(f"   └─ Total Configs Tested: {len(configs) if configs else 48}\n")
+    logger.info("\n" + "-"*80)
+    logger.info("TEST PARAMETERS:")
+    logger.info("-"*80)
+    logger.info(f"   ├─ Market: BTC/USDT Perpetual (Binance Futures)")
+    logger.info(f"   ├─ Starting Capital: ${starting_capital:,.2f} USDT")
+    logger.info(f"   ├─ Position Sizing:")
+    logger.info(f"   │  ├─ Risk per trade: {risk_per_trade_pct}% of capital = ${margin_per_trade:,.2f} margin")
+    logger.info(f"   │  ├─ Leverage: {max_leverage:.0f}x")
+    logger.info(f"   │  ├─ Notional per trade: ${margin_per_trade:,.2f} × {max_leverage:.0f} = ${notional_per_trade:,.2f}")
+    logger.info(f"   │  └─ BTC Position: ~{btc_position_size:.3f} BTC @ $95K BTC (${notional_per_trade:,.2f} notional)")
+    logger.info(f"   ├─ Timeframe: 15-minute bars (primary trading timeframe)")
+    logger.info(f"   ├─ Fee Structure (Binance Perpetual):")
+    logger.info(f"   │  ├─ Maker Fee: -0.01% (rebate)")
+    logger.info(f"   │  └─ Taker Fee: 0.05%")
+    logger.info(f"   ├─ Order Type: Market Orders (Taker fees)")
+    logger.info(f"   ├─ Test Period: {test_days} days")
+    logger.info(f"   └─ Total Configs Tested: {len(configs) if configs else 48}\n")
     
     preset_names = ['Balanced', 'Event-Heavy', 'Context-Heavy', 'Conservative']
     
@@ -75,9 +77,9 @@ def display_top_5_configs(results: List[ConfigPerformance], iteration: int, test
         else:
             label = f"#{i}: {config_type} Configuration"
         
-        print(f"\n{label}")
-        print(f"   ├─ Config ID: {result.config_id}")
-        print(f"   │")
+        logger.info(f"\n{label}")
+        logger.info(f"   ├─ Config ID: {result.config_id}")
+        logger.info(f"   │")
         # Calculate hold time statistics if trades available
         avg_hold_bars = 0
         min_hold_bars = 0
@@ -105,34 +107,34 @@ def display_top_5_configs(results: List[ConfigPerformance], iteration: int, test
         min_hold_hours = min_hold_bars * 0.25
         max_hold_hours = max_hold_bars * 0.25
         
-        print(f"   ├─ TRADING PERFORMANCE:")
-        print(f"   │  ├─ Total Trades: {result.total_trades}")
-        print(f"   │  ├─ Winning Trades: {result.winning_trades} ({result.win_rate_pct:.1f}%)")
-        print(f"   │  ├─ Losing Trades: {result.losing_trades}")
+        logger.info(f"   ├─ TRADING PERFORMANCE:")
+        logger.info(f"   │  ├─ Total Trades: {result.total_trades}")
+        logger.info(f"   │  ├─ Winning Trades: {result.winning_trades} ({result.win_rate_pct:.1f}%)")
+        logger.info(f"   │  ├─ Losing Trades: {result.losing_trades}")
         if avg_hold_bars > 0:
-            print(f"   │  ├─ Avg Hold Time: {avg_hold_bars:.0f} bars ({avg_hold_hours:.1f} hours)")
-            print(f"   │  ├─ Min Hold Time: {min_hold_bars} bars ({min_hold_hours:.1f} hours)")
-            print(f"   │  ├─ Max Hold Time: {max_hold_bars} bars ({max_hold_hours:.1f} hours)")
-        print(f"   │  ├─ Avg Win: ${result.avg_win:.2f}")
-        print(f"   │  ├─ Avg Loss: ${result.avg_loss:.2f}")
-        print(f"   │  ├─ Largest Win: ${result.largest_win:.2f}")
-        print(f"   │  └─ Largest Loss: ${result.largest_loss:.2f}")
-        print(f"   │")
-        print(f"   ├─ FINANCIAL RESULTS:")
-        print(f"   │  ├─ Gross PnL: ${result.total_pnl:+.2f}")
-        print(f"   │  ├─ Total Fees: -${result.total_fees:.2f}")
-        print(f"   │  ├─ Net PnL: ${result.net_pnl:+.2f}")
-        print(f"   │  ├─ Net Return: {result.net_return_pct:+.2f}%")
-        print(f"   │  ├─ Starting Capital: ${starting_capital:,.2f}")
-        print(f"   │  └─ Final Capital: ${final_capital:,.2f}")
-        print(f"   │")
-        print(f"   ├─ RISK METRICS:")
-        print(f"   │  ├─ Profit Factor: {result.profit_factor:.2f}")
-        print(f"   │  ├─ Sharpe Ratio: {result.sharpe_ratio:.2f}")
-        print(f"   │  ├─ Max Drawdown: {result.max_drawdown_pct:.2f}%")
-        print(f"   │  └─ Risk-Adjusted Return: {result.net_return_pct / max(result.max_drawdown_pct, 0.1):.2f}")
-        print(f"   │")
-        print(f"   └─ TRADE RECORD: data/reports/strategies/universal_optimizer/{result.config_id}_trades.csv")
+            logger.info(f"   │  ├─ Avg Hold Time: {avg_hold_bars:.0f} bars ({avg_hold_hours:.1f} hours)")
+            logger.info(f"   │  ├─ Min Hold Time: {min_hold_bars} bars ({min_hold_hours:.1f} hours)")
+            logger.info(f"   │  ├─ Max Hold Time: {max_hold_bars} bars ({max_hold_hours:.1f} hours)")
+        logger.info(f"   │  ├─ Avg Win: ${result.avg_win:.2f}")
+        logger.info(f"   │  ├─ Avg Loss: ${result.avg_loss:.2f}")
+        logger.info(f"   │  ├─ Largest Win: ${result.largest_win:.2f}")
+        logger.info(f"   │  └─ Largest Loss: ${result.largest_loss:.2f}")
+        logger.info(f"   │")
+        logger.info(f"   ├─ FINANCIAL RESULTS:")
+        logger.info(f"   │  ├─ Gross PnL: ${result.total_pnl:+.2f}")
+        logger.info(f"   │  ├─ Total Fees: -${result.total_fees:.2f}")
+        logger.info(f"   │  ├─ Net PnL: ${result.net_pnl:+.2f}")
+        logger.info(f"   │  ├─ Net Return: {result.net_return_pct:+.2f}%")
+        logger.info(f"   │  ├─ Starting Capital: ${starting_capital:,.2f}")
+        logger.info(f"   │  └─ Final Capital: ${final_capital:,.2f}")
+        logger.info(f"   │")
+        logger.info(f"   ├─ RISK METRICS:")
+        logger.info(f"   │  ├─ Profit Factor: {result.profit_factor:.2f}")
+        logger.info(f"   │  ├─ Sharpe Ratio: {result.sharpe_ratio:.2f}")
+        logger.info(f"   │  ├─ Max Drawdown: {result.max_drawdown_pct:.2f}%")
+        logger.info(f"   │  └─ Risk-Adjusted Return: {result.net_return_pct / max(result.max_drawdown_pct, 0.1):.2f}")
+        logger.info(f"   │")
+        logger.info(f"   └─ TRADE RECORD: data/reports/strategies/universal_optimizer/{result.config_id}_trades.csv")
 
 
 def prompt_user_selection() -> int:
@@ -148,7 +150,7 @@ def prompt_user_selection() -> int:
             
             # Check for quit
             if choice in ['q', 'quit', 'exit']:
-                print("\n⚠️  Optimization cancelled by user.")
+                logger.warning("\n⚠️  Optimization cancelled by user.")
                 return -1
             
             # Try to convert to number
@@ -157,13 +159,13 @@ def prompt_user_selection() -> int:
             if 0 <= idx < 5:
                 return idx
             else:
-                print("❌ Invalid choice. Please select 1-5, or 'q' to quit.")
+                logger.error("❌ Invalid choice. Please select 1-5, or 'q' to quit.")
         except (ValueError, KeyboardInterrupt):
-            print("\n⚠️  Interrupted. Exiting...")
+            logger.warning("\n⚠️  Interrupted. Exiting...")
             return -1
         except EOFError:
             # Handle non-interactive mode
-            print("\n⚠️  Non-interactive mode detected. Selecting #1 (recommended).")
+            logger.warning("\n⚠️  Non-interactive mode detected. Selecting #1 (recommended).")
             return 0
 
 
@@ -175,33 +177,33 @@ def display_block_recommendations(weak_block: str, recommendations: List[tuple])
         weak_block: Name of weakest performing block
         recommendations: List of (block_name, score) tuples
     """
-    print("\n" + "="*80)
-    print("ITERATION 5 COMPLETE - BLOCK IMPROVEMENT SUGGESTIONS")
-    print("="*80)
-    print(f"\n⚠️  Weakest Block Identified: '{weak_block}'")
-    print("\nTop 5 Replacement Recommendations:\n")
+    logger.info("\n" + "="*80)
+    logger.info("ITERATION 5 COMPLETE - BLOCK IMPROVEMENT SUGGESTIONS")
+    logger.info("="*80)
+    logger.warning(f"\n⚠️  Weakest Block Identified: '{weak_block}'")
+    logger.info("\nTop 5 Replacement Recommendations:\n")
     
     for i, (block_name, score) in enumerate(recommendations, 1):
-        print(f"   #{i}: {block_name:30s} (Score: {score:.1f})")
+        logger.info(f"   #{i}: {block_name:30s} (Score: {score:.1f})")
     
-    print("\nTo replace block:")
-    print(f"1. Edit strategy file")
-    print(f"2. Remove '{weak_block}' block")
-    print(f"3. Add recommended block")
-    print(f"4. Re-run optimizer")
-    print("="*80 + "\n")
+    logger.info("\nTo replace block:")
+    logger.info(f"1. Edit strategy file")
+    logger.info(f"2. Remove '{weak_block}' block")
+    logger.info(f"3. Add recommended block")
+    logger.info(f"4. Re-run optimizer")
+    logger.info("="*80 + "\n")
 
 
 def display_iteration_context(iteration: int):
     """Display context about current iteration"""
     if iteration == 1:
-        print("\n💡 First optimization - establishing baseline")
+        logger.info("\n💡 First optimization - establishing baseline")
     elif iteration < 5:
-        print(f"\n💡 Iteration {iteration} - refining parameters")
+        logger.info(f"\n💡 Iteration {iteration} - refining parameters")
     elif iteration == 5:
-        print(f"\n💡 Iteration 5 - final refinement + block evaluation")
+        logger.info(f"\n💡 Iteration 5 - final refinement + block evaluation")
     else:
-        print(f"\n💡 Iteration {iteration} - continuing optimization")
+        logger.info(f"\n💡 Iteration {iteration} - continuing optimization")
 
 
 def confirm_application() -> bool:

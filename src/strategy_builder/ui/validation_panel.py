@@ -28,6 +28,10 @@ from src.strategy_builder.ui.styles import (
     get_success_button_stylesheet
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class ValidationPanel(QWidget):
     """
@@ -498,10 +502,10 @@ class ValidationPanel(QWidget):
             )
             db.strategy.session.commit()
             
-            print(f"✅ Validation status saved: {validation_status} for version {self.current_version_id}")
+            logger.info(f"✅ Validation status saved: {validation_status} for version {self.current_version_id}")
             
         except Exception as e:
-            print(f"⚠️ Failed to save validation status: {e}")
+            logger.error(f"⚠️ Failed to save validation status: {e}")
             # Don't fail the UI if database save fails
             import traceback
             traceback.print_exc()

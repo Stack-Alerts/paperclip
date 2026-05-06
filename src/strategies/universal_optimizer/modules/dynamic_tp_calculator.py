@@ -22,6 +22,8 @@ from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class TPLevels:
@@ -279,7 +281,7 @@ class DynamicTPCalculator:
         try:
             swing_result = self.tp_blocks['swing_points'].analyze(df_slice)
         except Exception as e:
-            print(f"   ⚠️  Swing analysis failed: {e}, using fallback")
+            logger.error(f"   ⚠️  Swing analysis failed: {e}, using fallback")
             return self._calculate_percentage_tps(entry_price, side, fallback_pcts)
         
         if swing_result['signal'] in ['ERROR', 'INSUFFICIENT_DATA']:
@@ -342,7 +344,7 @@ class DynamicTPCalculator:
         try:
             sd_result = self.tp_blocks['supply_demand'].analyze(df_slice)
         except Exception as e:
-            print(f"   ⚠️  S/D analysis failed: {e}, using fallback")
+            logger.error(f"   ⚠️  S/D analysis failed: {e}, using fallback")
             return self._calculate_percentage_tps(entry_price, side, fallback_pcts)
         
         if sd_result['signal'] == 'ERROR':

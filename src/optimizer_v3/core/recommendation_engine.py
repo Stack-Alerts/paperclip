@@ -21,6 +21,8 @@ Sprint: 1.6 (Intelligent Recommendations - Task 1.6.2)
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Recommendation:
@@ -61,7 +63,7 @@ class RecommendationEngine:
     rec = engine.generate_recommendation('win_rate', 45.5, '✗ Poor')
     
     if rec:
-        print(rec.description)
+        logger.info(rec.description)
         # "Add 'liquidity_sweep' (SMC_ICT) - stop hunts before reversals (improves win_rate by ~15%)"
     
     # Generate all recommendations for all poor metrics
@@ -91,7 +93,7 @@ class RecommendationEngine:
         self.intelligence = self._build_intelligence_from_registry(registered_blocks)
         self.current_blocks = set(self._get_current_blocks())
         
-        print(f"✅ Recommendation Engine initialized with {len(self.intelligence)} registered blocks")
+        logger.info(f"✅ Recommendation Engine initialized with {len(self.intelligence)} registered blocks")
     
     def _build_intelligence_from_registry(self, registered_blocks: Dict) -> Dict[str, Dict]:
         """

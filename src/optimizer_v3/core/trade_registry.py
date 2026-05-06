@@ -44,6 +44,8 @@ import json
 import threading
 from pathlib import Path
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Trade:
@@ -234,7 +236,7 @@ class TradeRegistry:
                     'reason': 'Duplicate unique key'
                 })
                 
-                print(f"⚠️ DUPLICATE REJECTED: Entry={entry_ts}, Exit={exit_ts}, Type={trade.exit_type}")
+                logger.warning(f"⚠️ DUPLICATE REJECTED: Entry={entry_ts}, Exit={exit_ts}, Type={trade.exit_type}")
                 return None
             
             # Add to registry (each sub-ID gets its own entry - NO OVERWRITES!)
@@ -243,7 +245,7 @@ class TradeRegistry:
             
             # Show partial status
             partial_marker = f" [{trade.exit_percentage:.0%}]" if trade.partial_exit else ""
-            print(f"✅ Trade #{trade_id} added: {trade.exit_condition_name or trade.exit_type}{partial_marker} - ${trade.pnl:.2f}")
+            logger.info(f"✅ Trade #{trade_id} added: {trade.exit_condition_name or trade.exit_type}{partial_marker} - ${trade.pnl:.2f}")
             
             return trade_id
     
@@ -294,7 +296,7 @@ class TradeRegistry:
             self._duplicate_count = 0
             self._duplicate_log.clear()
             
-            print("🧹 Trade registry cleared")
+            logger.info("🧹 Trade registry cleared")
     
     def save_to_file(self, filepath: str):
         """
@@ -317,7 +319,7 @@ class TradeRegistry:
             with open(filepath, 'w') as f:
                 json.dump(data, f, indent=2)
             
-            print(f"💾 Trades saved to {filepath}")
+            logger.info(f"💾 Trades saved to {filepath}")
     
     def load_from_file(self, filepath: str):
         """
@@ -341,7 +343,7 @@ class TradeRegistry:
                 
                 self.add_trade(trade_dict)
             
-            print(f"📁 Loaded {len(self._trades)} trades from {filepath}")
+            logger.info(f"📁 Loaded {len(self._trades)} trades from {filepath}")
     
     def get_summary_metrics(self) -> Dict:
         """

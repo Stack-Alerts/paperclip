@@ -52,6 +52,8 @@ from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
 # Sprint 2.0.1 Task 2.0.1.3: Real data integration
 from src.optimizer_v3.core.backtest_data_provider import get_backtest_provider
 
+import logging
+logger = logging.getLogger(__name__)
 
 class StdoutCapture:
     """
@@ -2257,9 +2259,9 @@ class BacktestConfigPanel(QWidget):
             db = get_database_manager()
             if hasattr(db, 'engine') and db.engine is not None:
                 db.engine.dispose()  # Force close all connections in pool
-                print("✅ Pre-backtest cleanup: Closed PostgreSQL connections in main thread")
+                logger.info("✅ Pre-backtest cleanup: Closed PostgreSQL connections in main thread")
         except Exception as e:
-            print(f"⚠️ Could not close database connections in main thread: {e}")
+            logger.warning(f"⚠️ Could not close database connections in main thread: {e}")
         
         # Validate strategy
         validation = self.orchestrator.validate_strategy()
@@ -2428,7 +2430,7 @@ class BacktestConfigPanel(QWidget):
         if success:
             # CRITICAL FIX: Sync trades from TradeRegistry (single source of truth)
             # This replaces any duplicate trades received via signals with unique trades only
-            print("📊 Syncing trades from TradeRegistry...")
+            logger.info("📊 Syncing trades from TradeRegistry...")
             self.trades_panel.sync_from_registry()
             
             # Update displays - INLINE HTML FORMAT
@@ -2615,7 +2617,7 @@ class BacktestConfigPanel(QWidget):
         )
         
         # ✅ CRITICAL: Update metrics WITH backtest_complete=True AND full results to trigger AI recommendations
-        print("[Backtest] COMPLETE - Triggering AI recommendations...")
+        logger.info("[Backtest] COMPLETE - Triggering AI recommendations...")
         # FIXED: Pass full results dict (includes trade list) for AI analysis
         full_results = {
             'metrics': metrics_data,
@@ -2700,16 +2702,16 @@ class BacktestConfigPanel(QWidget):
 
                 db = get_database_manager()
                 result_id = db.test_results.create_test_result(test_data)
-                print(f"[Backtest] Test result saved: {result_id}")
+                logger.info(f"[Backtest] Test result saved: {result_id}")
                 self.output_panel.add_message(
                     f"📥 Results saved to database (id: {result_id[:8]}…)",
                     "INFO",
                     "SYSTEM"
                 )
             else:
-                print("[Backtest] Skipping DB persist: strategy not saved yet (no strategy_id / version_id)")
+                logger.info("[Backtest] Skipping DB persist: strategy not saved yet (no strategy_id / version_id)")
         except Exception as _persist_exc:
-            print(f"[Backtest] Warning: could not save test result to DB: {_persist_exc}")
+            logger.warning(f"[Backtest] Warning: could not save test result to DB: {_persist_exc}")
         # ── End persistence block ───────────────────────────────────────────────
 
         # Add note to Live Output about tab availability
@@ -2982,7 +2984,7 @@ class BacktestConfigPanel(QWidget):
             self.config_changed.emit()
         except Exception as e:
             # Silently log but don't interrupt user workflow
-            print(f"Auto-save failed: {e}")
+            logger.error(f"Auto-save failed: {e}")
     
     def _set_live_output_color(self, color: str) -> None:
         """
@@ -3411,7 +3413,7 @@ Detailed report saved to:
         # Show in discovery results dialog if mode is 'discovery', else handle other modes
         if mode == 'csv_only':
             # CSV already saved above; no dialog action needed
-            print(summary)
+            logger.info(summary)
         elif mode == 'discovery':
             def apply_cb(delta):
                 self._apply_discovery_config_to_ui(delta)
@@ -3422,7 +3424,7 @@ Detailed report saved to:
             )
             dialog.set_results(discovery_results)
             dialog.show()
-            print(summary)
+            logger.info(summary)
         else:
             # Legacy wiring report dialog
             msg = QMessageBox(self)
@@ -3433,7 +3435,7 @@ Detailed report saved to:
             msg.setStandardButtons(QMessageBox.Ok)
             msg.exec_()
 
-        print(summary)
+        logger.info(summary)
 
     def _apply_discovery_config_to_ui(self, config_delta: dict):
         """

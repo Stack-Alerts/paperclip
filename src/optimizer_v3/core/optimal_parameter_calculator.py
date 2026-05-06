@@ -21,6 +21,10 @@ from collections import Counter
 # NautilusTrader imports
 from nautilus_trader.model.objects import Money, Quantity
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Import configuration
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))

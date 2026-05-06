@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Dict, Optional, Any
 from datetime import datetime
 
+import logging
+logger = logging.getLogger(__name__)
 
 class SignalStatisticsLoader:
     """
@@ -54,8 +56,8 @@ class SignalStatisticsLoader:
             return True
         
         if not self.stats_file.exists():
-            print(f"Signal statistics file not found: {self.stats_file}")
-            print("Run: python scripts/analyze_signal_occurrences.py")
+            logger.warning(f"Signal statistics file not found: {self.stats_file}")
+            logger.info("Run: python scripts/analyze_signal_occurrences.py")
             return False
         
         try:
@@ -65,11 +67,11 @@ class SignalStatisticsLoader:
             self._loaded = True
             self._load_time = datetime.now()
             
-            print(f"✅ Loaded signal statistics: {self._statistics.get('total_blocks', 0)} blocks")
+            logger.info(f"✅ Loaded signal statistics: {self._statistics.get('total_blocks', 0)} blocks")
             return True
             
         except Exception as e:
-            print(f"❌ Failed to load signal statistics: {e}")
+            logger.error(f"❌ Failed to load signal statistics: {e}")
             return False
     
     def is_loaded(self) -> bool:
@@ -284,7 +286,7 @@ class SignalStatisticsLoader:
         self._statistics = None
         self._loaded = False
         self._load_time = None
-        print("Signal statistics cache cleared")
+        logger.info("Signal statistics cache cleared")
 
 
 # Global singleton instance

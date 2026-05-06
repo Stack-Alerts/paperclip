@@ -32,6 +32,8 @@ import pickle
 from .data_classes import OptimizationConfig, ConfigPerformance, TradeResult
 from datetime import datetime
 
+import logging
+logger = logging.getLogger(__name__)
 
 def process_bar_chunk(args):
     """
@@ -224,14 +226,14 @@ def test_single_config(args):
             sl = emergency_sl  # Start with emergency SL
             
             # DEBUG: Log TP values for forensic analysis
-            print(f"\n🔍 TP CALC DEBUG | Entry: ${entry_price:.2f} | Side: {config.side}")
-            print(f"   TP1 = ${tp1:.2f} (should be closest,  {abs((entry_price-tp1)/entry_price*100):.2f}% away)")
-            print(f"   TP2 = ${tp2:.2f} (should be middle,   {abs((entry_price-tp2)/entry_price*100):.2f}% away)")
-            print(f"   TP3 = ${tp3:.2f} (should be furthest, {abs((entry_price-tp3)/entry_price*100):.2f}% away)")
+            logger.debug(f"\n🔍 TP CALC DEBUG | Entry: ${entry_price:.2f} | Side: {config.side}")
+            logger.info(f"   TP1 = ${tp1:.2f} (should be closest,  {abs((entry_price-tp1)/entry_price*100):.2f}% away)")
+            logger.info(f"   TP2 = ${tp2:.2f} (should be middle,   {abs((entry_price-tp2)/entry_price*100):.2f}% away)")
+            logger.info(f"   TP3 = ${tp3:.2f} (should be furthest, {abs((entry_price-tp3)/entry_price*100):.2f}% away)")
             if config.side == 'SHORT':
-                print(f"   ORDER CHECK (SHORT): tp1 > tp2 > tp3? {tp1:.2f} > {tp2:.2f} > {tp3:.2f} = {tp1 > tp2 > tp3}")
+                logger.info(f"   ORDER CHECK (SHORT): tp1 > tp2 > tp3? {tp1:.2f} > {tp2:.2f} > {tp3:.2f} = {tp1 > tp2 > tp3}")
             else:
-                print(f"   ORDER CHECK (LONG):  tp1 < tp2 < tp3? {tp1:.2f} < {tp2:.2f} < {tp3:.2f} = {tp1 < tp2 < tp3}")
+                logger.info(f"   ORDER CHECK (LONG):  tp1 < tp2 < tp3? {tp1:.2f} < {tp2:.2f} < {tp3:.2f} = {tp1 < tp2 < tp3}")
             
             # Get partial exit percentages from config
             exit_pct_tp1 = config.partial_exit_pcts.get('tp1', 50)
@@ -353,7 +355,7 @@ def test_single_config(args):
                         exit_price = bar['close']
                         exit_reason = tp_names[idx]  # Assign label based on hit ORDER, not original name
                         tp_label = f"TP{idx+1}"
-                        print(f"🎯 {tp_label} HIT! Bar low: ${bar['low']:.2f} <= Price: ${tp_price:.2f} | Exit: ${exit_price:.2f} | Exit%: {exit_pct}%")
+                        logger.info(f"🎯 {tp_label} HIT! Bar low: ${bar['low']:.2f} <= Price: ${tp_price:.2f} | Exit: ${exit_price:.2f} | Exit%: {exit_pct}%")
                         current_position['exits'].append({
                             'price': exit_price,
                             'pct': exit_pct,
@@ -413,7 +415,7 @@ def test_single_config(args):
                     exit_reason = 'SL_HIT'
                     
                     # INSTITUTIONAL DEBUG: Log SL exit details for Adaptive SL forensics
-                    print(f"🔍 SL_HIT (SHORT) | Bar {bars_held} | remaining_pct={current_position['remaining_pct']:.4f}% | "
+                    logger.info(f"🔍 SL_HIT (SHORT) | Bar {bars_held} | remaining_pct={current_position['remaining_pct']:.4f}% | "
                           f"Entry=${current_position['entry_price']:.2f} | Exit=${exit_price:.2f} | "
                           f"SL_mode={current_position.get('sl_method', 'UNKNOWN')} | "
                           f"TP1_hit={current_position.get('tp1_hit', False)} | "
@@ -455,7 +457,7 @@ def test_single_config(args):
                         exit_price = bar['close']
                         exit_reason = tp_names[idx]  # Assign label based on hit ORDER, not original name
                         tp_label = f"TP{idx+1}"
-                        print(f"🎯 {tp_label} HIT! Bar high: ${bar['high']:.2f} >= Price: ${tp_price:.2f} | Exit: ${exit_price:.2f} | Exit%: {exit_pct}%")
+                        logger.info(f"🎯 {tp_label} HIT! Bar high: ${bar['high']:.2f} >= Price: ${tp_price:.2f} | Exit: ${exit_price:.2f} | Exit%: {exit_pct}%")
                         current_position['exits'].append({
                             'price': exit_price,
                             'pct': exit_pct,
@@ -514,7 +516,7 @@ def test_single_config(args):
                     exit_reason = 'SL_HIT'
                     
                     # INSTITUTIONAL DEBUG: Log SL exit details for Adaptive SL forensics
-                    print(f"🔍 SL_HIT (LONG) | Bar {bars_held} | remaining_pct={current_position['remaining_pct']:.4f}% | "
+                    logger.info(f"🔍 SL_HIT (LONG) | Bar {bars_held} | remaining_pct={current_position['remaining_pct']:.4f}% | "
                           f"Entry=${current_position['entry_price']:.2f} | Exit=${exit_price:.2f} | "
                           f"SL_mode={current_position.get('sl_method', 'UNKNOWN')} | "
                           f"TP1_hit={current_position.get('tp1_hit', False)} | "
@@ -744,7 +746,7 @@ class UltraHybridSimulator:
     
     def __init__(self, num_cores: int = None):
         self.num_cores = num_cores or cpu_count()
-        print(f"   Ultra Hybrid: Using {self.num_cores} CPU cores for BOTH phases!")
+        logger.info(f"   Ultra Hybrid: Using {self.num_cores} CPU cores for BOTH phases!")
     
     def optimize(
         self,
@@ -758,7 +760,6 @@ class UltraHybridSimulator:
         
         import time
         from datetime import datetime
-        
         # Setup debug logging
         log_dir = Path(__file__).parent.parent.parent.parent.parent / 'logs'
         log_dir.mkdir(exist_ok=True)
@@ -768,7 +769,7 @@ class UltraHybridSimulator:
             with open(log_file, 'a') as f:
                 timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
                 f.write(f"[{timestamp}] {message}\n")
-            print(f"   DEBUG: {message}")
+            logger.debug(f"   DEBUG: {message}")
         
         log_debug(f"Ultra Hybrid Optimization Starting")
         log_debug(f"Strategy: {strategy_module_name}")
@@ -776,9 +777,9 @@ class UltraHybridSimulator:
         log_debug(f"CPU cores available: {self.num_cores}")
         
         # PHASE 1: Parallel building block computation
-        print(f"\n⚡ PHASE 1: Pre-computing building blocks in PARALLEL...")
-        print(f"   Splitting {len(test_df)} bars across {self.num_cores} cores")
-        print(f"   Each core processes ~{len(test_df) // self.num_cores} bars independently")
+        logger.info(f"\n⚡ PHASE 1: Pre-computing building blocks in PARALLEL...")
+        logger.info(f"   Splitting {len(test_df)} bars across {self.num_cores} cores")
+        logger.info(f"   Each core processes ~{len(test_df) // self.num_cores} bars independently")
         
         log_debug(f"Phase 1: Starting parallel building block computation")
         
@@ -797,7 +798,7 @@ class UltraHybridSimulator:
             chunks.append((i, warmup_df, chunk_df, strategy_module_name, configs[0]))
             log_debug(f"Chunk {i}: bars {start_idx}-{end_idx} ({len(chunk_df)} bars)")
         
-        print(f"   Created {len(chunks)} chunks")
+        logger.info(f"   Created {len(chunks)} chunks")
         log_debug(f"All chunks created, starting parallel processing...")
         
         # Process chunks in parallel
@@ -808,10 +809,10 @@ class UltraHybridSimulator:
         phase1_time = time.time() - phase1_start
         log_debug(f"Phase 1 complete: {phase1_time:.1f}s")
         log_debug(f"Received results from {len(chunk_results)} chunks")
-        print(f"   ✅ Phase 1 complete in {phase1_time:.1f}s")
+        logger.info(f"   ✅ Phase 1 complete in {phase1_time:.1f}s")
         
         # PHASE 2: Merge results
-        print(f"\n🔄 PHASE 2: Merging {self.num_cores} chunks...")
+        logger.info(f"\n🔄 PHASE 2: Merging {self.num_cores} chunks...")
         log_debug(f"Phase 2: Starting merge of {self.num_cores} chunks")
         phase2_start = time.time()
         
@@ -822,13 +823,13 @@ class UltraHybridSimulator:
         for chunk_id, results in chunk_results:
             all_building_block_results.extend(results)
             log_debug(f"Merged chunk {chunk_id}: {len(results)} bars, total so far: {len(all_building_block_results)}")
-            print(f"   Merged chunk {chunk_id}: {len(results)} bars")
+            logger.info(f"   Merged chunk {chunk_id}: {len(results)} bars")
         
         phase2_time = time.time() - phase2_start
         log_debug(f"Phase 2 complete: {phase2_time:.1f}s")
         log_debug(f"Final merged result: {len(all_building_block_results)} total bars")
-        print(f"   ✅ Phase 2 complete in {phase2_time:.1f}s")
-        print(f"   Total building block results: {len(all_building_block_results)}")
+        logger.info(f"   ✅ Phase 2 complete in {phase2_time:.1f}s")
+        logger.info(f"   Total building block results: {len(all_building_block_results)}")
         
         # Validate merge
         if len(all_building_block_results) != len(test_df):
@@ -837,7 +838,7 @@ class UltraHybridSimulator:
             log_debug(f"✓ Merge validation passed: {len(all_building_block_results)} bars")
         
         # PHASE 3: Parallel config testing
-        print(f"\n⚡ PHASE 3: Testing {len(configs)} configs across {self.num_cores} cores...")
+        logger.info(f"\n⚡ PHASE 3: Testing {len(configs)} configs across {self.num_cores} cores...")
         log_debug(f"Phase 3: Starting parallel config testing")
         log_debug(f"Total configs to test: {len(configs)}")
         phase3_start = time.time()
@@ -857,7 +858,7 @@ class UltraHybridSimulator:
         phase3_time = time.time() - phase3_start
         log_debug(f"Phase 3 complete: {phase3_time:.1f}s")
         log_debug(f"Received {len(results)} config performance results")
-        print(f"   ✅ Phase 3 complete in {phase3_time:.1f}s")
+        logger.info(f"   ✅ Phase 3 complete in {phase3_time:.1f}s")
         
         total_time = time.time() - phase1_start
         log_debug(f"=== OPTIMIZATION COMPLETE ===")
@@ -868,10 +869,10 @@ class UltraHybridSimulator:
         log_debug(f"Throughput: {len(test_df)/total_time:.1f} bars/sec overall")
         log_debug(f"Speedup vs single-core: ~{(16*17280/total_time):.0f}x")
         
-        print(f"\n🎯 TOTAL TIME: {total_time:.1f}s ({total_time/60:.1f} minutes)")
-        print(f"   Phase 1 (Parallel blocks): {phase1_time:.1f}s")
-        print(f"   Phase 2 (Merge): {phase2_time:.1f}s")
-        print(f"   Phase 3 (Parallel configs): {phase3_time:.1f}s")
+        logger.info(f"\n🎯 TOTAL TIME: {total_time:.1f}s ({total_time/60:.1f} minutes)")
+        logger.info(f"   Phase 1 (Parallel blocks): {phase1_time:.1f}s")
+        logger.info(f"   Phase 2 (Merge): {phase2_time:.1f}s")
+        logger.info(f"   Phase 3 (Parallel configs): {phase3_time:.1f}s")
         
         log_debug(f"Debug log saved to: {log_file}")
         

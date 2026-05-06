@@ -34,6 +34,9 @@ import pandas as pd
 import pickle
 from pathlib import Path
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Handle both package import and standalone execution
 try:
     from .pattern_encoder import PatternEncoder, EncodedPattern
@@ -347,8 +350,8 @@ class PatternStatistics:
         with open(filepath, 'wb') as f:
             pickle.dump(data, f)
         
-        print(f"✅ Statistics saved to {filepath}")
-        print(f"   Total patterns tracked: {self.total_patterns_tracked}")
+        logger.info(f"✅ Statistics saved to {filepath}")
+        logger.info(f"   Total patterns tracked: {self.total_patterns_tracked}")
     
     @classmethod
     def load(cls, filepath: str) -> 'PatternStatistics':
@@ -377,8 +380,8 @@ class PatternStatistics:
         stats.total_patterns_tracked = data['total_patterns_tracked']
         stats.training_complete = data.get('training_complete', False)
         
-        print(f"✅ Statistics loaded from {filepath}")
-        print(f"   Total patterns tracked: {stats.total_patterns_tracked}")
+        logger.info(f"✅ Statistics loaded from {filepath}")
+        logger.info(f"   Total patterns tracked: {stats.total_patterns_tracked}")
         
         return stats
     
@@ -472,21 +475,21 @@ class PatternStatistics:
         Args:
             top_n: Number of top patterns to show
         """
-        print("="*80)
-        print("PATTERN STATISTICS SUMMARY")
-        print("="*80)
+        logger.info("="*80)
+        logger.info("PATTERN STATISTICS SUMMARY")
+        logger.info("="*80)
         
         stats_info = self.get_statistics()
-        print(f"\nTotal patterns tracked: {stats_info['total_patterns_tracked']}")
-        print(f"Patterns with data (highs): {stats_info['high_patterns_with_data']}/64")
-        print(f"Patterns with data (lows): {stats_info['low_patterns_with_data']}/64")
-        print(f"Avg samples per pattern: {stats_info['avg_samples_per_pattern']:.1f}")
+        logger.info(f"\nTotal patterns tracked: {stats_info['total_patterns_tracked']}")
+        logger.info(f"Patterns with data (highs): {stats_info['high_patterns_with_data']}/64")
+        logger.info(f"Patterns with data (lows): {stats_info['low_patterns_with_data']}/64")
+        logger.info(f"Avg samples per pattern: {stats_info['avg_samples_per_pattern']:.1f}")
         
-        print(f"\n{'='*80}")
-        print(f"Top {top_n} Most Common Patterns (Pivot Highs):")
-        print(f"{'='*80}")
-        print(f"{'Idx':<5} {'Total':<8} {'HH %':<8} {'LH %':<8} {'Avg Fib':<10} {'Avg Bars':<10} {'Description'}")
-        print("-"*80)
+        logger.info(f"\n{'='*80}")
+        logger.info(f"Top {top_n} Most Common Patterns (Pivot Highs):")
+        logger.info(f"{'='*80}")
+        logger.info(f"{'Idx':<5} {'Total':<8} {'HH %':<8} {'LH %':<8} {'Avg Fib':<10} {'Avg Bars':<10} {'Description'}")
+        logger.info("-"*80)
         
         # Get top patterns by total count
         totals = self.pivot_high_stats[:, 2]
@@ -500,12 +503,12 @@ class PatternStatistics:
             prediction = self.predict(idx, is_high=True)
             desc = encoder.get_pattern_description(idx)
             
-            print(f"{idx:<5} {prediction.sample_count:<8} "
+            logger.info(f"{idx:<5} {prediction.sample_count:<8} "
                   f"{prediction.hh_probability:<8.1%} {prediction.lh_probability:<8.1%} "
                   f"{prediction.avg_fib_ratio:<10.2f} {prediction.expected_bars:<10} "
                   f"{desc[:40]}")
         
-        print("="*80)
+        logger.info("="*80)
     
     def predict_with_mtf(
         self,
@@ -604,14 +607,14 @@ class PatternStatistics:
 # Helper function for quick testing
 def quick_test():
     """Quick test of pattern statistics"""
-    print("="*60)
-    print("PATTERN STATISTICS TEST")
-    print("="*60)
+    logger.info("="*60)
+    logger.info("PATTERN STATISTICS TEST")
+    logger.info("="*60)
     
     stats = PatternStatistics(min_samples=5)
     
     # Simulate some historical outcomes
-    print("\nSimulating historical outcomes...")
+    logger.info("\nSimulating historical outcomes...")
     
     # Pattern 6 (Bearish divergence): mostly LH
     for i in range(15):
@@ -631,30 +634,30 @@ def quick_test():
     for i in range(4):
         stats.update(4, 'HH', 0.9, 28)  # 4 HH outcomes
     
-    print(f"✓ Simulated {stats.total_patterns_tracked} historical outcomes")
+    logger.info(f"✓ Simulated {stats.total_patterns_tracked} historical outcomes")
     
     # Test predictions
-    print("\n" + "="*60)
-    print("Testing Predictions:")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("Testing Predictions:")
+    logger.info("="*60)
     
     for idx in [3, 4, 6]:
         prediction = stats.predict(idx)
         encoder = PatternEncoder()
         desc = encoder.get_pattern_description(idx)
         
-        print(f"\nPattern {idx}: {desc}")
-        print(f"  {prediction}")
-        print(f"  Should enter: {prediction.should_enter()}")
-        print(f"  Should skip: {prediction.should_skip()}")
+        logger.info(f"\nPattern {idx}: {desc}")
+        logger.info(f"  {prediction}")
+        logger.info(f"  Should enter: {prediction.should_enter()}")
+        logger.info(f"  Should skip: {prediction.should_skip()}")
     
     # Print summary
-    print("\n")
+    logger.info("\n")
     stats.print_summary(top_n=5)
     
-    print("\n" + "="*60)
-    print("TEST COMPLETE")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("TEST COMPLETE")
+    logger.info("="*60)
 
 
 if __name__ == "__main__":

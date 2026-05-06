@@ -23,6 +23,10 @@ from typing import Optional, Tuple
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Handle both package import and standalone execution
 try:
     from .pattern_encoder import PatternEncoder, EncodedPattern, TrendDirection
@@ -35,8 +39,6 @@ except ImportError:
     from .pattern_encoder import PatternEncoder, EncodedPattern, TrendDirection
     from .pattern_statistics import PivotPrediction
     from .zigzag_detector import ZigzagDetector, Pivot, PivotType
-
-
 class HTFConfirmation:
     """
     Higher Timeframe Confirmation Helper.
@@ -339,9 +341,9 @@ class HTFConfirmation:
             pattern_30m: 30m pattern
             prediction_30m: 30m prediction
         """
-        print("="*80)
-        print("HIGHER TIMEFRAME CONFLUENCE ANALYSIS")
-        print("="*80)
+        logger.info("="*80)
+        logger.info("HIGHER TIMEFRAME CONFLUENCE ANALYSIS")
+        logger.info("="*80)
         
         # Get all factors
         htf_trend = self.get_trend()
@@ -349,20 +351,20 @@ class HTFConfirmation:
         rsi_state = self.get_rsi_state()
         score = self.calculate_confluence(pattern_30m, prediction_30m)
         
-        print(f"\n30m Pattern:")
-        print(f"  Trend: {pattern_30m.trend_direction.name}")
-        print(f"  LH Probability: {prediction_30m.lh_probability:.1%}")
-        print(f"  HH Probability: {prediction_30m.hh_probability:.1%}")
+        logger.info(f"\n30m Pattern:")
+        logger.info(f"  Trend: {pattern_30m.trend_direction.name}")
+        logger.info(f"  LH Probability: {prediction_30m.lh_probability:.1%}")
+        logger.info(f"  HH Probability: {prediction_30m.hh_probability:.1%}")
         
-        print(f"\n4H Analysis:")
-        print(f"  Trend: {htf_trend.name}")
-        print(f"  Pivot Bias: {pivot_bias}")
-        print(f"  RSI State: {rsi_state} (RSI={self.htf_rsi.iloc[-1]:.1f})")
+        logger.info(f"\n4H Analysis:")
+        logger.info(f"  Trend: {htf_trend.name}")
+        logger.info(f"  Pivot Bias: {pivot_bias}")
+        logger.info(f"  RSI State: {rsi_state} (RSI={self.htf_rsi.iloc[-1]:.1f})")
         
-        print(f"\nConfluence Score: {score}/100")
-        print(f"Assessment: {self.get_confluence_description(score)}")
+        logger.info(f"\nConfluence Score: {score}/100")
+        logger.info(f"Assessment: {self.get_confluence_description(score)}")
         
-        print("="*80)
+        logger.info("="*80)
     
     def __repr__(self) -> str:
         return f"HTFConfirmation(bars={len(self.htf_df)}, zigzag_len={self.zigzag_length})"
@@ -371,17 +373,17 @@ class HTFConfirmation:
 # Quick test function
 def quick_test():
     """Quick test of HTF confirmation"""
-    print("="*60)
-    print("HTF CONFIRMATION TEST")
-    print("="*60)
+    logger.info("="*60)
+    logger.info("HTF CONFIRMATION TEST")
+    logger.info("="*60)
     
     # This would need actual 4H data to run
-    print("\nNote: Requires 4H data to run full test")
-    print("See implementation in sophisticated_m_pattern_detector")
+    logger.info("\nNote: Requires 4H data to run full test")
+    logger.info("See implementation in sophisticated_m_pattern_detector")
     
-    print("\n" + "="*60)
-    print("MODULE LOADED SUCCESSFULLY")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("MODULE LOADED SUCCESSFULLY")
+    logger.info("="*60)
 
 
 if __name__ == "__main__":

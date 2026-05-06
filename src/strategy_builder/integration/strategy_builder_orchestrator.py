@@ -24,6 +24,8 @@ from src.strategy_builder.testing.walkforward_test_engine import (
 )
 from src.strategy_builder.persistence.strategy_persistence import StrategyPersistence
 
+import logging
+logger = logging.getLogger(__name__)
 
 class MockRegistry:
     """
@@ -878,7 +880,7 @@ class StrategyBuilderOrchestrator:
             # CRITICAL: Track loaded strategy path for version control (Sprint 1.6)
             # This allows version control to work on ANY loaded strategy, not hardcoded
             self.loaded_strategy_path = filepath
-            print(f"ℹ️ Loaded strategy path set: {filepath}")
+            logger.info(f"ℹ️ Loaded strategy path set: {filepath}")
             
             return WorkflowResult(
                 success=True,
@@ -1071,9 +1073,9 @@ class StrategyBuilderOrchestrator:
                     } if hasattr(exit_cond, 'recheck_config') and exit_cond.recheck_config else None
                 })
         
-        print(f"✅ Serialized strategy config: {config_dict['name']}")
-        print(f"   Blocks: {len(config_dict['blocks'])}")
-        print(f"   Total signals: {sum(len(b['signals']) for b in config_dict['blocks'])}")
+        logger.info(f"✅ Serialized strategy config: {config_dict['name']}")
+        logger.info(f"   Blocks: {len(config_dict['blocks'])}")
+        logger.info(f"   Total signals: {sum(len(b['signals']) for b in config_dict['blocks'])}")
         
         return config_dict
     
@@ -1102,8 +1104,8 @@ class StrategyBuilderOrchestrator:
         """
         # Check if version is tracked
         if not self.current_version_id:
-            print("❌ No strategy version loaded for backtest")
-            print("   User must open a strategy from Strategy Browser first")
+            logger.error("❌ No strategy version loaded for backtest")
+            logger.info("   User must open a strategy from Strategy Browser first")
             return None
         
         try:
@@ -1117,25 +1119,25 @@ class StrategyBuilderOrchestrator:
             version_dict = db.strategy.get_strategy_version(self.current_version_id)
             
             if not version_dict:
-                print(f"❌ Strategy version {self.current_version_id} not found in database")
+                logger.error(f"❌ Strategy version {self.current_version_id} not found in database")
                 return None
             
             # Log what was loaded
             blocks_count = len(version_dict.get('blocks', []))
             total_signals = sum(len(b.get('signals', [])) for b in version_dict.get('blocks', []))
             
-            print(f"✅ Loaded strategy for backtest: {version_dict['name']}")
-            print(f"   Version: v{version_dict['version_number']}")
-            print(f"   Blocks: {blocks_count}")
-            print(f"   Total signals: {total_signals}")
-            print(f"   Exit conditions: {len(version_dict.get('exit_conditions', []))}")
+            logger.info(f"✅ Loaded strategy for backtest: {version_dict['name']}")
+            logger.info(f"   Version: v{version_dict['version_number']}")
+            logger.info(f"   Blocks: {blocks_count}")
+            logger.info(f"   Total signals: {total_signals}")
+            logger.info(f"   Exit conditions: {len(version_dict.get('exit_conditions', []))}")
             
             # CRITICAL FIX: Close PostgreSQL connections BEFORE returning
             # Multiprocessing fork() will happen next (bar aggregation with 31 CPUs)
             # SSL connections don't survive fork() - must close in parent process
             if hasattr(db, 'engine') and db.engine is not None:
                 db.engine.dispose()  # Close all connections in pool
-                print("✅ Closed PostgreSQL connections before multiprocessing")
+                logger.info("✅ Closed PostgreSQL connections before multiprocessing")
             
             # Return database dict directly
             # InstitutionalSignalEvaluator will access: config['blocks'], config['exit_conditions']
@@ -1143,7 +1145,7 @@ class StrategyBuilderOrchestrator:
             
         except Exception as e:
             import traceback
-            print(f"❌ ERROR loading strategy from database: {e}")
+            logger.error(f"❌ ERROR loading strategy from database: {e}")
             traceback.print_exc()
             return None
     
@@ -1170,19 +1172,19 @@ class StrategyBuilderOrchestrator:
             # Get block metadata from registry
             block_metadata = self.registry.get_block(block_name)
             if not block_metadata:
-                print(f"❌ Block '{block_name}' not found in registry")
+                logger.error(f"❌ Block '{block_name}' not found in registry")
                 return False
             
             # Get strategy type from config (Bullish, Bearish, Neutral)
             strategy_type = getattr(self.config_engine.config, 'strategy_type', 'Bearish')
-            print(f"📊 Strategy type: {strategy_type}")
+            logger.info(f"📊 Strategy type: {strategy_type}")
             
             # INTELLIGENT: Get strategy-appropriate signals from mapping
             signal_names = get_signals_for_strategy(block_name, strategy_type)
             
             if not signal_names:
                 # Fallback: No mapping found - use all registry signals (old behavior)
-                print(f"⚠️ No intelligent mapping for '{block_name}' - using registry signals")
+                logger.warning(f"⚠️ No intelligent mapping for '{block_name}' - using registry signals")
                 if 'signals' in block_metadata:
                     for signal in block_metadata['signals']:
                         if isinstance(signal, dict) and 'name' in signal:
@@ -1191,11 +1193,11 @@ class StrategyBuilderOrchestrator:
                             signal_names.append(signal)
             
             if not signal_names:
-                print(f"⚠️ No signals found for block '{block_name}', adding block only")
+                logger.warning(f"⚠️ No signals found for block '{block_name}', adding block only")
                 result = self.add_block(block_name, logic="AND")
                 return result.success
             
-            print(f"🎯 Intelligent signal selection: {signal_names}")
+            logger.info(f"🎯 Intelligent signal selection: {signal_names}")
             
             # Add block WITH filtered signals using institutional-grade method
             result = self.add_block_with_signals(
@@ -1206,12 +1208,12 @@ class StrategyBuilderOrchestrator:
             )
             
             if result.success:
-                print(f"✅ Added building block '{block_name}' with {len(signal_names)} signal(s)")
+                logger.info(f"✅ Added building block '{block_name}' with {len(signal_names)} signal(s)")
             
             return result.success
             
         except Exception as e:
-            print(f"❌ Failed to add building block '{block_name}': {str(e)}")
+            logger.error(f"❌ Failed to add building block '{block_name}': {str(e)}")
             return False
     
     def update_parameter(self, param_name: str, new_value) -> bool:
@@ -1246,8 +1248,8 @@ class StrategyBuilderOrchestrator:
             
             # Check if parameter is supported
             if param_name not in param_mapping:
-                print(f"⚠️ Parameter '{param_name}' not yet supported for update")
-                print(f"   Supported parameters: {list(param_mapping.keys())}")
+                logger.warning(f"⚠️ Parameter '{param_name}' not yet supported for update")
+                logger.info(f"   Supported parameters: {list(param_mapping.keys())}")
                 return False
             
             # Get config attribute name
@@ -1256,16 +1258,16 @@ class StrategyBuilderOrchestrator:
             # Update parameter
             if hasattr(config, config_attr):
                 setattr(config, config_attr, new_value)
-                print(f"✅ Updated {param_name} = {new_value}")
+                logger.info(f"✅ Updated {param_name} = {new_value}")
                 return True
             else:
                 # Add parameter if it doesn't exist
                 setattr(config, config_attr, new_value)
-                print(f"✅ Added {param_name} = {new_value}")
+                logger.info(f"✅ Added {param_name} = {new_value}")
                 return True
                 
         except Exception as e:
-            print(f"❌ Failed to update parameter '{param_name}': {str(e)}")
+            logger.error(f"❌ Failed to update parameter '{param_name}': {str(e)}")
             return False
     
     def save_config_version(self, message: str) -> bool:
@@ -1298,18 +1300,18 @@ class StrategyBuilderOrchestrator:
             # CRITICAL: Use loaded strategy path if available (dynamically tracks ANY loaded strategy)
             if self.loaded_strategy_path:
                 config_file = Path(self.loaded_strategy_path)
-                print(f"💾 Saving to loaded strategy: {config_file.name}")
+                logger.info(f"💾 Saving to loaded strategy: {config_file.name}")
             else:
                 # Fallback to current_strategy.json if no strategy loaded
                 config_file = project_root / "user_strategies" / "current_strategy.json"
-                print(f"💾 No loaded strategy path - saving to: current_strategy.json")
+                logger.info(f"💾 No loaded strategy path - saving to: current_strategy.json")
             
             config_file.parent.mkdir(parents=True, exist_ok=True)
             
             # Persist current config
             save_result = self.save_strategy(str(config_file))
             if not save_result.success:
-                print(f"⚠️ Failed to save config file before version commit")
+                logger.error(f"⚠️ Failed to save config file before version commit")
                 return False
             
             # Git add the configuration file
@@ -1322,7 +1324,7 @@ class StrategyBuilderOrchestrator:
             )
             
             if result_add.returncode != 0:
-                print(f"⚠️ Git add failed: {result_add.stderr}")
+                logger.error(f"⚠️ Git add failed: {result_add.stderr}")
                 return False
             
             # Git commit with message
@@ -1335,23 +1337,23 @@ class StrategyBuilderOrchestrator:
             )
             
             if result_commit.returncode == 0:
-                print(f"✅ Configuration version saved: {message}")
+                logger.info(f"✅ Configuration version saved: {message}")
                 return True
             elif "nothing to commit" in result_commit.stdout.lower():
-                print(f"ℹ️ No changes to commit (already saved)")
+                logger.info(f"ℹ️ No changes to commit (already saved)")
                 return True
             else:
-                print(f"⚠️ Git commit failed: {result_commit.stderr}")
+                logger.error(f"⚠️ Git commit failed: {result_commit.stderr}")
                 return False
             
         except subprocess.TimeoutExpired:
-            print(f"❌ Git operation timed out")
+            logger.error(f"❌ Git operation timed out")
             return False
         except FileNotFoundError:
-            print(f"⚠️ Git not available - version control disabled")
+            logger.warning(f"⚠️ Git not available - version control disabled")
             return False
         except Exception as e:
-            print(f"❌ Version save failed: {str(e)}")
+            logger.error(f"❌ Version save failed: {str(e)}")
             return False
         
     def add_exit_condition(
@@ -1391,7 +1393,6 @@ class StrategyBuilderOrchestrator:
         """
         try:
             from src.strategy_builder.core.strategy_config_engine import ExitCondition, RecheckConfig
-            
             # Validate inputs
             if percentage <= 0 or percentage > 1.0:
                 return WorkflowResult(

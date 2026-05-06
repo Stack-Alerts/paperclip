@@ -49,6 +49,9 @@ from src.strategy_builder.ui.strategy_browser_dialog import StrategyBrowserDialo
 from src.optimizer_v3.database import get_database_manager
 from src.strategy_builder.ui.settings_dialog import SettingsDialog
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Import real block registry adapter
 try:
     from src.strategy_builder.core.block_registry_adapter import BlockRegistryAdapter
@@ -109,7 +112,7 @@ class _RuntimeCandleUpdateThread(QThread):
             from datetime import datetime, timedelta, timezone
             from src.data_manager.unified_manager import UnifiedDataManager
 
-            print(f"[RuntimeUpdate] cycle start")
+            logger.info(f"[RuntimeUpdate] cycle start")
             manager = UnifiedDataManager(mode='live')
 
             now = datetime.now()
@@ -147,28 +150,22 @@ class _RuntimeCandleUpdateThread(QThread):
                     # Step back one 15m period to include the boundary bar in
                     # the detect_gaps scan window.
                     start_date = last_15m - timedelta(minutes=15)
-                    print(
-                        f"[RuntimeUpdate] RC4c scan anchor: last_15m={last_15m.strftime('%H:%M:%S')}"
+                    logger.info(f"[RuntimeUpdate] RC4c scan anchor: last_15m={last_15m.strftime('%H:%M:%S')}"
                         f" → scan_start={start_date.strftime('%H:%M:%S')}"
-                        f" → now={now.strftime('%H:%M:%S')}"
-                    )
+                        f" → now={now.strftime('%H:%M:%S')}")
                 else:
                     # No 15m bars on disk yet — fall back to session_start - 15m
                     fallback_base = self._session_start_time if self._session_start_time is not None else now
                     start_date = fallback_base - timedelta(minutes=15)
-                    print(
-                        f"[RuntimeUpdate] RC4c: no 15m bars on disk; "
-                        f"falling back to session_start-15m → {start_date.strftime('%H:%M:%S')}"
-                    )
+                    logger.info(f"[RuntimeUpdate] RC4c: no 15m bars on disk; "
+                        f"falling back to session_start-15m → {start_date.strftime('%H:%M:%S')}")
             except Exception as _anchor_exc:
                 # Defensive: if get_last_bar_timestamp raises, fall back
                 # gracefully to session_start_time or 2h window.
                 fallback_base = self._session_start_time if self._session_start_time is not None else now
                 start_date = fallback_base - timedelta(minutes=15)
-                print(
-                    f"[RuntimeUpdate] RC4c anchor lookup failed ({_anchor_exc}); "
-                    f"falling back to {start_date.strftime('%H:%M:%S')}"
-                )
+                logger.error(f"[RuntimeUpdate] RC4c anchor lookup failed ({_anchor_exc}); "
+                    f"falling back to {start_date.strftime('%H:%M:%S')}")
             # Apply hard lookback cap.
             start_date = max(start_date, max_lookback)
 
@@ -183,7 +180,7 @@ class _RuntimeCandleUpdateThread(QThread):
                 start_date=start_date,
                 end_date=now,
             )
-            print(f"[RuntimeUpdate] verify_and_repair completed in {_time.monotonic() - t_repair:.2f}s")
+            logger.info(f"[RuntimeUpdate] verify_and_repair completed in {_time.monotonic() - t_repair:.2f}s")
 
             # Timeout check after the (potentially slow) repair.
             if _timed_out():
@@ -210,7 +207,7 @@ class _RuntimeCandleUpdateThread(QThread):
 
             total_elapsed = _elapsed()
             msg = f"Runtime update complete ({total_elapsed:.1f}s) — " + " | ".join(tf_lines)
-            print(f"[RuntimeUpdate] {msg}")
+            logger.info(f"[RuntimeUpdate] {msg}")
             self.finished.emit(not any_error, msg)
 
         except Exception as exc:
@@ -235,7 +232,7 @@ class StrategyBuilderMainWindow(QMainWindow):
                 adapter = BlockRegistryAdapter()
                 self.orchestrator = StrategyBuilderOrchestrator(registry=adapter)
             except Exception as e:
-                print(f"Warning: Failed to initialize BlockRegistryAdapter: {e}")
+                logger.error(f"Warning: Failed to initialize BlockRegistryAdapter: {e}")
                 # Fallback to mock registry
                 self.orchestrator = StrategyBuilderOrchestrator()
         else:
@@ -834,10 +831,10 @@ class StrategyBuilderMainWindow(QMainWindow):
                 # Assign to config engine (SAME PATTERN as orchestrator.load_strategy)
                 self.orchestrator.config_engine.config = restored_config
                 
-                print(f"Successfully restored {len(restored_config.blocks)} blocks with full config")
+                logger.info(f"Successfully restored {len(restored_config.blocks)} blocks with full config")
                 
             except Exception as e:
-                print(f"Error loading config from database: {e}")
+                logger.error(f"Error loading config from database: {e}")
                 import traceback
                 traceback.print_exc()
                 # Fallback to empty config
@@ -994,9 +991,9 @@ class StrategyBuilderMainWindow(QMainWindow):
                 
             except Exception as version_error:
                 # VERSION CREATION FAILED
-                print(f"\n❌ VERSION CREATION FAILED!")
-                print(f"   Error: {version_error}")
-                print(f"   Error type: {type(version_error)}")
+                logger.error(f"\n❌ VERSION CREATION FAILED!")
+                logger.error(f"   Error: {version_error}")
+                logger.error(f"   Error type: {type(version_error)}")
                 import traceback
                 traceback.print_exc()
                 
@@ -1007,18 +1004,18 @@ class StrategyBuilderMainWindow(QMainWindow):
                 if created_strategy:
                     try:
                         from sqlalchemy import text
-                        print(f"   Cleaning up orphaned strategy: {self.current_strategy_id}")
+                        logger.info(f"   Cleaning up orphaned strategy: {self.current_strategy_id}")
                         # Execute delete in fresh transaction (no intermediate rollback needed)
                         db.strategy.session.execute(
                             text("DELETE FROM strategies WHERE strategy_id = :sid"),
                             {'sid': self.current_strategy_id}
                         )
                         db.strategy.session.commit()
-                        print(f"   ✅ Orphan deleted")
+                        logger.info(f"   ✅ Orphan deleted")
                     except Exception as cleanup_error:
                         # Cleanup failed - log but don't block error reporting
                         db.strategy.session.rollback()
-                        print(f"   ❌ Failed to cleanup orphaned strategy: {cleanup_error}")
+                        logger.error(f"   ❌ Failed to cleanup orphaned strategy: {cleanup_error}")
                     
                     self.current_strategy_id = None
                 
@@ -1145,14 +1142,14 @@ class StrategyBuilderMainWindow(QMainWindow):
             ui_type = self.info_panel.get_strategy_type()
             config_type = getattr(self.orchestrator.config_engine.config, 'strategy_type', None)
             if config_type != ui_type:
-                print(f"WARNING: Config mismatch before save! UI={ui_type}, Config={config_type}")
-                print(f"Forcing config to match UI: {ui_type}")
+                logger.warning(f"WARNING: Config mismatch before save! UI={ui_type}, Config={config_type}")
+                logger.info(f"Forcing config to match UI: {ui_type}")
                 # Force config to match UI
                 if hasattr(self.orchestrator.config_engine.config, 'strategy_type'):
                     self.orchestrator.config_engine.config.strategy_type = ui_type
                 else:
                     setattr(self.orchestrator.config_engine.config, 'strategy_type', ui_type)
-                print(f"Config now: {self.orchestrator.config_engine.config.strategy_type}")
+                logger.info(f"Config now: {self.orchestrator.config_engine.config.strategy_type}")
             
             # PERSIST WORKFLOW STATE: Save validation status
             if self.validation_passed:
@@ -1623,7 +1620,7 @@ class StrategyBuilderMainWindow(QMainWindow):
                 # Verify the UI actually changed
                 actual_type = self.info_panel.get_strategy_type()
                 if actual_type != suggested_type:
-                    print(f"WARNING: UI didn't update! Expected {suggested_type}, got {actual_type}")
+                    logger.warning(f"WARNING: UI didn't update! Expected {suggested_type}, got {actual_type}")
                 
                 # Also update config directly right now (don't wait for later)
                 if hasattr(self.orchestrator.config_engine.config, 'strategy_type'):
@@ -1642,7 +1639,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             
         except Exception as e:
             # Don't block save on error, just log and proceed
-            print(f"Error checking strategy type match: {e}")
+            logger.error(f"Error checking strategy type match: {e}")
             return True
     
     def _on_app_start(self):
@@ -1669,7 +1666,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             modal.exec_()  # Show modal (blocks until closed)
         except Exception as e:
             # Don't block app startup if modal fails
-            print(f"Warning: Data update modal failed: {e}")
+            logger.error(f"Warning: Data update modal failed: {e}")
             self._update_status("Data update check skipped (error occurred)")
     
     def _start_auto_update_system(self):
@@ -1689,7 +1686,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             # so gaps that predate the 2h rolling window are never hidden.
             if self._session_start_time is None:
                 self._session_start_time = now
-                print(f"[AutoUpdate] session_start_time set to {now.strftime('%Y-%m-%d %H:%M:%S')}")
+                logger.info(f"[AutoUpdate] session_start_time set to {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
             # Next 15-min boundary
             minutes_to_next = 15 - (now.minute % 15)
@@ -1714,11 +1711,11 @@ class StrategyBuilderMainWindow(QMainWindow):
             self.retry_count = 0  # reset on successful startup
 
         except Exception as e:
-            print(f"Error starting auto-update system: {e}")
+            logger.error(f"Error starting auto-update system: {e}")
             # Exponential backoff: 2, 4, 8, 16, 30, 30, ... seconds (capped at 30s)
             delay_s = min(2 * (2 ** self.retry_count), 30)
             self.retry_count += 1
-            print(f"Retrying auto-update startup in {delay_s}s (attempt {self.retry_count})...")
+            logger.info(f"Retrying auto-update startup in {delay_s}s (attempt {self.retry_count})...")
             QTimer.singleShot(delay_s * 1000, self._start_auto_update_system)
     
     def _check_and_update_data(self):
@@ -1736,7 +1733,7 @@ class StrategyBuilderMainWindow(QMainWindow):
 
             # --- Guard: skip if a previous update cycle is still running ---
             if self._runtime_update_thread is not None and self._runtime_update_thread.isRunning():
-                print("Runtime update thread still running — skipping this cycle trigger.")
+                logger.info("Runtime update thread still running — skipping this cycle trigger.")
                 self._schedule_next_check()
                 return
 
@@ -1752,7 +1749,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             self._schedule_next_check()
 
         except Exception as e:
-            print(f"Error launching runtime update thread: {e}")
+            logger.error(f"Error launching runtime update thread: {e}")
             import traceback
             traceback.print_exc()
             self._update_status(f"Data update error: {str(e)}")
@@ -1760,7 +1757,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Guard against cascading storms — only one quick retry per cycle failure.
             if not self._in_quick_retry:
                 self._in_quick_retry = True
-                print("Cycle exception — scheduling quick retry in 12s...")
+                logger.error("Cycle exception — scheduling quick retry in 12s...")
                 QTimer.singleShot(12 * 1000, self._check_and_update_data)
             else:
                 # Second failure in quick-retry cycle — fall back to boundary schedule
@@ -1774,7 +1771,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         Updates the status bar and resets state.  Schedules a quick retry on
         failure (honouring the same single-retry guard as before).
         """
-        print(f"[RuntimeUpdate] {'OK' if success else 'FAIL'}: {message}")
+        logger.info(f"[RuntimeUpdate] {'OK' if success else 'FAIL'}: {message}")
         if success:
             self.last_update_time = datetime.now()
             self._in_quick_retry = False
@@ -1785,7 +1782,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             self._update_status(f"Update failed: {message[:120]}")
             if not self._in_quick_retry:
                 self._in_quick_retry = True
-                print("Update failed — scheduling quick retry in 12s...")
+                logger.error("Update failed — scheduling quick retry in 12s...")
                 QTimer.singleShot(12 * 1000, self._check_and_update_data)
             else:
                 self._in_quick_retry = False
@@ -1821,22 +1818,22 @@ class StrategyBuilderMainWindow(QMainWindow):
             # Save next check time for countdown
             self.next_check_time = now + timedelta(milliseconds=ms_until_check)
 
-            print(f"[RuntimeSchedule] Next check in {ms_until_check/1000:.1f}s (at {self.next_check_time.strftime('%H:%M:%S')})")
+            logger.info(f"[RuntimeSchedule] Next check in {ms_until_check/1000:.1f}s (at {self.next_check_time.strftime('%H:%M:%S')})")
 
         except Exception as e:
             # BUG 1 FIX: always reschedule even when boundary calculation throws.
             # Previously the chain died permanently on any exception here.
-            print(f"Error scheduling next check: {e} — falling back to {_FALLBACK_MS // 1000}s fixed delay")
+            logger.error(f"Error scheduling next check: {e} — falling back to {_FALLBACK_MS // 1000}s fixed delay")
             try:
                 self.candle_check_timer = QTimer(self)
                 self.candle_check_timer.setSingleShot(True)
                 self.candle_check_timer.timeout.connect(self._check_and_update_data)
                 self.candle_check_timer.start(_FALLBACK_MS)
                 self.next_check_time = datetime.now() + timedelta(milliseconds=_FALLBACK_MS)
-                print(f"[RuntimeSchedule] Fallback: Next check in {_FALLBACK_MS/1000:.1f}s (at {self.next_check_time.strftime('%H:%M:%S')})")
+                logger.info(f"[RuntimeSchedule] Fallback: Next check in {_FALLBACK_MS/1000:.1f}s (at {self.next_check_time.strftime('%H:%M:%S')})")
             except Exception as inner_e:
                 # Last resort: bare singleShot — cannot die here
-                print(f"Fallback schedule also failed: {inner_e} — using QTimer.singleShot")
+                logger.error(f"Fallback schedule also failed: {inner_e} — using QTimer.singleShot")
                 QTimer.singleShot(_FALLBACK_MS, self._check_and_update_data)
     
     def _update_countdown_status(self):
@@ -1928,10 +1925,10 @@ class StrategyBuilderMainWindow(QMainWindow):
             fix_type: Type of fix applied (rule_id)
             fix_data: Dict with fix details
         """
-        print(f"\n{'='*80}")
-        print(f"AUTO-FIX APPLIED: {fix_type}")
-        print(f"Saving updated configuration to database...")
-        print(f"{'='*80}\n")
+        logger.info(f"\n{'='*80}")
+        logger.info(f"AUTO-FIX APPLIED: {fix_type}")
+        logger.info(f"Saving updated configuration to database...")
+        logger.info(f"{'='*80}\n")
         
         # CRITICAL FIX (BTCAAAAA-135): Sync the full fixed config from validation_window
         # into the orchestrator for ALL fix types, not just DIRECTION_001.
@@ -1953,18 +1950,18 @@ class StrategyBuilderMainWindow(QMainWindow):
         success = self._on_save_strategy()
         
         if success:
-            print(f"✅ Configuration saved to database successfully")
+            logger.info(f"✅ Configuration saved to database successfully")
             
             # CRITICAL: Save validation status as 'Pass' (fix was applied successfully)
             # This must happen BEFORE reload so reload sees the Pass status
-            print(f"💾 Saving validation status = 'Pass' to database...")
+            logger.info(f"💾 Saving validation status = 'Pass' to database...")
             self._save_validation_status_to_db('Pass')
-            print(f"✅ Validation status saved")
+            logger.info(f"✅ Validation status saved")
             
             # CRITICAL: Reload the saved version from database
             # This ensures main window shows exact config that was saved
             if self.current_version_id:
-                print(f"🔄 Reloading version {self.current_version_id} from database...")
+                logger.info(f"🔄 Reloading version {self.current_version_id} from database...")
                 self._reload_current_version()
 
             # BTCAAAAA-133: Push freshly-reloaded config to the validation window so
@@ -1973,13 +1970,13 @@ class StrategyBuilderMainWindow(QMainWindow):
             # a new object; ValidationReportWindow still holds the old reference unless
             # we update it here.  This call is safe when validation_window is None.
             if self.validation_window and self.orchestrator and self.orchestrator.config_engine and self.orchestrator.config_engine.config:
-                print(f"🔄 Pushing reloaded config to ValidationReportWindow (BTCAAAAA-133)")
+                logger.info(f"🔄 Pushing reloaded config to ValidationReportWindow (BTCAAAAA-133)")
                 self.validation_window.update_config(self.orchestrator.config_engine.config)
-                print(f"✅ ValidationReportWindow config reference updated")
+                logger.info(f"✅ ValidationReportWindow config reference updated")
 
             self._update_status(f"Auto-fix applied, saved, and reloaded: {fix_data.get('issue', fix_type)}")
         else:
-            print(f"❌ Failed to save configuration to database")
+            logger.error(f"❌ Failed to save configuration to database")
             self._update_status(f"Auto-fix applied but save failed")
     
     def _reload_current_version(self):
@@ -2000,7 +1997,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             version = db.strategy.get_strategy_version(self.current_version_id)
             
             if not version:
-                print(f"❌ Version {self.current_version_id} not found")
+                logger.error(f"❌ Version {self.current_version_id} not found")
                 return
             
             # Extract blocks and exit conditions
@@ -2026,28 +2023,28 @@ class StrategyBuilderMainWindow(QMainWindow):
                 # Update orchestrator
                 self.orchestrator.config_engine.config = restored_config
                 
-                print(f"✅ Reloaded {len(restored_config.blocks)} blocks from database")
+                logger.info(f"✅ Reloaded {len(restored_config.blocks)} blocks from database")
                 
                 # Refresh all UI panels
                 self.blocks_panel.refresh_from_orchestrator()
                 self.info_panel.refresh_from_orchestrator()
                 self.search_panel.sync_with_strategy()
                 
-                print(f"✅ UI refreshed with reloaded data")
+                logger.info(f"✅ UI refreshed with reloaded data")
                 
                 # CRITICAL: Restore validation status from database
                 # This updates BOTH the flag AND the stepper to show correct validation state
                 validation_status = version.get('validation_status', 'Un-Validated')
                 
-                print(f"\n{'='*80}")
-                print(f"RESTORING VALIDATION STATUS FROM DATABASE")
-                print(f"{'='*80}")
-                print(f"Database status = '{validation_status}'")
+                logger.info(f"\n{'='*80}")
+                logger.info(f"RESTORING VALIDATION STATUS FROM DATABASE")
+                logger.info(f"{'='*80}")
+                logger.info(f"Database status = '{validation_status}'")
                 
                 if validation_status == 'Pass':
                     # Set flag FIRST
                     self.validation_passed = True
-                    print(f"✅ Set validation_passed = True")
+                    logger.info(f"✅ Set validation_passed = True")
                     
                     # Clear ALL step states first
                     self.stepper.completed_steps.clear()
@@ -2055,14 +2052,14 @@ class StrategyBuilderMainWindow(QMainWindow):
                     
                     # Now mark step 1 as complete (GREEN with checkmark)
                     self.stepper.mark_step_complete(1)
-                    print(f"✅ Stepper step 1 marked COMPLETE (should be GREEN)")
-                    print(f"   completed_steps = {self.stepper.completed_steps}")
-                    print(f"   error_steps = {self.stepper.error_steps}")
+                    logger.info(f"✅ Stepper step 1 marked COMPLETE (should be GREEN)")
+                    logger.info(f"   completed_steps = {self.stepper.completed_steps}")
+                    logger.info(f"   error_steps = {self.stepper.error_steps}")
                     
                 elif validation_status == 'Fail':
                     # Set flag FIRST
                     self.validation_passed = False
-                    print(f"⚠️ Set validation_passed = False")
+                    logger.warning(f"⚠️ Set validation_passed = False")
                     
                     # Clear ALL step states first
                     self.stepper.completed_steps.clear()
@@ -2070,27 +2067,27 @@ class StrategyBuilderMainWindow(QMainWindow):
                     
                     # Mark step 1 as error (RED with X)
                     self.stepper.mark_step_error(1)
-                    print(f"❌ Stepper step 1 marked ERROR (should be RED)")
+                    logger.error(f"❌ Stepper step 1 marked ERROR (should be RED)")
                     
                 else:  # Un-Validated
                     # Set flag FIRST
                     self.validation_passed = False
-                    print(f"ℹ️ Set validation_passed = False (un-validated)")
+                    logger.info(f"ℹ️ Set validation_passed = False (un-validated)")
                     
                     # Clear ALL step states - no mark needed (grey default)
                     self.stepper.completed_steps.clear()
                     self.stepper.error_steps.clear()
                     self.stepper._update_display()
-                    print(f"   Stepper reset to default (should be GREY)")
+                    logger.info(f"   Stepper reset to default (should be GREY)")
                 
-                print(f"{'='*80}\n")
+                logger.info(f"{'='*80}\n")
                 
             finally:
                 # Re-enable validation reset
                 self.loading_strategy = False
             
         except Exception as e:
-            print(f"❌ Error reloading version: {e}")
+            logger.error(f"❌ Error reloading version: {e}")
             import traceback
             traceback.print_exc()
     
@@ -2256,7 +2253,7 @@ class StrategyBuilderMainWindow(QMainWindow):
                     deleted_count += 1
                     total_size += file_size
                 except Exception as e:
-                    print(f"Error deleting {log_file}: {e}")
+                    logger.error(f"Error deleting {log_file}: {e}")
             
             # Show result
             size_mb = total_size / (1024 * 1024)
@@ -2353,7 +2350,6 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _save_debug_settings(self):
         """Save debug logger settings."""
         from src.debugger_logger.config_debugger import ConfigDebugger
-        
         settings = QSettings("BTC_Engine", "StrategyBuilder")
         settings.setValue("debug/consoleEnabled", ConfigDebugger.CONSOLE_ENABLED)
         settings.setValue("debug/logfileEnabled", ConfigDebugger.LOGFILE_ENABLED)

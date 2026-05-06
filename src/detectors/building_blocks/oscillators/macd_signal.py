@@ -24,6 +24,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='macd_signal',
@@ -602,25 +604,25 @@ if __name__ == "__main__":
     macd_block = MACDSignal(fast_period=12, slow_period=26, signal_period=9, timeframe='15min')
     result = macd_block.analyze(df)
     
-    print("=" * 80)
-    print("MACD SIGNAL BUILDING BLOCK - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"\nMACD Values:")
-    print(f"  MACD Line: {result['metadata']['macd_line']:.2f}")
-    print(f"  Signal Line: {result['metadata']['signal_line']:.2f}")
-    print(f"  Histogram: {result['metadata']['histogram']:.2f}")
-    print(f"  Current Price: ${result['metadata']['current_price']:.2f}")
-    print(f"\nSignals:")
-    print(f"  Crossover: {result['metadata']['crossover']}")
-    print(f"  Zero Cross: {result['metadata']['zero_cross']}")
-    print(f"  Bullish Divergence: {result['metadata']['divergences']['bullish_divergence']}")
-    print(f"  Bearish Divergence: {result['metadata']['divergences']['bearish_divergence']}")
-    print(f"\nAnalysis:")
-    print(f"  Strength: {result['metadata']['strength']}")
-    print(f"  Trend: {result['metadata']['trend']}")
-    print(f"\nConfluence Factors:")
+    logger.info("=" * 80)
+    logger.info("MACD SIGNAL BUILDING BLOCK - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"\nMACD Values:")
+    logger.info(f"  MACD Line: {result['metadata']['macd_line']:.2f}")
+    logger.info(f"  Signal Line: {result['metadata']['signal_line']:.2f}")
+    logger.info(f"  Histogram: {result['metadata']['histogram']:.2f}")
+    logger.info(f"  Current Price: ${result['metadata']['current_price']:.2f}")
+    logger.info(f"\nSignals:")
+    logger.info(f"  Crossover: {result['metadata']['crossover']}")
+    logger.info(f"  Zero Cross: {result['metadata']['zero_cross']}")
+    logger.info(f"  Bullish Divergence: {result['metadata']['divergences']['bullish_divergence']}")
+    logger.info(f"  Bearish Divergence: {result['metadata']['divergences']['bearish_divergence']}")
+    logger.info(f"\nAnalysis:")
+    logger.info(f"  Strength: {result['metadata']['strength']}")
+    logger.info(f"  Trend: {result['metadata']['trend']}")
+    logger.info(f"\nConfluence Factors:")
     for factor in result['confluence_factors']:
-        print(f"  - {factor}")
-    print("=" * 80)
+        logger.info(f"  - {factor}")
+    logger.info("=" * 80)

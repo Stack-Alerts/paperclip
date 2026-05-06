@@ -21,6 +21,10 @@ from enum import Enum
 
 from src.utils.logger import get_logger
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 logger = get_logger(__name__)
 
 

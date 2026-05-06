@@ -31,6 +31,10 @@ from src.optimizer_v3.core.block_intelligence_extractor import (
     BlockPurpose
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class RootCause(Enum):
     """Root causes for poor metric performance"""
@@ -158,7 +162,7 @@ class StrategyDeepAnalyzer:
         Returns:
             Complete strategy analysis report
         """
-        print("🔍 Beginning deep strategy analysis...")
+        logger.info("🔍 Beginning deep strategy analysis...")
         
         # Extract strategy components
         blocks = self._extract_blocks(strategy_config)
@@ -211,7 +215,7 @@ class StrategyDeepAnalyzer:
             strengths=strengths
         )
         
-        print("✅ Strategy analysis complete")
+        logger.info("✅ Strategy analysis complete")
         return report
     
     def _extract_blocks(self, strategy_config) -> List[str]:

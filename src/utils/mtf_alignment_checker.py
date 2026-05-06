@@ -10,6 +10,8 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
+import logging
+logger = logging.getLogger(__name__)
 
 class TimeframeHierarchy(Enum):
     """Timeframe hierarchy for multi-timeframe analysis"""
@@ -89,9 +91,9 @@ class MTFAlignmentChecker:
         )
         
         if result.aligned:
-            print(f"✅ Aligned! Confluence bonus: +{result.confluence_score} points")
+            logger.info(f"✅ Aligned! Confluence bonus: +{result.confluence_score} points")
         else:
-            print(f"❌ Not aligned: {result.recommendation}")
+            logger.error(f"❌ Not aligned: {result.recommendation}")
     """
     
     # Confluence point bonuses
@@ -415,12 +417,12 @@ def check_mtf_alignment(
 
 if __name__ == "__main__":
     # Example usage
-    print("=" * 70)
-    print("MULTI-TIMEFRAME ALIGNMENT CHECKER - Institutional Grade")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("MULTI-TIMEFRAME ALIGNMENT CHECKER - Institutional Grade")
+    logger.info("=" * 70)
     
     # Example 1: Perfect alignment (EXECUTE)
-    print("\n📊 Example 1: Perfect Alignment")
+    logger.info("\n📊 Example 1: Perfect Alignment")
     result1 = check_mtf_alignment(
         execution_tf='15min',
         timeframe_data={
@@ -429,13 +431,13 @@ if __name__ == "__main__":
             '4hr': {'trend': 'bullish', 'strength': 85, 'confidence': 90}
         }
     )
-    print(f"Aligned: {'✅ YES' if result1.aligned else '❌ NO'}")
-    print(f"Quality: {result1.quality.value.upper()}")
-    print(f"Confluence Bonus: +{result1.confluence_score} points")
-    print(f"Recommendation: {result1.recommendation}")
+    logger.error(f"Aligned: {'✅ YES' if result1.aligned else '❌ NO'}")
+    logger.info(f"Quality: {result1.quality.value.upper()}")
+    logger.info(f"Confluence Bonus: +{result1.confluence_score} points")
+    logger.info(f"Recommendation: {result1.recommendation}")
     
     # Example 2: Against trend (REJECT)
-    print("\n📊 Example 2: Trading Against Trend")
+    logger.info("\n📊 Example 2: Trading Against Trend")
     result2 = check_mtf_alignment(
         execution_tf='15min',
         timeframe_data={
@@ -444,15 +446,15 @@ if __name__ == "__main__":
             '4hr': {'trend': 'bearish', 'strength': 85, 'confidence': 90}
         }
     )
-    print(f"Aligned: {'✅ YES' if result2.aligned else '❌ NO'}")
-    print(f"Quality: {result2.quality.value.upper()}")
-    print(f"Confluence Bonus: +{result2.confluence_score} points")
-    print(f"Recommendation: {result2.recommendation}")
+    logger.error(f"Aligned: {'✅ YES' if result2.aligned else '❌ NO'}")
+    logger.info(f"Quality: {result2.quality.value.upper()}")
+    logger.info(f"Confluence Bonus: +{result2.confluence_score} points")
+    logger.info(f"Recommendation: {result2.recommendation}")
     if result2.warnings:
-        print(f"Warnings: {', '.join(result2.warnings)}")
+        logger.info(f"Warnings: {', '.join(result2.warnings)}")
     
     # Example 3: Moderate alignment
-    print("\n📊 Example 3: Moderate Alignment")
+    logger.info("\n📊 Example 3: Moderate Alignment")
     result3 = check_mtf_alignment(
         execution_tf='15min',
         timeframe_data={
@@ -462,16 +464,16 @@ if __name__ == "__main__":
             'daily': {'trend': 'bearish', 'strength': 65, 'confidence': 70}
         }
     )
-    print(f"Aligned: {'✅ YES' if result3.aligned else '❌ NO'}")
-    print(f"Quality: {result3.quality.value.upper()}")
-    print(f"Confluence Bonus: +{result3.confluence_score} points")
-    print(f"Recommendation: {result3.recommendation}")
+    logger.error(f"Aligned: {'✅ YES' if result3.aligned else '❌ NO'}")
+    logger.info(f"Quality: {result3.quality.value.upper()}")
+    logger.info(f"Confluence Bonus: +{result3.confluence_score} points")
+    logger.info(f"Recommendation: {result3.recommendation}")
     
     # Show recommended timeframes
     checker = MTFAlignmentChecker()
     recommended = checker.get_required_timeframes('15min')
-    print(f"\n💡 Recommended timeframes for 15min execution: {', '.join(recommended)}")
+    logger.info(f"\n💡 Recommended timeframes for 15min execution: {', '.join(recommended)}")
     
-    print("\n" + "=" * 70)
-    print("✅ Multi-Timeframe Alignment Checker Ready for Production")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("✅ Multi-Timeframe Alignment Checker Ready for Production")
+    logger.info("=" * 70)

@@ -35,6 +35,8 @@ from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class LiquidityZone:
@@ -688,6 +690,6 @@ class Liquidity:
 
 
 if __name__ == "__main__":
-    print("Liquidity - Building Block")
-    print("CONTEXT BLOCK - Detects institutional liquidity zones")
-    print("Based on LuxAlgo/ICT methodology")
+    logger.info("Liquidity - Building Block")
+    logger.info("CONTEXT BLOCK - Detects institutional liquidity zones")
+    logger.info("Based on LuxAlgo/ICT methodology")

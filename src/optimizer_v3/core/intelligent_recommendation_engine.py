@@ -27,6 +27,10 @@ from pathlib import Path
 import time
 import sys
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -134,7 +138,7 @@ class IntelligentRecommendationEngine:
     
     def _default_status(self, message: str):
         """Default status callback (prints to console)"""
-        print(message)
+        logger.info(message)
     
     def _update_status(self, message: str):
         """Update status via callback"""
@@ -544,30 +548,29 @@ def test_integrated_engine():
     """Test integrated recommendation engine"""
     import sys
     from pathlib import Path
-    
     # Add project root to path
     project_root = Path(__file__).parent.parent.parent.parent
     sys.path.insert(0, str(project_root))
     
-    print("\n" + "="*80)
-    print("INTEGRATED INTELLIGENT RECOMMENDATION ENGINE - TEST")
-    print("="*80 + "\n")
+    logger.info("\n" + "="*80)
+    logger.info("INTEGRATED INTELLIGENT RECOMMENDATION ENGINE - TEST")
+    logger.info("="*80 + "\n")
     
     # Initialize engine with status callback
     def status_handler(message: str):
-        print(message)
+        logger.info(message)
     
     engine = IntelligentRecommendationEngine(status_callback=status_handler)
     
     # Print summary
     stats = engine.get_summary_stats()
-    print(f"\n📊 Engine Statistics:")
-    print(f"   - Blocks in Database: {stats['total_blocks_in_database']}")
-    print(f"   - AI Enhancement: {'✅ Available' if stats['ai_enhancement_available'] else '❌ Unavailable'}")
+    logger.info(f"\n📊 Engine Statistics:")
+    logger.info(f"   - Blocks in Database: {stats['total_blocks_in_database']}")
+    logger.error(f"   - AI Enhancement: {'✅ Available' if stats['ai_enhancement_available'] else '❌ Unavailable'}")
     if stats['ai_model']:
-        print(f"   - AI Model: {stats['ai_model']}")
+        logger.info(f"   - AI Model: {stats['ai_model']}")
     
-    print("\n✅ Integrated engine test complete\n")
+    logger.info("\n✅ Integrated engine test complete\n")
 
 
 if __name__ == '__main__':

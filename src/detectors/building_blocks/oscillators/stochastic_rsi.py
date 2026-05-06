@@ -24,6 +24,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='stochastic_rsi',
@@ -341,17 +343,17 @@ if __name__ == "__main__":
     stoch_rsi = StochasticRSI()
     result = stoch_rsi.analyze(data)
     
-    print("=" * 80)
-    print("STOCHASTIC RSI BUILDING BLOCK - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"\nStochastic RSI:")
-    print(f"  %K: {result['metadata']['k_value']:.2f}")
-    print(f"  %D: {result['metadata']['d_value']:.2f}")
-    print(f"  Level: {result['metadata']['level']}")
-    print(f"  Crossover: {result['metadata']['crossover']}")
-    print(f"\nConfluence Factors:")
+    logger.info("=" * 80)
+    logger.info("STOCHASTIC RSI BUILDING BLOCK - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"\nStochastic RSI:")
+    logger.info(f"  %K: {result['metadata']['k_value']:.2f}")
+    logger.info(f"  %D: {result['metadata']['d_value']:.2f}")
+    logger.info(f"  Level: {result['metadata']['level']}")
+    logger.info(f"  Crossover: {result['metadata']['crossover']}")
+    logger.info(f"\nConfluence Factors:")
     for factor in result['confluence_factors']:
-        print(f"  - {factor}")
-    print("=" * 80)
+        logger.info(f"  - {factor}")
+    logger.info("=" * 80)

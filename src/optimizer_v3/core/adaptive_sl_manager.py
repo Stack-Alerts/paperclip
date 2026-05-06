@@ -20,6 +20,10 @@ from pathlib import Path
 
 from nautilus_trader.model.data import Bar
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Wiring test logger - DETAILED parameter tracking
 Path("logs/wiring-test").mkdir(parents=True, exist_ok=True)
 wiring_logger = logging.getLogger('wiring_test')
@@ -101,8 +105,8 @@ class AdaptiveSLManager:
                 entry_side='LONG'
             )
             
-            print(f"New SL: {result.new_sl}")
-            print(f"Mode: {result.sl_mode}")  # EMERGENCY or ADAPTIVE
+            logger.info(f"New SL: {result.new_sl}")
+            logger.info(f"Mode: {result.sl_mode}")  # EMERGENCY or ADAPTIVE)
         """
         # CRITICAL FIX: Use correct config key names from UI
         # UI sends: delay_bars (correct), but also check 'delay_period' for backwards compat

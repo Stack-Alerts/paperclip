@@ -22,6 +22,9 @@ from typing import Optional, List, Dict, Union
 import time
 from pathlib import Path
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Binance API endpoints (no authentication needed for market data!)
 BINANCE_SPOT_BASE = "https://api.binance.com"
 BINANCE_FUTURES_BASE = "https://fapi.binance.com"
@@ -62,9 +65,9 @@ class BinanceRestClient:
         self.window_start = time.time()
         self.max_requests_per_minute = 1200
         
-        print(f"✅ Binance REST client initialized")
-        print(f"   Mode: {'Testnet' if use_testnet else 'Production'}")
-        print(f"   Rate limit: {self.max_requests_per_minute} req/min")
+        logger.info(f"✅ Binance REST client initialized")
+        logger.info(f"   Mode: {'Testnet' if use_testnet else 'Production'}")
+        logger.info(f"   Rate limit: {self.max_requests_per_minute} req/min")
     
     def _check_rate_limit(self):
         """Check and enforce rate limiting"""
@@ -79,7 +82,7 @@ class BinanceRestClient:
         if self.request_count >= self.max_requests_per_minute - 10:
             sleep_time = 60 - (current_time - self.window_start)
             if sleep_time > 0:
-                print(f"⏳ Rate limit approaching, waiting {sleep_time:.1f}s...")
+                logger.info(f"⏳ Rate limit approaching, waiting {sleep_time:.1f}s...")
                 time.sleep(sleep_time)
                 self.request_count = 0
                 self.window_start = time.time()
@@ -113,7 +116,7 @@ class BinanceRestClient:
             return response.json()
             
         except requests.exceptions.RequestException as e:
-            print(f"❌ Binance API error: {e}")
+            logger.error(f"❌ Binance API error: {e}")
             raise
     
     def get_recent_trades(
@@ -140,7 +143,7 @@ class BinanceRestClient:
         Note:
             This is perfect for real-time monitoring but limited to ~10 min history
         """
-        print(f"📥 Fetching {limit} recent trades from Binance...")
+        logger.info(f"📥 Fetching {limit} recent trades from Binance...")
         
         response = self._request(
             '/api/v3/trades',
@@ -167,8 +170,8 @@ class BinanceRestClient:
         # Select relevant columns
         df = df[['timestamp', 'price', 'quantity', 'side']]
         
-        print(f"✅ Received {len(df)} trades")
-        print(f"   Time range: {df['timestamp'].min()} to {df['timestamp'].max()}")
+        logger.info(f"✅ Received {len(df)} trades")
+        logger.info(f"   Time range: {df['timestamp'].min()} to {df['timestamp'].max()}")
         
         return df
     
@@ -197,7 +200,7 @@ class BinanceRestClient:
             This uses multiple API calls to get more history
             Binance keeps ~48-72 hours of trade history accessible
         """
-        print(f"📥 Fetching last {hours} hours of trades...")
+        logger.info(f"📥 Fetching last {hours} hours of trades...")
         
         all_trades = []
         from_id = None
@@ -225,11 +228,11 @@ class BinanceRestClient:
             all_trades.append(df_batch)
             from_id = response[0]['id']  # Get oldest trade ID for next batch
             
-            print(f"   Fetched batch: {len(df_batch)} trades, oldest: {df_batch['timestamp'].min()}")
+            logger.info(f"   Fetched batch: {len(df_batch)} trades, oldest: {df_batch['timestamp'].min()}")
           
             # Safety check
             if len(all_trades) > 100:  # Max 100 batches = 100k trades
-                print("⚠️  Hit safety limit (100 batches)")
+                logger.warning("⚠️  Hit safety limit (100 batches)")
                 break
         
         if not all_trades:
@@ -252,8 +255,8 @@ class BinanceRestClient:
         
         df = df[['timestamp', 'price', 'quantity', 'side']].sort_values('timestamp')
         
-        print(f"✅ Total trades: {len(df):,}")
-        print(f"   Time span: {df['timestamp'].min()} to {df['timestamp'].max()}")
+        logger.info(f"✅ Total trades: {len(df):,}")
+        logger.info(f"   Time span: {df['timestamp'].min()} to {df['timestamp'].max()}")
         
         return df
     
@@ -301,7 +304,7 @@ class BinanceRestClient:
         endpoint = '/fapi/v1/klines' if futures else '/api/v3/klines'
         source = 'Binance Futures' if futures else 'Binance Spot'
         
-        print(f"📊 Fetching {interval} candles from {source}...")
+        logger.info(f"📊 Fetching {interval} candles from {source}...")
         
         response = self._request(endpoint, params, futures=futures)
         
@@ -342,8 +345,8 @@ class BinanceRestClient:
         df['symbol'] = symbol
         df['timeframe'] = interval
         
-        print(f"✅ Received {len(df)} candles")
-        print(f"   Time range: {df['timestamp'].min()} to {df['timestamp'].max()}")
+        logger.info(f"✅ Received {len(df)} candles")
+        logger.info(f"   Time range: {df['timestamp'].min()} to {df['timestamp'].max()}")
         
         # INSTITUTIONAL: Check freshness and use fallback if stale
         if len(df) > 0:
@@ -359,8 +362,8 @@ class BinanceRestClient:
 
             # If delay > threshold, use direct fallback
             if delay_minutes > stale_threshold:
-                print(f"   ⚠️  Data stale ({delay_minutes:.0f} min delay)")
-                print(f"   🔄 Using direct fallback for fresh data...")
+                logger.warning(f"   ⚠️  Data stale ({delay_minutes:.0f} min delay)")
+                logger.warning(f"   🔄 Using direct fallback for fresh data...")
                 
                 # Import and use direct fallback
                 from .direct_fallback import get_fresh_klines_direct
@@ -372,12 +375,12 @@ class BinanceRestClient:
                     fresh_delay = (datetime.now(timezone.utc).replace(tzinfo=None) - fresh_latest).total_seconds() / 60
                     
                     if fresh_delay < delay_minutes:
-                        print(f"   ✅ Fallback successful: {delay_minutes:.0f}m → {fresh_delay:.0f}m")
+                        logger.info(f"   ✅ Fallback successful: {delay_minutes:.0f}m → {fresh_delay:.0f}m")
                         return df_fresh
                     else:
-                        print(f"   ⚠️  Fallback also stale (Binance API issue)")
+                        logger.warning(f"   ⚠️  Fallback also stale (Binance API issue)")
             else:
-                print(f"   ✅ Data fresh ({delay_minutes:.1f} min delay)")
+                logger.info(f"   ✅ Data fresh ({delay_minutes:.1f} min delay)")
         
         return df
     
@@ -398,7 +401,7 @@ class BinanceRestClient:
             >>> funding = client.get_funding_rate()
             >>> print(f"Current rate: {funding['fundingRate']}")
         """
-        print(f"💰 Fetching funding rate for {symbol}...")
+        logger.info(f"💰 Fetching funding rate for {symbol}...")
         
         response = self._request(
             '/fapi/v1/premiumIndex',
@@ -406,7 +409,7 @@ class BinanceRestClient:
             futures=True
         )
         
-        print(f"✅ Funding rate: {float(response['lastFundingRate']):.6f}%")
+        logger.info(f"✅ Funding rate: {float(response['lastFundingRate']):.6f}%")
         
         return {
             'symbol': response['symbol'],
@@ -452,7 +455,7 @@ class BinanceRestClient:
             'fundingRate': 'funding_rate'
         })
         
-        print(f"✅ Received {len(df)} funding rate records")
+        logger.info(f"✅ Received {len(df)} funding rate records")
         
         return df[['timestamp', 'symbol', 'funding_rate']]
     

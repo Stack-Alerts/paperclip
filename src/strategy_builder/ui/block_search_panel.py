@@ -37,6 +37,10 @@ from src.strategy_builder.ui.styles import (
 # Import exit condition dialog
 from src.strategy_builder.ui.exit_condition_dialog import ExitConditionDialog
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Import institutional logger
 try:
     from src.strategy_builder.utils import logger, LogComponent
@@ -55,8 +59,6 @@ from src.strategy_builder.utils.signal_statistics_loader import (
 )
 # Import universal combo box fix
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
-
-
 class BlockListItem(QWidget):
     """
     Custom widget for displaying a block with expandable signal details and selection.
@@ -394,14 +396,14 @@ class BlockListItem(QWidget):
             if LOGGER_AVAILABLE and logger:
                 logger.warning(LogComponent.SEARCH_PANEL, 
                              f"No signal selected for exit condition")
-            print("\n⚠️  Please select ONE signal to add as exit condition\n")
+            logger.warning("\n⚠️  Please select ONE signal to add as exit condition\n")
             return
         
         if len(selected_signals) > 1:
             if LOGGER_AVAILABLE and logger:
                 logger.warning(LogComponent.SEARCH_PANEL, 
                              f"Multiple signals selected for exit - only one allowed")
-            print("\n⚠️  Exit conditions support ONE signal at a time. Please select only one signal.\n")
+            logger.warning("\n⚠️  Exit conditions support ONE signal at a time. Please select only one signal.\n")
             return
         
         signal_name = selected_signals[0]
@@ -571,9 +573,9 @@ class BlockSearchPanel(QWidget):
         self.stats_loaded = self.stats_loader.load()
         
         if self.stats_loaded:
-            print("✅ Signal statistics loaded successfully")
+            logger.info("✅ Signal statistics loaded successfully")
         else:
-            print("⚠️  Signal statistics not available - run: python scripts/analyze_signal_occurrences.py")
+            logger.warning("⚠️  Signal statistics not available - run: python scripts/analyze_signal_occurrences.py")
         
         self._init_ui()
         self._load_blocks()
@@ -933,10 +935,10 @@ class BlockSearchPanel(QWidget):
                                'block_existed': result.data.get('block_existed') if result.data else False
                            })
             
-            print(f"\n✅ BLOCK ADDED: {block_name}")
-            print(f"✅ SIGNALS: {signals}")
-            print(f"✅ LOGIC: {logic_type}")
-            print(f"✅ Message: {result.message}\n")
+            logger.info(f"\n✅ BLOCK ADDED: {block_name}")
+            logger.info(f"✅ SIGNALS: {signals}")
+            logger.info(f"✅ LOGIC: {logic_type}")
+            logger.info(f"✅ Message: {result.message}\n")
         else:
             if LOGGER_AVAILABLE and logger:
                 logger.error(LogComponent.SEARCH_PANEL,
@@ -947,9 +949,9 @@ class BlockSearchPanel(QWidget):
                                 'errors': result.errors
                             })
             
-            print(f"\n❌ FAILED: {block_name}")
-            print(f"❌ Error: {result.message}")
-            print(f"❌ Details: {result.errors}\n")
+            logger.error(f"\n❌ FAILED: {block_name}")
+            logger.error(f"❌ Error: {result.message}")
+            logger.error(f"❌ Details: {result.errors}\n")
     
     def _on_signal_added_as_exit(self, signal_name: str, dialog_config: dict):
         """
@@ -966,7 +968,7 @@ class BlockSearchPanel(QWidget):
         if not dialog_config or not dialog_config.get('signal_name'):
             if LOGGER_AVAILABLE and logger:
                 logger.error(LogComponent.SEARCH_PANEL, "Invalid dialog configuration")
-            print("\n❌ FAILED: Invalid exit condition configuration\n")
+            logger.error("\n❌ FAILED: Invalid exit condition configuration\n")
             return
         
         # Call orchestrator with USER'S actual configuration values
@@ -991,9 +993,9 @@ class BlockSearchPanel(QWidget):
                                'result': result.message
                            })
             
-            print(f"\n✅ EXIT CONDITION ADDED: {signal_name}")
-            print(f"✅ Added to strategy-level exits")
-            print(f"✅ {result.message}\n")
+            logger.info(f"\n✅ EXIT CONDITION ADDED: {signal_name}")
+            logger.info(f"✅ Added to strategy-level exits")
+            logger.info(f"✅ {result.message}\n")
             
             # CRITICAL: Emit signal to refresh blocks panel UI
             self.block_selected.emit("EXIT_CONDITION_ADDED")
@@ -1006,10 +1008,10 @@ class BlockSearchPanel(QWidget):
                                 'errors': result.errors
                             })
             
-            print(f"\n❌ FAILED TO ADD EXIT: {signal_name}")
-            print(f"❌ Error: {result.message}")
+            logger.error(f"\n❌ FAILED TO ADD EXIT: {signal_name}")
+            logger.error(f"❌ Error: {result.message}")
             if result.errors:
-                print(f"❌ Details: {result.errors}\n")
+                logger.error(f"❌ Details: {result.errors}\n")
     
     def mark_block_as_added(self, block_name: str):
         """

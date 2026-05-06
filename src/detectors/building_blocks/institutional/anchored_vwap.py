@@ -35,6 +35,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='anchored_vwap',
@@ -488,7 +490,7 @@ def analyze_multi_vwap(df: pd.DataFrame) -> Dict[str, Any]:
         notes.extend(result['notes'])
         
         if result['convergence']:
-            print("🎯 Multi-VWAP convergence detected!")
+            logger.info("🎯 Multi-VWAP convergence detected!")
     """
     confluence_bonus = 0
     notes = []

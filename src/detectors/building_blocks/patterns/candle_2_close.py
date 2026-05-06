@@ -24,6 +24,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='candle_2_close',
@@ -459,6 +461,6 @@ class Candle2Close:
 
 
 if __name__ == "__main__":
-    print("Candle 2 Close - Building Block")
-    print("PATTERN BLOCK - 4-candle reversal pattern detection")
-    print("Based on TTrades Candle 2 Closure framework")
+    logger.info("Candle 2 Close - Building Block")
+    logger.info("PATTERN BLOCK - 4-candle reversal pattern detection")
+    logger.info("Based on TTrades Candle 2 Closure framework")

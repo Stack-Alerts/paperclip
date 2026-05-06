@@ -40,6 +40,10 @@ from src.strategy_builder.ui.styles import (
     set_hand_cursor, format_block_name
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class BlockConfigItem(QWidget):
     """
@@ -1417,7 +1421,7 @@ class StrategyBlocksPanel(QWidget):
                         'exit_mode': exit_cond.exit_mode,
                         'binding_level': exit_cond.binding_level
                     })
-                print(f"DEBUG: Block '{block_config.name}' has {len(block_info['exit_conditions'])} block-level exits")
+                logger.debug(f"DEBUG: Block '{block_config.name}' has {len(block_info['exit_conditions'])} block-level exits")
             
             # Add signal info with timing constraints and recheck config
             for signal_config in block_config.signals:
@@ -1669,7 +1673,7 @@ class StrategyBlocksPanel(QWidget):
                 available_references = self._get_available_references(block_name, signal_name)
             
             if not available_references:
-                print(f"No reference signals available for {display_name}")
+                logger.info(f"No reference signals available for {display_name}")
                 return
             
             # Get current constraint
@@ -1701,7 +1705,7 @@ class StrategyBlocksPanel(QWidget):
                             if block.name == block_name:
                                 if block.signals:
                                     target_signal_name = block.signals[0].name
-                                    print(f"Block-level timing: Applying to first signal '{target_signal_name}'")
+                                    logger.info(f"Block-level timing: Applying to first signal '{target_signal_name}'")
                                 break
                 
                 # Save to orchestrator
@@ -1717,9 +1721,9 @@ class StrategyBlocksPanel(QWidget):
                         self._refresh_blocks()
                         # Emit changed signal
                         self.blocks_changed.emit()
-                        print(f"Timing constraint configured for {block_name}::{signal_name}")
+                        logger.info(f"Timing constraint configured for {block_name}::{signal_name}")
                     else:
-                        print(f"Failed to set timing constraint: {result.message}")
+                        logger.error(f"Failed to set timing constraint: {result.message}")
                 else:
                     # Remove constraint
                     result = self.orchestrator.remove_signal_timing_constraint(
@@ -1732,12 +1736,12 @@ class StrategyBlocksPanel(QWidget):
                         self._refresh_blocks()
                         # Emit changed signal
                         self.blocks_changed.emit()
-                        print(f"Timing constraint removed for {block_name}::{signal_name}")
+                        logger.info(f"Timing constraint removed for {block_name}::{signal_name}")
                     else:
-                        print(f"Failed to remove timing constraint: {result.message}")
+                        logger.error(f"Failed to remove timing constraint: {result.message}")
         
         except Exception as e:
-            print(f"Error configuring timing constraint: {e}")
+            logger.error(f"Error configuring timing constraint: {e}")
             import traceback
             traceback.print_exc()
     
@@ -1753,9 +1757,9 @@ class StrategyBlocksPanel(QWidget):
                 # Emit changed signal
                 self.blocks_changed.emit()
             else:
-                print(f"Failed to move block up: {result.message}")
+                logger.error(f"Failed to move block up: {result.message}")
         except Exception as e:
-            print(f"Error moving block up: {e}")
+            logger.error(f"Error moving block up: {e}")
     
     def _on_move_down(self, block_name: str):
         """Handle move down button click."""
@@ -1769,9 +1773,9 @@ class StrategyBlocksPanel(QWidget):
                 # Emit changed signal
                 self.blocks_changed.emit()
             else:
-                print(f"Failed to move block down: {result.message}")
+                logger.error(f"Failed to move block down: {result.message}")
         except Exception as e:
-            print(f"Error moving block down: {e}")
+            logger.error(f"Error moving block down: {e}")
     
     def _on_remove(self, block_name: str):
         """Handle remove button click."""
@@ -1785,9 +1789,9 @@ class StrategyBlocksPanel(QWidget):
                 # Emit changed signal
                 self.blocks_changed.emit()
             else:
-                print(f"Failed to remove block: {result.message}")
+                logger.error(f"Failed to remove block: {result.message}")
         except Exception as e:
-            print(f"Error removing block: {e}")
+            logger.error(f"Error removing block: {e}")
     
     def _on_signal_recheck_configured(self, block_name: str, signal_name: str, bar_delay: int, mode: str = "WITHIN"):
         """
@@ -1803,7 +1807,7 @@ class StrategyBlocksPanel(QWidget):
             # Get current config
             config = self.orchestrator.get_current_config()
             if not config:
-                print("No configuration available")
+                logger.info("No configuration available")
                 return
             
             # Find and update signal
@@ -1815,7 +1819,7 @@ class StrategyBlocksPanel(QWidget):
                         if signal.name == signal_name:
                             # Set recheck config with mode
                             signal.recheck_config = RecheckConfig(enabled=True, bar_delay=bar_delay, mode=mode)
-                            print(f"Recheck configured for {block_name}::{signal_name} - {bar_delay} bars, mode={mode}")
+                            logger.info(f"Recheck configured for {block_name}::{signal_name} - {bar_delay} bars, mode={mode}")
                             
                             # Refresh display
                             self._refresh_blocks()
@@ -1823,9 +1827,9 @@ class StrategyBlocksPanel(QWidget):
                             self.blocks_changed.emit()
                             return
             
-            print(f"Signal {block_name}::{signal_name} not found")
+            logger.warning(f"Signal {block_name}::{signal_name} not found")
         except Exception as e:
-            print(f"Error configuring recheck: {e}")
+            logger.error(f"Error configuring recheck: {e}")
             import traceback
             traceback.print_exc()
     
@@ -1851,7 +1855,7 @@ class StrategyBlocksPanel(QWidget):
             # Get current config
             config = self.orchestrator.get_current_config()
             if not config:
-                print("No configuration available")
+                logger.info("No configuration available")
                 return
             
             # Find and update signal
@@ -1862,7 +1866,7 @@ class StrategyBlocksPanel(QWidget):
                     for signal in block.signals:
                         if signal.name == signal_name:
                             if not signal.recheck_config:
-                                print(f"No base RECHECK found for {block_name}::{signal_name}")
+                                logger.info(f"No base RECHECK found for {block_name}::{signal_name}")
                                 return
                                 
                             # Create nested recheck config with mode
@@ -1878,10 +1882,8 @@ class StrategyBlocksPanel(QWidget):
                                 signal.recheck_chain = []
                             signal.recheck_chain.append(nested_recheck)
                             
-                            print(
-                                f"Nested RECHECK configured for {block_name}::{signal_name} "
-                                f"- {bar_delay} bars, validating against {validate_against}, mode={mode}"
-                            )
+                            logger.info(f"Nested RECHECK configured for {block_name}::{signal_name} "
+                                f"- {bar_delay} bars, validating against {validate_against}, mode={mode}")
                             
                             # Refresh display
                             self._refresh_blocks()
@@ -1889,9 +1891,9 @@ class StrategyBlocksPanel(QWidget):
                             self.blocks_changed.emit()
                             return
             
-            print(f"Signal {block_name}::{signal_name} not found")
+            logger.warning(f"Signal {block_name}::{signal_name} not found")
         except Exception as e:
-            print(f"Error configuring nested recheck: {e}")
+            logger.error(f"Error configuring nested recheck: {e}")
             import traceback
             traceback.print_exc()
     
@@ -1907,7 +1909,7 @@ class StrategyBlocksPanel(QWidget):
             # Get current config
             config = self.orchestrator.get_current_config()
             if not config:
-                print("No configuration available")
+                logger.info("No configuration available")
                 return
             
             # Find and update signal
@@ -1919,7 +1921,7 @@ class StrategyBlocksPanel(QWidget):
                             signal.recheck_config = None
                             if hasattr(signal, 'recheck_chain'):
                                 signal.recheck_chain = []
-                            print(f"Recheck removed for {block_name}::{signal_name}")
+                            logger.info(f"Recheck removed for {block_name}::{signal_name}")
                             
                             # Refresh display
                             self._refresh_blocks()
@@ -1927,9 +1929,9 @@ class StrategyBlocksPanel(QWidget):
                             self.blocks_changed.emit()
                             return
             
-            print(f"Signal {block_name}::{signal_name} not found")
+            logger.warning(f"Signal {block_name}::{signal_name} not found")
         except Exception as e:
-            print(f"Error removing recheck: {e}")
+            logger.error(f"Error removing recheck: {e}")
             import traceback
             traceback.print_exc()
     
@@ -1955,10 +1957,10 @@ class StrategyBlocksPanel(QWidget):
                 self.blocks_changed.emit()
                 return True
             else:
-                print(f"Failed to add block: {result.message}")
+                logger.error(f"Failed to add block: {result.message}")
                 return False
         except Exception as e:
-            print(f"Error adding block: {e}")
+            logger.error(f"Error adding block: {e}")
             return False
     
     def get_block_count(self) -> int:
@@ -1981,7 +1983,7 @@ class StrategyBlocksPanel(QWidget):
                 
                 # Validate that a signal was selected
                 if not config or not config.get('signal_name'):
-                    print("No signal selected for exit condition")
+                    logger.info("No signal selected for exit condition")
                     return
                 
                 # Add to orchestrator at STRATEGY binding level
@@ -1995,15 +1997,15 @@ class StrategyBlocksPanel(QWidget):
                 )
                 
                 if result.success:
-                    print(f"Strategy exit condition added: {config['signal_name']}")
+                    logger.info(f"Strategy exit condition added: {config['signal_name']}")
                     # Refresh display
                     self._refresh_strategy_exits()
                     self.blocks_changed.emit()
                 else:
-                    print(f"Failed to add exit condition: {result.message}")
+                    logger.error(f"Failed to add exit condition: {result.message}")
         
         except Exception as e:
-            print(f"Error adding strategy exit condition: {e}")
+            logger.error(f"Error adding strategy exit condition: {e}")
             import traceback
             traceback.print_exc()
     
@@ -2073,17 +2075,17 @@ class StrategyBlocksPanel(QWidget):
                 self.strategy_exits_layout.addLayout(exit_row_layout)
         
         except Exception as e:
-            print(f"Error refreshing strategy exits: {e}")
+            logger.error(f"Error refreshing strategy exits: {e}")
             import traceback
             traceback.print_exc()
     
     def _on_remove_strategy_exit(self, signal_name: str, checked: bool = False):
         """Handle removal of strategy-level exit condition - Sprint 1.8 Task 1.8.49"""
-        print(f"\n{'='*80}")
-        print(f"DEBUG: _on_remove_strategy_exit CALLED")
-        print(f"  signal_name: {signal_name}")
-        print(f"  checked: {checked}")
-        print(f"{'='*80}\n")
+        logger.info(f"\n{'='*80}")
+        logger.debug(f"DEBUG: _on_remove_strategy_exit CALLED")
+        logger.info(f"  signal_name: {signal_name}")
+        logger.info(f"  checked: {checked}")
+        logger.info(f"{'='*80}\n")
         try:
             result = self.orchestrator.remove_exit_condition(
                 signal_name=signal_name,
@@ -2091,24 +2093,24 @@ class StrategyBlocksPanel(QWidget):
             )
             
             if result.success:
-                print(f"Strategy exit condition removed: {signal_name}")
+                logger.info(f"Strategy exit condition removed: {signal_name}")
                 self._refresh_strategy_exits()
                 self.blocks_changed.emit()
             else:
-                print(f"Failed to remove exit condition: {result.message}")
+                logger.error(f"Failed to remove exit condition: {result.message}")
         
         except Exception as e:
-            print(f"Error removing strategy exit: {e}")
+            logger.error(f"Error removing strategy exit: {e}")
             import traceback
             traceback.print_exc()
     
     def _on_edit_strategy_exit(self, signal_name: str, checked: bool = False):
         """Handle double-click on exit condition to edit - Sprint 1.8 Task 1.8.50"""
-        print(f"\n{'='*80}")
-        print(f"DEBUG: _on_edit_strategy_exit CALLED")
-        print(f"  signal_name: {signal_name}")
-        print(f"  checked: {checked}")
-        print(f"{'='*80}\n")
+        logger.info(f"\n{'='*80}")
+        logger.debug(f"DEBUG: _on_edit_strategy_exit CALLED")
+        logger.info(f"  signal_name: {signal_name}")
+        logger.info(f"  checked: {checked}")
+        logger.info(f"{'='*80}\n")
         try:
             # Get current config
             config = self.orchestrator.get_current_config()
@@ -2123,7 +2125,7 @@ class StrategyBlocksPanel(QWidget):
                     break
             
             if not current_exit:
-                print(f"Exit condition {signal_name} not found")
+                logger.warning(f"Exit condition {signal_name} not found")
                 return
             
             # Show exit condition dialog pre-populated with current values (BUG FIX)
@@ -2141,7 +2143,7 @@ class StrategyBlocksPanel(QWidget):
                 new_config = dialog.get_config()
                 
                 if not new_config or not new_config.get('signal_name'):
-                    print("No signal selected for exit condition")
+                    logger.info("No signal selected for exit condition")
                     return
                 
                 # Remove old exit condition first
@@ -2151,7 +2153,7 @@ class StrategyBlocksPanel(QWidget):
                 )
                 
                 if not remove_result.success:
-                    print(f"Failed to remove old exit condition: {remove_result.message}")
+                    logger.error(f"Failed to remove old exit condition: {remove_result.message}")
                     return
                 
                 # Add updated exit condition
@@ -2165,21 +2167,21 @@ class StrategyBlocksPanel(QWidget):
                 )
                 
                 if add_result.success:
-                    print(f"Strategy exit condition updated: {new_config['signal_name']}")
+                    logger.info(f"Strategy exit condition updated: {new_config['signal_name']}")
                     # Refresh display
                     self._refresh_strategy_exits()
                     self.blocks_changed.emit()
                 else:
-                    print(f"Failed to update exit condition: {add_result.message}")
+                    logger.error(f"Failed to update exit condition: {add_result.message}")
         
         except Exception as e:
-            print(f"Error editing strategy exit: {e}")
+            logger.error(f"Error editing strategy exit: {e}")
             import traceback
             traceback.print_exc()
     
     def _on_edit_block_exit(self, block_name: str, signal_name: str):
         """Handle config button for block-level exit condition - show exit dialog."""
-        print(f"DEBUG: _on_edit_block_exit called for block '{block_name}', signal '{signal_name}'")
+        logger.debug(f"DEBUG: _on_edit_block_exit called for block '{block_name}', signal '{signal_name}'")
         try:
             # Get current config to find the exit
             config = self.orchestrator.get_current_config()
@@ -2198,7 +2200,7 @@ class StrategyBlocksPanel(QWidget):
                     break
             
             if not current_exit:
-                print(f"Block exit condition {signal_name} not found in block {block_name}")
+                logger.warning(f"Block exit condition {signal_name} not found in block {block_name}")
                 return
             
             # Show exit condition dialog pre-populated with current values
@@ -2216,7 +2218,7 @@ class StrategyBlocksPanel(QWidget):
                 new_config = dialog.get_config()
                 
                 if not new_config or not new_config.get('signal_name'):
-                    print("No signal selected for exit condition")
+                    logger.info("No signal selected for exit condition")
                     return
                 
                 # Remove old exit condition first
@@ -2227,7 +2229,7 @@ class StrategyBlocksPanel(QWidget):
                 )
                 
                 if not remove_result.success:
-                    print(f"Failed to remove old block exit condition: {remove_result.message}")
+                    logger.error(f"Failed to remove old block exit condition: {remove_result.message}")
                     return
                 
                 # Add updated exit condition
@@ -2242,20 +2244,20 @@ class StrategyBlocksPanel(QWidget):
                 )
                 
                 if add_result.success:
-                    print(f"Block exit condition updated: {block_name} -> {new_config['signal_name']}")
+                    logger.info(f"Block exit condition updated: {block_name} -> {new_config['signal_name']}")
                     self._refresh_blocks()
                     self.blocks_changed.emit()
                 else:
-                    print(f"Failed to update block exit condition: {add_result.message}")
+                    logger.error(f"Failed to update block exit condition: {add_result.message}")
         
         except Exception as e:
-            print(f"Error editing block exit: {e}")
+            logger.error(f"Error editing block exit: {e}")
             import traceback
             traceback.print_exc()
     
     def _on_duplicate_block_exit(self, block_name: str, exit_signal_name: str):
         """Handle duplicate button - add another exit to this block with same signal pre-populated."""
-        print(f"DEBUG: _on_duplicate_block_exit called for block '{block_name}', exit_signal '{exit_signal_name}'")
+        logger.debug(f"DEBUG: _on_duplicate_block_exit called for block '{block_name}', exit_signal '{exit_signal_name}'")
         try:
             # Show exit condition dialog pre-populated with the current exit's signal (ready to duplicate)
             # Issue 1 Fix: Pass binding context so dialog auto-selects BLOCK binding level
@@ -2274,7 +2276,7 @@ class StrategyBlocksPanel(QWidget):
                 
                 # Validate that a signal was selected
                 if not config or not config.get('signal_name'):
-                    print("No signal selected for exit condition")
+                    logger.info("No signal selected for exit condition")
                     return
                 
                 # Add to orchestrator at BLOCK binding level
@@ -2289,20 +2291,20 @@ class StrategyBlocksPanel(QWidget):
                 )
                 
                 if result.success:
-                    print(f"Block exit condition added: {block_name} -> {config['signal_name']}")
+                    logger.info(f"Block exit condition added: {block_name} -> {config['signal_name']}")
                     self._refresh_blocks()
                     self.blocks_changed.emit()
                 else:
-                    print(f"Failed to add block exit condition: {result.message}")
+                    logger.error(f"Failed to add block exit condition: {result.message}")
         
         except Exception as e:
-            print(f"Error adding block exit condition: {e}")
+            logger.error(f"Error adding block exit condition: {e}")
             import traceback
             traceback.print_exc()
     
     def _on_remove_block_exit(self, block_name: str, signal_name: str):
         """Handle remove button for block-level exit condition."""
-        print(f"DEBUG: _on_remove_block_exit called for block '{block_name}', signal '{signal_name}'")
+        logger.debug(f"DEBUG: _on_remove_block_exit called for block '{block_name}', signal '{signal_name}'")
         try:
             result = self.orchestrator.remove_exit_condition(
                 signal_name=signal_name,
@@ -2311,20 +2313,20 @@ class StrategyBlocksPanel(QWidget):
             )
             
             if result.success:
-                print(f"Block exit condition removed: {block_name} -> {signal_name}")
+                logger.info(f"Block exit condition removed: {block_name} -> {signal_name}")
                 self._refresh_blocks()
                 self.blocks_changed.emit()
             else:
-                print(f"Failed to remove block exit condition: {result.message}")
+                logger.error(f"Failed to remove block exit condition: {result.message}")
         
         except Exception as e:
-            print(f"Error removing block exit: {e}")
+            logger.error(f"Error removing block exit: {e}")
             import traceback
             traceback.print_exc()
     
     def _on_signal_exit_config_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
         """Handle config button for signal-level exit condition."""
-        print(f"DEBUG: _on_signal_exit_config_clicked called for block '{block_name}', signal '{signal_name}', exit '{exit_signal_name}'")
+        logger.debug(f"DEBUG: _on_signal_exit_config_clicked called for block '{block_name}', signal '{signal_name}', exit '{exit_signal_name}'")
         try:
             # Get current config to find the exit
             config = self.orchestrator.get_current_config()
@@ -2346,7 +2348,7 @@ class StrategyBlocksPanel(QWidget):
                     break
             
             if not current_exit:
-                print(f"Signal exit condition {exit_signal_name} not found in signal {block_name}::{signal_name}")
+                logger.warning(f"Signal exit condition {exit_signal_name} not found in signal {block_name}::{signal_name}")
                 return
             
             # Show exit condition dialog pre-populated (CRITICAL: Include RECHECK values)
@@ -2356,7 +2358,7 @@ class StrategyBlocksPanel(QWidget):
             if current_exit.recheck_config:
                 existing_recheck_enabled = current_exit.recheck_config.enabled
                 existing_recheck_bar_delay = current_exit.recheck_config.bar_delay
-                print(f"DEBUG: Loading RECHECK from exit: enabled={existing_recheck_enabled}, bar_delay={existing_recheck_bar_delay}")
+                logger.debug(f"DEBUG: Loading RECHECK from exit: enabled={existing_recheck_enabled}, bar_delay={existing_recheck_bar_delay}")
             
             dialog = ExitConditionDialog(
                 signal_name=exit_signal_name,
@@ -2373,7 +2375,7 @@ class StrategyBlocksPanel(QWidget):
                 new_config = dialog.get_config()
                 
                 if not new_config or not new_config.get('signal_name'):
-                    print("No signal selected for exit condition")
+                    logger.info("No signal selected for exit condition")
                     return
                 
                 # Remove old
@@ -2385,7 +2387,7 @@ class StrategyBlocksPanel(QWidget):
                 )
                 
                 if not remove_result.success:
-                    print(f"Failed to remove old signal exit: {remove_result.message}")
+                    logger.error(f"Failed to remove old signal exit: {remove_result.message}")
                     return
                 
                 # Add updated with RECHECK values
@@ -2404,23 +2406,23 @@ class StrategyBlocksPanel(QWidget):
                 )
                 
                 # DEBUG: Log what we're saving
-                print(f"DEBUG: Saving exit with percentage={new_config.get('percentage')}, recheck_enabled={new_config.get('recheck_enabled')}, recheck_bar_delay={new_config.get('recheck_bar_delay')}")
+                logger.debug(f"DEBUG: Saving exit with percentage={new_config.get('percentage')}, recheck_enabled={new_config.get('recheck_enabled')}, recheck_bar_delay={new_config.get('recheck_bar_delay')}")
                 
                 if add_result.success:
-                    print(f"Signal exit updated: {block_name}::{signal_name} -> {new_config['signal_name']}")
+                    logger.info(f"Signal exit updated: {block_name}::{signal_name} -> {new_config['signal_name']}")
                     self._refresh_blocks()
                     self.blocks_changed.emit()
                 else:
-                    print(f"Failed to update signal exit: {add_result.message}")
+                    logger.error(f"Failed to update signal exit: {add_result.message}")
         
         except Exception as e:
-            print(f"Error editing signal exit: {e}")
+            logger.error(f"Error editing signal exit: {e}")
             import traceback
             traceback.print_exc()
     
     def _on_signal_exit_duplicate_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
         """Handle duplicate button for signal-level exit - add another exit to this signal with same signal pre-populated."""
-        print(f"DEBUG: _on_signal_exit_duplicate_clicked called for block '{block_name}', signal '{signal_name}', exit_signal '{exit_signal_name}'")
+        logger.debug(f"DEBUG: _on_signal_exit_duplicate_clicked called for block '{block_name}', signal '{signal_name}', exit_signal '{exit_signal_name}'")
         try:
             # Show exit condition dialog pre-populated with the current exit's signal (ready to duplicate)
             # Issue 1 Fix: Pass binding context so dialog auto-selects SIGNAL binding level
@@ -2438,7 +2440,7 @@ class StrategyBlocksPanel(QWidget):
                 config = dialog.get_config()
                 
                 if not config or not config.get('signal_name'):
-                    print("No signal selected for exit condition")
+                    logger.info("No signal selected for exit condition")
                     return
                 
                 # Add to orchestrator at SIGNAL binding level
@@ -2454,20 +2456,20 @@ class StrategyBlocksPanel(QWidget):
                 )
                 
                 if result.success:
-                    print(f"Signal exit added: {block_name}::{signal_name} -> {config['signal_name']}")
+                    logger.info(f"Signal exit added: {block_name}::{signal_name} -> {config['signal_name']}")
                     self._refresh_blocks()
                     self.blocks_changed.emit()
                 else:
-                    print(f"Failed to add signal exit: {result.message}")
+                    logger.error(f"Failed to add signal exit: {result.message}")
         
         except Exception as e:
-            print(f"Error adding signal exit: {e}")
+            logger.error(f"Error adding signal exit: {e}")
             import traceback
             traceback.print_exc()
     
     def _on_signal_exit_remove_clicked(self, block_name: str, signal_name: str, exit_signal_name: str):
         """Handle remove button for signal-level exit condition."""
-        print(f"DEBUG: _on_signal_exit_remove_clicked called for block '{block_name}', signal '{signal_name}', exit '{exit_signal_name}'")
+        logger.debug(f"DEBUG: _on_signal_exit_remove_clicked called for block '{block_name}', signal '{signal_name}', exit '{exit_signal_name}'")
         try:
             result = self.orchestrator.remove_exit_condition(
                 signal_name=exit_signal_name,
@@ -2477,25 +2479,25 @@ class StrategyBlocksPanel(QWidget):
             )
             
             if result.success:
-                print(f"Signal exit removed: {block_name}::{signal_name} -> {exit_signal_name}")
+                logger.info(f"Signal exit removed: {block_name}::{signal_name} -> {exit_signal_name}")
                 self._refresh_blocks()
                 self.blocks_changed.emit()
             else:
-                print(f"Failed to remove signal exit: {result.message}")
+                logger.error(f"Failed to remove signal exit: {result.message}")
         
         except Exception as e:
-            print(f"Error removing signal exit: {e}")
+            logger.error(f"Error removing signal exit: {e}")
             import traceback
             traceback.print_exc()
     
     def _on_exit_recheck_configured(self, block_name: str, signal_name: str, exit_signal_name: str, bar_delay: int, mode: str = "WITHIN"):
         """Handle RECHECK configuration for an exit condition."""
-        print(f"DEBUG: _on_exit_recheck_configured called: block='{block_name}', signal='{signal_name}', exit='{exit_signal_name}', bars={bar_delay}, mode={mode}")
+        logger.debug(f"DEBUG: _on_exit_recheck_configured called: block='{block_name}', signal='{signal_name}', exit='{exit_signal_name}', bars={bar_delay}, mode={mode}")
         try:
             # Get current config
             config = self.orchestrator.get_current_config()
             if not config:
-                print("No configuration available")
+                logger.info("No configuration available")
                 return
             
             # Find and update the exit condition
@@ -2510,27 +2512,27 @@ class StrategyBlocksPanel(QWidget):
                                     if exit_cond.signal_name == exit_signal_name:
                                         # Set RECHECK config for this exit with mode
                                         exit_cond.recheck_config = RecheckConfig(enabled=True, bar_delay=bar_delay, mode=mode)
-                                        print(f"RECHECK configured for exit {exit_signal_name} - {bar_delay} bars, mode={mode}")
+                                        logger.info(f"RECHECK configured for exit {exit_signal_name} - {bar_delay} bars, mode={mode}")
                                         
                                         # Refresh display
                                         self._refresh_blocks()
                                         self.blocks_changed.emit()
                                         return
             
-            print(f"Exit condition {exit_signal_name} not found in {block_name}::{signal_name}")
+            logger.warning(f"Exit condition {exit_signal_name} not found in {block_name}::{signal_name}")
         except Exception as e:
-            print(f"Error configuring exit RECHECK: {e}")
+            logger.error(f"Error configuring exit RECHECK: {e}")
             import traceback
             traceback.print_exc()
     
     def _on_exit_recheck_removed(self, block_name: str, signal_name: str, exit_signal_name: str):
         """Handle removal of RECHECK from an exit condition."""
-        print(f"DEBUG: _on_exit_recheck_removed called: block='{block_name}', signal='{signal_name}', exit='{exit_signal_name}'")
+        logger.debug(f"DEBUG: _on_exit_recheck_removed called: block='{block_name}', signal='{signal_name}', exit='{exit_signal_name}'")
         try:
             # Get current config
             config = self.orchestrator.get_current_config()
             if not config:
-                print("No configuration available")
+                logger.info("No configuration available")
                 return
             
             # Find and update the exit condition
@@ -2543,16 +2545,16 @@ class StrategyBlocksPanel(QWidget):
                                     if exit_cond.signal_name == exit_signal_name:
                                         # Remove RECHECK config
                                         exit_cond.recheck_config = None
-                                        print(f"RECHECK removed from exit {exit_signal_name}")
+                                        logger.info(f"RECHECK removed from exit {exit_signal_name}")
                                         
                                         # Refresh display
                                         self._refresh_blocks()
                                         self.blocks_changed.emit()
                                         return
             
-            print(f"Exit condition {exit_signal_name} not found in {block_name}::{signal_name}")
+            logger.warning(f"Exit condition {exit_signal_name} not found in {block_name}::{signal_name}")
         except Exception as e:
-            print(f"Error removing exit RECHECK: {e}")
+            logger.error(f"Error removing exit RECHECK: {e}")
             import traceback
             traceback.print_exc()
     
@@ -2569,7 +2571,7 @@ class StrategyBlocksPanel(QWidget):
         try:
             config = self.orchestrator.get_current_config()
             if not config:
-                print("No configuration available")
+                logger.info("No configuration available")
                 return
             
             from src.strategy_builder.core.strategy_config_engine import RecheckConfig
@@ -2587,15 +2589,15 @@ class StrategyBlocksPanel(QWidget):
                                         validation_mode=validate_against,
                                         mode=mode
                                     )
-                                    print(f"Nested RECHECK updated for {block_name}::{signal_name} at index {chain_index}")
+                                    logger.info(f"Nested RECHECK updated for {block_name}::{signal_name} at index {chain_index}")
                                     
                                     self._refresh_blocks()
                                     self.blocks_changed.emit()
                                     return
             
-            print(f"Nested RECHECK not found at index {chain_index} for {block_name}::{signal_name}")
+            logger.warning(f"Nested RECHECK not found at index {chain_index} for {block_name}::{signal_name}")
         except Exception as e:
-            print(f"Error updating nested recheck: {e}")
+            logger.error(f"Error updating nested recheck: {e}")
             import traceback
             traceback.print_exc()
     
@@ -2604,7 +2606,7 @@ class StrategyBlocksPanel(QWidget):
         try:
             config = self.orchestrator.get_current_config()
             if not config:
-                print("No configuration available")
+                logger.info("No configuration available")
                 return
             
             for block in config.blocks:
@@ -2615,14 +2617,14 @@ class StrategyBlocksPanel(QWidget):
                                 if 0 <= chain_index < len(signal.recheck_chain):
                                     # Remove this nested RECHECK from chain
                                     signal.recheck_chain.pop(chain_index)
-                                    print(f"Nested RECHECK removed from {block_name}::{signal_name} at index {chain_index}")
+                                    logger.info(f"Nested RECHECK removed from {block_name}::{signal_name} at index {chain_index}")
                                     
                                     self._refresh_blocks()
                                     self.blocks_changed.emit()
                                     return
             
-            print(f"Nested RECHECK not found at index {chain_index} for {block_name}::{signal_name}")
+            logger.warning(f"Nested RECHECK not found at index {chain_index} for {block_name}::{signal_name}")
         except Exception as e:
-            print(f"Error removing nested recheck: {e}")
+            logger.error(f"Error removing nested recheck: {e}")
             import traceback
             traceback.print_exc()

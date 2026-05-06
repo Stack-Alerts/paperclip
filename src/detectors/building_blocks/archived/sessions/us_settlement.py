@@ -43,6 +43,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 class USSettlement:
     """
@@ -356,9 +358,9 @@ if __name__ == "__main__":
     
     settlement = USSettlement()
     
-    print("=" * 80)
-    print("US SETTLEMENT DETECTOR - TEST RESULTS")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("US SETTLEMENT DETECTOR - TEST RESULTS")
+    logger.info("=" * 80)
     
     for i in range(len(data)):
         result = settlement.analyze(data.iloc[:i+1])
@@ -366,5 +368,5 @@ if __name__ == "__main__":
         magnet = result['metadata']['has_magnet_effect']
         event_marker = "🆕 " if is_new else ""
         magnet_marker = "🧲 " if magnet else ""
-        print(f"{data['timestamp'].iloc[i]}: {event_marker}{magnet_marker}{result['signal']} ({result['confidence']}%)")
-    print("=" * 80)
+        logger.info(f"{data['timestamp'].iloc[i]}: {event_marker}{magnet_marker}{result['signal']} ({result['confidence']}%)")
+    logger.info("=" * 80)

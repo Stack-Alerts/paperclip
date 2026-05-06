@@ -31,6 +31,9 @@ from enum import Enum
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Handle both package import and standalone execution
 try:
     from .zigzag_detector import Pivot, PivotType, PatternDirection
@@ -421,37 +424,36 @@ def quick_test(data_path: str = 'data/raw/BTC_USDT_PERP_30m.pkl', n_bars: int = 
     
     from src.detectors.utilities.zigzag_detector import ZigzagDetector
     from src.detectors.utilities.oscillators import calculate_rsi, calculate_cci
-    
-    print("="*60)
-    print("DIVERGENCE DETECTOR TEST")
-    print("="*60)
+    logger.info("="*60)
+    logger.info("DIVERGENCE DETECTOR TEST")
+    logger.info("="*60)
     
     # Load data
     with open(data_path, 'rb') as f:
         df = pickle.load(f)
     
     df = df[df.index >= '2024-01-01'].iloc[:n_bars]
-    print(f"\nData: {len(df)} bars from {df.index[0]} to {df.index[-1]}")
+    logger.info(f"\nData: {len(df)} bars from {df.index[0]} to {df.index[-1]}")
     
     # Calculate oscillators
-    print(f"\n{'='*60}")
-    print("Calculating oscillators...")
-    print(f"{'='*60}")
+    logger.info(f"\n{'='*60}")
+    logger.info("Calculating oscillators...")
+    logger.info(f"{'='*60}")
     rsi = calculate_rsi(df, length=14)
     cci = calculate_cci(df, length=20)
     
     # Detect pivots with oscillators
-    print(f"\n{'='*60}")
-    print("Detecting pivots with RSI...")
-    print(f"{'='*60}")
+    logger.info(f"\n{'='*60}")
+    logger.info("Detecting pivots with RSI...")
+    logger.info(f"{'='*60}")
     zigzag = ZigzagDetector(length=50)
     pivots = zigzag.find_pivots(df, oscillator_data=rsi)
-    print(f"Found {len(pivots)} pivots")
+    logger.info(f"Found {len(pivots)} pivots")
     
     # Check for divergences
-    print(f"\n{'='*60}")
-    print("Checking for divergences...")
-    print(f"{'='*60}")
+    logger.info(f"\n{'='*60}")
+    logger.info("Checking for divergences...")
+    logger.info(f"{'='*60}")
     
     div_detector = DivergenceDetector(oscillator_name='rsi')
     
@@ -461,28 +463,28 @@ def quick_test(data_path: str = 'data/raw/BTC_USDT_PERP_30m.pkl', n_bars: int = 
         signal = div_detector.check_divergence(pivots[:i])
         if signal:
             divergences_found.append(signal)
-            print(f"\n{signal}")
-            print(f"  Pivot 1: {signal.pivot1.timestamp} @ ${signal.pivot1.price:.2f}, RSI={signal.pivot1.oscillator_value:.1f}")
-            print(f"  Pivot 2: {signal.pivot2.timestamp} @ ${signal.pivot2.price:.2f}, RSI={signal.pivot2.oscillator_value:.1f}")
+            logger.info(f"\n{signal}")
+            logger.info(f"  Pivot 1: {signal.pivot1.timestamp} @ ${signal.pivot1.price:.2f}, RSI={signal.pivot1.oscillator_value:.1f}")
+            logger.info(f"  Pivot 2: {signal.pivot2.timestamp} @ ${signal.pivot2.price:.2f}, RSI={signal.pivot2.oscillator_value:.1f}")
     
-    print(f"\n{'='*60}")
-    print(f"Summary:")
-    print(f"{'='*60}")
-    print(f"Total divergences found: {len(divergences_found)}")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"Summary:")
+    logger.info(f"{'='*60}")
+    logger.info(f"Total divergences found: {len(divergences_found)}")
     
     bearish = [d for d in divergences_found if d.divergence_type.value < 0]
     bullish = [d for d in divergences_found if d.divergence_type.value > 0]
     
-    print(f"Bearish divergences: {len(bearish)}")
-    print(f"Bullish divergences: {len(bullish)}")
+    logger.info(f"Bearish divergences: {len(bearish)}")
+    logger.info(f"Bullish divergences: {len(bullish)}")
     
     if divergences_found:
         avg_boost = np.mean([d.probability_boost for d in divergences_found])
-        print(f"Average probability boost: +{avg_boost:.1%}")
+        logger.info(f"Average probability boost: +{avg_boost:.1%}")
     
-    print("\n" + "="*60)
-    print("TEST COMPLETE")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("TEST COMPLETE")
+    logger.info("="*60)
 
 
 if __name__ == "__main__":

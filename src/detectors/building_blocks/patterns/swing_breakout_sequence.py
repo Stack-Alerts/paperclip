@@ -26,6 +26,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='swing_breakout_sequence',
@@ -609,6 +611,6 @@ class SwingBreakoutSequence:
 
 
 if __name__ == "__main__":
-    print("Swing Breakout Sequence - Building Block")
-    print("PATTERN BLOCK - 5-point breakout sequence")
-    print("Based on LuxAlgo methodology")
+    logger.info("Swing Breakout Sequence - Building Block")
+    logger.info("PATTERN BLOCK - 5-point breakout sequence")
+    logger.info("Based on LuxAlgo methodology")

@@ -30,6 +30,10 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent.parent  
 sys.path.insert(0, str(project_root))
@@ -74,9 +78,9 @@ class ComprehensiveAIRequestBuilder:
         try:
             from src.detectors.building_blocks.registry import BlockRegistry
             self.block_registry = BlockRegistry
-            print(f"✅ BlockRegistry loaded: {len(BlockRegistry.get_all_blocks())} blocks available")
+            logger.info(f"✅ BlockRegistry loaded: {len(BlockRegistry.get_all_blocks())} blocks available")
         except Exception as e:
-            print(f"⚠️ Could not load BlockRegistry: {e}")
+            logger.warning(f"⚠️ Could not load BlockRegistry: {e}")
             self.block_registry = None
     
     def build_complete_request(
@@ -100,7 +104,7 @@ class ComprehensiveAIRequestBuilder:
         Returns:
             Complete request data structure
         """
-        print("\n🔧 Building Comprehensive AI Request...")
+        logger.info("\n🔧 Building Comprehensive AI Request...")
         
         request = {
             'metadata': self._build_metadata(),
@@ -347,11 +351,11 @@ class ComprehensiveAIRequestBuilder:
                 
                 blocks_catalog.append(block_info)
             
-            print(f"   ✅ Extracted {len(blocks_catalog)} blocks with {sum(len(b['signals']) for b in blocks_catalog)} signals")
+            logger.info(f"   ✅ Extracted {len(blocks_catalog)} blocks with {sum(len(b['signals']) for b in blocks_catalog)} signals")
             return blocks_catalog
             
         except Exception as e:
-            print(f"   ⚠️ Error extracting blocks: {e}")
+            logger.error(f"   ⚠️ Error extracting blocks: {e}")
             import traceback
             traceback.print_exc()
             return []
@@ -407,17 +411,17 @@ class ComprehensiveAIRequestBuilder:
         
         # Print validation results
         if issues:
-            print("\n⚠️ Request Validation Issues:")
+            logger.warning("\n⚠️ Request Validation Issues:")
             for issue in issues:
-                print(f"   {issue}")
+                logger.info(f"   {issue}")
         else:
-            print("\n✅ Request validation passed - all data present")
+            logger.info("\n✅ Request validation passed - all data present")
         
-        print(f"\n📊 Request Summary:")
-        print(f"   - Strategy Blocks: {len(request['strategy_configuration'].get('blocks', []))}")
-        print(f"   - Total Trades: {trade_count}")
-        print(f"   - Metrics: {len(request['performance_metrics'])}")
-        print(f"   - Available Blocks: {len(request['available_building_blocks'])}")
+        logger.info(f"\n📊 Request Summary:")
+        logger.info(f"   - Strategy Blocks: {len(request['strategy_configuration'].get('blocks', []))}")
+        logger.info(f"   - Total Trades: {trade_count}")
+        logger.info(f"   - Metrics: {len(request['performance_metrics'])}")
+        logger.info(f"   - Available Blocks: {len(request['available_building_blocks'])}")
     
     def format_for_ai_prompt(self, request: Dict) -> str:
         """
@@ -667,9 +671,9 @@ Analyze the data above and respond in this EXACT JSON format:
 # Test function
 def test_request_builder():
     """Test comprehensive request builder"""
-    print("\n" + "="*80)
-    print("COMPREHENSIVE AI REQUEST BUILDER - TEST")
-    print("="*80)
+    logger.info("\n" + "="*80)
+    logger.info("COMPREHENSIVE AI REQUEST BUILDER - TEST")
+    logger.info("="*80)
     
     builder = ComprehensiveAIRequestBuilder()
     
@@ -723,16 +727,16 @@ def test_request_builder():
         backtest_config
     )
     
-    print(f"\n✅ Request built successfully")
-    print(f"\nRequest size: {len(json.dumps(request, default=str))} bytes")
+    logger.info(f"\n✅ Request built successfully")
+    logger.info(f"\nRequest size: {len(json.dumps(request, default=str))} bytes")
     
     # Test prompt formatting
     prompt = builder.format_for_ai_prompt(request)
-    print(f"Prompt size: {len(prompt)} characters")
-    print(f"\nFirst 500 characters of prompt:")
-    print(prompt[:500])
+    logger.info(f"Prompt size: {len(prompt)} characters")
+    logger.info(f"\nFirst 500 characters of prompt:")
+    logger.info(prompt[:500])
     
-    print("\n" + "="*80)
+    logger.info("\n" + "="*80)
 
 
 if __name__ == '__main__':

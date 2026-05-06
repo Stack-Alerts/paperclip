@@ -11,6 +11,10 @@ from src.optimizer_v3.core.logger import OptimizerLogger
 from src.optimizer_v3.core.validator import DataValidator, ValidationError
 from src.optimizer_v3.core.dependency_graph import DependencyGraph
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class StrategyAnalyzer:
     """

@@ -24,6 +24,8 @@ from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class AdaptiveSLResult:
@@ -165,7 +167,7 @@ class AdaptiveSLCalculator:
         
         # CRITICAL FIX: Handle None from volatility calculation
         if volatility_pct is None:
-            print(f"[STOP LOSS] [WARNING] Volatility calculation returned None - using emergency SL")
+            logger.warning(f"[STOP LOSS] [WARNING] Volatility calculation returned None - using emergency SL")
             volatility_pct = self.emergency_sl_pct  # Fallback to emergency SL
 
         if debugger:
@@ -311,7 +313,7 @@ class AdaptiveSLCalculator:
         
         # CRITICAL: Defensive check for None delay_bars
         if sl_result.delay_bars is None:
-            print(f"Warning: delay_bars is None, using working SL immediately")
+            logger.info(f"Warning: delay_bars is None, using working SL immediately")
             return sl_result.working_sl
         
         if bars_held < sl_result.delay_bars:
@@ -345,7 +347,7 @@ class AdaptiveSLCalculator:
         
         # CRITICAL FIX: Handle None/NaN from mean()
         if avg_range is None or pd.isna(avg_range):
-            print(f"[STOP LOSS] [WARNING] Bar range mean is None/NaN - using default 1.0%")
+            logger.warning(f"[STOP LOSS] [WARNING] Bar range mean is None/NaN - using default 1.0%")
             return 1.0
         
         avg_range_pct = avg_range * 100  # Convert to percentage

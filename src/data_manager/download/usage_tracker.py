@@ -6,6 +6,8 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from ..config import USAGE_TRACKING_FILE, LAKEAPI_LIMIT_GB, LAKEAPI_WARNING_GB
 
+import logging
+logger = logging.getLogger(__name__)
 
 class UsageTracker:
     """
@@ -50,14 +52,14 @@ class UsageTracker:
             # Check if we need to reset for new month
             current_month = datetime.now().strftime('%Y-%m')
             if data.get('month') != current_month:
-                print(f"📅 New month detected: {current_month}")
-                print(f"Previous month ({data.get('month')}): {data.get('total_gb', 0):.2f} GB used")
+                logger.info(f"📅 New month detected: {current_month}")
+                logger.info(f"Previous month ({data.get('month')}): {data.get('total_gb', 0):.2f} GB used")
                 return self._initialize_usage_data()
             
             return data
             
         except Exception as e:
-            print(f"⚠️  Error loading usage data: {e}")
+            logger.error(f"⚠️  Error loading usage data: {e}")
             return self._initialize_usage_data()
     
     def _initialize_usage_data(self) -> Dict:
@@ -85,7 +87,7 @@ class UsageTracker:
             with open(self.tracking_file, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            print(f"⚠️  Error saving usage data: {e}")
+            logger.error(f"⚠️  Error saving usage data: {e}")
     
     def record_download(self, data_type: str, year: int, month: int, size_gb: float) -> float:
         """
@@ -136,8 +138,8 @@ class UsageTracker:
         
         # Check if approaching warning threshold
         if new_total >= self.warning_gb:
-            print(f"⚠️  WARNING: Approaching LakeAPI limit!")
-            print(f"Used: {new_total:.2f} GB / {self.limit_gb} GB ({new_total/self.limit_gb*100:.1f}%)")
+            logger.warning(f"⚠️  WARNING: Approaching LakeAPI limit!")
+            logger.info(f"Used: {new_total:.2f} GB / {self.limit_gb} GB ({new_total/self.limit_gb*100:.1f}%)")
         
         return new_total
     

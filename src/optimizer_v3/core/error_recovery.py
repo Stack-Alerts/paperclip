@@ -12,6 +12,10 @@ import traceback
 
 from src.optimizer_v3.core.logger import OptimizerLogger
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class ErrorSeverity(Enum):
     """Severity levels for errors"""

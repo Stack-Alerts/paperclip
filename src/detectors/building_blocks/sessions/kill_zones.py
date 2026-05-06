@@ -31,6 +31,8 @@ from datetime import datetime, time
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='kill_zones',
@@ -545,9 +547,9 @@ if __name__ == "__main__":
     
     kz = KillZones()
     
-    print("=" * 80)
-    print("ENHANCED KILL ZONES - TEST RESULTS")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("ENHANCED KILL ZONES - TEST RESULTS")
+    logger.info("=" * 80)
     
     for i in range(len(data)):
         result = kz.analyze(data.iloc[:i+1])
@@ -555,5 +557,5 @@ if __name__ == "__main__":
         priority = result['metadata']['priority']
         is_new = result['metadata']['is_new_event']
         event_marker = "🆕 NEW! " if is_new else ""
-        print(f"{data['timestamp'].iloc[i]}: {event_marker}{kz_name} (Priority: {priority}) - {result['signal']} ({result['confidence']}%)")
-    print("=" * 80)
+        logger.info(f"{data['timestamp'].iloc[i]}: {event_marker}{kz_name} (Priority: {priority}) - {result['signal']} ({result['confidence']}%)")
+    logger.info("=" * 80)

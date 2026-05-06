@@ -26,6 +26,8 @@ from enum import Enum
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 class SessionType(Enum):
     """Silver Bullet session types."""
@@ -592,6 +594,6 @@ class ICTSilverBullet:
 
 
 if __name__ == "__main__":
-    print("ICT Silver Bullet - Building Block")
-    print("SIGNAL BLOCK - Fair Value Gap retest setups")
-    print("Based on Inner Circle Trader methodology")
+    logger.info("ICT Silver Bullet - Building Block")
+    logger.info("SIGNAL BLOCK - Fair Value Gap retest setups")
+    logger.info("Based on Inner Circle Trader methodology")

@@ -21,6 +21,9 @@ from dataclasses import dataclass
 from enum import Enum
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Handle both package import and standalone execution
 try:
     from .zigzag_detector import Pivot, PivotType
@@ -214,7 +217,6 @@ class PatternEncoder:
         
         This captures ranging/consolidating markets which behave differently
         from trending markets.
-        
         Args:
             p1, p2, p3: Consecutive pivots
             
@@ -416,27 +418,27 @@ class PatternEncoder:
 # Helper functions for quick testing
 def quick_test():
     """Quick test of pattern encoder"""
-    print("="*60)
-    print("PATTERN ENCODER TEST")
-    print("="*60)
+    logger.info("="*60)
+    logger.info("PATTERN ENCODER TEST")
+    logger.info("="*60)
     
     encoder = PatternEncoder()
     
-    print("\nPattern Index Decoding:")
-    print("-" * 60)
+    logger.info("\nPattern Index Decoding:")
+    logger.info("-" * 60)
     for idx in [0, 3, 4, 6, 7, 63]:
-        print(f"Index {idx:2d}: {encoder.get_pattern_description(idx)}")
+        logger.info(f"Index {idx:2d}: {encoder.get_pattern_description(idx)}")
     
-    print("\n" + "="*60)
-    print("All 64 pattern combinations:")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("All 64 pattern combinations:")
+    logger.info("="*60)
     for idx in range(64):
         trend_bit, price_bit, osc_bit = encoder.decode_index(idx)
-        print(f"{idx:2d}: T={trend_bit} P={price_bit} O={osc_bit} | {encoder.get_pattern_description(idx)}")
+        logger.info(f"{idx:2d}: T={trend_bit} P={price_bit} O={osc_bit} | {encoder.get_pattern_description(idx)}")
     
-    print("\n" + "="*60)
-    print("TEST COMPLETE")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("TEST COMPLETE")
+    logger.info("="*60)
 
 
 if __name__ == "__main__":

@@ -20,6 +20,10 @@ import logging
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 logger = logging.getLogger(__name__)
 
 

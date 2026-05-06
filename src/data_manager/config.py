@@ -5,6 +5,10 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -61,7 +65,7 @@ TOTAL_CORES = multiprocessing.cpu_count()
 SYSTEM_RESERVED_CORES = 2
 NUM_CORES = min(int(os.getenv('MULTICORE_WORKERS', str(TOTAL_CORES - SYSTEM_RESERVED_CORES))), 30)
 
-print(f"⚙️  Multicore Config: Using {NUM_CORES} cores (Total: {TOTAL_CORES}, Reserved: {SYSTEM_RESERVED_CORES})")
+logger.info(f"⚙️  Multicore Config: Using {NUM_CORES} cores (Total: {TOTAL_CORES}, Reserved: {SYSTEM_RESERVED_CORES})")
 
 # ============================================================================
 # TIMEFRAMES
@@ -169,18 +173,18 @@ LOG_DIR.mkdir(exist_ok=True)
 
 def print_config_summary():
     """Print configuration summary"""
-    print("\n" + "="*80)
-    print("DATA MANAGER CONFIGURATION")
-    print("="*80)
-    print(f"Project Root: {PROJECT_ROOT}")
-    print(f"Data Directory: {RAW_DATA_DIR}")
-    print(f"Catalog Directory: {CATALOG_DIR}")
-    print(f"LakeAPI Limit: {LAKEAPI_LIMIT_GB}GB (Warning: {LAKEAPI_WARNING_GB}GB)")
-    print(f"Multicore Workers: {NUM_CORES} cores")
-    print(f"Timeframes: {', '.join(TIMEFRAMES)}")
-    print(f"Data Types: {', '.join(DATA_TYPES)}")
-    print(f"Alerts Enabled: {ENABLE_ALERTS}")
-    print("="*80 + "\n")
+    logger.info("\n" + "="*80)
+    logger.info("DATA MANAGER CONFIGURATION")
+    logger.info("="*80)
+    logger.info(f"Project Root: {PROJECT_ROOT}")
+    logger.info(f"Data Directory: {RAW_DATA_DIR}")
+    logger.info(f"Catalog Directory: {CATALOG_DIR}")
+    logger.info(f"LakeAPI Limit: {LAKEAPI_LIMIT_GB}GB (Warning: {LAKEAPI_WARNING_GB}GB)")
+    logger.info(f"Multicore Workers: {NUM_CORES} cores")
+    logger.info(f"Timeframes: {', '.join(TIMEFRAMES)}")
+    logger.info(f"Data Types: {', '.join(DATA_TYPES)}")
+    logger.info(f"Alerts Enabled: {ENABLE_ALERTS}")
+    logger.info("="*80 + "\n")
 
 if __name__ == "__main__":
     print_config_summary()

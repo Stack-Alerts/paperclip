@@ -31,6 +31,8 @@ from datetime import datetime, time
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='session_time',
@@ -466,14 +468,14 @@ if __name__ == "__main__":
     
     session = SessionTime()
     
-    print("=" * 80)
-    print("ENHANCED SESSION TIME - TEST RESULTS")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("ENHANCED SESSION TIME - TEST RESULTS")
+    logger.info("=" * 80)
     
     for i in range(len(data)):
         result = session.analyze(data.iloc[:i+1])
         sess_name = result['metadata']['session']
         is_new = result['metadata']['is_new_event']
         event_marker = "🆕 NEW! " if is_new else ""
-        print(f"{data['timestamp'].iloc[i]}: {event_marker}{sess_name} - {result['signal']} ({result['confidence']}%)")
-    print("=" * 80)
+        logger.info(f"{data['timestamp'].iloc[i]}: {event_marker}{sess_name} - {result['signal']} ({result['confidence']}%)")
+    logger.info("=" * 80)

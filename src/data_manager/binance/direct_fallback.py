@@ -12,6 +12,8 @@ import pandas as pd
 from datetime import datetime
 from typing import Dict, List
 
+import logging
+logger = logging.getLogger(__name__)
 
 def get_fresh_klines_direct(
     interval: str = '15m',
@@ -140,17 +142,17 @@ def get_klines_with_fallback(
     """
     # If REST client bars are fresh, use them
     if rest_client_bars is not None and check_data_freshness(rest_client_bars, max_delay_minutes):
-        print(f"   ✅ REST client data is fresh (delay < {max_delay_minutes}m)")
+        logger.info(f"   ✅ REST client data is fresh (delay < {max_delay_minutes}m)")
         return rest_client_bars
     
     # Otherwise, use direct fallback
-    print(f"   🔄 REST client data stale, using direct fallback...")
+    logger.warning(f"   🔄 REST client data stale, using direct fallback...")
     fresh_bars = get_fresh_klines_direct(interval, symbol, limit)
     
     # Verify freshness
     if check_data_freshness(fresh_bars, max_delay_minutes):
-        print(f"   ✅ Direct fallback successful (fresh data)")
+        logger.warning(f"   ✅ Direct fallback successful (fresh data)")
     else:
-        print(f"   ⚠️  Even direct method returned stale data (Binance issue)")
+        logger.warning(f"   ⚠️  Even direct method returned stale data (Binance issue)")
     
     return fresh_bars

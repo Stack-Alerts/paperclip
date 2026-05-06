@@ -32,6 +32,8 @@ from enum import Enum
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 class SignalType(Enum):
     """Signal types"""
@@ -515,6 +517,6 @@ class AdaptiveMomentumOscillator:
 
 
 if __name__ == "__main__":
-    print("Adaptive Momentum Oscillator - Building Block")
-    print("SIGNAL BLOCK - Momentum signals with adaptive smoothing")
-    print("Based on LuxAlgo Adaptive Momentum Oscillator")
+    logger.info("Adaptive Momentum Oscillator - Building Block")
+    logger.info("SIGNAL BLOCK - Momentum signals with adaptive smoothing")
+    logger.info("Based on LuxAlgo Adaptive Momentum Oscillator")

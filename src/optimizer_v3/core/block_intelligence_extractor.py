@@ -25,6 +25,8 @@ from dataclasses import dataclass
 from enum import Enum
 import re
 
+import logging
+logger = logging.getLogger(__name__)
 
 class BlockPurpose(Enum):
     """Automatically inferred block purpose categories"""
@@ -244,13 +246,13 @@ class BlockIntelligenceExtractor:
         
         registered_blocks = BlockRegistry.get_all_blocks()
         
-        print(f"🔬 Extracting intelligence from {len(registered_blocks)} registered blocks...")
+        logger.info(f"🔬 Extracting intelligence from {len(registered_blocks)} registered blocks...")
         
         for block_name, metadata in registered_blocks.items():
             intelligence = self._extract_block_intelligence(block_name, metadata)
             self.extracted_intelligence[block_name] = intelligence
         
-        print(f"✅ Intelligence extraction complete: {len(self.extracted_intelligence)} blocks analyzed")
+        logger.info(f"✅ Intelligence extraction complete: {len(self.extracted_intelligence)} blocks analyzed")
         
         return self.extracted_intelligence
     
@@ -450,9 +452,9 @@ class BlockIntelligenceExtractor:
     
     def print_intelligence_summary(self):
         """Print summary of extracted intelligence"""
-        print("\n" + "=" * 80)
-        print("BUILDING BLOCK INTELLIGENCE SUMMARY")
-        print("=" * 80)
+        logger.info("\n" + "=" * 80)
+        logger.info("BUILDING BLOCK INTELLIGENCE SUMMARY")
+        logger.info("=" * 80)
         
         by_purpose = {}
         for intel in self.extracted_intelligence.values():
@@ -461,20 +463,19 @@ class BlockIntelligenceExtractor:
                 by_purpose[purpose] = []
             by_purpose[purpose].append(intel.name)
         
-        print(f"\nTotal Blocks: {len(self.extracted_intelligence)}")
-        print(f"\nBy Purpose:")
+        logger.info(f"\nTotal Blocks: {len(self.extracted_intelligence)}")
+        logger.info(f"\nBy Purpose:")
         for purpose, blocks in sorted(by_purpose.items()):
-            print(f"  {purpose}: {len(blocks)} blocks")
+            logger.info(f"  {purpose}: {len(blocks)} blocks")
         
         avg_confidence = sum(i.confidence for i in self.extracted_intelligence.values()) / len(self.extracted_intelligence)
-        print(f"\nAverage Extraction Confidence: {avg_confidence:.1%}")
-        print("=" * 80)
+        logger.info(f"\nAverage Extraction Confidence: {avg_confidence:.1%}")
+        logger.info("=" * 80)
 
 
 if __name__ == '__main__':
     # Test extraction
     from src.detectors.building_blocks.registry import BlockRegistry
-    
     extractor = BlockIntelligenceExtractor()
     intelligence = extractor.extract_from_registry(BlockRegistry)
     extractor.print_intelligence_summary()
@@ -482,9 +483,9 @@ if __name__ == '__main__':
     # Show example
     if 'liquidity_sweep' in intelligence:
         intel = intelligence['liquidity_sweep']
-        print(f"\n\nEXAMPLE: {intel.name}")
-        print(f"Purpose: {intel.purpose.value}")
-        print(f"Primary Metrics: {intel.primary_metrics}")
-        print(f"Signals: {[s.name for s in intel.signals]}")
-        print(f"Restrictiveness: {intel.overall_restrictiveness:.1%}")
-        print(f"Confidence: {intel.confidence:.1%}")
+        logger.info(f"\n\nEXAMPLE: {intel.name}")
+        logger.info(f"Purpose: {intel.purpose.value}")
+        logger.info(f"Primary Metrics: {intel.primary_metrics}")
+        logger.info(f"Signals: {[s.name for s in intel.signals]}")
+        logger.info(f"Restrictiveness: {intel.overall_restrictiveness:.1%}")
+        logger.info(f"Confidence: {intel.confidence:.1%}")

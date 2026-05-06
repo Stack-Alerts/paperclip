@@ -25,6 +25,8 @@ import pandas as pd
 import numpy as np
 from src.utils.advanced_data_loader import advanced_data
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='fair_value_gap',
@@ -389,17 +391,17 @@ if __name__ == "__main__":
     fvg = FairValueGap()
     result = fvg.analyze(data)
     
-    print("=" * 80)
-    print("FAIR VALUE GAP DETECTOR - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
+    logger.info("=" * 80)
+    logger.info("FAIR VALUE GAP DETECTOR - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
     if 'fvg_type' in result['metadata']:
-        print(f"\nFVG Analysis:")
-        print(f"  Type: {result['metadata']['fvg_type']}")
-        print(f"  Gap: ${result['metadata']['gap_low']:.2f} - ${result['metadata']['gap_high']:.2f}")
-        print(f"  Size: ${result['metadata']['gap_size']:.2f} ({result['metadata']['gap_pct']:.3f}%)")
-        print(f"\nConfluence:")
+        logger.info(f"\nFVG Analysis:")
+        logger.info(f"  Type: {result['metadata']['fvg_type']}")
+        logger.info(f"  Gap: ${result['metadata']['gap_low']:.2f} - ${result['metadata']['gap_high']:.2f}")
+        logger.info(f"  Size: ${result['metadata']['gap_size']:.2f} ({result['metadata']['gap_pct']:.3f}%)")
+        logger.info(f"\nConfluence:")
         for factor in result['confluence_factors']:
-            print(f"  - {factor}")
-    print("=" * 80)
+            logger.info(f"  - {factor}")
+    logger.info("=" * 80)

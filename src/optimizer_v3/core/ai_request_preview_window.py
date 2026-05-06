@@ -36,6 +36,10 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QSettings
 from PyQt5.QtGui import QFont, QTextOption
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Import centralized styles
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -548,17 +552,17 @@ class AIRequestPreviewWindow(QMainWindow):
     
     def _populate_blocks_section(self, blocks: List[Dict]):
         """Populate available blocks section"""
-        print(f"\n🔍 DEBUG: _populate_blocks_section called with {len(blocks)} blocks")
+        logger.debug(f"\n🔍 DEBUG: _populate_blocks_section called with {len(blocks)} blocks")
         
         # DEBUG: Check first block structure
         if blocks:
             first_block = blocks[0]
-            print(f"   First block: {first_block.get('name')}")
-            print(f"   Has signals key: {'signals' in first_block}")
+            logger.info(f"   First block: {first_block.get('name')}")
+            logger.info(f"   Has signals key: {'signals' in first_block}")
             if 'signals' in first_block:
-                print(f"   Signals count: {len(first_block.get('signals', []))}")
+                logger.info(f"   Signals count: {len(first_block.get('signals', []))}")
                 if first_block.get('signals'):
-                    print(f"   First signal: {first_block['signals'][0]}")
+                    logger.info(f"   First signal: {first_block['signals'][0]}")
         
         output = f"Total Available Blocks: {len(blocks)}\n\n"
         
@@ -586,11 +590,11 @@ class AIRequestPreviewWindow(QMainWindow):
                         signal_desc = signal.get('description', 'No description')
                         output += f"      - {signal_name}: {signal_desc}\n"
                 else:
-                    print(f"   ⚠️ Block {block.get('name')} has NO signals!")
+                    logger.warning(f"   ⚠️ Block {block.get('name')} has NO signals!")
                 output += "\n"
         
         self.blocks_text.setPlainText(output)
-        print(f"✓ Blocks section populated with {len(output)} characters")
+        logger.info(f"✓ Blocks section populated with {len(output)} characters")
     
     def _populate_validation_section(self):
         """Populate validation checklist"""
@@ -831,7 +835,7 @@ class AIRequestPreviewWindow(QMainWindow):
     
     def _reset_view(self):
         """Reset view to initial state - all sections expanded"""
-        print("✓ Resetting view to initial state...")
+        logger.info("✓ Resetting view to initial state...")
         for section in self.all_sections:
             # Show all widgets
             section['widget'].setVisible(True)
@@ -849,12 +853,12 @@ class AIRequestPreviewWindow(QMainWindow):
         # Force layout update
         self.centralWidget().layout().update()
         self.centralWidget().updateGeometry()
-        print("✓ View reset complete")
+        logger.info("✓ View reset complete")
     
     def _preview_ai_request(self):
         """Build and show the actual formatted AI request that will be sent to the API"""
         try:
-            print("[Preview] Building formatted AI request...")
+            logger.info("[Preview] Building formatted AI request...")
             
             # Import the request builder
             from src.optimizer_v3.core.comprehensive_ai_request_builder import ComprehensiveAIRequestBuilder
@@ -968,7 +972,7 @@ PART 2: STRUCTURED DATA (JSON format for parsing)
             dialog.exec()
             
         except Exception as e:
-            print(f"❌ Failed to build AI request preview: {str(e)}")
+            logger.error(f"❌ Failed to build AI request preview: {str(e)}")
             import traceback
             traceback.print_exc()
             
@@ -1010,7 +1014,7 @@ PART 2: STRUCTURED DATA (JSON format for parsing)
     
     def closeEvent(self, event):
         """Override close event to save window geometry"""
-        print(f"✓ Window closing, saving geometry...")
+        logger.info(f"✓ Window closing, saving geometry...")
         self._save_geometry()
         event.accept()  # Accept the close event
         super().closeEvent(event)
@@ -1021,7 +1025,6 @@ def test_preview_window():
     """Test the preview window"""
     import sys
     from PyQt5.QtWidgets import QApplication
-    
     app = QApplication(sys.argv)
     
     # Sample data
@@ -1084,8 +1087,8 @@ def test_preview_window():
     )
     
     def on_send_approved(data):
-        print("✅ Send approved!")
-        print(f"Request data size: {len(json.dumps(data, default=str))} bytes")
+        logger.info("✅ Send approved!")
+        logger.info(f"Request data size: {len(json.dumps(data, default=str))} bytes")
         app.quit()
     
     window.send_approved.connect(on_send_approved)

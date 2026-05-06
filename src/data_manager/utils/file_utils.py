@@ -5,6 +5,8 @@ from typing import Optional, List
 import shutil
 import os
 
+import logging
+logger = logging.getLogger(__name__)
 
 def ensure_directory_exists(directory: Path) -> Path:
     """
@@ -90,7 +92,7 @@ def safe_delete_file(file_path: Path, backup: bool = True, backup_dir: Optional[
         return True
         
     except Exception as e:
-        print(f"Error deleting file {file_path}: {e}")
+        logger.error(f"Error deleting file {file_path}: {e}")
         return False
 
 
@@ -156,7 +158,7 @@ def copy_file_with_metadata(source: Path, destination: Path, preserve_stats: boo
         return True
         
     except Exception as e:
-        print(f"Error copying file: {e}")
+        logger.error(f"Error copying file: {e}")
         return False
 
 
@@ -220,7 +222,7 @@ def clean_temp_files(directory: Path, patterns: List[str] = None) -> int:
                     file_path.unlink()
                     deleted_count += 1
                 except Exception as e:
-                    print(f"Error deleting {file_path}: {e}")
+                    logger.error(f"Error deleting {file_path}: {e}")
     
     return deleted_count
 
@@ -260,7 +262,7 @@ def atomic_write(file_path: Path, content: str, encoding: str = 'utf-8') -> bool
         return True
         
     except Exception as e:
-        print(f"Error in atomic write: {e}")
+        logger.error(f"Error in atomic write: {e}")
         
         # Cleanup temp file if exists
         if temp_path.exists():

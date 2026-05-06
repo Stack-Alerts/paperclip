@@ -4,6 +4,10 @@ Strategy Generator - Code Generation Module
 Generates NautilusTrader strategy files, tests, and optimizer configs
 from validated StrategyConfiguration objects using Jinja2 templates.
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 Author: Strategy Builder v1.0
 Date: 2026-01-09
 """
@@ -18,8 +22,6 @@ from jinja2 import Environment, FileSystemLoader, Template
 import yaml
 
 from src.utils.Strategy_Builder.models import StrategyConfiguration, BlockSelection
-
-
 class StrategyGenerator:
     """
     Generates strategy files from validated configurations
@@ -327,7 +329,7 @@ class StrategyGenerator:
             if block_metadata:
                 class_map[block_name] = block_metadata.class_name
             else:
-                print(f"Warning: Block '{block_name}' not in registry")
+                logger.info(f"Warning: Block '{block_name}' not in registry")
                 # Fallback to generated name
                 class_map[block_name] = self._generate_class_name(block_name)
         
@@ -349,7 +351,6 @@ class StrategyGenerator:
             List of import statement strings
         """
         from src.detectors.building_blocks.registry import BlockRegistry
-        
         imports = []
         seen = set()  # Track unique imports
         registry = BlockRegistry()
@@ -362,7 +363,7 @@ class StrategyGenerator:
             
             if not block_metadata:
                 # Fallback if block not in registry (shouldn't happen in production)
-                print(f"Warning: Block '{block_name}' not found in registry, skipping import")
+                logger.warning(f"Warning: Block '{block_name}' not found in registry, skipping import")
                 continue
             
             # Get import info from registry metadata
@@ -403,10 +404,10 @@ class StrategyGenerator:
             return True
             
         except SyntaxError as e:
-            print(f"Syntax error in {filepath}: {e}")
+            logger.error(f"Syntax error in {filepath}: {e}")
             return False
         except Exception as e:
-            print(f"Error validating {filepath}: {e}")
+            logger.error(f"Error validating {filepath}: {e}")
             return False
     
     def validate_yaml_syntax(self, filepath: Path) -> bool:
@@ -425,10 +426,10 @@ class StrategyGenerator:
             return True
             
         except yaml.YAMLError as e:
-            print(f"YAML error in {filepath}: {e}")
+            logger.error(f"YAML error in {filepath}: {e}")
             return False
         except Exception as e:
-            print(f"Error validating {filepath}: {e}")
+            logger.error(f"Error validating {filepath}: {e}")
             return False
     
     def dry_run(

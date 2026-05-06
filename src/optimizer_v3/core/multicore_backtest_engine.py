@@ -45,6 +45,8 @@ import os
 from nautilus_trader.model.data import Bar
 from nautilus_trader.model.objects import Price, Quantity
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class ChunkData:
@@ -460,7 +462,7 @@ def evaluate_chunk(
                             result.exit_condition_name = "TP1"
                             result.exact_exit_price = float(tpsl.take_profit_1)  # ✅ Use TP1 price
                             # DEBUG: Log partial exit calculation
-                            print(f"[TP1 HIT] remaining={remaining:.4f}, exit_pct={result.exit_percentage:.4f}, tp_hits={tp_hits}")
+                            logger.info(f"[TP1 HIT] remaining={remaining:.4f}, exit_pct={result.exit_percentage:.4f}, tp_hits={tp_hits}")
                         elif 'TP2' not in tp_hits and current_price >= tpsl.take_profit_2:
                             result.should_exit = True
                             result.exit_reason = "TP2 Hit"
@@ -531,7 +533,7 @@ def evaluate_chunk(
                 
                 # 🔍 DEBUG: Verify exact price usage
                 if hasattr(result, 'exit_condition_name') and result.exit_condition_name in ['TP1', 'TP2', 'TP3', 'SL']:
-                    print(f"🔍 DEBUG {result.exit_condition_name}: exit_price={exit_price:.2f}, exact={getattr(result, 'exact_exit_price', 'N/A')}, bar_close={float(current_bar.close):.2f}, bar_range=[{float(current_bar.low):.2f}, {float(current_bar.high):.2f}]")
+                    logger.debug(f"🔍 DEBUG {result.exit_condition_name}: exit_price={exit_price:.2f}, exact={getattr(result, 'exact_exit_price', 'N/A')}, bar_close={float(current_bar.close):.2f}, bar_range=[{float(current_bar.low):.2f}, {float(current_bar.high):.2f}]")
                 
                 entry_bar = evaluator.current_trade.entry_bar
                 entry_price = float(evaluator.current_trade.entry_price)
@@ -660,7 +662,7 @@ def evaluate_chunk(
     except Exception as e:
         import traceback
         error_msg = f"Chunk {chunk.chunk_id} failed: {str(e)}\n{traceback.format_exc()}"
-        print(error_msg)
+        logger.info(error_msg)
         
         return ChunkResult(
             chunk_id=chunk.chunk_id,
@@ -694,7 +696,6 @@ def merge_chunk_results(
         Dict with deduplicated trades and stats
     """
     from src.optimizer_v3.core.trade_registry import get_trade_registry
-    
     # Get global registry
     registry = get_trade_registry()
     
@@ -734,10 +735,10 @@ def merge_chunk_results(
     # Get deduplication stats
     duplicates_rejected = registry.get_duplicate_count()
 
-    print(f"\n📊 TRADE DEDUPLICATION SUMMARY:")
-    print(f"   Unique trades: {len(unique_trades)}")
-    print(f"   Duplicates rejected: {duplicates_rejected}")
-    print(f"   Data integrity: ✅ VALIDATED\n")
+    logger.info(f"\n📊 TRADE DEDUPLICATION SUMMARY:")
+    logger.info(f"   Unique trades: {len(unique_trades)}")
+    logger.info(f"   Duplicates rejected: {duplicates_rejected}")
+    logger.info(f"   Data integrity: ✅ VALIDATED\n")
 
     # FIX 2026-02-13: Count TP exits from actual trades (not hardcoded zeros!)
     tp1_count = sum(1 for t in unique_trades if t.get('exit_condition_name') == 'TP1')
@@ -876,7 +877,7 @@ class MulticoreBacktestEngine:
                         
                 except Exception as e:
                     error_msg = f"Chunk {chunk.chunk_id} failed: {str(e)}"
-                    print(error_msg)
+                    logger.info(error_msg)
                     chunk_results.append(ChunkResult(
                         chunk_id=chunk.chunk_id,
                         trades=[],

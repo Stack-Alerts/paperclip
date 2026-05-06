@@ -21,6 +21,10 @@ from sqlalchemy.exc import OperationalError, DatabaseError
 
 from .config import get_db_config, get_db_url
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class DatabaseMetrics:
     """Track database connection and performance metrics"""

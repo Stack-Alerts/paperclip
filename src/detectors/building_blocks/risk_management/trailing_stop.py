@@ -32,6 +32,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='trailing_stop',
@@ -515,6 +517,6 @@ class TrailingStop:
 
 
 if __name__ == "__main__":
-    print("Trailing Stop - Building Block")
-    print("CONTEXT BLOCK - Dynamic stop levels based on volatility")
-    print("Based on LuxAlgo Statistical Trailing Stop")
+    logger.info("Trailing Stop - Building Block")
+    logger.info("CONTEXT BLOCK - Dynamic stop levels based on volatility")
+    logger.info("Based on LuxAlgo Statistical Trailing Stop")

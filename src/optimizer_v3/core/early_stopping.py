@@ -10,6 +10,10 @@ from enum import Enum
 
 from src.optimizer_v3.core.logger import OptimizerLogger
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class StoppingReason(Enum):
     """Reasons for early stopping"""

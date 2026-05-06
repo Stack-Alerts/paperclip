@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='fifty_pct_hod_lod',
@@ -265,9 +267,9 @@ class FiftyPctHODLOD:
 
 
 if __name__ == "__main__":
-    print("="*80)
-    print("50%H-LOD (YESTERDAY'S 50% EQUILIBRIUM) TEST")
-    print("="*80)
+    logger.info("="*80)
+    logger.info("50%H-LOD (YESTERDAY'S 50% EQUILIBRIUM) TEST")
+    logger.info("="*80)
     
     # Create 2 days of data
     dates = pd.date_range(start='2024-01-01 00:00', periods=200, freq='15min')
@@ -289,12 +291,12 @@ if __name__ == "__main__":
     fifty_pct = FiftyPctHODLOD()
     result = fifty_pct.analyze(data)
     
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"Description: {result['metadata']['description']}")
-    print(f"Yesterday HOD: ${result['metadata']['yesterday_hod']:.2f}")
-    print(f"Yesterday LOD: ${result['metadata']['yesterday_lod']:.2f}")
-    print(f"50% Level: ${result['metadata']['fifty_pct']:.2f}")
-    print(f"Current Price: ${result['metadata']['current_price']:.2f}")
-    print(f"Position in Range: {result['metadata']['position_in_range_pct']:.1f}%")
-    print("="*80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"Description: {result['metadata']['description']}")
+    logger.info(f"Yesterday HOD: ${result['metadata']['yesterday_hod']:.2f}")
+    logger.info(f"Yesterday LOD: ${result['metadata']['yesterday_lod']:.2f}")
+    logger.info(f"50% Level: ${result['metadata']['fifty_pct']:.2f}")
+    logger.info(f"Current Price: ${result['metadata']['current_price']:.2f}")
+    logger.info(f"Position in Range: {result['metadata']['position_in_range_pct']:.1f}%")
+    logger.info("="*80)

@@ -24,6 +24,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='bollinger_bands',
@@ -1017,26 +1019,26 @@ if __name__ == "__main__":
     bb_block = BollingerBands(period=20, std_dev=2.0, timeframe='15min')
     result = bb_block.analyze(df)
     
-    print("=" * 80)
-    print("BOLLINGER BANDS BUILDING BLOCK - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"\nBand Values:")
-    print(f"  Upper Band: ${result['metadata']['upper_band']:.2f}")
-    print(f"  Middle Band: ${result['metadata']['middle_band']:.2f}")
-    print(f"  Lower Band: ${result['metadata']['lower_band']:.2f}")
-    print(f"  Current Price: ${result['metadata']['current_price']:.2f}")
-    print(f"\nIndicators:")
-    print(f"  Band Width: {result['metadata']['band_width']:.2f}%")
-    print(f"  %B: {result['metadata']['percent_b']:.4f}")
-    print(f"  Position: {result['metadata']['position']}")
-    print(f"  Squeeze Status: {result['metadata']['squeeze_status']}")
-    print(f"  Band Walk: {result['metadata']['band_walk']}")
-    print(f"\nPatterns:")
-    print(f"  W-Bottom: {result['metadata']['patterns']['w_bottom']}")
-    print(f"  M-Top: {result['metadata']['patterns']['m_top']}")
-    print(f"\nConfluence Factors:")
+    logger.info("=" * 80)
+    logger.info("BOLLINGER BANDS BUILDING BLOCK - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"\nBand Values:")
+    logger.info(f"  Upper Band: ${result['metadata']['upper_band']:.2f}")
+    logger.info(f"  Middle Band: ${result['metadata']['middle_band']:.2f}")
+    logger.info(f"  Lower Band: ${result['metadata']['lower_band']:.2f}")
+    logger.info(f"  Current Price: ${result['metadata']['current_price']:.2f}")
+    logger.info(f"\nIndicators:")
+    logger.info(f"  Band Width: {result['metadata']['band_width']:.2f}%")
+    logger.info(f"  %B: {result['metadata']['percent_b']:.4f}")
+    logger.info(f"  Position: {result['metadata']['position']}")
+    logger.info(f"  Squeeze Status: {result['metadata']['squeeze_status']}")
+    logger.info(f"  Band Walk: {result['metadata']['band_walk']}")
+    logger.info(f"\nPatterns:")
+    logger.info(f"  W-Bottom: {result['metadata']['patterns']['w_bottom']}")
+    logger.info(f"  M-Top: {result['metadata']['patterns']['m_top']}")
+    logger.info(f"\nConfluence Factors:")
     for factor in result['confluence_factors']:
-        print(f"  - {factor}")
-    print("=" * 80)
+        logger.info(f"  - {factor}")
+    logger.info("=" * 80)
