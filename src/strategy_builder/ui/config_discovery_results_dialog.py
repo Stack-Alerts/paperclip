@@ -27,10 +27,10 @@ from PyQt5.QtCore import (
 )
 from PyQt5.QtGui import QStandardItem, QStandardItemModel
 from PyQt5.QtWidgets import (
-    QAbstractItemView, QComboBox, QDialog, QGroupBox, QHBoxLayout,
-    QHeaderView, QLabel, QMessageBox, QProgressBar, QPushButton,
-    QSlider, QSplitter, QTableView, QTextEdit, QVBoxLayout, QWidget,
-    QApplication,
+    QAbstractItemView, QComboBox, QDialog, QDialogButtonBox, QGroupBox,
+    QHBoxLayout, QHeaderView, QLabel, QMessageBox, QProgressBar, QPushButton,
+    QSlider, QSplitter, QTableView, QTableWidget, QTableWidgetItem,
+    QTextEdit, QVBoxLayout, QWidget, QApplication,
 )
 
 from src.strategy_builder.ui.styles import (
@@ -379,6 +379,122 @@ def _build_summary_text(
 
 
 # ---------------------------------------------------------------------------
+# Apply Config confirmation dialog
+# ---------------------------------------------------------------------------
+
+def _flatten_dict(d: dict, prefix: str = '') -> list:
+    """
+    Flatten a nested dict into a list of (key_path, display_value) tuples.
+    Nested keys are joined with '.'.  Python True/False → Yes/No.
+    """
+    rows = []
+    for k, v in d.items():
+        full_key = f"{prefix}{k}" if prefix else k
+        if isinstance(v, dict):
+            rows.extend(_flatten_dict(v, prefix=f"{full_key}."))
+        else:
+            if isinstance(v, bool):
+                display = "Yes" if v else "No"
+            elif isinstance(v, float):
+                display = f"{v:g}"
+            else:
+                display = str(v)
+            rows.append((full_key, display))
+    return rows
+
+
+class _ApplyConfigDialog(QDialog):
+    """
+    Custom styled confirmation dialog for Apply Config.
+
+    Shows:
+    - Scenario description header
+    - Table of flattened key → value changes
+    - Apply / Cancel buttons (primary / secondary styling)
+    """
+
+    def __init__(
+        self,
+        scenario_description: str,
+        config_delta: dict,
+        parent: Optional[QWidget] = None,
+    ):
+        super().__init__(parent)
+        self.setWindowTitle("Apply Config")
+        self.setModal(True)
+        self.setMinimumWidth(520)
+        self.setStyleSheet(MAIN_STYLESHEET)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 12)
+        layout.setSpacing(10)
+
+        # Header
+        header = QLabel("Apply scenario:")
+        header.setStyleSheet(get_label_style('muted'))
+        header.setFont(create_font(9))
+        layout.addWidget(header)
+
+        desc_label = QLabel(scenario_description)
+        desc_label.setFont(create_font(11, bold=True))
+        desc_label.setWordWrap(True)
+        layout.addWidget(desc_label)
+
+        # Changes label
+        changes_label = QLabel("Changes to apply:")
+        changes_label.setStyleSheet(get_label_style('muted'))
+        changes_label.setFont(create_font(9))
+        layout.addWidget(changes_label)
+
+        # Table of changes
+        rows = _flatten_dict(config_delta)
+        table = QTableWidget(len(rows), 2, self)
+        table.setHorizontalHeaderLabels(["Parameter", "Value"])
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.setSelectionMode(QAbstractItemView.NoSelection)
+        table.setAlternatingRowColors(True)
+        table.setFont(create_monospace_font(9))
+        table.horizontalHeader().setFont(create_font(9, bold=True))
+        table.verticalHeader().setVisible(False)
+        table.setStyleSheet(get_table_view_stylesheet())
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+
+        for i, (key, val) in enumerate(rows):
+            key_item = QTableWidgetItem(key)
+            key_item.setFont(create_monospace_font(9))
+            val_item = QTableWidgetItem(val)
+            val_item.setFont(create_monospace_font(9))
+            val_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            table.setItem(i, 0, key_item)
+            table.setItem(i, 1, val_item)
+
+        table.resizeRowsToContents()
+        # Cap height so the dialog doesn't exceed screen; min 3 rows visible
+        row_h = table.rowHeight(0) if rows else 24
+        max_visible_rows = 12
+        table.setMaximumHeight(row_h * min(len(rows) + 1, max_visible_rows) + 4)
+        layout.addWidget(table)
+
+        # Buttons
+        btn_box = QHBoxLayout()
+        btn_box.addStretch()
+
+        apply_btn = QPushButton("Apply")
+        apply_btn.setDefault(True)
+        apply_btn.setStyleSheet(get_primary_button_stylesheet())
+        apply_btn.clicked.connect(self.accept)
+        btn_box.addWidget(apply_btn)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setStyleSheet(get_secondary_button_stylesheet())
+        cancel_btn.clicked.connect(self.reject)
+        btn_box.addWidget(cancel_btn)
+
+        layout.addLayout(btn_box)
+
+
+# ---------------------------------------------------------------------------
 # Main dialog
 # ---------------------------------------------------------------------------
 
@@ -495,14 +611,13 @@ class ConfigDiscoveryResultsDialog(QDialog):
         summary_layout = QVBoxLayout(summary_group)
         self._summary_text = QTextEdit()
         self._summary_text.setReadOnly(True)
-        self._summary_text.setMaximumHeight(180)
         self._summary_text.setStyleSheet(get_text_edit_stylesheet())
-        # Monospace font for detail pane — minimum 12pt per UX spec
-        self._summary_text.setFont(create_monospace_font(12))
+        # Monospace font for detail pane — 13pt per UX spec (one size up from prior 12pt)
+        self._summary_text.setFont(create_monospace_font(13))
         summary_layout.addWidget(self._summary_text)
         splitter.addWidget(summary_group)
 
-        splitter.setSizes([500, 180])
+        splitter.setSizes([600, 300])
         root.addWidget(splitter, 1)
 
         # Action buttons
@@ -724,16 +839,13 @@ class ConfigDiscoveryResultsDialog(QDialog):
         if not result or result.scenario_id == 'BASELINE' or result.error:
             return
 
-        # Confirm
-        reply = QMessageBox.question(
-            self,
-            "Apply Config",
-            f"Apply config from scenario '{result.description}' to BacktestConfigPanel?\n\n"
-            + "\n".join(f"  {k} = {v}" for k, v in result.config_delta.items()),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+        # Confirm with a styled human-readable dialog (not raw Python dict)
+        dlg = _ApplyConfigDialog(
+            scenario_description=result.description,
+            config_delta=result.config_delta,
+            parent=self,
         )
-        if reply != QMessageBox.Yes:
+        if dlg.exec_() != QDialog.Accepted:
             return
 
         # Emit and call callback

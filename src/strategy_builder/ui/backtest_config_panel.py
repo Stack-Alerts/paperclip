@@ -3822,7 +3822,13 @@ Detailed report saved to:
             QApplication.processEvents()
 
         progress.setValue(total_scenarios)
+        progress.close()
         results_dialog.set_progress(total_scenarios, total_scenarios, "Complete")
+
+        # Re-raise and activate results dialog now that the progress modal is gone
+        results_dialog.raise_()
+        results_dialog.activateWindow()
+        QApplication.processEvents()
 
         # ------------------------------------------------------------------
         # Step 7: Restore original UI state
