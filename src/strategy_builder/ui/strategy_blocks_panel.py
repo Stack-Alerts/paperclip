@@ -1338,7 +1338,7 @@ class StrategyBlocksPanel(QWidget):
         self.blocks_layout.setContentsMargins(5, 5, 5, 5)
         
         # Empty state label - dark theme
-        self.empty_label = QLabel("No blocks added yet.\n\nSearch and add blocks from the panel above.")
+        self.empty_label = QLabel("No blocks added yet.\n\nSearch and add blocks from the panel to the right.")
         self.empty_label.setAlignment(Qt.AlignCenter)
         self.empty_label.setStyleSheet(
             get_label_style('muted') + " font-size: 12pt; padding: 50px; "
