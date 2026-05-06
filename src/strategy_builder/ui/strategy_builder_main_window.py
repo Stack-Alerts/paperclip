@@ -115,7 +115,12 @@ class _RuntimeCandleUpdateThread(QThread):
             logger.info(f"[RuntimeUpdate] cycle start")
             manager = UnifiedDataManager(mode='live')
 
-            now = datetime.now()
+            # Use utcnow() so end_date passed to verify_and_repair and
+            # detect_gaps is UTC-consistent with tz-naive bar timestamps on disk.
+            # datetime.now() (local CEST = UTC+2) produces a gap_end 2h ahead of
+            # any UTC bar, causing _fetch_binance_range's filter_end to exclude
+            # all bars except the first one (only 1 bar written per cycle).
+            now = datetime.utcnow()
 
             # RC4b FIX: anchor the scan window to last_bar_on_disk rather than
             # session_start_time.
