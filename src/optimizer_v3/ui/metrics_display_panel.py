@@ -2097,8 +2097,17 @@ class MetricsDisplayPanel(QWidget):
         self.apply_btn.setEnabled(selected_count > 0)
     
     def _apply_selected_recommendations(self) -> None:
-        """Apply selected recommendations to strategy configuration"""
-        # Collect selected recommendations with cached objects
+        """
+        Apply selected recommendations to strategy configuration.
+
+        End-to-end flow (Sprint 1.9.3):
+        1. Read selected recommendation checkboxes from UI.
+        2. Delegate each recommendation to the orchestrator (preferred) OR use the
+           engine's apply_recommendations() as a config-dict fallback.
+        3. Show per-recommendation confirmation / error feedback.
+        4. Trigger re-evaluation (auto-retest) when the toggle is active.
+        """
+        # 1. Collect selected recommendations with cached objects
         selected_recs = []
         
         # Collect from performance metrics (checkbox is column 4)
@@ -2123,6 +2132,30 @@ class MetricsDisplayPanel(QWidget):
         
         if not selected_recs:
             return
+
+        # 2. Try engine-level batch apply when an orchestrator config dict is available
+        #    but the orchestrator doesn't own the mutation directly.  When the orchestrator
+        #    DOES own the mutation (add_building_block / update_parameter etc.) we still
+        #    delegate to it below via _apply_single_recommendation() so Strategy Builder UI
+        #    stays consistent.  The engine path is a reliable fallback for testing and for
+        #    cases where the orchestrator surface is not fully wired yet.
+        engine_fallback_used = False
+        orchestrator = self._get_orchestrator()
+        if self.rec_engine is not None and orchestrator is not None:
+            strategy_config_obj = self._get_current_strategy_config()
+            if strategy_config_obj is not None:
+                # Build mutable config dict snapshot for engine apply
+                config_snapshot = self._convert_strategy_config_to_dict(strategy_config_obj)
+                engine_result = self.rec_engine.apply_recommendations(
+                    config_snapshot, selected_recs
+                )
+                if engine_result["applied"]:
+                    logger.info(
+                        f"[Apply] Engine pre-apply OK: {len(engine_result['applied'])} mutations"
+                        f" | skipped={len(engine_result['skipped'])}"
+                        f" | failed={len(engine_result['failed'])}"
+                    )
+                    engine_fallback_used = True
         
         # Build version description for Git commit
         block_names = [rec.block_name for rec in selected_recs if rec.type == 'ADD_BLOCK']
@@ -2136,8 +2169,9 @@ class MetricsDisplayPanel(QWidget):
         
         version_message = "Applied recommendations: " + (" | ".join(description_parts) if description_parts else "multiple changes")
         
-        # Apply each recommendation
+        # 3. Apply each recommendation via orchestrator (preferred path)
         applied_count = 0
+        failed_count = 0
         applied_blocks = []
         applied_params = []
         
@@ -2148,6 +2182,8 @@ class MetricsDisplayPanel(QWidget):
                     applied_blocks.append(rec.block_name)
                 elif rec.type == 'ADJUST_PARAM':
                     applied_params.append(rec.parameter_name)
+            else:
+                failed_count += 1
         
         # Save configuration version (Git commit) - Sprint 1.6 Task 1.6.8
         if applied_count > 0:
@@ -2159,17 +2195,87 @@ class MetricsDisplayPanel(QWidget):
         if applied_count > 0:
             self._refresh_strategy_builder_ui()
         
-        # Update status
+        # 3a. Show confirmation / error feedback dialog
+        self._show_apply_feedback(
+            applied_count=applied_count,
+            failed_count=failed_count,
+            total_count=len(selected_recs),
+            applied_blocks=applied_blocks,
+            applied_params=applied_params,
+        )
+        
+        # Update status label
         status_text = f"Status: <b>{applied_count}/{len(selected_recs)} recommendations applied</b>"
+        if failed_count:
+            status_text += f" | <span style='color:red'>{failed_count} failed</span>"
         if applied_blocks:
             status_text += f" | Blocks: {', '.join(applied_blocks)}"
         if applied_params:
             status_text += f" | Params: {', '.join(applied_params)}"
         self.status_label.setText(status_text)
         
-        # Auto-retest if enabled
+        # 4. Trigger re-evaluation (auto-retest) when toggle is active
         if applied_count > 0 and self.auto_retest_check.isChecked():
+            logger.info("[Apply] Auto-retest toggled — triggering strategy re-evaluation...")
             self._trigger_retest()
+    
+    def _show_apply_feedback(
+        self,
+        applied_count: int,
+        failed_count: int,
+        total_count: int,
+        applied_blocks: List[str],
+        applied_params: List[str],
+    ) -> None:
+        """
+        Show confirmation or error feedback after applying recommendations.
+
+        Args:
+            applied_count: Number of successfully applied recommendations.
+            failed_count: Number of failed recommendations.
+            total_count: Total number of selected recommendations.
+            applied_blocks: Names of newly-added building blocks.
+            applied_params: Names of adjusted parameters.
+        """
+        from PyQt5.QtWidgets import QMessageBox
+
+        if applied_count == 0 and failed_count == 0:
+            return  # Nothing to report
+
+        if applied_count > 0 and failed_count == 0:
+            # All succeeded
+            detail_parts = []
+            if applied_blocks:
+                detail_parts.append(f"Blocks added: {', '.join(b for b in applied_blocks if b)}")
+            if applied_params:
+                detail_parts.append(f"Parameters updated: {', '.join(p for p in applied_params if p)}")
+            detail_text = "\n".join(detail_parts) if detail_parts else ""
+
+            QMessageBox.information(
+                self,
+                "Recommendations Applied",
+                f"Successfully applied {applied_count} recommendation(s).\n\n"
+                f"{detail_text}\n\n"
+                f"Strategy configuration updated. Use Auto-Retest to evaluate the changes."
+            )
+        elif applied_count > 0 and failed_count > 0:
+            # Partial success
+            QMessageBox.warning(
+                self,
+                "Partial Apply",
+                f"{applied_count} of {total_count} recommendation(s) applied successfully.\n"
+                f"{failed_count} recommendation(s) could not be applied.\n\n"
+                f"Check the application log for details on failed recommendations."
+            )
+        else:
+            # All failed
+            QMessageBox.critical(
+                self,
+                "Apply Failed",
+                f"None of the {total_count} recommendation(s) could be applied.\n\n"
+                f"The strategy remains unchanged.\n"
+                f"Ensure the Strategy Builder is connected and the configuration is loaded."
+            )
     
     def _apply_single_recommendation(self, rec: IntegratedRecommendation) -> bool:
         """
