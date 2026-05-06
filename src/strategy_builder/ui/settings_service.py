@@ -136,7 +136,28 @@ class SettingsService:
         """
         Verify PIN and elevate to ADMIN role if correct.
 
+        .. deprecated::
+            Prefer :meth:`elevate_to_admin` which is the canonical public
+            entry-point for PIN-based role elevation.  This method is kept
+            for backwards compatibility and delegates to ``elevate_to_admin``.
+
         Returns True if authentication succeeded, False otherwise.
+        Stores nothing to disk — session role only.
+        """
+        return self.elevate_to_admin(pin)
+
+    def elevate_to_admin(self, pin: str) -> bool:
+        """
+        Validate *pin* against the stored bcrypt hash and, on success,
+        elevate the session role to ADMIN.
+
+        This is the **single authorised entry-point** for granting admin
+        access via PIN.  No external caller should write ``_role`` directly.
+
+        Returns:
+            ``True``  — PIN matched; session role is now ADMIN.
+            ``False`` — PIN wrong or no PIN stored; role unchanged.
+
         Stores nothing to disk — session role only.
         """
         stored_hash = keyring.get_password(KEYRING_SERVICE, "admin_pin_hash")
@@ -150,6 +171,24 @@ class SettingsService:
             return ok
         except Exception:
             return False
+
+    def elevate_to_admin_first_run(self) -> None:
+        """
+        Temporarily grant ADMIN role for the first-run PIN-setup flow.
+
+        Only valid when **no** admin PIN has been stored yet.  Raises
+        ``PermissionError`` if a PIN already exists (use
+        :meth:`elevate_to_admin` in that case).
+
+        The caller is responsible for calling :meth:`drop_admin` if the
+        subsequent :meth:`set_admin_pin` call fails.
+        """
+        if self.has_admin_pin():
+            raise PermissionError(
+                "elevate_to_admin_first_run() is only valid before a PIN is set. "
+                "Use elevate_to_admin(pin) to authenticate with an existing PIN."
+            )
+        self._role = UserRole.ADMIN
 
     def drop_admin(self) -> None:
         """Revoke admin session — returns role to USER."""
