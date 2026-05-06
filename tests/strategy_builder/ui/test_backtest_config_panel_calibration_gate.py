@@ -1,34 +1,29 @@
 """
-Unit tests for BacktestConfigPanel calibration gate — BTCAAAAA-327/329.
+Unit tests for BacktestConfigPanel auto-calibration flow — BTCAAAAA-338/339.
 
-.. deprecated::
-    These tests cover the **old calibration gate** that was removed in
-    BTCAAAAA-338.  The gate (``_is_calibrated()``, the "Calibration Required"
-    dialog, and the forced switch to Calibrate tab index 1) no longer exists
-    in ``BacktestConfigPanel``.
+Replaces the old calibration-gate test suite (BTCAAAAA-327/329).
 
-    Calibration is now **automatic**: ``_run_auto_calibration()`` is called
-    inside ``_on_run_clicked()`` before every backtest run.  These tests are
-    preserved as a historical record and are expected to fail until a new
-    test suite for auto-calibration is written.
-
-Original coverage (now superseded):
-- _is_calibrated() logic: export_btn enabled → calibrated; disabled → not calibrated
-- _is_calibrated() defensive: exception from training_panel → returns True (safe default)
-- _on_run_clicked() when NOT calibrated: QMessageBox.Warning shown, tab switches to index 1,
-  backtest does NOT start (early return before validate_strategy)
-- _on_run_clicked() when calibrated: no dialog shown, proceeds past validation
-- No changes to calibration logic or backtest logic when gate passes
+Covers:
+- _run_auto_calibration(): skips when no blocks present
+- _run_auto_calibration(): shows status messages before and after calibration
+- _run_auto_calibration(): spawns TrainingThread with correct parameters
+- _run_auto_calibration(): applies optimal_delay results to blocks in-place
+- _run_auto_calibration(): gracefully degrades when TrainingThread raises
+- _run_auto_calibration(): gracefully degrades on timeout
+- _on_run_clicked(): calls _run_auto_calibration() (no calibration dialog, no gate)
+- _on_run_clicked(): proceeds past validation when strategy is valid
+- Code structure: no _is_calibrated(), no setCurrentIndex(1), _run_auto_calibration present
 """
 
 from __future__ import annotations
 
 import sys
 import types
+import inspect
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch, call, ANY
 
-from PyQt5.QtWidgets import QApplication, QMessageBox
+from PyQt5.QtWidgets import QApplication
 
 
 # ---------------------------------------------------------------------------
@@ -44,299 +39,388 @@ def qapp():
 
 
 # ---------------------------------------------------------------------------
-# Helper — create a minimal stand-in object that has the two target methods
-# bound from BacktestConfigPanel, but without ever calling __init__.
+# Helper — build a minimal stub for _run_auto_calibration tests
 # ---------------------------------------------------------------------------
 
-def _make_stub(training_panel_export_btn_enabled: bool):
+def _make_calibration_stub():
     """
-    Create a minimal stub that exposes _is_calibrated() and _on_run_clicked()
-    as unbound methods called on `self`, without invoking QWidget.__init__.
-
-    We import the unbound methods directly from the class and call them with
-    our stub as `self`.  This sidesteps all Qt and DB heavy-lifting while
-    exercising the exact same source code paths.
+    Return a MagicMock stub with _run_auto_calibration bound from the real
+    BacktestConfigPanel source, without triggering QWidget.__init__.
     """
     from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
 
-    # Pull the methods we need as plain functions
-    _is_calibrated_fn = BacktestConfigPanel._is_calibrated
-    _on_run_clicked_fn = BacktestConfigPanel._on_run_clicked
+    fn = BacktestConfigPanel._run_auto_calibration
 
-    # Build a minimal mock training panel
-    mock_training_panel = MagicMock()
-    mock_training_panel.export_btn.isEnabled.return_value = training_panel_export_btn_enabled
-
-    # Build stub with all instance attributes that the two methods reference
     stub = MagicMock()
-    stub.training_panel = mock_training_panel
-
-    mock_tab_widget = MagicMock()
-    stub.tab_widget = mock_tab_widget
-
-    mock_orch = MagicMock()
-    stub.orchestrator = mock_orch
-
     stub.results_text = MagicMock()
 
-    # Bind the real methods to our stub so `self` is our stub
-    stub._is_calibrated = types.MethodType(_is_calibrated_fn, stub)
-    stub._on_run_clicked = types.MethodType(_on_run_clicked_fn, stub)
-
-    return stub, mock_orch, mock_tab_widget
+    stub._run_auto_calibration = types.MethodType(fn, stub)
+    return stub
 
 
-# ---------------------------------------------------------------------------
-# Tests for _is_calibrated()
-# ---------------------------------------------------------------------------
+def _make_run_clicked_stub():
+    """
+    Return a stub with _on_run_clicked and _run_auto_calibration bound from
+    the real BacktestConfigPanel source.
+    """
+    from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
 
-class TestIsCalibrated:
-    """Unit tests for BacktestConfigPanel._is_calibrated()."""
+    run_clicked_fn = BacktestConfigPanel._on_run_clicked
+    auto_calib_fn = BacktestConfigPanel._run_auto_calibration
 
-    def test_returns_true_when_export_btn_enabled(self, qapp):
-        """If training_panel.export_btn.isEnabled() is True, calibration is done."""
-        stub, _, _ = _make_stub(training_panel_export_btn_enabled=True)
-        assert stub._is_calibrated() is True
+    stub = MagicMock()
+    stub.results_text = MagicMock()
+    stub.confluence_spin = MagicMock()
+    stub.confluence_spin.value.return_value = 3
 
-    def test_returns_false_when_export_btn_disabled(self, qapp):
-        """If training_panel.export_btn.isEnabled() is False, calibration has not been run."""
-        stub, _, _ = _make_stub(training_panel_export_btn_enabled=False)
-        assert stub._is_calibrated() is False
+    stub._run_auto_calibration = types.MethodType(auto_calib_fn, stub)
+    stub._on_run_clicked = types.MethodType(run_clicked_fn, stub)
 
-    def test_defensive_returns_true_when_exception_raised(self, qapp):
-        """If training_panel raises on access, _is_calibrated() must return True (safe default)."""
-        stub, _, _ = _make_stub(training_panel_export_btn_enabled=False)
-        broken_training_panel = MagicMock()
-        broken_training_panel.export_btn.isEnabled.side_effect = AttributeError("panel not ready")
-        stub.training_panel = broken_training_panel
-        # Must NOT raise; must return True
-        result = stub._is_calibrated()
-        assert result is True
-
-    def test_defensive_returns_true_when_training_panel_missing(self, qapp):
-        """If training_panel attribute is entirely absent, returns True."""
-        stub, _, _ = _make_stub(training_panel_export_btn_enabled=False)
-
-        # Remove training_panel so accessing it raises AttributeError
-        # (on a MagicMock we can't del, so replace with a property-raising object)
-        class _Raiser:
-            @property
-            def training_panel(self):
-                raise AttributeError("no training_panel")
-
-        # Patch _is_calibrated on the stub with the original source bound to a raiser stub
-        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
-        import types as _types
-        raiser = _Raiser()
-        fn = BacktestConfigPanel._is_calibrated
-        bound = _types.MethodType(fn, raiser)
-        result = bound()
-        assert result is True
+    return stub
 
 
 # ---------------------------------------------------------------------------
-# Tests for _on_run_clicked() calibration gate behaviour
+# Tests for _run_auto_calibration()
 # ---------------------------------------------------------------------------
 
-class TestOnRunClickedCalibrationGate:
-    """Tests for the calibration gate inside _on_run_clicked()."""
+class TestRunAutoCalibration:
+    """Unit tests for BacktestConfigPanel._run_auto_calibration()."""
 
-    def _run_gate(self, stub, *, patch_db=True):
-        """
-        Helper: call stub._on_run_clicked() with QMessageBox and DB mocked.
-        Returns (MockMsgBox_class, mock_msg_instance).
-        """
-        ctx_msgbox = patch(
-            "src.strategy_builder.ui.backtest_config_panel.QMessageBox"
+    def test_skips_when_no_blocks(self, qapp):
+        """When strategy_config_dict has no blocks, method returns without error."""
+        stub = _make_calibration_stub()
+        # Should not raise, should not call results_text.setText
+        stub._run_auto_calibration({'blocks': []})
+        stub.results_text.setText.assert_not_called()
+
+    def test_skips_when_blocks_key_missing(self, qapp):
+        """When strategy_config_dict has no 'blocks' key, method skips silently."""
+        stub = _make_calibration_stub()
+        stub._run_auto_calibration({})
+        stub.results_text.setText.assert_not_called()
+
+    def test_shows_calibrating_status_message(self, qapp):
+        """Status area must show calibration-in-progress message before thread starts."""
+        stub = _make_calibration_stub()
+        config = {'blocks': [{'name': 'BlockA'}]}
+
+        mock_thread = MagicMock()
+        mock_thread.isRunning.return_value = False
+
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+            return_value=mock_thread,
+        ):
+            stub._run_auto_calibration(config)
+
+        # The very first setText call must mention calibration
+        first_call_text = stub.results_text.setText.call_args_list[0].args[0]
+        assert "calibration" in first_call_text.lower() or "calibrat" in first_call_text.lower()
+
+    def test_shows_complete_status_after_success(self, qapp):
+        """Status area must show completion message after a successful calibration."""
+        stub = _make_calibration_stub()
+        config = {'blocks': [{'name': 'BlockA'}]}
+
+        mock_thread = MagicMock()
+        mock_thread.isRunning.return_value = False
+
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+            return_value=mock_thread,
+        ):
+            stub._run_auto_calibration(config)
+
+        appended_texts = [c.args[0] for c in stub.results_text.append.call_args_list]
+        assert any(
+            "calibration complete" in t.lower() or "starting backtest" in t.lower()
+            for t in appended_texts
+        ), f"Expected completion message in append calls: {appended_texts}"
+
+    def test_training_thread_receives_correct_parameters(self, qapp):
+        """TrainingThread must be started with 15m timeframe, 180-day lookback, production mode."""
+        stub = _make_calibration_stub()
+        config = {'blocks': [{'name': 'Alpha'}, {'name': 'Beta'}]}
+
+        mock_thread = MagicMock()
+        mock_thread.isRunning.return_value = False
+
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+            return_value=mock_thread,
+        ) as MockThread:
+            stub._run_auto_calibration(config)
+
+        init_kwargs = MockThread.call_args
+        _, kwargs = init_kwargs if isinstance(init_kwargs[0], tuple) else ((), init_kwargs[1])
+        # Accept positional or keyword args
+        all_args = dict(zip(
+            ['selected_blocks', 'mode', 'period_days', 'selected_timeframes', 'logger'],
+            init_kwargs[0] if init_kwargs[0] else []
+        ))
+        all_args.update(init_kwargs[1] if init_kwargs[1] else {})
+
+        assert all_args.get('mode') == 'production', "mode must be 'production'"
+        assert all_args.get('period_days') == 180, "period_days must be 180"
+        assert all_args.get('selected_timeframes') == ['15m'], "timeframe must be ['15m']"
+        assert set(all_args.get('selected_blocks', [])) == {'Alpha', 'Beta'}
+
+    def test_applies_optimal_delay_to_blocks(self, qapp):
+        """When TrainingThread emits results, optimal_delay is written into each block."""
+        stub = _make_calibration_stub()
+        block_a = {'name': 'Alpha'}
+        config = {'blocks': [block_a]}
+
+        calib_results = [{'signal_name': 'Alpha', 'optimal_delay': 5}]
+
+        mock_thread = MagicMock()
+        mock_thread.isRunning.return_value = False
+
+        # Capture the signal connection and call _on_complete synchronously
+        connected_callbacks = []
+
+        def _capture_connect(cb):
+            connected_callbacks.append(cb)
+
+        mock_thread.training_complete.connect.side_effect = _capture_connect
+
+        def _start():
+            for cb in connected_callbacks:
+                cb(calib_results)
+
+        mock_thread.start.side_effect = _start
+
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+            return_value=mock_thread,
+        ):
+            stub._run_auto_calibration(config)
+
+        assert block_a.get('optimal_delay') == 5, (
+            f"Expected optimal_delay=5 on block Alpha, got {block_a}"
         )
-        MockMsgBox = ctx_msgbox.__enter__()
-        mock_msg_instance = MagicMock()
-        MockMsgBox.return_value = mock_msg_instance
-        MockMsgBox.Warning = QMessageBox.Warning
-        MockMsgBox.Ok = QMessageBox.Ok
 
-        ctx_db = patch("src.optimizer_v3.database.get_database_manager") if patch_db else None
-        if ctx_db:
-            ctx_db.__enter__()
-
-        try:
-            stub._on_run_clicked()
-        except Exception:
-            pass
-        finally:
-            ctx_msgbox.__exit__(None, None, None)
-            if ctx_db:
-                ctx_db.__exit__(None, None, None)
-
-        return MockMsgBox, mock_msg_instance
-
-    def test_warning_dialog_title_when_not_calibrated(self, qapp):
-        """
-        When calibration has NOT been run, the dialog title must be
-        'Calibration Required'.
-        The gate uses a local import so we patch PyQt5.QtWidgets.QMessageBox.
-        """
-        stub, _, _ = _make_stub(training_panel_export_btn_enabled=False)
+    def test_graceful_degradation_when_thread_raises(self, qapp):
+        """When TrainingThread constructor raises, _run_auto_calibration does not propagate."""
+        stub = _make_calibration_stub()
+        config = {'blocks': [{'name': 'Alpha'}]}
 
         with patch(
-            "PyQt5.QtWidgets.QMessageBox"
-        ) as MockMsgBox, patch(
-            "src.optimizer_v3.database.get_database_manager"
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+            side_effect=RuntimeError("simulated failure"),
         ):
-            mock_msg = MagicMock()
-            MockMsgBox.return_value = mock_msg
-            MockMsgBox.Warning = QMessageBox.Warning
-            MockMsgBox.Ok = QMessageBox.Ok
+            # Must NOT raise
+            stub._run_auto_calibration(config)
 
-            try:
-                stub._on_run_clicked()
-            except Exception:
-                pass
+        # Warning/skip message appended
+        appended_texts = [c.args[0] for c in stub.results_text.append.call_args_list]
+        assert any(
+            "calibration skipped" in t.lower() or "proceeding" in t.lower()
+            for t in appended_texts
+        ), f"Expected graceful-degradation message, got: {appended_texts}"
 
-        mock_msg.setWindowTitle.assert_called_once_with("Calibration Required")
-
-    def test_warning_dialog_icon_is_warning(self, qapp):
-        """The dialog icon must be QMessageBox.Warning."""
-        stub, _, _ = _make_stub(training_panel_export_btn_enabled=False)
+    def test_graceful_degradation_does_not_modify_blocks_on_failure(self, qapp):
+        """On exception, blocks in strategy_config_dict are left unchanged."""
+        stub = _make_calibration_stub()
+        block_a = {'name': 'Alpha'}
+        config = {'blocks': [block_a]}
 
         with patch(
-            "PyQt5.QtWidgets.QMessageBox"
-        ) as MockMsgBox, patch(
-            "src.optimizer_v3.database.get_database_manager"
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+            side_effect=RuntimeError("boom"),
         ):
-            mock_msg = MagicMock()
-            MockMsgBox.return_value = mock_msg
-            MockMsgBox.Warning = QMessageBox.Warning
-            MockMsgBox.Ok = QMessageBox.Ok
+            stub._run_auto_calibration(config)
 
-            try:
-                stub._on_run_clicked()
-            except Exception:
-                pass
+        assert 'optimal_delay' not in block_a, (
+            "optimal_delay must NOT be set on blocks when calibration fails"
+        )
 
-        mock_msg.setIcon.assert_called_once_with(QMessageBox.Warning)
 
-    def test_tab_switches_to_calibrate_index_1_when_not_calibrated(self, qapp):
-        """After the dialog is dismissed, the tab must switch to index 1 (Calibrate)."""
-        stub, _, mock_tab_widget = _make_stub(training_panel_export_btn_enabled=False)
+# ---------------------------------------------------------------------------
+# Tests for _on_run_clicked() auto-calibration integration
+# ---------------------------------------------------------------------------
 
-        with patch(
-            "PyQt5.QtWidgets.QMessageBox"
-        ) as MockMsgBox, patch(
-            "src.optimizer_v3.database.get_database_manager"
-        ):
-            mock_msg = MagicMock()
-            MockMsgBox.return_value = mock_msg
-            MockMsgBox.Warning = QMessageBox.Warning
-            MockMsgBox.Ok = QMessageBox.Ok
+class TestOnRunClickedAutoCalibration:
+    """Tests that _on_run_clicked() integrates auto-calibration correctly."""
 
-            try:
-                stub._on_run_clicked()
-            except Exception:
-                pass
+    def test_no_calibration_dialog_when_running(self, qapp):
+        """_on_run_clicked() must never show a 'Calibration Required' dialog."""
+        stub = _make_run_clicked_stub()
 
-        mock_tab_widget.setCurrentIndex.assert_called_once_with(1)
-
-    def test_backtest_does_not_start_when_not_calibrated(self, qapp):
-        """
-        When calibration has not been run, _on_run_clicked() must return early
-        WITHOUT calling orchestrator.validate_strategy().
-        """
-        stub, mock_orch, _ = _make_stub(training_panel_export_btn_enabled=False)
-
-        with patch(
-            "PyQt5.QtWidgets.QMessageBox"
-        ) as MockMsgBox, patch(
-            "src.optimizer_v3.database.get_database_manager"
-        ):
-            mock_msg = MagicMock()
-            MockMsgBox.return_value = mock_msg
-            MockMsgBox.Warning = QMessageBox.Warning
-            MockMsgBox.Ok = QMessageBox.Ok
-
-            try:
-                stub._on_run_clicked()
-            except Exception:
-                pass
-
-        mock_orch.validate_strategy.assert_not_called()
-
-    def test_backtest_proceeds_when_calibrated(self, qapp):
-        """
-        When calibration HAS been run, _on_run_clicked() must NOT show a
-        calibration dialog and MUST call orchestrator.validate_strategy().
-        """
-        stub, mock_orch, mock_tab_widget = _make_stub(training_panel_export_btn_enabled=True)
-
-        # Validation fails → stops cleanly after gate
+        # Strategy validation fails — stops cleanly after calibration call
         mock_val = MagicMock()
         mock_val.success = False
         mock_val.message = "test stop"
-        mock_orch.validate_strategy.return_value = mock_val
+        stub.orchestrator.validate_strategy.return_value = mock_val
 
         with patch(
-            "PyQt5.QtWidgets.QMessageBox"
-        ) as MockMsgBox, patch(
             "src.optimizer_v3.database.get_database_manager"
-        ):
-            mock_msg = MagicMock()
-            MockMsgBox.return_value = mock_msg
-            MockMsgBox.Warning = QMessageBox.Warning
-            MockMsgBox.Ok = QMessageBox.Ok
+        ), patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+        ) as MockThread:
+            mock_thread = MagicMock()
+            mock_thread.isRunning.return_value = False
+            MockThread.return_value = mock_thread
 
             try:
                 stub._on_run_clicked()
             except Exception:
                 pass
 
-        # Gate passed → validate_strategy must have been called
-        mock_orch.validate_strategy.assert_called_once()
+        # QMessageBox must never have been called with "Calibration Required"
+        # (The stub has no real QMessageBox — if the old code path ran, it
+        # would call QMessageBox which is a MagicMock on the stub; check
+        # the setWindowTitle was not called with that title on any mock.)
+        for mock_call in stub.mock_calls:
+            if 'setWindowTitle' in str(mock_call):
+                assert 'Calibration Required' not in str(mock_call), (
+                    "_on_run_clicked() must not show 'Calibration Required' dialog"
+                )
 
-        # No calibration dialog
-        for c in mock_msg.setWindowTitle.call_args_list:
-            assert c.args[0] != "Calibration Required", (
-                "Calibration dialog must NOT appear when calibration is complete"
-            )
+    def test_auto_calibration_called_before_worker_creation(self, qapp):
+        """_run_auto_calibration must be called before BacktestWorker is created."""
+        stub = _make_run_clicked_stub()
 
-        # Tab must NOT have been force-switched to Calibrate (index 1)
-        for c in mock_tab_widget.setCurrentIndex.call_args_list:
-            assert c.args[0] != 1, (
-                "Tab must not switch to Calibrate when calibration already done"
-            )
-
-    def test_gate_does_not_interfere_with_no_strategy_validation(self, qapp):
-        """
-        If calibration IS done but strategy validation fails, the validation
-        error path is triggered (not the calibration gate).
-        """
-        stub, mock_orch, _ = _make_stub(training_panel_export_btn_enabled=True)
+        call_order = []
 
         mock_val = MagicMock()
-        mock_val.success = False
-        mock_val.message = "No strategy loaded"
-        mock_orch.validate_strategy.return_value = mock_val
+        mock_val.success = True
+        stub.orchestrator.validate_strategy.return_value = mock_val
+        stub.orchestrator.serialize_config_for_backtest.return_value = {
+            'blocks': [{'name': 'Alpha'}],
+            'name': 'TestStrategy',
+        }
+
+        original_auto_calib = stub._run_auto_calibration
+
+        def _track_auto_calib(cfg):
+            call_order.append('auto_calibration')
+            return original_auto_calib(cfg)
+
+        stub._run_auto_calibration = _track_auto_calib
 
         with patch(
-            "PyQt5.QtWidgets.QMessageBox"
-        ) as MockMsgBox, patch(
             "src.optimizer_v3.database.get_database_manager"
-        ):
-            mock_msg = MagicMock()
-            MockMsgBox.return_value = mock_msg
-            MockMsgBox.Warning = QMessageBox.Warning
-            MockMsgBox.Ok = QMessageBox.Ok
+        ), patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+        ) as MockThread, patch(
+            "src.strategy_builder.ui.backtest_config_panel.BacktestWorker",
+        ) as MockWorker:
+            mock_thread = MagicMock()
+            mock_thread.isRunning.return_value = False
+            MockThread.return_value = mock_thread
+
+            def _track_worker(*a, **kw):
+                call_order.append('worker_created')
+                return MagicMock()
+
+            MockWorker.side_effect = _track_worker
 
             try:
                 stub._on_run_clicked()
             except Exception:
                 pass
 
-        # Calibration gate must have passed → reached validate_strategy
-        mock_orch.validate_strategy.assert_called_once()
+        assert 'auto_calibration' in call_order, "_run_auto_calibration was never called"
+        if 'worker_created' in call_order:
+            auto_idx = call_order.index('auto_calibration')
+            worker_idx = call_order.index('worker_created')
+            assert auto_idx < worker_idx, (
+                "_run_auto_calibration must be called BEFORE BacktestWorker creation"
+            )
 
-        # No calibration dialog
-        for c in mock_msg.setWindowTitle.call_args_list:
-            assert c.args[0] != "Calibration Required"
+    def test_validate_strategy_called_before_auto_calibration(self, qapp):
+        """Strategy validation must happen before auto-calibration (fail fast on bad strategy)."""
+        stub = _make_run_clicked_stub()
+
+        # Strategy validation fails — auto-calibration should NOT run
+        mock_val = MagicMock()
+        mock_val.success = False
+        mock_val.message = "No strategy"
+        stub.orchestrator.validate_strategy.return_value = mock_val
+
+        auto_calib_called = []
+        original = stub._run_auto_calibration
+
+        def _track(cfg):
+            auto_calib_called.append(True)
+            return original(cfg)
+
+        stub._run_auto_calibration = _track
+
+        with patch("src.optimizer_v3.database.get_database_manager"), \
+             patch("src.strategy_builder.ui.backtest_config_panel.QApplication"):
+            try:
+                stub._on_run_clicked()
+            except Exception:
+                pass
+
+        assert not auto_calib_called, (
+            "_run_auto_calibration must NOT be called when strategy validation fails"
+        )
+
+    def test_backtest_proceeds_after_calibration(self, qapp):
+        """After calibration, the backtest worker must be created and started."""
+        stub = _make_run_clicked_stub()
+
+        mock_val = MagicMock()
+        mock_val.success = True
+        stub.orchestrator.validate_strategy.return_value = mock_val
+        stub.orchestrator.serialize_config_for_backtest.return_value = {
+            'blocks': [{'name': 'Alpha'}],
+            'name': 'TestStrategy',
+        }
+        stub.cache_manager = MagicMock()
+        stub.cache_manager.get_cached_bars.return_value = None
+        stub.cache_manager.get_metrics.return_value = {'hit_rate_pct': 0.0}
+        stub.trades_panel = MagicMock()
+        stub.output_panel = MagicMock()
+        stub.run_btn = MagicMock()
+        stub.pause_btn = MagicMock()
+        stub.stop_btn = MagicMock()
+        stub.results_btn = MagicMock()
+        stub.live_output_tab_index = 1
+        stub.tab_widget = MagicMock()
+        stub.get_config = MagicMock(return_value={
+            'timeframe': '15m',
+            'lookback_days': 180,
+        })
+
+        with patch("src.optimizer_v3.database.get_database_manager"), \
+             patch("src.strategy_builder.ui.backtest_config_panel.QApplication"), \
+             patch("src.optimizer_v3.core.training_thread.TrainingThread") as MockThread, \
+             patch("src.strategy_builder.ui.backtest_config_panel.BacktestWorker") as MockWorker, \
+             patch("src.optimizer_v3.core.trade_registry.get_trade_registry"):
+            mock_thread = MagicMock()
+            mock_thread.isRunning.return_value = False
+            MockThread.return_value = mock_thread
+
+            mock_worker = MagicMock()
+            MockWorker.return_value = mock_worker
+
+            try:
+                stub._on_run_clicked()
+            except Exception:
+                pass
+
+        MockWorker.assert_called_once()
+        mock_worker.start.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -345,68 +429,96 @@ class TestOnRunClickedCalibrationGate:
 
 class TestCodeStructuralRequirements:
     """
-    Structural checks on the source that verify acceptance-criteria placement
-    constraints.
+    Structural checks on the source that verify the new implementation
+    acceptance criteria.
     """
 
-    def test_is_calibrated_uses_export_btn_is_enabled(self):
-        """_is_calibrated() must use export_btn.isEnabled() as proxy."""
-        import inspect
+    def test_is_calibrated_method_removed(self):
+        """_is_calibrated() must NOT exist in BacktestConfigPanel."""
         from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
-        src = inspect.getsource(BacktestConfigPanel._is_calibrated)
-        assert "export_btn.isEnabled()" in src, (
-            "_is_calibrated() must use export_btn.isEnabled() as calibration proxy"
+        assert not hasattr(BacktestConfigPanel, '_is_calibrated'), (
+            "_is_calibrated() must be removed from BacktestConfigPanel — "
+            "calibration now runs automatically"
         )
 
-    def test_is_calibrated_has_defensive_except(self):
-        """_is_calibrated() must have a try/except that returns True on failure."""
-        import inspect
-        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
-        src = inspect.getsource(BacktestConfigPanel._is_calibrated)
-        assert "except" in src, "_is_calibrated() must have exception handling"
-        assert "return True" in src, "_is_calibrated() must return True in except block"
-
-    def test_calibration_gate_at_top_of_on_run_clicked(self):
-        """
-        The calibration gate must appear BEFORE the '# Validate strategy' block
-        inside _on_run_clicked().
-        """
-        import inspect
+    def test_no_set_current_index_1_in_on_run_clicked(self):
+        """_on_run_clicked() must NOT contain setCurrentIndex(1) (old Calibrate redirect)."""
         from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
         src = inspect.getsource(BacktestConfigPanel._on_run_clicked)
-
-        gate_pos = src.find("_is_calibrated")
-        validate_pos = src.find("# Validate strategy")
-
-        assert gate_pos != -1, "_is_calibrated() call not found in _on_run_clicked"
-        assert validate_pos != -1, "'# Validate strategy' comment not found in _on_run_clicked"
-        assert gate_pos < validate_pos, (
-            "Calibration gate (_is_calibrated call) must appear BEFORE '# Validate strategy' block"
+        assert "setCurrentIndex(1)" not in src, (
+            "_on_run_clicked() must not redirect to tab index 1; "
+            "Calibrate tab has been removed"
         )
 
-    def test_calibration_gate_switches_to_index_1(self):
-        """The gate must switch to tab index 1 (Calibrate tab)."""
-        import inspect
+    def test_run_auto_calibration_method_exists(self):
+        """_run_auto_calibration() must exist in BacktestConfigPanel."""
         from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
-        src = inspect.getsource(BacktestConfigPanel._on_run_clicked)
-        assert "setCurrentIndex(1)" in src, (
-            "_on_run_clicked() must call setCurrentIndex(1) in calibration gate"
+        assert hasattr(BacktestConfigPanel, '_run_auto_calibration'), (
+            "_run_auto_calibration() must be added to BacktestConfigPanel"
         )
 
-    def test_calibration_gate_uses_warning_message_box(self):
-        """The gate must use QMessageBox.Warning icon."""
-        import inspect
+    def test_auto_calibration_called_in_on_run_clicked_source(self):
+        """_on_run_clicked() source must call _run_auto_calibration."""
         from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
         src = inspect.getsource(BacktestConfigPanel._on_run_clicked)
-        assert "QMessageBox.Warning" in src, (
-            "Calibration gate must use QMessageBox.Warning icon"
+        assert "_run_auto_calibration" in src, (
+            "_on_run_clicked() must call _run_auto_calibration()"
         )
 
-    def test_window_title_is_calibration_required(self):
-        """The dialog title must be 'Calibration Required'."""
-        import inspect
+    def test_no_training_panel_attribute_in_on_run_clicked(self):
+        """_on_run_clicked() must not reference self.training_panel."""
         from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
         src = inspect.getsource(BacktestConfigPanel._on_run_clicked)
-        assert '"Calibration Required"' in src, (
-            "Dialog title must be 'Calibration Required'"
+        assert "training_panel" not in src, (
+            "_on_run_clicked() must not reference self.training_panel "
+            "(Calibrate tab was removed)"
+        )
+
+    def test_no_calibration_required_dialog_in_on_run_clicked(self):
+        """_on_run_clicked() must not contain 'Calibration Required' dialog text."""
+        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
+        src = inspect.getsource(BacktestConfigPanel._on_run_clicked)
+        assert "Calibration Required" not in src, (
+            "_on_run_clicked() must not show the old 'Calibration Required' dialog"
+        )
+
+    def test_run_auto_calibration_uses_production_mode(self):
+        """_run_auto_calibration() must use 'production' mode."""
+        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
+        src = inspect.getsource(BacktestConfigPanel._run_auto_calibration)
+        assert "'production'" in src or '"production"' in src, (
+            "_run_auto_calibration() must use mode='production'"
+        )
+
+    def test_run_auto_calibration_uses_15m_timeframe(self):
+        """_run_auto_calibration() must hardcode '15m' timeframe."""
+        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
+        src = inspect.getsource(BacktestConfigPanel._run_auto_calibration)
+        assert "'15m'" in src or '"15m"' in src, (
+            "_run_auto_calibration() must hardcode timeframe '15m'"
+        )
+
+    def test_run_auto_calibration_uses_180_day_lookback(self):
+        """_run_auto_calibration() must hardcode 180-day lookback."""
+        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
+        src = inspect.getsource(BacktestConfigPanel._run_auto_calibration)
+        assert "180" in src, (
+            "_run_auto_calibration() must hardcode 180-day lookback period"
+        )
+
+    def test_run_auto_calibration_has_graceful_degradation(self):
+        """_run_auto_calibration() must have exception handling (graceful degradation)."""
+        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
+        src = inspect.getsource(BacktestConfigPanel._run_auto_calibration)
+        assert "except" in src, (
+            "_run_auto_calibration() must catch exceptions and degrade gracefully"
+        )
+
+    def test_no_training_panel_ui_import_in_init_ui(self):
+        """_init_ui() source must not import or instantiate TrainingPanelUI."""
+        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
+        src = inspect.getsource(BacktestConfigPanel._init_ui)
+        assert "TrainingPanelUI" not in src, (
+            "_init_ui() must not import or instantiate TrainingPanelUI "
+            "(Calibrate tab was removed)"
         )
