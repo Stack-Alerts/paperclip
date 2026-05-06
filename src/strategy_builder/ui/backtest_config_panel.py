@@ -2290,6 +2290,13 @@ class BacktestConfigPanel(QWidget):
             logger.info("Auto-calibration: no blocks found, skipping.")
             return
 
+        # Show indeterminate progress animation while calibration runs
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setFormat("Calibrating blocks...")
+        self.progress_bar.setValue(0)
+        self.run_btn.setEnabled(False)
+        QApplication.processEvents()
+
         self.results_text.setText(
             "⚙️ Running signal calibration on all blocks (15m)...\n"
             "This may take a moment."
@@ -2337,6 +2344,13 @@ class BacktestConfigPanel(QWidget):
                 self.results_text.append(
                     "⚠️ Calibration timed out. Proceeding without calibration."
                 )
+                # Reset progress bar before returning; run_btn stays disabled
+                # (the subsequent backtest launch in _on_run_clicked will keep it
+                # disabled, so we must NOT re-enable here — the existing
+                # completion handler at line ~2576 handles re-enable on finish).
+                self.progress_bar.setRange(0, 100)
+                self.progress_bar.setValue(0)
+                self.progress_bar.setFormat("%p%")
                 return
 
             # Guard: skip applying results when TrainingThread is in simulation
@@ -2367,6 +2381,10 @@ class BacktestConfigPanel(QWidget):
                         )
 
             self.results_text.append("✓ Calibration complete. Starting backtest...")
+            # Reset progress bar; run_btn remains disabled until backtest finishes
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setFormat("%p%")
             QApplication.processEvents()
 
         except Exception as e:
@@ -2374,6 +2392,11 @@ class BacktestConfigPanel(QWidget):
             self.results_text.append(
                 f"⚠️ Calibration skipped ({e}). Proceeding with uncalibrated parameters."
             )
+            # Reset progress bar on exception; run_btn re-enable handled by
+            # backtest completion logic so we leave it disabled here.
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setFormat("%p%")
             QApplication.processEvents()
 
 
