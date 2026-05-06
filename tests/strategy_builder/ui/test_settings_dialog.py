@@ -219,10 +219,18 @@ class TestSettingsDialogAdminPopulate:
                 call.args[0]
                 for call in service_mock.get_with_default.call_args_list
             }
+            # BTCAAAAA-235: LAKEAPI_REGION, LAKEAPI_LIMIT_GB, LOG_LEVEL and
+            # ENABLE_ALERTS were moved from admin-only to user-editable keys —
+            # they are NOT expected in _populate_admin_fields() any more.
+            # New admin groups (DB pool, Risk, Strategy, etc.) must be populated.
             expected_admin_plain_keys = {
                 "POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_DB",
-                "POSTGRES_USER", "LAKEAPI_REGION", "LAKEAPI_LIMIT_GB",
-                "LOG_LEVEL",
+                "POSTGRES_USER",
+                # DB connection pool (new in BTCAAAAA-235)
+                "POSTGRES_POOL_SIZE", "POSTGRES_MAX_OVERFLOW",
+                "POSTGRES_POOL_TIMEOUT", "POSTGRES_POOL_RECYCLE",
+                # Risk management (new in BTCAAAAA-235)
+                "RISK_PERCENT", "RISK_MAX_LEVERAGE", "RISK_MAX_DRAWDOWN",
             }
             assert expected_admin_plain_keys.issubset(called_keys), (
                 f"Expected admin fields to be populated. Missing: "
