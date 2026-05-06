@@ -1088,12 +1088,49 @@ class StrategyBrowserDialog(QMainWindow):
                     )
                     self.detail_labels['performance'].setText(perf_text)
                     
-                    # Quality badge based on Sharpe
-                    if sharpe > 1.5:
+                    # Quality badge — multi-metric composite score
+                    # The raw Sharpe stored in the DB is avg_pnl/std_dev (not annualised),
+                    # so values are typically 0.05–0.5.  We therefore build a composite
+                    # score from three independent signals that each operate in their own
+                    # natural range, then map the total to a quality label.
+                    #
+                    # Scoring rubric (4 pts max):
+                    #   Win rate  >= 60%   → 2 pts  |  >= 45% → 1 pt
+                    #   Profit factor >= 1.5 → 2 pts  |  >= 1.0 → 1 pt
+                    #   Raw Sharpe >= 0.15 → 2 pts  |  >= 0.05 → 1 pt  (DB formula: avg_pnl/std_dev)
+                    #   Total trades >= 20  → 1 pt  (sufficient sample)
+                    #
+                    # Total  7 pts max → Excellent ≥6 | Good ≥4 | Fair ≥2 | Poor <2
+                    _wr   = float(win_rate)    if win_rate    is not None else 0.0
+                    _pf   = float(profit_factor) if profit_factor is not None else 0.0
+                    _sh   = float(sharpe)      if sharpe      is not None else 0.0
+                    _tt   = int(total_trades)  if total_trades is not None else 0
+
+                    _score = 0
+                    # Win rate
+                    if _wr >= 60:
+                        _score += 2
+                    elif _wr >= 45:
+                        _score += 1
+                    # Profit factor
+                    if _pf >= 1.5:
+                        _score += 2
+                    elif _pf >= 1.0:
+                        _score += 1
+                    # Raw Sharpe (DB stores avg_pnl/std_dev, not annualised)
+                    if _sh >= 0.15:
+                        _score += 2
+                    elif _sh >= 0.05:
+                        _score += 1
+                    # Sample size bonus
+                    if _tt >= 20:
+                        _score += 1
+
+                    if _score >= 6:
                         quality = "🟢 Excellent"
-                    elif sharpe > 1.0:
+                    elif _score >= 4:
                         quality = "🟡 Good"
-                    elif sharpe > 0.5:
+                    elif _score >= 2:
                         quality = "🟠 Fair"
                     else:
                         quality = "🔴 Poor"
