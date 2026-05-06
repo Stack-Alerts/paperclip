@@ -171,8 +171,8 @@ class TestRunAutoCalibration:
         assert all_args.get('selected_timeframes') == ['15m'], "timeframe must be ['15m']"
         assert set(all_args.get('selected_blocks', [])) == {'Alpha', 'Beta'}
 
-    def test_applies_optimal_delay_to_blocks(self, qapp):
-        """When TrainingThread emits results, optimal_delay is written into each block."""
+    def test_applies_optimal_delay_to_blocks_when_not_simulation(self, qapp):
+        """When TrainingThread.is_simulation_mode=False, optimal_delay IS written into blocks."""
         stub = _make_calibration_stub()
         block_a = {'name': 'Alpha'}
         config = {'blocks': [block_a]}
@@ -181,6 +181,7 @@ class TestRunAutoCalibration:
 
         mock_thread = MagicMock()
         mock_thread.isRunning.return_value = False
+        mock_thread.is_simulation_mode = False  # Real calibration path active
 
         # Capture the signal connection and call _on_complete synchronously
         connected_callbacks = []
@@ -205,8 +206,55 @@ class TestRunAutoCalibration:
             stub._run_auto_calibration(config)
 
         assert block_a.get('optimal_delay') == 5, (
-            f"Expected optimal_delay=5 on block Alpha, got {block_a}"
+            f"Expected optimal_delay=5 on block Alpha when not in simulation mode, got {block_a}"
         )
+
+    def test_does_not_apply_optimal_delay_when_simulation_mode(self, qapp):
+        """When TrainingThread.is_simulation_mode=True, optimal_delay is NOT written to blocks.
+
+        This guards against random/dummy calibration data silently overwriting
+        manually-tuned block delays (BTCAAAAA-348).
+        """
+        stub = _make_calibration_stub()
+        block_a = {'name': 'Alpha', 'optimal_delay': 42}  # manually-set value
+        config = {'blocks': [block_a]}
+
+        calib_results = [{'signal_name': 'Alpha', 'optimal_delay': 7}]  # random/fake result
+
+        mock_thread = MagicMock()
+        mock_thread.isRunning.return_value = False
+        mock_thread.is_simulation_mode = True  # Simulation mode — do NOT apply
+
+        connected_callbacks = []
+
+        def _capture_connect(cb):
+            connected_callbacks.append(cb)
+
+        mock_thread.training_complete.connect.side_effect = _capture_connect
+
+        def _start():
+            for cb in connected_callbacks:
+                cb(calib_results)
+
+        mock_thread.start.side_effect = _start
+
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+            return_value=mock_thread,
+        ):
+            stub._run_auto_calibration(config)
+
+        assert block_a.get('optimal_delay') == 42, (
+            f"Manually-set optimal_delay must NOT be overwritten in simulation mode, got {block_a}"
+        )
+
+        # Status message must inform user that simulation mode was active
+        appended_texts = [c.args[0] for c in stub.results_text.append.call_args_list]
+        assert any(
+            "simulation mode" in t.lower() for t in appended_texts
+        ), f"Expected 'simulation mode' message, got: {appended_texts}"
 
     def test_graceful_degradation_when_thread_raises(self, qapp):
         """When TrainingThread constructor raises, _run_auto_calibration does not propagate."""

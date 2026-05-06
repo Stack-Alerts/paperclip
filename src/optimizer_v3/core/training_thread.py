@@ -109,7 +109,21 @@ class TrainingThread(QThread):
                 f"{len(selected_timeframes)} timeframes, "
                 f"{period_days} days"
             )
-    
+
+    @property
+    def is_simulation_mode(self) -> bool:
+        """Return True when the real training path is not active.
+
+        Currently ``run()`` uses dummy/random data (SIMULATION MODE) rather
+        than live NautilusTrader signal analysis.  This property exposes that
+        fact so callers can guard against applying the synthetic results to
+        production strategy configuration.
+
+        Set this to ``False`` (or override the property) once the real data
+        pipeline is wired into ``run()``.
+        """
+        return True
+
     def run(self):
         """
         Execute training (runs in background thread)

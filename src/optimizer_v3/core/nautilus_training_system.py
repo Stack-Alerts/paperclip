@@ -22,6 +22,7 @@ import sys
 
 # NautilusTrader imports - MANDATORY types
 from nautilus_trader.model.objects import Quantity, Price, Money
+from nautilus_trader.model.currencies import USD
 from nautilus_trader.model.identifiers import InstrumentId, Symbol
 from nautilus_trader.model.enums import OrderSide, PositionSide
 from nautilus_trader.model.data import Bar
@@ -57,9 +58,9 @@ class SignalEvent:
         self.instrument_id = instrument_id
         
         # Metrics calculated during analysis
-        self.price_impact: Money = Money('0', 'USD')
-        self.position_size: Quantity = Quantity('0')
-        self.pnl: Money = Money('0', 'USD')
+        self.price_impact: Money = Money('0', USD)
+        self.position_size: Quantity = Quantity(0.0, 8)
+        self.pnl: Money = Money('0', USD)
         self.is_valid: bool = False
         
         # Forward analysis data
@@ -109,9 +110,6 @@ class NautilusTrainingSystem:
         self.valid_signals: int = 0
         self.invalid_signals: int = 0
         
-        # USD currency for Money type
-        self.currency = 'USD'
-        
         if self.logger:
             self.logger.info("NautilusTrainingSystem initialized")
     
@@ -151,8 +149,8 @@ class NautilusTrainingSystem:
             'total_signals': 0,
             'valid_signals': 0,
             'invalid_signals': 0,
-            'avg_price_impact': Money('0', self.currency),
-            'avg_position_size': Quantity('0'),
+            'avg_price_impact': Money(0, USD),
+            'avg_position_size': Quantity(0.0, 8),
             'win_rate': Decimal('0'),
             'profit_factor': Decimal('0'),
             'max_drawdown': Decimal('0'),
@@ -182,26 +180,26 @@ class NautilusTrainingSystem:
             valid_signals = [s for s in signals if s.is_valid]
             if valid_signals:
                 price_impacts = [s.price_impact for s in valid_signals]
-                total_impact = sum(price_impacts, Money('0', self.currency))
+                total_impact = sum(price_impacts, Money(0, USD))
                 avg_impact = Money(
                     str(total_impact.as_decimal() / len(valid_signals)),
-                    self.currency
+                    USD
                 )
                 metrics['avg_price_impact'] = avg_impact
             
             # Calculate position sizes (Quantity type)
             if valid_signals:
                 position_sizes = [s.position_size for s in valid_signals]
-                total_size = sum(position_sizes, Quantity('0'))
+                total_size = sum(position_sizes, Quantity(0.0, 8))
                 avg_size = Quantity(
-                    str(total_size.as_double() / len(valid_signals))
+                    float(total_size.as_double() / len(valid_signals)), 8
                 )
                 metrics['avg_position_size'] = avg_size
             
             # Calculate win rate and profit factor (Decimal)
             if signals:
-                winning_trades = [s for s in signals if s.pnl > Money('0', self.currency)]
-                losing_trades = [s for s in signals if s.pnl < Money('0', self.currency)]
+                winning_trades = [s for s in signals if s.pnl > Money(0, USD)]
+                losing_trades = [s for s in signals if s.pnl < Money(0, USD)]
                 
                 if signals:
                     win_rate = Decimal(str(len(winning_trades))) / Decimal(str(len(signals)))
@@ -211,7 +209,7 @@ class NautilusTrainingSystem:
                 if winning_trades and losing_trades:
                     gross_profit = sum(
                         [s.pnl for s in winning_trades],
-                        Money('0', self.currency)
+                        Money(0, USD)
                     )
                     gross_loss = sum(
                         [abs(s.pnl.as_decimal()) for s in losing_trades],
@@ -219,7 +217,7 @@ class NautilusTrainingSystem:
                     )
                     
                     if gross_loss > Decimal('0'):
-                        profit_factor = gross_profit.as_decimal() / Money(str(gross_loss), self.currency).as_decimal()
+                        profit_factor = gross_profit.as_decimal() / Money(str(gross_loss), USD).as_decimal()
                         metrics['profit_factor'] = profit_factor
             
             # Store timeframe-specific results
@@ -373,7 +371,7 @@ class NautilusTrainingSystem:
         
         # Price impact as Money type
         impact_value = abs(final_move * Decimal(str(entry_price)))
-        signal.price_impact = Money(str(impact_value), self.currency)
+        signal.price_impact = Money(str(impact_value), USD)
     
     def _calculate_position_size(
         self,
@@ -397,7 +395,7 @@ class NautilusTrainingSystem:
         """
         # Risk amount from config
         risk_limit = self.config['position']['risk_limit']
-        risk_amount = Money(str(risk_limit), self.currency)
+        risk_amount = Money(risk_limit, USD)
         
         # Stop distance: price * volatility (use volatility as stop multiplier)
         # Minimum volatility to avoid division by zero
@@ -424,7 +422,7 @@ class NautilusTrainingSystem:
         increment = self.config['position']['size_increment']
         size = (size / increment).quantize(Decimal('1')) * increment
         
-        return Quantity(str(size))
+        return Quantity(float(size), 8)
     
     def _calculate_volatility(self, bars: List[Bar]) -> Decimal:
         """
@@ -477,8 +475,8 @@ class NautilusTrainingSystem:
         Returns:
             Money: Simulated PnL
         """
-        if not forward_bars or signal.position_size <= Quantity('0'):
-            return Money('0', self.currency)
+        if not forward_bars or signal.position_size <= Quantity(0.0, 8):
+            return Money(0, USD)
         
         # Entry price
         entry_price = signal.price.as_decimal()
@@ -493,7 +491,7 @@ class NautilusTrainingSystem:
         position_size_decimal = Decimal(str(signal.position_size.as_double()))
         pnl_value = position_size_decimal * price_change
         
-        return Money(str(pnl_value), self.currency)
+        return Money(str(pnl_value), USD)
     
     def _find_signal_recurrence(
         self,
