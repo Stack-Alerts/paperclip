@@ -1735,8 +1735,11 @@ class StrategyBuilderMainWindow(QMainWindow):
             if seconds_to_next > 900:
                 seconds_to_next = 1
 
-            # Add 0.2s delay after candle close
-            ms_until_check = (seconds_to_next * 1000) + 200
+            # Add 2s delay after candle close so Binance has time to finalize
+            # the bar before the fetch arrives. 200ms was consumed by cycle
+            # overhead, causing the first fetch to hit Binance at the exact
+            # boundary and return no data — triggering a 12s retry every cycle.
+            ms_until_check = (seconds_to_next * 1000) + 2000
 
             # Schedule first check and store handle so it can be inspected / cancelled
             self.candle_check_timer = QTimer(self)
@@ -1839,8 +1842,8 @@ class StrategyBuilderMainWindow(QMainWindow):
             if seconds_to_next > 900:
                 seconds_to_next = 1
 
-            # Add 0.2s delay after candle close
-            ms_until_check = (seconds_to_next * 1000) + 200
+            # Add 2s delay after candle close (matches _start_auto_update_system).
+            ms_until_check = (seconds_to_next * 1000) + 2000
 
             # Cap to MAX_WAIT_MS so skipped cycles (thread still running) never
             # push the next attempt more than 5 min into the future.
