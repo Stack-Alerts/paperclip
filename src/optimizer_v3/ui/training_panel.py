@@ -1,16 +1,16 @@
 """
-Training Panel UI - Sprint 2.1
-===============================
+Calibrate Panel UI - Sprint 2.1
+================================
 
-New Tab: Automated Trainer
-Provides forward-looking signal analysis, training database, and optimal parameters.
+New Tab: Signal Calibration (formerly Automated Trainer)
+Provides forward-looking signal analysis, calibration database, and optimal RECHECK parameters.
 
 Tasks Implemented:
 - 2.1.1: TrainingPanelUI base structure
 - 2.1.2: Block selection with BlockRegistry
 - 2.1.3: Mode selection (Testing/Production)
 - 2.1.4: Period selection dropdown
-- 2.1.5: Timeframe checkboxes
+- 2.1.5: Timeframe selection (multi-select QListWidget)
 - 2.1.6: Resource estimator & monitoring
 - 2.1.7: Confirmation dialog
 
@@ -31,10 +31,9 @@ from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout,
     QCheckBox, QComboBox, QSpinBox, QLabel, QPushButton,
-    QMessageBox, QProgressBar, QTextEdit
+    QMessageBox, QProgressBar, QTextEdit, QListWidget, QListWidgetItem, QAbstractItemView
 )
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont
 
 # Import centralized styles
 project_root = Path(__file__).parent.parent.parent.parent
@@ -44,7 +43,8 @@ from src.strategy_builder.ui.styles import (
     get_primary_button_stylesheet,
     get_secondary_button_stylesheet,
     get_text_edit_stylesheet,
-    get_color
+    get_color,
+    create_font
 )
 
 # Import configuration
@@ -53,7 +53,7 @@ from src.optimizer_v3.config.training_config import get_training_config
 
 class TrainingPanelUI(QWidget):
     """
-    Training Panel UI - New Tab: Automated Trainer
+    Calibrate Panel UI - New Tab: Signal Calibration
     
     Forward-looking signal analysis to determine optimal RECHECK delays,
     timing windows, and parameter configurations.
@@ -62,7 +62,7 @@ class TrainingPanelUI(QWidget):
     - Block selection from BlockRegistry
     - Testing/Production mode selection
     - Configurable analysis period
-    - Multi-timeframe analysis
+    - Multi-timeframe analysis via QListWidget
     - Resource estimation
     - Progress tracking
     - Results display with export
@@ -94,6 +94,9 @@ class TrainingPanelUI(QWidget):
         # Training worker
         self.training_thread = None
         
+        # Timeframe list widget (replaces checkboxes)
+        self.timeframe_list = None
+        
         # Setup UI
         self._setup_ui()
     
@@ -107,7 +110,7 @@ class TrainingPanelUI(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)  # More padding around edges
         layout.setSpacing(16)  # More space between sections
         
-        # Header
+        # Header (title + description)
         header = self._create_header()
         layout.addWidget(header)
         
@@ -128,19 +131,37 @@ class TrainingPanelUI(QWidget):
         layout.addWidget(action_section)
     
     def _create_header(self) -> QWidget:
-        """Create header with title"""
+        """Create header with title and explanatory description"""
         header_widget = QWidget()
-        header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(4, 4, 4, 4)
-        
-        title = QLabel("🎯 Automated Trainer - Forward-Looking Signal Analysis")
-        title_font = QFont("Segoe UI", 12, QFont.Weight.Bold)
-        title.setFont(title_font)
-        title.setStyleSheet("color: #FFFFFF; padding: 4px;")  # White for readability
-        header_layout.addWidget(title)
-        
-        header_layout.addStretch()
-        
+        header_layout = QVBoxLayout(header_widget)
+        header_layout.setContentsMargins(4, 4, 4, 8)
+        header_layout.setSpacing(8)
+
+        # Title row
+        title_row = QHBoxLayout()
+        title = QLabel("⚙️ Signal Calibration")
+        title.setFont(create_font(12, bold=True))
+        title.setStyleSheet(f"color: {get_color('primary')}; padding: 4px;")
+        title_row.addWidget(title)
+        title_row.addStretch()
+        header_layout.addLayout(title_row)
+
+        # Explanatory description
+        description = QLabel(
+            "What this does: Each building block signal has a timing window — a period after "
+            "the signal fires during which the engine should wait before re-evaluating it. If "
+            "this delay is too short, the engine takes noise re-entries; too long, and it misses "
+            "valid ones. This panel analyses your historical bar data to calculate the statistically "
+            "optimal re-evaluation delay for each selected block on each selected timeframe.\n\n"
+            "How to use it: Select the building blocks you want to calibrate, choose your lookback "
+            "period, select your timeframes, then click Start Calibration. Apply the resulting delay "
+            "values to your strategy's RECHECK configuration before running your backtest."
+        )
+        description.setWordWrap(True)
+        description.setFont(create_font(9))
+        description.setStyleSheet(f"color: {get_color('text_muted')}; padding: 4px;")
+        header_layout.addWidget(description)
+
         return header_widget
     
     def _create_configuration_section(self) -> QWidget:
@@ -152,9 +173,9 @@ class TrainingPanelUI(QWidget):
         - QCheckBox for block selection
         - QComboBox for mode selection
         - QSpinBox for period selection
-        - QCheckBox for timeframe selection
+        - QListWidget for timeframe selection (multi-select, replaces checkboxes)
         """
-        config_group = QGroupBox("Training Configuration")
+        config_group = QGroupBox("Calibration Configuration")
         config_group.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
@@ -186,7 +207,7 @@ class TrainingPanelUI(QWidget):
         
         # Analysis Mode
         mode_label = QLabel("Analysis Mode:")
-        mode_label.setStyleSheet("color: #FFFFFF; font-size: 10pt;")
+        mode_label.setFont(create_font(size=10))
         single_row_layout.addWidget(mode_label)
         
         self.mode_combo = QComboBox()
@@ -199,7 +220,7 @@ class TrainingPanelUI(QWidget):
                 border-radius: 3px;
                 background-color: {get_color('bg_light')};
                 min-height: 24px;
-                color: #FFFFFF;
+                color: {get_color('text_primary')};
             }}
             QComboBox:hover {{
                 border-color: {get_color('primary')};
@@ -209,6 +230,10 @@ class TrainingPanelUI(QWidget):
                 width: 20px;
             }}
         """)
+        self.mode_combo.setToolTip(
+            "Testing Mode uses a subset of data for speed. "
+            "Production Mode analyses the full lookback period."
+        )
         single_row_layout.addWidget(self.mode_combo)
         
         # Separator
@@ -216,7 +241,7 @@ class TrainingPanelUI(QWidget):
         
         # Lookback Period
         period_label = QLabel("Lookback Period:")
-        period_label.setStyleSheet("color: #FFFFFF; font-size: 10pt;")
+        period_label.setFont(create_font(size=10))
         single_row_layout.addWidget(period_label)
         
         self.period_spin = QSpinBox()
@@ -230,20 +255,24 @@ class TrainingPanelUI(QWidget):
                 border-radius: 3px;
                 background-color: {get_color('bg_light')};
                 min-height: 24px;
-                color: #FFFFFF;
+                color: {get_color('text_primary')};
             }}
             QSpinBox:hover {{
                 border-color: {get_color('primary')};
             }}
         """)
+        self.period_spin.setToolTip(
+            "Number of historical days to analyse. "
+            "More days = more signal occurrences = higher confidence in results."
+        )
         single_row_layout.addWidget(self.period_spin)
         
         # Separator
         single_row_layout.addSpacing(20)
         
         # Timeframes
-        timeframe_label = QLabel("Timeframes:")
-        timeframe_label.setStyleSheet("color: #FFFFFF; font-size: 10pt;")
+        timeframe_label = QLabel("Timeframe(s):")
+        timeframe_label.setFont(create_font(size=10))
         single_row_layout.addWidget(timeframe_label)
         
         timeframe_section = self._create_timeframe_selection()
@@ -272,7 +301,7 @@ class TrainingPanelUI(QWidget):
         if not blocks:
             # Fallback if no strategy loaded
             no_blocks_label = QLabel("⚠️ No strategy loaded. Please add building blocks first.")
-            no_blocks_label.setStyleSheet("color: #FFB74D; padding: 8px;")  # Orange warning
+            no_blocks_label.setStyleSheet(f"color: {get_color('warning')};")
             main_layout.addWidget(no_blocks_label)
             self.block_checkboxes = []
             return block_widget
@@ -284,27 +313,28 @@ class TrainingPanelUI(QWidget):
         self.block_checkboxes = []
         for block_name in blocks:
             checkbox = QCheckBox(block_name)
-            checkbox.setStyleSheet("""
-                QCheckBox {
+            checkbox.setFont(create_font(size=10))
+            checkbox.setStyleSheet(f"""
+                QCheckBox {{
                     spacing: 8px;
-                    color: #FFFFFF;
-                    font-size: 10pt;
-                }
-                QCheckBox::indicator {
+                    color: {get_color('text_primary')};
+                }}
+                QCheckBox::indicator {{
                     width: 18px;
                     height: 18px;
-                    border: 2px solid #555;
+                    border: 2px solid {get_color('border')};
                     border-radius: 3px;
-                    background-color: #2A2A2A;
-                }
-                QCheckBox::indicator:checked {
-                    background-color: #007ACC;
-                    border-color: #007ACC;
-                }
-                QCheckBox::indicator:hover {
-                    border-color: #007ACC;
-                }
+                    background-color: {get_color('bg_light')};
+                }}
+                QCheckBox::indicator:checked {{
+                    background-color: {get_color('primary')};
+                    border-color: {get_color('primary')};
+                }}
+                QCheckBox::indicator:hover {{
+                    border-color: {get_color('primary')};
+                }}
             """)
+            checkbox.setToolTip("Select this block to calibrate its optimal signal re-evaluation delay")
             checkboxes_layout.addWidget(checkbox)
             self.block_checkboxes.append(checkbox)
         
@@ -315,25 +345,13 @@ class TrainingPanelUI(QWidget):
         button_layout = QHBoxLayout()
         
         select_all_btn = QPushButton("Select All")
-        select_all_btn.setStyleSheet(get_secondary_button_stylesheet() + """
-            font-size: 12pt;
-            color: #FFFFFF;
-            font-weight: bold;
-            padding: 8px 20px;
-            min-width: 120px;
-        """)
+        select_all_btn.setStyleSheet(get_secondary_button_stylesheet())
         select_all_btn.setFixedHeight(36)
         select_all_btn.clicked.connect(lambda: self._toggle_all_blocks(True))
         button_layout.addWidget(select_all_btn)
         
         deselect_all_btn = QPushButton("Deselect All")
-        deselect_all_btn.setStyleSheet(get_secondary_button_stylesheet() + """
-            font-size: 12pt;
-            color: #FFFFFF;
-            font-weight: bold;
-            padding: 8px 20px;
-            min-width: 140px;
-        """)
+        deselect_all_btn.setStyleSheet(get_secondary_button_stylesheet())
         deselect_all_btn.setFixedHeight(36)
         deselect_all_btn.clicked.connect(lambda: self._toggle_all_blocks(False))
         button_layout.addWidget(deselect_all_btn)
@@ -345,44 +363,50 @@ class TrainingPanelUI(QWidget):
     
     def _create_timeframe_selection(self) -> QWidget:
         """
-        Create timeframe selection checkboxes
+        Create timeframe multi-select QListWidget (replaces individual QCheckBox controls).
         
-        REUSES: BacktestConfigurationPanel checkbox patterns
+        Shows ~3 rows tall, defaults to 15m selected.
         """
         timeframe_widget = QWidget()
-        timeframe_layout = QHBoxLayout(timeframe_widget)
-        timeframe_layout.setSpacing(12)
+        timeframe_layout = QVBoxLayout(timeframe_widget)
+        timeframe_layout.setSpacing(0)
         timeframe_layout.setContentsMargins(0, 0, 0, 0)
         
         timeframes = ['5m', '15m', '1h', '4h']
-        self.timeframe_checkboxes = {}
+        
+        self.timeframe_list = QListWidget()
+        self.timeframe_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
+        self.timeframe_list.setFixedHeight(72)  # ~3 rows
+        self.timeframe_list.setStyleSheet(f"""
+            QListWidget {{
+                border: 1px solid {get_color('border')};
+                border-radius: 3px;
+                background-color: {get_color('bg_light')};
+                color: {get_color('text_primary')};
+            }}
+            QListWidget::item {{
+                padding: 2px 6px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {get_color('primary')};
+                color: {get_color('text_primary')};
+            }}
+            QListWidget::item:hover {{
+                background-color: {get_color('border')};
+            }}
+        """)
+        self.timeframe_list.setToolTip(
+            "The bar timeframe to use for calibration. "
+            "Results will be specific to this timeframe."
+        )
         
         for tf in timeframes:
-            checkbox = QCheckBox(tf)
-            checkbox.setChecked(tf in ['5m', '15m'])  # Default selection
-            checkbox.setStyleSheet(f"""
-                QCheckBox {{
-                    spacing: 8px;
-                    color: {get_color('text_secondary')};
-                }}
-                QCheckBox::indicator {{
-                    width: 16px;
-                    height: 16px;
-                    border: 2px solid {get_color('border')};
-                    border-radius: 3px;
-                    background-color: {get_color('bg_light')};
-                }}
-                QCheckBox::indicator:checked {{
-                    background-color: {get_color('success')};
-                    border-color: {get_color('success')};
-                }}
-                QCheckBox::indicator:hover {{
-                    border-color: {get_color('primary')};
-                }}
-            """)
-            timeframe_layout.addWidget(checkbox)
-            self.timeframe_checkboxes[tf] = checkbox
+            item = QListWidgetItem(tf)
+            self.timeframe_list.addItem(item)
+            if tf == '15m':
+                item.setSelected(True)  # Default: 15m selected
         
+        timeframe_layout.addWidget(self.timeframe_list)
         return timeframe_widget
     
     def _create_progress_section(self) -> QWidget:
@@ -391,7 +415,7 @@ class TrainingPanelUI(QWidget):
         
         Task 2.1.21: Progress tracking UI
         """
-        progress_group = QGroupBox("Training Progress")
+        progress_group = QGroupBox("Calibration Progress")
         progress_group.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
@@ -451,7 +475,7 @@ class TrainingPanelUI(QWidget):
         Task 2.1.22: Results display table
         (Full implementation will be in training_results_table.py)
         """
-        results_group = QGroupBox("Training Results")
+        results_group = QGroupBox("Calibration Results")
         results_group.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
@@ -476,7 +500,10 @@ class TrainingPanelUI(QWidget):
         # Results text area (placeholder - will be replaced with table)
         self.results_text = QTextEdit()
         self.results_text.setReadOnly(True)
-        self.results_text.setPlainText("No training results yet. Start training to see optimal parameters.")
+        self.results_text.setPlainText(
+            "No calibration results yet. Run calibration to see optimal RECHECK delay parameters "
+            "for your selected blocks."
+        )
         # INCREASED FONT SIZE for readability
         self.results_text.setStyleSheet(get_text_edit_stylesheet() + """
             QTextEdit {
@@ -499,7 +526,7 @@ class TrainingPanelUI(QWidget):
         action_layout.addStretch()
         
         # Export button
-        self.export_btn = QPushButton("Export Results")
+        self.export_btn = QPushButton("Export Calibration Results")
         self.export_btn.setStyleSheet(get_secondary_button_stylesheet())
         self.export_btn.setFixedHeight(40)
         self.export_btn.setEnabled(False)
@@ -507,7 +534,7 @@ class TrainingPanelUI(QWidget):
         action_layout.addWidget(self.export_btn)
         
         # Stop button (hidden by default)
-        self.stop_btn = QPushButton("⏹ Stop Training")
+        self.stop_btn = QPushButton("⏹ Stop Calibration")
         self.stop_btn.setStyleSheet(get_secondary_button_stylesheet())
         self.stop_btn.setFixedHeight(40)
         self.stop_btn.setVisible(False)
@@ -515,9 +542,13 @@ class TrainingPanelUI(QWidget):
         action_layout.addWidget(self.stop_btn)
         
         # Start button
-        self.start_btn = QPushButton("▶ Start Training")
+        self.start_btn = QPushButton("▶ Start Calibration")
         self.start_btn.setStyleSheet(get_primary_button_stylesheet())
         self.start_btn.setFixedHeight(40)
+        self.start_btn.setToolTip(
+            "Analyse historical bar data to calculate the optimal RECHECK delay "
+            "for each selected block."
+        )
         self.start_btn.clicked.connect(self._start_training)
         action_layout.addWidget(self.start_btn)
         
@@ -530,7 +561,7 @@ class TrainingPanelUI(QWidget):
     
     def _start_training(self):
         """
-        Start training with confirmation dialog
+        Start calibration with confirmation dialog
         
         Task 2.1.7: Confirmation dialog
         """
@@ -539,9 +570,9 @@ class TrainingPanelUI(QWidget):
             cb.text() for cb in self.block_checkboxes if cb.isChecked()
         ]
         
-        # Get selected timeframes
+        # Get selected timeframes from QListWidget
         selected_timeframes = [
-            tf for tf, cb in self.timeframe_checkboxes.items() if cb.isChecked()
+            item.text() for item in self.timeframe_list.selectedItems()
         ]
         
         # Validation
@@ -572,7 +603,7 @@ class TrainingPanelUI(QWidget):
         
         # Confirmation dialog (Task 2.1.7)
         msg = f"""
-        <h3>Confirm Training Configuration</h3>
+        <h3>Confirm Calibration Configuration</h3>
         <p><b>Selected Blocks:</b> {len(selected_blocks)}</p>
         <ul>{''.join(f'<li>{block}</li>' for block in selected_blocks)}</ul>
         <p><b>Timeframes:</b> {', '.join(selected_timeframes)}</p>
@@ -580,12 +611,12 @@ class TrainingPanelUI(QWidget):
         <p><b>Mode:</b> {self.mode_combo.currentText()}</p>
         <br>
         <p><b>Estimated Analysis Time:</b> 5-15 minutes</p>
-        <p>This will analyze historical signals and calculate optimal parameters.</p>
+        <p>This will analyze historical signals and calculate optimal RECHECK delay parameters.</p>
         """
         
         reply = QMessageBox.question(
             self,
-            "Confirm Training",
+            "Confirm Calibration",
             msg,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes
@@ -595,20 +626,19 @@ class TrainingPanelUI(QWidget):
             self._execute_training(training_config)
     
     def _execute_training(self, config: dict):
-        """Execute training with given configuration"""
+        """Execute calibration with given configuration"""
         self.training_running = True
         
         # Update UI state
         self.start_btn.setEnabled(False)
         self.stop_btn.setVisible(True)
-        self.status_label.setText("Status: Training in progress...")
+        self.status_label.setText("Status: Calibration in progress...")
         self.status_label.setStyleSheet(f"color: {get_color('warning')}; font-weight: bold;")
         
         # Disable configuration inputs
         for checkbox in self.block_checkboxes:
             checkbox.setEnabled(False)
-        for checkbox in self.timeframe_checkboxes.values():
-            checkbox.setEnabled(False)
+        self.timeframe_list.setEnabled(False)
         self.mode_combo.setEnabled(False)
         self.period_spin.setEnabled(False)
         
@@ -634,11 +664,11 @@ class TrainingPanelUI(QWidget):
         self.training_thread.start()
     
     def _stop_training(self):
-        """Stop training"""
+        """Stop calibration"""
         reply = QMessageBox.question(
             self,
-            "Stop Training",
-            "Are you sure you want to stop the training?\n\nPartial results will be saved.",
+            "Stop Calibration",
+            "Are you sure you want to stop the calibration?\n\nPartial results will be saved.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
@@ -648,7 +678,7 @@ class TrainingPanelUI(QWidget):
             self._reset_ui_state()
     
     def _reset_ui_state(self):
-        """Reset UI state after training completes or stops"""
+        """Reset UI state after calibration completes or stops"""
         self.training_running = False
         
         # Update UI state
@@ -660,8 +690,7 @@ class TrainingPanelUI(QWidget):
         # Enable configuration inputs
         for checkbox in self.block_checkboxes:
             checkbox.setEnabled(True)
-        for checkbox in self.timeframe_checkboxes.values():
-            checkbox.setEnabled(True)
+        self.timeframe_list.setEnabled(True)
         self.mode_combo.setEnabled(True)
         self.period_spin.setEnabled(True)
         
@@ -676,11 +705,11 @@ class TrainingPanelUI(QWidget):
         self.eta_label.setText(f"ETA: {eta}")
     
     def training_complete(self, results: dict):
-        """Handle training completion"""
+        """Handle calibration completion"""
         self._reset_ui_state()
         
         # Update status
-        self.status_label.setText("Status: Training complete ✓")
+        self.status_label.setText("Status: Calibration complete ✓")
         self.status_label.setStyleSheet(f"color: {get_color('success')}; font-weight: bold;")
         self.progress_bar.setValue(100)
         self.eta_label.setText("ETA: Complete")
@@ -689,7 +718,7 @@ class TrainingPanelUI(QWidget):
         self.export_btn.setEnabled(True)
         
         # Display results (placeholder - will use TrainingResultsTable)
-        self.results_text.setPlainText(f"Training complete!\n\nResults: {results}")
+        self.results_text.setPlainText(f"Calibration complete!\n\nResults: {results}")
     
     def _on_progress_update(self, current: int, total: int, message: str):
         """Handle progress update from training thread"""
@@ -705,18 +734,21 @@ class TrainingPanelUI(QWidget):
         delay = result.get('optimal_delay', 0)
         current_text = self.results_text.toPlainText()
         
-        if current_text == "No training results yet. Start training to see optimal parameters.":
-            current_text = "Training Results:\n\n"
+        if current_text == (
+            "No calibration results yet. Run calibration to see optimal RECHECK delay parameters "
+            "for your selected blocks."
+        ):
+            current_text = "Calibration Results:\n\n"
         
         current_text += f"✓ {block_name}: Optimal delay = {delay} bars (confidence: {float(confidence):.0%})\n"
         self.results_text.setPlainText(current_text)
     
     def _on_training_complete(self, results: list):
-        """Handle training completion"""
+        """Handle calibration completion"""
         self._reset_ui_state()
         
         # Update status
-        self.status_label.setText("Status: Training complete ✓")
+        self.status_label.setText("Status: Calibration complete ✓")
         self.status_label.setStyleSheet(f"color: {get_color('success')}; font-weight: bold;")
         self.progress_bar.setValue(100)
         self.eta_label.setText("ETA: Complete")
@@ -725,7 +757,7 @@ class TrainingPanelUI(QWidget):
         self.export_btn.setEnabled(True)
         
         # Display summary
-        summary = f"\n\n{'='*50}\nTRAINING COMPLETE\n{'='*50}\n"
+        summary = f"\n\n{'='*50}\nCALIBRATION COMPLETE\n{'='*50}\n"
         summary += f"Total results: {len(results)}\n"
         summary += f"High confidence (>80%): {len([r for r in results if r.get('confidence', 0) > 0.8])}\n"
         summary += f"Medium confidence (50-80%): {len([r for r in results if 0.5 <= r.get('confidence', 0) <= 0.8])}\n"
@@ -735,7 +767,7 @@ class TrainingPanelUI(QWidget):
         self.results_text.setPlainText(current_text + summary)
     
     def _on_training_error(self, error_message: str):
-        """Handle training error"""
+        """Handle calibration error"""
         self._reset_ui_state()
         
         # Update status
@@ -743,13 +775,13 @@ class TrainingPanelUI(QWidget):
         self.status_label.setStyleSheet(f"color: {get_color('error')}; font-weight: bold;")
         
         # Display error
-        self.results_text.setPlainText(f"❌ Training Error:\n\n{error_message}")
+        self.results_text.setPlainText(f"❌ Calibration Error:\n\n{error_message}")
         
         # Show error dialog
         QMessageBox.critical(
             self,
-            "Training Error",
-            f"An error occurred during training:\n\n{error_message}"
+            "Calibration Error",
+            f"An error occurred during calibration:\n\n{error_message}"
         )
     
     def _on_eta_update(self, seconds_remaining: int):
@@ -796,7 +828,7 @@ class TrainingPanelUI(QWidget):
     
     def _export_results(self):
         """
-        Export training results
+        Export calibration results
         
         Task 2.1.23: Export functionality
         (Full implementation will be in training_results_table.py)
@@ -804,6 +836,6 @@ class TrainingPanelUI(QWidget):
         # Placeholder for export
         QMessageBox.information(
             self,
-            "Export Results",
+            "Export Calibration Results",
             "Export functionality will be implemented in training_results_table.py"
         )
