@@ -323,7 +323,8 @@ COLORS = {
     'warning': '#FFA500',
     'error': '#C35252',
     'info': '#2070FF',
-    
+    'bg_info_subtle': '#1a2540',  # Subtle info/blue tint background (replaces rgba(59,130,246,0.1))
+
     # Panel / column title color (also used by QGroupBox::title and get_panel_title_stylesheet)
     'panel_title': '#095983',
 

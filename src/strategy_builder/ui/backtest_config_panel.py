@@ -3733,6 +3733,9 @@ Detailed report saved to:
         if baseline_result is not None:
             results_dialog.set_baseline(baseline_result)
         results_dialog.showMaximized()
+        # Ensure the results dialog is visible and on top when it opens
+        results_dialog.raise_()
+        results_dialog.activateWindow()
 
         # Progress dialog so the user sees per-scenario status
         progress = QProgressDialog(
@@ -3744,6 +3747,11 @@ Detailed report saved to:
         )
         progress.setWindowTitle("Config Discovery")
         progress.setWindowModality(Qt.WindowModal)
+        # Show progress dialog in the foreground so the user knows a scan is
+        # in progress — without this it can open behind other windows
+        progress.show()
+        progress.raise_()
+        progress.activateWindow()
 
         # ------------------------------------------------------------------
         # Step 6: Loop over each scenario on the main thread
