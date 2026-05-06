@@ -1128,22 +1128,35 @@ class StrategyBrowserDialog(QMainWindow):
 
                     if _score >= 6:
                         quality = "🟢 Excellent"
+                        _quality_color = get_color('success')
                     elif _score >= 4:
                         quality = "🟡 Good"
+                        _quality_color = get_color('success')
                     elif _score >= 2:
                         quality = "🟠 Fair"
+                        _quality_color = get_color('warning')
                     else:
                         quality = "🔴 Poor"
+                        _quality_color = get_color('error')
+                    self.detail_labels['status'].setStyleSheet(
+                        f"color: {_quality_color}; padding: 4px 6px;"
+                    )
                     self.detail_labels['status'].setText(f"<b>Quality:</b> {quality}")
                 else:
                     self.detail_labels['tests'].setText(f"<b>Tests Run:</b> 0<br>⚠️ No backtest data")
                     self.detail_labels['performance'].setText("<b>Run backtest to see:</b><br>• Sharpe Ratio<br>• Win Rate<br>• Trade Stats")
+                    self.detail_labels['status'].setStyleSheet(
+                        f"color: {get_color('text_muted')}; padding: 4px 6px;"
+                    )
                     self.detail_labels['status'].setText("<b>Quality:</b> 🔵 Untested")
                     
             except Exception as e:
                 logger.error(f"Error loading test results: {e}")
                 self.detail_labels['tests'].setText(f"<b>Tests:</b> Error loading")
                 self.detail_labels['performance'].setText("<b>Database error</b><br>Check logs for details")
+                self.detail_labels['status'].setStyleSheet(
+                    f"color: {get_color('warning')}; padding: 4px 6px;"
+                )
                 self.detail_labels['status'].setText("<b>Quality:</b> ⚠️ Error")
             
             # Show the panel
