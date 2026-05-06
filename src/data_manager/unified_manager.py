@@ -1249,10 +1249,18 @@ class UnifiedDataManager:
         # Fix 3: Clamp result to the explicitly requested window so that bars
         # Binance returns slightly outside [start_ts, end_ts] (due to alignment
         # or batch overlap) can never produce "+0 new" from spurious out-of-window bars.
-        fetch_start = pd.Timestamp(start_ts)
-        fetch_end = pd.Timestamp(end_ts)
+        #
+        # start_ts may include BINANCE_PROPAGATION_BUFFER (+2 s) to ensure the
+        # API returns a finalized bar, but Binance bar timestamps are always on
+        # exact bar-open boundaries (e.g. 06:15:00.000).  Comparing >=start_ts
+        # with the 2-s buffer would discard the bar at 06:15:00.
+        # Fix: floor start_ts to the nearest whole second and subtract one extra
+        # second so any sub-second API offset is absorbed without widening the
+        # window more than necessary.
+        filter_start = pd.Timestamp(start_ts).floor('s') - pd.Timedelta(seconds=3)
+        filter_end = pd.Timestamp(end_ts)
         result = result[
-            (result['timestamp'] >= fetch_start) & (result['timestamp'] <= fetch_end)
+            (result['timestamp'] >= filter_start) & (result['timestamp'] <= filter_end)
         ].reset_index(drop=True)
 
         return result
