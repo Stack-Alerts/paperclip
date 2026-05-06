@@ -1586,19 +1586,18 @@ class UnifiedDataManager:
                     # == gap_start + bar_td, so fetch_start == fetch_end (same bar).
                     # Accept this — _fetch_binance_range handles the 1-bar window.
                     #
-                    # BINANCE_PROPAGATION_BUFFER: Binance takes 1–2 s after candle
-                    # close to finalize the bar.  Without this offset the cycle that
-                    # fires immediately after candle close sends startTime=<exact
-                    # close epoch> and receives 0 bars, leaving the gap unrepaired.
-                    fetch_start = gap_start + bar_td + BINANCE_PROPAGATION_BUFFER
+                    # NOTE: BINANCE_PROPAGATION_BUFFER is NOT added to fetch_start.
+                    # The scheduler fires 0.2s after the boundary so the API call
+                    # is already naturally delayed.  Adding +2 s to startTime causes
+                    # Binance to see startTime=07:45:02 for a bar that opens at
+                    # 07:45:00 — Binance returns nothing because startTime is past
+                    # the bar open.  The filter_start guard in _fetch_binance_range
+                    # handles any sub-second edge cases on the result side.
+                    fetch_start = gap_start + bar_td
                     fetch_end = gap_end - bar_td
 
-                    if fetch_end < fetch_start - BINANCE_PROPAGATION_BUFFER:
+                    if fetch_end < fetch_start:
                         # Degenerate case: gap spans less than one bar period.
-                        # Exclude BINANCE_PROPAGATION_BUFFER from the size check —
-                        # without this a one-bar gap at the trailing edge produces
-                        # fetch_end (11:45:00) < fetch_start (11:45:02) and is
-                        # falsely skipped (off-by-2 s).
                         logger.warning(f"   ⚠️  Gap smaller than one bar period — skipping.")
                         continue
 
