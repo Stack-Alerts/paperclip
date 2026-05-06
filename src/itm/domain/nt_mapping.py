@@ -26,7 +26,17 @@ Module-level function helpers
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from nautilus_trader.model.enums import (
+        OrderSide as NTOrderSide,
+        OrderStatus as NTOrderStatus,
+        OrderType as NTOrderType,
+        PositionSide as NTPositionSide,
+    )
+    from nautilus_trader.model.identifiers import InstrumentId
+    from nautilus_trader.model.instruments import CurrencyPair
 
 from .entities import (
     ContractType,
@@ -92,7 +102,7 @@ def _decimal_precision(value: Decimal) -> int:
 # ---------------------------------------------------------------------------
 
 
-def itm_to_nt_currency_pair(instrument: Instrument):
+def itm_to_nt_currency_pair(instrument: Instrument) -> CurrencyPair:
     """Convert an ITM ``Instrument`` to a NautilusTrader ``CurrencyPair``.
 
     The CurrencyPair is constructed with the correct tick_size, lot_size,
@@ -204,7 +214,7 @@ def nt_to_itm_instrument(
 # ---------------------------------------------------------------------------
 
 
-def itm_to_nt_order_side(side: OrderSide):
+def itm_to_nt_order_side(side: OrderSide) -> NTOrderSide:
     """Convert ITM ``OrderSide`` → NT ``OrderSide``."""
     _require_nt()
     from nautilus_trader.model.enums import OrderSide as NTOrderSide
@@ -242,7 +252,7 @@ def nt_to_itm_order_side(nt_side) -> OrderSide:
 # ---------------------------------------------------------------------------
 
 
-def itm_to_nt_order_type(order_type: OrderType):
+def itm_to_nt_order_type(order_type: OrderType) -> NTOrderType:
     """Convert ITM ``OrderType`` → NT ``OrderType``."""
     _require_nt()
     from nautilus_trader.model.enums import OrderType as NTOrderType
@@ -315,7 +325,7 @@ def nt_to_itm_order_status(nt_status) -> OrderStatus:
     return mapping.get(nt_status, OrderStatus.ERROR)
 
 
-def itm_to_nt_order_status(status: OrderStatus):
+def itm_to_nt_order_status(status: OrderStatus) -> NTOrderStatus:
     """Convert ITM ``OrderStatus`` → NT ``OrderStatus`` (nearest equivalent)."""
     _require_nt()
     from nautilus_trader.model.enums import OrderStatus as NTOrderStatus
@@ -336,7 +346,7 @@ def itm_to_nt_order_status(status: OrderStatus):
 # ---------------------------------------------------------------------------
 
 
-def itm_to_nt_position_side(direction: PositionDirection):
+def itm_to_nt_position_side(direction: PositionDirection) -> NTPositionSide:
     """Convert ITM ``PositionDirection`` → NT ``PositionSide``."""
     _require_nt()
     from nautilus_trader.model.enums import PositionSide as NTPositionSide
@@ -367,7 +377,7 @@ def nt_to_itm_position_side(nt_side) -> PositionDirection:
 # ---------------------------------------------------------------------------
 
 
-def itm_instrument_to_nt_id(instrument: Instrument):
+def itm_instrument_to_nt_id(instrument: Instrument) -> InstrumentId:
     """Convert ITM Instrument → NT InstrumentId (``BTCUSDT.BINANCE`` style)."""
     _require_nt()
     from nautilus_trader.model.identifiers import InstrumentId, Symbol, Venue
@@ -540,7 +550,7 @@ class NTTypeMapper:
     """
 
     @staticmethod
-    def order_side_to_nt(side: OrderSide):
+    def order_side_to_nt(side: OrderSide) -> NTOrderSide:
         return itm_to_nt_order_side(side)
 
     @staticmethod
@@ -548,7 +558,7 @@ class NTTypeMapper:
         return nt_to_itm_order_side(nt_side)
 
     @staticmethod
-    def order_type_to_nt(order_type: OrderType):
+    def order_type_to_nt(order_type: OrderType) -> NTOrderType:
         return itm_to_nt_order_type(order_type)
 
     @staticmethod
@@ -556,7 +566,7 @@ class NTTypeMapper:
         return nt_to_itm_order_type(nt_type)
 
     @staticmethod
-    def order_status_to_nt(status: OrderStatus):
+    def order_status_to_nt(status: OrderStatus) -> NTOrderStatus:
         return itm_to_nt_order_status(status)
 
     @staticmethod
@@ -564,7 +574,7 @@ class NTTypeMapper:
         return nt_to_itm_order_status(nt_status)
 
     @staticmethod
-    def position_direction_to_nt(direction: PositionDirection):
+    def position_direction_to_nt(direction: PositionDirection) -> NTPositionSide:
         return itm_to_nt_position_side(direction)
 
     @staticmethod
@@ -572,7 +582,7 @@ class NTTypeMapper:
         return nt_to_itm_position_side(nt_side)
 
     @staticmethod
-    def instrument_to_nt_id(instrument: Instrument):
+    def instrument_to_nt_id(instrument: Instrument) -> InstrumentId:
         return itm_instrument_to_nt_id(instrument)
 
     @staticmethod

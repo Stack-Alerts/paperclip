@@ -2,7 +2,8 @@
 Additional unit tests for ITM ↔ NautilusTrader type mapping (function-based API).
 Complements test_nt_mapping.py which covers the NTTypeMapper class.
 Covers: itm_instrument_to_nt_id, nt_id_to_itm_kwargs, signal_to_sb_dict,
-        apply_nt_fill_to_itm_order, signal_from_strategy_builder.
+        apply_nt_fill_to_itm_order, signal_from_strategy_builder,
+        itm_to_nt_currency_pair (real NT CurrencyPair), nt_to_itm_instrument.
 """
 from __future__ import annotations
 
@@ -23,7 +24,9 @@ from src.itm.domain.entities import (
 from src.itm.domain.nt_mapping import (
     apply_nt_fill_to_itm_order,
     itm_instrument_to_nt_id,
+    itm_to_nt_currency_pair,
     nt_id_to_itm_kwargs,
+    nt_to_itm_instrument,
     signal_from_strategy_builder,
     signal_to_sb_dict,
     signal_to_strategy_builder,
@@ -329,3 +332,219 @@ class TestApplyNTFillToITMOrder:
         fill = self._make_fill_event("0.1", "45000.00", venue_order_id="VEN-42")
         apply_nt_fill_to_itm_order(order, fill)
         assert order.exchange_order_id == "VEN-42"
+
+
+# ---------------------------------------------------------------------------
+# itm_to_nt_currency_pair / nt_to_itm_instrument with real NT objects (AC3)
+# ---------------------------------------------------------------------------
+
+
+class TestNTCurrencyPairConversion:
+    """AC3: Tests using real NautilusTrader CurrencyPair objects (not mocks).
+
+    Verify round-trip fidelity for symbol, exchange, tick_size, and lot_size.
+    """
+
+    def _make_nt_currency_pair(
+        self,
+        symbol: str = "BTCUSDT",
+        venue: str = "BINANCE",
+        price_precision: int = 2,
+        size_precision: int = 5,
+        price_increment_str: str = "0.01",
+        size_increment_str: str = "0.00001",
+    ):
+        """Helper to construct a real NautilusTrader CurrencyPair."""
+        from nautilus_trader.model.currencies import BTC, USDT
+        from nautilus_trader.model.identifiers import InstrumentId, Symbol, Venue
+        from nautilus_trader.model.instruments import CurrencyPair
+        from nautilus_trader.model.objects import Price, Quantity
+
+        return CurrencyPair(
+            instrument_id=InstrumentId(Symbol(symbol), Venue(venue)),
+            raw_symbol=Symbol(symbol),
+            base_currency=BTC,
+            quote_currency=USDT,
+            price_precision=price_precision,
+            size_precision=size_precision,
+            price_increment=Price.from_str(price_increment_str),
+            size_increment=Quantity.from_str(size_increment_str),
+            ts_event=0,
+            ts_init=0,
+        )
+
+    # ------------------------------------------------------------------ #
+    # itm_to_nt_currency_pair tests                                        #
+    # ------------------------------------------------------------------ #
+
+    def test_itm_to_nt_currency_pair_btcusdt_binance(self) -> None:
+        instr = Instrument.btc_usdt_spot("binance")
+        nt_pair = itm_to_nt_currency_pair(instr)
+
+        # Verify it's actually a CurrencyPair
+        from nautilus_trader.model.instruments import CurrencyPair
+        assert isinstance(nt_pair, CurrencyPair)
+
+        # Symbol and venue
+        assert str(nt_pair.id.symbol) == "BTCUSDT"
+        assert str(nt_pair.id.venue) == "BINANCE"
+
+        # Price/size increments
+        assert Decimal(str(nt_pair.price_increment)) == instr.tick_size
+        assert Decimal(str(nt_pair.size_increment)) == instr.lot_size
+
+    def test_itm_to_nt_currency_pair_btcusdt_bybit(self) -> None:
+        instr = Instrument.btc_usdt_perp("bybit")
+        nt_pair = itm_to_nt_currency_pair(instr)
+
+        assert str(nt_pair.id.venue) == "BYBIT"
+        assert str(nt_pair.id.symbol) == "BTCUSDT"
+        # PERP tick size is 0.10
+        assert Decimal(str(nt_pair.price_increment)) == Decimal("0.10")
+
+    def test_itm_to_nt_currency_pair_price_precision(self) -> None:
+        # tick_size 0.01 → price_precision 2
+        instr = Instrument.btc_usdt_spot("binance")
+        nt_pair = itm_to_nt_currency_pair(instr)
+        assert nt_pair.price_precision == 2
+
+    def test_itm_to_nt_currency_pair_size_precision(self) -> None:
+        # lot_size 0.00001 → size_precision 5
+        instr = Instrument.btc_usdt_spot("binance")
+        nt_pair = itm_to_nt_currency_pair(instr)
+        assert nt_pair.size_precision == 5
+
+    def test_itm_to_nt_currency_pair_perp_size_precision(self) -> None:
+        # lot_size 0.001 → size_precision 3
+        instr = Instrument.btc_usdt_perp("binance")
+        nt_pair = itm_to_nt_currency_pair(instr)
+        assert nt_pair.size_precision == 3
+
+    def test_itm_to_nt_currency_pair_custom_instrument(self) -> None:
+        custom = Instrument(
+            symbol="BTC/USDT",
+            exchange="okx",
+            contract_type=ContractType.FUTURES,
+            tick_size=Decimal("0.001"),
+            lot_size=Decimal("0.0001"),
+        )
+        nt_pair = itm_to_nt_currency_pair(custom)
+        assert str(nt_pair.id.venue) == "OKX"
+        assert nt_pair.price_precision == 3
+        assert nt_pair.size_precision == 4
+
+    # ------------------------------------------------------------------ #
+    # nt_to_itm_instrument tests                                           #
+    # ------------------------------------------------------------------ #
+
+    def test_nt_to_itm_instrument_btcusdt_binance(self) -> None:
+        nt_pair = self._make_nt_currency_pair("BTCUSDT", "BINANCE", 2, 5, "0.01", "0.00001")
+        itm_instr = nt_to_itm_instrument(nt_pair, ContractType.SPOT)
+
+        assert itm_instr.symbol == "BTC/USDT"
+        assert itm_instr.exchange == "binance"
+        assert itm_instr.contract_type == ContractType.SPOT
+        assert itm_instr.tick_size == Decimal("0.01")
+        assert itm_instr.lot_size == Decimal("0.00001")
+
+    def test_nt_to_itm_instrument_btcusdt_bybit(self) -> None:
+        nt_pair = self._make_nt_currency_pair("BTCUSDT", "BYBIT", 1, 3, "0.1", "0.001")
+        itm_instr = nt_to_itm_instrument(nt_pair, ContractType.PERPETUAL)
+
+        assert itm_instr.symbol == "BTC/USDT"
+        assert itm_instr.exchange == "bybit"
+        assert itm_instr.contract_type == ContractType.PERPETUAL
+        assert itm_instr.tick_size == Decimal("0.1")
+        assert itm_instr.lot_size == Decimal("0.001")
+
+    def test_nt_to_itm_instrument_default_contract_type_spot(self) -> None:
+        nt_pair = self._make_nt_currency_pair("BTCUSDT", "BINANCE")
+        itm_instr = nt_to_itm_instrument(nt_pair)
+        assert itm_instr.contract_type == ContractType.SPOT
+
+    def test_nt_to_itm_instrument_base_currency(self) -> None:
+        nt_pair = self._make_nt_currency_pair("BTCUSDT", "BINANCE")
+        itm_instr = nt_to_itm_instrument(nt_pair)
+        assert itm_instr.base_currency == "BTC"
+        assert itm_instr.quote_currency == "USDT"
+
+    # ------------------------------------------------------------------ #
+    # Round-trip fidelity tests                                            #
+    # ------------------------------------------------------------------ #
+
+    def test_round_trip_spot_binance(self) -> None:
+        """ITM → NT → ITM round-trip must preserve symbol, exchange, tick/lot size."""
+        original = Instrument.btc_usdt_spot("binance")
+        nt_pair = itm_to_nt_currency_pair(original)
+        restored = nt_to_itm_instrument(nt_pair, ContractType.SPOT)
+
+        assert restored.symbol == original.symbol
+        assert restored.exchange == original.exchange
+        assert restored.tick_size == original.tick_size
+        assert restored.lot_size == original.lot_size
+
+    def test_round_trip_perp_bybit(self) -> None:
+        """Round-trip for BYBIT perpetual."""
+        original = Instrument.btc_usdt_perp("bybit")
+        nt_pair = itm_to_nt_currency_pair(original)
+        restored = nt_to_itm_instrument(nt_pair, ContractType.PERPETUAL)
+
+        assert restored.symbol == original.symbol
+        assert restored.exchange == original.exchange
+        assert restored.tick_size == original.tick_size
+        assert restored.lot_size == original.lot_size
+
+    def test_round_trip_custom_precision(self) -> None:
+        """Round-trip with a non-standard tick/lot size."""
+        original = Instrument(
+            symbol="BTC/USDT",
+            exchange="kraken",
+            contract_type=ContractType.SPOT,
+            tick_size=Decimal("0.5"),
+            lot_size=Decimal("0.0001"),
+        )
+        nt_pair = itm_to_nt_currency_pair(original)
+        restored = nt_to_itm_instrument(nt_pair, ContractType.SPOT)
+
+        assert restored.tick_size == original.tick_size
+        assert restored.lot_size == original.lot_size
+        assert restored.exchange == "kraken"
+
+    def test_itm_to_nt_integer_tick_size(self) -> None:
+        """tick_size=1 (integer exponent) → price_precision 0 (covers _decimal_precision line 97)."""
+        instr = Instrument(
+            symbol="BTC/USDT",
+            exchange="test",
+            contract_type=ContractType.SPOT,
+            tick_size=Decimal("1"),  # integer — exponent is 0
+            lot_size=Decimal("1"),
+        )
+        nt_pair = itm_to_nt_currency_pair(instr)
+        assert nt_pair.price_precision == 0
+        assert nt_pair.size_precision == 0
+
+    def test_nt_to_itm_instrument_unknown_symbol_suffix(self) -> None:
+        """Covers the else-branch in nt_to_itm_instrument (non-USDT/non-BTC suffix)."""
+        from nautilus_trader.model.currencies import BTC, USDT
+        from nautilus_trader.model.identifiers import InstrumentId, Symbol, Venue
+        from nautilus_trader.model.instruments import CurrencyPair
+        from nautilus_trader.model.objects import Price, Quantity
+
+        # XYZABC — neither ends with USDT nor BTC
+        nt_pair = CurrencyPair(
+            instrument_id=InstrumentId(Symbol("XYZABC"), Venue("TEST")),
+            raw_symbol=Symbol("XYZABC"),
+            base_currency=BTC,
+            quote_currency=USDT,
+            price_precision=2,
+            size_precision=3,
+            price_increment=Price.from_str("0.01"),
+            size_increment=Quantity.from_str("0.001"),
+            ts_event=0,
+            ts_init=0,
+        )
+        itm_instr = nt_to_itm_instrument(nt_pair)
+        # else branch: symbol = raw_symbol, quote = ""
+        assert itm_instr.symbol == "XYZABC"
+        assert itm_instr.base_currency == "XYZABC"
+        assert itm_instr.quote_currency == ""

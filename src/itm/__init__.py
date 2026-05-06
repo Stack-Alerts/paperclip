@@ -12,8 +12,12 @@ Package layout
 --------------
 itm/
   domain/        — pure domain model (entities, events, state machines, config)
-  adapters/      — NautilusTrader type mappers and event converters (Section B+)
-  engine/        — execution engine orchestration (Section B+)
+                   (Section A — complete)
+  data/          — data management & synchronization layer (Section B)
+                   Binance WebSocket stream, real-time bar construction,
+                   gap detection + backfill, freshness gating, NT data adapter
+  adapters/      — NautilusTrader type mappers and event converters (Section C+)
+  engine/        — execution engine orchestration (Section G+)
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"  # Section B added
