@@ -578,7 +578,15 @@ class SettingsDialog(QDialog):
     # ------------------------------------------------------------------
 
     def _build_preferences_tab(self) -> QWidget:
-        """User-editable preferences — non-secret settings."""
+        """User-editable preferences — non-secret settings.
+
+        Groups:
+          - AI Configuration
+          - Performance & Resources
+          - Data & API
+          - Alerts & Logging
+          - UI Preferences
+        """
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         # BTCAAAAA-90: suppress horizontal scrollbar artifact.
@@ -590,23 +598,126 @@ class SettingsDialog(QDialog):
         layout.setSpacing(16)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        # --- Preferences group ---
-        pref_group = QGroupBox("Preferences")
-        pref_group.setFont(create_font(10, bold=True))
-        pref_form = QFormLayout(pref_group)
-        pref_form.setSpacing(10)
-        pref_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        # ----------------------------------------------------------------
+        # Group: AI Configuration
+        # ----------------------------------------------------------------
+        ai_group = QGroupBox("AI Configuration")
+        ai_group.setFont(create_font(10, bold=True))
+        ai_form = QFormLayout(ai_group)
+        ai_form.setSpacing(10)
+        ai_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        # AI Model
         self._plain_fields["AI_MODEL"] = QLineEdit()
         self._plain_fields["AI_MODEL"].setText(
             self._service.get_with_default("AI_MODEL", "anthropic/claude-4.5-sonnet")
         )
+        self._plain_fields["AI_MODEL"].setPlaceholderText("anthropic/claude-4.5-sonnet")
         self._plain_fields["AI_MODEL"].setStyleSheet(get_input_field_stylesheet())
         self._plain_fields["AI_MODEL"].setFont(create_font(10))
-        pref_form.addRow(self._make_label("AI Model:"), self._plain_fields["AI_MODEL"])
+        self._plain_fields["AI_MODEL"].setToolTip(
+            "OpenRouter model identifier (e.g. anthropic/claude-4.5-sonnet)"
+        )
+        ai_form.addRow(self._make_label("AI Model:"), self._plain_fields["AI_MODEL"])
 
-        # Alert email
+        layout.addWidget(ai_group)
+
+        # ----------------------------------------------------------------
+        # Group: Performance & Resources
+        # ----------------------------------------------------------------
+        perf_group = QGroupBox("Performance & Resources")
+        perf_group.setFont(create_font(10, bold=True))
+        perf_form = QFormLayout(perf_group)
+        perf_form.setSpacing(10)
+        perf_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        for key, label, placeholder, tooltip in [
+            ("MULTICORE_WORKERS", "CPU Workers:",
+             "auto (leave empty)", "Number of CPU cores for parallel processing — leave empty to auto-detect"),
+            ("MEMORY_LIMIT_GB", "Memory Limit (GB):",
+             "16", "Memory limit per worker in GB (e.g. 16)"),
+            ("CPU_CORES_MIN", "CPU Cores Min:",
+             "1", "Minimum number of CPU cores to allocate"),
+            ("CPU_CORES_MAX", "CPU Cores Max:",
+             "auto", "Maximum CPU cores — enter a number or 'auto'"),
+            ("CPU_AFFINITY_MODE", "CPU Affinity Mode:",
+             "automatic", "CPU affinity strategy: automatic or manual"),
+            ("MEMORY_CHART_HISTORY", "Chart History (points):",
+             "60", "Number of data points to keep in memory for charts"),
+            ("UPDATE_INTERVAL", "Update Interval (ms):",
+             "1000", "General UI update interval in milliseconds"),
+        ]:
+            self._plain_fields[key] = QLineEdit()
+            self._plain_fields[key].setText(
+                self._service.get_with_default(key, placeholder)
+            )
+            self._plain_fields[key].setPlaceholderText(placeholder)
+            self._plain_fields[key].setStyleSheet(get_input_field_stylesheet())
+            self._plain_fields[key].setFont(create_font(10))
+            self._plain_fields[key].setToolTip(tooltip)
+            perf_form.addRow(self._make_label(label), self._plain_fields[key])
+
+        layout.addWidget(perf_group)
+
+        # ----------------------------------------------------------------
+        # Group: Data & API
+        # ----------------------------------------------------------------
+        data_group = QGroupBox("Data & API")
+        data_group.setFont(create_font(10, bold=True))
+        data_form = QFormLayout(data_group)
+        data_form.setSpacing(10)
+        data_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        for key, label, placeholder, tooltip in [
+            ("LAKEAPI_REGION", "LakeAPI Region:",
+             "eu-west-1", "LakeAPI S3 region for market data downloads"),
+            ("LAKEAPI_LIMIT_GB", "Monthly Transfer Limit (GB):",
+             "300", "Monthly bandwidth cap for LakeAPI downloads in GB"),
+        ]:
+            self._plain_fields[key] = QLineEdit()
+            self._plain_fields[key].setText(
+                self._service.get_with_default(key, placeholder)
+            )
+            self._plain_fields[key].setPlaceholderText(placeholder)
+            self._plain_fields[key].setStyleSheet(get_input_field_stylesheet())
+            self._plain_fields[key].setFont(create_font(10))
+            self._plain_fields[key].setToolTip(tooltip)
+            data_form.addRow(self._make_label(label), self._plain_fields[key])
+
+        layout.addWidget(data_group)
+
+        # ----------------------------------------------------------------
+        # Group: Alerts & Logging
+        # ----------------------------------------------------------------
+        alert_group = QGroupBox("Alerts & Logging")
+        alert_group.setFont(create_font(10, bold=True))
+        alert_form = QFormLayout(alert_group)
+        alert_form.setSpacing(10)
+        alert_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        self._plain_fields["ENABLE_ALERTS"] = QLineEdit()
+        self._plain_fields["ENABLE_ALERTS"].setText(
+            self._service.get_with_default("ENABLE_ALERTS", "false")
+        )
+        self._plain_fields["ENABLE_ALERTS"].setPlaceholderText("true / false")
+        self._plain_fields["ENABLE_ALERTS"].setStyleSheet(get_input_field_stylesheet())
+        self._plain_fields["ENABLE_ALERTS"].setFont(create_font(10))
+        self._plain_fields["ENABLE_ALERTS"].setToolTip(
+            "Enable usage alerts: true or false"
+        )
+        alert_form.addRow(self._make_label("Enable Alerts:"), self._plain_fields["ENABLE_ALERTS"])
+
+        self._plain_fields["LOG_LEVEL"] = QLineEdit()
+        self._plain_fields["LOG_LEVEL"].setText(
+            self._service.get_with_default("LOG_LEVEL", "INFO")
+        )
+        self._plain_fields["LOG_LEVEL"].setPlaceholderText("DEBUG / INFO / WARNING / ERROR / CRITICAL")
+        self._plain_fields["LOG_LEVEL"].setStyleSheet(get_input_field_stylesheet())
+        self._plain_fields["LOG_LEVEL"].setFont(create_font(10))
+        self._plain_fields["LOG_LEVEL"].setToolTip(
+            "Application log verbosity: DEBUG, INFO, WARNING, ERROR, or CRITICAL"
+        )
+        alert_form.addRow(self._make_label("Log Level:"), self._plain_fields["LOG_LEVEL"])
+
         self._plain_fields["ALERT_EMAIL"] = QLineEdit()
         self._plain_fields["ALERT_EMAIL"].setText(
             self._service.get_with_default("ALERT_EMAIL", "")
@@ -614,9 +725,44 @@ class SettingsDialog(QDialog):
         self._plain_fields["ALERT_EMAIL"].setPlaceholderText("your@email.com (optional)")
         self._plain_fields["ALERT_EMAIL"].setStyleSheet(get_input_field_stylesheet())
         self._plain_fields["ALERT_EMAIL"].setFont(create_font(10))
-        pref_form.addRow(self._make_label("Alert Email:"), self._plain_fields["ALERT_EMAIL"])
+        self._plain_fields["ALERT_EMAIL"].setToolTip("Email address for usage and alert notifications")
+        alert_form.addRow(self._make_label("Alert Email:"), self._plain_fields["ALERT_EMAIL"])
 
-        layout.addWidget(pref_group)
+        layout.addWidget(alert_group)
+
+        # ----------------------------------------------------------------
+        # Group: UI Preferences
+        # ----------------------------------------------------------------
+        ui_group = QGroupBox("UI Preferences")
+        ui_group.setFont(create_font(10, bold=True))
+        ui_form = QFormLayout(ui_group)
+        ui_form.setSpacing(10)
+        ui_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        self._plain_fields["DARK_THEME_ENABLED"] = QLineEdit()
+        self._plain_fields["DARK_THEME_ENABLED"].setText(
+            self._service.get_with_default("DARK_THEME_ENABLED", "true")
+        )
+        self._plain_fields["DARK_THEME_ENABLED"].setPlaceholderText("true / false")
+        self._plain_fields["DARK_THEME_ENABLED"].setStyleSheet(get_input_field_stylesheet())
+        self._plain_fields["DARK_THEME_ENABLED"].setFont(create_font(10))
+        self._plain_fields["DARK_THEME_ENABLED"].setToolTip(
+            "Enable dark theme: true or false (restart required)"
+        )
+        ui_form.addRow(self._make_label("Dark Theme:"), self._plain_fields["DARK_THEME_ENABLED"])
+
+        self._plain_fields["UI_THEME"] = QLineEdit()
+        self._plain_fields["UI_THEME"].setText(
+            self._service.get_with_default("UI_THEME", "dark")
+        )
+        self._plain_fields["UI_THEME"].setPlaceholderText("dark / light")
+        self._plain_fields["UI_THEME"].setStyleSheet(get_input_field_stylesheet())
+        self._plain_fields["UI_THEME"].setFont(create_font(10))
+        self._plain_fields["UI_THEME"].setToolTip("UI theme identifier: dark or light (restart required)")
+        ui_form.addRow(self._make_label("UI Theme:"), self._plain_fields["UI_THEME"])
+
+        layout.addWidget(ui_group)
+
         layout.addStretch()
         scroll.setWidget(container)
         return scroll
@@ -624,7 +770,7 @@ class SettingsDialog(QDialog):
     # ------------------------------------------------------------------
 
     def _build_admin_tab(self) -> QWidget:
-        """Admin-only settings: DB, performance, logging.
+        """Admin-only settings: DB, risk, strategy, training, resource thresholds.
 
         IMPORTANT: this method must NOT call self._service.get() or
         get_with_default() for any admin-only key.  Those calls go through
@@ -658,26 +804,36 @@ class SettingsDialog(QDialog):
         badge.setWordWrap(True)
         layout.addWidget(badge)
 
-        # --- Database group ---
+        # ----------------------------------------------------------------
+        # Helper: build a plain field row (uses static placeholder, populated later)
+        # ----------------------------------------------------------------
+        def _admin_field(key: str, placeholder: str, tooltip: str = "") -> QLineEdit:
+            field = QLineEdit()
+            field.setText(placeholder)
+            field.setPlaceholderText(placeholder)
+            field.setStyleSheet(get_input_field_stylesheet())
+            field.setFont(create_font(10))
+            if tooltip:
+                field.setToolTip(tooltip)
+            self._plain_fields[key] = field
+            return field
+
+        # ----------------------------------------------------------------
+        # Group: Database Connection
+        # ----------------------------------------------------------------
         db_group = QGroupBox("Database Connection")
         db_group.setFont(create_font(10, bold=True))
         db_form = QFormLayout(db_group)
         db_form.setSpacing(10)
         db_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        # Use static defaults — do NOT call service.get*() here (role not yet
-        # elevated; admin keys raise PermissionError for non-admin users).
-        for key, label, placeholder in [
-            ("POSTGRES_HOST", "Host:", "localhost"),
-            ("POSTGRES_PORT", "Port:", "5432"),
-            ("POSTGRES_DB", "Database:", "optimizer_v3"),
-            ("POSTGRES_USER", "User:", "optimizer_admin"),
+        for key, label, placeholder, tooltip in [
+            ("POSTGRES_HOST", "Host:", "localhost", "PostgreSQL server hostname or IP"),
+            ("POSTGRES_PORT", "Port:", "5432", "PostgreSQL port (default 5432)"),
+            ("POSTGRES_DB", "Database:", "optimizer_v3", "Database name"),
+            ("POSTGRES_USER", "User:", "optimizer_admin", "Database user account"),
         ]:
-            self._plain_fields[key] = QLineEdit()
-            self._plain_fields[key].setText(placeholder)
-            self._plain_fields[key].setStyleSheet(get_input_field_stylesheet())
-            self._plain_fields[key].setFont(create_font(10))
-            db_form.addRow(self._make_label(label), self._plain_fields[key])
+            db_form.addRow(self._make_label(label), _admin_field(key, placeholder, tooltip))
 
         # DB password (secret field)
         self._secret_widgets["POSTGRES_PASSWORD"] = SecretFieldWidget(
@@ -687,41 +843,346 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(db_group)
 
-        # --- LakeAPI admin group ---
-        lake_group = QGroupBox("LakeAPI Admin")
-        lake_group.setFont(create_font(10, bold=True))
-        lake_form = QFormLayout(lake_group)
-        lake_form.setSpacing(10)
-        lake_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        # ----------------------------------------------------------------
+        # Group: DB Connection Pool
+        # ----------------------------------------------------------------
+        pool_group = QGroupBox("DB Connection Pool")
+        pool_group.setFont(create_font(10, bold=True))
+        pool_form = QFormLayout(pool_group)
+        pool_form.setSpacing(10)
+        pool_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        for key, label, placeholder in [
-            ("LAKEAPI_REGION", "Region:", "eu-west-1"),
-            ("LAKEAPI_LIMIT_GB", "Monthly Limit (GB):", "300"),
+        for key, label, placeholder, tooltip in [
+            ("POSTGRES_POOL_SIZE", "Pool Size:", "10",
+             "Number of persistent connections in the connection pool"),
+            ("POSTGRES_MAX_OVERFLOW", "Max Overflow:", "20",
+             "Maximum extra connections allowed above pool_size"),
+            ("POSTGRES_POOL_TIMEOUT", "Pool Timeout (s):", "30",
+             "Seconds to wait for a connection before raising an error"),
+            ("POSTGRES_POOL_RECYCLE", "Pool Recycle (s):", "3600",
+             "Seconds after which connections are recycled (prevents stale connections)"),
         ]:
-            self._plain_fields[key] = QLineEdit()
-            self._plain_fields[key].setText(placeholder)
-            self._plain_fields[key].setStyleSheet(get_input_field_stylesheet())
-            self._plain_fields[key].setFont(create_font(10))
-            lake_form.addRow(self._make_label(label), self._plain_fields[key])
+            pool_form.addRow(self._make_label(label), _admin_field(key, placeholder, tooltip))
 
-        layout.addWidget(lake_group)
+        layout.addWidget(pool_group)
 
-        # --- System group ---
-        sys_group = QGroupBox("System")
-        sys_group.setFont(create_font(10, bold=True))
-        sys_form = QFormLayout(sys_group)
-        sys_form.setSpacing(10)
-        sys_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        # ----------------------------------------------------------------
+        # Group: DB SSL
+        # ----------------------------------------------------------------
+        ssl_group = QGroupBox("DB SSL")
+        ssl_group.setFont(create_font(10, bold=True))
+        ssl_form = QFormLayout(ssl_group)
+        ssl_form.setSpacing(10)
+        ssl_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        self._plain_fields["LOG_LEVEL"] = QLineEdit()
-        self._plain_fields["LOG_LEVEL"].setText("INFO")
-        self._plain_fields["LOG_LEVEL"].setStyleSheet(get_input_field_stylesheet())
-        self._plain_fields["LOG_LEVEL"].setFont(create_font(10))
-        sys_form.addRow(self._make_label("Log Level:"), self._plain_fields["LOG_LEVEL"])
+        ssl_form.addRow(
+            self._make_label("SSL Enabled:"),
+            _admin_field("POSTGRES_SSL", "false",
+                         "Enable SSL for PostgreSQL connections: true or false"),
+        )
 
-        layout.addWidget(sys_group)
+        # SSL cert/key are secret — stored in keyring
+        for key, label, tooltip in [
+            ("POSTGRES_SSL_CERT_PATH", "SSL Cert Path:",
+             "Path to PEM-encoded SSL certificate file"),
+            ("POSTGRES_SSL_KEY_PATH", "SSL Key Path:",
+             "Path to PEM-encoded SSL private key file"),
+        ]:
+            self._secret_widgets[key] = SecretFieldWidget(key, self._service)
+            ssl_form.addRow(self._make_label(label), self._secret_widgets[key])
 
-        # --- Change PIN group ---
+        layout.addWidget(ssl_group)
+
+        # ----------------------------------------------------------------
+        # Group: DB Monitoring
+        # ----------------------------------------------------------------
+        mon_group = QGroupBox("DB Monitoring")
+        mon_group.setFont(create_font(10, bold=True))
+        mon_form = QFormLayout(mon_group)
+        mon_form.setSpacing(10)
+        mon_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        for key, label, placeholder, tooltip in [
+            ("POSTGRES_LOG_MIN_DURATION", "Log Min Duration (ms):", "1000",
+             "Log queries that take longer than this many milliseconds (0 = log all)"),
+            ("POSTGRES_LOG_CONNECTIONS", "Log Connections:", "false",
+             "Log each new connection: true or false"),
+            ("POSTGRES_LOG_DISCONNECTIONS", "Log Disconnections:", "false",
+             "Log each connection close: true or false"),
+        ]:
+            mon_form.addRow(self._make_label(label), _admin_field(key, placeholder, tooltip))
+
+        layout.addWidget(mon_group)
+
+        # ----------------------------------------------------------------
+        # Group: Backup
+        # ----------------------------------------------------------------
+        bak_group = QGroupBox("Backup")
+        bak_group.setFont(create_font(10, bold=True))
+        bak_form = QFormLayout(bak_group)
+        bak_form.setSpacing(10)
+        bak_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        for key, label, placeholder, tooltip in [
+            ("POSTGRES_BACKUP_PATH", "Backup Path:", "",
+             "Directory path where backups are written"),
+            ("POSTGRES_BACKUP_RETENTION_DAYS", "Retention (days):", "30",
+             "Number of days to keep backup files"),
+            ("POSTGRES_BACKUP_COMPRESSION", "Compression:", "true",
+             "Compress backup files: true or false"),
+        ]:
+            bak_form.addRow(self._make_label(label), _admin_field(key, placeholder, tooltip))
+
+        layout.addWidget(bak_group)
+
+        # ----------------------------------------------------------------
+        # Group: Risk Management
+        # ----------------------------------------------------------------
+        risk_group = QGroupBox("Risk Management")
+        risk_group.setFont(create_font(10, bold=True))
+        risk_form = QFormLayout(risk_group)
+        risk_form.setSpacing(10)
+        risk_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        for key, label, placeholder, tooltip in [
+            ("RISK_MIN_REWARD_RATIO", "Min Reward Ratio:", "2.0",
+             "Minimum acceptable risk:reward ratio for a trade"),
+            ("RISK_PERCENT", "Risk Percent:", "1.0",
+             "Percentage of capital risked per trade"),
+            ("RISK_MAX_LEVERAGE", "Max Leverage:", "1.0",
+             "Maximum leverage multiplier (1.0 = no leverage)"),
+            ("RISK_MIN_CONFLUENCE", "Min Confluence:", "2",
+             "Minimum number of confirming signals required"),
+            ("RISK_MAX_BARS_HELD", "Max Bars Held:", "20",
+             "Maximum number of bars a position can be held"),
+            ("RISK_MAX_DRAWDOWN", "Max Drawdown:", "0.02",
+             "Maximum acceptable portfolio drawdown (e.g. 0.02 = 2%)"),
+            ("RISK_MIN_WIN_RATE", "Min Win Rate:", "0.55",
+             "Minimum required win rate (e.g. 0.55 = 55%)"),
+            ("RISK_MIN_PROFIT_FACTOR", "Min Profit Factor:", "1.5",
+             "Minimum acceptable profit factor"),
+            ("RISK_MAX_CORRELATION", "Max Correlation:", "0.7",
+             "Maximum allowed correlation between positions"),
+            ("RISK_MAX_EXPOSURE", "Max Exposure:", "0.1",
+             "Maximum total exposure as fraction of capital"),
+            ("EMERGENCY_SL_ENABLED", "Emergency SL Enabled:", "true",
+             "Activate emergency stop-loss: true or false"),
+            ("EMERGENCY_SL_THRESHOLD", "Emergency SL Threshold:", "3.0",
+             "ATR multiplier for emergency stop-loss trigger"),
+            ("EMERGENCY_SL_VOLATILITY_LOOKBACK", "ESL Vol Lookback:", "14",
+             "Lookback periods for emergency SL volatility calculation"),
+            ("EMERGENCY_SL_VOLATILITY_MULTIPLIER", "ESL Vol Multiplier:", "2.0",
+             "Volatility multiplier for emergency SL width"),
+            ("TP_FIBONACCI_LEVELS", "TP Fibonacci Levels:", "[1.618, 2.618, 3.618]",
+             "Take-profit Fibonacci extension levels (JSON list)"),
+            ("TP_FIBONACCI_ADJUSTMENT_THRESHOLD", "TP Fib Adjustment Threshold:", "0.01",
+             "Minimum distance for Fibonacci TP adjustment"),
+            ("TP_HYBRID_ATR_MULTIPLIER", "TP Hybrid ATR Multiplier:", "2.0",
+             "ATR multiplier for hybrid take-profit"),
+            ("TP_HYBRID_MIN_DISTANCE", "TP Hybrid Min Distance:", "0.005",
+             "Minimum distance for hybrid take-profit"),
+            ("TP_FIXED_DISTANCES", "TP Fixed Distances:", "[0.01, 0.02, 0.03]",
+             "Fixed take-profit distance levels (JSON list)"),
+            ("SL_ADAPTIVE_ATR_PERIOD", "SL Adaptive ATR Period:", "14",
+             "ATR period for adaptive stop-loss"),
+            ("SL_ADAPTIVE_ATR_MULTIPLIER", "SL Adaptive ATR Multiplier:", "2.0",
+             "ATR multiplier for adaptive stop-loss"),
+            ("SL_ADAPTIVE_MIN_DISTANCE", "SL Adaptive Min Distance:", "0.005",
+             "Minimum distance for adaptive stop-loss"),
+            ("SL_STATIC_DISTANCE", "SL Static Distance:", "0.01",
+             "Fixed stop-loss distance as fraction of price"),
+        ]:
+            risk_form.addRow(self._make_label(label), _admin_field(key, placeholder, tooltip))
+
+        layout.addWidget(risk_group)
+
+        # ----------------------------------------------------------------
+        # Group: Strategy Configuration (Optimization Ranges)
+        # ----------------------------------------------------------------
+        opt_group = QGroupBox("Strategy Configuration — Optimization Ranges")
+        opt_group.setFont(create_font(10, bold=True))
+        opt_form = QFormLayout(opt_group)
+        opt_form.setSpacing(10)
+        opt_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        for key, label, placeholder, tooltip in [
+            ("OPTIMIZATION_RISK_REWARD_MIN", "Risk/Reward Min:", "1.5",
+             "Minimum risk:reward ratio to test during optimization"),
+            ("OPTIMIZATION_RISK_REWARD_MAX", "Risk/Reward Max:", "3.0",
+             "Maximum risk:reward ratio to test during optimization"),
+            ("OPTIMIZATION_RISK_PERCENT_MIN", "Risk % Min:", "0.5",
+             "Minimum risk percent per trade during optimization"),
+            ("OPTIMIZATION_RISK_PERCENT_MAX", "Risk % Max:", "2.0",
+             "Maximum risk percent per trade during optimization"),
+            ("OPTIMIZATION_CONFLUENCE_MIN", "Confluence Min:", "1",
+             "Minimum confluence level in optimization sweep"),
+            ("OPTIMIZATION_CONFLUENCE_MAX", "Confluence Max:", "3",
+             "Maximum confluence level in optimization sweep"),
+            ("OPTIMIZATION_BARS_HELD_MIN", "Bars Held Min:", "10",
+             "Minimum bars held in optimization sweep"),
+            ("OPTIMIZATION_BARS_HELD_MAX", "Bars Held Max:", "30",
+             "Maximum bars held in optimization sweep"),
+            ("OPTIMIZATION_VOLATILITY_MULTIPLIER_MIN", "Vol Multiplier Min:", "1.5",
+             "Minimum volatility multiplier in optimization sweep"),
+            ("OPTIMIZATION_VOLATILITY_MULTIPLIER_MAX", "Vol Multiplier Max:", "2.5",
+             "Maximum volatility multiplier in optimization sweep"),
+            ("OPTIMIZATION_SL_DISTANCE_MIN", "SL Distance Min:", "0.003",
+             "Minimum stop-loss distance in optimization sweep"),
+            ("OPTIMIZATION_SL_DISTANCE_MAX", "SL Distance Max:", "0.025",
+             "Maximum stop-loss distance in optimization sweep"),
+        ]:
+            opt_form.addRow(self._make_label(label), _admin_field(key, placeholder, tooltip))
+
+        layout.addWidget(opt_group)
+
+        # ----------------------------------------------------------------
+        # Group: Strategy Configuration (Metrics)
+        # ----------------------------------------------------------------
+        metrics_group = QGroupBox("Strategy Configuration — Performance Metrics")
+        metrics_group.setFont(create_font(10, bold=True))
+        metrics_form = QFormLayout(metrics_group)
+        metrics_form.setSpacing(10)
+        metrics_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        for key, label, placeholder, tooltip in [
+            ("METRICS_SHARPE_WINDOW", "Sharpe Window:", "252",
+             "Rolling window for Sharpe ratio calculation (trading days)"),
+            ("METRICS_SORTINO_WINDOW", "Sortino Window:", "252",
+             "Rolling window for Sortino ratio calculation"),
+            ("METRICS_CALMAR_WINDOW", "Calmar Window:", "252",
+             "Rolling window for Calmar ratio calculation"),
+            ("METRICS_MIN_TRADES", "Min Trades:", "30",
+             "Minimum number of trades required before metrics are computed"),
+            ("METRICS_CONFIDENCE_LEVEL", "Confidence Level:", "0.95",
+             "Confidence level for statistical metric calculations"),
+            ("RISK_VAR_CONFIDENCE", "VaR Confidence:", "0.99",
+             "Confidence level for Value-at-Risk"),
+            ("RISK_VAR_WINDOW", "VaR Window:", "10",
+             "Rolling window for VaR calculation (days)"),
+            ("RISK_ES_CONFIDENCE", "ES Confidence:", "0.975",
+             "Confidence level for Expected Shortfall"),
+            ("RISK_MONTE_CARLO_SIMS", "Monte Carlo Sims:", "10000",
+             "Number of Monte Carlo simulations for risk metrics"),
+            ("RISK_DRAWDOWN_WINDOW", "Drawdown Window:", "252",
+             "Rolling window for drawdown metrics"),
+            ("RISK_CORRELATION_WINDOW", "Correlation Window:", "60",
+             "Rolling window for correlation calculation"),
+            ("TRADE_MIN_SAMPLE_SIZE", "Trade Min Sample:", "50",
+             "Minimum trades required for trade analysis"),
+            ("TRADE_PATTERN_CONFIDENCE", "Pattern Confidence:", "0.95",
+             "Confidence threshold for trade pattern recognition"),
+            ("TRADE_CLUSTER_THRESHOLD", "Cluster Threshold:", "0.5",
+             "Distance threshold for trade clustering"),
+            ("TRADE_QUALITY_WINDOW", "Trade Quality Window:", "30",
+             "Rolling window for trade quality scoring"),
+            ("TRADE_SLIPPAGE_THRESHOLD", "Slippage Threshold:", "0.001",
+             "Threshold beyond which slippage is flagged"),
+            ("TRADE_COMMISSION_IMPACT_THRESHOLD", "Commission Impact:", "0.002",
+             "Threshold for flagging high commission impact"),
+            ("CAPITAL_EFFICIENCY_TARGET", "Capital Efficiency Target:", "0.8",
+             "Target capital utilization efficiency (0-1)"),
+            ("CAPITAL_FREE_MARGIN_TARGET", "Free Margin Target:", "0.3",
+             "Target free margin as fraction of capital (0-1)"),
+            ("CAPITAL_MAX_USAGE_LIMIT", "Capital Max Usage:", "0.9",
+             "Hard limit on capital usage as fraction (0-1)"),
+            ("CAPITAL_TURNOVER_TARGET", "Capital Turnover Target:", "12",
+             "Target number of portfolio turnovers per year"),
+            ("CAPITAL_CURVE_SMOOTHNESS", "Curve Smoothness:", "0.7",
+             "Target equity curve smoothness score (0-1)"),
+            ("WEIGHT_SHARPE_RATIO", "Weight Sharpe:", "0.20",
+             "Scoring weight for Sharpe ratio (weights sum to 1.0)"),
+            ("WEIGHT_SORTINO_RATIO", "Weight Sortino:", "0.15", "Scoring weight for Sortino ratio"),
+            ("WEIGHT_CALMAR_RATIO", "Weight Calmar:", "0.15", "Scoring weight for Calmar ratio"),
+            ("WEIGHT_WIN_RATE", "Weight Win Rate:", "0.10", "Scoring weight for win rate"),
+            ("WEIGHT_PROFIT_FACTOR", "Weight Profit Factor:", "0.10", "Scoring weight for profit factor"),
+            ("WEIGHT_MAX_DRAWDOWN", "Weight Max Drawdown:", "0.10", "Scoring weight for max drawdown"),
+            ("WEIGHT_CAPITAL_EFFICIENCY", "Weight Capital Eff.:", "0.10",
+             "Scoring weight for capital efficiency"),
+            ("WEIGHT_TRADE_QUALITY", "Weight Trade Quality:", "0.10",
+             "Scoring weight for trade quality"),
+        ]:
+            metrics_form.addRow(self._make_label(label), _admin_field(key, placeholder, tooltip))
+
+        layout.addWidget(metrics_group)
+
+        # ----------------------------------------------------------------
+        # Group: State Management
+        # ----------------------------------------------------------------
+        state_group = QGroupBox("State Management")
+        state_group.setFont(create_font(10, bold=True))
+        state_form = QFormLayout(state_group)
+        state_form.setSpacing(10)
+        state_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        for key, label, placeholder, tooltip in [
+            ("STATE_SAVE_INTERVAL", "Save Interval (s):", "300",
+             "Interval in seconds between automatic state saves"),
+            ("STATE_MAX_HISTORY", "Max History:", "100",
+             "Maximum number of historical state snapshots to retain"),
+            ("STATE_COMPRESSION", "Compression:", "true",
+             "Compress saved state files: true or false"),
+            ("STATE_BACKUP_COUNT", "Backup Count:", "3",
+             "Number of rolling state backups to keep"),
+            ("STATE_VALIDATION_LEVEL", "Validation Level:", "strict",
+             "State validation strictness: strict, normal, or off"),
+        ]:
+            state_form.addRow(self._make_label(label), _admin_field(key, placeholder, tooltip))
+
+        layout.addWidget(state_group)
+
+        # ----------------------------------------------------------------
+        # Group: Training System
+        # ----------------------------------------------------------------
+        train_group = QGroupBox("Training System")
+        train_group.setFont(create_font(10, bold=True))
+        train_form = QFormLayout(train_group)
+        train_form.setSpacing(10)
+        train_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        for key, label, placeholder, tooltip in [
+            ("TRAINING_MAX_LOOKBACK", "Max Lookback (days):", "180",
+             "Maximum lookback period for training data in days"),
+            ("TRAINING_MIN_SIGNALS", "Min Signals:", "50",
+             "Minimum number of signals required for a training run"),
+            ("TRAINING_MAX_TIMEFRAMES", "Max Timeframes:", "5",
+             "Maximum number of timeframes used in training"),
+            ("TRAINING_BATCH_SIZE", "Batch Size:", "1000",
+             "Number of samples per training batch"),
+            ("TRAINING_PARALLEL_BLOCKS", "Parallel Blocks:", "4",
+             "Number of strategy blocks processed in parallel during training"),
+        ]:
+            train_form.addRow(self._make_label(label), _admin_field(key, placeholder, tooltip))
+
+        layout.addWidget(train_group)
+
+        # ----------------------------------------------------------------
+        # Group: Resource Thresholds
+        # ----------------------------------------------------------------
+        res_group = QGroupBox("Resource Thresholds")
+        res_group.setFont(create_font(10, bold=True))
+        res_form = QFormLayout(res_group)
+        res_form.setSpacing(10)
+        res_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        for key, label, placeholder, tooltip in [
+            ("RESOURCE_CHECK_INTERVAL", "Check Interval (s):", "60",
+             "Interval in seconds between resource usage checks"),
+            ("RESOURCE_WARNING_THRESHOLD", "Warning Threshold (%):", "80",
+             "CPU/memory usage percentage that triggers a warning"),
+            ("RESOURCE_CRITICAL_THRESHOLD", "Critical Threshold (%):", "90",
+             "CPU/memory usage percentage that triggers critical action"),
+            ("RESOURCE_AUTO_CLEANUP", "Auto Cleanup:", "true",
+             "Automatically free resources when critical threshold is hit: true or false"),
+            ("RESOURCE_HISTORY_LENGTH", "History Length:", "1440",
+             "Number of resource usage samples to keep in history"),
+        ]:
+            res_form.addRow(self._make_label(label), _admin_field(key, placeholder, tooltip))
+
+        layout.addWidget(res_group)
+
+        # ----------------------------------------------------------------
+        # Group: Change Admin PIN
+        # ----------------------------------------------------------------
         pin_group = QGroupBox("Admin PIN")
         pin_group.setFont(create_font(10, bold=True))
         pin_layout = QVBoxLayout(pin_group)
@@ -836,16 +1297,8 @@ class SettingsDialog(QDialog):
         Must only be called after PIN authentication (role == ADMIN).
         Using the service before auth raises PermissionError for admin keys.
         """
-        admin_plain_defaults = {
-            "POSTGRES_HOST": "localhost",
-            "POSTGRES_PORT": "5432",
-            "POSTGRES_DB": "optimizer_v3",
-            "POSTGRES_USER": "optimizer_admin",
-            "LAKEAPI_REGION": "eu-west-1",
-            "LAKEAPI_LIMIT_GB": "300",
-            "LOG_LEVEL": "INFO",
-        }
-        for key, default in admin_plain_defaults.items():
+        from src.strategy_builder.ui.settings_service import ADMIN_DEFAULTS
+        for key, default in ADMIN_DEFAULTS.items():
             if key in self._plain_fields:
                 try:
                     value = self._service.get_with_default(key, default)
@@ -853,9 +1306,10 @@ class SettingsDialog(QDialog):
                     value = default
                 self._plain_fields[key].setText(value)
 
-        # Refresh the secret display for POSTGRES_PASSWORD now that admin is active
-        if "POSTGRES_PASSWORD" in self._secret_widgets:
-            self._secret_widgets["POSTGRES_PASSWORD"]._refresh_display()
+        # Refresh all admin secret widgets now that admin role is active
+        for key in ("POSTGRES_PASSWORD", "POSTGRES_SSL_CERT_PATH", "POSTGRES_SSL_KEY_PATH"):
+            if key in self._secret_widgets:
+                self._secret_widgets[key]._refresh_display()
 
     def _reveal_admin_tab(self) -> None:
         # Populate admin fields with live values now that role is elevated.
@@ -893,7 +1347,7 @@ class SettingsDialog(QDialog):
         # Collect user values
         user_values: dict[str, str] = {}
         for key, widget in self._secret_widgets.items():
-            if key in ("POSTGRES_PASSWORD",):
+            if key in ("POSTGRES_PASSWORD", "POSTGRES_SSL_CERT_PATH", "POSTGRES_SSL_KEY_PATH"):
                 # Skip admin-only secrets if not admin
                 if not self._service.is_admin():
                     continue
@@ -902,12 +1356,22 @@ class SettingsDialog(QDialog):
         for key, field in self._plain_fields.items():
             user_values[key] = field.text().strip()
 
+        # User-editable keys (non-admin)
+        _user_keys = {
+            "OPENROUTER_API_KEY", "LAKEAPI_KEY", "LAKEAPI_SECRET",
+            "AI_MODEL", "ALERT_EMAIL",
+            "LAKEAPI_REGION", "LAKEAPI_LIMIT_GB",
+            "MULTICORE_WORKERS", "MEMORY_LIMIT_GB",
+            "CPU_CORES_MIN", "CPU_CORES_MAX", "CPU_AFFINITY_MODE",
+            "MEMORY_CHART_HISTORY", "UPDATE_INTERVAL",
+            "ENABLE_ALERTS", "LOG_LEVEL",
+            "DARK_THEME_ENABLED", "UI_THEME",
+        }
+
         # Persist user settings
         try:
             self._service.save_user_settings(
-                {k: v for k, v in user_values.items()
-                 if k in ("OPENROUTER_API_KEY", "LAKEAPI_KEY", "LAKEAPI_SECRET",
-                           "AI_MODEL", "ALERT_EMAIL")}
+                {k: v for k, v in user_values.items() if k in _user_keys}
             )
         except Exception as e:
             errors.append(f"User settings: {e}")
@@ -916,8 +1380,7 @@ class SettingsDialog(QDialog):
         if self._service.is_admin():
             admin_values = {
                 k: v for k, v in user_values.items()
-                if k not in ("OPENROUTER_API_KEY", "LAKEAPI_KEY", "LAKEAPI_SECRET",
-                              "AI_MODEL", "ALERT_EMAIL")
+                if k not in _user_keys
             }
             try:
                 self._service.save_admin_settings(admin_values)
