@@ -14,7 +14,7 @@ Institutional-grade implementation with:
 
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import json
 import logging
@@ -191,7 +191,7 @@ class StrategyDatabaseManager:
             
             if parent_strategy:
                 # Trigger updated_at by setting a field (onupdate will handle timestamp)
-                parent_strategy.updated_at = datetime.utcnow()
+                parent_strategy.updated_at = datetime.now(timezone.utc)
             
             self.session.commit()
             

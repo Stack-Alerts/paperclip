@@ -19,7 +19,7 @@ Author: Strategy Builder Team
 Date: 2026-05-02
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -92,7 +92,7 @@ class DataVerifyThread(QThread):
         try:
             self.progress.emit(10, 100, "Initialising data manager…")
             manager = UnifiedDataManager(mode='live')
-            horizon_cutoff = datetime.utcnow() - timedelta(days=_BINANCE_HORIZON_DAYS)
+            horizon_cutoff = datetime.now(timezone.utc) - timedelta(days=_BINANCE_HORIZON_DAYS)
 
             report: Dict = {}
             steps = len(self._TIMEFRAMES)
