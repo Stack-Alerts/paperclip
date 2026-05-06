@@ -9,9 +9,10 @@ CRITICAL: All signals use proper types for institutional safety.
 """
 
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from decimal import Decimal
+import os
 import sys
 import traceback
 
@@ -98,6 +99,12 @@ class TrainingThread(QThread):
         self._is_running = True
         self._results = []
         
+        # Simulation mode: set True only when TRAINING_SIMULATION_MODE=true env var is present.
+        # When False (default), the real _train_block() path is used.
+        self._simulation_mode: bool = (
+            os.environ.get('TRAINING_SIMULATION_MODE', 'false').lower() == 'true'
+        )
+        
         # Performance tracking
         self._start_time = None
         self._blocks_completed = 0
@@ -107,95 +114,141 @@ class TrainingThread(QThread):
             self.logger.info(
                 f"TrainingThread initialized: {len(selected_blocks)} blocks, "
                 f"{len(selected_timeframes)} timeframes, "
-                f"{period_days} days"
+                f"{period_days} days, "
+                f"simulation_mode={self.is_simulation_mode}"
             )
 
     @property
     def is_simulation_mode(self) -> bool:
-        """Return True when the real training path is not active.
+        """True when simulation mode is active; False when the real training path is used.
 
-        Currently ``run()`` uses dummy/random data (SIMULATION MODE) rather
-        than live NautilusTrader signal analysis.  This property exposes that
-        fact so callers can guard against applying the synthetic results to
-        production strategy configuration.
-
-        Set this to ``False`` (or override the property) once the real data
-        pipeline is wired into ``run()``.
+        Set via TRAINING_SIMULATION_MODE env var (default: False — real path active).
         """
-        return True
+        return self._simulation_mode
+
+    @is_simulation_mode.setter
+    def is_simulation_mode(self, value: bool) -> None:
+        self._simulation_mode = value
 
     def run(self):
         """
-        Execute training (runs in background thread)
+        Execute training (runs in background thread).
         
-        SIMULATION MODE: Uses dummy data for demonstration
-        TODO: Integrate real data loading system
+        Routes to simulation or real training path based on TRAINING_SIMULATION_MODE env var.
+        
+        Simulation path (TRAINING_SIMULATION_MODE=true):
+        - Uses random dummy data for UI demonstration
+        - is_simulation_mode remains True
+        
+        Real path (default — TRAINING_SIMULATION_MODE unset or false):
+        - Calls _train_block() for each (block_name, timeframe) combination
+        - Uses NautilusTrainingSystem + BacktestDataProvider for real analysis
+        - is_simulation_mode is False, unblocking dependent features
         """
         try:
             self._start_time = datetime.now()
             self._total_blocks = len(self.selected_blocks) * len(self.selected_timeframes)
-            
-            # Emit initial progress
+
             self.progress_update.emit(0, self._total_blocks, "Starting training...")
-            
-            # SIMULATION: Process each block with dummy data
-            block_num = 0
-            for block_name in self.selected_blocks:
-                for timeframe in self.selected_timeframes:
-                    # Check if cancelled
-                    if not self._is_running:
-                        self.progress_update.emit(
-                            self._blocks_completed,
-                            self._total_blocks,
-                            "Training cancelled"
-                        )
-                        return
-                    
-                    block_num += 1
-                    
-                    # Update progress
-                    self.progress_update.emit(
-                        block_num,
-                        self._total_blocks,
-                        f"Training {block_name} on {timeframe}..."
-                    )
-                    
-                    # SIMULATION: Generate dummy result
-                    from random import uniform
-                    result = {
-                        'signal_name': block_name,
-                        'timeframe': timeframe,
-                        'optimal_delay': int(uniform(2, 10)),
-                        'min_delay': int(uniform(1, 3)),
-                        'max_delay': int(uniform(10, 15)),
-                        'sample_size': int(uniform(50, 200)),
-                        'confidence': uniform(0.5, 0.95)
-                    }
-                    
-                    self._results.append(result)
-                    self._blocks_completed += 1
-                    
-                    # Emit block completion
-                    self.block_complete.emit(block_name, result)
-                    
-                    # Update ETA
-                    self._update_eta()
-                    
-                    # Simulate work (reduce for faster demo)
-                    self.msleep(500)  # 0.5 seconds per block
-            
+
+            if self.is_simulation_mode:
+                self._run_simulation()
+            else:
+                self.is_simulation_mode = False  # Explicitly mark real path active
+                self._run_real_training()
+
             # Training complete
             self.progress_update.emit(
                 self._total_blocks,
                 self._total_blocks,
                 "Training complete!"
             )
-            
             self.training_complete.emit(self._results)
-            
+
         except Exception as e:
             error_msg = f"Training error: {str(e)}\n{traceback.format_exc()}"
             self.error_occurred.emit(error_msg)
+
+    def _run_simulation(self):
+        """
+        Simulation mode: generate dummy training results.
+        
+        Used only when TRAINING_SIMULATION_MODE=true.
+        Real production code should never hit this path.
+        """
+        from random import uniform
+
+        block_num = 0
+        for block_name in self.selected_blocks:
+            for timeframe in self.selected_timeframes:
+                if not self._is_running:
+                    self.progress_update.emit(
+                        self._blocks_completed, self._total_blocks, "Training cancelled"
+                    )
+                    return
+
+                block_num += 1
+                self.progress_update.emit(
+                    block_num,
+                    self._total_blocks,
+                    f"[SIM] Training {block_name} on {timeframe}..."
+                )
+
+                result = {
+                    'signal_name': block_name,
+                    'timeframe': timeframe,
+                    'optimal_delay': int(uniform(2, 10)),
+                    'min_delay': int(uniform(1, 3)),
+                    'max_delay': int(uniform(10, 15)),
+                    'sample_size': int(uniform(50, 200)),
+                    'confidence': Decimal(str(round(uniform(0.5, 0.95), 4))),
+                    'method': 'simulation',
+                    'reasoning': 'Simulated result — TRAINING_SIMULATION_MODE=true',
+                }
+
+                self._results.append(result)
+                self._blocks_completed += 1
+                self.block_complete.emit(block_name, result)
+                self._update_eta()
+                self.msleep(500)
+
+    def _run_real_training(self):
+        """
+        Real training path: calls _train_block() for each (block, timeframe).
+        
+        Computes training period from period_days, builds InstrumentId for BTC,
+        and delegates to the full NautilusTrainingSystem analysis stack.
+        """
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=self.period_days)
+        period = (start_date, end_date)
+
+        # Default instrument: BTC-USD on BINANCE (override via config if needed)
+        instrument_id = InstrumentId(
+            symbol=Symbol('BTC-USD'),
+            venue=Venue('BINANCE')
+        )
+
+        if self.logger:
+            self.logger.info(
+                f"Real training: {len(self.selected_blocks)} blocks × "
+                f"{len(self.selected_timeframes)} timeframes, "
+                f"{start_date.date()} → {end_date.date()}"
+            )
+
+        for block_name in self.selected_blocks:
+            if not self._is_running:
+                self.progress_update.emit(
+                    self._blocks_completed, self._total_blocks, "Training cancelled"
+                )
+                return
+
+            self._train_block(
+                block_name=block_name,
+                period=period,
+                instrument_id=instrument_id,
+                block_index=self.selected_blocks.index(block_name)
+            )
     
     def _train_block(
         self,
@@ -335,7 +388,3 @@ class TrainingThread(QThread):
         
         percentage = (self._blocks_completed / self._total_blocks) * 100
         return (self._blocks_completed, self._total_blocks, percentage)
-
-
-# Import timedelta here (was missing)
-from datetime import timedelta
