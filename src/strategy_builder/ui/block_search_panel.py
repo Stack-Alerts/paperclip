@@ -391,16 +391,16 @@ class BlockListItem(QWidget):
         # Validate exactly one signal selected
         if len(selected_signals) == 0:
             if LOGGER_AVAILABLE and logger:
-            logger.warning(LogComponent.SEARCH_PANEL, 
-                         f"No signal selected for exit condition")
-            logger.warning(LogComponent.SEARCH_PANEL, "Please select ONE signal to add as exit condition")
+                logger.warning(LogComponent.SEARCH_PANEL,
+                             f"No signal selected for exit condition")
+                logger.warning(LogComponent.SEARCH_PANEL, "Please select ONE signal to add as exit condition")
             return
-        
+
         if len(selected_signals) > 1:
             if LOGGER_AVAILABLE and logger:
-                logger.warning(LogComponent.SEARCH_PANEL, 
+                logger.warning(LogComponent.SEARCH_PANEL,
                              f"Multiple signals selected for exit - only one allowed")
-            logger.warning(LogComponent.SEARCH_PANEL, "Exit conditions support ONE signal at a time. Please select only one signal.")
+                logger.warning(LogComponent.SEARCH_PANEL, "Exit conditions support ONE signal at a time. Please select only one signal.")
             return
         
         signal_name = selected_signals[0]
