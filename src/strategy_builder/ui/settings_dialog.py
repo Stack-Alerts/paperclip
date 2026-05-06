@@ -426,9 +426,17 @@ class SettingsDialog(QDialog):
     """
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
-        # Defect 5: Use Qt.Tool so the Settings window is an independent
-        # top-level window — dragging it does NOT move the Strategy Browser.
-        super().__init__(None, Qt.Tool)
+        # Defect 5: Use Qt.Window (not Qt.Tool/Qt.Dialog) so the Settings
+        # window is an independent top-level window — dragging it does NOT
+        # move the Strategy Builder.
+        # BTCAAAAA-240: Qt.Window gives a full OS title bar that includes a
+        # working maximize button.  Qt.WindowMaximizeButtonHint is added
+        # explicitly for platforms that require it.  We deliberately omit any
+        # setFixedSize / setMaximumSize call so the window is freely resizable.
+        super().__init__(
+            None,
+            Qt.Window | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint,
+        )
         self.setWindowTitle("Settings")
         self.setModal(True)
         # BTCAAAAA-87: Replace fixed pixel size with layout-driven sizing.
@@ -438,6 +446,8 @@ class SettingsDialog(QDialog):
         # BTCAAAAA-90: Raised minimum width floor from 820 to 860px to ensure
         # the widest row ("OpenRouter AI Key: (not set) | Show 10s | Edit")
         # fits with comfortable padding at default size.
+        # BTCAAAAA-240: Do NOT call setMaximumSize — leave the upper bound
+        # unconstrained so the window can maximise to fill the screen.
         self.setMinimumWidth(860)
         self.setMinimumHeight(600)
         self.setStyleSheet(get_main_stylesheet())
