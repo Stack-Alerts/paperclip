@@ -39,9 +39,10 @@ from PyQt5.QtCore import Qt, pyqtSignal
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 from src.strategy_builder.ui.styles import (
-    get_main_stylesheet,
     get_primary_button_stylesheet,
     get_secondary_button_stylesheet,
+    get_groupbox_header_stylesheet,
+    get_panel_title_stylesheet,
     get_text_edit_stylesheet,
     get_color,
     create_font
@@ -102,9 +103,6 @@ class TrainingPanelUI(QWidget):
     
     def _setup_ui(self):
         """Setup UI with zero hardcoded styles"""
-        # Apply main stylesheet
-        self.setStyleSheet(get_main_stylesheet())
-        
         # Main layout - INCREASED SPACING for better readability
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)  # More padding around edges
@@ -141,7 +139,7 @@ class TrainingPanelUI(QWidget):
         title_row = QHBoxLayout()
         title = QLabel("⚙️ Signal Calibration")
         title.setFont(create_font(12, bold=True))
-        title.setStyleSheet(f"color: {get_color('primary')}; padding: 4px;")
+        title.setStyleSheet(get_panel_title_stylesheet())
         title_row.addWidget(title)
         title_row.addStretch()
         header_layout.addLayout(title_row)
@@ -176,22 +174,7 @@ class TrainingPanelUI(QWidget):
         - QListWidget for timeframe selection (multi-select, replaces checkboxes)
         """
         config_group = QGroupBox("Calibration Configuration")
-        config_group.setStyleSheet(f"""
-            QGroupBox {{
-                font-weight: bold;
-                font-size: 11pt;
-                color: {get_color('primary')};
-                border: 2px solid {get_color('border')};
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 8px;
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }}
-        """)
+        config_group.setStyleSheet(get_groupbox_header_stylesheet())
         
         config_layout = QVBoxLayout()
         config_layout.setSpacing(12)  # Space between rows
@@ -223,7 +206,7 @@ class TrainingPanelUI(QWidget):
                 color: {get_color('text_primary')};
             }}
             QComboBox:hover {{
-                border-color: {get_color('primary')};
+                border-color: {get_color('border_focus')};
             }}
             QComboBox::drop-down {{
                 border: none;
@@ -258,7 +241,7 @@ class TrainingPanelUI(QWidget):
                 color: {get_color('text_primary')};
             }}
             QSpinBox:hover {{
-                border-color: {get_color('primary')};
+                border-color: {get_color('border_focus')};
             }}
         """)
         self.period_spin.setToolTip(
@@ -327,11 +310,11 @@ class TrainingPanelUI(QWidget):
                     background-color: {get_color('bg_light')};
                 }}
                 QCheckBox::indicator:checked {{
-                    background-color: {get_color('primary')};
-                    border-color: {get_color('primary')};
+                    background-color: {get_color('button_primary')};
+                    border-color: {get_color('button_primary')};
                 }}
                 QCheckBox::indicator:hover {{
-                    border-color: {get_color('primary')};
+                    border-color: {get_color('button_primary')};
                 }}
             """)
             checkbox.setToolTip("Select this block to calibrate its optimal signal re-evaluation delay")
@@ -388,7 +371,7 @@ class TrainingPanelUI(QWidget):
                 padding: 2px 6px;
             }}
             QListWidget::item:selected {{
-                background-color: {get_color('primary')};
+                background-color: {get_color('button_primary')};
                 color: {get_color('text_primary')};
             }}
             QListWidget::item:hover {{
@@ -416,22 +399,7 @@ class TrainingPanelUI(QWidget):
         Task 2.1.21: Progress tracking UI
         """
         progress_group = QGroupBox("Calibration Progress")
-        progress_group.setStyleSheet(f"""
-            QGroupBox {{
-                font-weight: bold;
-                font-size: 10pt;
-                color: {get_color('text_secondary')};
-                border: 2px solid {get_color('border')};
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 8px;
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }}
-        """)
+        progress_group.setStyleSheet(get_groupbox_header_stylesheet())
         
         progress_layout = QVBoxLayout()
         progress_layout.setSpacing(4)
@@ -454,7 +422,7 @@ class TrainingPanelUI(QWidget):
                 background-color: {get_color('bg_light')};
             }}
             QProgressBar::chunk {{
-                background-color: {get_color('primary')};
+                background-color: {get_color('button_primary')};
                 border-radius: 3px;
             }}
         """)
@@ -476,22 +444,7 @@ class TrainingPanelUI(QWidget):
         (Full implementation will be in training_results_table.py)
         """
         results_group = QGroupBox("Calibration Results")
-        results_group.setStyleSheet(f"""
-            QGroupBox {{
-                font-weight: bold;
-                font-size: 11pt;
-                color: {get_color('text_secondary')};
-                border: 2px solid {get_color('border')};
-                border-radius: 4px;
-                margin-top: 8px;
-                padding-top: 8px;
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }}
-        """)
+        results_group.setStyleSheet(get_groupbox_header_stylesheet())
         
         results_layout = QVBoxLayout()
         results_layout.setSpacing(4)
@@ -527,16 +480,16 @@ class TrainingPanelUI(QWidget):
         
         # Export button
         self.export_btn = QPushButton("Export Calibration Results")
-        self.export_btn.setStyleSheet(get_secondary_button_stylesheet())
-        self.export_btn.setFixedHeight(40)
+        self.export_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        self.export_btn.setFixedHeight(52)
         self.export_btn.setEnabled(False)
         self.export_btn.clicked.connect(self._export_results)
         action_layout.addWidget(self.export_btn)
         
         # Stop button (hidden by default)
         self.stop_btn = QPushButton("⏹ Stop Calibration")
-        self.stop_btn.setStyleSheet(get_secondary_button_stylesheet())
-        self.stop_btn.setFixedHeight(40)
+        self.stop_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        self.stop_btn.setFixedHeight(52)
         self.stop_btn.setVisible(False)
         self.stop_btn.clicked.connect(self._stop_training)
         action_layout.addWidget(self.stop_btn)
@@ -544,7 +497,7 @@ class TrainingPanelUI(QWidget):
         # Start button
         self.start_btn = QPushButton("▶ Start Calibration")
         self.start_btn.setStyleSheet(get_primary_button_stylesheet())
-        self.start_btn.setFixedHeight(40)
+        self.start_btn.setFixedSize(200, 52)
         self.start_btn.setToolTip(
             "Analyse historical bar data to calculate the optimal RECHECK delay "
             "for each selected block."
