@@ -2261,6 +2261,18 @@ class BacktestConfigPanel(QWidget):
         
         return layout
     
+    def _is_calibrated(self) -> bool:
+        """
+        Return True if the Calibrate tab has completed results for the
+        currently loaded strategy. Uses the Export button enabled state
+        as the proxy (it is only enabled after a successful calibration run).
+        """
+        try:
+            return self.training_panel.export_btn.isEnabled()
+        except Exception:
+            # If training panel is not initialised for any reason, do not block the run
+            return True
+
     def _on_run_clicked(self):
         """Handle run button click - WITH INSTITUTIONAL DATA CACHING"""
         # CRITICAL: Close ALL PostgreSQL connections in MAIN THREAD FIRST
@@ -2276,6 +2288,25 @@ class BacktestConfigPanel(QWidget):
         except Exception as e:
             logger.warning(f"⚠️ Could not close database connections in main thread: {e}")
         
+        # --- Calibration gate check ---
+        if not self._is_calibrated():
+            from PyQt5.QtWidgets import QMessageBox
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Calibration Required")
+            msg.setIcon(QMessageBox.Warning)
+            msg.setText("This strategy has not been calibrated.")
+            msg.setInformativeText(
+                "Run Signal Calibration before backtesting to ensure optimal RECHECK delay "
+                "parameters are applied to your building blocks.\n\n"
+                "Click OK to go to the Calibrate tab."
+            )
+            msg.setStandardButtons(QMessageBox.Ok)
+            msg.exec_()
+            # Auto-switch to Calibrate tab (index 1)
+            self.tab_widget.setCurrentIndex(1)
+            return
+        # --- END calibration gate ---
+
         # Validate strategy
         validation = self.orchestrator.validate_strategy()
         if not validation.success:
