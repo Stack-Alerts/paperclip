@@ -42,6 +42,8 @@ from src.strategy_builder.ui.styles import (
 # Import institutional-grade logger for trade tracking
 from src.debugger_logger.config_debugger import ConfigDebugger, DebugLevel
 
+import logging
+logger = logging.getLogger(__name__)
 
 class NumericTableWidgetItem(QTableWidgetItem):
     """
@@ -142,7 +144,7 @@ class TradesPanel(QWidget):
         """Print to console only if console debugging is enabled"""
         from src.debugger_logger.config_debugger import ConfigDebugger
         if ConfigDebugger.CONSOLE_ENABLED:
-            print(message)
+            logger.info(message)
     
     def _init_ui(self) -> None:
         """Initialize the user interface"""
@@ -345,7 +347,7 @@ class TradesPanel(QWidget):
         self._update_table()
         self._update_metrics()
         
-        print(f"✅ Synced {len(self.trades)} unique trades from TradeRegistry")
+        logger.info(f"✅ Synced {len(self.trades)} unique trades from TradeRegistry")
         self.logger._write_log(
             f"📊 Synced trades from registry: {len(unique_trades)} unique trades loaded",
             force=True
@@ -385,7 +387,7 @@ class TradesPanel(QWidget):
         # CRITICAL: For PARTIAL EXITS, always append (don't update)
         # Each partial exit (TP1, TP2, TP3) is a separate record to aggregate later
         if exit_condition in ['TP1', 'TP2', 'TP3', 'SL']:
-            print(f"➕ Adding partial exit #{trade_id} ({exit_condition})")
+            logger.info(f"➕ Adding partial exit #{trade_id} ({exit_condition})")
             self.trades.append(trade_data)
             self.filtered_trades = self.trades.copy()
             self._update_table()
@@ -403,7 +405,7 @@ class TradesPanel(QWidget):
                     new_data=trade_data,
                     location="add_trade() - duplicate non-partial"
                 )
-                print(f"🔄 Trade #{trade_id} non-partial - updating")
+                logger.info(f"🔄 Trade #{trade_id} non-partial - updating")
                 self.trades[i].update(trade_data)
                 self.filtered_trades = self.trades.copy()
                 self._update_table()
@@ -411,7 +413,7 @@ class TradesPanel(QWidget):
                 return
         
         # Trade doesn't exist - add it
-        print(f"➕ Adding new trade #{trade_id}")
+        logger.info(f"➕ Adding new trade #{trade_id}")
         self.trades.append(trade_data)
         self.filtered_trades = self.trades.copy()
         self._update_table()
@@ -459,7 +461,7 @@ class TradesPanel(QWidget):
                         location="update_trade() - after position closed"
                     )
                 
-                print(f"✅ Trade #{trade_id} updated in real-time")
+                logger.info(f"✅ Trade #{trade_id} updated in real-time")
                 return
         
         # TRADE NOT FOUND - CRITICAL ERROR
@@ -478,7 +480,7 @@ class TradesPanel(QWidget):
             force=True
         )
         
-        print(f"⚠️ Trade #{trade_id} not found for update - adding as new trade")
+        logger.warning(f"⚠️ Trade #{trade_id} not found for update - adding as new trade")
         # If not found, add as new trade (shouldn't happen, but safety fallback)
         self.add_trade(trade_data)
     
@@ -961,10 +963,10 @@ class TradesPanel(QWidget):
             clipboard = QApplication.clipboard()
             clipboard.setText(csv_content)
             
-            print(f"✅ {len(selected_trades)} selected trades copied to clipboard")
+            logger.info(f"✅ {len(selected_trades)} selected trades copied to clipboard")
             
         except Exception as e:
-            print(f"❌ Copy selection failed: {str(e)}")
+            logger.error(f"❌ Copy selection failed: {str(e)}")
     
     def _copy_trades(self) -> None:
         """Copy all trades to clipboard in CSV format"""
@@ -1005,10 +1007,10 @@ class TradesPanel(QWidget):
             clipboard = QApplication.clipboard()
             clipboard.setText(csv_content)
             
-            print(f"✅ {len(self.trades)} trades copied to clipboard")
+            logger.info(f"✅ {len(self.trades)} trades copied to clipboard")
             
         except Exception as e:
-            print(f"❌ Copy failed: {str(e)}")
+            logger.error(f"❌ Copy failed: {str(e)}")
     
     def _export_trades(self) -> None:
         """
@@ -1018,7 +1020,6 @@ class TradesPanel(QWidget):
         Panel list may contain duplicates from multicore worker messages.
         """
         from src.optimizer_v3.core.trade_registry import get_trade_registry
-        
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"trades_export_{timestamp}.csv"
         
@@ -1028,7 +1029,7 @@ class TradesPanel(QWidget):
             unique_trades = registry.get_all_trades()
             
             if not unique_trades:
-                print("⚠️ No trades in registry to export")
+                logger.warning("⚠️ No trades in registry to export")
                 return
             
             with open(filename, 'w') as f:
@@ -1053,10 +1054,10 @@ class TradesPanel(QWidget):
                         f"{self._format_notes(trade)}\n"
                     )
             
-            print(f"✅ {len(unique_trades)} unique trades exported to {filename} (from TradeRegistry)")
+            logger.info(f"✅ {len(unique_trades)} unique trades exported to {filename} (from TradeRegistry)")
             
         except Exception as e:
-            print(f"❌ Export failed: {str(e)}")
+            logger.error(f"❌ Export failed: {str(e)}")
     
     def _format_duration(self, trade: Dict) -> str:
         """Format trade duration from bars_held"""

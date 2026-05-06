@@ -24,6 +24,10 @@ from src.utils.Strategy_Builder.models import (
 )
 from src.utils.Strategy_Builder.registry_bridge import RegistryBridge
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -44,10 +48,10 @@ class StrategyValidator:
         result = validator.validate(strategy_config)
         
         if result.is_valid:
-            print("Strategy is valid!")
+            logger.info("Strategy is valid!")
         else:
             for error in result.errors:
-                print(f"Error: {error}")
+                logger.error(f"Error: {error}")
     """
     
     def __init__(self):

@@ -13,6 +13,10 @@ import gc
 
 from src.optimizer_v3.core.logger import OptimizerLogger
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class ProcessMonitor:
     """

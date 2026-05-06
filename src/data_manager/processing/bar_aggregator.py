@@ -18,6 +18,8 @@ from functools import partial
 
 from ..config import RAW_DATA_DIR, TIMEFRAME_MAPPING, TIMEFRAMES
 
+import logging
+logger = logging.getLogger(__name__)
 
 class BarAggregator:
     """
@@ -85,17 +87,17 @@ class BarAggregator:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
         
-        print(f"📊 Aggregating {file_path.name} to {timeframe} bars...")
+        logger.info(f"📊 Aggregating {file_path.name} to {timeframe} bars...")
         
         # Load trades
-        print(f"   Loading trades...", end='', flush=True)
+        logger.info(f"   Loading trades...")
         df = pd.read_parquet(file_path)
-        print(f" ✅ ({len(df):,} trades)")
+        logger.info(f" ✅ ({len(df):,} trades)")
         
         # Prepare for aggregation
         bars = self._aggregate_trades(df, timeframe, start_date, end_date)
         
-        print(f"   Generated {len(bars):,} {timeframe} bars")
+        logger.info(f"   Generated {len(bars):,} {timeframe} bars")
         
         # Validate output
         self._validate_bars(bars, timeframe)
@@ -196,7 +198,7 @@ class BarAggregator:
                     month_bars = self.aggregate_month(data_type, year, month, timeframe)
                     all_bars.append(month_bars)
                 except FileNotFoundError:
-                    print(f"⚠️  No data for {year}-{month:02d}")
+                    logger.warning(f"⚠️  No data for {year}-{month:02d}")
         
         if not all_bars:
             raise ValueError(f"No data found for date range")
@@ -239,7 +241,7 @@ class BarAggregator:
         max_workers = max(1, int(total_cpus * 0.98))
         
         msg = f"   ⚡ Parallel processing: {len(months)} months using {max_workers}/{total_cpus} CPUs"
-        print(msg)
+        logger.info(msg)
         if progress_queue:
             progress_queue.put(msg)
         
@@ -268,7 +270,7 @@ class BarAggregator:
                         results.append((year, month, month_bars))
                 except Exception as e:
                     error_msg = f"   ❌ Error processing {year}-{month:02d}: {e}"
-                    print(error_msg)
+                    logger.info(error_msg)
                     if progress_queue:
                         progress_queue.put(error_msg)
         
@@ -295,7 +297,7 @@ class BarAggregator:
         Returns:
             DataFrame with OHLCV bars
         """
-        print(f"   Aggregating to {timeframe}...", end='', flush=True)
+        logger.info(f"   Aggregating to {timeframe}...")
         
         # Convert timestamp to datetime
         # LakeAPI uses 'origin_time' column
@@ -365,7 +367,7 @@ class BarAggregator:
             'trade_count'
         ]]
         
-        print(" ✅")
+        logger.info(" ✅")
         
         return bars
     
@@ -380,7 +382,7 @@ class BarAggregator:
         Raises:
             ValueError: If validation fails
         """
-        print(f"   Validating bars...", end='', flush=True)
+        logger.info(f"   Validating bars...")
         
         # Check required columns
         required_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
@@ -431,9 +433,9 @@ class BarAggregator:
             # Check for gaps > 2x expected (allow some flexibility)
             large_gaps = time_diffs[time_diffs > expected_diff * 2].count()
             if large_gaps > len(bars) * 0.01:  # More than 1% gaps
-                print(f" ⚠️  {large_gaps} time gaps detected", end='')
+                logger.warning(f" ⚠️  {large_gaps} time gaps detected")
         
-        print(" ✅")
+        logger.info(" ✅")
     
     def get_last_n_bars(
         self,
@@ -522,7 +524,7 @@ class BarAggregator:
         )
         
         file_size = output_path.stat().st_size / 1024 / 1024
-        print(f"💾 Saved {len(bars):,} bars to {output_path.name} ({file_size:.1f} MB)")
+        logger.info(f"💾 Saved {len(bars):,} bars to {output_path.name} ({file_size:.1f} MB)")
 
 
 # Module-level worker function for multiprocessing (must be picklable)
@@ -554,7 +556,7 @@ def _process_single_month(
     try:
         # Send start message
         msg = f"📊 Aggregating BTC-USDT_trades_{year}-{month:02d}.parquet to {timeframe} bars..."
-        print(msg)
+        logger.info(msg)
         if progress_queue:
             progress_queue.put(msg)
         
@@ -569,7 +571,7 @@ def _process_single_month(
         # Send completion message
         if result is not None:
             completion_msg = f"   ✅ {year}-{month:02d}: {len(result):,} bars loaded"
-            print(completion_msg)
+            logger.info(completion_msg)
             if progress_queue:
                 progress_queue.put(completion_msg)
         
@@ -577,13 +579,13 @@ def _process_single_month(
         
     except FileNotFoundError:
         msg = f"   ⚠️  No data for {year}-{month:02d}"
-        print(msg)
+        logger.info(msg)
         if progress_queue:
             progress_queue.put(msg)
         return None
     except Exception as e:
         msg = f"   ❌ Error processing {year}-{month:02d}: {e}"
-        print(msg)
+        logger.info(msg)
         if progress_queue:
             progress_queue.put(msg)
         return None
@@ -622,9 +624,9 @@ def aggregate_and_save_month(
     agg = BarAggregator()
     month_str = f"{year}-{month:02d}"
     
-    print(f"\n{'='*60}")
-    print(f"AGGREGATING {month_str} - {len(timeframes)} TIMEFRAMES")
-    print(f"{'='*60}\n")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"AGGREGATING {month_str} - {len(timeframes)} TIMEFRAMES")
+    logger.info(f"{'='*60}\n")
     
     for tf in timeframes:
         try:
@@ -634,8 +636,8 @@ def aggregate_and_save_month(
             agg.save_bars(bars, output_file)
             
         except Exception as e:
-            print(f"❌ Error aggregating {tf}: {e}")
+            logger.error(f"❌ Error aggregating {tf}: {e}")
     
-    print(f"\n{'='*60}")
-    print(f"AGGREGATION COMPLETE")
-    print(f"{'='*60}\n")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"AGGREGATION COMPLETE")
+    logger.info(f"{'='*60}\n")

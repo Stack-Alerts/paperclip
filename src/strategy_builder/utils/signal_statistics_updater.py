@@ -19,6 +19,8 @@ from typing import Dict, Set, Optional, Any, List
 from datetime import datetime, date
 from collections import defaultdict
 
+import logging
+logger = logging.getLogger(__name__)
 
 class SignalStatisticsUpdater:
     """
@@ -72,10 +74,10 @@ class SignalStatisticsUpdater:
                 for block_name, dates in data.items()
             }
             
-            print(f"✅ Loaded analyzed dates for {len(self.analyzed_dates)} blocks")
+            logger.info(f"✅ Loaded analyzed dates for {len(self.analyzed_dates)} blocks")
             
         except Exception as e:
-            print(f"⚠️  Failed to load analyzed dates: {e}")
+            logger.error(f"⚠️  Failed to load analyzed dates: {e}")
             self.analyzed_dates = {}
     
     def _initialize_analyzed_dates_from_stats(self):
@@ -93,7 +95,7 @@ class SignalStatisticsUpdater:
             analysis_date = stats.get('analysis_date')
             
             if not analysis_date:
-                print("⚠️  No analysis_date in stats file - cannot initialize date tracking")
+                logger.warning("⚠️  No analysis_date in stats file - cannot initialize date tracking")
                 return
             
             # Parse analysis date
@@ -114,10 +116,10 @@ class SignalStatisticsUpdater:
             # Save to file
             self._save_analyzed_dates()
             
-            print(f"✅ Initialized analyzed dates: {data_days} days for {len(blocks)} blocks")
+            logger.info(f"✅ Initialized analyzed dates: {data_days} days for {len(blocks)} blocks")
             
         except Exception as e:
-            print(f"❌ Failed to initialize analyzed dates: {e}")
+            logger.error(f"❌ Failed to initialize analyzed dates: {e}")
     
     def _save_analyzed_dates(self):
         """Save analyzed dates to file."""
@@ -137,7 +139,7 @@ class SignalStatisticsUpdater:
             temp_file.replace(self.analyzed_dates_file)
             
         except Exception as e:
-            print(f"❌ Failed to save analyzed dates: {e}")
+            logger.error(f"❌ Failed to save analyzed dates: {e}")
     
     def update_statistics(
         self,
@@ -177,7 +179,7 @@ class SignalStatisticsUpdater:
                 truly_new_dates = new_dates - analyzed
                 
                 if not truly_new_dates:
-                    print(f"ℹ️  No new dates to analyze for {block_name} - all dates already processed")
+                    logger.info(f"ℹ️  No new dates to analyze for {block_name} - all dates already processed")
                     return True
                 
                 # Count only signals on truly new dates
@@ -188,12 +190,12 @@ class SignalStatisticsUpdater:
                             new_signal_counts[signal] += 1
                 
                 if not new_signal_counts:
-                    print(f"ℹ️  No new signals found on new dates for {block_name}")
+                    logger.info(f"ℹ️  No new signals found on new dates for {block_name}")
                     return True
                 
                 # Load current statistics
                 if not self.stats_file.exists():
-                    print(f"❌ Statistics file not found: {self.stats_file}")
+                    logger.error(f"❌ Statistics file not found: {self.stats_file}")
                     return False
                 
                 with open(self.stats_file, 'r') as f:
@@ -202,7 +204,7 @@ class SignalStatisticsUpdater:
                 # Get block stats
                 blocks = stats.get('blocks', {})
                 if block_name not in blocks:
-                    print(f"❌ Block {block_name} not found in statistics")
+                    logger.error(f"❌ Block {block_name} not found in statistics")
                     return False
                 
                 block_stats = blocks[block_name]
@@ -261,15 +263,15 @@ class SignalStatisticsUpdater:
                 self.analyzed_dates[block_name] = analyzed | truly_new_dates
                 self._save_analyzed_dates()
                 
-                print(f"✅ Updated statistics for {block_name}:")
-                print(f"   New dates analyzed: {len(truly_new_dates)}")
-                print(f"   New signals found: {sum(new_signal_counts.values())}")
-                print(f"   Total candles: {old_total_candles} → {new_total_candles}")
+                logger.info(f"✅ Updated statistics for {block_name}:")
+                logger.info(f"   New dates analyzed: {len(truly_new_dates)}")
+                logger.info(f"   New signals found: {sum(new_signal_counts.values())}")
+                logger.info(f"   Total candles: {old_total_candles} → {new_total_candles}")
                 
                 return True
                 
             except Exception as e:
-                print(f"❌ Failed to update statistics for {block_name}: {e}")
+                logger.error(f"❌ Failed to update statistics for {block_name}: {e}")
                 import traceback
                 traceback.print_exc()
                 return False

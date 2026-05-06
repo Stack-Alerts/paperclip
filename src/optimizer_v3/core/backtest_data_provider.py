@@ -19,6 +19,8 @@ from nautilus_trader.model.data import Bar
 from src.data_manager.unified_manager import UnifiedDataManager
 from src.data_manager.nautilus_loader import NautilusDataLoader
 
+import logging
+logger = logging.getLogger(__name__)
 
 class BacktestDataProvider:
     """
@@ -184,7 +186,7 @@ class BacktestDataProvider:
                 datetime(2025, 12, 31)
             )
             if not valid:
-                print(f"Invalid: {msg}")
+                logger.info(f"Invalid: {msg}")
         """
         available = self.get_available_range(timeframe)
         

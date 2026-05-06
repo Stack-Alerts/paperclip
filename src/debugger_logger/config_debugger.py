@@ -23,6 +23,8 @@ import json
 from pathlib import Path
 import traceback
 
+import logging
+logger = logging.getLogger(__name__)
 
 class DebugLevel(Enum):
     """Debug logging levels"""
@@ -108,7 +110,7 @@ class ConfigDebugger:
         """Write to log file and/or console (respects global toggle flags)"""
         # Check global console flag (can be toggled via UI)
         if (self.console_output or force) and ConfigDebugger.CONSOLE_ENABLED:
-            print(message, flush=True)
+            logger.info(message)
         
         # Check global logfile flag (can be toggled via UI)
         if self.log_file and ConfigDebugger.LOGFILE_ENABLED:

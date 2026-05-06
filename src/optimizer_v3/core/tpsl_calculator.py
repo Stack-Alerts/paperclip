@@ -17,6 +17,8 @@ from dataclasses import dataclass
 
 from nautilus_trader.model.data import Bar
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class TPSLLevels:
@@ -147,7 +149,6 @@ class TPSLCalculator:
         use_adaptive = adaptive_sl_config.get('enabled', False)
         
         # DEBUG: Log what we received
-        import logging
         import os
         log_dir = '/home/sirrus/projects/BTC_Engine_v3/logs/wiring-test'
         os.makedirs(log_dir, exist_ok=True)

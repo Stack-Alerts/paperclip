@@ -19,6 +19,10 @@ from datetime import datetime
 
 from src.strategy_builder.core.strategy_config_engine import StrategyConfig
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 logger = logging.getLogger(__name__)
 
 

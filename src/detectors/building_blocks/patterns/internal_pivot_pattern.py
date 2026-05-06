@@ -24,6 +24,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='internal_pivot_pattern',
@@ -402,6 +404,6 @@ class InternalPivotPattern:
 
 
 if __name__ == "__main__":
-    print("Internal Pivot Pattern - Building Block")
-    print("PATTERN BLOCK - Real-time pivot detection")
-    print("Based on LuxAlgo methodology")
+    logger.info("Internal Pivot Pattern - Building Block")
+    logger.info("PATTERN BLOCK - Real-time pivot detection")
+    logger.info("Based on LuxAlgo methodology")

@@ -18,12 +18,15 @@ from PyQt5.QtWidgets import (
     QSpinBox, QDoubleSpinBox, QRadioButton, QGroupBox, QCheckBox, QButtonGroup, QComboBox, QWidget
 )
 from PyQt5.QtCore import Qt
-
 from src.strategy_builder.ui.styles import (
     get_exit_dialog_stylesheet, get_color, get_primary_button_stylesheet,
     get_secondary_button_stylesheet, get_label_style, get_radio_button_style,
     get_checkbox_style, create_font, get_recheck_gear_button_stylesheet
 )
+
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 class ExitConditionDialog(QMainWindow):
@@ -103,7 +106,7 @@ class ExitConditionDialog(QMainWindow):
         # Initialize RECHECK from existing values
         self.recheck_enabled = existing_recheck_enabled
         self.recheck_bar_delay = existing_recheck_bar_delay
-        print(f"DEBUG: Initialized RECHECK: enabled={self.recheck_enabled}, bar_delay={self.recheck_bar_delay}")
+        logger.debug(f"DEBUG: Initialized RECHECK: enabled={self.recheck_enabled}, bar_delay={self.recheck_bar_delay}")
         
         # UI components
         self.signal_selector: Optional[QComboBox] = None
@@ -123,7 +126,7 @@ class ExitConditionDialog(QMainWindow):
         
         # Load signals on first show (after dialog is in widget tree)
         if self.signal_selector_mode and self.signal_selector and self.signal_selector.count() == 0:
-            print("DEBUG: showEvent - Loading available signals now that dialog is shown")
+            logger.debug("DEBUG: showEvent - Loading available signals now that dialog is shown")
             self._load_available_signals()
         
         # Issue 1: Auto-select binding level based on duplication source
@@ -131,7 +134,7 @@ class ExitConditionDialog(QMainWindow):
             return  # Already set, don't do it again
         
         self._binding_level_set = True
-        print(f"DEBUG: Auto-selecting binding level: {self.initial_binding_level}")
+        logger.debug(f"DEBUG: Auto-selecting binding level: {self.initial_binding_level}")
         
         if self.initial_binding_level == "BLOCK":
             self.block_radio.setChecked(True)
@@ -289,10 +292,10 @@ class ExitConditionDialog(QMainWindow):
         # Binding cannot be changed after creation - would break strategy structure
         if self.is_edit_mode:
             binding_group.setVisible(False)
-            print(f"DEBUG: EDIT MODE - Hiding binding section, preserving: {self.initial_binding_level}")
+            logger.debug(f"DEBUG: EDIT MODE - Hiding binding section, preserving: {self.initial_binding_level}")
         else:
             layout.addWidget(binding_group)
-            print(f"DEBUG: ADD MODE - Showing binding section")
+            logger.debug(f"DEBUG: ADD MODE - Showing binding section")
         
         # Percentage section
         percentage_group = QGroupBox("Exit Percentage")
@@ -580,7 +583,7 @@ class ExitConditionDialog(QMainWindow):
             self.recheck_checkbox.blockSignals(True)
             self.recheck_checkbox.setChecked(True)
             self.recheck_checkbox.blockSignals(False)
-            print(f"DEBUG: Loaded existing RECHECK state: checked={True}, bar_delay={self.recheck_bar_delay}")
+            logger.debug(f"DEBUG: Loaded existing RECHECK state: checked={True}, bar_delay={self.recheck_bar_delay}")
     
     def _connect_signals(self):
         """Connect UI signals to handlers."""
@@ -607,11 +610,11 @@ class ExitConditionDialog(QMainWindow):
         widget = self.parent()
         while widget is not None:
             if hasattr(widget, 'orchestrator'):
-                print(f"DEBUG: Found orchestrator on {type(widget).__name__}")
+                logger.debug(f"DEBUG: Found orchestrator on {type(widget).__name__}")
                 return widget.orchestrator
             widget = widget.parent()
         
-        print("DEBUG: No orchestrator found in widget tree")
+        logger.debug("DEBUG: No orchestrator found in widget tree")
         return None
     
     def _on_mode_changed(self, checked):
@@ -631,12 +634,12 @@ class ExitConditionDialog(QMainWindow):
             # Show bar delay spinbox
             self.recheck_delay_widget.setVisible(True)
             self.recheck_enabled = True
-            print(f"DEBUG: RECHECK enabled, showing bar delay spinbox (value={self.recheck_delay_spin.value()})")
+            logger.debug(f"DEBUG: RECHECK enabled, showing bar delay spinbox (value={self.recheck_delay_spin.value()})")
         else:
             # Hide bar delay spinbox
             self.recheck_delay_widget.setVisible(False)
             self.recheck_enabled = False
-            print("DEBUG: RECHECK disabled, hiding bar delay spinbox")
+            logger.debug("DEBUG: RECHECK disabled, hiding bar delay spinbox")
     
     def _on_binding_level_changed(self):
         """Handle binding level radio button changes - show/hide selectors."""
@@ -658,25 +661,25 @@ class ExitConditionDialog(QMainWindow):
             # Use stored orchestrator or find in widget tree
             orchestrator = self.orchestrator or self._find_orchestrator()
             if not orchestrator:
-                print("DEBUG: Could not find orchestrator")
+                logger.warning("DEBUG: Could not find orchestrator")
                 self.block_selector.addItem("No blocks available")
                 return
             
             config = orchestrator.get_current_config()
             
             if not config or not config.blocks:
-                print("DEBUG: No blocks in config")
+                logger.debug("DEBUG: No blocks in config")
                 self.block_selector.addItem("No blocks in strategy")
                 return
             
             # Successfully found blocks
-            print(f"DEBUG: Found {len(config.blocks)} blocks in strategy")
+            logger.debug(f"DEBUG: Found {len(config.blocks)} blocks in strategy")
             for block in config.blocks:
                 self.block_selector.addItem(block.name)
-                print(f"  - Added block: {block.name}")
+                logger.info(f"  - Added block: {block.name}")
         
         except Exception as e:
-            print(f"Error populating block selector: {e}")
+            logger.error(f"Error populating block selector: {e}")
             import traceback
             traceback.print_exc()
             self.block_selector.addItem("Error loading blocks")
@@ -689,32 +692,32 @@ class ExitConditionDialog(QMainWindow):
             # Use stored orchestrator or find in widget tree
             orchestrator = self.orchestrator or self._find_orchestrator()
             if not orchestrator:
-                print("DEBUG: Could not find orchestrator for signal selector")
+                logger.warning("DEBUG: Could not find orchestrator for signal selector")
                 self.signal_binding_selector.addItem("No signals available")
                 return
             
             config = orchestrator.get_current_config()
             
             if not config or not config.blocks:
-                print("DEBUG: No blocks in config for signal selector")
+                logger.debug("DEBUG: No blocks in config for signal selector")
                 self.signal_binding_selector.addItem("No blocks in strategy")
                 return
             
             # Collect all signals from all blocks
-            print(f"DEBUG: Populating signal selector with signals from {len(config.blocks)} blocks")
+            logger.debug(f"DEBUG: Populating signal selector with signals from {len(config.blocks)} blocks")
             for block in config.blocks:
                 for signal in block.signals:
                     # Format: "block_name::signal_name"
                     display_text = f"{block.name} → {signal.name}"
                     self.signal_binding_selector.addItem(display_text, f"{block.name}::{signal.name}")
-                    print(f"  - Added signal: {block.name} → {signal.name}")
+                    logger.info(f"  - Added signal: {block.name} → {signal.name}")
             
             if self.signal_binding_selector.count() == 0:
-                print("DEBUG: No signals found in any block")
+                logger.debug("DEBUG: No signals found in any block")
                 self.signal_binding_selector.addItem("No signals in strategy")
         
         except Exception as e:
-            print(f"Error populating signal selector: {e}")
+            logger.error(f"Error populating signal selector: {e}")
             import traceback
             traceback.print_exc()
             self.signal_binding_selector.addItem("Error loading signals")
@@ -722,7 +725,7 @@ class ExitConditionDialog(QMainWindow):
     def _load_available_signals(self):
         """Load available signals from registry (only in selector mode)."""
         if not self.signal_selector_mode or not self.signal_selector:
-            print("DEBUG: Not in signal selector mode or no signal selector widget")
+            logger.debug("DEBUG: Not in signal selector mode or no signal selector widget")
             return
         
         try:
@@ -730,16 +733,16 @@ class ExitConditionDialog(QMainWindow):
             orchestrator = self.orchestrator or self._find_orchestrator()
             
             if not orchestrator:
-                print("Warning: Cannot access orchestrator - not found in widget tree")
+                logger.warning("Warning: Cannot access orchestrator - not found in widget tree")
                 self.signal_selector.addItem("No orchestrator available")
                 self.signal_selector.setEnabled(False)
                 return
             
-            print(f"DEBUG: Successfully found orchestrator: {type(orchestrator).__name__}")
+            logger.debug(f"DEBUG: Successfully found orchestrator: {type(orchestrator).__name__}")
             
             # Get all blocks from registry
             search_results = orchestrator.search_blocks("")  # Empty = all blocks
-            print(f"DEBUG: Found {len(search_results)} blocks in registry")
+            logger.debug(f"DEBUG: Found {len(search_results)} blocks in registry")
             
             # Collect all signals marked for exit conditions
             signals_set = set()
@@ -755,23 +758,23 @@ class ExitConditionDialog(QMainWindow):
                         # This ensures backward compatibility with blocks that don't have is_exit_signal yet
                         if ui_visible and (is_exit_signal or not hasattr(signal, 'is_exit_signal')):
                             signals_set.add(signal.name)
-                            print(f"  - Added signal: {signal.name} (is_exit={is_exit_signal})")
+                            logger.info(f"  - Added signal: {signal.name} (is_exit={is_exit_signal})")
             
-            print(f"DEBUG: Total unique signals collected: {len(signals_set)}")
+            logger.debug(f"DEBUG: Total unique signals collected: {len(signals_set)}")
             
             # Sort and populate combo box
             for signal_name in sorted(signals_set):
                 self.signal_selector.addItem(signal_name)
             
             if self.signal_selector.count() == 0:
-                print("WARNING: No signals found in registry")
+                logger.warning("WARNING: No signals found in registry")
                 self.signal_selector.addItem("No signals available")
                 self.signal_selector.setEnabled(False)
             else:
-                print(f"SUCCESS: Populated signal selector with {self.signal_selector.count()} signals")
+                logger.info(f"SUCCESS: Populated signal selector with {self.signal_selector.count()} signals")
             
         except Exception as e:
-            print(f"ERROR loading signals: {e}")
+            logger.error(f"ERROR loading signals: {e}")
             import traceback
             traceback.print_exc()
             self.signal_selector.addItem("Error loading signals")
@@ -796,7 +799,7 @@ class ExitConditionDialog(QMainWindow):
             binding_level = self.initial_binding_level
             block_name = self.initial_block_name
             parent_signal_name = self.initial_parent_signal_name
-            print(f"DEBUG: EDIT MODE - Preserving original binding: {binding_level}, block={block_name}, signal={parent_signal_name}")
+            logger.debug(f"DEBUG: EDIT MODE - Preserving original binding: {binding_level}, block={block_name}, signal={parent_signal_name}")
         else:
             # ADD MODE: Get binding from radio buttons (user can choose)
             binding_level = "STRATEGY"  # Default

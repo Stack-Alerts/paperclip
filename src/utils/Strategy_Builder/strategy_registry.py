@@ -26,6 +26,10 @@ from src.utils.Strategy_Builder.models import (
 )
 from src.utils.Strategy_Builder.validator import StrategyValidator
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -628,9 +632,9 @@ class StrategyRegistry:
         Example:
             registry = StrategyRegistry()
             files = registry.generate_strategy_files(1)
-            print(f"Strategy: {files['strategy']}")
-            print(f"Test: {files['test']}")
-            print(f"Optimizer: {files['optimizer']}")
+            logger.info(f"Strategy: {files['strategy']}")
+            logger.info(f"Test: {files['test']}")
+            logger.info(f"Optimizer: {files['optimizer']}")
         """
         # Lazy import to avoid circular dependency
         from src.utils.Strategy_Builder.generator import StrategyGenerator

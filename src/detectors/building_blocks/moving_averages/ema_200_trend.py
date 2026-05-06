@@ -24,6 +24,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='ema_200_trend',
@@ -534,20 +536,20 @@ if __name__ == "__main__":
     ema200 = EMA200Trend()
     result = ema200.analyze(data)
     
-    print("=" * 80)
-    print("200 EMA TREND FILTER - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"\n200 EMA Analysis:")
-    print(f"  200 EMA: ${result['metadata']['ema_200']:.2f}")
-    print(f"  Current Price: ${result['metadata']['current_price']:.2f}")
-    print(f"  Position: {result['metadata']['position']}")
-    print(f"  Slope: {result['metadata']['slope']}")
-    print(f"  Distance: {result['metadata']['distance_pct']:+.2f}% ({result['metadata']['distance_class']})")
-    print(f"  Trend Filter: {result['metadata']['trend_filter']}")
-    print(f"  Overextended: {result['metadata']['is_overextended']}")
-    print(f"\nConfluence Factors:")
+    logger.info("=" * 80)
+    logger.info("200 EMA TREND FILTER - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"\n200 EMA Analysis:")
+    logger.info(f"  200 EMA: ${result['metadata']['ema_200']:.2f}")
+    logger.info(f"  Current Price: ${result['metadata']['current_price']:.2f}")
+    logger.info(f"  Position: {result['metadata']['position']}")
+    logger.info(f"  Slope: {result['metadata']['slope']}")
+    logger.info(f"  Distance: {result['metadata']['distance_pct']:+.2f}% ({result['metadata']['distance_class']})")
+    logger.info(f"  Trend Filter: {result['metadata']['trend_filter']}")
+    logger.info(f"  Overextended: {result['metadata']['is_overextended']}")
+    logger.info(f"\nConfluence Factors:")
     for factor in result['confluence_factors']:
-        print(f"  - {factor}")
-    print("=" * 80)
+        logger.info(f"  - {factor}")
+    logger.info("=" * 80)

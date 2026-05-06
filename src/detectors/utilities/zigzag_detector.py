@@ -24,6 +24,8 @@ import pandas as pd
 import numpy as np
 from enum import Enum
 
+import logging
+logger = logging.getLogger(__name__)
 
 class PivotType(Enum):
     """Pivot type enumeration"""
@@ -530,49 +532,48 @@ def quick_test(data_path: str = 'data/raw/BTC_USDT_PERP_30m.pkl', n_bars: int = 
         n_bars: Number of bars to test
     """
     import pickle
-    
-    print("="*60)
-    print("ZIGZAG DETECTOR TEST")
-    print("="*60)
+    logger.info("="*60)
+    logger.info("ZIGZAG DETECTOR TEST")
+    logger.info("="*60)
     
     # Load data
     with open(data_path, 'rb') as f:
         df = pickle.load(f)
     
     df = df[df.index >= '2024-01-01'].iloc[:n_bars]
-    print(f"\nData: {len(df)} bars from {df.index[0]} to {df.index[-1]}")
+    logger.info(f"\nData: {len(df)} bars from {df.index[0]} to {df.index[-1]}")
     
     # Test different lengths
     for length in [30, 50, 70]:
-        print(f"\n{'='*60}")
-        print(f"Testing with length={length}")
-        print(f"{'='*60}")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Testing with length={length}")
+        logger.info(f"{'='*60}")
         
         detector = ZigzagDetector(length=length, threshold_percent=2.0)
         pivots = detector.find_pivots(df)
         
         stats = detector.get_statistics()
-        print(f"\nStatistics:")
-        print(f"  Total pivots: {stats['total_pivots']}")
-        print(f"  Pivot highs: {stats['pivot_highs']}")
-        print(f"  Pivot lows: {stats['pivot_lows']}")
-        print(f"  Ghost levels: {stats['ghost_levels']}")
-        print(f"  Pivot rate: {stats['pivot_rate']:.2%}")
-        print(f"  Avg bars between pivots: {stats['avg_bars_between_pivots']:.1f}")
+        logger.info(f"\nStatistics:")
+        logger.info(f"  Total pivots: {stats['total_pivots']}")
+        logger.info(f"  Pivot highs: {stats['pivot_highs']}")
+        logger.info(f"  Pivot lows: {stats['pivot_lows']}")
+        logger.info(f"  Ghost levels: {stats['ghost_levels']}")
+        logger.info(f"  Pivot rate: {stats['pivot_rate']:.2%}")
+        logger.info(f"  Avg bars between pivots: {stats['avg_bars_between_pivots']:.1f}")
         
-        print(f"\nFirst 5 pivots:")
+        logger.info(f"\nFirst 5 pivots:")
         for p in pivots[:5]:
-            print(f"  {p}")
+            logger.info(f"  {p}")
         
         sequence = detector.get_pattern_sequence()
-        print(f"\nPattern sequence (last 10): {[s.value for s in sequence]}")
+        logger.info(f"\nPattern sequence (last 10): {[s.value for s in sequence]}")
         
         m_candidate = detector.is_m_pattern_candidate()
-        print(f"M-pattern candidate: {m_candidate}")
+        logger.info(f"M-pattern candidate: {m_candidate}")
     
-    print("\n" + "="*60)
-    print("TEST COMPLETE")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("TEST COMPLETE")
+    logger.info("="*60)
 
 
 if __name__ == "__main__":

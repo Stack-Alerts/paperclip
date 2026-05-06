@@ -38,6 +38,10 @@ from src.strategy_builder.ui.styles import (
     get_color
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 # Institutional-grade event patterns - VERIFIED AGAINST ACTUAL LOGS
 EVENT_PATTERNS = {
@@ -859,7 +863,7 @@ class LogViewerWindow(QDialog):
                     total_size += file_size
                 except Exception as e:
                     failed_files.append(f"{log_file.name}: {e}")
-                    print(f"Error deleting {log_file}: {e}")
+                    logger.error(f"Error deleting {log_file}: {e}")
             
             # Show result
             size_mb = total_size / (1024 * 1024)

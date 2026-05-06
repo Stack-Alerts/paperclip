@@ -12,6 +12,8 @@ from datetime import datetime
 from .catalog import BUILDING_BLOCK_CATALOG
 from .data_classes import OptimizationConfig, ConfigPerformance
 
+import logging
+logger = logging.getLogger(__name__)
 
 def extract_blocks_from_strategy(strategy_module_name: str) -> Optional[Dict]:
     """Extract building blocks from strategy file"""
@@ -72,23 +74,23 @@ def validate_blocks_against_catalog(blocks: Dict, strategy_name: str) -> bool:
             unknown_blocks.append((key, base_name))
     
     if unknown_blocks:
-        print("\n" + "="*80)
-        print("❌ ERROR: UNIVERSAL OPTIMIZER BLOCKS MISMATCH")
-        print("="*80)
-        print(f"\nStrategy: {strategy_name}")
-        print(f"Found {len(unknown_blocks)} unknown block(s):\n")
+        logger.info("\n" + "="*80)
+        logger.error("❌ ERROR: UNIVERSAL OPTIMIZER BLOCKS MISMATCH")
+        logger.info("="*80)
+        logger.info(f"\nStrategy: {strategy_name}")
+        logger.info(f"Found {len(unknown_blocks)} unknown block(s):\n")
         
         for block_key, base_name in unknown_blocks:
-            print(f"   ❌ '{block_key}' (base: '{base_name}') - NOT IN CATALOG")
-            print(f"      Name: {blocks[block_key].get('name', 'N/A')}")
-            print(f"      Weight: {blocks[block_key].get('weight', 'N/A')}")
-            print(f"      Enabled: {blocks[block_key].get('enabled', 'N/A')}\n")
+            logger.error(f"   ❌ '{block_key}' (base: '{base_name}') - NOT IN CATALOG")
+            logger.info(f"      Name: {blocks[block_key].get('name', 'N/A')}")
+            logger.info(f"      Weight: {blocks[block_key].get('weight', 'N/A')}")
+            logger.info(f"      Enabled: {blocks[block_key].get('enabled', 'N/A')}\n")
         
-        print("REQUIRED ACTION:")
-        print("1. Add blocks to BUILDING_BLOCK_CATALOG in catalog.py")
-        print("2. Specify: category, type, weight_range")
-        print("3. Re-run optimizer")
-        print("="*80 + "\n")
+        logger.info("REQUIRED ACTION:")
+        logger.info("1. Add blocks to BUILDING_BLOCK_CATALOG in catalog.py")
+        logger.info("2. Specify: category, type, weight_range")
+        logger.info("3. Re-run optimizer")
+        logger.info("="*80 + "\n")
         
         return False
     

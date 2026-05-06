@@ -17,6 +17,10 @@ import shutil
 
 from .config import get_db_config, get_backup_config
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class DatabaseBackup:
     """

@@ -20,6 +20,8 @@ from datetime import datetime, time
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='hod',
@@ -553,19 +555,19 @@ if __name__ == "__main__":
     hod_block = HOD()
     result = hod_block.analyze(data)
     
-    print("=" * 80)
-    print("HOD (HIGH OF DAY) - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"\nHOD Analysis:")
-    print(f"  HOD: ${result['metadata']['hod']:.2f}")
-    print(f"  Current Price: ${result['metadata']['current_price']:.2f}")
-    print(f"  Distance: {result['metadata']['distance_pct']:+.2f}% ({result['metadata']['distance_class']})")
-    print(f"  Breakout Status: {result['metadata']['breakout_status']}")
-    print(f"  At Resistance: {result['metadata']['is_at_resistance']}")
-    print(f"  Breaking Out: {result['metadata']['is_breaking_out']}")
-    print(f"\nConfluence Factors:")
+    logger.info("=" * 80)
+    logger.info("HOD (HIGH OF DAY) - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"\nHOD Analysis:")
+    logger.info(f"  HOD: ${result['metadata']['hod']:.2f}")
+    logger.info(f"  Current Price: ${result['metadata']['current_price']:.2f}")
+    logger.info(f"  Distance: {result['metadata']['distance_pct']:+.2f}% ({result['metadata']['distance_class']})")
+    logger.info(f"  Breakout Status: {result['metadata']['breakout_status']}")
+    logger.info(f"  At Resistance: {result['metadata']['is_at_resistance']}")
+    logger.info(f"  Breaking Out: {result['metadata']['is_breaking_out']}")
+    logger.info(f"\nConfluence Factors:")
     for factor in result['confluence_factors']:
-        print(f"  - {factor}")
-    print("=" * 80)
+        logger.info(f"  - {factor}")
+    logger.info("=" * 80)

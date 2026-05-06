@@ -13,6 +13,10 @@ from multiprocessing import Pool, cpu_count
 from .data_classes import OptimizationConfig, ConfigPerformance
 from .multi_config_simulator import MultiConfigSimulator
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 def process_config_batch(args):
     """
@@ -109,7 +113,7 @@ class MulticoreConfigSimulator:
             num_cores: Number of CPU cores to use (default: all available)
         """
         self.num_cores = num_cores or cpu_count()
-        print(f"   Using {self.num_cores} CPU cores for parallel optimization")
+        logger.info(f"   Using {self.num_cores} CPU cores for parallel optimization")
     
     def optimize(
         self,
@@ -140,8 +144,8 @@ class MulticoreConfigSimulator:
             batch = configs[i:i+batch_size]
             config_batches.append((batch, warmup_df, test_df, strategy_module_name))
         
-        print(f"   Split {len(configs)} configs into {len(config_batches)} batches")
-        print(f"   Each core processes ~{batch_size} configs")
+        logger.info(f"   Split {len(configs)} configs into {len(config_batches)} batches")
+        logger.info(f"   Each core processes ~{batch_size} configs")
         
         # Process batches in parallel
         with Pool(processes=self.num_cores) as pool:

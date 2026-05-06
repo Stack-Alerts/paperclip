@@ -54,6 +54,8 @@ from src.optimizer_v3.ui.recommendation_worker import RecommendationWorker
 from src.optimizer_v3.core.ai_request_preview_window import AIRequestPreviewWindow
 from src.optimizer_v3.core.comprehensive_ai_request_builder import ComprehensiveAIRequestBuilder
 
+import logging
+logger = logging.getLogger(__name__)
 
 class MetricsDisplayPanel(QWidget):
     """
@@ -864,7 +866,7 @@ class MetricsDisplayPanel(QWidget):
         # (NOT on every metrics update)
         # DO NOT auto-generate - wait for user to click "Approve & Send to AI" button
         if backtest_complete:
-            print("[UI] Backtest complete - populating AI Recommendations panel preview...")
+            logger.info("[UI] Backtest complete - populating AI Recommendations panel preview...")
             self._populate_ai_recommendations_panel()
         
         # Update tables with metrics and recommendations
@@ -1390,10 +1392,10 @@ class MetricsDisplayPanel(QWidget):
                     rating = self.perf_table.item(row, 2).text()
                     f.write(f"{metric},{value},{rating}\n")
             
-            print(f"✅ Metrics exported to {filename}")
+            logger.info(f"✅ Metrics exported to {filename}")
             
         except Exception as e:
-            print(f"❌ Export failed: {str(e)}")
+            logger.error(f"❌ Export failed: {str(e)}")
     
     def _generate_batch_recommendations(self) -> None:
         """
@@ -1404,26 +1406,26 @@ class MetricsDisplayPanel(QWidget):
         
         CRITICAL FIX: Runs in background thread to prevent UI freeze.
         """
-        print("=" * 80)
-        print("[AI GEN] _generate_batch_recommendations() CALLED")
-        print(f"[AI GEN] rec_engine: {self.rec_engine is not None}")
-        print(f"[AI GEN] current_metrics: {self.current_metrics is not None}")
+        logger.info("=" * 80)
+        logger.info("[AI GEN] _generate_batch_recommendations() CALLED")
+        logger.info(f"[AI GEN] rec_engine: {self.rec_engine is not None}")
+        logger.info(f"[AI GEN] current_metrics: {self.current_metrics is not None}")
         if self.current_metrics:
-            print(f"[AI GEN] current_metrics keys: {list(self.current_metrics.keys())}")
-        print("=" * 80)
+            logger.info(f"[AI GEN] current_metrics keys: {list(self.current_metrics.keys())}")
+        logger.info("=" * 80)
         
         if not self.rec_engine or not self.current_metrics:
-            print(f"[AI GEN] ❌ EARLY RETURN: rec_engine={self.rec_engine is not None}, metrics={self.current_metrics is not None}")
+            logger.error(f"[AI GEN] ❌ EARLY RETURN: rec_engine={self.rec_engine is not None}, metrics={self.current_metrics is not None}")
             return
         
         try:
-            print("[AI GEN] Getting strategy config...")
+            logger.info("[AI GEN] Getting strategy config...")
             # Prepare strategy config (get from orchestrator)
             strategy_config_obj = self._get_current_strategy_config()
-            print(f"[AI GEN] strategy_config_obj: {strategy_config_obj is not None}")
+            logger.info(f"[AI GEN] strategy_config_obj: {strategy_config_obj is not None}")
             
             if not strategy_config_obj:
-                print("⚠️ No strategy config available - using generic recommendations")
+                logger.warning("⚠️ No strategy config available - using generic recommendations")
                 self.batch_recommendations = []
                 return
             
@@ -1492,11 +1494,11 @@ class MetricsDisplayPanel(QWidget):
             self.min_dialog_timer.start(1000)  # Minimum 1 second display
             
             # Start background generation
-            print("[UI] Starting AI recommendation generation in background thread...")
+            logger.info("[UI] Starting AI recommendation generation in background thread...")
             self.rec_worker.start()
             
         except Exception as e:
-            print(f"⚠️ Failed to start background recommendation generation: {str(e)}")
+            logger.error(f"⚠️ Failed to start background recommendation generation: {str(e)}")
             import traceback
             traceback.print_exc()
             self.batch_recommendations = []
@@ -1506,7 +1508,7 @@ class MetricsDisplayPanel(QWidget):
         self.dialog_can_close = True
         # If recommendations are already ready, close dialog now
         if hasattr(self, 'progress_dialog') and hasattr(self, '_recommendations_waiting'):
-            print("[UI] Minimum dialog time elapsed - closing now")
+            logger.info("[UI] Minimum dialog time elapsed - closing now")
             self.progress_dialog.close()
     
     def _on_recommendations_ready(self, recommendations: List[IntegratedRecommendation]) -> None:
@@ -1518,17 +1520,17 @@ class MetricsDisplayPanel(QWidget):
         """
         # Store results first
         self.batch_recommendations = recommendations
-        print(f"[UI] ✅ Received {len(recommendations)} AI recommendations")
+        logger.info(f"[UI] ✅ Received {len(recommendations)} AI recommendations")
         
         # Close progress dialog ONLY if minimum time has elapsed
         if hasattr(self, 'progress_dialog'):
             if self.dialog_can_close:
                 # Minimum time elapsed - close immediately
-                print("[UI] Closing dialog (minimum time already elapsed)")
+                logger.info("[UI] Closing dialog (minimum time already elapsed)")
                 self.progress_dialog.close()
             else:
                 # Minimum time not elapsed - mark as waiting and let timer close it
-                print("[UI] Recommendations ready but waiting for minimum dialog time...")
+                logger.info("[UI] Recommendations ready but waiting for minimum dialog time...")
                 self._recommendations_waiting = True
                 return  # Don't update UI yet - wait for timer
         
@@ -1537,7 +1539,7 @@ class MetricsDisplayPanel(QWidget):
     
     def _finalize_recommendations(self) -> None:
         """Finalize recommendations display (called after dialog closes)"""
-        print("[UI] Finalizing recommendations display...")
+        logger.info("[UI] Finalizing recommendations display...")
         
         # Update tables to show new recommendations
         self._update_performance_table()
@@ -1548,7 +1550,7 @@ class MetricsDisplayPanel(QWidget):
         
         # CRITICAL: Populate AI Recommendations Panel with FULL preview data
         self._populate_ai_recommendations_panel()
-        print(f"[UI] ✅ Populated AI Recommendations Panel with full preview data")
+        logger.info(f"[UI] ✅ Populated AI Recommendations Panel with full preview data")
         
         # AUTO-SWITCH to Metrics tab to show user where recommendations are
         self._switch_to_metrics_tab()
@@ -1576,7 +1578,7 @@ class MetricsDisplayPanel(QWidget):
         if hasattr(self, 'progress_dialog'):
             self.progress_dialog.close()
         
-        print(f"❌ AI Error: {error_msg}")
+        logger.error(f"❌ AI Error: {error_msg}")
         self.status_label.setText(f"Status: <b>AI generation failed: {error_msg}</b>")
         self.batch_recommendations = []
     
@@ -1758,7 +1760,7 @@ class MetricsDisplayPanel(QWidget):
             return config_dict
             
         except Exception as e:
-            print(f"⚠️ Failed to convert strategy config: {str(e)}")
+            logger.error(f"⚠️ Failed to convert strategy config: {str(e)}")
             import traceback
             traceback.print_exc()
             # Return minimal valid dict
@@ -1779,15 +1781,15 @@ class MetricsDisplayPanel(QWidget):
             # Create status callback to capture AI progress messages
             def ui_status_callback(message: str):
                 # Print to console (could add UI display later)
-                print(f"[AI Engine] {message}")
+                logger.info(f"[AI Engine] {message}")
             
             # Initialize NEW engine with status callback
             self.rec_engine = IntelligentRecommendationEngine(
                 status_callback=ui_status_callback
             )
-            print("✅ NEW Intelligent Recommendation Engine initialized (with AI)")
+            logger.info("✅ NEW Intelligent Recommendation Engine initialized (with AI)")
         except Exception as e:
-            print(f"⚠️ Failed to initialize NEW recommendation engine: {str(e)}")
+            logger.error(f"⚠️ Failed to initialize NEW recommendation engine: {str(e)}")
             import traceback
             traceback.print_exc()
             self.rec_engine = None
@@ -1800,7 +1802,7 @@ class MetricsDisplayPanel(QWidget):
             if hasattr(main_window, 'orchestrator'):
                 return main_window.orchestrator.get_current_config()
         except Exception as e:
-            print(f"⚠️ Could not access strategy config: {str(e)}")
+            logger.warning(f"⚠️ Could not access strategy config: {str(e)}")
         return None
     
     def _is_intelligent_recommendation(self, rec_text: str) -> bool:
@@ -1945,11 +1947,11 @@ class MetricsDisplayPanel(QWidget):
             clipboard_text = "\n".join(lines)
             QApplication.clipboard().setText(clipboard_text)
             
-            print(f"✅ Copied all metrics ({len(lines)} lines) to clipboard")
+            logger.info(f"✅ Copied all metrics ({len(lines)} lines) to clipboard")
             self.status_label.setText("Status: <b>All metrics copied to clipboard</b>")
             
         except Exception as e:
-            print(f"❌ Copy failed: {str(e)}")
+            logger.error(f"❌ Copy failed: {str(e)}")
             self.status_label.setText(f"Status: <b>Copy failed: {str(e)}</b>")
     
     def _copy_selected_metrics(self) -> None:
@@ -1989,7 +1991,7 @@ class MetricsDisplayPanel(QWidget):
                     lines.append(f"{metric}\t{value}\t{status}\t{rec}")
             
             if not lines:
-                print("⚠️ No rows selected")
+                logger.warning("⚠️ No rows selected")
                 self.status_label.setText("Status: <b>No rows selected</b>")
                 return
             
@@ -1998,11 +2000,11 @@ class MetricsDisplayPanel(QWidget):
             QApplication.clipboard().setText(clipboard_text)
             
             total_selected = len(perf_selected_rows) + len(risk_selected_rows)
-            print(f"✅ Copied {total_selected} selected rows to clipboard")
+            logger.info(f"✅ Copied {total_selected} selected rows to clipboard")
             self.status_label.setText(f"Status: <b>{total_selected} selected rows copied to clipboard</b>")
             
         except Exception as e:
-            print(f"❌ Copy failed: {str(e)}")
+            logger.error(f"❌ Copy failed: {str(e)}")
             self.status_label.setText(f"Status: <b>Copy failed: {str(e)}</b>")
     
     def _select_all_recommendations(self) -> None:
@@ -2170,20 +2172,20 @@ class MetricsDisplayPanel(QWidget):
                 # Add building block to strategy
                 success = self._add_building_block(rec.block_name)
                 if success:
-                    print(f"✅ Added building block: {rec.block_name}")
+                    logger.info(f"✅ Added building block: {rec.block_name}")
                 return success
                 
             elif rec.type == 'ADJUST_PARAM':
                 # Modify parameter (SL, TP, position size, etc.)
                 success = self._adjust_parameter(rec.parameter_name or 'unknown', rec.configuration)
                 if success:
-                    print(f"✅ Adjusted {rec.parameter_name}: {rec.new_value}")
+                    logger.info(f"✅ Adjusted {rec.parameter_name}: {rec.new_value}")
                 return success
             
             return False
             
         except Exception as e:
-            print(f"❌ Failed to apply recommendation: {str(e)}")
+            logger.error(f"❌ Failed to apply recommendation: {str(e)}")
             return False
     
     def _add_building_block(self, block_name: str) -> bool:
@@ -2200,18 +2202,18 @@ class MetricsDisplayPanel(QWidget):
             # Access orchestrator
             orchestrator = self._get_orchestrator()
             if not orchestrator:
-                print("⚠️ Orchestrator not available")
+                logger.warning("⚠️ Orchestrator not available")
                 return False
             
             # Add block via orchestrator
             if hasattr(orchestrator, 'add_building_block'):
                 return orchestrator.add_building_block(block_name)
             else:
-                print("⚠️ Orchestrator does not support add_building_block method")
+                logger.warning("⚠️ Orchestrator does not support add_building_block method")
                 return False
                 
         except Exception as e:
-            print(f"❌ Failed to add block {block_name}: {str(e)}")
+            logger.error(f"❌ Failed to add block {block_name}: {str(e)}")
             return False
     
     def _adjust_parameter(self, param_name: str, new_value) -> bool:
@@ -2234,11 +2236,11 @@ class MetricsDisplayPanel(QWidget):
             if hasattr(orchestrator, 'update_parameter'):
                 return orchestrator.update_parameter(param_name, new_value)
             else:
-                print("⚠️ Orchestrator does not support update_parameter method")
+                logger.warning("⚠️ Orchestrator does not support update_parameter method")
                 return False
                 
         except Exception as e:
-            print(f"❌ Failed to adjust {param_name}: {str(e)}")
+            logger.error(f"❌ Failed to adjust {param_name}: {str(e)}")
             return False
     
     def _get_orchestrator(self):
@@ -2267,27 +2269,27 @@ class MetricsDisplayPanel(QWidget):
                 # Refresh the UI
                 if hasattr(blocks_panel, 'refresh_blocks'):
                     blocks_panel.refresh_blocks()
-                    print("🔄 Strategy Builder UI refreshed")
+                    logger.info("🔄 Strategy Builder UI refreshed")
                 elif hasattr(blocks_panel, '_refresh_ui'):
                     blocks_panel._refresh_ui()
-                    print("🔄 Strategy Builder UI refreshed")
+                    logger.info("🔄 Strategy Builder UI refreshed")
                 elif hasattr(blocks_panel, 'load_strategy'):
                     # Reload current config
                     orchestrator = self._get_orchestrator()
                     if orchestrator:
                         blocks_panel.load_strategy(orchestrator.get_current_config())
-                        print("🔄 Strategy Builder UI reloaded")
+                        logger.info("🔄 Strategy Builder UI reloaded")
                 else:
-                    print("⚠️ Strategy Blocks Panel has no refresh method - trying generic update")
+                    logger.warning("⚠️ Strategy Blocks Panel has no refresh method - trying generic update")
                     # Force Qt to update the widget
                     blocks_panel.update()
                     blocks_panel.repaint()
             else:
-                print("⚠️ Strategy Blocks Panel not accessible for UI refresh")
-                print("   (Main window may not be StrategyBuilderMainWindow)")
+                logger.warning("⚠️ Strategy Blocks Panel not accessible for UI refresh")
+                logger.info("   (Main window may not be StrategyBuilderMainWindow)")
                 
         except Exception as e:
-            print(f"❌ UI refresh failed: {str(e)}")
+            logger.error(f"❌ UI refresh failed: {str(e)}")
     
     def _trigger_retest(self) -> None:
         """Trigger automatic backtest retest after applying recommendations"""
@@ -2300,14 +2302,14 @@ class MetricsDisplayPanel(QWidget):
                 # Trigger backtest run
                 if hasattr(config_panel, '_on_run_clicked'):
                     config_panel._on_run_clicked()
-                    print("🔄 Auto-retest triggered - backtest started")
+                    logger.info("🔄 Auto-retest triggered - backtest started")
                 else:
-                    print("⚠️ Backtest panel does not support _on_run_clicked method")
+                    logger.warning("⚠️ Backtest panel does not support _on_run_clicked method")
             else:
-                print("⚠️ Backtest panel not accessible for auto-retest")
+                logger.warning("⚠️ Backtest panel not accessible for auto-retest")
                 
         except Exception as e:
-            print(f"❌ Auto-retest failed: {str(e)}")
+            logger.error(f"❌ Auto-retest failed: {str(e)}")
     
     def _show_ai_request_preview(self) -> None:
         """
@@ -2318,10 +2320,10 @@ class MetricsDisplayPanel(QWidget):
         This replaces automatic AI generation with user-gated preview.
         """
         try:
-            print("[UI] Building comprehensive AI request...")
-            print(f"[DEBUG] full_backtest_results type: {type(self.full_backtest_results)}")
+            logger.info("[UI] Building comprehensive AI request...")
+            logger.debug(f"[DEBUG] full_backtest_results type: {type(self.full_backtest_results)}")
             if self.full_backtest_results:
-                print(f"[DEBUG] full_backtest_results keys: {self.full_backtest_results.keys()}")
+                logger.debug(f"[DEBUG] full_backtest_results keys: {self.full_backtest_results.keys()}")
             
             # Build comprehensive request using builder
             request_builder = ComprehensiveAIRequestBuilder()
@@ -2329,11 +2331,11 @@ class MetricsDisplayPanel(QWidget):
             # Get strategy config
             strategy_config_obj = self._get_current_strategy_config()
             if not strategy_config_obj:
-                print("⚠️ No strategy config - cannot build AI request")
+                logger.warning("⚠️ No strategy config - cannot build AI request")
                 return
             
             strategy_config_dict = self._convert_strategy_config_to_dict(strategy_config_obj)
-            print(f"[DEBUG] Strategy config blocks: {len(strategy_config_dict.get('blocks', []))}")
+            logger.debug(f"[DEBUG] Strategy config blocks: {len(strategy_config_dict.get('blocks', []))}")
             
             # Get backtest config - TRY MULTIPLE SOURCES + BUILD MANUALLY IF NEEDED
             backtest_config = {}
@@ -2341,24 +2343,24 @@ class MetricsDisplayPanel(QWidget):
             # Source 1: From full_backtest_results
             if self.full_backtest_results and 'config' in self.full_backtest_results:
                 backtest_config = self.full_backtest_results['config']
-                print(f"[DEBUG] Got backtest config from full_backtest_results: {len(backtest_config)} keys")
+                logger.debug(f"[DEBUG] Got backtest config from full_backtest_results: {len(backtest_config)} keys")
             
             # Source 2: Try to get from orchestrator's last backtest
             if not backtest_config:
                 orchestrator = self._get_orchestrator()
                 if orchestrator and hasattr(orchestrator, 'get_backtest_config'):
                     backtest_config = orchestrator.get_backtest_config()
-                    print(f"[DEBUG] Got backtest config from orchestrator: {len(backtest_config)} keys")
+                    logger.debug(f"[DEBUG] Got backtest config from orchestrator: {len(backtest_config)} keys")
                 elif orchestrator and hasattr(orchestrator, 'last_backtest_config'):
                     backtest_config = orchestrator.last_backtest_config
-                    print(f"[DEBUG] Got backtest config from orchestrator.last_backtest_config")
+                    logger.debug(f"[DEBUG] Got backtest config from orchestrator.last_backtest_config")
             
             # Source 3: BUILD MANUALLY from main window components (FALLBACK)
             if not backtest_config:
-                print("[DEBUG] No backtest config from orchestrator - building manually...")
+                logger.debug("[DEBUG] No backtest config from orchestrator - building manually...")
                 backtest_config = self._build_backtest_config_manually()
                 if backtest_config:
-                    print(f"[DEBUG] Built backtest config manually: {len(backtest_config)} keys")
+                    logger.debug(f"[DEBUG] Built backtest config manually: {len(backtest_config)} keys")
             
             # Get trades - TRY MULTIPLE SOURCES
             trades = []
@@ -2366,7 +2368,7 @@ class MetricsDisplayPanel(QWidget):
             # Source 1: From full_backtest_results
             if self.full_backtest_results and 'trades' in self.full_backtest_results:
                 trades = self.full_backtest_results['trades']
-                print(f"[DEBUG] Got {len(trades)} trades from full_backtest_results")
+                logger.debug(f"[DEBUG] Got {len(trades)} trades from full_backtest_results")
             
             # Source 2: From TradesPanel (CRITICAL - this is where trades are actually stored!)
             if not trades:
@@ -2377,19 +2379,19 @@ class MetricsDisplayPanel(QWidget):
                         trades_panel = backtest_panel.trades_panel
                         if hasattr(trades_panel, 'get_trades'):
                             trades = trades_panel.get_trades()
-                            print(f"[DEBUG] Got {len(trades)} trades from TradesPanel.get_trades()")
+                            logger.debug(f"[DEBUG] Got {len(trades)} trades from TradesPanel.get_trades()")
             
             # Source 3: Try orchestrator's last backtest
             if not trades:
                 orchestrator = self._get_orchestrator()
                 if orchestrator and hasattr(orchestrator, 'get_last_trades'):
                     trades = orchestrator.get_last_trades()
-                    print(f"[DEBUG] Got {len(trades)} trades from orchestrator.get_last_trades()")
+                    logger.debug(f"[DEBUG] Got {len(trades)} trades from orchestrator.get_last_trades()")
                 elif orchestrator and hasattr(orchestrator, 'last_backtest_trades'):
                     trades = orchestrator.last_backtest_trades
-                    print(f"[DEBUG] Got {len(trades)} trades from orchestrator.last_backtest_trades")
+                    logger.debug(f"[DEBUG] Got {len(trades)} trades from orchestrator.last_backtest_trades")
             
-            print(f"[DEBUG] Final data: strategy_blocks={len(strategy_config_dict.get('blocks', []))}, backtest_config={len(backtest_config)}, trades={len(trades)}, metrics={len(self.current_metrics)}")
+            logger.debug(f"[DEBUG] Final data: strategy_blocks={len(strategy_config_dict.get('blocks', []))}, backtest_config={len(backtest_config)}, trades={len(trades)}, metrics={len(self.current_metrics)}")
             
             # Get available blocks with signals properly extracted
             # ComprehensiveAIRequestBuilder already imported at top of file (line 51)
@@ -2413,10 +2415,10 @@ class MetricsDisplayPanel(QWidget):
             
             # Show window (modal - blocks until closed)
             preview_window.show()
-            print("[UI] ✓ AI Request Preview window opened")
+            logger.info("[UI] ✓ AI Request Preview window opened")
             
         except Exception as e:
-            print(f"❌ Failed to show AI request preview: {str(e)}")
+            logger.error(f"❌ Failed to show AI request preview: {str(e)}")
             import traceback
             traceback.print_exc()
     
@@ -2439,24 +2441,24 @@ class MetricsDisplayPanel(QWidget):
             # The widget hierarchy is complex, so we find it by type instead
             
             dialog = self.window()
-            print(f"[DEBUG] Our window: {type(dialog).__name__}")
+            logger.debug(f"[DEBUG] Our window: {type(dialog).__name__}")
             
             # Search all children for BacktestConfigPanel by checking for lookback_spin
             panel = None
             for child in dialog.findChildren(QWidget):
                 if hasattr(child, 'lookback_spin') and hasattr(child, 'capital_spin'):
                     panel = child
-                    print(f"[DEBUG] Found BacktestConfigPanel: {type(panel).__name__}")
+                    logger.debug(f"[DEBUG] Found BacktestConfigPanel: {type(panel).__name__}")
                     break
             
             if not panel:
-                print("[DEBUG] Could not find BacktestConfigPanel in widget tree")
+                logger.warning("[DEBUG] Could not find BacktestConfigPanel in widget tree")
                 # Try backup: check if dialog itself is the panel
                 if hasattr(dialog, 'lookback_spin'):
                     panel = dialog
-                    print("[DEBUG] Dialog itself has config fields")
+                    logger.debug("[DEBUG] Dialog itself has config fields")
                 else:
-                    print("[DEBUG] No config UI found")
+                    logger.debug("[DEBUG] No config UI found")
                     return config
             
             # ===== READ RUNTIME VALUES FROM UI FIELDS =====
@@ -2586,11 +2588,11 @@ class MetricsDisplayPanel(QWidget):
                     f"  → Fine-tuned for specific strategy requirements\n"
                 )
             
-            print(f"[DEBUG] ✅ Read {len(config)} backtest parameters from UI at runtime")
+            logger.debug(f"[DEBUG] ✅ Read {len(config)} backtest parameters from UI at runtime")
             return config
                 
         except Exception as e:
-            print(f"[DEBUG] ❌ Failed to read backtest config from UI: {str(e)}")
+            logger.error(f"[DEBUG] ❌ Failed to read backtest config from UI: {str(e)}")
             import traceback
             traceback.print_exc()
         
@@ -2608,22 +2610,22 @@ class MetricsDisplayPanel(QWidget):
         Args:
             request_data: Complete request data from preview window (EXACT preview data)
         """
-        print("=" * 80)
-        print("[AI REQUEST] ✅ _on_ai_request_approved() CALLED")
-        print(f"[AI REQUEST] Request data keys: {list(request_data.keys()) if request_data else 'None'}")
-        print(f"[AI REQUEST] Using EXACT preview data (no rebuild)")
-        print(f"[AI REQUEST] Trades in preview: {len(request_data.get('trades', []))}")
-        print(f"[AI REQUEST] Metrics in preview: {len(request_data.get('metrics', {}))}")
-        print("=" * 80)
+        logger.info("=" * 80)
+        logger.info("[AI REQUEST] ✅ _on_ai_request_approved() CALLED")
+        logger.info(f"[AI REQUEST] Request data keys: {list(request_data.keys()) if request_data else 'None'}")
+        logger.info(f"[AI REQUEST] Using EXACT preview data (no rebuild)")
+        logger.info(f"[AI REQUEST] Trades in preview: {len(request_data.get('trades', []))}")
+        logger.info(f"[AI REQUEST] Metrics in preview: {len(request_data.get('metrics', {}))}")
+        logger.info("=" * 80)
 
         # CRITICAL FIX: Use the EXACT data from preview, don't rebuild
         # This ensures what the user approved is what the AI receives
-        print("[AI REQUEST] Calling _generate_batch_recommendations_with_preview_data()...")
+        logger.info("[AI REQUEST] Calling _generate_batch_recommendations_with_preview_data()...")
         try:
             self._generate_batch_recommendations_with_preview_data(request_data)
-            print("[AI REQUEST] ✅ _generate_batch_recommendations() completed")
+            logger.info("[AI REQUEST] ✅ _generate_batch_recommendations() completed")
         except Exception as e:
-            print(f"[AI REQUEST] ❌ ERROR in _generate_batch_recommendations(): {e}")
+            logger.error(f"[AI REQUEST] ❌ ERROR in _generate_batch_recommendations(): {e}")
             import traceback
             traceback.print_exc()
     
@@ -2637,15 +2639,15 @@ class MetricsDisplayPanel(QWidget):
         Args:
             preview_data: Complete request data from preview window (strategy, backtest, trades, metrics)
         """
-        print("=" * 80)
-        print("[AI GEN PREVIEW] Using EXACT preview data for AI request")
-        print(f"[AI GEN PREVIEW] Preview data keys: {list(preview_data.keys())}")
-        print(f"[AI GEN PREVIEW] Trades count: {len(preview_data.get('trades', []))}")
-        print(f"[AI GEN PREVIEW] Metrics count: {len(preview_data.get('metrics', {}))}")
-        print("=" * 80)
+        logger.info("=" * 80)
+        logger.info("[AI GEN PREVIEW] Using EXACT preview data for AI request")
+        logger.info(f"[AI GEN PREVIEW] Preview data keys: {list(preview_data.keys())}")
+        logger.info(f"[AI GEN PREVIEW] Trades count: {len(preview_data.get('trades', []))}")
+        logger.info(f"[AI GEN PREVIEW] Metrics count: {len(preview_data.get('metrics', {}))}")
+        logger.info("=" * 80)
         
         if not self.rec_engine:
-            print("[AI GEN PREVIEW] ❌ No recommendation engine available")
+            logger.error("[AI GEN PREVIEW] ❌ No recommendation engine available")
             return
         
         # CRITICAL: Check if OpenRouter API key is configured
@@ -2715,11 +2717,11 @@ class MetricsDisplayPanel(QWidget):
             self.min_dialog_timer.start(1000)
             
             # Start AI generation
-            print("[AI GEN PREVIEW] Starting worker with exact preview data...")
+            logger.info("[AI GEN PREVIEW] Starting worker with exact preview data...")
             self.rec_worker.start()
             
         except Exception as e:
-            print(f"❌ Failed to generate recommendations with preview data: {str(e)}")
+            logger.error(f"❌ Failed to generate recommendations with preview data: {str(e)}")
             import traceback
             traceback.print_exc()
             self.batch_recommendations = []
@@ -2771,7 +2773,7 @@ class MetricsDisplayPanel(QWidget):
         msg.setModal(False)
         msg.show()
         
-        print("⚠️ API key warning dialog shown to user")
+        logger.warning("⚠️ API key warning dialog shown to user")
     
     def _switch_to_metrics_tab(self) -> None:
         """
@@ -2794,13 +2796,13 @@ class MetricsDisplayPanel(QWidget):
                     tab_text = parent.tabText(i).lower()
                     if 'metric' in tab_text or 'ai' in tab_text:
                         parent.setCurrentIndex(i)
-                        print(f"[UI] ✅ Switched to tab: {parent.tabText(i)}")
+                        logger.info(f"[UI] ✅ Switched to tab: {parent.tabText(i)}")
                         return
             
-            print("[UI] ⚠️ Could not find tab widget to switch")
+            logger.warning("[UI] ⚠️ Could not find tab widget to switch")
                 
         except Exception as e:
-            print(f"❌ Failed to switch tabs: {str(e)}")
+            logger.error(f"❌ Failed to switch tabs: {str(e)}")
     
     def _populate_ai_recommendations_panel(self):
         """
@@ -2812,7 +2814,7 @@ class MetricsDisplayPanel(QWidget):
             # Get strategy config
             strategy_config_obj = self._get_current_strategy_config()
             if not strategy_config_obj:
-                print("⚠️ No strategy config available - cannot populate AI panel")
+                logger.warning("⚠️ No strategy config available - cannot populate AI panel")
                 return
             
             strategy_config_dict = self._convert_strategy_config_to_dict(strategy_config_obj)
@@ -2834,12 +2836,12 @@ class MetricsDisplayPanel(QWidget):
                     trades_panel = backtest_panel.trades_panel
                     if hasattr(trades_panel, 'get_trades'):
                         trades = trades_panel.get_trades()
-                        print(f"[DEBUG] Got {len(trades)} trades DIRECTLY from TradesPanel.get_trades()")
+                        logger.debug(f"[DEBUG] Got {len(trades)} trades DIRECTLY from TradesPanel.get_trades()")
             
             if not trades:
-                print(f"[DEBUG] ⚠️ No trades available - checking current_metrics fallback")
+                logger.warning(f"[DEBUG] ⚠️ No trades available - checking current_metrics fallback")
                 trades = self.current_metrics.get('trades', [])
-                print(f"[DEBUG] Fallback got {len(trades)} trades from current_metrics")
+                logger.debug(f"[DEBUG] Fallback got {len(trades)} trades from current_metrics")
             
             # Get available blocks
             from src.optimizer_v3.core.comprehensive_ai_request_builder import ComprehensiveAIRequestBuilder
@@ -2862,17 +2864,17 @@ class MetricsDisplayPanel(QWidget):
                         available_blocks=available_blocks
                     )
                     
-                    print(f"[UI] ✅ AI Recommendations Panel populated with:")
-                    print(f"     Strategy Blocks: {len(strategy_config_dict.get('blocks', []))}")
-                    print(f"     Trades: {len(trades)}")
-                    print(f"     Metrics: {len(self.current_metrics)}")
-                    print(f"     Available Blocks: {len(available_blocks)}")
+                    logger.info(f"[UI] ✅ AI Recommendations Panel populated with:")
+                    logger.info(f"     Strategy Blocks: {len(strategy_config_dict.get('blocks', []))}")
+                    logger.info(f"     Trades: {len(trades)}")
+                    logger.info(f"     Metrics: {len(self.current_metrics)}")
+                    logger.info(f"     Available Blocks: {len(available_blocks)}")
                 else:
-                    print("⚠️ AI Recommendations Panel not found")
+                    logger.warning("⚠️ AI Recommendations Panel not found")
             else:
-                print("⚠️ Backtest panel not found")
+                logger.warning("⚠️ Backtest panel not found")
                 
         except Exception as e:
-            print(f"❌ Failed to populate AI Recommendations Panel: {str(e)}")
+            logger.error(f"❌ Failed to populate AI Recommendations Panel: {str(e)}")
             import traceback
             traceback.print_exc()

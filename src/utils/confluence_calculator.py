@@ -10,6 +10,8 @@ from typing import List, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 
+import logging
+logger = logging.getLogger(__name__)
 
 class ConfluenceLevel(Enum):
     """Confluence quality levels"""
@@ -49,7 +51,7 @@ class ConfluenceCalculator:
         ])
         
         if result.tradeable:
-            print(f"Trade setup approved: {result.total_score} points")
+            logger.info(f"Trade setup approved: {result.total_score} points")
     """
     
     # Institutional-grade thresholds
@@ -257,7 +259,7 @@ def calculate_confluence(factors: List[Dict[str, Any]]) -> ConfluenceResult:
             {'name': 'FVG', 'points': 20},
             {'name': 'Kill Zone', 'points': 15}
         ])
-        print(f"Total: {result.total_score}, Tradeable: {result.tradeable}")
+        logger.info(f"Total: {result.total_score}, Tradeable: {result.tradeable}")
     """
     calc = ConfluenceCalculator()
     return calc.calculate(factors)
@@ -265,12 +267,12 @@ def calculate_confluence(factors: List[Dict[str, Any]]) -> ConfluenceResult:
 
 if __name__ == "__main__":
     # Example usage
-    print("=" * 70)
-    print("CONFLUENCE CALCULATOR - Institutional Grade Analysis")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("CONFLUENCE CALCULATOR - Institutional Grade Analysis")
+    logger.info("=" * 70)
     
     # Example 1: High confluence trade (EXECUTE)
-    print("\n📊 Example 1: High Confluence Setup")
+    logger.info("\n📊 Example 1: High Confluence Setup")
     factors1 = [
         {'name': 'Order Block', 'points': 25, 'details': 'Bullish OB at $43,500'},
         {'name': 'Fair Value Gap', 'points': 20, 'details': 'FVG mitigation'},
@@ -280,34 +282,34 @@ if __name__ == "__main__":
     ]
     
     result1 = calculate_confluence(factors1)
-    print(f"Total Score: {result1.total_score} points")
-    print(f"Level: {result1.level.value.upper()}")
-    print(f"Tradeable: {'✅ YES' if result1.tradeable else '❌ NO'}")
-    print(f"Recommendation: {result1.recommendation}")
+    logger.info(f"Total Score: {result1.total_score} points")
+    logger.info(f"Level: {result1.level.value.upper()}")
+    logger.error(f"Tradeable: {'✅ YES' if result1.tradeable else '❌ NO'}")
+    logger.info(f"Recommendation: {result1.recommendation}")
     
     # Example 2: Insufficient confluence (SKIP)
-    print("\n📊 Example 2: Insufficient Setup")
+    logger.info("\n📊 Example 2: Insufficient Setup")
     factors2 = [
         {'name': '50 EMA Break', 'points': 15},
         {'name': 'RSI Overbought', 'points': 10},
     ]
     
     result2 = calculate_confluence(factors2)
-    print(f"Total Score: {result2.total_score} points")
-    print(f"Level: {result2.level.value.upper()}")
-    print(f"Tradeable: {'✅ YES' if result2.tradeable else '❌ NO'}")
-    print(f"Recommendation: {result2.recommendation}")
+    logger.info(f"Total Score: {result2.total_score} points")
+    logger.info(f"Level: {result2.level.value.upper()}")
+    logger.error(f"Tradeable: {'✅ YES' if result2.tradeable else '❌ NO'}")
+    logger.info(f"Recommendation: {result2.recommendation}")
     
     # Show what's needed
     calc = ConfluenceCalculator()
     needed = calc.get_required_additional_points(result2.total_score)
-    print(f"\n⚠️ Additional points needed: {needed}")
+    logger.warning(f"\n⚠️ Additional points needed: {needed}")
     
     suggestions = calc.suggest_additional_factors(['50 EMA Break', 'RSI'])
-    print(f"💡 Suggested additional factors:")
+    logger.info(f"💡 Suggested additional factors:")
     for suggestion in suggestions:
-        print(f"   - {suggestion}")
+        logger.info(f"   - {suggestion}")
     
-    print("\n" + "=" * 70)
-    print("✅ Confluence Calculator Ready for Production")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("✅ Confluence Calculator Ready for Production")
+    logger.info("=" * 70)

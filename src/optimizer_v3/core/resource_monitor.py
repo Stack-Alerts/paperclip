@@ -13,6 +13,10 @@ import time
 
 from src.optimizer_v3.core.logger import OptimizerLogger
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class ResourceType(Enum):
     """Types of system resources"""

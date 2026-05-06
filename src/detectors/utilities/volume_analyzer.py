@@ -17,6 +17,8 @@ import pandas as pd
 import numpy as np
 from typing import Tuple
 
+import logging
+logger = logging.getLogger(__name__)
 
 class VolumeAnalyzer:
     """
@@ -206,9 +208,9 @@ if __name__ == "__main__":
     """
     Test VolumeAnalyzer with sample data
     """
-    print("="*80)
-    print("VOLUME ANALYZER TEST")
-    print("="*80)
+    logger.info("="*80)
+    logger.info("VOLUME ANALYZER TEST")
+    logger.info("="*80)
     
     # Create sample data
     dates = pd.date_range('2024-01-01', periods=100, freq='30min')
@@ -225,31 +227,31 @@ if __name__ == "__main__":
     analyzer = VolumeAnalyzer(lookback=20)
     
     # Test volume states
-    print("\nVolume State Classification:")
+    logger.info("\nVolume State Classification:")
     for idx in [30, 50, 70]:
         state, ratio = analyzer.get_volume_state(df, idx)
-        print(f"  Index {idx}: {state} ({ratio:.2f}x average)")
+        logger.info(f"  Index {idx}: {state} ({ratio:.2f}x average)")
     
     # Test bearish confirmation
-    print("\nBearish Reversal Confirmation:")
+    logger.info("\nBearish Reversal Confirmation:")
     for idx in [30, 50, 70]:
         confirmed, state, ratio = analyzer.confirm_bearish_reversal(df, idx)
         status = "✅ CONFIRMED" if confirmed else "❌ REJECTED"
-        print(f"  Index {idx}: {status} - {state} volume ({ratio:.2f}x)")
+        logger.info(f"  Index {idx}: {status} - {state} volume ({ratio:.2f}x)")
     
     # Test bullish confirmation
-    print("\nBullish Reversal Confirmation:")
+    logger.info("\nBullish Reversal Confirmation:")
     for idx in [30, 50, 70]:
         confirmed, state, ratio = analyzer.confirm_bullish_reversal(df, idx)
         status = "✅ CONFIRMED" if confirmed else "❌ REJECTED"
-        print(f"  Index {idx}: {status} - {state} volume ({ratio:.2f}x)")
+        logger.info(f"  Index {idx}: {status} - {state} volume ({ratio:.2f}x)")
     
     # Statistics
-    print("\nVolume Statistics:")
+    logger.info("\nVolume Statistics:")
     stats = analyzer.get_volume_statistics(df)
     for key, value in stats.items():
-        print(f"  {key}: {value:,.2f}")
+        logger.info(f"  {key}: {value:,.2f}")
     
-    print("\n" + "="*80)
-    print("✅ VolumeAnalyzer test complete!")
-    print("="*80)
+    logger.info("\n" + "="*80)
+    logger.info("✅ VolumeAnalyzer test complete!")
+    logger.info("="*80)

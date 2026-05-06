@@ -24,6 +24,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='ema_20_50_cross',
@@ -374,16 +376,16 @@ if __name__ == "__main__":
     
     cross = EMA2050Cross()
     
-    print("=" * 80)
-    print("20/50 EMA CROSS - TEST RESULTS (Event-Driven)")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("20/50 EMA CROSS - TEST RESULTS (Event-Driven)")
+    logger.info("=" * 80)
     
     # Test at different points
     for i in [50, 100, 150, 199]:
         result = cross.analyze(data.iloc[:i+1])
-        print(f"\nBar {i}: {result['signal']} ({result['confidence']}%)")
+        logger.info(f"\nBar {i}: {result['signal']} ({result['confidence']}%)")
         if result['signal'] != 'NEUTRAL':
             for factor in result['confluence_factors']:
-                print(f"  - {factor}")
+                logger.info(f"  - {factor}")
     
-    print("=" * 80)
+    logger.info("=" * 80)

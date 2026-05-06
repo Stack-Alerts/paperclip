@@ -30,6 +30,8 @@ import pandas as pd
 import numpy as np
 from collections import deque
 
+import logging
+logger = logging.getLogger(__name__)
 
 class SignalType(Enum):
     """MACD signal types"""
@@ -476,6 +478,6 @@ class MACDPriceForecasting:
 
 
 if __name__ == "__main__":
-    print("MACD Price Forecasting - Building Block")
-    print("SIGNAL BLOCK - Forward-looking MACD with percentile ranges")
-    print("Based on LuxAlgo MACD Price Forecasting")
+    logger.info("MACD Price Forecasting - Building Block")
+    logger.info("SIGNAL BLOCK - Forward-looking MACD with percentile ranges")
+    logger.info("Based on LuxAlgo MACD Price Forecasting")

@@ -25,6 +25,8 @@ from nautilus_trader.model.data import Bar
 from nautilus_trader.model.objects import Price, Quantity
 from src.detectors.building_blocks.registry import BlockRegistry
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class SignalEvaluationResult:
@@ -525,7 +527,7 @@ class InstitutionalSignalEvaluator:
         
         # DEBUG: Log DataFrame size for first few bars
         if bar_index < 5:
-            print(f"[DEBUG] Bar {bar_index}: lookback has {len(lookback)} bars, DataFrame has {len(df)} rows")
+            logger.debug(f"[DEBUG] Bar {bar_index}: lookback has {len(lookback)} bars, DataFrame has {len(df)} rows")
         
         # CRITICAL FIX: Skip building blocks during warm-up period (< 50 bars)
         # This is the TRAINING period - indicators need historical context
@@ -595,7 +597,7 @@ class InstitutionalSignalEvaluator:
                     f"  Analyze value: {getattr(block_instance, 'analyze', 'MISSING')}\n"
                     f"  Traceback: {traceback.format_exc()}"
                 )
-                print(error_detail)
+                logger.info(error_detail)
                 if bar_index > 0:
                    self.logger.log_error("_evaluate_building_blocks", f"{block_name}: {e}")
                 continue

@@ -15,6 +15,9 @@ Sprint: 1.6 (Critical Fix - Intelligent Signal Selection)
 
 from typing import Dict, List, Optional
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Signal mapping by block name and strategy type
 # =============================================
 # Format: {
@@ -365,24 +368,24 @@ def print_mapping_summary():
     """Print summary of signal mapping"""
     stats = get_mapping_stats()
     
-    print("=" * 80)
-    print("INTELLIGENT SIGNAL MAPPING DATABASE")
-    print("=" * 80)
-    print(f"\nTotal Blocks Mapped: {stats['total_blocks']}")
-    print(f"\nCompatible with:")
-    print(f"  Bullish strategies: {stats['bullish_compatible']} blocks")
-    print(f"  Bearish strategies: {stats['bearish_compatible']} blocks")
-    print(f"  Neutral (both): {stats['neutral_compatible']} blocks")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("INTELLIGENT SIGNAL MAPPING DATABASE")
+    logger.info("=" * 80)
+    logger.info(f"\nTotal Blocks Mapped: {stats['total_blocks']}")
+    logger.info(f"\nCompatible with:")
+    logger.info(f"  Bullish strategies: {stats['bullish_compatible']} blocks")
+    logger.info(f"  Bearish strategies: {stats['bearish_compatible']} blocks")
+    logger.info(f"  Neutral (both): {stats['neutral_compatible']} blocks")
+    logger.info("=" * 80)
 
 
 if __name__ == '__main__':
     print_mapping_summary()
     
     # Test examples
-    print("\nTest Examples:")
-    print(f"liquidity_sweep (Bearish): {get_signals_for_strategy('liquidity_sweep', 'Bearish')}")
-    print(f"liquidity_sweep (Bullish): {get_signals_for_strategy('liquidity_sweep', 'Bullish')}")
-    print(f"atr (Bearish): {get_signals_for_strategy('atr', 'Bearish')}")
-    print(f"m_pattern (Bearish): {get_signals_for_strategy('m_pattern', 'Bearish')}")
-    print(f"m_pattern (Bullish): {get_signals_for_strategy('m_pattern', 'Bullish')}")
+    logger.info("\nTest Examples:")
+    logger.info(f"liquidity_sweep (Bearish): {get_signals_for_strategy('liquidity_sweep', 'Bearish')}")
+    logger.info(f"liquidity_sweep (Bullish): {get_signals_for_strategy('liquidity_sweep', 'Bullish')}")
+    logger.info(f"atr (Bearish): {get_signals_for_strategy('atr', 'Bearish')}")
+    logger.info(f"m_pattern (Bearish): {get_signals_for_strategy('m_pattern', 'Bearish')}")
+    logger.info(f"m_pattern (Bullish): {get_signals_for_strategy('m_pattern', 'Bullish')}")

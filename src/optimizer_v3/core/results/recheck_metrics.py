@@ -20,6 +20,10 @@ import numpy as np
 
 from src.debugger_logger.recheck_debugger import RecheckValidationState
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class RecheckMetricsCalculator:
     """

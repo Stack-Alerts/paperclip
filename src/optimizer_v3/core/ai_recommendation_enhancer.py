@@ -33,6 +33,10 @@ from pathlib import Path
 # Import ComprehensiveAIRequestBuilder for institutional-grade prompts
 from src.optimizer_v3.core.comprehensive_ai_request_builder import ComprehensiveAIRequestBuilder
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Load environment variables
 load_dotenv()
 
@@ -101,9 +105,9 @@ class AIRecommendationEnhancer:
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
         
         if self.enabled:
-            print(f"✅ AI Enhancement ENABLED (Model: {self.model})")
+            logger.info(f"✅ AI Enhancement ENABLED (Model: {self.model})")
         else:
-            print("ℹ️ AI Enhancement DISABLED (No OPENROUTER_API_KEY in .env)")
+            logger.info("ℹ️ AI Enhancement DISABLED (No OPENROUTER_API_KEY in .env)")
     
     def enhance_recommendations(
         self,
@@ -125,11 +129,11 @@ class AIRecommendationEnhancer:
             AI-enhanced recommendations with specific configurations
         """
         if not self.enabled:
-            print("⚠️ AI enhancement skipped (not enabled)")
+            logger.warning("⚠️ AI enhancement skipped (not enabled)")
             return self._convert_to_enhanced_format(preliminary_recommendations)
         
         try:
-            print("🤖 Querying AI for recommendation enhancement...")
+            logger.info("🤖 Querying AI for recommendation enhancement...")
             
             # Build comprehensive prompt
             prompt = self._build_analysis_prompt(
@@ -154,12 +158,12 @@ class AIRecommendationEnhancer:
                 analysis_report
             )
             
-            print(f"✅ AI enhancement complete: {len(validated_recs)} recommendations")
+            logger.info(f"✅ AI enhancement complete: {len(validated_recs)} recommendations")
             return validated_recs
             
         except Exception as e:
-            print(f"⚠️ AI enhancement failed: {str(e)}")
-            print("📊 Falling back to data-driven recommendations")
+            logger.error(f"⚠️ AI enhancement failed: {str(e)}")
+            logger.info("📊 Falling back to data-driven recommendations")
             return self._convert_to_enhanced_format(preliminary_recommendations)
     
     def _build_analysis_prompt(
@@ -175,7 +179,7 @@ class AIRecommendationEnhancer:
         CRITICAL FIX: Uses institutional-grade builder instead of simple format
         This ensures AI receives the SAME comprehensive data shown in preview window.
         """
-        print("🔧 Building institutional-grade AI prompt...")
+        logger.info("🔧 Building institutional-grade AI prompt...")
         
         # Initialize builder
         builder = ComprehensiveAIRequestBuilder()
@@ -214,8 +218,8 @@ class AIRecommendationEnhancer:
         # Format as AI prompt (this creates the long institutional prompt)
         prompt = builder.format_for_ai_prompt(request)
         
-        print(f"✅ Comprehensive prompt built: {len(prompt):,} characters")
-        print(f"   (Expected: 50,000+ for complete data)")
+        logger.info(f"✅ Comprehensive prompt built: {len(prompt):,} characters")
+        logger.info(f"   (Expected: 50,000+ for complete data)")
         
         return prompt
     
@@ -345,7 +349,7 @@ class AIRecommendationEnhancer:
             content = ai_response.get('choices', [{}])[0].get('message', {}).get('content', '{}')
             
             # Debug: Print first 500 chars of response
-            print(f"📝 AI Response (first 500 chars): {content[:500]}")
+            logger.info(f"📝 AI Response (first 500 chars): {content[:500]}")
             
             # Handle markdown code block wrapping (```json ... ```)
             if content.startswith('```json'):
@@ -515,15 +519,15 @@ def test_ai_enhancer():
     project_root = Path(__file__).parent.parent.parent.parent
     sys.path.insert(0, str(project_root))
     
-    print("\n" + "=" * 80)
-    print("AI RECOMMENDATION ENHANCER - LIVE TEST")
-    print("=" * 80)
+    logger.info("\n" + "=" * 80)
+    logger.info("AI RECOMMENDATION ENHANCER - LIVE TEST")
+    logger.info("=" * 80)
     
     enhancer = AIRecommendationEnhancer()
     
     if not enhancer.enabled:
-        print("\n❌ AI Enhancement not available (no API key)")
-        print("Set OPENROUTER_API_KEY in .env to enable")
+        logger.error("\n❌ AI Enhancement not available (no API key)")
+        logger.info("Set OPENROUTER_API_KEY in .env to enable")
         return
     
     # Sample test data
@@ -608,7 +612,7 @@ def test_ai_enhancer():
         }
     ]
     
-    print("\n🔬 Testing AI enhancement...")
+    logger.info("\n🔬 Testing AI enhancement...")
     try:
         enhanced = enhancer.enhance_recommendations(
             strategy_config,
@@ -617,17 +621,17 @@ def test_ai_enhancer():
             preliminary_recommendations
         )
         
-        print(f"\n✅ Received {len(enhanced)} enhanced recommendations:")
+        logger.info(f"\n✅ Received {len(enhanced)} enhanced recommendations:")
         for i, rec in enumerate(enhanced, 1):
-            print(f"\n{i}. {enhancer.format_recommendation_text(rec)}")
-            print(f"   Reasoning: {rec.reasoning[:200]}...")
+            logger.info(f"\n{i}. {enhancer.format_recommendation_text(rec)}")
+            logger.info(f"   Reasoning: {rec.reasoning[:200]}...")
             if rec.warnings:
-                print(f"   ⚠️ Warnings: {', '.join(rec.warnings)}")
+                logger.warning(f"   ⚠️ Warnings: {', '.join(rec.warnings)}")
         
     except Exception as e:
-        print(f"\n❌ Test failed: {str(e)}")
+        logger.error(f"\n❌ Test failed: {str(e)}")
     
-    print("\n" + "=" * 80)
+    logger.info("\n" + "=" * 80)
 
 
 if __name__ == '__main__':

@@ -17,6 +17,8 @@ from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
 
+import logging
+logger = logging.getLogger(__name__)
 
 class SessionHistory:
     """
@@ -66,7 +68,7 @@ class SessionHistory:
             return True
         
         except Exception as e:
-            print(f"Database connection error: {e}")
+            logger.error(f"Database connection error: {e}")
             return False
     
     def get_session_list(self,
@@ -134,7 +136,7 @@ class SessionHistory:
                 return sessions
         
         except Exception as e:
-            print(f"Error retrieving sessions: {e}")
+            logger.error(f"Error retrieving sessions: {e}")
             return []
     
     def get_session_details(self, session_id: str) -> Optional[Dict]:
@@ -193,7 +195,7 @@ class SessionHistory:
                 }
         
         except Exception as e:
-            print(f"Error retrieving session details: {e}")
+            logger.error(f"Error retrieving session details: {e}")
             return None
     
     def get_interrupted_sessions(self) -> List[Dict]:
@@ -247,7 +249,7 @@ class SessionHistory:
                 return interrupted
         
         except Exception as e:
-            print(f"Error finding interrupted sessions: {e}")
+            logger.error(f"Error finding interrupted sessions: {e}")
             return []
     
     def get_recent_sessions(self, hours: int = 24) -> List[Dict]:
@@ -301,7 +303,7 @@ class SessionHistory:
                 return sessions
         
         except Exception as e:
-            print(f"Error retrieving recent sessions: {e}")
+            logger.error(f"Error retrieving recent sessions: {e}")
             return []
     
     def search_sessions(self, 
@@ -357,7 +359,7 @@ class SessionHistory:
                 return sessions
         
         except Exception as e:
-            print(f"Error searching sessions: {e}")
+            logger.error(f"Error searching sessions: {e}")
             return []
     
     def get_session_statistics(self) -> Dict:
@@ -411,7 +413,7 @@ class SessionHistory:
                 }
         
         except Exception as e:
-            print(f"Error retrieving statistics: {e}")
+            logger.error(f"Error retrieving statistics: {e}")
             return {}
     
     def mark_session_resumable(self, session_id: str) -> bool:
@@ -443,7 +445,7 @@ class SessionHistory:
                 return True
         
         except Exception as e:
-            print(f"Error marking session as resumable: {e}")
+            logger.error(f"Error marking session as resumable: {e}")
             return False
     
     def update_session_progress(self,
@@ -487,7 +489,7 @@ class SessionHistory:
                 return True
         
         except Exception as e:
-            print(f"Error updating session progress: {e}")
+            logger.error(f"Error updating session progress: {e}")
             return False
     
     def delete_old_sessions(self, days: int = 90) -> int:
@@ -521,7 +523,7 @@ class SessionHistory:
                 return result.rowcount
         
         except Exception as e:
-            print(f"Error deleting old sessions: {e}")
+            logger.error(f"Error deleting old sessions: {e}")
             return 0
     
     def close(self):

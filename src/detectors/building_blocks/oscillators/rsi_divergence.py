@@ -24,6 +24,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='rsi_divergence',
@@ -407,19 +409,19 @@ if __name__ == "__main__":
     rsi_block = RSIDivergence()
     result = rsi_block.analyze(df)
     
-    print("=" * 80)
-    print("RSI DIVERGENCE BUILDING BLOCK - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"\nRSI Analysis:")
-    print(f"  RSI Value: {result['metadata']['rsi_value']:.2f}")
-    print(f"  Level: {result['metadata']['level']}")
-    print(f"  Current Price: ${result['metadata']['current_price']:.2f}")
-    print(f"\nDivergences:")
+    logger.info("=" * 80)
+    logger.info("RSI DIVERGENCE BUILDING BLOCK - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"\nRSI Analysis:")
+    logger.info(f"  RSI Value: {result['metadata']['rsi_value']:.2f}")
+    logger.info(f"  Level: {result['metadata']['level']}")
+    logger.info(f"  Current Price: ${result['metadata']['current_price']:.2f}")
+    logger.info(f"\nDivergences:")
     for div_type, detected in result['metadata']['divergences'].items():
-        print(f"  {div_type}: {detected}")
-    print(f"\nConfluence Factors:")
+        logger.info(f"  {div_type}: {detected}")
+    logger.info(f"\nConfluence Factors:")
     for factor in result['confluence_factors']:
-        print(f"  - {factor}")
-    print("=" * 80)
+        logger.info(f"  - {factor}")
+    logger.info("=" * 80)

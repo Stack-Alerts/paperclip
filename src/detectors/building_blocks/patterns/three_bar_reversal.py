@@ -25,6 +25,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='three_bar_reversal',
@@ -433,6 +435,6 @@ class ThreeBarReversal:
 
 
 if __name__ == "__main__":
-    print("Three Bar Reversal - Building Block")
-    print("PATTERN BLOCK - 3-bar reversal pattern detection")
-    print("Based on LuxAlgo methodology")
+    logger.info("Three Bar Reversal - Building Block")
+    logger.info("PATTERN BLOCK - 3-bar reversal pattern detection")
+    logger.info("Based on LuxAlgo methodology")

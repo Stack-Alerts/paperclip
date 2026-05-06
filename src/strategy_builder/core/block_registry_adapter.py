@@ -11,6 +11,10 @@ Date: 2026-01-16
 
 from typing import List, Dict, Any, Optional
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 try:
     from src.detectors.building_blocks.registry import BlockRegistry, BlockMetadata
     BLOCK_REGISTRY_AVAILABLE = True

@@ -34,6 +34,8 @@ from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class VolumeZone:
@@ -657,6 +659,6 @@ class SupplyDemandZones:
 
 
 if __name__ == "__main__":
-    print("Supply & Demand Zones - LuxAlgo Volume Profile")
-    print("Grade: A- (92/100) - Institutional Grade")
-    print("SUPPLY/DEMAND: 57.7/42.3 (near ideal 60/40)")
+    logger.info("Supply & Demand Zones - LuxAlgo Volume Profile")
+    logger.info("Grade: A- (92/100) - Institutional Grade")
+    logger.info("SUPPLY/DEMAND: 57.7/42.3 (near ideal 60/40)")

@@ -26,6 +26,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='wave_consolidation',
@@ -580,6 +582,6 @@ class WaveConsolidation:
 
 
 if __name__ == "__main__":
-    print("Wave Consolidation - Building Block")
-    print("MARKET STRUCTURE BLOCK - Volume-based zones")
-    print("Based on LuxAlgo methodology")
+    logger.info("Wave Consolidation - Building Block")
+    logger.info("MARKET STRUCTURE BLOCK - Volume-based zones")
+    logger.info("Based on LuxAlgo methodology")

@@ -18,6 +18,10 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QSize, QSettings
 from PyQt6.QtGui import QAction
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
 
@@ -33,8 +37,6 @@ from src.utils.Strategy_Builder.qt_gui.block_library import BlockLibraryPanel
 from src.utils.Strategy_Builder.qt_gui.code_preview import CodePreviewDialog
 from src.utils.Strategy_Builder.qt_gui.strategy_creator import StrategyCreatorDialog
 from src.debugger_logger import ConfigDebugger
-
-
 class BacktestThread(QThread):
     """Background thread for running backtests without freezing UI"""
     
@@ -93,7 +95,7 @@ class BacktestThread(QThread):
                     self.process.kill()  # Force kill with SIGKILL
                     self.process.wait()
             except Exception as e:
-                print(f"Error stopping process: {e}")
+                logger.error(f"Error stopping process: {e}")
 
 
 class StrategyBuilderMainWindow(QMainWindow):
@@ -400,7 +402,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             with open(qss_path, 'r') as f:
                 self.setStyleSheet(f.read())
         except Exception as e:
-            print(f"Warning: Could not load dark theme: {e}")
+            logger.warning(f"Warning: Could not load dark theme: {e}")
             
     def load_strategies(self):
         """Load strategies from registry with folder status and filtering"""
@@ -3634,14 +3636,14 @@ Log File: test_{timestamp}.txt
                     with open(config_snapshot_file, 'w') as f:
                         yaml.dump(snapshot_config, f, default_flow_style=False, sort_keys=False)
                     
-                    print(f"✅ Config snapshot saved from: {strategy_json_file.name}")
+                    logger.info(f"✅ Config snapshot saved from: {strategy_json_file.name}")
                 else:
                     # This should NEVER happen - log error
-                    print(f"❌ CRITICAL: Strategy #{strategy_num:03d} JSON file not found in any folder!")
-                    print(f"   Searched: drafts/, unpublished/, published/")
+                    logger.error(f"❌ CRITICAL: Strategy #{strategy_num:03d} JSON file not found in any folder!")
+                    logger.info(f"   Searched: drafts/, unpublished/, published/")
                     
             except Exception as e:
-                print(f"⚠️ Warning: Failed to save config snapshot: {e}")
+                logger.error(f"⚠️ Warning: Failed to save config snapshot: {e}")
             
             # Keep only 2 most recent logs (and their configs)
             log_files = sorted(logs_dir.glob("test_*.txt"), reverse=True)
@@ -3653,12 +3655,12 @@ Log File: test_{timestamp}.txt
                 if old_config.exists():
                     old_config.unlink()
             
-            print(f"Saved test log: {log_file}")
-            print(f"Saved config snapshot: {config_snapshot_file if config_snapshot_file.exists() else 'N/A'}")
-            print(f"Total logs for strategy {strategy_num}: {len(list(logs_dir.glob('test_*.txt')))}")
+            logger.info(f"Saved test log: {log_file}")
+            logger.info(f"Saved config snapshot: {config_snapshot_file if config_snapshot_file.exists() else 'N/A'}")
+            logger.info(f"Total logs for strategy {strategy_num}: {len(list(logs_dir.glob('test_*.txt')))}")
             
         except Exception as e:
-            print(f"Warning: Failed to save test log: {e}")
+            logger.error(f"Warning: Failed to save test log: {e}")
     
     def _restore_previous_config(self, strategy_num: int, parent_dialog):
         """Restore configuration from previous test to the selected strategy"""
@@ -3770,7 +3772,6 @@ Log File: test_{timestamp}.txt
 def main():
     """Entry point"""
     from PyQt6.QtWidgets import QApplication
-    
     app = QApplication(sys.argv)
     window = StrategyBuilderMainWindow()
     window.show()

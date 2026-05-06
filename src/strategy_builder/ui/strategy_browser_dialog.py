@@ -39,6 +39,8 @@ from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
 # Import content measurement for smart resizing
 from .content_measurement import ContentMeasurement
 
+import logging
+logger = logging.getLogger(__name__)
 
 class HTMLDelegate(QStyledItemDelegate):
     """Custom delegate to render HTML in table cells"""
@@ -557,13 +559,13 @@ class StrategyBrowserDialog(QMainWindow):
                     # Skip strategies that fail to load (data corruption or missing versions)
                     # Rollback to clear failed state and continue with next strategy
                     self.db.strategy.session.rollback()
-                    print(f"⚠️ Skipping strategy {strategy.get('strategy_id', 'unknown')}: {e}")
+                    logger.warning(f"⚠️ Skipping strategy {strategy.get('strategy_id', 'unknown')}: {e}")
                     continue
 
             self._populate_table(self.all_strategies)
 
         except Exception as e:
-            print(f"❌ Error loading strategies: {e}")
+            logger.error(f"❌ Error loading strategies: {e}")
             self.all_strategies = []
     
     def _populate_table(self, strategies: List[Dict[str, Any]]):
@@ -1094,7 +1096,7 @@ class StrategyBrowserDialog(QMainWindow):
                     self.detail_labels['status'].setText("<b>Quality:</b> 🔵 Untested")
                     
             except Exception as e:
-                print(f"Error loading test results: {e}")
+                logger.error(f"Error loading test results: {e}")
                 self.detail_labels['tests'].setText(f"<b>Tests:</b> Error loading")
                 self.detail_labels['performance'].setText("<b>Database error</b><br>Check logs for details")
                 self.detail_labels['status'].setText("<b>Quality:</b> ⚠️ Error")
@@ -1107,7 +1109,7 @@ class StrategyBrowserDialog(QMainWindow):
             # Columns should remain equal width (1:1:1) as set in _init_ui()
             
         except Exception as e:
-            print(f"Error populating details: {e}")
+            logger.error(f"Error populating details: {e}")
             import traceback
             traceback.print_exc()
             self.details_frame.setVisible(False)
@@ -1429,7 +1431,7 @@ class StrategyBrowserDialog(QMainWindow):
                         self.db.strategy.delete_strategy_version(version_id)
                         deleted_count += 1
                     except Exception as e:
-                        print(f"Failed to delete version {version_id}: {e}")
+                        logger.error(f"Failed to delete version {version_id}: {e}")
                 
                 if deleted_count > 0:
                     # Emit signal to notify main window (versions deleted, not entire strategy)

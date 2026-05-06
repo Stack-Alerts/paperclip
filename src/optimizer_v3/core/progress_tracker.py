@@ -11,6 +11,10 @@ import threading
 
 from src.optimizer_v3.core.logger import OptimizerLogger
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class TaskStatus(Enum):
     """Status of a tracked task"""

@@ -10,6 +10,8 @@ from ..utils.date_utils import generate_month_range, get_current_month, is_curre
 from .lake_api_client import LakeAPIClient
 from .usage_tracker import UsageTracker
 
+import logging
+logger = logging.getLogger(__name__)
 
 class DataSynchronizer:
     """
@@ -51,7 +53,7 @@ class DataSynchronizer:
             with open(self.state_file, 'r') as f:
                 return json.load(f)
         except Exception as e:
-            print(f"⚠️  Error loading sync state: {e}")
+            logger.error(f"⚠️  Error loading sync state: {e}")
             return self._initialize_sync_state()
     
     def _initialize_sync_state(self) -> Dict:
@@ -81,7 +83,7 @@ class DataSynchronizer:
             with open(self.state_file, 'w') as f:
                 json.dump(state, f, indent=2)
         except Exception as e:
-            print(f"⚠️  Error saving sync state: {e}")
+            logger.error(f"⚠️  Error saving sync state: {e}")
     
     def get_missing_months(
         self,
@@ -150,14 +152,14 @@ class DataSynchronizer:
         Note:
             This is the key method for incremental synchronization
         """
-        print(f"\n{'='*60}")
-        print(f"SYNCHRONIZING: {data_type.upper()}")
-        print(f"{'='*60}")
-        print(f"Start date: {start_date}")
-        print(f"End date: {end_date or 'today'}")
-        print(f"Force redownload: {force_redownload}")
-        print(f"Update current month: {update_current_month}")
-        print()
+        logger.info(f"\n{'='*60}")
+        logger.info(f"SYNCHRONIZING: {data_type.upper()}")
+        logger.info(f"{'='*60}")
+        logger.info(f"Start date: {start_date}")
+        logger.info(f"End date: {end_date or 'today'}")
+        logger.info(f"Force redownload: {force_redownload}")
+        logger.info(f"Update current month: {update_current_month}")
+        logger.debug("")
         
         # Get missing months
         if force_redownload:
@@ -165,7 +167,7 @@ class DataSynchronizer:
             if end_date is None:
                 end_date = datetime.now().strftime('%Y-%m-%d')
             months_to_download = generate_month_range(start_date, end_date)
-            print(f"🔄 Force redownload: {len(months_to_download)} months")
+            logger.info(f"🔄 Force redownload: {len(months_to_download)} months")
         else:
             # Only download missing months
             months_to_download = self.get_missing_months(data_type, start_date, end_date)
@@ -182,12 +184,12 @@ class DataSynchronizer:
                 if file_path.exists():
                     # Previous month exists but might be partial - add to redownload
                     if (prev_year, prev_month) not in months_to_download:
-                        print(f"🔄 Re-downloading previous month {prev_year}-{prev_month:02d} (may be incomplete)")
+                        logger.info(f"🔄 Re-downloading previous month {prev_year}-{prev_month:02d} (may be incomplete)")
                         months_to_download.append((prev_year, prev_month))
                         months_to_download.sort()
             
             if not months_to_download:
-                print(f"✅ All months already downloaded for {data_type}")
+                logger.info(f"✅ All months already downloaded for {data_type}")
                 
                 # Check if we should update current month
                 if update_current_month:
@@ -195,10 +197,10 @@ class DataSynchronizer:
                     current_month = datetime.now().month
                     
                     if is_current_month(current_year, current_month):
-                        print(f"🔄 Updating current month: {current_year}-{current_month:02d}")
+                        logger.info(f"🔄 Updating current month: {current_year}-{current_month:02d}")
                         months_to_download = [(current_year, current_month)]
             else:
-                print(f"📥 {len(months_to_download)} missing months to download")
+                logger.info(f"📥 {len(months_to_download)} missing months to download")
         
         if not months_to_download:
             return {
@@ -265,12 +267,12 @@ class DataSynchronizer:
         if data_types is None:
             data_types = DATA_TYPES
         
-        print(f"\n{'='*60}")
-        print(f"FULL SYNCHRONIZATION")
-        print(f"{'='*60}")
-        print(f"Data types: {', '.join(data_types)}")
-        print(f"Period: {start_date} to {end_date or 'today'}")
-        print(f"{self.tracker.get_usage_summary()}\n")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"FULL SYNCHRONIZATION")
+        logger.info(f"{'='*60}")
+        logger.info(f"Data types: {', '.join(data_types)}")
+        logger.info(f"Period: {start_date} to {end_date or 'today'}")
+        logger.info(f"{self.tracker.get_usage_summary()}\n")
         
         all_results = {}
         
@@ -285,7 +287,7 @@ class DataSynchronizer:
                 all_results[data_type] = results
                 
             except Exception as e:
-                print(f"❌ Error syncing {data_type}: {e}")
+                logger.error(f"❌ Error syncing {data_type}: {e}")
                 all_results[data_type] = {
                     'data_type': data_type,
                     'downloaded': 0,
@@ -302,29 +304,29 @@ class DataSynchronizer:
     
     def _print_sync_summary(self, results: Dict[str, Dict]):
         """Print synchronization summary"""
-        print(f"\n{'='*60}")
-        print(f"SYNCHRONIZATION COMPLETE")
-        print(f"{'='*60}\n")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"SYNCHRONIZATION COMPLETE")
+        logger.info(f"{'='*60}\n")
         
         total_downloaded = sum(r['downloaded'] for r in results.values())
         total_skipped = sum(r['skipped'] for r in results.values())
         total_failed = sum(r['failed'] for r in results.values())
         
-        print(f"Summary:")
-        print(f"  Total downloaded: {total_downloaded}")
-        print(f"  Total skipped: {total_skipped}")
-        print(f"  Total failed: {total_failed}")
-        print()
+        logger.info(f"Summary:")
+        logger.info(f"  Total downloaded: {total_downloaded}")
+        logger.info(f"  Total skipped: {total_skipped}")
+        logger.error(f"  Total failed: {total_failed}")
+        logger.debug("")
         
         # Per data type breakdown
-        print(f"By Data Type:")
+        logger.info(f"By Data Type:")
         for data_type, result in results.items():
             status_icon = "✅" if result['status'] in ['success', 'up_to_date'] else "⚠️"
-            print(f"  {status_icon} {data_type:15} - Downloaded: {result['downloaded']}, Skipped: {result['skipped']}, Failed: {result['failed']}")
+            logger.error(f"  {status_icon} {data_type:15} - Downloaded: {result['downloaded']}, Skipped: {result['skipped']}, Failed: {result['failed']}")
         
-        print()
-        print(f"{self.tracker.get_usage_summary()}")
-        print(f"{'='*60}\n")
+        logger.debug("")
+        logger.info(f"{self.tracker.get_usage_summary()}")
+        logger.info(f"{'='*60}\n")
     
     def get_sync_status(self) -> Dict:
         """
@@ -370,7 +372,6 @@ class DataSynchronizer:
             False  # Trades data is stale
         """
         from ..utils.date_utils import is_file_stale
-        
         freshness = {}
         current_year = datetime.now().year
         current_month = datetime.now().month
@@ -403,10 +404,10 @@ class DataSynchronizer:
         stale_types = [dt for dt, fresh in freshness.items() if not fresh]
         
         if not stale_types:
-            print("✅ All current month data is fresh")
+            logger.info("✅ All current month data is fresh")
             return {'status': 'fresh', 'updated': 0}
         
-        print(f"🔄 Updating {len(stale_types)} stale data types...")
+        logger.info(f"🔄 Updating {len(stale_types)} stale data types...")
         
         current_year = datetime.now().year
         current_month = datetime.now().month

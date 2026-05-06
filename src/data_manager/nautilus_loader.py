@@ -31,6 +31,8 @@ from nautilus_trader.model.objects import Price, Quantity
 
 from .unified_manager import UnifiedDataManager
 
+import logging
+logger = logging.getLogger(__name__)
 
 class NautilusDataLoader:
     """
@@ -75,8 +77,8 @@ class NautilusDataLoader:
         else:
             self.instrument_id = instrument_id
         
-        print(f"✅ NautilusTrader Data Loader initialized")
-        print(f"   Instrument: {self.instrument_id}")
+        logger.info(f"✅ NautilusTrader Data Loader initialized")
+        logger.info(f"   Instrument: {self.instrument_id}")
     
     def load_bars(
         self,
@@ -108,9 +110,9 @@ class NautilusDataLoader:
         if timeframe is None:
             timeframe = self._parse_timeframe(bar_type)
         
-        print(f"📊 Loading bars for NautilusTrader...")
-        print(f"   Timeframe: {timeframe}")
-        print(f"   Range: {start} to {end}")
+        logger.info(f"📊 Loading bars for NautilusTrader...")
+        logger.info(f"   Timeframe: {timeframe}")
+        logger.info(f"   Range: {start} to {end}")
         
         # Load from unified manager
         df = self.manager.get_bars(
@@ -122,7 +124,7 @@ class NautilusDataLoader:
         # Convert to NautilusTrader format
         nautilus_bars = self._convert_to_nautilus_bars(df, bar_type)
         
-        print(f"✅ Loaded {len(nautilus_bars)} bars for NautilusTrader")
+        logger.info(f"✅ Loaded {len(nautilus_bars)} bars for NautilusTrader")
         
         return nautilus_bars
     
@@ -157,8 +159,8 @@ class NautilusDataLoader:
         if timeframe is None:
             timeframe = self._parse_timeframe(bar_type)
         
-        print(f"🔥 Loading {count}-bar warmup for strategy...")
-        print(f"   Timeframe: {timeframe}")
+        logger.info(f"🔥 Loading {count}-bar warmup for strategy...")
+        logger.info(f"   Timeframe: {timeframe}")
         
         # Load from unified manager
         df = self.manager.get_bars(
@@ -170,7 +172,7 @@ class NautilusDataLoader:
         # Convert to NautilusTrader format
         nautilus_bars = self._convert_to_nautilus_bars(df, bar_type)
         
-        print(f"✅ Warmup complete: {len(nautilus_bars)} bars ready")
+        logger.info(f"✅ Warmup complete: {len(nautilus_bars)} bars ready")
         
         return nautilus_bars
     
@@ -268,7 +270,7 @@ class NautilusDataLoader:
                 bars.append(bar)
                 
             except Exception as e:
-                print(f"⚠️  Skipping bar at {row.get('timestamp')}: {e}")
+                logger.warning(f"⚠️  Skipping bar at {row.get('timestamp')}: {e}")
                 continue
         
         return bars

@@ -29,6 +29,8 @@ from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class InitialBalanceRange:
@@ -548,6 +550,6 @@ class InitialBalanceBreakout:
 
 
 if __name__ == "__main__":
-    print("Initial Balance Breakout - Building Block")
-    print("EVENT BLOCK - Detects IB formation and breakouts")
-    print("Based on LuxAlgo methodology")
+    logger.info("Initial Balance Breakout - Building Block")
+    logger.info("EVENT BLOCK - Detects IB formation and breakouts")
+    logger.info("Based on LuxAlgo methodology")

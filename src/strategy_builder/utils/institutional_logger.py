@@ -30,6 +30,10 @@ from pathlib import Path
 import json
 from threading import Lock
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class LogLevel(Enum):
     """Log levels with numeric values for filtering"""
@@ -221,7 +225,7 @@ class InstitutionalLogger:
                 callback(entry)
             except Exception as e:
                 # Avoid infinite loop if UI callback fails
-                print(f"UI callback error: {e}")
+                logger.error(f"UI callback error: {e}")
     
     def _get_python_log_function(self, level: LogLevel):
         """Get corresponding Python logging function"""

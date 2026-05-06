@@ -22,6 +22,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='asfx_a2_vwap',
@@ -428,6 +430,6 @@ class ASFXA2VWAP:
 
 
 if __name__ == "__main__":
-    print("ASFX A2 VWAP - Building Block")
-    print("SIGNAL BLOCK - A2 entry signals with VWAP confirmation")
-    print("Based on Austin Silver methodology")
+    logger.info("ASFX A2 VWAP - Building Block")
+    logger.info("SIGNAL BLOCK - A2 entry signals with VWAP confirmation")
+    logger.info("Based on Austin Silver methodology")

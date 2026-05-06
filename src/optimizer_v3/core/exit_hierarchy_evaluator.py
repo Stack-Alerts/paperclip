@@ -37,6 +37,8 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from nautilus_trader.model.data import Bar
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class PendingExitRecheck:
@@ -449,7 +451,6 @@ class ExitHierarchyEvaluator:
             True if signal firing now, False otherwise
         """
         import pandas as pd
-        
         # CRITICAL FIX: Convert List[Bar] to DataFrame
         bars = lookback + [bar]
         
@@ -581,7 +582,7 @@ class ExitHierarchyEvaluator:
                     return True
                     
             except Exception as e:
-                print(f"Error checking {exit_signal_name} in {block_name}: {e}")
+                logger.error(f"Error checking {exit_signal_name} in {block_name}: {e}")
                 continue
         
         return False

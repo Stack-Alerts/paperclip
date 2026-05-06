@@ -20,6 +20,10 @@ from PyQt5.QtCore import QThread, pyqtSignal
 # NautilusTrader imports
 from nautilus_trader.model.identifiers import InstrumentId, Symbol, Venue
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Import core components
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))

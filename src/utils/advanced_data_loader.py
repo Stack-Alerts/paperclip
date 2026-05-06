@@ -14,6 +14,10 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List
 import warnings
+
+import logging
+logger = logging.getLogger(__name__)
+
 warnings.filterwarnings('ignore')
 
 
@@ -58,7 +62,7 @@ class AdvancedDataLoader:
                         df = pd.read_parquet(file_path)
                         dfs.append(df)
                     except Exception as e:
-                        print(f"Error loading {file_name}: {e}")
+                        logger.error(f"Error loading {file_name}: {e}")
                         continue
             
             if not dfs:
@@ -78,7 +82,7 @@ class AdvancedDataLoader:
                 combined['timestamp'] = pd.to_datetime(combined['received_time'])
             else:
                 # No timestamp column found - return empty DataFrame
-                print(f"Warning: Liquidation data missing timestamp column. Available: {combined.columns.tolist()}")
+                logger.info(f"Warning: Liquidation data missing timestamp column. Available: {combined.columns.tolist()}")
                 return pd.DataFrame()
             
             # Filter date range
@@ -93,7 +97,7 @@ class AdvancedDataLoader:
             return combined
             
         except Exception as e:
-            print(f"Error loading liquidations: {e}")
+            logger.error(f"Error loading liquidations: {e}")
             return pd.DataFrame()
     
     def get_liquidation_levels(self, df_price: pd.DataFrame, lookback_bars: int = 100) -> Dict:
@@ -140,7 +144,7 @@ class AdvancedDataLoader:
             }
             
         except Exception as e:
-            print(f"Error getting liquidation levels: {e}")
+            logger.error(f"Error getting liquidation levels: {e}")
             return {'above': [], 'below': [], 'total_liq_volume': 0}
     
     def detect_liquidation_spike(self, timestamp: datetime, window_minutes: int = 15) -> Dict:
@@ -208,7 +212,7 @@ class AdvancedDataLoader:
             }
             
         except Exception as e:
-            print(f"Error detecting liquidation spike: {e}")
+            logger.error(f"Error detecting liquidation spike: {e}")
             return {
                 'has_spike': False,
                 'spike_volume': 0,
@@ -230,7 +234,7 @@ class AdvancedDataLoader:
             return None
             
         except Exception as e:
-            print(f"Error loading orderbook: {e}")
+            logger.error(f"Error loading orderbook: {e}")
             return None
     
     def estimate_order_book_from_volume(self, df: pd.DataFrame, window: int = 20) -> Dict:
@@ -279,7 +283,7 @@ class AdvancedDataLoader:
             # Placeholder - actual implementation depends on your funding format
             return None
         except Exception as e:
-            print(f"Error loading funding: {e}")
+            logger.error(f"Error loading funding: {e}")
             return None
     
     def load_open_interest(self, start_date: datetime, end_date: datetime) -> pd.DataFrame:
@@ -292,7 +296,7 @@ class AdvancedDataLoader:
             # Placeholder - actual implementation depends on your OI format
             return pd.DataFrame()
         except Exception as e:
-            print(f"Error loading open interest: {e}")
+            logger.error(f"Error loading open interest: {e}")
             return pd.DataFrame()
 
 
@@ -302,7 +306,7 @@ advanced_data = AdvancedDataLoader()
 
 if __name__ == "__main__":
     # Test the loader
-    print("Testing Advanced Data Loader...")
+    logger.info("Testing Advanced Data Loader...")
     
     loader = AdvancedDataLoader()
     
@@ -310,16 +314,16 @@ if __name__ == "__main__":
     end = datetime.now()
     start = end - timedelta(days=7)
     
-    print(f"\nLoading liquidations from {start} to {end}...")
+    logger.info(f"\nLoading liquidations from {start} to {end}...")
     liq_df = loader.load_liquidations(start, end)
-    print(f"Loaded {len(liq_df)} liquidation records")
+    logger.info(f"Loaded {len(liq_df)} liquidation records")
     
     if len(liq_df) > 0:
-        print(f"Columns: {liq_df.columns.tolist()}")
-        print(f"Total liquidation volume: {liq_df['quantity'].sum():,.2f}")
-        print(f"\nSample records:")
-        print(liq_df.head())
+        logger.info(f"Columns: {liq_df.columns.tolist()}")
+        logger.info(f"Total liquidation volume: {liq_df['quantity'].sum():,.2f}")
+        logger.info(f"\nSample records:")
+        logger.info(liq_df.head())
     
-    print("\n" + "="*80)
-    print("Advanced Data Loader Ready!")
-    print("="*80)
+    logger.info("\n" + "="*80)
+    logger.info("Advanced Data Loader Ready!")
+    logger.info("="*80)

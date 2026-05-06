@@ -100,6 +100,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='wyckoff_accumulation',
@@ -620,7 +622,7 @@ def analyze_multi_timeframe(df_2hr: pd.DataFrame, df_4hr: pd.DataFrame) -> Dict[
         notes.extend(result['notes'])
         
         if result['mtf_aligned']:
-            print("🎯 Multi-timeframe alignment detected!")
+            logger.info("🎯 Multi-timeframe alignment detected!")
     """
     confluence = 0
     notes = []

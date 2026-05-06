@@ -22,6 +22,10 @@ from src.layers.tbd_v2.base_tbd_pattern import BaseTBDPattern
 from src.core.framework.base_layer import LayerSignal
 from src.utils.logger import get_logger
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 logger = get_logger(__name__)
 
 

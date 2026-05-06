@@ -21,6 +21,10 @@ from src.utils.Strategy_Builder.models import (
     BlockType
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -206,7 +210,7 @@ class RegistryBridge:
         Example:
             result = bridge.validate_block_signal('double_top', 'BEARISH_BREAKDOWN')
             if result.is_valid:
-                print("Valid combination!")
+                logger.info("Valid combination!")
         """
         result = ValidationResult()
         

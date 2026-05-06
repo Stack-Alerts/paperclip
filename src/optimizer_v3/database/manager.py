@@ -26,6 +26,10 @@ from .models import (
 )
 from .validators import NautilusDataValidator, ValidationError
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Type variable for model classes
 T = TypeVar('T', bound=Base)
 

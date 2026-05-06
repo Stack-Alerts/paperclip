@@ -24,6 +24,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='atr',
@@ -670,19 +672,19 @@ if __name__ == "__main__":
     atr_block = ATR(period=14, timeframe='15min')
     result = atr_block.analyze(df)
     
-    print("=" * 80)
-    print("ATR BUILDING BLOCK - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"ATR Value: ${result['metadata']['atr_value']:.2f}")
-    print(f"ATR %: {result['metadata']['atr_percent']:.2f}%")
-    print(f"Volatility Level: {result['metadata']['volatility_level']}")
-    print(f"ATR Trend: {result['metadata']['atr_trend']}")
-    print(f"\nStop-Loss Suggestions (Standard 2.0x ATR):")
-    print(f"  Long Stop: ${result['metadata']['stop_suggestions']['standard']['long_stop']:.2f}")
-    print(f"  Short Stop: ${result['metadata']['stop_suggestions']['standard']['short_stop']:.2f}")
-    print(f"\nConfluence Factors:")
+    logger.info("=" * 80)
+    logger.info("ATR BUILDING BLOCK - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"ATR Value: ${result['metadata']['atr_value']:.2f}")
+    logger.info(f"ATR %: {result['metadata']['atr_percent']:.2f}%")
+    logger.info(f"Volatility Level: {result['metadata']['volatility_level']}")
+    logger.info(f"ATR Trend: {result['metadata']['atr_trend']}")
+    logger.info(f"\nStop-Loss Suggestions (Standard 2.0x ATR):")
+    logger.info(f"  Long Stop: ${result['metadata']['stop_suggestions']['standard']['long_stop']:.2f}")
+    logger.info(f"  Short Stop: ${result['metadata']['stop_suggestions']['standard']['short_stop']:.2f}")
+    logger.info(f"\nConfluence Factors:")
     for factor in result['confluence_factors']:
-        print(f"  - {factor}")
-    print("=" * 80)
+        logger.info(f"  - {factor}")
+    logger.info("=" * 80)

@@ -24,6 +24,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='ema_50_vector',
@@ -498,19 +500,19 @@ if __name__ == "__main__":
     ema50 = EMA50Vector()
     result = ema50.analyze(data)
     
-    print("=" * 80)
-    print("50 EMA VECTOR BREAK - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"\n50 EMA Analysis:")
-    print(f"  EMA Value: ${result['metadata']['ema_value']:.2f}")
-    print(f"  Current Price: ${result['metadata']['current_price']:.2f}")
-    print(f"  Position: {result['metadata']['position']}")
-    print(f"  Slope: {result['metadata']['slope']}")
-    print(f"  Vector Break: {result['metadata']['vector_break']}")
-    print(f"  Distance: {result['metadata']['distance_pct']:+.2f}% ({result['metadata']['distance_class']})")
-    print(f"\nConfluence Factors:")
+    logger.info("=" * 80)
+    logger.info("50 EMA VECTOR BREAK - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"\n50 EMA Analysis:")
+    logger.info(f"  EMA Value: ${result['metadata']['ema_value']:.2f}")
+    logger.info(f"  Current Price: ${result['metadata']['current_price']:.2f}")
+    logger.info(f"  Position: {result['metadata']['position']}")
+    logger.info(f"  Slope: {result['metadata']['slope']}")
+    logger.info(f"  Vector Break: {result['metadata']['vector_break']}")
+    logger.info(f"  Distance: {result['metadata']['distance_pct']:+.2f}% ({result['metadata']['distance_class']})")
+    logger.info(f"\nConfluence Factors:")
     for factor in result['confluence_factors']:
-        print(f"  - {factor}")
-    print("=" * 80)
+        logger.info(f"  - {factor}")
+    logger.info("=" * 80)

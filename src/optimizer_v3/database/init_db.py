@@ -12,6 +12,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from .config import get_db_url
 from .models import Base
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -370,23 +374,23 @@ if __name__ == '__main__':
     )
     
     # Initialize database
-    print("Initializing Optimizer V3 Database...")
+    logger.info("Initializing Optimizer V3 Database...")
     success = initialize_database(drop_existing=False)
     
     if success:
-        print("\n✅ Database initialized successfully")
+        logger.info("\n✅ Database initialized successfully")
         
         # Verify schema
         if verify_schema():
-            print("✅ Schema verification passed")
+            logger.info("✅ Schema verification passed")
             
             # Show schema info
             info = get_schema_info()
-            print(f"\n📊 Schema Information:")
-            print(f"Tables: {len(info['tables'])}")
-            print(f"Indexes: {len(info['indexes'])}")
-            print(f"Functions: {len(info['functions'])}")
+            logger.info(f"\n📊 Schema Information:")
+            logger.info(f"Tables: {len(info['tables'])}")
+            logger.info(f"Indexes: {len(info['indexes'])}")
+            logger.info(f"Functions: {len(info['functions'])}")
         else:
-            print("❌ Schema verification failed")
+            logger.error("❌ Schema verification failed")
     else:
-        print("❌ Database initialization failed")
+        logger.error("❌ Database initialization failed")

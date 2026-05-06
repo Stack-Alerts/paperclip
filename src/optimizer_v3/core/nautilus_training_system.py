@@ -26,6 +26,10 @@ from nautilus_trader.model.identifiers import InstrumentId, Symbol
 from nautilus_trader.model.enums import OrderSide, PositionSide
 from nautilus_trader.model.data import Bar
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Import configuration
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))

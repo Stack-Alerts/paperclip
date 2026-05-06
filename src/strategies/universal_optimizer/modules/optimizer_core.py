@@ -33,6 +33,10 @@ from .ui import (
     confirm_application
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 def load_strategy_side_from_config(strategy_module_name: str) -> Optional[str]:
     """
@@ -71,10 +75,10 @@ def load_strategy_side_from_config(strategy_module_name: str) -> Optional[str]:
                     if side in ['SHORT', 'LONG']:
                         return side
                     else:
-                        print(f"   ⚠️  Invalid side '{side}' in config, must be SHORT or LONG")
+                        logger.warning(f"   ⚠️  Invalid side '{side}' in config, must be SHORT or LONG")
                         
             except Exception as e:
-                print(f"   ⚠️  Error reading config {config_path}: {e}")
+                logger.error(f"   ⚠️  Error reading config {config_path}: {e}")
     
     return None  # Side not found in config
 
@@ -115,73 +119,73 @@ def optimize_strategy_v2(
         Selected configuration or None if failed
     """
     
-    print("="*80)
-    print("UNIVERSAL STRATEGY OPTIMIZER V2.0 - INSTITUTIONAL GRADE")
-    print("="*80)
-    print(f"\n📦 Strategy: {strategy_module_name}")
-    print(f"📅 Test Period: {test_days} days")
-    print(f"🔥 Warmup: {warmup_bars} bars")
+    logger.info("="*80)
+    logger.info("UNIVERSAL STRATEGY OPTIMIZER V2.0 - INSTITUTIONAL GRADE")
+    logger.info("="*80)
+    logger.info(f"\n📦 Strategy: {strategy_module_name}")
+    logger.info(f"📅 Test Period: {test_days} days")
+    logger.info(f"🔥 Warmup: {warmup_bars} bars")
     
     # 0. Archive previous results before starting
-    print(f"\n📁 Archiving previous optimization results...")
+    logger.info(f"\n📁 Archiving previous optimization results...")
     archive_previous_results(strategy_module_name)
     
     # 1. Extract & validate blocks
-    print(f"\n🔍 Extracting building blocks...")
+    logger.info(f"\n🔍 Extracting building blocks...")
     blocks = extract_blocks_from_strategy(strategy_module_name)
     
     if not blocks:
-        print(f"❌ No blocks found in {strategy_module_name}")
+        logger.error(f"❌ No blocks found in {strategy_module_name}")
         return None
     
-    print(f"✅ Found {len(blocks)} building blocks:")
+    logger.info(f"✅ Found {len(blocks)} building blocks:")
     for block_name in blocks.keys():
-        print(f"   - {block_name}")
+        logger.info(f"   - {block_name}")
     
     if not validate_blocks_against_catalog(blocks, strategy_module_name):
         return None  # ERROR - HALT
     
-    print(f"✅ All blocks validated against catalog")
+    logger.info(f"✅ All blocks validated against catalog")
     
     # 2. Load iteration history
     iteration = load_strategy_iterations(strategy_module_name)
     display_iteration_context(iteration.iteration_count + 1)
     
     # 3. Load data
-    print(f"\n📊 Loading BTC data...")
+    logger.info(f"\n📊 Loading BTC data...")
     warmup_df, test_df = load_btc_data(test_days, warmup_bars)
     
     if warmup_df is None or test_df is None:
-        print("❌ Failed to load data")
+        logger.error("❌ Failed to load data")
         return None
     
-    print(f"✅ Loaded {len(warmup_df)} warmup bars + {len(test_df)} test bars")
-    print(f"   Warmup: {warmup_df['timestamp'].min()} to {warmup_df['timestamp'].max()}")
-    print(f"   Test:   {test_df['timestamp'].min()} to {test_df['timestamp'].max()}")
+    logger.info(f"✅ Loaded {len(warmup_df)} warmup bars + {len(test_df)} test bars")
+    logger.info(f"   Warmup: {warmup_df['timestamp'].min()} to {warmup_df['timestamp'].max()}")
+    logger.info(f"   Test:   {test_df['timestamp'].min()} to {test_df['timestamp'].max()}")
     
     # 4. Build 48 configs
-    print(f"\n🔧 Building optimization configurations...")
+    logger.info(f"\n🔧 Building optimization configurations...")
     
     # Load strategy side from config file if available
     strategy_side = load_strategy_side_from_config(strategy_module_name)
     if strategy_side:
-        print(f"   📍 Strategy direction: {strategy_side} (from config)")
+        logger.info(f"   📍 Strategy direction: {strategy_side} (from config)")
     
     # Quick test mode: skip TP/SL optimization
     if quick_test:
-        print(f"   ⚡ QUICK TEST MODE: Skipping TP/SL optimization")
+        logger.info(f"   ⚡ QUICK TEST MODE: Skipping TP/SL optimization")
         configs = build_optimization_configs(blocks, strategy_module_name, strategy_side, test_tp_modes=False, debugger=debugger)
     else:
         configs = build_optimization_configs(blocks, strategy_module_name, strategy_side, test_tp_modes=True, debugger=debugger)
     
-    print(f"✅ Created {len(configs)} parameter combinations")
+    logger.info(f"✅ Created {len(configs)} parameter combinations")
     
     # 5. Run ULTRA Hybrid Optimizer (MAXIMUM PARALLEL!)
-    print(f"\n🚀 Running ULTRA HYBRID optimization (3 phases, ALL parallel!)...")
-    print(f"   Phase 1: Pre-compute blocks PARALLEL (32 cores, ~35 sec)")
-    print(f"   Phase 2: Merge results (single-core, <1 sec)")
-    print(f"   Phase 3: Test 48 configs PARALLEL (32 cores, ~0.3 sec)")
-    print(f"   Total: ~35 seconds (vs 18 min single-core!)")
+    logger.info(f"\n🚀 Running ULTRA HYBRID optimization (3 phases, ALL parallel!)...")
+    logger.info(f"   Phase 1: Pre-compute blocks PARALLEL (32 cores, ~35 sec)")
+    logger.info(f"   Phase 2: Merge results (single-core, <1 sec)")
+    logger.info(f"   Phase 3: Test 48 configs PARALLEL (32 cores, ~0.3 sec)")
+    logger.info(f"   Total: ~35 seconds (vs 18 min single-core!)")
     
     start_time = time.time()
     
@@ -195,18 +199,18 @@ def optimize_strategy_v2(
     )
     
     elapsed = time.time() - start_time
-    print(f"\n✅ Optimization complete in {elapsed:.1f} seconds ({elapsed/60:.1f} minutes)")
-    print(f"   🎯 48x FASTER than traditional approach!")
+    logger.info(f"\n✅ Optimization complete in {elapsed:.1f} seconds ({elapsed/60:.1f} minutes)")
+    logger.info(f"   🎯 48x FASTER than traditional approach!")
     
     # 6. Sort results
     results.sort(key=lambda x: x.get_sortable_score(), reverse=True)
     
     # 6.5. VALIDATE RESULTS - INSTITUTIONAL GRADE
-    print(f"\n🔍 Running institutional-grade result validation...")
+    logger.info(f"\n🔍 Running institutional-grade result validation...")
     issues = validate_optimization_results(results, test_days, configs)
     
     if issues and not non_interactive:
-        print(f"\n⚠️  VALIDATION ISSUES DETECTED")
+        logger.warning(f"\n⚠️  VALIDATION ISSUES DETECTED")
         display_diagnostic_report(issues, results, configs)
         
         # Offer auto-fix with Option 2 (add context blocks)
@@ -214,12 +218,12 @@ def optimize_strategy_v2(
         
         if action == 'add_blocks':
             # OPTION 2: Add "Always On" context blocks
-            print(f"\n🔧 Adding context blocks to strategy...")
+            logger.info(f"\n🔧 Adding context blocks to strategy...")
             success = add_context_blocks_to_strategy(strategy_module_name, context_issue)
             
             if success:
-                print(f"\n✅ Context blocks added successfully!")
-                print(f"   ♻️  Re-running optimization with new blocks...")
+                logger.info(f"\n✅ Context blocks added successfully!")
+                logger.info(f"   ♻️  Re-running optimization with new blocks...")
                 
                 # Fully restart optimization with new blocks
                 return optimize_strategy_v2(
@@ -229,11 +233,11 @@ def optimize_strategy_v2(
                     use_multicore
                 )
             else:
-                print(f"\n❌ Failed to add context blocks")
+                logger.error(f"\n❌ Failed to add context blocks")
                 return None
                 
         elif action == 'adjust':
-            print(f"\n🔧 Auto-adjusting parameters to target {target_trades}+ trades...")
+            logger.info(f"\n🔧 Auto-adjusting parameters to target {target_trades}+ trades...")
             adjusted_configs = auto_adjust_configs(configs, issues, target_trades, results)
             
             # Re-run with adjusted configs
@@ -246,15 +250,15 @@ def optimize_strategy_v2(
             )
             results.sort(key=lambda x: x.get_sortable_score(), reverse=True)
             configs = adjusted_configs  # Use adjusted configs going forward
-            print(f"\n✅ Re-optimization complete with adjusted parameters")
+            logger.info(f"\n✅ Re-optimization complete with adjusted parameters")
             
         elif action == 'quit':
-            print(f"\n⚠️  Optimization cancelled due to validation issues")
+            logger.warning(f"\n⚠️  Optimization cancelled due to validation issues")
             return None
         # If 'proceed', continue with results as-is
     
     # 6.6. Export trade records for top 5 configs
-    print(f"\n📊 Exporting trade records for top 5 configurations...")
+    logger.info(f"\n📊 Exporting trade records for top 5 configurations...")
     export_trade_records(results[:5], configs, strategy_module_name)
     
     # 7. Display top 5 (pass configs for accurate display of risk params)
@@ -263,23 +267,23 @@ def optimize_strategy_v2(
     # 8. User selects (or auto-select if non-interactive)
     if non_interactive:
         selected_index = 0  # Auto-select best config
-        print(f"\n🤖 Non-interactive mode: Auto-selecting best configuration (#1)")
+        logger.info(f"\n🤖 Non-interactive mode: Auto-selecting best configuration (#1)")
     else:
         selected_index = prompt_user_selection()
     
     # Handle quit
     if selected_index == -1:
-        print(f"\n⚠️  No configuration applied. Exiting...")
+        logger.warning(f"\n⚠️  No configuration applied. Exiting...")
         return None
     
     selected_config = configs[results[selected_index].config_id]
     selected_perf = results[selected_index]
     
-    print(f"\n✅ Selected configuration #{selected_index + 1}")
+    logger.info(f"\n✅ Selected configuration #{selected_index + 1}")
     
     # 9. Apply to file (auto-confirm if non-interactive)
     if non_interactive or confirm_application():
-        print(f"\n📝 Applying configuration to strategy file...")
+        logger.info(f"\n📝 Applying configuration to strategy file...")
         success = apply_config_to_strategy_file(
             strategy_module_name,
             selected_config,
@@ -287,26 +291,26 @@ def optimize_strategy_v2(
         )
         
         if success:
-            print(f"✅ Strategy file updated successfully!")
-            print(f"   - Min Confluence: {selected_config.min_confluence}")
-            print(f"   - Min Risk:Reward: {selected_config.min_risk_reward}")
-            print(f"   - Block weights optimized")
+            logger.info(f"✅ Strategy file updated successfully!")
+            logger.info(f"   - Min Confluence: {selected_config.min_confluence}")
+            logger.info(f"   - Min Risk:Reward: {selected_config.min_risk_reward}")
+            logger.info(f"   - Block weights optimized")
         else:
-            print(f"❌ Failed to update strategy file")
+            logger.error(f"❌ Failed to update strategy file")
             return None
     else:
-        print(f"\n⚠️  Configuration not applied (user cancelled)")
+        logger.warning(f"\n⚠️  Configuration not applied (user cancelled)")
         return selected_config
     
     # 10. Save iteration
-    print(f"\n💾 Saving optimization history...")
+    logger.info(f"\n💾 Saving optimization history...")
     iteration.add_iteration(selected_config.to_dict(), selected_perf)
     save_strategy_iterations(iteration)
-    print(f"✅ Iteration {iteration.iteration_count} saved")
+    logger.info(f"✅ Iteration {iteration.iteration_count} saved")
     
     # 11. Check cycle 5
     if iteration.iteration_count == 5:
-        print(f"\n🎯 Iteration 5 reached - analyzing block performance...")
+        logger.info(f"\n🎯 Iteration 5 reached - analyzing block performance...")
         weak_block = identify_weakest_block(iteration)
         
         if weak_block:
@@ -317,9 +321,9 @@ def optimize_strategy_v2(
             )
             display_block_recommendations(weak_block, recommendations)
     
-    print(f"\n" + "="*80)
-    print(f"🏆 OPTIMIZATION COMPLETE")
-    print(f"="*80)
+    logger.info(f"\n" + "="*80)
+    logger.info(f"🏆 OPTIMIZATION COMPLETE")
+    logger.info(f"="*80)
     
     return selected_config
 
@@ -391,17 +395,17 @@ def load_risk_params_from_yaml(strategy_module_name: str) -> dict:
                         params['use_structure_sl'] = bool(sl.get('use_structure_sl', True))
                         params['structure_sources'] = sl.get('structure_sources', ['swing_points', 'supply_demand', 'fibonacci'])
 
-                print(f"   📊 Loaded ALL params from {config_path.name}:")
-                print(f"      - Starting Capital: ${params['starting_capital']:,.2f}")
-                print(f"      - Max Leverage: {params['max_leverage']}x")
-                print(f"      - Risk per Trade: {params['risk_per_trade_pct']}%")
-                print(f"      - TP Mode: {params['tp_mode']}")
-                print(f"      - SL Params: volatility_mult={params['volatility_multiplier']}, delay_bars={params['delay_bars']}, emergency_sl={params['emergency_sl_pct']}%")
+                logger.info(f"   📊 Loaded ALL params from {config_path.name}:")
+                logger.info(f"      - Starting Capital: ${params['starting_capital']:,.2f}")
+                logger.info(f"      - Max Leverage: {params['max_leverage']}x")
+                logger.info(f"      - Risk per Trade: {params['risk_per_trade_pct']}%")
+                logger.info(f"      - TP Mode: {params['tp_mode']}")
+                logger.info(f"      - SL Params: volatility_mult={params['volatility_multiplier']}, delay_bars={params['delay_bars']}, emergency_sl={params['emergency_sl_pct']}%")
 
                 return params
 
             except Exception as e:
-                print(f"   ⚠️  Error reading {config_path}: {e}")
+                logger.error(f"   ⚠️  Error reading {config_path}: {e}")
                 raise  # Re-raise to see the actual error
 
     # If no config found, raise error (nuclear option - no defaults!)
@@ -493,7 +497,7 @@ def build_optimization_configs(
         # Quick test mode: Use tp_mode from YAML config (NO EXCEPTIONS!)
         yaml_tp_mode = risk_params.get('tp_mode', 'PERCENTAGE')
         tp_modes = [yaml_tp_mode]  # Honor YAML setting!
-        print(f"   🎯 Quick Test: Using TP mode from YAML: {yaml_tp_mode}")
+        logger.info(f"   🎯 Quick Test: Using TP mode from YAML: {yaml_tp_mode}")
     
     # TP DISTANCE SETS (Conservative, Moderate, Aggressive)
     # CRITICAL: No 'name' field! Just TP percentages.
@@ -594,9 +598,9 @@ def build_optimization_configs(
                     configs.append(config)
                     config_id += 1
     
-    print(f"   ✅ Dynamic confluence: {confluence_range[:4]}")
-    print(f"   ✅ Expanded R:R: {rr_range}")
-    print(f"   ✅ TP Modes: {tp_modes}")
+    logger.info(f"   ✅ Dynamic confluence: {confluence_range[:4]}")
+    logger.info(f"   ✅ Expanded R:R: {rr_range}")
+    logger.info(f"   ✅ TP Modes: {tp_modes}")
     
     return configs
 
@@ -654,7 +658,7 @@ def export_trade_records(
         if hasattr(result, 'trades') and result.trades:
             trades_df = pd.DataFrame([t.to_dict() for t in result.trades])
             trades_df.to_csv(csv_file, index=False)
-            print(f"   ✅ Exported {len(result.trades)} trades → {csv_file}")
+            logger.info(f"   ✅ Exported {len(result.trades)} trades → {csv_file}")
         else:
             # Create summary file even if no trades
             with open(csv_file, 'w') as f:
@@ -662,7 +666,7 @@ def export_trade_records(
                 f.write(f"Config ID: {result.config_id}\n")
                 f.write(f"Min Confluence: {config.min_confluence}\n")
                 f.write(f"Min Risk:Reward: {config.min_risk_reward}\n")
-            print(f"   ⚠️  Config {result.config_id}: No trades executed")
+            logger.warning(f"   ⚠️  Config {result.config_id}: No trades executed")
     
     # Export summary CSV
     summary_file = results_dir / 'optimization_summary.csv'
@@ -692,7 +696,7 @@ def export_trade_records(
     
     summary_df = pd.DataFrame(summary_data)
     summary_df.to_csv(summary_file, index=False)
-    print(f"   ✅ Summary exported → {summary_file}")
+    logger.info(f"   ✅ Summary exported → {summary_file}")
 
 
 def validate_optimization_results(
@@ -805,28 +809,28 @@ def display_diagnostic_report(
 ):
     """Display detailed diagnostic report with recommendations"""
     
-    print("\n" + "="*80)
-    print("🔍 INSTITUTIONAL DIAGNOSTIC REPORT")
-    print("="*80)
+    logger.info("\n" + "="*80)
+    logger.info("🔍 INSTITUTIONAL DIAGNOSTIC REPORT")
+    logger.info("="*80)
     
     for i, issue in enumerate(issues, 1):
         severity_icon = "🔴" if issue['severity'] == 'CRITICAL' else "⚠️"
         
-        print(f"\n{severity_icon} ISSUE #{i}: {issue['type']} ({issue['severity']})")
-        print(f"   Description: {issue['description']}")
-        print(f"   Expected: {issue['expected']}")
-        print(f"   Actual: {issue['actual']}")
-        print(f"   Likely Cause: {issue['likely_cause']}")
-        print(f"   Recommendation: {issue['recommendation']}")
+        logger.info(f"\n{severity_icon} ISSUE #{i}: {issue['type']} ({issue['severity']})")
+        logger.info(f"   Description: {issue['description']}")
+        logger.info(f"   Expected: {issue['expected']}")
+        logger.info(f"   Actual: {issue['actual']}")
+        logger.info(f"   Likely Cause: {issue['likely_cause']}")
+        logger.info(f"   Recommendation: {issue['recommendation']}")
         
         if issue['auto_fix']:
-            print(f"   ✅ Auto-fix available: {issue['auto_fix']}")
+            logger.info(f"   ✅ Auto-fix available: {issue['auto_fix']}")
         else:
-            print(f"   ❌ Manual intervention required")
+            logger.error(f"   ❌ Manual intervention required")
     
-    print("\n" + "="*80)
-    print("📊 CURRENT CONFIGURATION SUMMARY")
-    print("="*80)
+    logger.info("\n" + "="*80)
+    logger.info("📊 CURRENT CONFIGURATION SUMMARY")
+    logger.info("="*80)
     
     # Show current parameter ranges
     min_conf = min(c.min_confluence for c in configs)
@@ -834,16 +838,16 @@ def display_diagnostic_report(
     min_rr = min(c.min_risk_reward for c in configs)
     max_rr = max(c.min_risk_reward for c in configs)
     
-    print(f"   Confluence Range: {min_conf}-{max_conf}")
-    print(f"   Risk:Reward Range: {min_rr:.1f}-{max_rr:.1f}")
-    print(f"   Configs Tested: {len(configs)}")
+    logger.info(f"   Confluence Range: {min_conf}-{max_conf}")
+    logger.info(f"   Risk:Reward Range: {min_rr:.1f}-{max_rr:.1f}")
+    logger.info(f"   Configs Tested: {len(configs)}")
     
     top_result = results[0] if results else None
     if top_result:
-        print(f"\n   Best Config Results:")
-        print(f"   - Total Trades: {top_result.total_trades}")
-        print(f"   - Win Rate: {top_result.win_rate_pct:.1f}%")
-        print(f"   - Net PnL: ${top_result.net_pnl:.2f}")
+        logger.info(f"\n   Best Config Results:")
+        logger.info(f"   - Total Trades: {top_result.total_trades}")
+        logger.info(f"   - Win Rate: {top_result.win_rate_pct:.1f}%")
+        logger.info(f"   - Net PnL: ${top_result.net_pnl:.2f}")
 
 
 def prompt_diagnostic_action(issues: List[dict] = None) -> tuple:
@@ -864,15 +868,15 @@ def prompt_diagnostic_action(issues: List[dict] = None) -> tuple:
                 confluence_gap_issue = issue
                 break
     
-    print("\n" + "="*80)
-    print("🔧 REMEDIATION OPTIONS")
-    print("="*80)
+    logger.info("\n" + "="*80)
+    logger.info("🔧 REMEDIATION OPTIONS")
+    logger.info("="*80)
     
     if confluence_gap_issue:
-        print("\n   1. ADD CONTEXT BLOCKS: Add 'Always On' blocks for base confluence (RECOMMENDED ⭐)")
-        print("   2. AUTO-ADJUST: Adjust parameters to target specific trade count")
-        print("   3. PROCEED: Continue with current results (not recommended if CRITICAL)")
-        print("   4. QUIT: Cancel optimization and review strategy manually")
+        logger.info("\n   1. ADD CONTEXT BLOCKS: Add 'Always On' blocks for base confluence (RECOMMENDED ⭐)")
+        logger.info("   2. AUTO-ADJUST: Adjust parameters to target specific trade count")
+        logger.error("   3. PROCEED: Continue with current results (not recommended if CRITICAL)")
+        logger.info("   4. QUIT: Cancel optimization and review strategy manually")
         
         while True:
             choice = input("\nSelect action (1-4): ").strip()
@@ -896,9 +900,9 @@ def prompt_diagnostic_action(issues: List[dict] = None) -> tuple:
                         target_trades = int(target)
                         if target_trades > 0:
                             break
-                        print("   Please enter a positive number")
+                        logger.info("   Please enter a positive number")
                     except ValueError:
-                        print("   Please enter a valid number")
+                        logger.info("   Please enter a valid number")
                 
                 return ('adjust', target_trades, None)
                 
@@ -909,12 +913,12 @@ def prompt_diagnostic_action(issues: List[dict] = None) -> tuple:
             elif choice == '4':
                 return ('quit', None, None)
             else:
-                print("   Invalid choice. Please enter 1, 2, 3, or 4.")
+                logger.info("   Invalid choice. Please enter 1, 2, 3, or 4.")
     else:
         # Standard options without confluence gap
-        print("\n   1. AUTO-ADJUST: Adjust parameters to target specific trade count")
-        print("   2. PROCEED: Continue with current results (not recommended if CRITICAL)")
-        print("   3. QUIT: Cancel optimization and review strategy manually")
+        logger.info("\n   1. AUTO-ADJUST: Adjust parameters to target specific trade count")
+        logger.error("   2. PROCEED: Continue with current results (not recommended if CRITICAL)")
+        logger.info("   3. QUIT: Cancel optimization and review strategy manually")
         
         while True:
             choice = input("\nSelect action (1-3): ").strip()
@@ -930,9 +934,9 @@ def prompt_diagnostic_action(issues: List[dict] = None) -> tuple:
                         target_trades = int(target)
                         if target_trades > 0:
                             break
-                        print("   Please enter a positive number")
+                        logger.info("   Please enter a positive number")
                     except ValueError:
-                        print("   Please enter a valid number")
+                        logger.info("   Please enter a valid number")
                 
                 return ('adjust', target_trades, None)
                 
@@ -943,7 +947,7 @@ def prompt_diagnostic_action(issues: List[dict] = None) -> tuple:
             elif choice == '3':
                 return ('quit', None, None)
             else:
-                print("   Invalid choice. Please enter 1, 2, or 3.")
+                logger.info("   Invalid choice. Please enter 1, 2, or 3.")
 
 
 def auto_adjust_configs(
@@ -976,14 +980,14 @@ def auto_adjust_configs(
     current_rr_min = min(c.min_risk_reward for c in configs)
     current_rr_max = max(c.min_risk_reward for c in configs)
     
-    print(f"\n📊 ADJUSTMENT ANALYSIS")
-    print(f"="*80)
-    print(f"   Current Trades: {current_trades}")
-    print(f"   Target Trades: {target_trades}")
-    print(f"   Adjustment Needed: {ratio:.1f}x")
-    print(f"\n   Current Parameters:")
-    print(f"   - Confluence: {current_conf_min}-{current_conf_max}")
-    print(f"   - Risk:Reward: {current_rr_min:.1f}-{current_rr_max:.1f}")
+    logger.info(f"\n📊 ADJUSTMENT ANALYSIS")
+    logger.info(f"="*80)
+    logger.info(f"   Current Trades: {current_trades}")
+    logger.info(f"   Target Trades: {target_trades}")
+    logger.info(f"   Adjustment Needed: {ratio:.1f}x")
+    logger.info(f"\n   Current Parameters:")
+    logger.info(f"   - Confluence: {current_conf_min}-{current_conf_max}")
+    logger.info(f"   - Risk:Reward: {current_rr_min:.1f}-{current_rr_max:.1f}")
     
     # Determine new parameters based on ratio
     if ratio >= 10:  # Need 10x+ more trades (AGGRESSIVE)
@@ -1011,17 +1015,17 @@ def auto_adjust_configs(
         new_rr = [2.5, 3.0, 3.5]
         adjustment_type = "RAISING (reduce trades)"
     
-    print(f"\n   🔧 Adjustment Strategy: {adjustment_type}")
-    print(f"\n   Proposed New Parameters:")
-    print(f"   - Confluence: {min(new_confluence)}-{max(new_confluence)}")
-    print(f"   - Risk:Reward: {min(new_rr):.1f}-{max(new_rr):.1f}")
-    print(f"\n   Expected Result: ~{target_trades} trades")
-    print(f"="*80)
+    logger.info(f"\n   🔧 Adjustment Strategy: {adjustment_type}")
+    logger.info(f"\n   Proposed New Parameters:")
+    logger.info(f"   - Confluence: {min(new_confluence)}-{max(new_confluence)}")
+    logger.info(f"   - Risk:Reward: {min(new_rr):.1f}-{max(new_rr):.1f}")
+    logger.info(f"\n   Expected Result: ~{target_trades} trades")
+    logger.info(f"="*80)
     
     # Confirm adjustment
     confirm = input("\nApply these adjustments? (y/n): ").strip().lower()
     if confirm != 'y':
-        print("   ⚠️  Adjustment cancelled by user")
+        logger.warning("   ⚠️  Adjustment cancelled by user")
         return configs  # Return original configs
     
     # Rebuild configs with new parameters
@@ -1081,7 +1085,7 @@ sl_mode=configs[0].sl_mode,
                 adjusted_configs.append(config)
                 config_id += 1
     
-    print(f"   ✅ Created {len(adjusted_configs)} adjusted configurations")
+    logger.info(f"   ✅ Created {len(adjusted_configs)} adjusted configurations")
     
     return adjusted_configs
 
@@ -1106,7 +1110,7 @@ def archive_previous_results(strategy_name: str, max_archives: int = 5):
     
     # Check if results exist
     if not results_dir.exists() or not any(results_dir.iterdir()):
-        print(f"   ℹ️  No previous results to archive")
+        logger.info(f"   ℹ️  No previous results to archive")
         return
     
     # Archive directory
@@ -1121,7 +1125,7 @@ def archive_previous_results(strategy_name: str, max_archives: int = 5):
     try:
         # Move current results to archive
         shutil.move(str(results_dir), str(archive_path))
-        print(f"   ✅ Archived previous results → {archive_name}")
+        logger.info(f"   ✅ Archived previous results → {archive_name}")
         
         # Clean up old archives (keep only last max_archives)
         archives = sorted(archive_base.glob('archive_*'), key=lambda x: x.name, reverse=True)
@@ -1132,14 +1136,14 @@ def archive_previous_results(strategy_name: str, max_archives: int = 5):
                 shutil.rmtree(old_archive)
                 deleted_count += 1
             
-            print(f"   🗑️  Removed {deleted_count} old archive(s) (keeping last {max_archives})")
+            logger.info(f"   🗑️  Removed {deleted_count} old archive(s) (keeping last {max_archives})")
         
         # Recreate results directory for new run
         results_dir.mkdir(parents=True, exist_ok=True)
         
     except Exception as e:
-        print(f"   ⚠️  Archive failed: {e}")
-        print(f"   Continuing with optimization...")
+        logger.error(f"   ⚠️  Archive failed: {e}")
+        logger.info(f"   Continuing with optimization...")
 
 
 def detect_confluence_gap(
@@ -1457,37 +1461,37 @@ def display_context_block_recommendations(issue: dict):
     
     Beautiful UI for Option 2 solution
     """
-    print("\n" + "="*80)
-    print("💡 INTELLIGENT SOLUTION: ADD 'ALWAYS ON' CONTEXT BLOCKS")
-    print("="*80)
+    logger.info("\n" + "="*80)
+    logger.info("💡 INTELLIGENT SOLUTION: ADD 'ALWAYS ON' CONTEXT BLOCKS")
+    logger.info("="*80)
     
-    print(f"\n📊 DIAGNOSIS:")
-    print(f"   - Your strategy signals ARE firing")
-    print(f"   - But confluence is ~{issue.get('actual', 'unknown')}")
-    print(f"   - Threshold requires {issue.get('expected', 'unknown')}")
-    print(f"   - Gap: ~{issue.get('estimated_boost', 0) - 10} points")
+    logger.info(f"\n📊 DIAGNOSIS:")
+    logger.info(f"   - Your strategy signals ARE firing")
+    logger.info(f"   - But confluence is ~{issue.get('actual', 'unknown')}")
+    logger.info(f"   - Threshold requires {issue.get('expected', 'unknown')}")
+    logger.info(f"   - Gap: ~{issue.get('estimated_boost', 0) - 10} points")
     
-    print(f"\n💡 SOLUTION (Option 2):")
-    print(f"   Add 'Always On' context blocks that fire on EVERY bar")
-    print(f"   These provide BASE confluence even when event blocks rare")
+    logger.info(f"\n💡 SOLUTION (Option 2):")
+    logger.info(f"   Add 'Always On' context blocks that fire on EVERY bar")
+    logger.info(f"   These provide BASE confluence even when event blocks rare")
     
-    print(f"\n✨ RECOMMENDED BLOCKS:")
-    print(f"="*80)
+    logger.info(f"\n✨ RECOMMENDED BLOCKS:")
+    logger.info(f"="*80)
     
     for i, block in enumerate(issue.get('recommended_blocks', []), 1):
-        print(f"\n   {i}. {block['name']} ({block['category']})")
-        print(f"      Weight: {block['weight']} points")
-        print(f"      Fires: {block['fires']}")
-        print(f"      Benefit: {block['benefit']}")
-        print(f"      Impact: {block['impact']}")
+        logger.info(f"\n   {i}. {block['name']} ({block['category']})")
+        logger.info(f"      Weight: {block['weight']} points")
+        logger.info(f"      Fires: {block['fires']}")
+        logger.info(f"      Benefit: {block['benefit']}")
+        logger.info(f"      Impact: {block['impact']}")
     
     total_boost = sum(b['weight'] for b in issue.get('recommended_blocks', []))
-    print(f"\n📈 TOTAL CONFLUENCE BOOST: +{total_boost} points")
-    print(f"   Current: ~{issue.get('actual', 'unknown')}")
-    print(f"   After: ~{int(issue.get('actual', '30').split('~')[1].split(' ')[0]) + total_boost} points")
-    print(f"   Result: TRADEABLE! ✅")
+    logger.info(f"\n📈 TOTAL CONFLUENCE BOOST: +{total_boost} points")
+    logger.info(f"   Current: ~{issue.get('actual', 'unknown')}")
+    logger.info(f"   After: ~{int(issue.get('actual', '30').split('~')[1].split(' ')[0]) + total_boost} points")
+    logger.info(f"   Result: TRADEABLE! ✅")
     
-    print(f"\n" + "="*80)
+    logger.info(f"\n" + "="*80)
 
 
 def prompt_add_context_blocks(issue: dict) -> bool:
@@ -1499,23 +1503,23 @@ def prompt_add_context_blocks(issue: dict) -> bool:
     """
     display_context_block_recommendations(issue)
     
-    print(f"\n🔧 AUTO-ADD CONTEXT BLOCKS?")
-    print(f"="*80)
-    print(f"\n   This will:")
-    print(f"   1. Add {len(issue.get('recommended_blocks', []))} context blocks to your strategy")
-    print(f"   2. Update block weights in strategy file")
-    print(f"   3. Re-run optimization with new blocks")
-    print(f"   4. Generate tradeable signals")
+    logger.info(f"\n🔧 AUTO-ADD CONTEXT BLOCKS?")
+    logger.info(f"="*80)
+    logger.info(f"\n   This will:")
+    logger.info(f"   1. Add {len(issue.get('recommended_blocks', []))} context blocks to your strategy")
+    logger.info(f"   2. Update block weights in strategy file")
+    logger.info(f"   3. Re-run optimization with new blocks")
+    logger.info(f"   4. Generate tradeable signals")
     
     while True:
         choice = input(f"\n   Add context blocks and re-optimize? (y/n): ").strip().lower()
         if choice in ['y', 'yes']:
             return True
         elif choice in ['n', 'no']:
-            print(f"\n   ⚠️  Blocks NOT added - strategy remains unchanged")
+            logger.warning(f"\n   ⚠️  Blocks NOT added - strategy remains unchanged")
             return False
         else:
-            print(f"   Please enter 'y' or 'n'")
+            logger.info(f"   Please enter 'y' or 'n'")
 
 
 def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
@@ -1542,18 +1546,17 @@ def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
     from pathlib import Path
     import shutil
     from datetime import datetime
-    
     recommended_blocks = issue.get('recommended_blocks', [])
     
     if not recommended_blocks:
-        print("   ❌ No blocks to add")
+        logger.error("   ❌ No blocks to add")
         return False
     
     # Get strategy file path
     strategy_path = Path('src') / 'strategies' / f'{strategy_name}.py'
     
     if not strategy_path.exists():
-        print(f"   ❌ Strategy file not found: {strategy_path}")
+        logger.error(f"   ❌ Strategy file not found: {strategy_path}")
         return False
     
     # ========================================================================
@@ -1568,12 +1571,12 @@ def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
     
     try:
         shutil.copy2(strategy_path, backup_path)
-        print(f"\n   💾 Backup created: {backup_path.name}")
+        logger.info(f"\n   💾 Backup created: {backup_path.name}")
     except Exception as e:
-        print(f"   ❌ Failed to create backup: {e}")
+        logger.error(f"   ❌ Failed to create backup: {e}")
         return False
     
-    print(f"\n   📝 Updating {strategy_path}...")
+    logger.info(f"\n   📝 Updating {strategy_path}...")
     
     # Read current file
     with open(strategy_path, 'r') as f:
@@ -1674,7 +1677,7 @@ def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
     # ========================================================================
     # STEP 2: INJECT SCORING CODE INTO _calculate_confluence()
     # ========================================================================
-    print(f"\n   🎯 Injecting scoring code into _calculate_confluence()...")
+    logger.info(f"\n   🎯 Injecting scoring code into _calculate_confluence()...")
     
     scoring_code_generated = []
     for block in recommended_blocks:
@@ -1704,10 +1707,10 @@ def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
             new_lines.insert(confluence_injection_point, scoring_code)
             confluence_injection_point += 1
         
-        print(f"   ✅ Injected {len(scoring_code_generated)} scoring blocks into _calculate_confluence()")
+        logger.info(f"   ✅ Injected {len(scoring_code_generated)} scoring blocks into _calculate_confluence()")
     else:
-        print(f"   ⚠️  Could not find _calculate_confluence() - scoring NOT injected!")
-        print(f"   ⚠️  Manual scoring required for new blocks")
+        logger.warning(f"   ⚠️  Could not find _calculate_confluence() - scoring NOT injected!")
+        logger.warning(f"   ⚠️  Manual scoring required for new blocks")
     
     # ========================================================================
     # STEP 3: WRITE UPDATED FILE WITH ERROR HANDLING
@@ -1716,21 +1719,21 @@ def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
         with open(strategy_path, 'w') as f:
             f.writelines(new_lines)
         
-        print(f"\n   ✅ Strategy file updated successfully!")
-        print(f"\n   📝 Changes Made:")
-        print(f"      - Imports: Added {len(added_imports)} imports")
-        print(f"      - _initialize_blocks(): Added {len(new_blocks_config)} detectors + configs")
-        print(f"      - _analyze_blocks(): Added {len(new_blocks_analysis)} analysis calls")
-        print(f"      - _calculate_confluence(): Added {len(scoring_code_generated)} scoring blocks")
+        logger.info(f"\n   ✅ Strategy file updated successfully!")
+        logger.info(f"\n   📝 Changes Made:")
+        logger.info(f"      - Imports: Added {len(added_imports)} imports")
+        logger.info(f"      - _initialize_blocks(): Added {len(new_blocks_config)} detectors + configs")
+        logger.info(f"      - _analyze_blocks(): Added {len(new_blocks_analysis)} analysis calls")
+        logger.info(f"      - _calculate_confluence(): Added {len(scoring_code_generated)} scoring blocks")
         
         for block in recommended_blocks:
-            print(f"\n   ✅ {block['name']}: +{block['weight']} points")
+            logger.info(f"\n   ✅ {block['name']}: +{block['weight']} points")
         
         return True
         
     except Exception as e:
-        print(f"\n   ❌ CRITICAL ERROR during file write: {e}")
-        print(f"   🔄 Rolling back to backup...")
+        logger.error(f"\n   ❌ CRITICAL ERROR during file write: {e}")
+        logger.info(f"   🔄 Rolling back to backup...")
         
         # Rollback: restore from backup
         try:
@@ -1740,13 +1743,13 @@ def add_context_blocks_to_strategy(strategy_name: str, issue: dict) -> bool:
             with open(strategy_path, 'w') as f:
                 f.write(backup_content)
             
-            print(f"   ✅ Rollback successful - strategy restored from backup")
-            print(f"   💾 Backup preserved at: {backup_path}")
+            logger.info(f"   ✅ Rollback successful - strategy restored from backup")
+            logger.info(f"   💾 Backup preserved at: {backup_path}")
             
         except Exception as rollback_error:
-            print(f"   ❌ ROLLBACK FAILED: {rollback_error}")
-            print(f"   🆘 MANUAL RECOVERY REQUIRED")
-            print(f"   📁 Backup location: {backup_path}")
+            logger.error(f"   ❌ ROLLBACK FAILED: {rollback_error}")
+            logger.info(f"   🆘 MANUAL RECOVERY REQUIRED")
+            logger.info(f"   📁 Backup location: {backup_path}")
         
         return False
 

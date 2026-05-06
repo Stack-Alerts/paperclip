@@ -35,6 +35,10 @@ from src.strategy_builder.ui.styles import (
     get_color
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class ConfigPanel(QScrollArea):
     """Single configuration panel with scroll area"""
@@ -344,7 +348,7 @@ class CompareViewPanel(QWidget):
     def _export_comparison(self) -> None:
         """Export comparison to CSV"""
         if not self.configurations:
-            print("⚠️ No configurations to export")
+            logger.warning("⚠️ No configurations to export")
             return
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -389,10 +393,10 @@ class CompareViewPanel(QWidget):
                         f.write(f",{value}")
                     f.write("\n")
             
-            print(f"✅ Comparison exported to {filename}")
+            logger.info(f"✅ Comparison exported to {filename}")
             
         except Exception as e:
-            print(f"❌ Export failed: {str(e)}")
+            logger.error(f"❌ Export failed: {str(e)}")
     
     def get_configurations(self) -> List[Dict]:
         """Get loaded configurations"""

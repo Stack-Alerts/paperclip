@@ -32,6 +32,8 @@ import importlib
 import inspect
 from pathlib import Path
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class BlockMetadata:
@@ -449,14 +451,14 @@ class BlockRegistry:
         """Print a summary of registered blocks"""
         stats = cls.get_stats()
         
-        print("="*80)
-        print("BUILDING BLOCK REGISTRY SUMMARY")
-        print("="*80)
-        print(f"\nTotal Registered Blocks: {stats['total_blocks']}")
-        print(f"\nBlocks by Category:")
+        logger.info("="*80)
+        logger.info("BUILDING BLOCK REGISTRY SUMMARY")
+        logger.info("="*80)
+        logger.info(f"\nTotal Registered Blocks: {stats['total_blocks']}")
+        logger.info(f"\nBlocks by Category:")
         for category, count in sorted(stats['blocks_by_category'].items()):
-            print(f"  {category:20s}: {count:3d} blocks")
-        print("="*80)
+            logger.info(f"  {category:20s}: {count:3d} blocks")
+        logger.info("="*80)
 
 
 def register_block(**metadata):

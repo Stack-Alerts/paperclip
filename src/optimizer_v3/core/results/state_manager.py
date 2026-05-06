@@ -22,6 +22,8 @@ from nautilus_trader.model.objects import Money, Quantity, Price
 from dotenv import load_dotenv
 import os
 
+import logging
+logger = logging.getLogger(__name__)
 
 class StateManager:
     """
@@ -169,7 +171,7 @@ class StateManager:
             return state
         
         except Exception as e:
-            print(f"Error loading state: {e}")
+            logger.error(f"Error loading state: {e}")
             return None
     
     def delete_state(self, session_id: str) -> bool:
@@ -197,7 +199,7 @@ class StateManager:
             return True
         
         except Exception as e:
-            print(f"Error deleting state: {e}")
+            logger.error(f"Error deleting state: {e}")
             return False
     
     def list_sessions(self) -> List[Dict]:
@@ -303,7 +305,7 @@ class StateManager:
             return True
         
         except Exception as e:
-            print(f"Error restoring backup: {e}")
+            logger.error(f"Error restoring backup: {e}")
             return False
     
     # ==================== Serialization ====================

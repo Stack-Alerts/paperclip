@@ -25,10 +25,6 @@ from PyQt5.QtCore import Qt, QSettings, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QColor
 from datetime import datetime
 import csv
-import logging
-
-logger = logging.getLogger(__name__)
-
 from src.optimizer_v3.validation.institutional_validator import (
     InstitutionalValidator,
     ValidationReport,
@@ -50,6 +46,10 @@ from src.strategy_builder.validation.auto_fix import (
 )
 from src.strategy_builder.validation.undo_manager import UndoManager
 from src.strategy_builder.ui.auto_fix_confirm_dialog import AutoFixConfirmDialog
+
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 class ValidationReportWindow(QMainWindow):
@@ -2107,67 +2107,67 @@ class ValidationReportWindow(QMainWindow):
         - Should adjust constraint, NOT strategy
         """
         try:
-            print(f"\n{'='*80}")
-            print(f"DEBUG: RECHECK TIMING FIX - INSTITUTIONAL APPROACH")
-            print(f"{'='*80}")
-            print(f"Signal name: {signal_name}")
-            print(f"Current timing window: {timing_window} bars")
+            logger.info(f"\n{'='*80}")
+            logger.debug(f"DEBUG: RECHECK TIMING FIX - INSTITUTIONAL APPROACH")
+            logger.info(f"{'='*80}")
+            logger.info(f"Signal name: {signal_name}")
+            logger.info(f"Current timing window: {timing_window} bars")
             
             # Find signal in config
             for block in self.config.blocks:
                 for signal in block.signals:
                     if signal.name == signal_name:
-                        print(f"  DEBUG: ✓ FOUND target signal '{signal_name}'")
+                        logger.debug(f"  DEBUG: ✓ FOUND target signal '{signal_name}'")
                         
                         # Calculate CUMULATIVE delay (same as validator)
                         cumulative_delay = 0
                         if hasattr(signal, 'recheck_config') and signal.recheck_config:
                             cumulative_delay = signal.recheck_config.bar_delay
-                            print(f"  DEBUG: Main recheck_config.bar_delay = {signal.recheck_config.bar_delay} bars")
+                            logger.debug(f"  DEBUG: Main recheck_config.bar_delay = {signal.recheck_config.bar_delay} bars")
                         
                         if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
                             chain_delays = [rc.bar_delay for rc in signal.recheck_chain]
                             cumulative_delay += sum(chain_delays)
-                            print(f"  DEBUG: RECHECK CHAIN: {len(signal.recheck_chain)} items")
-                            print(f"  DEBUG: Chain delays: {chain_delays}")
+                            logger.debug(f"  DEBUG: RECHECK CHAIN: {len(signal.recheck_chain)} items")
+                            logger.debug(f"  DEBUG: Chain delays: {chain_delays}")
                         
-                        print(f"  DEBUG: CUMULATIVE RECHECK DELAY = {cumulative_delay} bars (PRESERVED)")
+                        logger.debug(f"  DEBUG: CUMULATIVE RECHECK DELAY = {cumulative_delay} bars (PRESERVED)")
                         
                         # INSTITUTIONAL FIX: Increase timing window to fit delays + buffer
                         # Add 20% buffer for safety
                         buffer = int(cumulative_delay * 0.2)
                         new_timing_window = cumulative_delay + buffer
                         
-                        print(f"  DEBUG: Required window = {cumulative_delay} + {buffer} buffer = {new_timing_window} bars")
+                        logger.debug(f"  DEBUG: Required window = {cumulative_delay} + {buffer} buffer = {new_timing_window} bars")
                         
                         # Update timing constraint
                         if hasattr(signal, 'timing_constraint') and signal.timing_constraint:
                             old_window = signal.timing_constraint.max_candles
                             signal.timing_constraint.max_candles = new_timing_window
                             
-                            print(f"  DEBUG: TIMING WINDOW BEFORE = {old_window} bars")
-                            print(f"  DEBUG: TIMING WINDOW AFTER = {new_timing_window} bars")
-                            print(f"  DEBUG: ✅ RECHECK delays PRESERVED (strategic choice)")
-                            print(f"  DEBUG: ✅ Timing window ADJUSTED (constraint)")
+                            logger.debug(f"  DEBUG: TIMING WINDOW BEFORE = {old_window} bars")
+                            logger.debug(f"  DEBUG: TIMING WINDOW AFTER = {new_timing_window} bars")
+                            logger.debug(f"  DEBUG: ✅ RECHECK delays PRESERVED (strategic choice)")
+                            logger.debug(f"  DEBUG: ✅ Timing window ADJUSTED (constraint)")
                         else:
-                            print(f"  DEBUG: ❌ No timing_constraint found")
-                            print(f"{'='*80}\n")
+                            logger.error(f"  DEBUG: ❌ No timing_constraint found")
+                            logger.info(f"{'='*80}\n")
                             return False
                         
-                        print(f"  DEBUG: ✅ Fix successful! Window {old_window} → {new_timing_window} bars")
-                        print(f"{'='*80}\n")
+                        logger.debug(f"  DEBUG: ✅ Fix successful! Window {old_window} → {new_timing_window} bars")
+                        logger.info(f"{'='*80}\n")
                         
                         return True
             
-            print(f"DEBUG: ❌ Signal '{signal_name}' not found in config")
-            print(f"{'='*80}\n")
+            logger.error(f"DEBUG: ❌ Signal '{signal_name}' not found in config")
+            logger.info(f"{'='*80}\n")
             return False
             
         except Exception as e:
-            print(f"DEBUG: ❌ EXCEPTION: {e}")
+            logger.error(f"DEBUG: ❌ EXCEPTION: {e}")
             import traceback
             traceback.print_exc()
-            print(f"{'='*80}\n")
+            logger.info(f"{'='*80}\n")
             return False
     
     def _apply_exit_consolidation_fix(self, signal_name: str, level: str) -> bool:
@@ -2230,7 +2230,7 @@ class ValidationReportWindow(QMainWindow):
             return True
 
         except Exception as e:
-            print(f"Exit consolidation fix failed: {e}")
+            logger.error(f"Exit consolidation fix failed: {e}")
             return False
     
     def _apply_dead_code_fix(self, signal_name: str, block_name: str, preserve_history: bool = True) -> bool:
@@ -2257,5 +2257,5 @@ class ValidationReportWindow(QMainWindow):
             return False
             
         except Exception as e:
-            print(f"Dead code fix failed: {e}")
+            logger.error(f"Dead code fix failed: {e}")
             return False

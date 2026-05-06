@@ -30,6 +30,10 @@ from src.strategy_builder.ui.styles import (
     get_primary_button_stylesheet, get_secondary_button_stylesheet
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class DataUpdateThread(QThread):
     """
@@ -519,10 +523,8 @@ class DataUpdateModal(QDialog):
         gap_seconds = (self.current_time - start_date).total_seconds()
         if gap_seconds < 3600:  # less than 1 hour
             start_date = self.current_time - timedelta(hours=2)
-            print(
-                f"[DataUpdateModal] BUG-B: sub-1h gap ({gap_seconds:.0f}s) — "
-                f"widening 1h query start to {start_date} to ensure ≥1 closed candle"
-            )
+            logger.info(f"[DataUpdateModal] BUG-B: sub-1h gap ({gap_seconds:.0f}s) — "
+                f"widening 1h query start to {start_date} to ensure ≥1 closed candle")
         
         # Create and start update thread (with retry logic!)
         self.update_thread = DataUpdateThread(
@@ -614,7 +616,7 @@ class DataUpdateModal(QDialog):
         self.retry_timer.stop()
         
         # Log retry attempt
-        print(f"🔄 AUTO-RETRY: Attempt {self.retry_count}/{self.max_retries} starting now...")
+        logger.info(f"🔄 AUTO-RETRY: Attempt {self.retry_count}/{self.max_retries} starting now...")
         
         # Restart the update process
         self._start_update()

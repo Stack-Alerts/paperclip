@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Dict, Optional
 import json
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 logger = logging.getLogger(__name__)
 
 

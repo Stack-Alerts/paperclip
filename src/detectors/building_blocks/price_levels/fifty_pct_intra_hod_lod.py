@@ -13,6 +13,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='fifty_pct_intra_hod_lod',
@@ -263,9 +265,9 @@ class FiftyPctIntraHODLOD:
 
 
 if __name__ == "__main__":
-    print("="*80)
-    print("50%INTRA-H-LOD (TODAY'S 50% EQUILIBRIUM) TEST")
-    print("="*80)
+    logger.info("="*80)
+    logger.info("50%INTRA-H-LOD (TODAY'S 50% EQUILIBRIUM) TEST")
+    logger.info("="*80)
     
     # Create intraday data
     dates = pd.date_range(start='2024-01-01 09:00', periods=50, freq='15min')
@@ -288,13 +290,13 @@ if __name__ == "__main__":
     fifty_pct_intra = FiftyPctIntraHODLOD()
     result = fifty_pct_intra.analyze(data)
     
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"Description: {result['metadata']['description']}")
-    print(f"Today IHOD: ${result['metadata']['today_ihod']:.2f}")
-    print(f"Today ILOD: ${result['metadata']['today_ilod']:.2f}")
-    print(f"Intraday 50%: ${result['metadata']['intra_fifty_pct']:.2f}")
-    print(f"Current Price: ${result['metadata']['current_price']:.2f}")
-    print(f"Position in Intraday Range: {result['metadata']['position_in_range_pct']:.1f}%")
-    print(f"Equilibrium Changed: {result['metadata']['equilibrium_changed']}")
-    print("="*80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"Description: {result['metadata']['description']}")
+    logger.info(f"Today IHOD: ${result['metadata']['today_ihod']:.2f}")
+    logger.info(f"Today ILOD: ${result['metadata']['today_ilod']:.2f}")
+    logger.info(f"Intraday 50%: ${result['metadata']['intra_fifty_pct']:.2f}")
+    logger.info(f"Current Price: ${result['metadata']['current_price']:.2f}")
+    logger.info(f"Position in Intraday Range: {result['metadata']['position_in_range_pct']:.1f}%")
+    logger.info(f"Equilibrium Changed: {result['metadata']['equilibrium_changed']}")
+    logger.info("="*80)

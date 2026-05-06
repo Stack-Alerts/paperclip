@@ -14,6 +14,10 @@ from src.optimizer_v3.core.error_recovery import ErrorRecoveryStrategy
 from src.optimizer_v3.core.resource_monitor import ResourceMonitor, ResourceStatus
 from src.optimizer_v3.core.early_stopping import EarlyStopping, StoppingReason
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 @dataclass
 class OptimizationConfig:

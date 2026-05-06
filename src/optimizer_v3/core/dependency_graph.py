@@ -9,6 +9,10 @@ from collections import defaultdict, deque
 from src.optimizer_v3.core.logger import OptimizerLogger
 from src.optimizer_v3.core.validator import DataValidator, ValidationError
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class DependencyGraph:
     """

@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional
 import calendar
 
+import logging
+logger = logging.getLogger(__name__)
 
 class FileValidator:
     """
@@ -162,14 +164,14 @@ class FileValidator:
             data_dir: Directory containing month files
             data_type: Data type to validate
         """
-        print(f"\n{'='*80}")
-        print(f"FILE COMPLETENESS VALIDATION REPORT - {data_type.upper()}")
-        print(f"{'='*80}\n")
+        logger.info(f"\n{'='*80}")
+        logger.info(f"FILE COMPLETENESS VALIDATION REPORT - {data_type.upper()}")
+        logger.info(f"{'='*80}\n")
         
         results = self.validate_all_months(data_dir, data_type)
         
         if not results:
-            print(f"⚠️  No files found in {data_dir / data_type}\n")
+            logger.warning(f"⚠️  No files found in {data_dir / data_type}\n")
             return
         
         complete_count = 0
@@ -177,25 +179,24 @@ class FileValidator:
         
         for month_str, (is_complete, message) in results.items():
             icon = "✅" if is_complete else "⚠️ "
-            print(f"{icon} {month_str}: {message}")
+            logger.info(f"{icon} {month_str}: {message}")
             
             if is_complete:
                 complete_count += 1
             else:
                 incomplete_count += 1
         
-        print(f"\n{'='*80}")
-        print(f"Summary: {complete_count} complete, {incomplete_count} incomplete")
-        print(f"{'='*80}\n")
+        logger.info(f"\n{'='*80}")
+        logger.info(f"Summary: {complete_count} complete, {incomplete_count} incomplete")
+        logger.info(f"{'='*80}\n")
         
         if incomplete_count > 0:
-            print("⚠️  RECOMMENDATION: Re-download incomplete months with --force\n")
+            logger.warning("⚠️  RECOMMENDATION: Re-download incomplete months with --force\n")
 
 
 def main():
     """CLI for validation"""
     from ..config import RAW_DATA_DIR
-    
     validator = FileValidator()
     validator.print_validation_report(RAW_DATA_DIR, 'trades')
 

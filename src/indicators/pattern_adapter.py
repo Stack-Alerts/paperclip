@@ -21,6 +21,8 @@ from datetime import datetime
 from nautilus_trader.model.data import Bar
 from nautilus_trader.model.objects import Price, Quantity
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class PatternSignal:
@@ -396,5 +398,5 @@ class PatternAdapter:
 
 # Example usage
 if __name__ == "__main__":
-    print("Pattern Adapter initialized")
-    print("Use with NautilusTrader strategies")
+    logger.info("Pattern Adapter initialized")
+    logger.info("Use with NautilusTrader strategies")

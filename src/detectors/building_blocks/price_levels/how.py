@@ -24,6 +24,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='how',
@@ -494,18 +496,18 @@ if __name__ == "__main__":
     how_block = HOW()
     result = how_block.analyze(data)
     
-    print("=" * 80)
-    print("HOW (HIGH OF WEEK) - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"\nHOW Analysis:")
-    print(f"  HOW: ${result['metadata']['how']:.2f}")
-    print(f"  Current Price: ${result['metadata']['current_price']:.2f}")
-    print(f"  Distance: {result['metadata']['distance_pct']:+.2f}% ({result['metadata']['distance_class']})")
-    print(f"  Breakout Status: {result['metadata']['breakout_status']}")
-    print(f"  Major Resistance: {result['metadata']['is_major_resistance']}")
-    print(f"\nConfluence Factors:")
+    logger.info("=" * 80)
+    logger.info("HOW (HIGH OF WEEK) - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"\nHOW Analysis:")
+    logger.info(f"  HOW: ${result['metadata']['how']:.2f}")
+    logger.info(f"  Current Price: ${result['metadata']['current_price']:.2f}")
+    logger.info(f"  Distance: {result['metadata']['distance_pct']:+.2f}% ({result['metadata']['distance_class']})")
+    logger.info(f"  Breakout Status: {result['metadata']['breakout_status']}")
+    logger.info(f"  Major Resistance: {result['metadata']['is_major_resistance']}")
+    logger.info(f"\nConfluence Factors:")
     for factor in result['confluence_factors']:
-        print(f"  - {factor}")
-    print("=" * 80)
+        logger.info(f"  - {factor}")
+    logger.info("=" * 80)

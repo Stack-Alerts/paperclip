@@ -26,6 +26,10 @@ from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Import from original encoder
 try:
     from .pattern_encoder import Pivot, PivotType, PriceDirection, OscillatorDirection
@@ -34,8 +38,6 @@ except ImportError:
     import os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from .pattern_encoder import Pivot, PivotType, PriceDirection, OscillatorDirection
-
-
 class CorePattern(Enum):
     """
     8 Core Pattern Types (Simplified System)
@@ -323,24 +325,24 @@ class SimplifiedPatternEncoder:
 # Helper function for testing
 def quick_test():
     """Quick test of simplified encoder"""
-    print("="*80)
-    print("SIMPLIFIED PATTERN ENCODER TEST (8 Core Patterns)")
-    print("="*80)
+    logger.info("="*80)
+    logger.info("SIMPLIFIED PATTERN ENCODER TEST (8 Core Patterns)")
+    logger.info("="*80)
     
     encoder = SimplifiedPatternEncoder()
     
-    print("\nCore Pattern Descriptions:")
-    print("-" * 80)
+    logger.info("\nCore Pattern Descriptions:")
+    logger.info("-" * 80)
     for idx in range(8):
-        print(f"Pattern {idx}: {encoder.get_pattern_description(idx)}")
+        logger.info(f"Pattern {idx}: {encoder.get_pattern_description(idx)}")
     
-    print("\n" + "="*80)
-    print("Benefits of 8-Pattern System:")
-    print("="*80)
-    print("Current (48 patterns): 540 samples / 48 = 11.25 samples/pattern")
-    print("Simplified (8 patterns): 540 samples / 8 = 67.5 samples/pattern")
-    print("Improvement: 6x more robust statistics!")
-    print("\n" + "="*80)
+    logger.info("\n" + "="*80)
+    logger.info("Benefits of 8-Pattern System:")
+    logger.info("="*80)
+    logger.info("Current (48 patterns): 540 samples / 48 = 11.25 samples/pattern")
+    logger.info("Simplified (8 patterns): 540 samples / 8 = 67.5 samples/pattern")
+    logger.info("Improvement: 6x more robust statistics!")
+    logger.info("\n" + "="*80)
 
 
 if __name__ == "__main__":

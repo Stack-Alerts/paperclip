@@ -37,6 +37,8 @@ Status: Production-Ready
 from typing import Dict, List, Tuple, Any
 from src.strategies.universal_optimizer.modules.confluence_calculator import ConfluenceCalculator
 
+import logging
+logger = logging.getLogger(__name__)
 
 class SignalAccumulator:
     """
@@ -91,7 +93,7 @@ class SignalAccumulator:
         Example:
             should_enter, conf, sigs = accumulator.on_bar(15, results, configs)
             if should_enter:
-                print(f"Entry triggered! {conf} points from {len(sigs)} signals")
+                logger.info(f"Entry triggered! {conf} points from {len(sigs)} signals")
         """
         self.current_bar = bar_number
         
@@ -163,7 +165,7 @@ class SignalAccumulator:
             except Exception as e:
                 # If ConfluenceCalculator fails, log but don't crash
                 # (defensive programming)
-                print(f"Warning: Failed to calculate points for {block_name}: {e}")
+                logger.error(f"Warning: Failed to calculate points for {block_name}: {e}")
                 points = 0
             
             # Only add if points > 0

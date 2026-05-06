@@ -25,6 +25,8 @@ import pandas as pd
 import numpy as np
 from src.utils.advanced_data_loader import advanced_data
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='order_block',
@@ -351,17 +353,17 @@ if __name__ == "__main__":
     ob = OrderBlock()
     result = ob.analyze(data)
     
-    print("=" * 80)
-    print("ORDER BLOCK DETECTOR - TEST RESULTS")
-    print("=" * 80)
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
+    logger.info("=" * 80)
+    logger.info("ORDER BLOCK DETECTOR - TEST RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
     if 'order_block_type' in result['metadata']:
-        print(f"\nOrder Block Analysis:")
-        print(f"  Type: {result['metadata']['order_block_type']}")
-        print(f"  Zone: ${result['metadata']['ob_low']:.2f} - ${result['metadata']['ob_high']:.2f}")
-        print(f"  Impulse: {result['metadata']['impulse_pct']}%")
-        print(f"\nConfluence:")
+        logger.info(f"\nOrder Block Analysis:")
+        logger.info(f"  Type: {result['metadata']['order_block_type']}")
+        logger.info(f"  Zone: ${result['metadata']['ob_low']:.2f} - ${result['metadata']['ob_high']:.2f}")
+        logger.info(f"  Impulse: {result['metadata']['impulse_pct']}%")
+        logger.info(f"\nConfluence:")
         for factor in result['confluence_factors']:
-            print(f"  - {factor}")
-    print("=" * 80)
+            logger.info(f"  - {factor}")
+    logger.info("=" * 80)

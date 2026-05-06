@@ -20,6 +20,8 @@ from typing import Optional, Union
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 def calculate_rsi(
     data: Union[pd.DataFrame, pd.Series], 
@@ -420,56 +422,55 @@ def quick_test(data_path: str = 'data/raw/BTC_USDT_PERP_30m.pkl', n_bars: int = 
         n_bars: Number of bars to test
     """
     import pickle
-    
-    print("="*60)
-    print("OSCILLATORS TEST")
-    print("="*60)
+    logger.info("="*60)
+    logger.info("OSCILLATORS TEST")
+    logger.info("="*60)
     
     # Load data
     with open(data_path, 'rb') as f:
         df = pickle.load(f)
     
     df = df[df.index >= '2024-01-01'].iloc[:n_bars]
-    print(f"\nData: {len(df)} bars from {df.index[0]} to {df.index[-1]}")
+    logger.info(f"\nData: {len(df)} bars from {df.index[0]} to {df.index[-1]}")
     
     # Calculate all oscillators
-    print(f"\n{'='*60}")
-    print("Calculating all oscillators...")
-    print(f"{'='*60}")
+    logger.info(f"\n{'='*60}")
+    logger.info("Calculating all oscillators...")
+    logger.info(f"{'='*60}")
     
     oscillators = calculate_all_oscillators(df)
     
-    print(f"\nLast 5 values:")
-    print(oscillators.tail().to_string())
+    logger.info(f"\nLast 5 values:")
+    logger.info(oscillators.tail().to_string())
     
-    print(f"\n{'='*60}")
-    print("Statistics:")
-    print(f"{'='*60}")
-    print(oscillators.describe().to_string())
+    logger.info(f"\n{'='*60}")
+    logger.info("Statistics:")
+    logger.info(f"{'='*60}")
+    logger.info(oscillators.describe().to_string())
     
     # Check extremes
-    print(f"\n{'='*60}")
-    print("Extreme Conditions:")
-    print(f"{'='*60}")
+    logger.info(f"\n{'='*60}")
+    logger.info("Extreme Conditions:")
+    logger.info(f"{'='*60}")
     
     rsi_overbought = (oscillators['rsi'] > 70).sum()
     rsi_oversold = (oscillators['rsi'] < 30).sum()
-    print(f"RSI Overbought (>70): {rsi_overbought} bars ({rsi_overbought/len(df)*100:.1f}%)")
-    print(f"RSI Oversold (<30): {rsi_oversold} bars ({rsi_oversold/len(df)*100:.1f}%)")
+    logger.info(f"RSI Overbought (>70): {rsi_overbought} bars ({rsi_overbought/len(df)*100:.1f}%)")
+    logger.info(f"RSI Oversold (<30): {rsi_oversold} bars ({rsi_oversold/len(df)*100:.1f}%)")
     
     cci_extreme_high = (oscillators['cci'] > 100).sum()
     cci_extreme_low = (oscillators['cci'] < -100).sum()
-    print(f"CCI Extreme High (>100): {cci_extreme_high} bars ({cci_extreme_high/len(df)*100:.1f}%)")
-    print(f"CCI Extreme Low (<-100): {cci_extreme_low} bars ({cci_extreme_low/len(df)*100:.1f}%)")
+    logger.info(f"CCI Extreme High (>100): {cci_extreme_high} bars ({cci_extreme_high/len(df)*100:.1f}%)")
+    logger.info(f"CCI Extreme Low (<-100): {cci_extreme_low} bars ({cci_extreme_low/len(df)*100:.1f}%)")
     
     cmo_strong_up = (oscillators['cmo'] > 50).sum()
     cmo_strong_down = (oscillators['cmo'] < -50).sum()
-    print(f"CMO Strong Up (>50): {cmo_strong_up} bars ({cmo_strong_up/len(df)*100:.1f}%)")
-    print(f"CMO Strong Down (<-50): {cmo_strong_down} bars ({cmo_strong_down/len(df)*100:.1f}%)")
+    logger.info(f"CMO Strong Up (>50): {cmo_strong_up} bars ({cmo_strong_up/len(df)*100:.1f}%)")
+    logger.info(f"CMO Strong Down (<-50): {cmo_strong_down} bars ({cmo_strong_down/len(df)*100:.1f}%)")
     
-    print("\n" + "="*60)
-    print("TEST COMPLETE")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("TEST COMPLETE")
+    logger.info("="*60)
 
 
 if __name__ == "__main__":

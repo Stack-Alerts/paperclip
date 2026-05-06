@@ -23,6 +23,10 @@ from .strategy_manager import StrategyDatabaseManager
 from .ai_recommendations_manager import AIRecommendationsManager
 from .test_results_manager import TestResultsManager
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 logger = logging.getLogger(__name__)
 
 

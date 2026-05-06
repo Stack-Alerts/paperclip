@@ -21,6 +21,8 @@ from pathlib import Path
 import json
 from enum import Enum
 
+import logging
+logger = logging.getLogger(__name__)
 
 class RecheckValidationState(Enum):
     """States for RECHECK validation process"""
@@ -72,7 +74,7 @@ class RecheckDebugger:
     def _write_log(self, message: str, force: bool = False):
         """Write to log file and/or console"""
         if self.console_output or force:
-            print(message, flush=True)
+            logger.info(message)
         
         if self.log_file:
             with open(self.log_file, 'a') as f:

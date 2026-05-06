@@ -13,6 +13,10 @@ from nautilus_trader.model.identifiers import InstrumentId, Symbol, Venue
 
 from src.optimizer_v3.core.logger import OptimizerLogger
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class ValidationError(Exception):
     """Raised when validation fails"""

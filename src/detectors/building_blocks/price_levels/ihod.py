@@ -13,6 +13,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @register_block(
     name='ihod',
@@ -259,9 +261,9 @@ class IHOD:
 
 if __name__ == "__main__":
     # Test
-    print("="*80)
-    print("IHOD (INTRADAY HIGH OF DAY) TEST")
-    print("="*80)
+    logger.info("="*80)
+    logger.info("IHOD (INTRADAY HIGH OF DAY) TEST")
+    logger.info("="*80)
     
     dates = pd.date_range(start='2024-01-01 09:00', periods=50, freq='15min')
     np.random.seed(42)
@@ -282,8 +284,8 @@ if __name__ == "__main__":
     ihod = IHOD()
     result = ihod.analyze(data)
     
-    print(f"Signal: {result['signal']}")
-    print(f"Confidence: {result['confidence']}%")
-    print(f"Description: {result['metadata']['description']}")
-    print(f"Is New IHOD: {result['metadata']['is_new_ihod']}")
-    print("="*80)
+    logger.info(f"Signal: {result['signal']}")
+    logger.info(f"Confidence: {result['confidence']}%")
+    logger.info(f"Description: {result['metadata']['description']}")
+    logger.info(f"Is New IHOD: {result['metadata']['is_new_ihod']}")
+    logger.info("="*80)

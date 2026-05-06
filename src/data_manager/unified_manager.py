@@ -48,6 +48,10 @@ from .config import PROJECT_ROOT, RAW_DATA_DIR
 from .processing.bar_aggregator import BarAggregator
 from .binance.rest_client import BinanceRestClient
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 logger = logging.getLogger(__name__)
 
 # Per-file write locks to prevent concurrent write races on the same parquet file.

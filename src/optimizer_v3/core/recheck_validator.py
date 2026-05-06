@@ -16,6 +16,8 @@ Date: February 2026
 from typing import List, Dict, Any
 from nautilus_trader.model.data import Bar
 
+import logging
+logger = logging.getLogger(__name__)
 
 class RecheckValidator:
     """
@@ -75,11 +77,11 @@ class RecheckValidator:
             
             # CRITICAL: Defensive checks for None values
             if reference_bar is None:
-                print(f"Warning: Recheck {recheck.signal_name} has no reference bar, skipping")
+                logger.info(f"Warning: Recheck {recheck.signal_name} has no reference bar, skipping")
                 continue
             
             if recheck.bar_delay is None:
-                print(f"Warning: Recheck {recheck.signal_name} has no bar_delay, skipping")
+                logger.info(f"Warning: Recheck {recheck.signal_name} has no bar_delay, skipping")
                 continue
             
             # Apply timing mode
@@ -108,7 +110,7 @@ class RecheckValidator:
                             
                             # CRITICAL: Ensure fire_bar is never None
                             if nested.fire_bar is None:
-                                print(f"Warning: Nested recheck {nested.signal_name} has None fire_bar, using current bar {bar_index}")
+                                logger.info(f"Warning: Nested recheck {nested.signal_name} has None fire_bar, using current bar {bar_index}")
                                 nested.fire_bar = bar_index
                             
                             still_pending.append(nested)
@@ -123,7 +125,7 @@ class RecheckValidator:
                 
                 # CRITICAL: Double-check window_end is valid (defensive)
                 if window_end is None or window_start is None:
-                    print(f"Warning: Recheck {recheck.signal_name} has invalid window bounds, skipping")
+                    logger.info(f"Warning: Recheck {recheck.signal_name} has invalid window bounds, skipping")
                     continue
                 
                 if bar_index < window_start:
@@ -156,7 +158,7 @@ class RecheckValidator:
                                 
                                 # CRITICAL: Ensure fire_bar is never None
                                 if nested.fire_bar is None:
-                                    print(f"Warning: Nested recheck {nested.signal_name} has None fire_bar (WITHIN mode), using current bar {bar_index}")
+                                    logger.info(f"Warning: Nested recheck {nested.signal_name} has None fire_bar (WITHIN mode), using current bar {bar_index}")
                                     nested.fire_bar = bar_index
                                 
                                 still_pending.append(nested)
@@ -230,7 +232,7 @@ class RecheckValidator:
             
         except Exception as e:
             # Log error but don't crash
-            print(f"Error validating SIGNAL mode for {recheck.block_name}: {e}")
+            logger.error(f"Error validating SIGNAL mode for {recheck.block_name}: {e}")
             return False
     
     def _validate_recheck_mode(
@@ -305,5 +307,5 @@ class RecheckValidator:
             
         except Exception as e:
             # Log error but don't crash
-            print(f"Error checking signal re-fire for {recheck.block_name}: {e}")
+            logger.error(f"Error checking signal re-fire for {recheck.block_name}: {e}")
             return False

@@ -24,6 +24,10 @@ from datetime import datetime
 from src.strategy_builder.core.strategy_config_engine import StrategyConfig
 from src.optimizer_v3.validation.institutional_validator import InstitutionalValidator
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 logger = logging.getLogger(__name__)
 
 

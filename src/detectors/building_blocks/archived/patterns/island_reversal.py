@@ -28,6 +28,8 @@ from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Gap:
@@ -374,6 +376,6 @@ class IslandReversal:
 
 
 if __name__ == "__main__":
-    print("Island Reversal - Building Block")
-    print("EVENT BLOCK - Detects island reversal patterns")
-    print("Based on LuxAlgo methodology")
+    logger.info("Island Reversal - Building Block")
+    logger.info("EVENT BLOCK - Detects island reversal patterns")
+    logger.info("Based on LuxAlgo methodology")

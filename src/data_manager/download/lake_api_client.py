@@ -23,6 +23,8 @@ from ..config import (
 from ..utils.file_utils import get_file_size_mb, ensure_directory_exists
 from .usage_tracker import UsageTracker
 
+import logging
+logger = logging.getLogger(__name__)
 
 class LakeAPIClient:
     """
@@ -88,8 +90,8 @@ class LakeAPIClient:
         # Ensure cache directory exists
         ensure_directory_exists(LAKE_CACHE_DIR)
         
-        print(f"✅ LakeAPI client initialized (Region: {LAKEAPI_REGION})")
-        print(f"💾 Cache directory: {LAKE_CACHE_DIR}")
+        logger.info(f"✅ LakeAPI client initialized (Region: {LAKEAPI_REGION})")
+        logger.info(f"💾 Cache directory: {LAKE_CACHE_DIR}")
     
     def _get_table_name(self, data_type: str) -> str:
         """
@@ -162,7 +164,7 @@ class LakeAPIClient:
             Retries up to 3 times with exponential backoff (5s, 10s, 20s)
             Handles NoFilesFound gracefully (expected for current month non-trade data)
         """
-        print(f"   Connecting to LakeAPI", end='', flush=True)
+        logger.info(f"   Connecting to LakeAPI")
         
         max_retries = 3
         for attempt in range(max_retries):
@@ -181,7 +183,7 @@ class LakeAPIClient:
                     boto3_session=self.session
                 )
                 
-                print(" ✅")
+                logger.info(" ✅")
                 return df
                 
             except Exception as e:
@@ -190,7 +192,7 @@ class LakeAPIClient:
                 
                 # Check if NoFilesFound (expected for some data types)
                 if 'NoFilesFound' in error_name or 'No files Found' in error_msg:
-                    print(f" ⚠️  No files")
+                    logger.warning(f" ⚠️  No files")
                     # Check if current month
                     now = datetime.now()
                     is_current = (start_date.year == now.year and start_date.month == now.month)
@@ -210,12 +212,12 @@ class LakeAPIClient:
                 
                 # Other errors
                 if attempt < max_retries - 1:
-                    print(f" ❌ {error_name} (retry {attempt + 1}/{max_retries})")
+                    logger.error(f" ❌ {error_name} (retry {attempt + 1}/{max_retries})")
                     import time
                     wait = 5 * (2 ** attempt)
                     time.sleep(wait)
                 else:
-                    print(f" ❌ {error_name}")
+                    logger.error(f" ❌ {error_name}")
                     raise
         
         return None
@@ -266,7 +268,7 @@ class LakeAPIClient:
         # Check if file already exists (unless force redownload)
         if file_path.exists() and not force_redownload:
             file_size_mb = get_file_size_mb(file_path)
-            print(f"✅ Skipping {data_type} {month_str} - already exists ({file_size_mb:.1f} MB)")
+            logger.info(f"✅ Skipping {data_type} {month_str} - already exists ({file_size_mb:.1f} MB)")
             return None
         
         # Get LakeAPI table name
@@ -285,32 +287,32 @@ class LakeAPIClient:
         if end_date > datetime.now():
             end_date = datetime.now()
         
-        print(f"📥 Downloading {data_type} {month_str}...")
-        print(f"   Period: {start_date.date()} to {end_date.date()}")
+        logger.info(f"📥 Downloading {data_type} {month_str}...")
+        logger.info(f"   Period: {start_date.date()} to {end_date.date()}")
         
         try:
             # Download with automatic retry
             df = self._download_with_retry(table, start_date, end_date, month_str, data_type)
             
             if df is None or df.empty:
-                print(f"⚠️  No data returned for {data_type} {month_str}")
+                logger.warning(f"⚠️  No data returned for {data_type} {month_str}")
                 return None
             
             # Save to parquet (optimized for speed)
-            print(f"   Saving to disk...", end='', flush=True)
+            logger.info(f"   Saving to disk...")
             df.to_parquet(
                 file_path, 
                 engine='pyarrow',  # Faster engine
                 compression='snappy',  # 3x faster than gzip, similar size
                 index=False
             )
-            print(" ✅")
+            logger.info(" ✅")
             
             # Get file size
             file_size_mb = get_file_size_mb(file_path)
             file_size_gb = file_size_mb / 1024
             
-            print(f"✅ Downloaded {len(df):,} rows, {file_size_mb:.1f} MB")
+            logger.info(f"✅ Downloaded {len(df):,} rows, {file_size_mb:.1f} MB")
             
             # Record usage if checking is enabled
             if check_usage:
@@ -329,11 +331,11 @@ class LakeAPIClient:
             return result
             
         except Exception as e:
-            print(f"❌ Error downloading {data_type} {month_str}: {e}")
+            logger.error(f"❌ Error downloading {data_type} {month_str}: {e}")
             
             # Clean up partial download
             if file_path.exists():
-                print(f"   Cleaning up partial download...")
+                logger.info(f"   Cleaning up partial download...")
                 file_path.unlink()
             
             raise
@@ -365,8 +367,8 @@ class LakeAPIClient:
         """
         results = {}
         
-        print(f"\n📦 Downloading {len(months)} months of {data_type}...")
-        print(f"{self.usage_tracker.get_usage_summary()}\n")
+        logger.info(f"\n📦 Downloading {len(months)} months of {data_type}...")
+        logger.info(f"{self.usage_tracker.get_usage_summary()}\n")
         
         for year, month in months:
             month_str = f"{year}-{month:02d}"
@@ -381,25 +383,25 @@ class LakeAPIClient:
                 results[month_str] = df
                 
             except Exception as e:
-                print(f"❌ Error on {month_str}: {e}")
+                logger.error(f"❌ Error on {month_str}: {e}")
                 results[month_str] = None
                 
                 if stop_on_error:
-                    print("Stopping due to error")
+                    logger.error("Stopping due to error")
                     break
             
             # Garbage collection between months
             gc.collect()
         
         # Summary
-        print(f"\n✅ Download complete!")
-        print(f"{self.usage_tracker.get_usage_summary()}")
+        logger.info(f"\n✅ Download complete!")
+        logger.info(f"{self.usage_tracker.get_usage_summary()}")
         
         successful = sum(1 for v in results.values() if v is not None)
         skipped = sum(1 for v in results.values() if v is None)
         
-        print(f"   Successfully downloaded: {successful}")
-        print(f"   Skipped (already exist): {skipped}")
+        logger.info(f"   Successfully downloaded: {successful}")
+        logger.info(f"   Skipped (already exist): {skipped}")
         
         return results
     
