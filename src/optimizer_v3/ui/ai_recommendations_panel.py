@@ -33,8 +33,8 @@ from PyQt5.QtWidgets import (
     QMainWindow, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit,
     QLabel, QTabWidget, QWidget, QSplitter, QCheckBox, QGroupBox, QSizePolicy, QFrame, QFileDialog, QMessageBox
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QSettings
-from PyQt5.QtGui import QFont, QTextOption
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QTextOption
 
 import logging
 logger = logging.getLogger(__name__)
@@ -51,18 +51,23 @@ from src.strategy_builder.ui.styles import (
     get_secondary_button_stylesheet,
     get_text_edit_stylesheet,
     get_checkbox_style,
+    get_groupbox_header_stylesheet,
+    create_font,
+    create_monospace_font,
     COLORS
 )
 
 
 class AIRecommendationsPanel(QWidget):
     """
-    AI REQUEST PREVIEW WINDOW
-    
-    Shows complete structured request before sending to AI.
-    Prevents wasted API calls on incomplete/malformed requests.
-    
-    Uses QMainWindow for proper window with full controls (maximize, minimize, etc.)
+    AI Recommendations Panel
+
+    Displays the full AI analysis results including:
+    - Strategy Diagnosis: assessment, root cause analysis, implementation order
+    - Recommendations: actionable recommendations from AI/data-driven engine
+    - Request Preview: collapsible sections showing the full request sent to AI
+
+    Uses QWidget as the embedded tab panel in BacktestConfigPanel.
     """
     
     # Signal emitted when user approves sending request
@@ -71,17 +76,14 @@ class AIRecommendationsPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # CRITICAL: Set default geometry FIRST (like Strategy Builder does)
-        # Without this, restoreGeometry() has nothing to restore on first run!
-
         # Data storage
         self.request_data = {}
         self.response_data = {}
+        self._ai_recommendations: List = []
+        self._ai_analysis: Dict = {}
         
         # Setup UI first
         self._setup_ui()
-        
-        # Then restore window geometry (position, size, screen, maximized state) from last session
         
     
     def _setup_ui(self):
@@ -90,81 +92,162 @@ class AIRecommendationsPanel(QWidget):
         self.setStyleSheet(get_main_stylesheet())
         
         # Create central widget and layout
-        
-        
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
         
-        # Header with Reset button
+        # ── Header with Reset button ──────────────────────────────────────
         header_layout = QHBoxLayout()
         
-        header = QLabel("🔍 AI REQUEST PREVIEW - Verify Before Sending")
-        header_font = QFont("Segoe UI", 11, QFont.Weight.Bold)
-        header.setFont(header_font)
-        header.setStyleSheet("color: #095983; padding: 4px;")
+        header = QLabel("AI Recommendations")
+        header.setFont(create_font(11, bold=True))
+        header.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 4px;")
         header_layout.addWidget(header)
         
         header_layout.addStretch()
         
         # Reset View button
-        self.reset_view_btn = QPushButton("🔄 Reset View")
-        self.reset_view_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['button_secondary']};
-                color: white;
-                font-weight: normal;
-                padding: 4px 10px;
-                border-radius: 4px;
-                font-size: 9pt;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['button_secondary_hover']};
-            }}
-        """)
+        self.reset_view_btn = QPushButton("Reset View")
+        self.reset_view_btn.setStyleSheet(get_secondary_button_stylesheet())
         self.reset_view_btn.clicked.connect(self._reset_view)
         header_layout.addWidget(self.reset_view_btn)
         
         layout.addLayout(header_layout)
         
-        # Request content directly (no tabs)
+        # ── Strategy Diagnosis section (P3: assessment + root_cause + order) ─
+        self.diagnosis_frame = QFrame()
+        self.diagnosis_frame.setStyleSheet(
+            f"QFrame {{ background-color: {COLORS['bg_medium']}; "
+            f"border: 1px solid {COLORS['border']}; border-radius: 4px; }}"
+        )
+        diagnosis_layout = QVBoxLayout(self.diagnosis_frame)
+        diagnosis_layout.setContentsMargins(8, 8, 8, 8)
+        diagnosis_layout.setSpacing(4)
+        
+        diagnosis_header = QLabel("Strategy Diagnosis")
+        diagnosis_header.setFont(create_font(11, bold=True))
+        diagnosis_header.setStyleSheet(
+            f"color: {COLORS['text_primary']}; border: none; background: transparent;"
+        )
+        diagnosis_layout.addWidget(diagnosis_header)
+        
+        self.diagnosis_text = QTextEdit()
+        self.diagnosis_text.setReadOnly(True)
+        self.diagnosis_text.setFont(create_font(9))
+        self.diagnosis_text.setWordWrapMode(QTextOption.WrapMode.WordWrap)
+        self.diagnosis_text.setStyleSheet(
+            f"QTextEdit {{ background-color: {COLORS['bg_dark']}; "
+            f"color: {COLORS['text_secondary']}; "
+            f"border: 1px solid {COLORS['border']}; }}"
+        )
+        self.diagnosis_text.setMinimumHeight(120)
+        self.diagnosis_text.setMaximumHeight(200)
+        self.diagnosis_text.setPlainText(
+            "Awaiting AI analysis...\n\n"
+            "Run a backtest and click 'Approve & Send to AI' in the Request Preview section below."
+        )
+        diagnosis_layout.addWidget(self.diagnosis_text)
+        
+        layout.addWidget(self.diagnosis_frame)
+        
+        # ── AI Recommendations section (P4) ──────────────────────────────
+        self.recs_frame = QFrame()
+        self.recs_frame.setStyleSheet(
+            f"QFrame {{ background-color: {COLORS['bg_medium']}; "
+            f"border: 1px solid {COLORS['border']}; border-radius: 4px; }}"
+        )
+        recs_layout = QVBoxLayout(self.recs_frame)
+        recs_layout.setContentsMargins(8, 8, 8, 8)
+        recs_layout.setSpacing(4)
+        
+        recs_header = QLabel("Recommendations")
+        recs_header.setFont(create_font(11, bold=True))
+        recs_header.setStyleSheet(
+            f"color: {COLORS['text_primary']}; border: none; background: transparent;"
+        )
+        recs_layout.addWidget(recs_header)
+        
+        self.recs_text = QTextEdit()
+        self.recs_text.setReadOnly(True)
+        self.recs_text.setFont(create_font(9))
+        self.recs_text.setWordWrapMode(QTextOption.WrapMode.WordWrap)
+        self.recs_text.setStyleSheet(
+            f"QTextEdit {{ background-color: {COLORS['bg_dark']}; "
+            f"color: {COLORS['text_secondary']}; "
+            f"border: 1px solid {COLORS['border']}; }}"
+        )
+        self.recs_text.setMinimumHeight(120)
+        self.recs_text.setMaximumHeight(250)
+        self.recs_text.setPlainText(
+            "No recommendations yet.\n\n"
+            "Recommendations will appear here after AI analysis completes."
+        )
+        recs_layout.addWidget(self.recs_text)
+        
+        layout.addWidget(self.recs_frame)
+        
+        # ── Request Preview (collapsible, collapsed by default) ───────────
+        preview_toggle_layout = QHBoxLayout()
+        self.preview_toggle_btn = QPushButton("Show Request Preview")
+        self.preview_toggle_btn.setStyleSheet(get_secondary_button_stylesheet())
+        self.preview_toggle_btn.clicked.connect(self._toggle_request_preview)
+        preview_toggle_layout.addWidget(self.preview_toggle_btn)
+        preview_toggle_layout.addStretch()
+        layout.addLayout(preview_toggle_layout)
+        
+        # Container for request preview sections (hidden by default)
+        self.preview_container = QWidget()
+        preview_container_layout = QVBoxLayout(self.preview_container)
+        preview_container_layout.setContentsMargins(0, 0, 0, 0)
+        preview_container_layout.setSpacing(4)
+        
+        # Request content (5 sections)
         request_content = self._create_request_tab()
-        layout.addWidget(request_content)
+        preview_container_layout.addWidget(request_content)
         
         # Statistics summary - use dark theme
         self.stats_label = QLabel("Status: Backtest not executed or completed")
-        self.stats_label.setStyleSheet(f"background-color: {COLORS['bg_medium']}; color: {COLORS['text_secondary']}; padding: 8px; font-family: 'Courier New';")
-        layout.addWidget(self.stats_label)
+        self.stats_label.setStyleSheet(
+            f"background-color: {COLORS['bg_medium']}; "
+            f"color: {COLORS['text_secondary']}; "
+            f"padding: 8px; font-family: 'Courier New';"
+        )
+        preview_container_layout.addWidget(self.stats_label)
         
         # Action buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        # Export button - uses centralized secondary button style (NO EMOJI - clean text only)
+        # Export button
         self.export_btn = QPushButton("Export to JSON")
         self.export_btn.clicked.connect(self._export_to_json)
         self.export_btn.setStyleSheet(get_secondary_button_stylesheet())
-        self.export_btn.setFixedHeight(40)  # Force uniform HEIGHT
-        self.export_btn.setEnabled(False)  # Disabled by default until backtest run
+        self.export_btn.setFixedHeight(40)
+        self.export_btn.setEnabled(False)
         button_layout.addWidget(self.export_btn)
         
-        # Preview AI Request button - uses centralized primary button style (NO EMOJI - clean text only)
+        # Preview AI Request button
         self.preview_request_btn = QPushButton("Preview AI Request")
         self.preview_request_btn.clicked.connect(self._preview_ai_request)
         self.preview_request_btn.setStyleSheet(get_primary_button_stylesheet())
-        self.preview_request_btn.setFixedHeight(40)  # Force uniform HEIGHT
-        self.preview_request_btn.setEnabled(False)  # Disabled by default until backtest run
+        self.preview_request_btn.setFixedHeight(40)
+        self.preview_request_btn.setEnabled(False)
         button_layout.addWidget(self.preview_request_btn)
         
-        # Approve button - uses centralized success button style (NO EMOJI - clean text only)
+        # Approve button
         self.approve_btn = QPushButton("Approve & Send to AI")
         self.approve_btn.clicked.connect(self._approve_and_send)
         self.approve_btn.setStyleSheet(get_success_button_stylesheet())
-        self.approve_btn.setFixedHeight(40)  # Force uniform HEIGHT
-        self.approve_btn.setEnabled(False)  # Disabled by default until backtest run
+        self.approve_btn.setFixedHeight(40)
+        self.approve_btn.setEnabled(False)
         button_layout.addWidget(self.approve_btn)
         
-        layout.addLayout(button_layout)
+        preview_container_layout.addLayout(button_layout)
+        
+        self.preview_container.setVisible(False)  # Hidden by default (P4)
+        layout.addWidget(self.preview_container)
+        
+        layout.addStretch()
     
     def _create_request_tab(self) -> QWidget:
         """Create tab showing complete request structure with collapsible sections"""
@@ -229,14 +312,13 @@ class AIRecommendationsPanel(QWidget):
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
-        label = QLabel("📥 Expected Response Structure from AI:")
-        label_font = QFont("Segoe UI", 11, QFont.Weight.Bold)
-        label.setFont(label_font)
+        label = QLabel("Expected Response Structure from AI:")
+        label.setFont(create_font(11, bold=True))
         layout.addWidget(label)
         
         self.response_text = QTextEdit()
         self.response_text.setReadOnly(True)
-        self.response_text.setFont(QFont("Courier New", 10))
+        self.response_text.setFont(create_font(9))
         self.response_text.setWordWrapMode(QTextOption.WrapMode.NoWrap)
         layout.addWidget(self.response_text)
         
@@ -251,14 +333,13 @@ class AIRecommendationsPanel(QWidget):
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
-        label = QLabel("✅ Request Validation Checklist:")
-        label_font = QFont("Segoe UI", 11, QFont.Weight.Bold)
-        label.setFont(label_font)
+        label = QLabel("Request Validation Checklist:")
+        label.setFont(create_font(11, bold=True))
         layout.addWidget(label)
         
         self.validation_text = QTextEdit()
         self.validation_text.setReadOnly(True)
-        self.validation_text.setFont(QFont("Courier New", 10))
+        self.validation_text.setFont(create_font(9))
         layout.addWidget(self.validation_text)
         
         return widget
@@ -274,64 +355,45 @@ class AIRecommendationsPanel(QWidget):
         # Header with title and buttons
         header_layout = QHBoxLayout()
         
-        # Title - use EXACT Strategy Builder section title color
+        # Title - use COLORS constant for section title color
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: #095983; font-weight: bold; font-size: 12pt; border: none; background: transparent;")
+        title_label.setStyleSheet(
+            f"color: {COLORS['text_primary']}; font-weight: bold; font-size: 12pt; "
+            f"border: none; background: transparent;"
+        )
         header_layout.addWidget(title_label)
         
         header_layout.addStretch()
         
         # Maximize button - FIXED SIZE (width AND height)
-        maximize_btn = QPushButton("🗖 Maximize")
-        maximize_btn.setFixedSize(180, 38)  # FORCE exact width AND height
-        maximize_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['button_primary']};
-                color: white;
-                font-weight: normal;
-                padding: 3px 12px;
-                border-radius: 3px;
-                font-size: 9pt;
-                border: none;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['button_primary_hover']};
-            }}
-        """)
+        maximize_btn = QPushButton("Maximize")
+        maximize_btn.setFixedSize(180, 38)
+        maximize_btn.setStyleSheet(get_primary_button_stylesheet())
         header_layout.addWidget(maximize_btn)
         
         # Collapse/Expand button - EXACT SAME SIZE
-        toggle_btn = QPushButton("▼ Collapse")
-        toggle_btn.setFixedSize(180, 38)  # FORCE exact width AND height
-        toggle_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['button_secondary']};
-                color: white;
-                font-weight: normal;
-                padding: 3px 12px;
-                border-radius: 3px;
-                font-size: 9pt;
-                border: none;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['button_secondary_hover']};
-            }}
-        """)
+        toggle_btn = QPushButton("Collapse")
+        toggle_btn.setFixedSize(180, 38)
+        toggle_btn.setStyleSheet(get_secondary_button_stylesheet())
         header_layout.addWidget(toggle_btn)
         
         main_layout.addLayout(header_layout)
         
         # Description
         desc_label = QLabel(description)
-        desc_label.setStyleSheet(f"color: {COLORS['text_label']}; font-weight: normal; font-size: 8pt; padding-left: 4px; border: none; background: transparent;")
+        desc_label.setStyleSheet(
+            f"color: {COLORS['text_label']}; font-weight: normal; "
+            f"padding-left: 4px; border: none; background: transparent;"
+        )
+        desc_label.setFont(create_font(8))
         desc_label.setWordWrap(True)
         main_layout.addWidget(desc_label)
         
         # Text editor - use DARKER background like Strategy Builder inner panels
         text_edit = QTextEdit()
         text_edit.setReadOnly(True)
-        text_edit.setFont(QFont("Courier New", 9))
-        text_edit.setWordWrapMode(QTextOption.WrapMode.WordWrap)  # FIXED: Enable word wrap for long explanations
+        text_edit.setFont(create_monospace_font(9))
+        text_edit.setWordWrapMode(QTextOption.WrapMode.WordWrap)
         # Set darker background AND MUTED text (dimmer) to match Strategy Builder "Signals:" panels
         text_edit.setStyleSheet(f"QTextEdit {{ background-color: {COLORS['bg_dark']}; color: {COLORS['text_muted']}; border: 1px solid {COLORS['border']}; }}")
         # Allow widget to expand freely (QSizePolicy already imported from PyQt5)
@@ -880,16 +942,23 @@ class AIRecommendationsPanel(QWidget):
             layout.setSpacing(10)
             
             # Header
-            header_label = QLabel("📤 EXACT AI REQUEST - Complete prompt sent to API (Instructions + Data)")
-            header_label.setStyleSheet("color: #095983; font-weight: bold; font-size: 12pt; padding: 5px;")
+            header_label = QLabel("EXACT AI REQUEST - Complete prompt sent to API (Instructions + Data)")
+            header_label.setFont(create_font(12, bold=True))
+            header_label.setStyleSheet(
+                f"color: {COLORS['text_primary']}; padding: 5px;"
+            )
             layout.addWidget(header_label)
             
             # Text display
             text_edit = QTextEdit()
             text_edit.setReadOnly(True)
-            text_edit.setFont(QFont("Courier New", 9))
+            text_edit.setFont(create_monospace_font(9))
             text_edit.setWordWrapMode(QTextOption.WrapMode.WordWrap)
-            text_edit.setStyleSheet(f"QTextEdit {{ background-color: {COLORS['bg_dark']}; color: {COLORS['text_muted']}; border: 1px solid {COLORS['border']}; padding: 10px; }}")
+            text_edit.setStyleSheet(
+                f"QTextEdit {{ background-color: {COLORS['bg_dark']}; "
+                f"color: {COLORS['text_muted']}; "
+                f"border: 1px solid {COLORS['border']}; }}"
+            )
             
             # CRITICAL: Show the COMPLETE request (prompt + data)
             complete_request = f"""{'='*80}
@@ -910,26 +979,17 @@ PART 2: STRUCTURED DATA (JSON format for parsing)
             # Stats
             request_size = len(complete_request) / 1024
             estimated_tokens = len(complete_request) / 4
-            stats_label = QLabel(f"📊 Total Size: {request_size:.1f} KB | Estimated Tokens: {estimated_tokens:.0f} | Prompt: {len(ai_prompt)} chars | Data: {len(json.dumps(formatted_request, default=str))} chars")
-            stats_label.setStyleSheet(f"color: {COLORS['text_secondary']}; padding: 5px; font-family: 'Courier New';")
+            stats_label = QLabel(f"Total Size: {request_size:.1f} KB | Estimated Tokens: {estimated_tokens:.0f} | Prompt: {len(ai_prompt)} chars | Data: {len(json.dumps(formatted_request, default=str))} chars")
+            stats_label.setStyleSheet(
+                f"color: {COLORS['text_secondary']}; padding: 5px;"
+            )
+            stats_label.setFont(create_monospace_font(9))
             layout.addWidget(stats_label)
             
             # Close button
-            close_btn = QPushButton("✅ Close")
+            close_btn = QPushButton("Close")
             close_btn.clicked.connect(dialog.close)
-            close_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {COLORS['button_primary']};
-                    color: white;
-                    font-weight: bold;
-                    padding: 8px 20px;
-                    border-radius: 4px;
-                    min-width: 100px;
-                }}
-                QPushButton:hover {{
-                    background-color: {COLORS['button_primary_hover']};
-                }}
-            """)
+            close_btn.setStyleSheet(get_primary_button_stylesheet())
             layout.addWidget(close_btn)
             
             dialog.setLayout(layout)
@@ -953,18 +1013,140 @@ PART 2: STRUCTURED DATA (JSON format for parsing)
         self.send_approved.emit(self.request_data)
 
 
-    def display_recommendations(self, recommendations: List = None):
+    def _toggle_request_preview(self):
+        """Toggle visibility of the AI Request Preview sections."""
+        visible = self.preview_container.isVisible()
+        self.preview_container.setVisible(not visible)
+        if visible:
+            self.preview_toggle_btn.setText("Show Request Preview")
+        else:
+            self.preview_toggle_btn.setText("Hide Request Preview")
+
+    def display_ai_analysis(self, analysis: Dict) -> None:
         """
-        Display AI recommendations (stub for API compatibility)
-        
-        This panel displays the AI REQUEST preview (what will be sent to AI).
-        The AI RESPONSE recommendations are displayed in MetricsDisplayPanel.
-        
-        This method exists for API compatibility but does nothing.
+        Display the full AI strategy diagnosis in the Diagnosis section.
+
+        Called after AI recommendations are generated. Surfaces assessment,
+        root_cause_analysis, and implementation_order from the AI JSON response.
+
+        Args:
+            analysis: Dict with keys: assessment, root_cause_analysis, implementation_order
         """
-        logger.info("[AI Panel] Note: This panel shows REQUEST preview, not AI responses")
-        logger.info("[AI Panel] AI recommendations are displayed in MetricsDisplayPanel")
-        pass
+        if not analysis:
+            return
+
+        self._ai_analysis = analysis
+
+        assessment = analysis.get('assessment', '')
+        root_cause = analysis.get('root_cause_analysis', {})
+        impl_order = analysis.get('implementation_order', [])
+
+        lines = []
+
+        if assessment:
+            lines.append("ASSESSMENT")
+            lines.append("=" * 60)
+            lines.append(assessment)
+            lines.append("")
+
+        if root_cause:
+            lines.append("ROOT CAUSE ANALYSIS")
+            lines.append("=" * 60)
+            if isinstance(root_cause, dict):
+                primary = root_cause.get('primary_issue', '')
+                if primary:
+                    lines.append(f"Primary Issue: {primary}")
+                factors = root_cause.get('contributing_factors', [])
+                if factors:
+                    lines.append("Contributing Factors:")
+                    for f in factors:
+                        lines.append(f"  - {f}")
+                confidence = root_cause.get('confidence')
+                if confidence is not None:
+                    lines.append(f"Confidence: {float(confidence):.0%}")
+            else:
+                lines.append(str(root_cause))
+            lines.append("")
+
+        if impl_order:
+            lines.append("IMPLEMENTATION ORDER")
+            lines.append("=" * 60)
+            for step in impl_order:
+                lines.append(str(step))
+            lines.append("")
+
+        if lines:
+            self.diagnosis_text.setPlainText("\n".join(lines))
+        else:
+            self.diagnosis_text.setPlainText(
+                "AI analysis returned no diagnosis data.\n"
+                "Check that the AI response includes 'assessment' and 'root_cause_analysis' fields."
+            )
+
+        logger.info("[AI Panel] Strategy diagnosis displayed")
+
+    def display_recommendations(self, recommendations: List = None) -> None:
+        """
+        Display AI recommendations in the Recommendations section.
+
+        Args:
+            recommendations: List of IntegratedRecommendation objects (or dicts)
+        """
+        if recommendations is None:
+            recommendations = []
+
+        self._ai_recommendations = recommendations
+        logger.info(f"[AI Panel] Displaying {len(recommendations)} recommendations")
+
+        if not recommendations:
+            self.recs_text.setPlainText(
+                "No recommendations generated.\n\n"
+                "Possible reasons:\n"
+                "- No strategy config available\n"
+                "- AI API key not configured (set OPENROUTER_API_KEY in .env)\n"
+                "- Backtest produced no trades\n\n"
+                "Data-driven recommendations are shown in the Metrics tab."
+            )
+            return
+
+        lines = []
+        for i, rec in enumerate(recommendations, 1):
+            # Support both object attributes and dict keys
+            if isinstance(rec, dict):
+                rec_type = rec.get('type', 'UNKNOWN')
+                block_name = rec.get('block_name', '')
+                signal_name = rec.get('signal_name', '')
+                reasoning = rec.get('reasoning', '')
+                confidence = rec.get('combined_confidence') or rec.get('confidence', 0)
+                impact = rec.get('expected_impact', {})
+                ai_enhanced = rec.get('ai_enhanced', False)
+            else:
+                rec_type = getattr(rec, 'type', 'UNKNOWN')
+                block_name = getattr(rec, 'block_name', '') or ''
+                signal_name = getattr(rec, 'signal_name', '') or ''
+                reasoning = getattr(rec, 'reasoning', '')
+                confidence = getattr(rec, 'combined_confidence', 0) or getattr(rec, 'confidence', 0)
+                impact = getattr(rec, 'expected_impact', {}) or {}
+                ai_enhanced = getattr(rec, 'ai_enhanced', False)
+
+            source = "AI-ENHANCED" if ai_enhanced else "DATA-DRIVEN"
+            lines.append(f"#{i} [{source}] {rec_type}")
+            if block_name:
+                if signal_name:
+                    lines.append(f"   Target: {block_name} :: {signal_name}")
+                else:
+                    lines.append(f"   Target: {block_name}")
+            if confidence:
+                lines.append(f"   Confidence: {float(confidence):.0%}")
+            if reasoning:
+                lines.append(f"   Reasoning: {reasoning[:200]}{'...' if len(reasoning) > 200 else ''}")
+            if impact:
+                lines.append("   Expected Impact:")
+                for metric, delta in impact.items():
+                    lines.append(f"     {metric}: {delta}")
+            lines.append("")
+
+        self.recs_text.setPlainText("\n".join(lines))
 
 
 
