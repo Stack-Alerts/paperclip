@@ -970,8 +970,13 @@ class BacktestConfigPanel(QWidget):
         # Tab 1: Configuration (existing content)
         config_tab = self._create_config_tab()
         self.tab_widget.addTab(config_tab, "💠 Config")
+
+        # Tab 2: Calibrate (Sprint 2.1 - INTEGRATED)
+        from src.optimizer_v3.ui.training_panel import TrainingPanelUI
+        self.training_panel = TrainingPanelUI(orchestrator=self.orchestrator)
+        self.tab_widget.addTab(self.training_panel, "⚙️ Calibrate")
         
-        # Tab 2: Live Output (Optimizer v3 - INTEGRATED)
+        # Tab 3: Live Output (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.live_output_panel import LiveOutputPanel
         strategy_name = self._get_strategy_name()
         self.output_panel = LiveOutputPanel(strategy_name=strategy_name)
@@ -979,12 +984,12 @@ class BacktestConfigPanel(QWidget):
         self.live_output_tab_index = self.tab_widget.addTab(self.output_panel, "● Live Output")
         self._set_live_output_color("red")  # Red for idle
         
-        # Tab 3: Trades (Optimizer v3 - INTEGRATED)
+        # Tab 4: Trades (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.trades_panel import TradesPanel
         self.trades_panel = TradesPanel()
         self.tab_widget.addTab(self.trades_panel, "💰 Trades")
         
-        # Tab 4: Metrics (Optimizer v3 - INTEGRATED)
+        # Tab 5: Metrics (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
         self.metrics_panel = MetricsDisplayPanel()
         self.tab_widget.addTab(self.metrics_panel, "💹 Metrics")
@@ -994,7 +999,7 @@ class BacktestConfigPanel(QWidget):
         # to metrics_panel update_metrics() for real-time metric calculations
         self.trades_panel.metrics_updated.connect(self.metrics_panel.update_metrics)
         
-        # Tab 5: AI Recommendations (Optimizer v3 - INTEGRATED)
+        # Tab 6: AI Recommendations (Optimizer v3 - INTEGRATED)
         # Simple panel that shows AI recommendations with apply buttons
         from src.optimizer_v3.ui.ai_recommendations_panel import AIRecommendationsPanel
         self.ai_recommendations_panel = AIRecommendationsPanel()
@@ -1013,11 +1018,6 @@ class BacktestConfigPanel(QWidget):
             self.metrics_panel.recommendations_generated.connect(
                 self.ai_recommendations_panel.display_recommendations
             )
-        
-        # Tab 6: Training (Sprint 2.1 - INTEGRATED)
-        from src.optimizer_v3.ui.training_panel import TrainingPanelUI
-        self.training_panel = TrainingPanelUI(orchestrator=self.orchestrator)
-        self.tab_widget.addTab(self.training_panel, "🎓 Training")
         
         # Tab 7: Compare (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.compare_view_panel import CompareViewPanel
