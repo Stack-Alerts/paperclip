@@ -22,7 +22,8 @@ import copy
 from typing import Optional
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QAction, QToolBar, QStatusBar, QFileDialog, QMessageBox, QLabel
+    QAction, QToolBar, QStatusBar, QFileDialog, QMessageBox, QLabel,
+    QDialog, QPushButton, QTextBrowser
 )
 from PyQt5.QtCore import Qt, QSize, QSettings, QTimer, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon, QKeySequence, QFont
@@ -43,7 +44,10 @@ from src.strategy_builder.ui.data_update_modal import DataUpdateModal
 from src.strategy_builder.ui.data_verify_dialog import DataVerifyDialog
 from src.strategy_builder.ui.alert_dialog import show_warning, ask_question
 from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
-from src.strategy_builder.ui.styles import get_main_stylesheet, apply_hand_cursor_to_buttons
+from src.strategy_builder.ui.styles import (
+    get_main_stylesheet, apply_hand_cursor_to_buttons,
+    get_dialog_stylesheet, create_font, get_primary_button_stylesheet,
+)
 from src.strategy_builder.ui.new_strategy_dialog import NewStrategyDialog
 from src.strategy_builder.ui.strategy_browser_dialog import StrategyBrowserDialog
 from src.optimizer_v3.database import get_database_manager
@@ -1526,10 +1530,21 @@ class StrategyBuilderMainWindow(QMainWindow):
             self._update_status("Failed to open Settings dialog")
 
     def _on_about(self):
-        """Show about dialog."""
-        QMessageBox.about(
-            self,
-            "About BTC Trade Engine",
+        """Show about dialog — free-floating, wider than default, content-fitted height."""
+        dialog = QDialog()  # No parent: free-floating, not locked to main window position
+        dialog.setWindowTitle("About BTC Trade Engine")
+        dialog.resize(620, 380)
+        dialog.setStyleSheet(get_main_stylesheet() + get_dialog_stylesheet())
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 20, 24, 16)
+        layout.setSpacing(8)
+
+        content = QTextBrowser()
+        content.setOpenExternalLinks(False)
+        content.setReadOnly(True)
+        content.setFont(create_font(10))
+        content.setHtml(
             "<h2>BTC Trade Engine</h2>"
             "<p><b>Strategy Builder</b> &mdash; Version 1.0</p>"
             "<hr>"
@@ -1547,9 +1562,23 @@ class StrategyBuilderMainWindow(QMainWindow):
             "<li>NautilusTrader execution engine integration</li>"
             "</ul>"
             "<hr>"
-            "<p><small>© 2026 BTC Trade Engine. "
+            "<p><small>&copy; 2026 BTC Trade Engine. "
             "Powered by NautilusTrader. Built for professional trade engineers.</small></p>"
         )
+        layout.addWidget(content)
+
+        close_btn = QPushButton("Close")
+        close_btn.setFont(create_font(10))
+        close_btn.setStyleSheet(get_primary_button_stylesheet())
+        close_btn.setFixedWidth(100)
+        close_btn.clicked.connect(dialog.accept)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+        dialog.exec_()
     
     def _update_window_title(self):
         """Update the window title with strategy name and modified status."""
