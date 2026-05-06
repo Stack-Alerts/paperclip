@@ -262,41 +262,95 @@ class InstitutionalLogger:
             stats['warnings'] += 1
     
     # Convenience methods
-    
-    def debug(self, component: LogComponent, message: str, details: Optional[Dict[str, Any]] = None):
-        """Log debug message"""
+    #
+    # All level methods accept two calling conventions:
+    #
+    #   Preferred (structured):
+    #       logger.info(LogComponent.SYSTEM, "message", {details})
+    #
+    #   Legacy / plain-string (backward-compatible):
+    #       logger.info("message")
+    #
+    # When the first argument is a plain string (not a LogComponent), it is
+    # treated as the message and component defaults to LogComponent.SYSTEM.
+
+    @staticmethod
+    def _normalize_args(
+        component_or_msg,
+        message: Optional[str],
+        details: Optional[Dict[str, Any]],
+    ):
+        """Resolve (component, message, details) from overloaded positional args."""
+        if isinstance(component_or_msg, LogComponent):
+            return component_or_msg, message, details
+        # First arg is the message string; shift positional args left.
+        # component_or_msg → message, message → details (was None or a dict from caller)
+        return LogComponent.SYSTEM, component_or_msg, message
+
+    def debug(self, component_or_msg, message: Optional[str] = None, details: Optional[Dict[str, Any]] = None):
+        """Log debug message.
+
+        Accepts both:
+            debug(LogComponent.X, "msg", {...})
+            debug("msg")
+        """
+        component, message, details = self._normalize_args(component_or_msg, message, details)
         entry = LogEntry(LogLevel.DEBUG, component, message, details)
         self._emit(entry)
-    
-    def info(self, component: LogComponent, message: str, details: Optional[Dict[str, Any]] = None):
-        """Log info message"""
+
+    def info(self, component_or_msg, message: Optional[str] = None, details: Optional[Dict[str, Any]] = None):
+        """Log info message.
+
+        Accepts both:
+            info(LogComponent.X, "msg", {...})
+            info("msg")
+        """
+        component, message, details = self._normalize_args(component_or_msg, message, details)
         entry = LogEntry(LogLevel.INFO, component, message, details)
         self._emit(entry)
-    
-    def warning(self, component: LogComponent, message: str, details: Optional[Dict[str, Any]] = None):
-        """Log warning message"""
+
+    def warning(self, component_or_msg, message: Optional[str] = None, details: Optional[Dict[str, Any]] = None):
+        """Log warning message.
+
+        Accepts both:
+            warning(LogComponent.X, "msg", {...})
+            warning("msg")
+        """
+        component, message, details = self._normalize_args(component_or_msg, message, details)
         entry = LogEntry(LogLevel.WARNING, component, message, details)
         self._emit(entry)
-    
+
     def error(
         self,
-        component: LogComponent,
-        message: str,
+        component_or_msg,
+        message: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-        exception: Optional[Exception] = None
+        exception: Optional[Exception] = None,
     ):
-        """Log error message"""
+        """Log error message.
+
+        Accepts both:
+            error(LogComponent.X, "msg", {...}, exc)
+            error("msg")
+        """
+        component, message, details = self._normalize_args(component_or_msg, message, details)
         entry = LogEntry(LogLevel.ERROR, component, message, details, exception)
         self._emit(entry)
-    
+
     def critical(
         self,
-        component: LogComponent,
-        message: str,
+        component_or_msg,
+        message: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-        exception: Optional[Exception] = None
+        exception: Optional[Exception] = None,
     ):
-        """Log critical message"""
+        """Log critical message.
+
+        Accepts both:
+            critical(LogComponent.X, "msg", {...}, exc)
+            critical("msg")
+        """
+        component, message, details = self._normalize_args(component_or_msg, message, details)
         entry = LogEntry(LogLevel.CRITICAL, component, message, details, exception)
         self._emit(entry)
     
