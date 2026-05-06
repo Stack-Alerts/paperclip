@@ -186,16 +186,16 @@ class AIRecommendationsPanel(QWidget):
         
         layout.addWidget(self.recs_frame)
         
-        # ── Request Preview (collapsible, collapsed by default) ───────────
+        # ── Request Preview (collapsible, visible by default) ───────────────
         preview_toggle_layout = QHBoxLayout()
-        self.preview_toggle_btn = QPushButton("Show Request Preview")
+        self.preview_toggle_btn = QPushButton("Hide Request Preview")
         self.preview_toggle_btn.setStyleSheet(get_secondary_button_stylesheet())
         self.preview_toggle_btn.clicked.connect(self._toggle_request_preview)
         preview_toggle_layout.addWidget(self.preview_toggle_btn)
         preview_toggle_layout.addStretch()
         layout.addLayout(preview_toggle_layout)
         
-        # Container for request preview sections (hidden by default)
+        # Container for request preview sections (visible by default)
         self.preview_container = QWidget()
         preview_container_layout = QVBoxLayout(self.preview_container)
         preview_container_layout.setContentsMargins(0, 0, 0, 0)
@@ -244,7 +244,7 @@ class AIRecommendationsPanel(QWidget):
         
         preview_container_layout.addLayout(button_layout)
         
-        self.preview_container.setVisible(False)  # Hidden by default (P4)
+        self.preview_container.setVisible(True)   # Visible by default
         layout.addWidget(self.preview_container)
         
         layout.addStretch()
