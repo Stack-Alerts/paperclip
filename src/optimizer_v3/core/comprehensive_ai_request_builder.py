@@ -25,6 +25,8 @@ Sprint: 1.6 (AI Request System Rebuild)
 """
 
 import json
+import math
+from collections import defaultdict
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from pathlib import Path
@@ -113,7 +115,7 @@ class ComprehensiveAIRequestBuilder:
             'trade_results': self._extract_trade_results(backtest_results),
             'performance_metrics': self._extract_metrics(metrics_with_ratings, backtest_results),
             'available_building_blocks': self._extract_available_blocks(),
-            'signal_statistics': self._extract_signal_statistics(),
+            'signal_statistics': self._extract_signal_statistics(backtest_results),
             'analysis_context': self._extract_analysis_context(analysis_report)
         }
         
@@ -235,7 +237,10 @@ class ComprehensiveAIRequestBuilder:
         winning_trades = [t for t in detailed_trades if t['pnl'] > 0]
         losing_trades = [t for t in detailed_trades if t['pnl'] < 0]
         
-        return {
+        winning_trades = [t for t in detailed_trades if t['pnl'] > 0]
+        losing_trades = [t for t in detailed_trades if t['pnl'] < 0]
+
+        base = {
             'total_trades': len(detailed_trades),
             'winning_trades': len(winning_trades),
             'losing_trades': len(losing_trades),
@@ -245,10 +250,175 @@ class ComprehensiveAIRequestBuilder:
             'avg_loss': sum(t['pnl'] for t in losing_trades) / len(losing_trades) if losing_trades else 0.0,
             'largest_win': max((t['pnl'] for t in winning_trades), default=0.0),
             'largest_loss': min((t['pnl'] for t in losing_trades), default=0.0),
-            'trades': detailed_trades[:50],  # Send first 50 trades (to avoid huge payloads)
-            'note': f'Showing first 50 of {len(detailed_trades)} trades' if len(detailed_trades) > 50 else 'All trades included'
         }
+
+        if len(detailed_trades) > 50:
+            # Use intelligent summarization instead of naive truncation
+            summary = self._summarize_trades(detailed_trades)
+            base.update(summary)
+            base['summarization_mode'] = True
+            base['note'] = (
+                f'Intelligent statistical summary of all {len(detailed_trades)} trades. '
+                'Raw sample of 15 representative trades included.'
+            )
+        else:
+            base['trades'] = detailed_trades
+            base['summarization_mode'] = False
+            base['note'] = 'All trades included'
+
+        return base
     
+    def _summarize_trades(self, detailed_trades: List[Dict]) -> Dict:
+        """
+        Build an intelligent statistical summary for strategies with >50 trades.
+
+        Returns a dict with:
+        - avg_pnl_by_day_of_week: average PnL grouped by Mon-Sun
+        - time_of_day_clusters: hourly PnL averages bucketed into 4 daily sessions
+        - consecutive_loss_runs: stats on losing streaks
+        - streak_stats: longest winning / losing streaks
+        - drawdown_stats: max consecutive drawdown depth
+        - trade_sample: 15 representative trades (best 5, worst 5, last 5)
+        """
+        # ── 1. Avg PnL by day of week ────────────────────────────────────────
+        dow_pnl: Dict[int, List[float]] = defaultdict(list)   # 0=Mon … 6=Sun
+        for t in detailed_trades:
+            entry = t.get('entry_time', '')
+            try:
+                if isinstance(entry, str):
+                    dt = datetime.fromisoformat(entry.replace('Z', '+00:00'))
+                else:
+                    dt = entry
+                dow_pnl[dt.weekday()].append(t['pnl'])
+            except Exception:
+                pass  # unparseable timestamp — skip for this stat
+
+        day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        avg_pnl_by_dow = {
+            day_names[dow]: round(sum(pnls) / len(pnls), 4)
+            for dow, pnls in sorted(dow_pnl.items())
+            if pnls
+        }
+
+        # ── 2. Time-of-day clusters (4 sessions) ────────────────────────────
+        # Asian: 00-06, London: 07-12, NY: 13-18, Off-hours: 19-23
+        session_pnl: Dict[str, List[float]] = {
+            'Asian_0000_0600': [],
+            'London_0700_1200': [],
+            'NY_1300_1800': [],
+            'OffHours_1900_2359': [],
+        }
+        for t in detailed_trades:
+            entry = t.get('entry_time', '')
+            try:
+                if isinstance(entry, str):
+                    dt = datetime.fromisoformat(entry.replace('Z', '+00:00'))
+                else:
+                    dt = entry
+                h = dt.hour
+                if h < 7:
+                    session_pnl['Asian_0000_0600'].append(t['pnl'])
+                elif h < 13:
+                    session_pnl['London_0700_1200'].append(t['pnl'])
+                elif h < 19:
+                    session_pnl['NY_1300_1800'].append(t['pnl'])
+                else:
+                    session_pnl['OffHours_1900_2359'].append(t['pnl'])
+            except Exception:
+                pass
+
+        time_of_day_clusters = {
+            session: {
+                'avg_pnl': round(sum(pnls) / len(pnls), 4) if pnls else 0.0,
+                'trade_count': len(pnls),
+            }
+            for session, pnls in session_pnl.items()
+        }
+
+        # ── 3. Consecutive loss runs ─────────────────────────────────────────
+        loss_runs: List[int] = []
+        current_run = 0
+        max_loss_run = 0
+        for t in detailed_trades:
+            if t['pnl'] < 0:
+                current_run += 1
+                max_loss_run = max(max_loss_run, current_run)
+            else:
+                if current_run > 0:
+                    loss_runs.append(current_run)
+                current_run = 0
+        if current_run > 0:
+            loss_runs.append(current_run)
+
+        consecutive_loss_runs = {
+            'max_consecutive_losses': max_loss_run,
+            'avg_loss_run_length': round(sum(loss_runs) / len(loss_runs), 2) if loss_runs else 0.0,
+            'total_loss_runs': len(loss_runs),
+            'runs_of_3_or_more': sum(1 for r in loss_runs if r >= 3),
+        }
+
+        # ── 4. Win/loss streak stats ─────────────────────────────────────────
+        win_runs: List[int] = []
+        current_win_run = 0
+        max_win_run = 0
+        for t in detailed_trades:
+            if t['pnl'] > 0:
+                current_win_run += 1
+                max_win_run = max(max_win_run, current_win_run)
+            else:
+                if current_win_run > 0:
+                    win_runs.append(current_win_run)
+                current_win_run = 0
+        if current_win_run > 0:
+            win_runs.append(current_win_run)
+
+        streak_stats = {
+            'max_win_streak': max_win_run,
+            'max_loss_streak': max_loss_run,
+            'avg_win_streak': round(sum(win_runs) / len(win_runs), 2) if win_runs else 0.0,
+        }
+
+        # ── 5. Drawdown stats ────────────────────────────────────────────────
+        peak = 0.0
+        max_drawdown = 0.0
+        running_pnl = 0.0
+        for t in detailed_trades:
+            running_pnl += t['pnl']
+            if running_pnl > peak:
+                peak = running_pnl
+            dd = peak - running_pnl
+            if dd > max_drawdown:
+                max_drawdown = dd
+
+        drawdown_stats = {
+            'max_drawdown_abs': round(max_drawdown, 4),
+            'final_cumulative_pnl': round(running_pnl, 4),
+        }
+
+        # ── 6. Representative trade sample (best 5, worst 5, last 5) ─────────
+        sorted_by_pnl = sorted(detailed_trades, key=lambda t: t['pnl'])
+        worst_5 = sorted_by_pnl[:5]
+        best_5 = sorted_by_pnl[-5:]
+        last_5 = detailed_trades[-5:]
+        # Deduplicate while preserving order
+        seen: set = set()
+        sample: List[Dict] = []
+        for t in best_5 + worst_5 + last_5:
+            tid = t['trade_number']
+            if tid not in seen:
+                seen.add(tid)
+                sample.append(t)
+        sample.sort(key=lambda t: t['trade_number'])
+
+        return {
+            'avg_pnl_by_day_of_week': avg_pnl_by_dow,
+            'time_of_day_clusters': time_of_day_clusters,
+            'consecutive_loss_runs': consecutive_loss_runs,
+            'streak_stats': streak_stats,
+            'drawdown_stats': drawdown_stats,
+            'trade_sample': sample,
+        }
+
     def _calculate_duration(self, trade: Dict) -> str:
         """Calculate human-readable trade duration"""
         try:
@@ -360,17 +530,186 @@ class ComprehensiveAIRequestBuilder:
             traceback.print_exc()
             return []
     
-    def _extract_signal_statistics(self) -> Dict:
-        """Extract signal occurrence statistics"""
-        # This would ideally come from historical data analysis
-        # For now, return placeholder structure
+    # Keyword-based fire-rate heuristics (mirrors BlockIntelligenceExtractor.SIGNAL_PATTERNS)
+    _HEURISTIC_FIRE_RATES: Dict[str, float] = {
+        'DIVERGENCE':   0.05,
+        'BREAK':        0.07,
+        'SHIFT':        0.07,
+        'BOS':          0.07,
+        'MSS':          0.07,
+        'CHOCH':        0.07,
+        'BULLISH':      0.15,
+        'BEARISH':      0.15,
+        'BUY':          0.15,
+        'SELL':         0.15,
+        'LONG':         0.15,
+        'SHORT':        0.15,
+        'BOUNCE':       0.15,
+        'SUPPORT':      0.15,
+        'RESISTANCE':   0.15,
+        'BREAKOUT':     0.15,
+        'BREAKDOWN':    0.15,
+        'OVERBOUGHT':   0.15,
+        'OVERSOLD':     0.15,
+        'ZONE':         0.15,
+        'ORDER_BLOCK':  0.15,
+        'FVG':          0.15,
+        'SWEEP':        0.15,
+        'CROSS':        0.30,
+        'CROSSOVER':    0.30,
+        'TREND':        0.30,
+        'ABOVE_EMA':    0.30,
+        'BELOW_EMA':    0.30,
+        'ACTIVE':       0.60,
+        'TRIGGERED':    0.60,
+    }
+
+    def _heuristic_fire_rate(self, signal_name: str) -> float:
+        """
+        Return an estimated fire rate (0–1) for a signal based on its name keywords.
+
+        Order of matching: longest keyword wins (checked by iterating sorted keys).
+        Falls back to 0.30 (moderate) if no keyword matches.
+        """
+        upper = signal_name.upper()
+        # Check longest keyword matches first (descending length)
+        for kw in sorted(self._HEURISTIC_FIRE_RATES, key=len, reverse=True):
+            if kw in upper:
+                return self._HEURISTIC_FIRE_RATES[kw]
+        return 0.30  # default: moderate
+
+    def _extract_signal_statistics(self, backtest_results: Optional[Dict] = None) -> Dict:
+        """
+        Extract per-signal occurrence statistics.
+
+        Two-pass approach:
+        1. **Empirical** — count how many trades in ``backtest_results`` contain each
+           signal in their ``signals_fired`` list.  Fire rate = fires / total_trades.
+        2. **Heuristic** — for signals present in the block registry but not observed
+           in any trade, apply keyword-based estimated fire rates.
+
+        Returns
+        -------
+        Dict with keys:
+            - ``total_signals_available``  : int
+            - ``total_trades_analysed``    : int
+            - ``data_source``              : 'empirical' | 'heuristic' | 'mixed'
+            - ``signal_occurrence_rates``  : {signal_name: {
+                  'fires': int,
+                  'fire_rate': float,   # 0–1
+                  'fire_rate_pct': str, # e.g. '12.5%'
+                  'classification': str, # filtering | momentum | neutral
+                  'source': 'empirical' | 'heuristic'
+              }}
+        """
+        signal_stats: Dict[str, Dict] = {}
+
+        # ── 1. Empirical counts from trade data ─────────────────────────────
+        trades = (backtest_results or {}).get('trades', [])
+        total_trades = len(trades)
+
+        empirical_fires: Dict[str, int] = {}
+        for trade in trades:
+            fired = trade.get('signals_fired', [])
+            if isinstance(fired, list):
+                for sig in fired:
+                    if isinstance(sig, str):
+                        empirical_fires[sig] = empirical_fires.get(sig, 0) + 1
+
+        has_empirical = total_trades > 0 and bool(empirical_fires)
+
+        # ── 2. Build stats from block registry signals ───────────────────────
+        registry_signal_count = 0
+        if self.block_registry:
+            try:
+                all_blocks = self.block_registry.get_all_blocks()
+                for block_name, metadata in all_blocks.items():
+                    if not hasattr(metadata, 'signal_tiers') or not metadata.signal_tiers:
+                        continue
+                    for sig_name, tier_info in metadata.signal_tiers.items():
+                        if not isinstance(tier_info, dict):
+                            continue
+                        # Skip UI-invisible signals (same rule as _extract_available_blocks)
+                        if tier_info.get('ui_visible') is False:
+                            continue
+                        registry_signal_count += 1
+                        if sig_name in signal_stats:
+                            continue  # already populated
+
+                        if has_empirical and sig_name in empirical_fires:
+                            fires = empirical_fires[sig_name]
+                            rate = fires / total_trades
+                            source = 'empirical'
+                        elif has_empirical:
+                            # Signal in registry but never fired in trades
+                            fires = 0
+                            rate = 0.0
+                            source = 'empirical'
+                        else:
+                            fires = 0
+                            rate = self._heuristic_fire_rate(sig_name)
+                            source = 'heuristic'
+
+                        signal_stats[sig_name] = {
+                            'fires': fires,
+                            'fire_rate': round(rate, 4),
+                            'fire_rate_pct': f"{rate * 100:.1f}%",
+                            'classification': self._classify_signal(rate),
+                            'source': source,
+                        }
+            except Exception as e:
+                logger.error(f"   ⚠️ Error building signal statistics from registry: {e}")
+
+        # ── 3. Add empirical signals that weren't in registry ───────────────
+        for sig_name, fires in empirical_fires.items():
+            if sig_name not in signal_stats:
+                rate = fires / total_trades if total_trades > 0 else 0.0
+                signal_stats[sig_name] = {
+                    'fires': fires,
+                    'fire_rate': round(rate, 4),
+                    'fire_rate_pct': f"{rate * 100:.1f}%",
+                    'classification': self._classify_signal(rate),
+                    'source': 'empirical',
+                }
+
+        # ── 4. Determine data source label ───────────────────────────────────
+        sources = {v['source'] for v in signal_stats.values()}
+        if sources == {'empirical'}:
+            data_source = 'empirical'
+        elif sources == {'heuristic'}:
+            data_source = 'heuristic'
+        elif sources:
+            data_source = 'mixed'
+        else:
+            data_source = 'none'
+
+        logger.info(
+            f"   ✅ Signal statistics: {len(signal_stats)} signals, "
+            f"source={data_source}, trades_analysed={total_trades}"
+        )
+
         return {
-            'note': 'Signal statistics from building blocks registry',
-            'total_signals_available': 0,  # Would be calculated from blocks
-            'signal_occurrence_rates': {
-                # Example: 'HOD_REJECTION': {'rate': 0.023, 'avg_per_month': 34}
-            }
+            'total_signals_available': registry_signal_count,
+            'total_trades_analysed': total_trades,
+            'data_source': data_source,
+            'signal_occurrence_rates': signal_stats,
         }
+
+    @staticmethod
+    def _classify_signal(fire_rate: float) -> str:
+        """
+        Classify signal role based on its fire rate.
+
+        - ``filtering``  : < 20 %  — rare, used to narrow entries
+        - ``momentum``   : 20–60 % — moderate, momentum/trend confirmation
+        - ``neutral``    : > 60 %  — fires most of the time, broad context
+        """
+        if fire_rate < 0.20:
+            return 'filtering'
+        elif fire_rate <= 0.60:
+            return 'momentum'
+        else:
+            return 'neutral'
     
     def _extract_analysis_context(self, analysis_report: Optional[Any]) -> Dict:
         """Extract analysis context if available"""
@@ -628,6 +967,17 @@ Analyze this data directly - do not rely on summaries.
 6. ANALYSIS CONTEXT:
 ```json
 {json.dumps(request['analysis_context'], indent=2)}
+```
+
+7. SIGNAL OCCURRENCE STATISTICS ({len(request['signal_statistics'].get('signal_occurrence_rates', {}))} signals, source={request['signal_statistics'].get('data_source', 'unknown')}):
+
+Use these statistics to understand how often each signal fires.
+- **filtering** signals (<20% fire rate): rare, highly selective — good for narrowing entries
+- **momentum** signals (20–60% fire rate): moderate frequency — good for trend confirmation
+- **neutral** signals (>60% fire rate): fires most of the time — broad context only
+
+```json
+{json.dumps(request['signal_statistics'], indent=2)}
 ```
 
 ---
