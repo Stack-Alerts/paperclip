@@ -294,7 +294,7 @@ class DataUpdateModal(QDialog):
     
     def _init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("BTC Engine v3 - Data Update Check")
+        self.setWindowTitle("BTC Trade Engine - Data Update Check")
         
         # Make dialog moveable and independent (30% bigger)
         # Use Window flag instead of Dialog to allow dragging
@@ -370,6 +370,7 @@ class DataUpdateModal(QDialog):
         self.skip_button.setMinimumWidth(150)
         self.skip_button.setMinimumHeight(40)
         self.skip_button.setStyleSheet(get_secondary_button_stylesheet())
+        self.skip_button.setToolTip("Skip the data update and continue to the Strategy Builder with existing data")
         self.skip_button.clicked.connect(self.reject)
         buttons_layout.addWidget(self.skip_button)
         
@@ -377,6 +378,7 @@ class DataUpdateModal(QDialog):
         self.update_button.setMinimumWidth(150)
         self.update_button.setMinimumHeight(40)
         self.update_button.setStyleSheet(get_primary_button_stylesheet())
+        self.update_button.setToolTip("Download missing BTC/USDT bars from Binance to fill detected data gaps")
         self.update_button.clicked.connect(self._start_update)
         self.update_button.setEnabled(False)
         buttons_layout.addWidget(self.update_button)
@@ -385,6 +387,7 @@ class DataUpdateModal(QDialog):
         self.close_button.setMinimumWidth(150)
         self.close_button.setMinimumHeight(40)
         self.close_button.setStyleSheet(get_primary_button_stylesheet())
+        self.close_button.setToolTip("Data is up to date — continue to the Strategy Builder")
         self.close_button.clicked.connect(self.accept)
         self.close_button.setVisible(False)
         buttons_layout.addWidget(self.close_button)
@@ -504,41 +507,65 @@ class DataUpdateModal(QDialog):
     
     def _start_update(self):
         """Start the data update process (manual or auto)"""
-        if not self.lakeapi_end or not self.current_time:
+        if not self.current_time:
             return
-        
+
         # Disable buttons
         self.update_button.setEnabled(False)
         self.skip_button.setEnabled(False)
-        
+
         # Show progress
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.progress_label.setVisible(True)
         self.progress_label.setText("Starting download with retry logic...")
-        
+
+        # STARTUP GAP FIX: Use the last Binance OHLCV bar on disk as the
+        # fetch window start so multi-hour gaps from prior sessions are filled.
+        # lakeapi_end is the LakeAPI cutoff date (e.g. 2026-03), not the last
+        # Binance bar — using it as start_date causes the download to either
+        # skip the recent gap or fetch from the wrong anchor.
+        # end_date uses utcnow() to be consistent with UTC-naive bar timestamps.
+        try:
+            last_bar_ts = self.manager.get_last_bar_timestamp('15m')
+        except Exception:
+            last_bar_ts = None
+
+        end_date = datetime.utcnow()
+
+        if last_bar_ts is not None:
+            start_date = last_bar_ts
+            logger.info(f"[DataUpdateModal] startup fetch: last_bar_on_disk={last_bar_ts} → "
+                        f"fetching to {end_date.strftime('%H:%M:%S')} UTC")
+        elif self.lakeapi_end is not None:
+            # No Binance bars on disk yet — fall back to LakeAPI end date
+            start_date = self.lakeapi_end
+            logger.info(f"[DataUpdateModal] no Binance bars on disk; "
+                        f"falling back to lakeapi_end={start_date}")
+        else:
+            # Absolute fallback: fetch last 2 hours
+            start_date = end_date - timedelta(hours=2)
+            logger.info(f"[DataUpdateModal] no anchor available; "
+                        f"fetching last 2h from {start_date.strftime('%H:%M:%S')} UTC")
+
         # BUG B FIX: For 1h timeframe the query window must be ≥ 1 hour so that
-        # at least one complete candle falls within the range.  When lakeapi_end
-        # is very recent (within the last hour) the gap is sub-1h and Binance
-        # legitimately returns 0 bars — this is NOT a network failure.
-        # Widen the start date backward by 2 hours to guarantee coverage.
-        start_date = self.lakeapi_end
-        gap_seconds = (self.current_time - start_date).total_seconds()
-        if gap_seconds < 3600:  # less than 1 hour
-            start_date = self.current_time - timedelta(hours=2)
+        # at least one complete candle falls within the range.
+        gap_seconds = (end_date - start_date).total_seconds()
+        if gap_seconds < 3600:
+            start_date = end_date - timedelta(hours=2)
             logger.info(f"[DataUpdateModal] BUG-B: sub-1h gap ({gap_seconds:.0f}s) — "
-                f"widening 1h query start to {start_date} to ensure ≥1 closed candle")
-        
+                f"widening query start to {start_date.strftime('%H:%M:%S')} UTC to ensure ≥1 closed candle")
+
         # Create and start update thread (with retry logic!)
         self.update_thread = DataUpdateThread(
             start_date,
-            self.current_time
+            end_date
         )
-        
+
         # Connect signals
         self.update_thread.progress.connect(self._on_progress)
         self.update_thread.finished.connect(self._on_finished)
-        
+
         # Start download
         self.update_thread.start()
     
