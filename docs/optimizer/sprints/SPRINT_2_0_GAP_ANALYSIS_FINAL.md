@@ -474,7 +474,7 @@ def run(self):
 ✅ BacktestWorker execution loop  
 ✅ Trade lifecycle management (OPEN → CLOSED)  
 ✅ Progress tracking  
-✅ UI panel integration (7 tabs)  
+✅ UI panel integration (7 tabs) — **note: now 6 tabs after BTCAAAAA-338 removed the Calibrate tab**  
 ✅ Signal connections (progress, trades, messages)  
 ✅ Metrics calculation pipeline  
 ✅ AI recommendation system  
