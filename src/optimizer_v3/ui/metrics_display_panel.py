@@ -2111,14 +2111,14 @@ class MetricsDisplayPanel(QWidget):
             return
         
         # Build version description for Git commit
-        block_names = [rec.block_name for rec in selected_recs if rec.action_type == 'ADD_BLOCK']
-        param_names = [rec.parameter_name for rec in selected_recs if rec.action_type == 'ADJUST_PARAMETER']
+        block_names = [rec.block_name for rec in selected_recs if rec.type == 'ADD_BLOCK']
+        param_names = [rec.parameter_name for rec in selected_recs if rec.type == 'ADJUST_PARAM']
         
         description_parts = []
         if block_names:
-            description_parts.append(f"blocks={', '.join(block_names)}")
+            description_parts.append(f"blocks={', '.join(b for b in block_names if b)}")
         if param_names:
-            description_parts.append(f"params={', '.join(param_names)}")
+            description_parts.append(f"params={', '.join(p for p in param_names if p)}")
         
         version_message = "Applied recommendations: " + (" | ".join(description_parts) if description_parts else "multiple changes")
         
@@ -2130,9 +2130,9 @@ class MetricsDisplayPanel(QWidget):
         for rec in selected_recs:
             if self._apply_single_recommendation(rec):
                 applied_count += 1
-                if rec.action_type == 'ADD_BLOCK':
+                if rec.type == 'ADD_BLOCK':
                     applied_blocks.append(rec.block_name)
-                elif rec.action_type == 'ADJUST_PARAMETER':
+                elif rec.type == 'ADJUST_PARAM':
                     applied_params.append(rec.parameter_name)
         
         # Save configuration version (Git commit) - Sprint 1.6 Task 1.6.8
@@ -2177,12 +2177,33 @@ class MetricsDisplayPanel(QWidget):
                 
             elif rec.type == 'ADJUST_PARAM':
                 # Modify parameter (SL, TP, position size, etc.)
-                success = self._adjust_parameter(rec.parameter_name or 'unknown', rec.configuration)
+                new_value = rec.configuration.get('new_value') if rec.configuration else None
+                success = self._adjust_parameter(rec.parameter_name or 'unknown', new_value)
                 if success:
-                    logger.info(f"✅ Adjusted {rec.parameter_name}: {rec.new_value}")
+                    logger.info(f"✅ Adjusted {rec.parameter_name}: {new_value}")
                 return success
             
-            return False
+            elif rec.type == 'ADD_RECHECK':
+                # Add recheck validation to an existing block's signal
+                block_name = rec.block_name
+                signal_name = rec.signal_name
+                config = rec.configuration or {}
+                success = self._add_recheck_config(block_name, signal_name, config)
+                if success:
+                    logger.info(f"✅ Added recheck to {block_name}::{signal_name}: {config}")
+                return success
+
+            elif rec.type == 'ADD_TIMING':
+                # Set max_candles dependency between two signals
+                config = rec.configuration or {}
+                success = self._add_timing_config(rec.block_name, config)
+                if success:
+                    logger.info(f"✅ Added timing constraint to {rec.block_name}: {config}")
+                return success
+
+            else:
+                logger.warning(f"⚠️ Unknown recommendation type '{rec.type}' — skipping")
+                return False
             
         except Exception as e:
             logger.error(f"❌ Failed to apply recommendation: {str(e)}")
@@ -2242,7 +2263,76 @@ class MetricsDisplayPanel(QWidget):
         except Exception as e:
             logger.error(f"❌ Failed to adjust {param_name}: {str(e)}")
             return False
-    
+
+    def _add_recheck_config(self, block_name: str, signal_name: str, config: dict) -> bool:
+        """
+        Add recheck validation config to an existing block's signal.
+
+        ADD_RECHECK adds a delayed revalidation of the signal N bars later to filter
+        false positives without adding a new block (frequency-preserving).
+
+        Args:
+            block_name: Name of the building block
+            signal_name: Name of the signal to add recheck to
+            config: Configuration dict, e.g. {"bar_delay": 25, "validation_mode": "SIGNAL"}
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            orchestrator = self._get_orchestrator()
+            if not orchestrator:
+                logger.warning("⚠️ Orchestrator not available for ADD_RECHECK")
+                return False
+
+            if hasattr(orchestrator, 'add_recheck_config'):
+                return orchestrator.add_recheck_config(block_name, signal_name, config)
+            else:
+                # Graceful fallback: use update_parameter if orchestrator does not support recheck
+                logger.warning(
+                    f"⚠️ Orchestrator does not support add_recheck_config — "
+                    f"cannot apply ADD_RECHECK for {block_name}::{signal_name}"
+                )
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ Failed to add recheck config for {block_name}::{signal_name}: {str(e)}")
+            return False
+
+    def _add_timing_config(self, block_name: str, config: dict) -> bool:
+        """
+        Set a max_candles timing dependency on a block's signals.
+
+        ADD_TIMING sets a temporal constraint — signal B must occur within N candles
+        after signal A.
+
+        Args:
+            block_name: Name of the building block
+            config: Configuration dict, e.g. {"max_candles": 10}
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            orchestrator = self._get_orchestrator()
+            if not orchestrator:
+                logger.warning("⚠️ Orchestrator not available for ADD_TIMING")
+                return False
+
+            if hasattr(orchestrator, 'add_timing_config'):
+                return orchestrator.add_timing_config(block_name, config)
+            else:
+                # Graceful fallback: log clearly; do not crash
+                logger.warning(
+                    f"⚠️ Orchestrator does not support add_timing_config — "
+                    f"cannot apply ADD_TIMING for {block_name}"
+                )
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ Failed to add timing config for {block_name}: {str(e)}")
+            return False
+
     def _get_orchestrator(self):
         """Get orchestrator from main window"""
         try:
