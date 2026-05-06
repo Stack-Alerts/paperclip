@@ -10,7 +10,7 @@ Tasks Implemented:
 - 2.1.2: Block selection with BlockRegistry
 - 2.1.3: Mode selection (Testing/Production)
 - 2.1.4: Period selection dropdown
-- 2.1.5: Timeframe selection (multi-select QListWidget)
+- 2.1.5: Timeframe selection (inline QCheckBox controls)
 - 2.1.6: Resource estimator & monitoring
 - 2.1.7: Confirmation dialog
 
@@ -31,7 +31,7 @@ from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout,
     QCheckBox, QComboBox, QSpinBox, QLabel, QPushButton,
-    QMessageBox, QProgressBar, QTextEdit, QListWidget, QListWidgetItem, QAbstractItemView
+    QMessageBox, QProgressBar, QTextEdit
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 
@@ -63,7 +63,7 @@ class TrainingPanelUI(QWidget):
     - Block selection from BlockRegistry
     - Testing/Production mode selection
     - Configurable analysis period
-    - Multi-timeframe analysis via QListWidget
+    - Multi-timeframe analysis via inline QCheckBox controls
     - Resource estimation
     - Progress tracking
     - Results display with export
@@ -95,8 +95,8 @@ class TrainingPanelUI(QWidget):
         # Training worker
         self.training_thread = None
         
-        # Timeframe list widget (replaces checkboxes)
-        self.timeframe_list = None
+        # Timeframe checkboxes (inline, replaces QListWidget)
+        self.timeframe_checkboxes = {}
         
         # Setup UI
         self._setup_ui()
@@ -171,7 +171,7 @@ class TrainingPanelUI(QWidget):
         - QCheckBox for block selection
         - QComboBox for mode selection
         - QSpinBox for period selection
-        - QListWidget for timeframe selection (multi-select, replaces checkboxes)
+        - inline QCheckBox controls for timeframe selection
         """
         config_group = QGroupBox("Calibration Configuration")
         config_group.setStyleSheet(get_groupbox_header_stylesheet())
@@ -346,50 +346,49 @@ class TrainingPanelUI(QWidget):
     
     def _create_timeframe_selection(self) -> QWidget:
         """
-        Create timeframe multi-select QListWidget (replaces individual QCheckBox controls).
-        
-        Shows ~3 rows tall, defaults to 15m selected.
+        Create timeframe selection as 4 inline QCheckBox controls.
+
+        Replaces the previous QListWidget multi-select.
+        Default: 15m checked only.
         """
         timeframe_widget = QWidget()
-        timeframe_layout = QVBoxLayout(timeframe_widget)
-        timeframe_layout.setSpacing(0)
+        timeframe_layout = QHBoxLayout(timeframe_widget)
+        timeframe_layout.setSpacing(12)
         timeframe_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         timeframes = ['5m', '15m', '1h', '4h']
-        
-        self.timeframe_list = QListWidget()
-        self.timeframe_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
-        self.timeframe_list.setFixedHeight(72)  # ~3 rows
-        self.timeframe_list.setStyleSheet(f"""
-            QListWidget {{
-                border: 1px solid {get_color('border')};
-                border-radius: 3px;
-                background-color: {get_color('bg_light')};
-                color: {get_color('text_primary')};
-            }}
-            QListWidget::item {{
-                padding: 2px 6px;
-            }}
-            QListWidget::item:selected {{
-                background-color: {get_color('button_primary')};
-                color: {get_color('text_primary')};
-            }}
-            QListWidget::item:hover {{
-                background-color: {get_color('border')};
-            }}
-        """)
-        self.timeframe_list.setToolTip(
-            "The bar timeframe to use for calibration. "
-            "Results will be specific to this timeframe."
-        )
-        
+
+        self.timeframe_checkboxes = {}
         for tf in timeframes:
-            item = QListWidgetItem(tf)
-            self.timeframe_list.addItem(item)
-            if tf == '15m':
-                item.setSelected(True)  # Default: 15m selected
-        
-        timeframe_layout.addWidget(self.timeframe_list)
+            cb = QCheckBox(tf)
+            cb.setChecked(tf == '15m')  # Default: only 15m selected
+            cb.setFont(create_font(size=10))
+            cb.setStyleSheet(f"""
+                QCheckBox {{
+                    spacing: 8px;
+                    color: {get_color('text_primary')};
+                    font-size: 10pt;
+                }}
+                QCheckBox::indicator {{
+                    width: 16px;
+                    height: 16px;
+                    border: 2px solid {get_color('border')};
+                    border-radius: 3px;
+                    background-color: {get_color('bg_light')};
+                }}
+                QCheckBox::indicator:checked {{
+                    background-color: {get_color('button_primary')};
+                    border-color: {get_color('button_primary')};
+                }}
+                QCheckBox::indicator:hover {{
+                    border-color: {get_color('border_focus')};
+                }}
+            """)
+            cb.setToolTip(f"Include {tf} timeframe in calibration analysis")
+            self.timeframe_checkboxes[tf] = cb
+            timeframe_layout.addWidget(cb)
+
+        timeframe_layout.addStretch()
         return timeframe_widget
     
     def _create_progress_section(self) -> QWidget:
@@ -507,6 +506,10 @@ class TrainingPanelUI(QWidget):
         
         return action_widget
     
+    def _get_selected_timeframes(self) -> list:
+        """Return list of timeframe strings whose checkboxes are checked."""
+        return [tf for tf, cb in self.timeframe_checkboxes.items() if cb.isChecked()]
+
     def _toggle_all_blocks(self, checked: bool):
         """Toggle all block checkboxes"""
         for checkbox in self.block_checkboxes:
@@ -523,10 +526,8 @@ class TrainingPanelUI(QWidget):
             cb.text() for cb in self.block_checkboxes if cb.isChecked()
         ]
         
-        # Get selected timeframes from QListWidget
-        selected_timeframes = [
-            item.text() for item in self.timeframe_list.selectedItems()
-        ]
+        # Get selected timeframes from checkboxes
+        selected_timeframes = self._get_selected_timeframes()
         
         # Validation
         if not selected_blocks:
@@ -591,7 +592,8 @@ class TrainingPanelUI(QWidget):
         # Disable configuration inputs
         for checkbox in self.block_checkboxes:
             checkbox.setEnabled(False)
-        self.timeframe_list.setEnabled(False)
+        for cb in self.timeframe_checkboxes.values():
+            cb.setEnabled(False)
         self.mode_combo.setEnabled(False)
         self.period_spin.setEnabled(False)
         
@@ -643,7 +645,8 @@ class TrainingPanelUI(QWidget):
         # Enable configuration inputs
         for checkbox in self.block_checkboxes:
             checkbox.setEnabled(True)
-        self.timeframe_list.setEnabled(True)
+        for cb in self.timeframe_checkboxes.values():
+            cb.setEnabled(True)
         self.mode_combo.setEnabled(True)
         self.period_spin.setEnabled(True)
         
