@@ -3421,25 +3421,44 @@ Total Configurations Tested: {len(df)}
                 self.status_bar.showMessage("Cache clear failed")
     
     def show_about(self):
-        """Show about dialog"""
-        about_text = """Strategy Builder v3.0
+        """Show about dialog — free-floating, wider than default, content-fitted height."""
+        from PyQt6.QtWidgets import QTextBrowser, QPushButton
+        dialog = QDialog()  # No parent: free-floating, not locked to main window position
+        dialog.setWindowTitle("About Strategy Builder")
+        dialog.resize(620, 380)
 
-Professional PyQt6 Interface
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 20, 24, 16)
+        layout.setSpacing(8)
 
-Features:
-• VSCode dark theme
-• Large, readable fonts
-• 83 production-ready building blocks
-• Automated code generation
-• Institutional validation
-• Organized folder structure:
-  - drafts/ (WIP strategies)
-  - unpublished/ (Complete, not published)
-  - published/ (Ready for ITM)
+        content = QTextBrowser()
+        content.setReadOnly(True)
+        content.setPlainText(
+            "Strategy Builder v3.0\n\n"
+            "Professional PyQt6 Interface\n\n"
+            "Features:\n"
+            "• VSCode dark theme\n"
+            "• Large, readable fonts\n"
+            "• 83 production-ready building blocks\n"
+            "• Automated code generation\n"
+            "• Institutional validation\n"
+            "• Organized folder structure:\n"
+            "  - drafts/ (WIP strategies)\n"
+            "  - unpublished/ (Complete, not published)\n"
+            "  - published/ (Ready for ITM)\n\n"
+            "©  2026 BTC Engine Project"
+        )
+        layout.addWidget(content)
 
-©  2026 BTC Engine Project
-"""
-        QMessageBox.about(self, "About", about_text)
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        close_btn = QPushButton("Close")
+        close_btn.setFixedWidth(100)
+        close_btn.clicked.connect(dialog.accept)
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+        dialog.exec()
     
     def restore_window_state(self):
         """Restore window geometry and splitter sizes from settings"""
