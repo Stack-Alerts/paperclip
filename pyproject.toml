@@ -71,7 +71,9 @@ disable = ["C0111", "C0103"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+# Runtime is Python 3.13; py312 is the minimum that parses the f-string quoting
+# syntax used in src/detectors/building_blocks/patterns/*.py (PEP 701, Python 3.12+).
+target-version = "py312"
 
 [tool.ruff.lint]
 # DTZ rules enforce timezone-aware datetimes.
