@@ -18,6 +18,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from decimal import Decimal
 from datetime import datetime, timedelta
 from pathlib import Path
+import os
 import sys
 
 # NautilusTrader imports - MANDATORY types
@@ -27,6 +28,7 @@ from nautilus_trader.model.identifiers import InstrumentId, Symbol
 from nautilus_trader.model.enums import OrderSide, PositionSide
 from nautilus_trader.model.data import Bar
 
+import pandas as pd
 import logging
 logger = logging.getLogger(__name__)
 
@@ -109,6 +111,10 @@ class NautilusTrainingSystem:
         self.signals_analyzed: int = 0
         self.valid_signals: int = 0
         self.invalid_signals: int = 0
+        
+        # Block instance cache: {block_name: detector_instance}
+        # Lazy-loaded on first use to avoid slow startup
+        self._block_cache: Dict[str, Any] = {}
         
         if self.logger:
             self.logger.info("NautilusTrainingSystem initialized")
@@ -748,22 +754,131 @@ class NautilusTrainingSystem:
         all_bars: List[Bar]
     ) -> bool:
         """
-        Check if bar triggers signal condition (placeholder)
+        Check if bar triggers signal condition via BlockRegistry.
         
-        In production, this would check actual building block logic.
+        Builds a rolling window DataFrame from bars up to and including the
+        current bar, instantiates (or retrieves cached) the registered block,
+        calls block.analyze(df), and returns True when the block fires a
+        non-neutral, non-error signal.
         
         Args:
-            block_name: Building block name
+            block_name: Building block name (must be registered in BlockRegistry)
             bar: Current bar
             index: Bar index in data
-            all_bars: All available bars
+            all_bars: All available bars (used for the rolling window context)
         
         Returns:
-            bool: True if signal triggered
+            bool: True if the block emits an actionable signal on this bar
         """
-        # Placeholder - always False
-        # Full implementation connects to building block registry
-        return False
+        try:
+            from src.detectors.building_blocks.registry import BlockRegistry
+        except ImportError:
+            if self.logger:
+                self.logger.warning(
+                    f"BlockRegistry unavailable — cannot evaluate '{block_name}'"
+                )
+            return False
+
+        # Verify block is registered
+        metadata = BlockRegistry.get_block(block_name)
+        if metadata is None:
+            if self.logger:
+                self.logger.warning(
+                    f"Block '{block_name}' not found in registry — skipping signal check"
+                )
+            return False
+
+        # Build rolling context window: use up to 200 bars ending at current index
+        window_size = min(200, index + 1)
+        start_idx = index + 1 - window_size
+        window_bars = all_bars[start_idx:index + 1]
+
+        if len(window_bars) < 50:
+            # Most blocks need at least 50 bars to analyse
+            return False
+
+        # Convert Bar objects to pandas DataFrame expected by building blocks
+        df = self._bars_to_dataframe(window_bars)
+
+        # Get or instantiate the block detector
+        detector = self._get_block_detector(block_name, metadata)
+        if detector is None:
+            return False
+
+        # Run analysis
+        try:
+            result = detector.analyze(df)
+        except Exception as exc:
+            if self.logger:
+                self.logger.error(
+                    f"Block '{block_name}' analyze() raised: {exc}"
+                )
+            return False
+
+        if not isinstance(result, dict):
+            return False
+
+        signal = result.get('signal', 'NO_SIGNAL')
+
+        # Non-firing signals — everything else is considered a fire
+        NON_FIRING = {'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA', 'NO_SIGNAL', 'NO_PATTERN'}
+
+        return signal not in NON_FIRING
+
+    def _bars_to_dataframe(self, bars: List[Bar]) -> 'pd.DataFrame':
+        """
+        Convert a list of NautilusTrader Bar objects to the pandas DataFrame
+        format expected by building block analyze() methods.
+        
+        Columns produced: open, high, low, close, volume, timestamp
+        
+        Args:
+            bars: List of NautilusTrader Bar objects (chronological order)
+        
+        Returns:
+            pd.DataFrame: OHLCV frame with UTC-naive datetime timestamps
+        """
+        rows = []
+        for b in bars:
+            rows.append({
+                'open':      float(b.open.as_decimal()),
+                'high':      float(b.high.as_decimal()),
+                'low':       float(b.low.as_decimal()),
+                'close':     float(b.close.as_decimal()),
+                'volume':    float(b.volume.as_double()),
+                'timestamp': pd.Timestamp(b.ts_init, unit='ns', tz='UTC').tz_localize(None),
+            })
+        return pd.DataFrame(rows)
+
+    def _get_block_detector(self, block_name: str, metadata: Any) -> Optional[Any]:
+        """
+        Return a cached block detector instance, instantiating it on first access.
+        
+        Args:
+            block_name: Registered block name
+            metadata: BlockMetadata from registry
+        
+        Returns:
+            Detector instance, or None if instantiation fails
+        """
+        if block_name in self._block_cache:
+            return self._block_cache[block_name]
+
+        try:
+            from src.detectors.building_blocks.registry import BlockRegistry
+            detector = BlockRegistry.instantiate(block_name)
+            self._block_cache[block_name] = detector
+            if self.logger:
+                self.logger.info(f"Instantiated block detector: '{block_name}'")
+            return detector
+        except Exception as exc:
+            if self.logger:
+                self.logger.error(
+                    f"Failed to instantiate block '{block_name}': {exc}"
+                )
+            # Cache None so we don't retry repeatedly
+            self._block_cache[block_name] = None
+            return None
     
     def _get_forward_bars(
         self,
