@@ -12,11 +12,12 @@ from PyQt5.QtWidgets import (
     QTextEdit, QFrame, QCheckBox
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
 from typing import Dict, Any, Optional
 
 from src.strategy_builder.ui.styles import (
-    COLORS, create_font, get_dialog_stylesheet, set_hand_cursor
+    COLORS, MAIN_STYLESHEET, create_font, create_monospace_font,
+    get_success_button_stylesheet, get_secondary_button_stylesheet,
+    get_dialog_stylesheet, set_hand_cursor
 )
 
 
@@ -72,9 +73,10 @@ class AutoFixConfirmDialog(QDialog):
         self.setWindowTitle("Confirm Auto-Fix")
         self.setModal(True)
         self.setMinimumSize(900, 650)
-        
-        # Apply stylesheet
-        self.setStyleSheet(self._get_dialog_style())
+
+        # Apply the global dark stylesheet so this dialog is consistent with
+        # the rest of the Strategy Builder UI (no custom inline overrides)
+        self.setStyleSheet(MAIN_STYLESHEET)
         
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
@@ -100,29 +102,6 @@ class AutoFixConfirmDialog(QDialog):
         # Action buttons
         buttons = self._create_action_buttons()
         layout.addWidget(buttons)
-    
-    def _get_dialog_style(self) -> str:
-        """Get dialog stylesheet"""
-        return f"""
-            QDialog {{
-                background-color: {COLORS['bg_dark']};
-                color: {COLORS['text_primary']};
-            }}
-            QLabel {{
-                color: {COLORS['text_primary']};
-                background: transparent;
-            }}
-            QTextEdit {{
-                background-color: {COLORS['bg_medium']};
-                color: {COLORS['text_primary']};
-                border: 1px solid {COLORS['border']};
-                padding: 8px;
-                font-family: 'Courier New', monospace;
-            }}
-            QFrame {{
-                background: transparent;
-            }}
-        """
     
     def _create_header(self) -> QFrame:
         """Create dialog header with title and description"""
@@ -163,7 +142,7 @@ class AutoFixConfirmDialog(QDialog):
         
         before_text = QTextEdit()
         before_text.setReadOnly(True)
-        before_text.setFont(QFont("Courier New", 10))
+        before_text.setFont(create_monospace_font(10))
         before_text.setPlainText(self._format_state(self.before_state))
         before_text.setMaximumHeight(300)
         before_layout.addWidget(before_text)
@@ -190,7 +169,7 @@ class AutoFixConfirmDialog(QDialog):
         
         after_text = QTextEdit()
         after_text.setReadOnly(True)
-        after_text.setFont(QFont("Courier New", 10))
+        after_text.setFont(create_monospace_font(10))
         after_text.setPlainText(self._format_state(self.after_state))
         after_text.setMaximumHeight(300)
         after_layout.addWidget(after_text)
@@ -204,7 +183,7 @@ class AutoFixConfirmDialog(QDialog):
         frame = QFrame()
         frame.setStyleSheet(f"""
             QFrame {{
-                background: rgba(59, 130, 246, 0.1);
+                background: {COLORS['bg_info_subtle']};
                 border-left: 4px solid {COLORS['info']};
                 border-radius: 4px;
                 padding: 12px;
@@ -300,10 +279,10 @@ class AutoFixConfirmDialog(QDialog):
                 border-radius: 4px;
             }}
             QPushButton:hover {{
-                background-color: #059669;
+                background-color: {COLORS['button_success_hover']};
             }}
             QPushButton:pressed {{
-                background-color: #047857;
+                background-color: {COLORS['button_success']};
             }}
         """)
         apply_btn.clicked.connect(self._apply_fix)
