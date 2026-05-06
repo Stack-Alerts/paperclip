@@ -1186,8 +1186,8 @@ class TestDataUpdateThreadDownloads1d:
         """
         DataUpdateThread.run() must call _download_with_retry(timeframe='1d').
 
-        We mock _download_with_retry and _save_bars_to_disk to avoid live API
-        calls and filesystem writes, then assert on the captured call arguments.
+        We mock _download_with_retry and manager._save_binance_bars to avoid live
+        API calls and filesystem writes, then assert on the captured call arguments.
         """
         from src.strategy_builder.ui.data_update_modal import DataUpdateThread
 
@@ -1208,14 +1208,14 @@ class TestDataUpdateThreadDownloads1d:
 
         def fake_save(bars, timeframe):
             save_calls.append({"timeframe": timeframe})
-            return [f"fake_file_{timeframe}.parquet"]
+            # _save_binance_bars returns None (unlike old _save_bars_to_disk)
 
         # Patch the Binance ping so run() doesn't need network
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(thread, "_download_with_retry", side_effect=fake_download), \
-             patch.object(thread, "_save_bars_to_disk", side_effect=fake_save), \
+             patch.object(thread.manager, "_save_binance_bars", side_effect=fake_save), \
              patch("requests.get", return_value=mock_response):
             thread.run()
 
@@ -1227,7 +1227,7 @@ class TestDataUpdateThreadDownloads1d:
             f"Timeframes downloaded: {downloaded_timeframes}"
         )
         assert "1d" in saved_timeframes, (
-            f"DataUpdateThread.run() did not call _save_bars_to_disk for '1d'. "
+            f"DataUpdateThread.run() did not call _save_binance_bars for '1d'. "
             f"Timeframes saved: {saved_timeframes}"
         )
 
@@ -1253,13 +1253,13 @@ class TestDataUpdateThreadDownloads1d:
             return {"15m": bars_15m, "1h": bars_1h, "1d": bars_1d}[timeframe]
 
         def fake_save(bars, timeframe):
-            return [f"fake_{timeframe}.parquet"]
+            pass  # _save_binance_bars returns None
 
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(thread, "_download_with_retry", side_effect=fake_download), \
-             patch.object(thread, "_save_bars_to_disk", side_effect=fake_save), \
+             patch.object(thread.manager, "_save_binance_bars", side_effect=fake_save), \
              patch("requests.get", return_value=mock_response):
             thread.run()
 
