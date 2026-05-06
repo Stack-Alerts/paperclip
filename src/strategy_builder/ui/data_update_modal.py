@@ -13,7 +13,6 @@ Date: 2026-01-17
 
 from datetime import datetime, timedelta
 from typing import Optional
-import os
 import pandas as pd
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -23,9 +22,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont
 
 # Import UnifiedDataManager - THE ONLY DATA SOURCE!
-from src.data_manager.unified_manager import UnifiedDataManager, DataSource, _get_parquet_lock
-# Bug 1 fix: import PROJECT_ROOT so base_dir is always absolute.
-from src.data_manager.config import PROJECT_ROOT
+from src.data_manager.unified_manager import UnifiedDataManager, DataSource
 # Import centralized styles
 from src.strategy_builder.ui.styles import (
     get_main_stylesheet, get_panel_title_stylesheet, 
@@ -99,10 +96,11 @@ class DataUpdateThread(QThread):
             
             self.progress.emit(40, 100, f"Downloaded {len(bars_15m)} bars (15min)")
             
-            # INSTITUTIONAL: SAVE TO DISK!
+            # INSTITUTIONAL: SAVE TO DISK via unified _save_binance_bars (dtype
+            # normalization, cross-month guard, atomic write, read-back verify).
             self.progress.emit(45, 100, "Saving 15min bars to disk...")
-            saved_files_15m = self._save_bars_to_disk(bars_15m, '15m')
-            
+            self.manager._save_binance_bars(bars_15m, '15m')
+
             # INSTITUTIONAL: Download 1h bars with retry logic
             self.progress.emit(60, 100, "Downloading 1h bars from Binance (with retry logic)...")
             bars_1h = self._download_with_retry(
@@ -110,12 +108,12 @@ class DataUpdateThread(QThread):
                 start_date=self.start_date,
                 end_date=self.end_date
             )
-            
+
             self.progress.emit(80, 100, f"Downloaded {len(bars_1h)} bars (1h)")
-            
+
             # INSTITUTIONAL: SAVE TO DISK!
             self.progress.emit(85, 100, "Saving 1h bars to disk...")
-            saved_files_1h = self._save_bars_to_disk(bars_1h, '1h')
+            self.manager._save_binance_bars(bars_1h, '1h')
 
             # INSTITUTIONAL: Download 1d bars with retry logic
             self.progress.emit(88, 100, "Downloading 1d bars from Binance...")
@@ -128,16 +126,16 @@ class DataUpdateThread(QThread):
 
             # INSTITUTIONAL: SAVE TO DISK!
             self.progress.emit(94, 100, "Saving 1d bars to disk...")
-            saved_files_1d = self._save_bars_to_disk(bars_1d, '1d')
+            self.manager._save_binance_bars(bars_1d, '1d')
 
             # Success!
             self.progress.emit(100, 100, "Download complete!")
             self.finished.emit(
                 True,
                 f"✅ Successfully updated!\n\n"
-                f"15min bars: {len(bars_15m)} ({len(saved_files_15m)} files saved)\n"
-                f"1h bars: {len(bars_1h)} ({len(saved_files_1h)} files saved)\n"
-                f"1d bars: {len(bars_1d)} ({len(saved_files_1d)} files saved)\n\n"
+                f"15min bars: {len(bars_15m)} bars saved\n"
+                f"1h bars: {len(bars_1h)} bars saved\n"
+                f"1d bars: {len(bars_1d)} bars saved\n\n"
                 f"Files saved to: data/binance/\n"
                 f"Latest timestamp: {bars_15m['timestamp'].iloc[-1]}"
             )
@@ -236,73 +234,6 @@ class DataUpdateThread(QThread):
                 return bars
         
         return bars
-    
-    def _save_bars_to_disk(self, bars, timeframe: str) -> list:
-        """INSTITUTIONAL: Merge new bars with existing data"""
-        from pathlib import Path
-        import pandas as pd
-        
-        if len(bars) == 0:
-            return []
-        
-        saved_files = []
-        # Bug 1 fix: use absolute PROJECT_ROOT so this is always the same
-        # directory that UnifiedDataManager._save_binance_bars writes to,
-        # regardless of the CWD when the app is launched.
-        base_dir = PROJECT_ROOT / "data" / "binance"
-        base_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Group bars by month
-        bars['month'] = pd.to_datetime(bars['timestamp']).dt.to_period('M')
-        
-        for month, month_data in bars.groupby('month'):
-            # Create month directory (e.g., 2026-01)
-            month_dir = base_dir / str(month)
-            month_dir.mkdir(exist_ok=True)
-            
-            # Filename format: BTCUSDT_PERP_15m_2026-01.parquet (month level, not day!)
-            filename = f"BTCUSDT_PERP_{timeframe}_{month}.parquet"
-            filepath = month_dir / filename
-            
-            month_data_clean = month_data.drop(columns=['month'])
-            
-            # Bug 2 fix: serialize concurrent writers on the same file with a lock.
-            file_lock = _get_parquet_lock(filepath)
-            with file_lock:
-                # INSTITUTIONAL: Merge with existing data if file exists
-                if filepath.exists():
-                    try:
-                        # Read existing data
-                        existing_data = pd.read_parquet(filepath)
-                        n_existing = len(existing_data)
-                        
-                        # Combine old + new
-                        combined = pd.concat([existing_data, month_data_clean], ignore_index=True)
-                        
-                        # Remove duplicates (keep latest)
-                        combined = combined.sort_values('timestamp').drop_duplicates(subset=['timestamp'], keep='last')
-                        
-                        # Bug 2 fix: atomic write via temp file + os.replace.
-                        tmp_path = filepath.with_suffix('.parquet.tmp')
-                        combined.to_parquet(tmp_path, index=False)
-                        os.replace(tmp_path, filepath)
-                        print(f"   💾 Updated: {filepath} ({n_existing} → {len(combined)} bars, +{len(combined)-n_existing} new)")
-                    except Exception as e:
-                        print(f"   ⚠️  Could not merge, overwriting: {e}")
-                        tmp_path = filepath.with_suffix('.parquet.tmp')
-                        month_data_clean.to_parquet(tmp_path, index=False)
-                        os.replace(tmp_path, filepath)
-                        print(f"   💾 Saved: {filepath} ({len(month_data_clean)} bars)")
-                else:
-                    # New file — atomic write.
-                    tmp_path = filepath.with_suffix('.parquet.tmp')
-                    month_data_clean.to_parquet(tmp_path, index=False)
-                    os.replace(tmp_path, filepath)
-                    print(f"   💾 Created: {filepath} ({len(month_data_clean)} bars)")
-            
-            saved_files.append(str(filepath))
-        
-        return saved_files
 
 
 class DataUpdateModal(QDialog):

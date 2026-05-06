@@ -313,7 +313,7 @@ class BinanceRestClient:
         ])
         
         # Convert types - INSTITUTIONAL: Use exact same method as direct test!
-        df['timestamp'] = df['open_time'].apply(lambda x: datetime.fromtimestamp(x / 1000))
+        df['timestamp'] = pd.to_datetime(df['open_time'], unit='ms', utc=True).dt.tz_localize(None)
         df['open'] = df['open'].astype(float)
         df['high'] = df['high'].astype(float)
         df['low'] = df['low'].astype(float)
@@ -348,7 +348,9 @@ class BinanceRestClient:
         # INSTITUTIONAL: Check freshness and use fallback if stale
         if len(df) > 0:
             latest = pd.to_datetime(df['timestamp'].iloc[-1])
-            delay_minutes = (datetime.now() - latest).total_seconds() / 60
+            # timestamps are now UTC-naive; compare against utcnow() so the
+            # delay calculation is correct regardless of machine timezone.
+            delay_minutes = (datetime.utcnow() - latest).total_seconds() / 60
 
             # Per-interval stale thresholds — avoids false-positive stale warnings
             # for low-frequency bars (e.g. 1d) that are naturally hours old.
@@ -367,7 +369,7 @@ class BinanceRestClient:
                 # Check if fallback is fresher
                 if len(df_fresh) > 0:
                     fresh_latest = pd.to_datetime(df_fresh['timestamp'].iloc[-1])
-                    fresh_delay = (datetime.now() - fresh_latest).total_seconds() / 60
+                    fresh_delay = (datetime.utcnow() - fresh_latest).total_seconds() / 60
                     
                     if fresh_delay < delay_minutes:
                         print(f"   ✅ Fallback successful: {delay_minutes:.0f}m → {fresh_delay:.0f}m")

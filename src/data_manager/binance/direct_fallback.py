@@ -57,7 +57,7 @@ def get_fresh_klines_direct(
     ])
     
     # Convert types - INSTITUTIONAL: Same as REST client fix!
-    df['timestamp'] = df['open_time'].apply(lambda x: datetime.fromtimestamp(x / 1000))
+    df['timestamp'] = pd.to_datetime(df['open_time'], unit='ms', utc=True).dt.tz_localize(None)
     df['open'] = df['open'].astype(float)
     df['high'] = df['high'].astype(float)
     df['low'] = df['low'].astype(float)

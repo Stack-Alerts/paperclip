@@ -1245,6 +1245,16 @@ class UnifiedDataManager:
         result = result.sort_values('timestamp').drop_duplicates(
             subset=['timestamp'], keep='last'
         ).reset_index(drop=True)
+
+        # Fix 3: Clamp result to the explicitly requested window so that bars
+        # Binance returns slightly outside [start_ts, end_ts] (due to alignment
+        # or batch overlap) can never produce "+0 new" from spurious out-of-window bars.
+        fetch_start = pd.Timestamp(start_ts)
+        fetch_end = pd.Timestamp(end_ts)
+        result = result[
+            (result['timestamp'] >= fetch_start) & (result['timestamp'] <= fetch_end)
+        ].reset_index(drop=True)
+
         return result
 
     def _save_binance_bars(
@@ -1328,26 +1338,7 @@ class UnifiedDataManager:
                         existing['timestamp'] = existing['timestamp'].astype('datetime64[us]')
                         group['timestamp'] = group['timestamp'].astype('datetime64[us]')
 
-                        # merge_debug: keep until board confirms +N new is
-                        # correct on consecutive cycles (BTCAAAAA-167 AC5).
-                        print(
-                            f"   [merge_debug] existing: n={n_existing},"
-                            f" dtype={existing['timestamp'].dtype},"
-                            f" last={existing['timestamp'].max()}"
-                        )
-                        print(
-                            f"   [merge_debug] group:    n={len(group)},"
-                            f" dtype={group['timestamp'].dtype},"
-                            f" first={group['timestamp'].min()},"
-                            f" last={group['timestamp'].max()}"
-                        )
-
-                        merged_before_dedup = pd.concat([existing, group], ignore_index=True)
-                        print(
-                            f"   [merge_debug] merged:   n={len(merged_before_dedup)},"
-                            f" after_dedup=<computing>"
-                        )
-                        merged = merged_before_dedup
+                        merged = pd.concat([existing, group], ignore_index=True)
                     except Exception as exc:
                         logger.warning("Could not read %s for merge: %s – overwriting", file_path, exc)
                         n_existing = 0
@@ -1364,9 +1355,6 @@ class UnifiedDataManager:
                 merged = merged.sort_values('timestamp').drop_duplicates(
                     subset=['timestamp'], keep='last'
                 ).reset_index(drop=True)
-                if n_existing > 0:
-                    # Emit final dedup count only when we did a merge.
-                    print(f"   [merge_debug] after_dedup={len(merged)}")
 
                 # Bug 2 fix: atomic write via temp file + os.replace (POSIX atomic).
                 tmp_path = file_path.with_suffix('.parquet.tmp')
@@ -1680,13 +1668,15 @@ class UnifiedDataManager:
         if timeframes is None:
             timeframes = ['15m', '1h', '1d']
 
-        start_date = datetime.now() - timedelta(days=lookback_days)
+        start_date = datetime.utcnow() - timedelta(days=lookback_days)
+        end_date = datetime.utcnow()
         print(f"\n🔍 Startup continuity check (last {lookback_days} days)...")
 
-        # Quick gap scan
+        # Quick gap scan — pass end_date so trailing-edge gaps (last bar on disk
+        # vs. now) are included in the detection window.
         all_clean = True
         for tf in timeframes:
-            gaps = self.detect_gaps_in_binance_files(tf, start_date=start_date)
+            gaps = self.detect_gaps_in_binance_files(tf, start_date=start_date, end_date=end_date)
             if gaps:
                 all_clean = False
                 print(f"   ⚠️  {tf}: {len(gaps)} gap(s) detected in last {lookback_days} days.")
@@ -1701,9 +1691,10 @@ class UnifiedDataManager:
             return self.verify_and_repair(
                 timeframes=timeframes,
                 start_date=start_date,
+                end_date=end_date,
             )
         else:
-            return self.run_gap_report(timeframes=timeframes, start_date=start_date)
+            return self.run_gap_report(timeframes=timeframes, start_date=start_date, end_date=end_date)
 
 
 # Convenience function
