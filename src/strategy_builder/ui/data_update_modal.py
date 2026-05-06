@@ -399,6 +399,39 @@ class DataUpdateModal(QDialog):
     def _check_data_gap(self):
         """Check for gaps across ALL data types"""
         try:
+            # --- Fast path: skip download if Binance OHLCV is already current ---
+            # If the last 15m bar on disk is within 1 candle period + 2 minutes of
+            # now (UTC), data is current and we should not run the download flow.
+            # This avoids triggering a Binance API call on every startup when the
+            # system has been running continuously or restarted within 1 cycle.
+            if self.auto_mode:
+                try:
+                    last_bar = self.manager.get_last_bar_timestamp('15m')
+                    if last_bar is not None:
+                        staleness_seconds = (datetime.utcnow() - last_bar).total_seconds()
+                        # 15 min candle + 2 min grace = 17 min = 1020s
+                        if staleness_seconds <= 1020:
+                            logger.info(
+                                f"[DataUpdateModal] Data current — last 15m bar "
+                                f"{staleness_seconds:.0f}s ago, skipping startup download"
+                            )
+                            self.status_label.setText(
+                                f"✅ Data current — last bar {int(staleness_seconds//60)}m "
+                                f"{int(staleness_seconds%60)}s ago"
+                            )
+                            self.status_label.setStyleSheet(get_status_label_style('success'))
+                            self.details_text.setText(
+                                f"✅ Data is up to date.\n\n"
+                                f"Last 15m bar: {last_bar.strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+                                f"Age: {int(staleness_seconds//60)}m {int(staleness_seconds%60)}s\n\n"
+                                f"Skipping startup download — proceeding directly to live update mode."
+                            )
+                            # Close immediately with no countdown in auto mode
+                            QTimer.singleShot(500, self.accept)
+                            return
+                except Exception:
+                    pass  # Fall through to full check if fast-path fails
+
             # Get status for ALL data types
             all_status = self.manager.get_all_data_types_status()
             
