@@ -14,7 +14,7 @@ Institutional-grade implementation with:
 
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
 from sqlalchemy.orm import Session
@@ -288,7 +288,7 @@ class AIRecommendationsManager:
             # Update using ORM
             recommendation.applied = True
             recommendation.applied_version_id = applied_version_id
-            recommendation.applied_at = datetime.utcnow()
+            recommendation.applied_at = datetime.now(timezone.utc)
             recommendation.applied_by = applied_by
             
             self.session.commit()

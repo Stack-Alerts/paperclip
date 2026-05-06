@@ -9,7 +9,7 @@ for all database models with proper error handling and resource cleanup.
 import logging
 from contextlib import contextmanager
 from typing import List, Dict, Any, Optional, Type, TypeVar
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -217,7 +217,7 @@ class DatabaseManager:
         
         # Set defaults
         if 'start_time' not in run_data:
-            run_data['start_time'] = datetime.utcnow()
+            run_data['start_time'] = datetime.now(timezone.utc)
         if 'status' not in run_data:
             run_data['status'] = 'pending'
         
@@ -241,7 +241,7 @@ class DatabaseManager:
         """Mark optimization run as complete with final metrics"""
         updates = {
             'status': 'completed',
-            'end_time': datetime.utcnow(),
+            'end_time': datetime.now(timezone.utc),
             **final_metrics
         }
         self.update_optimization_run(run_id, updates)
@@ -370,7 +370,7 @@ class DatabaseManager:
                 # Update existing
                 for key, value in state_data.items():
                     setattr(existing, key, value)
-                existing.last_checkpoint_at = datetime.utcnow()
+                existing.last_checkpoint_at = datetime.now(timezone.utc)
             else:
                 # Create new
                 state_data['run_id'] = run_id

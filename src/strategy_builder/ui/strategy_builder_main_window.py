@@ -27,7 +27,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QSize, QSettings, QTimer, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon, QKeySequence, QFont
 from PyQt5.QtWidgets import QApplication, QStyle
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 
 from src.strategy_builder.integration.strategy_builder_orchestrator import (
@@ -106,7 +106,7 @@ class _RuntimeCandleUpdateThread(QThread):
             return _elapsed() > self.TIMEOUT_SECONDS
 
         try:
-            from datetime import datetime, timedelta
+            from datetime import datetime, timedelta, timezone
             from src.data_manager.unified_manager import UnifiedDataManager
 
             print(f"[RuntimeUpdate] cycle start")
@@ -1889,7 +1889,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             return  # No version to update yet (strategy not saved)
         
         try:
-            from datetime import datetime
+            from datetime import datetime, timezone
             from src.optimizer_v3.database.models import StrategyVersion
             
             db = get_database_manager()
@@ -1902,7 +1902,7 @@ class StrategyBuilderMainWindow(QMainWindow):
             if version:
                 # Update using ORM
                 version.validation_status = status
-                version.validation_timestamp = datetime.utcnow()
+                version.validation_timestamp = datetime.now(timezone.utc)
                 db.strategy.session.commit()
             
         except Exception as e:

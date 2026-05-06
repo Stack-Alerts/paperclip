@@ -475,7 +475,7 @@ class ValidationPanel(QWidget):
         
         try:
             from src.optimizer_v3.database import get_database_manager
-            from datetime import datetime
+            from datetime import datetime, timezone
             
             db = get_database_manager()
             
@@ -492,7 +492,7 @@ class ValidationPanel(QWidget):
                 """,
                 {
                     'status': validation_status,
-                    'timestamp': datetime.utcnow(),
+                    'timestamp': datetime.now(timezone.utc),
                     'version_id': str(self.current_version_id)
                 }
             )

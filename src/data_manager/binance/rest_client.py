@@ -17,7 +17,7 @@ Advantages over LakeAPI:
 
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Union
 import time
 from pathlib import Path
@@ -348,9 +348,9 @@ class BinanceRestClient:
         # INSTITUTIONAL: Check freshness and use fallback if stale
         if len(df) > 0:
             latest = pd.to_datetime(df['timestamp'].iloc[-1])
-            # timestamps are now UTC-naive; compare against utcnow() so the
+            # timestamps are now UTC-naive; strip tzinfo for comparison so the
             # delay calculation is correct regardless of machine timezone.
-            delay_minutes = (datetime.utcnow() - latest).total_seconds() / 60
+            delay_minutes = (datetime.now(timezone.utc).replace(tzinfo=None) - latest).total_seconds() / 60
 
             # Per-interval stale thresholds — avoids false-positive stale warnings
             # for low-frequency bars (e.g. 1d) that are naturally hours old.
@@ -369,7 +369,7 @@ class BinanceRestClient:
                 # Check if fallback is fresher
                 if len(df_fresh) > 0:
                     fresh_latest = pd.to_datetime(df_fresh['timestamp'].iloc[-1])
-                    fresh_delay = (datetime.utcnow() - fresh_latest).total_seconds() / 60
+                    fresh_delay = (datetime.now(timezone.utc).replace(tzinfo=None) - fresh_latest).total_seconds() / 60
                     
                     if fresh_delay < delay_minutes:
                         print(f"   ✅ Fallback successful: {delay_minutes:.0f}m → {fresh_delay:.0f}m")
