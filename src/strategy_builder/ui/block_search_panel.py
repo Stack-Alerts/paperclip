@@ -132,6 +132,7 @@ class BlockListItem(QWidget):
         self.expand_button = QPushButton(f"▶ Show Signals ({len(self.visible_signals)})")
         self.expand_button.setMinimumHeight(72)
         self.expand_button.setMaximumHeight(72)
+        self.expand_button.setToolTip("Expand to select individual signals from this building block to add to your strategy")
         self.expand_button.setStyleSheet("""
             QPushButton {
                 background-color: #2D3748;
@@ -237,6 +238,7 @@ class BlockListItem(QWidget):
         self.and_button = QPushButton("➕ Add as AND (Required)")
         self.and_button.setMinimumHeight(40)
         self.and_button.setStyleSheet(get_and_button_stylesheet())
+        self.and_button.setToolTip("Add this building block as a REQUIRED signal — ALL required signals must fire for an entry")
         self.and_button.clicked.connect(lambda: self._add_with_logic("AND"))
         buttons_layout.addWidget(self.and_button)
         
@@ -244,6 +246,7 @@ class BlockListItem(QWidget):
         self.or_button = QPushButton("➕ Add as OR (Optional)")
         self.or_button.setMinimumHeight(40)
         self.or_button.setStyleSheet(get_or_button_stylesheet())
+        self.or_button.setToolTip("Add this building block as an OPTIONAL booster signal — improves confluence score but not required for entry")
         self.or_button.clicked.connect(lambda: self._add_with_logic("OR"))
         buttons_layout.addWidget(self.or_button)
         
@@ -617,6 +620,7 @@ class BlockSearchPanel(QWidget):
         self.search_input.setFont(self.content_font)
         self.search_input.setPlaceholderText("Search by block name, description, or signal...")
         self.search_input.setMinimumHeight(36)  # Bigger input
+        self.search_input.setToolTip("Type to search building blocks by name, description, or signal name")
         self.search_input.textChanged.connect(self._on_search_changed)
         search_layout.addWidget(search_label)
         search_layout.addWidget(self.search_input, stretch=1)
@@ -634,6 +638,7 @@ class BlockSearchPanel(QWidget):
         self.category_filter = QComboBox()
         self.category_filter.setFont(self.content_font)
         self.category_filter.addItem("All Categories")
+        self.category_filter.setToolTip("Filter building blocks by category (e.g. Trend, Momentum, Volume)")
         fix_combobox_white_bars(self.category_filter)  # Comprehensive fix
         self.category_filter.currentTextChanged.connect(self._on_filter_changed)
         filters_layout.addWidget(self.category_filter)
@@ -646,6 +651,7 @@ class BlockSearchPanel(QWidget):
         self.type_filter = QComboBox()
         self.type_filter.setFont(self.content_font)
         self.type_filter.addItem("All Types")
+        self.type_filter.setToolTip("Filter by signal type — Bullish signals for long strategies, Bearish for short")
         fix_combobox_white_bars(self.type_filter)  # Comprehensive fix
         self.type_filter.currentTextChanged.connect(self._on_filter_changed)
         filters_layout.addWidget(self.type_filter)

@@ -2188,18 +2188,21 @@ class BacktestConfigPanel(QWidget):
         self.run_btn = QPushButton("▶️ Run Test")
         self.run_btn.clicked.connect(self._on_run_clicked)
         self.run_btn.setStyleSheet(get_primary_button_stylesheet())
+        self.run_btn.setToolTip("Run the walk-forward backtest with the current configuration")
         layout.addWidget(self.run_btn)
         
         # Pause Button
         self.pause_btn = QPushButton("⏸️ Pause")
         self.pause_btn.clicked.connect(self._on_pause_clicked)
         self.pause_btn.setEnabled(False)
+        self.pause_btn.setToolTip("Pause the currently running backtest")
         layout.addWidget(self.pause_btn)
         
         # Stop Button
         self.stop_btn = QPushButton("⏹️ Stop")
         self.stop_btn.clicked.connect(self._on_stop_clicked)
         self.stop_btn.setEnabled(False)
+        self.stop_btn.setToolTip("Stop and cancel the currently running backtest")
         layout.addWidget(self.stop_btn)
         
         # WIRING TEST Button (uses REAL backtest system!)
@@ -2244,6 +2247,7 @@ class BacktestConfigPanel(QWidget):
         # View Results Button
         self.results_btn = QPushButton("💠 View Live Results")
         self.results_btn.setEnabled(False)
+        self.results_btn.setToolTip("View the detailed results from the most recently completed backtest")
         layout.addWidget(self.results_btn)
         
         return layout

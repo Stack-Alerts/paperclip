@@ -122,6 +122,7 @@ class ValidationPanel(QWidget):
         # Validate Now button
         self.validate_button = QPushButton("🔍 Validate Now")
         self.validate_button.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        self.validate_button.setToolTip("Run all validation checks on the current strategy configuration")
         header_layout.addWidget(self.validate_button)
         
         group_layout.addLayout(header_layout)
@@ -204,16 +205,19 @@ class ValidationPanel(QWidget):
         self.save_button = QPushButton("💾 Save Strategy")
         self.save_button.setEnabled(False)
         self.save_button.setStyleSheet(get_success_button_stylesheet())
+        self.save_button.setToolTip("Save the validated strategy to the database")
         actions_layout.addWidget(self.save_button)
         
         self.run_test_button = QPushButton("▶️ Run Backtest")
         self.run_test_button.setEnabled(False)
         self.run_test_button.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        self.run_test_button.setToolTip("Open the Backtest Configuration and run a walk-forward test on this strategy")
         actions_layout.addWidget(self.run_test_button)
         
         self.generate_button = QPushButton("📝 Generate Code")
         self.generate_button.setEnabled(False)
         self.generate_button.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        self.generate_button.setToolTip("Generate NautilusTrader Python strategy code from this configuration")
         actions_layout.addWidget(self.generate_button)
         
         actions_layout.addStretch()

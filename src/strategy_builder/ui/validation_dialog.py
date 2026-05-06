@@ -43,7 +43,7 @@ class ValidationDialog(QDialog):
     
     def _init_ui(self):
         """Initialize the user interface."""
-        self.setWindowTitle("BTC Engine v3 - Strategy Validation")
+        self.setWindowTitle("BTC Trade Engine - Strategy Validation")
         
         # Make dialog independent and draggable
         self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint)
@@ -71,6 +71,7 @@ class ValidationDialog(QDialog):
         # Close button with centralized styling
         close_button = QPushButton("Close")
         close_button.setStyleSheet(get_secondary_button_stylesheet())
+        close_button.setToolTip("Close the validation dialog — you must validate again after any strategy changes")
         close_button.clicked.connect(self.accept)
         button_layout.addWidget(close_button)
         

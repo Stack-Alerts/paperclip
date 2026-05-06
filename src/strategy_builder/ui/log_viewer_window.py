@@ -457,6 +457,7 @@ class LogViewerWindow(QDialog):
         self.toggle_all_btn = QPushButton("Toggle All")
         self.toggle_all_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
         self.toggle_all_btn.setFixedSize(140, 36)
+        self.toggle_all_btn.setToolTip("Enable or disable all event filters at once")
         self.toggle_all_btn.clicked.connect(self._toggle_all_filters)
         grid_layout.addWidget(self.toggle_all_btn, row, 0, 1, 1)
         
@@ -499,12 +500,14 @@ class LogViewerWindow(QDialog):
         copy_btn = QPushButton("📋 Copy")
         copy_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
         copy_btn.setFixedSize(130, 52)
+        copy_btn.setToolTip("Copy all visible log content to the clipboard")
         copy_btn.clicked.connect(self._copy_to_clipboard)
         layout.addWidget(copy_btn)
         
         copy_selection_btn = QPushButton("📋 Copy Selection")
         copy_selection_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
         copy_selection_btn.setFixedSize(240, 52)
+        copy_selection_btn.setToolTip("Copy only the currently selected text in the log viewer to the clipboard")
         copy_selection_btn.clicked.connect(self._copy_selection)
         layout.addWidget(copy_selection_btn)
         
@@ -518,6 +521,7 @@ class LogViewerWindow(QDialog):
         close_btn = QPushButton("✖ Close")
         close_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
         close_btn.setFixedSize(130, 52)
+        close_btn.setToolTip("Close the log viewer window")
         close_btn.clicked.connect(self.close)
         layout.addWidget(close_btn)
         

@@ -40,8 +40,8 @@ def main():
 
     # Set application metadata
     app.setApplicationName("Strategy Builder")
-    app.setOrganizationName("BTC Engine v3")
-    app.setApplicationVersion("3.0")
+    app.setOrganizationName("BTC Trade Engine")
+    app.setApplicationVersion("1.0")
 
     # Create and show main window
     window = StrategyBuilderMainWindow()

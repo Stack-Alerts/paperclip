@@ -9,7 +9,7 @@ Professional table-based validation report with:
 - Clear, actionable guidance for users
 - One-click fix buttons integrated
 
-Author: BTC_Engine_v3
+Author: BTC Trade Engine
 Date: 2026-01-30 (Redesigned)
 """
 
@@ -93,7 +93,7 @@ class ValidationReportWindow(QMainWindow):
 
     def _init_ui(self):
         """Initialize UI with professional styling - QMainWindow is NON-BLOCKING by default"""
-        self.setWindowTitle("BTC Engine v3 - Validation Report")
+        self.setWindowTitle("BTC Trade Engine - Validation Report")
         self.setMinimumSize(1400, 900)
         self.resize(1600, 1000)
         
@@ -1552,7 +1552,7 @@ class ValidationReportWindow(QMainWindow):
                     writer = csv.writer(f)
                     
                     # Header
-                    writer.writerow(['BTC Engine v3 - Institutional Validation Report'])
+                    writer.writerow(['BTC Trade Engine - Institutional Validation Report'])
                     writer.writerow([])
                     writer.writerow(['Strategy:', self.report.strategy_summary.get('name', 'Unknown')])
                     writer.writerow(['Validated:', datetime.fromisoformat(self.report.timestamp).strftime('%Y-%m-%d %H:%M:%S')])

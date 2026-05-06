@@ -291,6 +291,7 @@ class DataVerifyDialog(QDialog):
         self._run_btn.setMinimumWidth(160)
         self._run_btn.setMinimumHeight(38)
         self._run_btn.setStyleSheet(get_secondary_button_stylesheet())
+        self._run_btn.setToolTip("Scan all data files for gaps and missing bars across all timeframes")
         self._run_btn.clicked.connect(self._start_verification)
         btn_row.addWidget(self._run_btn)
 
@@ -298,6 +299,7 @@ class DataVerifyDialog(QDialog):
         self._fix_btn.setMinimumWidth(130)
         self._fix_btn.setMinimumHeight(38)
         self._fix_btn.setStyleSheet(get_primary_button_stylesheet())
+        self._fix_btn.setToolTip("Download and fill all repairable data gaps from Binance")
         self._fix_btn.clicked.connect(self._start_repair)
         self._fix_btn.setVisible(False)
         btn_row.addWidget(self._fix_btn)
@@ -306,6 +308,7 @@ class DataVerifyDialog(QDialog):
         self._close_btn.setMinimumWidth(100)
         self._close_btn.setMinimumHeight(38)
         self._close_btn.setStyleSheet(get_secondary_button_stylesheet())
+        self._close_btn.setToolTip("Close the data verification dialog")
         self._close_btn.clicked.connect(self.reject)
         btn_row.addWidget(self._close_btn)
 

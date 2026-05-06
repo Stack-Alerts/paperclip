@@ -66,6 +66,7 @@ class NewStrategyDialog(QDialog):
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Enter strategy name...")
         self.name_input.setStyleSheet(get_input_field_stylesheet())
+        self.name_input.setToolTip("A unique name for your strategy — used as the identifier in the database")
         self.name_input.textChanged.connect(self._validate)
         layout.addWidget(self.name_input)
         
@@ -79,6 +80,7 @@ class NewStrategyDialog(QDialog):
         self.desc_input.setPlaceholderText("Enter strategy description...")
         self.desc_input.setStyleSheet(get_text_edit_stylesheet())
         self.desc_input.setMinimumHeight(100)
+        self.desc_input.setToolTip("Optional description — explain the market thesis or signal combination this strategy uses")
         layout.addWidget(self.desc_input)
         
         # Help text
@@ -96,12 +98,14 @@ class NewStrategyDialog(QDialog):
         
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setStyleSheet(get_secondary_button_stylesheet())
+        self.cancel_btn.setToolTip("Discard and close this dialog without creating a strategy")
         self.cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_btn)
         
         self.create_btn = QPushButton("Create Strategy")
         self.create_btn.setStyleSheet(get_primary_button_stylesheet())
         self.create_btn.setEnabled(False)
+        self.create_btn.setToolTip("Create a new strategy record in the database with the given name")
         self.create_btn.clicked.connect(self._on_create)
         button_layout.addWidget(self.create_btn)
         
