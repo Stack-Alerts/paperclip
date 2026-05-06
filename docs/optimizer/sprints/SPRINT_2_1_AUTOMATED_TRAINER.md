@@ -1,6 +1,13 @@
 # SPRINT 2.1: AUTOMATED TRAINER (New Tab (Automated Trainer))
 **Forward-Looking Analysis, Training Database, Optimal Parameters**
 
+> **Superseded by BTCAAAAA-338:** The "⚙️ Calibrate" tab introduced in this
+> sprint has been **removed** from `BacktestConfigDialog`. Calibration is now
+> automatic — it runs when the user clicks "▶️ Run Test" (see
+> `BacktestConfigPanel._run_auto_calibration()`). `TrainingPanelUI` is
+> preserved in `src/optimizer_v3/ui/training_panel.py` but is no longer
+> embedded in the main backtest dialog. This document is a historical record.
+
 **Duration**: 12 days  
 **Tasks**: 25  
 **Dependencies**: Phase 1 complete  

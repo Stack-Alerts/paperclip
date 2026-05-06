@@ -15,7 +15,7 @@
 The BTC Engine v3 system is **FULLY FUNCTIONAL** with demo data:
 - ✅ Complete execution engine (BacktestWorker.run())
 - ✅ Trade lifecycle management (OPEN → CLOSED)
-- ✅ All 7 tabs integrated (Trades, Metrics, AI, etc.)
+- ✅ All 7 tabs integrated (Trades, Metrics, AI, etc.) — **note: now 6 tabs after BTCAAAAA-338 removed the Calibrate tab**
 - ✅ Progress tracking and UI updates
 - ❌ **Uses hardcoded demo data** (5 hardcoded sources)
 

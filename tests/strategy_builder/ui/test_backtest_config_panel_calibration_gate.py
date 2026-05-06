@@ -1,7 +1,18 @@
 """
 Unit tests for BacktestConfigPanel calibration gate — BTCAAAAA-327/329.
 
-Covers:
+.. deprecated::
+    These tests cover the **old calibration gate** that was removed in
+    BTCAAAAA-338.  The gate (``_is_calibrated()``, the "Calibration Required"
+    dialog, and the forced switch to Calibrate tab index 1) no longer exists
+    in ``BacktestConfigPanel``.
+
+    Calibration is now **automatic**: ``_run_auto_calibration()`` is called
+    inside ``_on_run_clicked()`` before every backtest run.  These tests are
+    preserved as a historical record and are expected to fail until a new
+    test suite for auto-calibration is written.
+
+Original coverage (now superseded):
 - _is_calibrated() logic: export_btn enabled → calibrated; disabled → not calibrated
 - _is_calibrated() defensive: exception from training_panel → returns True (safe default)
 - _on_run_clicked() when NOT calibrated: QMessageBox.Warning shown, tab switches to index 1,

@@ -1,25 +1,31 @@
 """
-Calibrate Panel UI - Sprint 2.1
-================================
+TrainingPanelUI — Signal Calibration Widget (preserved, not in main dialog)
+============================================================================
 
-New Tab: Signal Calibration (formerly Automated Trainer)
-Provides forward-looking signal analysis, calibration database, and optimal RECHECK parameters.
+## Current status (as of BTCAAAAA-338)
 
-Tasks Implemented:
-- 2.1.1: TrainingPanelUI base structure
-- 2.1.2: Block selection with BlockRegistry
-- 2.1.3: Mode selection (Testing/Production)
-- 2.1.4: Period selection dropdown
-- 2.1.5: Timeframe selection (inline QCheckBox controls)
-- 2.1.6: Resource estimator & monitoring
-- 2.1.7: Confirmation dialog
+``TrainingPanelUI`` is **no longer instantiated inside the BacktestConfigDialog**.
+The dedicated "⚙️ Calibrate" tab that previously existed as tab index 1 in that
+dialog has been removed.
 
-REUSES PATTERNS FROM:
-- BacktestConfigurationPanel: QGroupBox, QFormLayout, QSpinBox, QCheckBox, QComboBox
-- TradesPanel: Table structure, export functionality, logger integration
-- AIRecommendationsPanel: Panel layout, button styling
+Calibration is now performed **automatically** inside ``BacktestConfigPanel``
+via ``_run_auto_calibration()`` each time the user clicks "▶️ Run Test".  The
+auto-calibration uses fixed parameters (15m timeframe, 180-day lookback,
+production mode, all strategy blocks) and applies the results directly to the
+backtest config before execution.  No user action or tab navigation is required.
 
-CRITICAL: Zero hardcoded styles - all from styles.py
+This module is preserved for:
+- Potential future use as a standalone calibration tool or developer utility.
+- The ``TrainingThread`` integration it demonstrates.
+
+## Original purpose (Sprint 2.1)
+
+Provided a forward-looking signal analysis UI with:
+- Block selection from BlockRegistry
+- Testing/Production mode selection
+- Configurable analysis period
+- Multi-timeframe analysis via inline QCheckBox controls
+- Resource estimation, progress tracking, and results export
 """
 
 import sys
@@ -54,24 +60,19 @@ from src.optimizer_v3.config.training_config import get_training_config
 
 class TrainingPanelUI(QWidget):
     """
-    Calibrate Panel UI - New Tab: Signal Calibration
-    
-    Forward-looking signal analysis to determine optimal RECHECK delays,
-    timing windows, and parameter configurations.
-    
-    FEATURES:
+    Signal Calibration widget (standalone — not embedded in BacktestConfigDialog).
+
+    As of BTCAAAAA-338, calibration runs automatically via
+    ``BacktestConfigPanel._run_auto_calibration()`` when the user clicks
+    "▶️ Run Test".  This class is preserved for potential future use as a
+    developer/standalone calibration tool.
+
+    Original features:
     - Block selection from BlockRegistry
     - Testing/Production mode selection
     - Configurable analysis period
     - Multi-timeframe analysis via inline QCheckBox controls
-    - Resource estimation
-    - Progress tracking
-    - Results display with export
-    
-    PATTERN REUSE:
-    - Configuration UI from BacktestConfigurationPanel
-    - Results display from TradesPanel
-    - Layout from AIRecommendationsPanel
+    - Resource estimation, progress tracking, and results export
     """
     
     # Signals

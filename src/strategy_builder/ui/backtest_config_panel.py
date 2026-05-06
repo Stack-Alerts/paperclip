@@ -8,8 +8,21 @@ Comprehensive backtest configuration with:
 - Live progress tracking with candle/trade counters
 - TP/SL adjustment tracking (per type)
 - Pause/Resume/Stop controls
+- **Automatic signal calibration** before every backtest run
 
 NAUTILUS EXPERT: Institutional-grade backtest execution with real-time monitoring
+
+## Tab structure (BacktestConfigDialog — 6 tabs)
+1. 💠 Config        — configure backtest parameters and launch the run
+2. ● Live Output    — real-time execution log
+3. 💰 Trades        — live trade table
+4. 💹 Metrics       — performance analysis
+5. 🤖 AI Recommendations — AI request preview and send
+6. 🔁 Compare       — side-by-side configuration comparison
+
+The dedicated "⚙️ Calibrate" tab was removed in sprint BTCAAAAA-338.
+Calibration now runs automatically when "▶️ Run Test" is clicked (see
+``_run_auto_calibration`` and ``_on_run_clicked``).
 
 Author: Strategy Builder Team
 Date: 2026-01-17
@@ -2355,7 +2368,32 @@ class BacktestConfigPanel(QWidget):
 
 
     def _on_run_clicked(self):
-        """Handle run button click - WITH INSTITUTIONAL DATA CACHING"""
+        """Handle run button click.
+
+        Sequence of operations when the user clicks "▶️ Run Test":
+
+        1. **Auto-calibration** (via ``_run_auto_calibration``):
+           Before the backtest starts, signal calibration is run automatically
+           on all building blocks in the loaded strategy.  Parameters are fixed:
+           - Timeframe: 15m
+           - Lookback: 180 days
+           - Mode: production (full data)
+           The Config tab displays "⚙️ Calibrating all blocks (15m, 180 days)..."
+           while calibration is in progress.  If calibration fails or times out,
+           a warning is shown in the Config panel and the backtest proceeds with
+           uncalibrated parameters (graceful degradation — calibration failure
+           never blocks the backtest).
+
+        2. **Backtest execution**:
+           After calibration completes (or is skipped on failure), the backtest
+           is launched with the user-specified parameters (lookback period,
+           timeframe, TP/SL settings, etc.).  The Live Output tab activates and
+           streams real-time progress.
+
+        Note: The dedicated "⚙️ Calibrate" tab that previously existed in the
+        BacktestConfigDialog has been removed (see BTCAAAAA-338).  All
+        calibration is now handled automatically here, requiring no user action.
+        """
         # CRITICAL: Close ALL PostgreSQL connections in MAIN THREAD FIRST
         # Main UI thread has open connections from strategy loading (strategy_builder_main_window, browser_dialog, etc.)
         # These connections will be inherited by fork() when bar_aggregator creates 31 workers

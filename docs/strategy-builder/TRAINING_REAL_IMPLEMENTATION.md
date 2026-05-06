@@ -1,5 +1,18 @@
 # Real Data Integration - CRITICAL GAP ANALYSIS
 
+> **Architecture update (BTCAAAAA-338):** The dedicated "⚙️ Calibrate" tab has
+> been **removed** from `BacktestConfigDialog`. `TrainingPanelUI` is no longer
+> instantiated in that dialog. Calibration now runs **automatically** inside
+> `BacktestConfigPanel._run_auto_calibration()` each time the user clicks
+> "▶️ Run Test" — before the backtest starts. Fixed parameters: 15m timeframe,
+> 180-day lookback, production mode, all strategy blocks. No user action required.
+>
+> The rest of this document is a historical gap-analysis record from before that
+> change. Sections that reference the "Training Tab" as a user-facing dialog tab
+> are superseded by the above.
+
+---
+
 ## 🚨 CRITICAL: TWO SYSTEMS NEED REAL DATA
 
 Both the **Config Tab "Run Backtest" button** AND the **Training Tab** currently use **SIMULATED/DEMO data**.
