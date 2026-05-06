@@ -64,6 +64,9 @@ minversion = "7.0"
 # Target: raise incrementally as test coverage expands.
 addopts = "-ra -q --cov=src --cov-config=.coveragerc --cov-report=term-missing --cov-fail-under=20"
 testpaths = ["tests"]
+# Ensure src/ is always on sys.path so all test modules can import from src/
+# regardless of conftest.py load order (fixes namespace-package import ordering).
+pythonpath = ["src"]
 
 [tool.pylint.messages_control]
 max-line-length = 88
