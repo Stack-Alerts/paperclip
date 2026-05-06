@@ -319,7 +319,7 @@ class StrategyBuilderMainWindow(QMainWindow):
     def _init_ui(self):
         """Initialize the user interface layout."""
         # Window properties
-        self.setWindowTitle("BTC Engine v3 - Strategy Builder")
+        self.setWindowTitle("BTC Trade Engine - Strategy Builder")
         self.setGeometry(100, 100, 1400, 900)
         
         # Use OS title bar (change via GNOME theme - see TITLE_BAR_COLOR_FIX.md)
@@ -418,12 +418,14 @@ class StrategyBuilderMainWindow(QMainWindow):
         new_action = QAction(style.standardIcon(QStyle.SP_FileIcon), "&New Strategy", self)
         new_action.setShortcut(QKeySequence.New)
         new_action.setStatusTip("Create a new strategy")
+        new_action.setToolTip("Create a new blank strategy in the database")
         new_action.triggered.connect(self._on_new_strategy)
         file_menu.addAction(new_action)
         
         open_action = QAction(style.standardIcon(QStyle.SP_DirOpenIcon), "&Open Strategy...", self)
         open_action.setShortcut(QKeySequence.Open)
         open_action.setStatusTip("Open an existing strategy")
+        open_action.setToolTip("Browse and open a saved strategy from the database")
         open_action.triggered.connect(self._on_open_strategy)
         file_menu.addAction(open_action)
         
@@ -432,12 +434,14 @@ class StrategyBuilderMainWindow(QMainWindow):
         save_action = QAction(style.standardIcon(QStyle.SP_DialogSaveButton), "&Save Strategy", self)
         save_action.setShortcut(QKeySequence.Save)
         save_action.setStatusTip("Save the current strategy")
+        save_action.setToolTip("Save the current strategy configuration to the database")
         save_action.triggered.connect(self._on_save_strategy)
         file_menu.addAction(save_action)
         
         save_as_action = QAction(style.standardIcon(QStyle.SP_DialogSaveButton), "Save Strategy &As...", self)
         save_as_action.setShortcut(QKeySequence.SaveAs)
         save_as_action.setStatusTip("Save the strategy with a new name")
+        save_as_action.setToolTip("Save a copy of the current strategy under a different name")
         save_as_action.triggered.connect(self._on_save_strategy_as)
         file_menu.addAction(save_as_action)
         
@@ -446,6 +450,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         exit_action = QAction(style.standardIcon(QStyle.SP_DialogCloseButton), "E&xit", self)
         exit_action.setShortcut(QKeySequence.Quit)
         exit_action.setStatusTip("Exit the application")
+        exit_action.setToolTip("Exit BTC Trade Engine")
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
@@ -454,6 +459,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         clear_action = QAction(style.standardIcon(QStyle.SP_TrashIcon), "&Clear All Blocks", self)
         clear_action.setStatusTip("Remove all blocks from strategy")
+        clear_action.setToolTip("Remove all building blocks from the current strategy (cannot be undone)")
         clear_action.triggered.connect(self._on_clear_blocks)
         edit_menu.addAction(clear_action)
         
@@ -462,11 +468,13 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         update_data_action = QAction(style.standardIcon(QStyle.SP_BrowserReload), "&Update Data...", self)
         update_data_action.setStatusTip("Check for data gaps and update from Binance")
+        update_data_action.setToolTip("Check for missing BTC/USDT bars and download updates from Binance")
         update_data_action.triggered.connect(self._on_update_data)
         tools_menu.addAction(update_data_action)
 
         verify_data_action = QAction(style.standardIcon(QStyle.SP_DialogApplyButton), "&Verify Data...", self)
         verify_data_action.setStatusTip("Verify data integrity and check for gaps")
+        verify_data_action.setToolTip("Run a full integrity scan across all data timeframes and identify repairable gaps")
         verify_data_action.triggered.connect(self._on_verify_data)
         tools_menu.addAction(verify_data_action)
 
@@ -474,6 +482,7 @@ class StrategyBuilderMainWindow(QMainWindow):
 
         settings_action = QAction(style.standardIcon(QStyle.SP_FileDialogDetailedView), "&Settings...", self)
         settings_action.setStatusTip("Edit application settings (API keys, preferences, admin options)")
+        settings_action.setToolTip("Configure API keys, preferences, and admin options")
         settings_action.triggered.connect(self._on_settings)
         tools_menu.addAction(settings_action)
 
@@ -486,6 +495,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.enable_console_action.setCheckable(True)
         self.enable_console_action.setChecked(True)  # Default: enabled
         self.enable_console_action.setStatusTip("Toggle debug output to console")
+        self.enable_console_action.setToolTip("When enabled, debug log messages are printed to the terminal console")
         self.enable_console_action.triggered.connect(self._on_toggle_console_debug)
         debug_menu.addAction(self.enable_console_action)
         
@@ -493,6 +503,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.enable_logfile_action.setCheckable(True)
         self.enable_logfile_action.setChecked(True)  # Default: enabled
         self.enable_logfile_action.setStatusTip("Toggle debug output to log files")
+        self.enable_logfile_action.setToolTip("When enabled, debug log messages are written to the logs/ directory")
         self.enable_logfile_action.triggered.connect(self._on_toggle_logfile_debug)
         debug_menu.addAction(self.enable_logfile_action)
         
@@ -500,11 +511,13 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         clear_logs_action = QAction(style.standardIcon(QStyle.SP_TrashIcon), "Clear Old Logs", self)
         clear_logs_action.setStatusTip("Delete old log files")
+        clear_logs_action.setToolTip("Delete old log files from the logs/ directory to free up disk space")
         clear_logs_action.triggered.connect(self._on_clear_old_logs)
         debug_menu.addAction(clear_logs_action)
         
         view_log_action = QAction(style.standardIcon(QStyle.SP_FileDialogDetailedView), "View Current Log File", self)
         view_log_action.setStatusTip("Open the current log file")
+        view_log_action.setToolTip("Open the current session log file in the built-in log viewer")
         view_log_action.triggered.connect(self._on_view_current_log)
         debug_menu.addAction(view_log_action)
         
@@ -513,6 +526,7 @@ class StrategyBuilderMainWindow(QMainWindow):
         
         about_action = QAction(style.standardIcon(QStyle.SP_MessageBoxInformation), "&About Strategy Builder", self)
         about_action.setStatusTip("About Strategy Builder")
+        about_action.setToolTip("Show version, capabilities, and information about BTC Trade Engine")
         about_action.triggered.connect(self._on_about)
         help_menu.addAction(about_action)
     
@@ -530,18 +544,21 @@ class StrategyBuilderMainWindow(QMainWindow):
         # New Strategy
         new_action = QAction(style.standardIcon(QStyle.SP_FileIcon), "New", self)
         new_action.setStatusTip("Create a new strategy")
+        new_action.setToolTip("Create a new strategy (Ctrl+N)")
         new_action.triggered.connect(self._on_new_strategy)
         toolbar.addAction(new_action)
         
         # Open Strategy
         open_action = QAction(style.standardIcon(QStyle.SP_DirOpenIcon), "Open", self)
         open_action.setStatusTip("Open strategy")
+        open_action.setToolTip("Open an existing strategy from the database (Ctrl+O)")
         open_action.triggered.connect(self._on_open_strategy)
         toolbar.addAction(open_action)
         
         # Save Strategy
         save_action = QAction(style.standardIcon(QStyle.SP_DialogSaveButton), "Save", self)
         save_action.setStatusTip("Save strategy")
+        save_action.setToolTip("Save the current strategy to the database (Ctrl+S)")
         save_action.triggered.connect(self._on_save_strategy)
         toolbar.addAction(save_action)
         
@@ -1471,16 +1488,31 @@ class StrategyBuilderMainWindow(QMainWindow):
         """Show about dialog."""
         QMessageBox.about(
             self,
-            "About Strategy Builder",
-            "<h2>Strategy Builder</h2>"
-            "<p>Version 3.0</p>"
-            "<p>Professional trading strategy builder for NautilusTrader</p>"
-            "<p>© 2026 BTC Engine v3</p>"
+            "About BTC Trade Engine",
+            "<h2>BTC Trade Engine</h2>"
+            "<p><b>Strategy Builder</b> &mdash; Version 1.0</p>"
+            "<hr>"
+            "<p>An institutional-grade automated Bitcoin trading platform built on top of "
+            "<b>NautilusTrader</b>, the world's leading open-source algorithmic trading framework.</p>"
+            "<p>Design, configure, and walk-forward test precise multi-signal BTC strategies "
+            "using a composable block-based architecture. Run validated strategies on autopilot "
+            "with full position, risk, and order lifecycle management.</p>"
+            "<p><b>Key capabilities:</b></p>"
+            "<ul>"
+            "<li>Visual strategy builder with building-block signals</li>"
+            "<li>Walk-forward backtesting with multi-window analysis</li>"
+            "<li>Institutional validation with auto-fix suggestions</li>"
+            "<li>Live data synchronisation from Binance (15-min bars)</li>"
+            "<li>NautilusTrader execution engine integration</li>"
+            "</ul>"
+            "<hr>"
+            "<p><small>© 2026 BTC Trade Engine. "
+            "Powered by NautilusTrader. Built for professional trade engineers.</small></p>"
         )
     
     def _update_window_title(self):
         """Update the window title with strategy name and modified status."""
-        title = "BTC Engine v3 - Strategy Builder"
+        title = "BTC Trade Engine - Strategy Builder"
 
         # Show strategy name only (from orchestrator config)
         strategy_name = None

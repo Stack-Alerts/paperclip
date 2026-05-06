@@ -165,6 +165,7 @@ class StrategyBrowserDialog(QMainWindow):
         self.search_input.setPlaceholderText("Search strategies...")
         self.search_input.setStyleSheet(get_input_field_stylesheet())
         self.search_input.setMinimumWidth(250)
+        self.search_input.setToolTip("Filter strategies by name — updates results as you type")
         self.search_input.textChanged.connect(self._on_search_changed)
         header_layout.addWidget(self.search_input)
         
@@ -180,6 +181,7 @@ class StrategyBrowserDialog(QMainWindow):
         
         self.type_filter = QComboBox()
         self.type_filter.addItems(["All", "Bullish", "Bearish"])
+        self.type_filter.setToolTip("Filter strategies by market direction — Bullish (long) or Bearish (short)")
         fix_combobox_white_bars(self.type_filter)
         self.type_filter.currentTextChanged.connect(self._apply_filters)
         filter_layout.addWidget(self.type_filter)
@@ -406,23 +408,27 @@ class StrategyBrowserDialog(QMainWindow):
             self.delete_btn = QPushButton("🗑️ Delete")
             self.delete_btn.setStyleSheet(get_danger_button_stylesheet())
             self.delete_btn.setEnabled(False)
+            self.delete_btn.setToolTip("Permanently delete the selected strategy and all its versions from the database")
             self.delete_btn.clicked.connect(self._on_delete)
             button_layout.addWidget(self.delete_btn)
             
             self.duplicate_btn = QPushButton("📋 Duplicate")
             self.duplicate_btn.setStyleSheet(get_secondary_button_stylesheet())
             self.duplicate_btn.setEnabled(False)
+            self.duplicate_btn.setToolTip("Create a copy of the selected strategy as a new entry")
             self.duplicate_btn.clicked.connect(self._on_duplicate)
             button_layout.addWidget(self.duplicate_btn)
             
             self.export_btn = QPushButton("📥 Export to JSON")
             self.export_btn.setStyleSheet(get_secondary_button_stylesheet())
             self.export_btn.setEnabled(False)
+            self.export_btn.setToolTip("Export the selected strategy's configuration to a JSON file")
             self.export_btn.clicked.connect(self._on_export)
             button_layout.addWidget(self.export_btn)
             
             self.import_btn = QPushButton("📤 Import from JSON")
             self.import_btn.setStyleSheet(get_secondary_button_stylesheet())
+            self.import_btn.setToolTip("Import a strategy configuration from a previously exported JSON file")
             self.import_btn.clicked.connect(self._on_import)
             button_layout.addWidget(self.import_btn)
         
@@ -431,12 +437,14 @@ class StrategyBrowserDialog(QMainWindow):
         # Right side actions
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setStyleSheet(get_secondary_button_stylesheet())
+        self.cancel_btn.setToolTip("Close the browser without opening or saving a strategy")
         self.cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_btn)
         
         self.open_btn = QPushButton("Open" if self.mode == 'open' else "Save Here")
         self.open_btn.setStyleSheet(get_primary_button_stylesheet())
         self.open_btn.setEnabled(False)
+        self.open_btn.setToolTip("Open the selected strategy in the Strategy Builder" if self.mode == 'open' else "Save the current strategy to the selected entry")
         self.open_btn.clicked.connect(self.accept)
         button_layout.addWidget(self.open_btn)
         

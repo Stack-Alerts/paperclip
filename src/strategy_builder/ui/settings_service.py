@@ -1,5 +1,5 @@
 """
-Settings Service — BTC Engine v3 Strategy Builder
+Settings Service — BTC Trade Engine Strategy Builder
 
 Provides secure persistence for application settings:
 - User-editable settings (API keys, preferences) stored in OS keyring

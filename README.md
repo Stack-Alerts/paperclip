@@ -1,14 +1,14 @@
-# BTC_Engine_v3 🚀
+# BTC Trade Engine
 
-**Institutional-Grade BTC Scalping Bot**  
+**Institutional-Grade BTC Automated Trading Platform**  
 **Framework:** NautilusTrader (Rust-powered)  
-**Strategy:** Sophisticated M/W Pattern Detection
+**Strategy:** Composable Multi-Signal Building Block Architecture
 
 ## Quick Start
 
 ```bash
 # Setup
-cd /home/sirrus/projects/BTC_Engine_v3
+cd /home/sirrus/projects/BTC-Trade-Engine-PaperClip
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt

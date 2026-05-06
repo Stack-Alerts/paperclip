@@ -1,5 +1,5 @@
 """
-Settings Dialog — BTC Engine v3 Strategy Builder
+Settings Dialog — BTC Trade Engine Strategy Builder
 
 Implements the full Settings page under Tools → Settings...
 
@@ -90,6 +90,7 @@ class SecretFieldWidget(QWidget):
         self._show_btn = QPushButton("Show 10s")
         self._show_btn.setFont(create_font(9))
         self._show_btn.setStyleSheet(get_secondary_button_stylesheet())
+        self._show_btn.setToolTip("Reveal this secret value in plain text for 10 seconds, then auto-mask")
         # BTCAAAAA-87: setMinimumWidth instead of setFixedWidth so button can
         # grow with content / DPI scaling rather than being clipped.
         self._show_btn.setMinimumWidth(80)
@@ -100,6 +101,7 @@ class SecretFieldWidget(QWidget):
         self._edit_btn = QPushButton("Edit")
         self._edit_btn.setFont(create_font(9))
         self._edit_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        self._edit_btn.setToolTip("Enter edit mode to change this secret value — leave blank to keep existing")
         # BTCAAAAA-87: setMinimumWidth instead of setFixedWidth.
         self._edit_btn.setMinimumWidth(60)
         self._edit_btn.clicked.connect(self._on_edit_toggle)
@@ -512,12 +514,14 @@ class SettingsDialog(QDialog):
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setFont(create_font(10))
         cancel_btn.setStyleSheet(get_secondary_button_stylesheet())
+        cancel_btn.setToolTip("Discard all changes and close Settings")
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Save && Close")
         save_btn.setFont(create_font(10, bold=True))
         save_btn.setStyleSheet(get_primary_button_stylesheet())
+        save_btn.setToolTip("Save all settings changes and close the dialog")
         save_btn.clicked.connect(self._on_save)
         btn_layout.addWidget(save_btn)
 
@@ -735,6 +739,7 @@ class SettingsDialog(QDialog):
         change_pin_btn = QPushButton("Change Admin PIN…")
         change_pin_btn.setFont(create_font(9))
         change_pin_btn.setStyleSheet(get_secondary_button_stylesheet())
+        change_pin_btn.setToolTip("Change the admin PIN that gates access to restricted settings")
         # BTCAAAAA-87: setMinimumWidth instead of setFixedWidth so button
         # can grow with content / DPI scaling.
         change_pin_btn.setMinimumWidth(200)
@@ -770,6 +775,7 @@ class SettingsDialog(QDialog):
         self._admin_auth_btn.setFont(create_font(9))
         self._admin_auth_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
         self._admin_auth_btn.setMinimumWidth(130)
+        self._admin_auth_btn.setToolTip("Enter your admin PIN to unlock restricted settings")
         self._admin_auth_btn.clicked.connect(self._on_admin_auth)
         layout.addWidget(self._admin_auth_btn)
 
@@ -777,6 +783,7 @@ class SettingsDialog(QDialog):
         self._admin_lock_btn.setFont(create_font(9))
         self._admin_lock_btn.setStyleSheet(get_danger_button_stylesheet())
         self._admin_lock_btn.setMinimumWidth(110)
+        self._admin_lock_btn.setToolTip("Lock admin access — restricted settings will be hidden again")
         self._admin_lock_btn.hide()
         self._admin_lock_btn.clicked.connect(self._on_admin_lock)
         layout.addWidget(self._admin_lock_btn)

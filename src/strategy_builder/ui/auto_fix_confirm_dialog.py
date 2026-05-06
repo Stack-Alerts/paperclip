@@ -2,7 +2,7 @@
 Auto-Fix Confirmation Dialog - Institutional Grade
 Preview and confirm strategy modifications before applying
 
-Author: BTC_Engine_v3
+Author: BTC Trade Engine
 Date: 2026-02-02
 Sprint: 1.9.2 Auto-Fix Buttons
 """
