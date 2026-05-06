@@ -294,8 +294,16 @@ class DiscoveryTableModel(QStandardItemModel):
 class NumericSortProxyModel(QSortFilterProxyModel):
     """
     Proxy that sorts numeric columns by Qt.UserRole (float/int) value
-    rather than the display text.
+    rather than the display text, and filters rows by a minimum trade-count
+    threshold.
+
+    Set ``min_trades`` before calling ``invalidateFilter()`` to activate the
+    row filter.  A value of 0 (the default) accepts all rows.
     """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.min_trades: int = 0
 
     def lessThan(self, left, right):
         left_data = left.data(Qt.UserRole)
@@ -306,6 +314,30 @@ class NumericSortProxyModel(QSortFilterProxyModel):
             except (TypeError, ValueError):
                 pass
         return super().lessThan(left, right)
+
+    def filterAcceptsRow(self, source_row: int, source_parent) -> bool:
+        """
+        Qt virtual override — called by Qt on every row whenever
+        invalidateFilter() is triggered.
+
+        Excludes rows where the Trades column value is below ``min_trades``.
+        A ``min_trades`` of 0 accepts all rows unconditionally.
+        """
+        if self.min_trades == 0:
+            return True
+        source_model = self.sourceModel()
+        if source_model is None:
+            return True
+        # Qt passes a valid QModelIndex as source_parent; guard against None
+        # for test-harness calls that pass None directly.
+        from PyQt5.QtCore import QModelIndex
+        parent_idx = source_parent if source_parent is not None else QModelIndex()
+        idx = source_model.index(source_row, COL_TRADES, parent_idx)
+        val = source_model.data(idx, Qt.UserRole)
+        try:
+            return int(val) >= self.min_trades
+        except (TypeError, ValueError):
+            return True
 
 
 # ---------------------------------------------------------------------------
@@ -616,27 +648,10 @@ class ConfigDiscoveryResultsDialog(QDialog):
         """Apply min-trades filter to the proxy model."""
         min_trades = self._min_trades_slider.value()
         self._min_trades_value_label.setText(str(min_trades))
-        if min_trades == 0:
-            self._proxy.setFilterWildcard('')
-            return
-        # Custom filter: hide rows where Trades < min_trades
-        self._proxy.setFilterRole(Qt.UserRole)
-        self._proxy.setFilterKeyColumn(COL_TRADES)
-        # QSortFilterProxyModel doesn't support numeric comparison natively;
-        # we use a custom filterAcceptsRow override below.
+        # Push the threshold onto the proxy so filterAcceptsRow() can read it,
+        # then invalidate so Qt re-evaluates every row via the proxy's override.
+        self._proxy.min_trades = min_trades
         self._proxy.invalidateFilter()
-
-    def filterAcceptsRow(self, source_row: int, source_parent) -> bool:
-        """Override to apply numeric min-trades filter."""
-        min_trades = self._min_trades_slider.value()
-        if min_trades == 0:
-            return True
-        idx = self._table_model.index(source_row, COL_TRADES)
-        val = self._table_model.data(idx, Qt.UserRole)
-        try:
-            return int(val) >= min_trades
-        except (TypeError, ValueError):
-            return True
 
     def _apply_sort(self):
         """Sort the table by the selected primary metric."""
