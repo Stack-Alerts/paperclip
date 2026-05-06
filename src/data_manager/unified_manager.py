@@ -1612,10 +1612,51 @@ class UnifiedDataManager:
                     logger.info(f"   [timing] fetch/{tf}: {_time_mod.monotonic() - t0_fetch:.2f}s")
 
                     if new_bars.empty:
-                        msg = f"Binance returned no data for {tf} {fetch_start}→{fetch_end}"
-                        logger.warning(f"   ⚠️  {msg}")
-                        tf_summary['errors'].append(msg)
-                        continue
+                        # For trailing-edge gaps (fetch_start within the last 2 bar
+                        # periods), the bar may not yet be finalized by Binance.
+                        # Poll every 2 seconds for up to 20 seconds before giving up.
+                        # Historical gaps are not retried — their data is either present
+                        # or absent and retrying won't help.
+                        age_seconds = (datetime.utcnow() - fetch_start).total_seconds()
+                        is_trailing_edge = age_seconds <= (2 * bar_td.total_seconds())
+
+                        if is_trailing_edge:
+                            MAX_RETRIES = 10
+                            RETRY_INTERVAL_S = 2
+                            logger.info(
+                                f"   [propagation] bar not yet available — "
+                                f"polling every {RETRY_INTERVAL_S}s (max {MAX_RETRIES} retries)"
+                            )
+                            for retry_n in range(MAX_RETRIES):
+                                _time_mod.sleep(RETRY_INTERVAL_S)
+                                new_bars = self._fetch_binance_range(
+                                    timeframe=tf,
+                                    start_ts=fetch_start,
+                                    end_ts=fetch_end,
+                                    symbol=symbol,
+                                    futures=futures,
+                                )
+                                if not new_bars.empty:
+                                    elapsed = (retry_n + 1) * RETRY_INTERVAL_S
+                                    logger.info(
+                                        f"   [propagation] bar available after "
+                                        f"{elapsed}s ({retry_n + 1} retries)"
+                                    )
+                                    break
+                            else:
+                                msg = (
+                                    f"Bar not available after "
+                                    f"{MAX_RETRIES * RETRY_INTERVAL_S}s: "
+                                    f"{tf} {fetch_start}"
+                                )
+                                logger.warning(f"   ⚠️  {msg}")
+                                tf_summary['errors'].append(msg)
+                                continue
+                        else:
+                            msg = f"Binance returned no data for {tf} {fetch_start}→{fetch_end}"
+                            logger.warning(f"   ⚠️  {msg}")
+                            tf_summary['errors'].append(msg)
+                            continue
 
                     logger.info(f"   ✅ Fetched {len(new_bars)} bars.")
                     t0_save = _time_mod.monotonic()
