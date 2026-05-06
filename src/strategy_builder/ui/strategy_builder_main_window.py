@@ -891,6 +891,28 @@ class StrategyBuilderMainWindow(QMainWindow):
             # NOW re-enable validation reset (AFTER all refresh operations)
             self.loading_strategy = False
             
+            # ── Config retention: restore saved backtest config ───────────────
+            # BTCAAAAA-252: Load and stash the persisted backtest_config so it
+            # can be applied to the BacktestConfigPanel immediately if the
+            # window is already open, or deferred until it is opened.
+            saved_backtest_config = version.get('backtest_config') or {}
+            # Stash on the orchestrator so _on_run_backtest can access it
+            self.orchestrator._pending_backtest_config = saved_backtest_config
+            if saved_backtest_config and saved_backtest_config.get('lookback_days'):
+                if self.backtest_window and self.backtest_window.isVisible():
+                    try:
+                        self.backtest_window.backtest_panel.apply_config_from_dict(
+                            saved_backtest_config, source='database'
+                        )
+                        logger.info(
+                            "[ConfigRetention] Restored backtest config to open panel"
+                        )
+                    except Exception as _e:
+                        logger.warning(
+                            f"[ConfigRetention] Could not restore to open panel: {_e}"
+                        )
+            # ── End config retention ──────────────────────────────────────────
+
             # Update UI
             self._update_window_title()
             self._update_status(f"Loaded strategy: {version['name']} (v{version['version_number']}) from database")
@@ -1263,6 +1285,20 @@ class StrategyBuilderMainWindow(QMainWindow):
             
             # Clear reference when window is destroyed
             self.backtest_window.destroyed.connect(lambda: setattr(self, 'backtest_window', None))
+
+            # ── Config retention: apply deferred saved config ─────────────────
+            # BTCAAAAA-252: If a saved backtest config was stashed when a strategy
+            # was opened, apply it now that the panel has been constructed.
+            pending = getattr(self.orchestrator, '_pending_backtest_config', None)
+            if pending and pending.get('lookback_days'):
+                try:
+                    self.backtest_window.backtest_panel.apply_config_from_dict(
+                        pending, source='database'
+                    )
+                    logger.info("[ConfigRetention] Applied pending backtest config on panel open")
+                except Exception as _e:
+                    logger.warning(f"[ConfigRetention] Could not apply pending config: {_e}")
+            # ── End config retention ──────────────────────────────────────────
             
             self.backtest_window.show()  # Non-modal so user can see strategy
             self._update_status("Backtest configuration opened")

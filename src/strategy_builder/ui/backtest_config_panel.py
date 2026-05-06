@@ -43,6 +43,7 @@ from src.strategy_builder.ui.styles import (
     get_preset_day_button_stylesheet,
     get_separator_stylesheet,
     get_input_field_stylesheet,
+    get_status_label_style,
     create_font,
     get_color
 )
@@ -1070,6 +1071,14 @@ class BacktestConfigPanel(QWidget):
             "✅ Real-time processing updates\n\n"
             "All terminal output will be captured and displayed here."
         )
+        # Config retention indicator — shown when a saved config is restored
+        # or persisted after a test run / config discovery.
+        self.config_retention_label = QLabel()
+        self.config_retention_label.setFont(create_font(9))
+        self.config_retention_label.setStyleSheet(get_status_label_style('info'))
+        self.config_retention_label.setVisible(False)  # Hidden until config is retained
+        layout.addWidget(self.config_retention_label)
+
         layout.addWidget(QLabel("📊 Status:"))
         layout.addWidget(self.results_text)  # Will expand to fill remaining space
         widget.setLayout(layout)
@@ -2712,6 +2721,23 @@ class BacktestConfigPanel(QWidget):
                     "INFO",
                     "SYSTEM"
                 )
+
+                # ── Config retention: save backtest config after test run ──────
+                # BTCAAAAA-252: Persist current panel config so it can be
+                # auto-restored the next time this strategy version is opened.
+                try:
+                    db.strategy.save_backtest_config_for_version(
+                        version_id, backtest_config, source='test_run'
+                    )
+                    logger.info(
+                        f"[Backtest] Config retained for version {version_id[:8]}…"
+                    )
+                    self._mark_config_retained('test run')
+                except Exception as _cfg_exc:
+                    logger.warning(
+                        f"[Backtest] Config retention warning: {_cfg_exc}"
+                    )
+                # ── End config retention ────────────────────────────────────────
             else:
                 logger.info("[Backtest] Skipping DB persist: strategy not saved yet (no strategy_id / version_id)")
         except Exception as _persist_exc:
@@ -2796,7 +2822,151 @@ class BacktestConfigPanel(QWidget):
         # Only lookback_days matters for Mode 2
         
         return config
-    
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Config retention helpers  (BTCAAAAA-252)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def apply_config_from_dict(self, saved: dict, source: str = 'database') -> bool:
+        """
+        Restore BacktestConfigPanel widgets from a previously persisted config dict.
+
+        Called by StrategyBuilderMainWindow when a strategy version is opened
+        and a non-empty backtest_config snapshot exists in the database.
+
+        Args:
+            saved:  The dict that was stored by save_backtest_config_for_version().
+                    datetime values may be ISO-8601 strings (they are ignored;
+                    dates are always recalculated from lookback_days at runtime).
+            source: Human-readable label used in the status indicator.
+
+        Returns:
+            True if at least one widget was updated; False if the dict was empty
+            or contained no recognised keys.
+        """
+        if not saved:
+            return False
+
+        applied_any = False
+
+        try:
+            # Suppress config-changed signal noise while we bulk-restore
+            self._loading_preset = True
+
+            # ── Basic fields ──────────────────────────────────────────────
+            if 'lookback_days' in saved:
+                self.lookback_spin.setValue(int(saved['lookback_days']))
+                applied_any = True
+            if 'mode' in saved:
+                mode_btn = self.mode_group.button(int(saved['mode']))
+                if mode_btn:
+                    mode_btn.setChecked(True)
+                    applied_any = True
+            if 'tpsl_mode' in saved:
+                self.tpsl_combo.setCurrentText(str(saved['tpsl_mode']))
+                applied_any = True
+            if 'sl_mode' in saved:
+                self.sl_combo.setCurrentText(str(saved['sl_mode']))
+                applied_any = True
+            if 'starting_capital' in saved:
+                self.capital_spin.setValue(float(saved['starting_capital']))
+                applied_any = True
+            if 'risk_per_trade_pct' in saved:
+                self.risk_spin.setValue(float(saved['risk_per_trade_pct']))
+                applied_any = True
+            if 'min_risk_reward' in saved:
+                # UI shows 10x the actual value (see get_config)
+                self.rr_spin.setValue(float(saved['min_risk_reward']) * 10.0)
+                applied_any = True
+            if 'max_leverage' in saved:
+                self.leverage_spin.setValue(float(saved['max_leverage']))
+                applied_any = True
+            if 'confluence_threshold' in saved:
+                self.confluence_spin.setValue(float(saved['confluence_threshold']))
+                applied_any = True
+            if 'max_bars_held' in saved:
+                self.max_bars_spin.setValue(int(saved['max_bars_held']))
+                applied_any = True
+
+            # ── Mode-1 specific ───────────────────────────────────────────
+            if 'training_window' in saved:
+                self.training_spin.setValue(int(saved['training_window']))
+                applied_any = True
+            if 'testing_window' in saved:
+                self.testing_spin.setValue(int(saved['testing_window']))
+                applied_any = True
+
+            # ── Adaptive SL sub-dict ──────────────────────────────────────
+            asl = saved.get('adaptive_sl', {})
+            if asl:
+                if 'delay_enabled' in asl:
+                    self.delayed_sl_check.setChecked(bool(asl['delay_enabled']))
+                    applied_any = True
+                if 'delay_bars' in asl:
+                    self.delay_spin.setValue(int(asl['delay_bars']))
+                    applied_any = True
+                if 'emergency_sl_pct' in asl:
+                    self.emergency_spin.setValue(float(asl['emergency_sl_pct']))
+                    applied_any = True
+                if 'volatility_lookback' in asl:
+                    self.vol_lookback_spin.setValue(int(asl['volatility_lookback']))
+                    applied_any = True
+                if 'volatility_multiplier' in asl:
+                    self.vol_multi_spin.setValue(float(asl['volatility_multiplier']))
+                    applied_any = True
+                if 'min_sl_pct' in asl:
+                    self.min_sl_spin.setValue(float(asl['min_sl_pct']))
+                    applied_any = True
+                if 'max_sl_pct' in asl:
+                    self.max_sl_spin.setValue(float(asl['max_sl_pct']))
+                    applied_any = True
+                if 'use_structure_sl' in asl:
+                    self.structure_check.setChecked(bool(asl['use_structure_sl']))
+                    applied_any = True
+
+        finally:
+            self._loading_preset = False
+
+        if applied_any:
+            self._mark_config_retained(source)
+
+        return applied_any
+
+    def _mark_config_retained(self, source: str = 'database') -> None:
+        """
+        Update the status label to indicate configuration was loaded from
+        persistence.  Called both after a restore on open and after a save
+        post-run / post-discovery.
+
+        Args:
+            source: Short label describing the trigger
+                    ('test run', 'config discovery', 'database').
+        """
+        try:
+            from datetime import datetime as _dt
+            ts = _dt.now().strftime('%H:%M')
+            label_map = {
+                'test run':        f'Config saved at {ts} (after test run)',
+                'config discovery': f'Config saved at {ts} (after discovery)',
+                'database':        f'Config restored from last test run',
+                'test_run':        f'Config saved at {ts} (after test run)',
+                'config_discovery': f'Config saved at {ts} (after discovery)',
+            }
+            msg = label_map.get(source, f'Config retained ({source})')
+
+            # Prefer a dedicated retention label if one is wired into the panel;
+            # fall back to the output panel log so there is always some feedback.
+            if hasattr(self, 'config_retention_label'):
+                self.config_retention_label.setText(msg)
+                self.config_retention_label.setVisible(True)
+            else:
+                if hasattr(self, 'output_panel') and self.output_panel is not None:
+                    self.output_panel.add_message(
+                        f'ℹ️  {msg}', 'INFO', 'SYSTEM'
+                    )
+        except Exception:
+            pass  # Never break the backtest flow over a UI label update
+
     def _get_strategy_name(self) -> str:
         """Get current strategy name from Strategy Info Panel (Name field in UI)"""
         try:
@@ -3449,6 +3619,7 @@ Detailed report saved to:
         to the appropriate widget update calls.
         
         Phase 3.3: Called when user clicks "Apply Config" in the results dialog.
+        BTCAAAAA-252: Also persists the resulting full config to the DB.
         """
         # Flatten nested keys: 'adaptive_sl.volatility_lookback' → 'adaptive_sl' sub-dict
         top_level = {}
@@ -3470,6 +3641,26 @@ Detailed report saved to:
             "\n[Config Discovery] Applied config delta from selected scenario.\n"
             + "\n".join(f"  {k}: {v}" for k, v in config_delta.items())
         )
+
+        # ── Config retention: save full config after discovery apply ──────────
+        # BTCAAAAA-252: Persist current panel state so it survives app restart.
+        try:
+            version_id = getattr(self.orchestrator, 'current_version_id', None)
+            if version_id:
+                from src.optimizer_v3.database import get_database_manager as _get_db
+                _db = _get_db()
+                _db.strategy.save_backtest_config_for_version(
+                    version_id, self.get_config(), source='config_discovery'
+                )
+                logger.info(
+                    f"[ConfigDiscovery] Config retained for version {version_id[:8]}…"
+                )
+                self._mark_config_retained('config discovery')
+        except Exception as _cfg_exc:
+            logger.warning(
+                f"[ConfigDiscovery] Config retention warning: {_cfg_exc}"
+            )
+        # ── End config retention ──────────────────────────────────────────────
     
     def _update_cache_status(self):
         """Update UI with cache status information"""
