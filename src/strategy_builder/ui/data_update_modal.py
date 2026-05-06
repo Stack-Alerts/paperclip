@@ -201,8 +201,11 @@ class DataUpdateThread(QThread):
                     raise ValueError(last_error)
 
             # Check freshness (how old is the latest candle?)
+            # Candle timestamps are tz-naive UTC after Fix 1 in rest_client.py.
+            # Must compare against utcnow() — not now() — to avoid a spurious
+            # +2h offset on CEST machines that would flag fresh candles as stale.
             latest_candle = pd.to_datetime(bars['timestamp'].iloc[-1])
-            delay_minutes = (datetime.now() - latest_candle).total_seconds() / 60
+            delay_minutes = (datetime.utcnow() - latest_candle).total_seconds() / 60
             
             # Per-timeframe staleness thresholds
             if timeframe == '15m':
