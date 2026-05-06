@@ -24,7 +24,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QWidget, QMessageBox, QFrame
 )
 
-from src.strategy_builder.ui.settings_service import SettingsService, UserRole
+from src.strategy_builder.ui.settings_service import SettingsService
 from src.strategy_builder.ui.styles import (
     COLORS,
     get_main_stylesheet,
@@ -204,13 +204,38 @@ class SecretFieldWidget(QWidget):
 # ---------------------------------------------------------------------------
 
 class AdminPinDialog(QDialog):
-    """Simple PIN entry dialog for admin authentication / PIN setup."""
+    """
+    PIN entry dialog for admin authentication or first-run PIN setup.
 
-    def __init__(self, setup_mode: bool = False, parent: Optional[QWidget] = None) -> None:
+    Authentication mode (setup_mode=False, service provided):
+    - Validates the PIN against SettingsService.elevate_to_admin().
+    - Accepts (Accepted result) only on a correct PIN.
+    - After 3 consecutive failures the dialog locks for 30 seconds.
+    - A visible countdown label shows remaining seconds.
+    - Input fields and the OK button are disabled during lockout.
+    - Failure count resets when lockout expires or dialog closes.
+
+    Setup mode (setup_mode=True):
+    - No service needed; no lockout — user is creating the PIN fresh.
+    - Dialog accepts with the entered PIN/confirm values for the caller
+      to process.
+    """
+
+    _MAX_FAILURES: int = 3
+    _LOCKOUT_SECONDS: int = 30
+
+    def __init__(
+        self,
+        setup_mode: bool = False,
+        service: Optional["SettingsService"] = None,
+        parent: Optional[QWidget] = None,
+    ) -> None:
         # Defect 5: Create as independent top-level window so dragging does not
         # move the Strategy Browser.  Qt.Tool keeps it always-on-top of the app
         # without parenting it into the main-window widget tree.
         super().__init__(None, Qt.Tool)
+        self._setup_mode = setup_mode
+        self._service = service  # Only used in auth mode
         self.setWindowTitle("Admin Authentication" if not setup_mode else "Set Admin PIN")
         self.setModal(True)
         # BTCAAAAA-87: Use layout-driven sizing — setMinimumWidth as a floor
@@ -219,10 +244,16 @@ class AdminPinDialog(QDialog):
         # BTCAAAAA-91: Raised minimum width from 360 → 440 so the full title
         # "Admin Authentication", instruction text, PIN input, and both
         # "Cancel" / "Authenticate" buttons are visible without clipping.
-        min_h = 220 if setup_mode else 180
+        # BTCAAAAA-202: Lockout countdown label adds height — raise auth floor.
+        min_h = 220 if setup_mode else 230
         self.setMinimumWidth(440)
         self.setMinimumHeight(min_h)
         self.setStyleSheet(get_main_stylesheet())
+
+        # Brute-force lockout state (auth mode only)
+        self._fail_count: int = 0
+        self._lockout_remaining: int = 0
+        self._lockout_timer: Optional[QTimer] = None
 
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
@@ -233,7 +264,7 @@ class AdminPinDialog(QDialog):
         else:
             msg = QLabel("Enter your admin PIN to access restricted settings.")
         msg.setFont(create_font(10))
-        msg.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        msg.setStyleSheet(get_label_style("secondary"))
         msg.setWordWrap(True)
         layout.addWidget(msg)
 
@@ -242,11 +273,10 @@ class AdminPinDialog(QDialog):
         self._pin_field.setPlaceholderText("PIN…")
         self._pin_field.setStyleSheet(get_input_field_stylesheet())
         self._pin_field.setFont(create_font(10))
-        self._pin_field.returnPressed.connect(self.accept)
         layout.addWidget(self._pin_field)
 
         if setup_mode:
-            self._confirm_field = QLineEdit()
+            self._confirm_field: Optional[QLineEdit] = QLineEdit()
             self._confirm_field.setEchoMode(QLineEdit.Password)
             self._confirm_field.setPlaceholderText("Confirm PIN…")
             self._confirm_field.setStyleSheet(get_input_field_stylesheet())
@@ -256,17 +286,119 @@ class AdminPinDialog(QDialog):
         else:
             self._confirm_field = None
 
+        # Lockout countdown label (hidden until lockout activates; auth mode only)
+        self._lockout_label = QLabel("")
+        self._lockout_label.setFont(create_font(9))
+        self._lockout_label.setStyleSheet(get_label_style("error"))
+        self._lockout_label.setAlignment(Qt.AlignCenter)
+        self._lockout_label.hide()
+        layout.addWidget(self._lockout_label)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal
         )
-        buttons.button(QDialogButtonBox.Ok).setText("Authenticate" if not setup_mode else "Set PIN")
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
+        self._ok_button = buttons.button(QDialogButtonBox.Ok)
+        self._ok_button.setText("Authenticate" if not setup_mode else "Set PIN")
+        if setup_mode:
+            # Setup mode: OK accepts directly (no lockout or validation here).
+            self._pin_field.returnPressed.connect(self.accept)
+            buttons.accepted.connect(self.accept)
+            buttons.rejected.connect(self.reject)
+        else:
+            # Auth mode: wire OK and Return key to _attempt_auth; do NOT connect
+            # buttons.accepted so it stays silent.  Cancel still rejects.
+            # Disconnect the default QDialogButtonBox OK→accepted internal link
+            # by not using accepted at all and blocking the OK click directly.
+            self._ok_button.clicked.disconnect()
+            self._ok_button.clicked.connect(self._attempt_auth)
+            self._pin_field.returnPressed.connect(self._attempt_auth)
+            buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
         # BTCAAAAA-87: Let Qt size the window to fit the layout; the minimum
         # size set above acts as a floor, not the final size.
         QTimer.singleShot(0, self.adjustSize)
+
+    # ------------------------------------------------------------------
+    # Brute-force lockout (auth mode only)
+    # ------------------------------------------------------------------
+
+    def _attempt_auth(self) -> None:
+        """
+        Validate the entered PIN via SettingsService.elevate_to_admin().
+
+        - On success: accepts the dialog (QDialog.Accepted).
+        - On failure: increments the failure counter; after _MAX_FAILURES
+          consecutive failures, locks the dialog for _LOCKOUT_SECONDS.
+        - During lockout: guard against keyboard shortcuts bypassing the
+          disabled OK button.
+        """
+        if self._lockout_remaining > 0:
+            return  # Lockout active — do nothing (OK should already be disabled)
+
+        if self._service is None:
+            # Safety: no service in auth mode — reject to prevent bypass.
+            self.reject()
+            return
+
+        pin = self._pin_field.text()
+        if self._service.elevate_to_admin(pin):
+            self.accept()
+        else:
+            self._fail_count += 1
+            self._pin_field.clear()
+            if self._fail_count >= self._MAX_FAILURES:
+                self._start_lockout()
+
+    def _start_lockout(self) -> None:
+        """Disable input and start the countdown timer."""
+        self._lockout_remaining = self._LOCKOUT_SECONDS
+        self._pin_field.setEnabled(False)
+        self._ok_button.setEnabled(False)
+        self._lockout_label.setText(
+            f"Too many incorrect attempts. Try again in {self._lockout_remaining}s."
+        )
+        self._lockout_label.show()
+        QTimer.singleShot(0, self.adjustSize)
+
+        self._lockout_timer = QTimer(self)
+        self._lockout_timer.setInterval(1000)
+        self._lockout_timer.timeout.connect(self._on_lockout_tick)
+        self._lockout_timer.start()
+
+    def _on_lockout_tick(self) -> None:
+        """Decrement countdown; unlock when it reaches zero."""
+        self._lockout_remaining -= 1
+        if self._lockout_remaining <= 0:
+            self._end_lockout()
+        else:
+            self._lockout_label.setText(
+                f"Too many incorrect attempts. Try again in {self._lockout_remaining}s."
+            )
+
+    def _end_lockout(self) -> None:
+        """Re-enable input after the lockout period expires."""
+        if self._lockout_timer is not None:
+            self._lockout_timer.stop()
+            self._lockout_timer = None
+        self._fail_count = 0
+        self._lockout_remaining = 0
+        self._pin_field.setEnabled(True)
+        self._ok_button.setEnabled(True)
+        self._lockout_label.hide()
+        self._lockout_label.setText("")
+        self._pin_field.setFocus()
+
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        """Stop the lockout timer cleanly when the dialog is closed."""
+        if self._lockout_timer is not None:
+            self._lockout_timer.stop()
+            self._lockout_timer = None
+        super().closeEvent(event)
+
+    # ------------------------------------------------------------------
+    # Accessors
+    # ------------------------------------------------------------------
 
     def get_pin(self) -> str:
         return self._pin_field.text()
@@ -658,7 +790,7 @@ class SettingsDialog(QDialog):
     def _on_admin_auth(self) -> None:
         """Prompt for PIN and unlock admin tab if correct."""
         if not self._service.has_admin_pin():
-            # First-time setup
+            # First-time setup — no PIN exists yet.
             dlg = AdminPinDialog(setup_mode=True, parent=self)
             if dlg.exec_() != QDialog.Accepted:
                 return
@@ -671,22 +803,21 @@ class SettingsDialog(QDialog):
                 QMessageBox.warning(self, "PIN Mismatch", "The two PIN values do not match.")
                 return
             try:
-                # Grant admin temporarily so set_admin_pin first-run path is allowed
-                self._service._role = UserRole.ADMIN
+                # Grant admin temporarily so set_admin_pin first-run path is allowed.
+                # elevate_to_admin_first_run() is only valid before any PIN is set.
+                self._service.elevate_to_admin_first_run()
                 self._service.set_admin_pin(pin)
                 self._reveal_admin_tab()
             except Exception as e:
-                self._service._role = UserRole.USER
+                self._service.drop_admin()
                 QMessageBox.critical(self, "Error", f"Failed to set PIN:\n{e}")
         else:
-            dlg = AdminPinDialog(setup_mode=False, parent=self)
-            if dlg.exec_() != QDialog.Accepted:
-                return
-            pin = dlg.get_pin()
-            if self._service.authenticate_admin(pin):
+            # Auth mode — pass service so AdminPinDialog validates internally
+            # and applies brute-force lockout after repeated failures.
+            dlg = AdminPinDialog(setup_mode=False, service=self._service, parent=self)
+            if dlg.exec_() == QDialog.Accepted:
+                # Dialog already called elevate_to_admin() on success.
                 self._reveal_admin_tab()
-            else:
-                QMessageBox.warning(self, "Authentication Failed", "Incorrect PIN.")
 
     def _on_admin_lock(self) -> None:
         self._service.drop_admin()
