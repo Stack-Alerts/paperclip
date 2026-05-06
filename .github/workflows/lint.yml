@@ -1,0 +1,27 @@
+name: Lint
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  ruff:
+    name: Ruff lint (no-print + datetime)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff (T201 no-print, DTZ003 utcnow)
+        # T201: prevents print() regression after structured-logging migration (BTCAAAAA-198)
+        # DTZ003: enforces timezone-aware datetimes
+        run: ruff check src/ --select T201,DTZ003
