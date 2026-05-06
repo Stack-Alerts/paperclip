@@ -23,6 +23,7 @@ import sys
 
 # NautilusTrader imports
 from nautilus_trader.model.objects import Money, Quantity, Price
+from nautilus_trader.model.currencies import USD
 from nautilus_trader.model.identifiers import InstrumentId, Symbol, Venue
 from nautilus_trader.model.enums import OrderSide
 
@@ -332,45 +333,41 @@ class TestTrainingEvent:
     def test_model_creation(self):
         """Test creating TrainingEvent instance"""
         event = TrainingEvent(
+            block_name='test_block',
             signal_name='test_signal',
             timeframe='15m',
-            mode='testing',
+            training_mode='testing',
             timestamp=datetime.now(),
-            optimal_delay=10,
-            min_delay=8,
-            max_delay=12,
-            sample_size=50,
-            confidence=Decimal('0.85'),
-            method='recurrence'
+            entry_price=Decimal('50000.00'),
+            forward_bars=10,
+            is_valid_signal=True,
+            has_sufficient_data=True,
+            meets_min_criteria=True,
         )
         
         assert event.signal_name == 'test_signal'
         assert event.timeframe == '15m'
-        assert event.optimal_delay == 10
-        assert isinstance(event.confidence, Decimal)
+        assert event.training_mode == 'testing'
+        assert event.forward_bars == 10
     
     def test_model_validation(self):
         """Test model field validation"""
         # Valid event
         event = TrainingEvent(
+            block_name='test_block',
             signal_name='test',
             timeframe='15m',
-            mode='testing',
+            training_mode='testing',
             timestamp=datetime.now(),
-            optimal_delay=10,
-            sample_size=50,
-            confidence=Decimal('0.85')
+            entry_price=Decimal('50000.00'),
+            forward_bars=10,
         )
         
-        # Confidence must be 0-1
-        assert event.confidence >= Decimal('0')
-        assert event.confidence <= Decimal('1.0')
+        # forward_bars must be positive
+        assert event.forward_bars > 0
         
-        # Delays must be positive
-        assert event.optimal_delay > 0
-        
-        # Sample size must be positive
-        assert event.sample_size > 0
+        # signal_name must be set
+        assert event.signal_name is not None
 
 
 class TestConfigurationLoading:
@@ -437,19 +434,19 @@ class TestIntegrationScenarios:
         system = NautilusTrainingSystem()
         
         # Verify Money type usage
-        money = Money('500', 'USD')
+        money = Money(500, USD)
         assert isinstance(money, Money)
         assert money.currency.code == 'USD'
         
         # Verify Quantity type usage
-        qty = Quantity('0.1')
+        qty = Quantity.from_str('0.1')
         assert isinstance(qty, Quantity)
-        assert qty > Quantity('0')
+        assert qty > Quantity.from_str('0')
         
         # Verify Price type usage
-        price = Price('50000.0')
+        price = Price.from_str('50000.0')
         assert isinstance(price, Price)
-        assert price > Price('0')
+        assert price > Price.from_str('0')
         
         # Verify InstrumentId usage
         instrument_id = InstrumentId(

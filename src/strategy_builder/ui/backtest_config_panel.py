@@ -2339,8 +2339,18 @@ class BacktestConfigPanel(QWidget):
                 )
                 return
 
-            # Apply optimal delay results to strategy_config_dict blocks
-            if calibration_results:
+            # Guard: skip applying results when TrainingThread is in simulation
+            # mode (random/dummy delays) to protect manually-tuned block delays.
+            if calibration_thread.is_simulation_mode:
+                logger.info(
+                    "Auto-calibration: skipped apply step (simulation mode) — "
+                    "using configured block delays."
+                )
+                self.results_text.append(
+                    "⚙️ Calibration skipped (simulation mode) — using configured block delays"
+                )
+            elif calibration_results:
+                # Apply optimal delay results to strategy_config_dict blocks
                 delay_map: dict = {}
                 for r in calibration_results:
                     name = r.get('signal_name', '')
