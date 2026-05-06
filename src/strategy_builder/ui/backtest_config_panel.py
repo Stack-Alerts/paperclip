@@ -971,12 +971,7 @@ class BacktestConfigPanel(QWidget):
         config_tab = self._create_config_tab()
         self.tab_widget.addTab(config_tab, "💠 Config")
 
-        # Tab 2: Calibrate (Sprint 2.1 - INTEGRATED)
-        from src.optimizer_v3.ui.training_panel import TrainingPanelUI
-        self.training_panel = TrainingPanelUI(orchestrator=self.orchestrator)
-        self.tab_widget.addTab(self.training_panel, "⚙️ Calibrate")
-        
-        # Tab 3: Live Output (Optimizer v3 - INTEGRATED)
+        # Tab 2: Live Output (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.live_output_panel import LiveOutputPanel
         strategy_name = self._get_strategy_name()
         self.output_panel = LiveOutputPanel(strategy_name=strategy_name)
@@ -984,12 +979,12 @@ class BacktestConfigPanel(QWidget):
         self.live_output_tab_index = self.tab_widget.addTab(self.output_panel, "● Live Output")
         self._set_live_output_color("red")  # Red for idle
         
-        # Tab 4: Trades (Optimizer v3 - INTEGRATED)
+        # Tab 3: Trades (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.trades_panel import TradesPanel
         self.trades_panel = TradesPanel()
         self.tab_widget.addTab(self.trades_panel, "💰 Trades")
         
-        # Tab 5: Metrics (Optimizer v3 - INTEGRATED)
+        # Tab 4: Metrics (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
         self.metrics_panel = MetricsDisplayPanel()
         self.tab_widget.addTab(self.metrics_panel, "💹 Metrics")
@@ -999,7 +994,7 @@ class BacktestConfigPanel(QWidget):
         # to metrics_panel update_metrics() for real-time metric calculations
         self.trades_panel.metrics_updated.connect(self.metrics_panel.update_metrics)
         
-        # Tab 6: AI Recommendations (Optimizer v3 - INTEGRATED)
+        # Tab 5: AI Recommendations (Optimizer v3 - INTEGRATED)
         # Simple panel that shows AI recommendations with apply buttons
         from src.optimizer_v3.ui.ai_recommendations_panel import AIRecommendationsPanel
         self.ai_recommendations_panel = AIRecommendationsPanel()
@@ -1019,7 +1014,7 @@ class BacktestConfigPanel(QWidget):
                 self.ai_recommendations_panel.display_recommendations
             )
         
-        # Tab 7: Compare (Optimizer v3 - INTEGRATED)
+        # Tab 6: Compare (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.compare_view_panel import CompareViewPanel
         self.compare_panel = CompareViewPanel()
         self.tab_widget.addTab(self.compare_panel, "🔁 Compare")
@@ -2261,17 +2256,103 @@ class BacktestConfigPanel(QWidget):
         
         return layout
     
-    def _is_calibrated(self) -> bool:
+    def _run_auto_calibration(self, strategy_config_dict: dict) -> None:
         """
-        Return True if the Calibrate tab has completed results for the
-        currently loaded strategy. Uses the Export button enabled state
-        as the proxy (it is only enabled after a successful calibration run).
+        Run signal calibration automatically on all strategy blocks before backtest.
+
+        Calibration parameters (hardcoded):
+        - Timeframe: 15m
+        - Lookback: 180 days
+        - Mode: production (full data)
+
+        On success, optimal delay parameters are applied to each block in
+        strategy_config_dict in-place.
+
+        On any failure the method logs a warning and returns without modifying
+        the config so the backtest proceeds with uncalibrated parameters
+        (graceful degradation — calibration failure never blocks the backtest).
         """
+        blocks = strategy_config_dict.get('blocks', [])
+        if not blocks:
+            logger.info("Auto-calibration: no blocks found, skipping.")
+            return
+
+        self.results_text.setText(
+            "⚙️ Running signal calibration on all blocks (15m)...\n"
+            "This may take a moment."
+        )
+        QApplication.processEvents()
+
         try:
-            return self.training_panel.export_btn.isEnabled()
-        except Exception:
-            # If training panel is not initialised for any reason, do not block the run
-            return True
+            from src.optimizer_v3.core.training_thread import TrainingThread
+
+            block_names = [
+                b.get('name') or b.get('block_name') or f"block_{i}"
+                for i, b in enumerate(blocks)
+            ]
+
+            # Run the training thread synchronously in the current thread by
+            # calling its run() logic directly via a temporary QThread.
+            # We use a blocking event-loop wait to keep things safe.
+            calibration_thread = TrainingThread(
+                selected_blocks=block_names,
+                mode='production',
+                period_days=180,
+                selected_timeframes=['15m'],
+                logger=None,
+            )
+
+            calibration_results: list = []
+
+            def _on_complete(results: list) -> None:
+                calibration_results.extend(results)
+
+            calibration_thread.training_complete.connect(_on_complete)
+            calibration_thread.start()
+
+            # Wait up to 60 seconds; UI stays responsive via processEvents
+            waited_ms = 0
+            while calibration_thread.isRunning() and waited_ms < 60_000:
+                calibration_thread.wait(200)
+                QApplication.processEvents()
+                waited_ms += 200
+
+            if calibration_thread.isRunning():
+                calibration_thread.stop()
+                calibration_thread.wait(2000)
+                logger.warning("Auto-calibration timed out; proceeding with uncalibrated parameters.")
+                self.results_text.append(
+                    "⚠️ Calibration timed out. Proceeding without calibration."
+                )
+                return
+
+            # Apply optimal delay results to strategy_config_dict blocks
+            if calibration_results:
+                delay_map: dict = {}
+                for r in calibration_results:
+                    name = r.get('signal_name', '')
+                    delay = r.get('optimal_delay')
+                    if name and delay is not None:
+                        delay_map[name] = int(delay)
+
+                for block in blocks:
+                    bname = block.get('name') or block.get('block_name', '')
+                    if bname in delay_map:
+                        block['optimal_delay'] = delay_map[bname]
+                        logger.info(
+                            f"Auto-calibration: applied optimal_delay={delay_map[bname]} to block '{bname}'"
+                        )
+
+            self.results_text.append("✓ Calibration complete. Starting backtest...")
+            QApplication.processEvents()
+
+        except Exception as e:
+            logger.warning(f"Auto-calibration failed (non-blocking): {e}")
+            self.results_text.append(
+                f"⚠️ Calibration skipped ({e}). Proceeding with uncalibrated parameters."
+            )
+            QApplication.processEvents()
+
 
     def _on_run_clicked(self):
         """Handle run button click - WITH INSTITUTIONAL DATA CACHING"""
@@ -2288,25 +2369,6 @@ class BacktestConfigPanel(QWidget):
         except Exception as e:
             logger.warning(f"⚠️ Could not close database connections in main thread: {e}")
         
-        # --- Calibration gate check ---
-        if not self._is_calibrated():
-            from PyQt5.QtWidgets import QMessageBox
-            msg = QMessageBox(self)
-            msg.setWindowTitle("Calibration Required")
-            msg.setIcon(QMessageBox.Warning)
-            msg.setText("This strategy has not been calibrated.")
-            msg.setInformativeText(
-                "Run Signal Calibration before backtesting to ensure optimal RECHECK delay "
-                "parameters are applied to your building blocks.\n\n"
-                "Click OK to go to the Calibrate tab."
-            )
-            msg.setStandardButtons(QMessageBox.Ok)
-            msg.exec_()
-            # Auto-switch to Calibrate tab (index 1)
-            self.tab_widget.setCurrentIndex(1)
-            return
-        # --- END calibration gate ---
-
         # Validate strategy
         validation = self.orchestrator.validate_strategy()
         if not validation.success:
@@ -2323,6 +2385,9 @@ class BacktestConfigPanel(QWidget):
         # CRITICAL FIX: Inject UI confluence threshold into strategy config
         # The serialized config doesn't include UI values - must add manually
         strategy_config_dict['confluence_threshold'] = self.confluence_spin.value()
+
+        # AUTO-CALIBRATION: Run signal calibration on all blocks before backtest
+        self._run_auto_calibration(strategy_config_dict)
 
         # Sprint 2.0.1: Get configuration with calculated dates and timeframe
         backtest_config = self.get_config()
