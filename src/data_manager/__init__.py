@@ -1,5 +1,5 @@
 """
-BTC Engine v3 - Data Manager Package
+BTC Trade Engine - Data Manager Package
 Institutional-Grade Data Management System
 
 Modules:
@@ -12,7 +12,7 @@ Modules:
 """
 
 __version__ = "1.0.0"
-__author__ = "BTC Engine v3 Team"
+__author__ = "BTC Trade Engine"
 
 from . import config
 from . import utils

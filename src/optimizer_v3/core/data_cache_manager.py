@@ -14,7 +14,7 @@ Performance Impact:
 - Reduces PostgreSQL connection overhead
 - Enables rapid iteration testing (Test Wiring: 29 tests)
 
-Author: BTC Engine v3 Team
+Author: BTC Trade Engine
 Date: 2026-02-12
 """
 

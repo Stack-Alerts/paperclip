@@ -110,5 +110,5 @@ __all__ = [
 ]
 
 __version__ = '1.0.0'
-__author__ = 'BTC Engine v3 Team'
+__author__ = 'BTC Trade Engine'
 __description__ = 'Database layer for strategy versioning and tracking'
