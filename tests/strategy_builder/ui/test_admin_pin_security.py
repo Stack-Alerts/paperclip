@@ -213,21 +213,27 @@ class TestSettingsServiceSentinelSkip:
 
     def test_save_user_settings_skips_multi_bullet_sentinel(self):
         """
-        Any all-bullet string (not just '••••') must be treated as a sentinel.
-        This matches the ``set(value) == {"•"}`` sentinel check in the service.
+        Any string composed entirely of bullet characters is treated as
+        a sentinel and skipped.  The service checks ``set(value) == {"•"}``,
+        so a longer all-bullet string like ``"••••••••"`` also qualifies.
+
+        Note: a masked value like ``"••••••••ac84"`` is NOT all-bullets
+        (it contains alphanumeric suffix) and should therefore be saved;
+        this test targets a pure-bullet string of arbitrary length.
         """
         from src.strategy_builder.ui.settings_service import SettingsService
 
         svc = SettingsService.__new__(SettingsService)
         svc.set = MagicMock()
 
+        # Eight bullets — all same character → set(value) == {"•"} → sentinel
         svc.save_user_settings({
-            "OPENROUTER_API_KEY": "••••••••••••ac84",  # longer masked display
+            "OPENROUTER_API_KEY": "••••••••",  # pure bullets — must be skipped
         })
 
         called_keys = [c.args[0] for c in svc.set.call_args_list]
         assert "OPENROUTER_API_KEY" not in called_keys, (
-            "Any all-bullet string must be treated as sentinel and skipped."
+            "An all-bullet string of any length must be treated as sentinel and skipped."
         )
 
     def test_save_admin_settings_skips_sentinel_value(self):
@@ -371,8 +377,13 @@ class TestAdminPinDialogLockout:
 
     def test_lockout_label_visible_and_contains_countdown(self, qapp):
         """
-        Lockout countdown label must be visible and contain the remaining
-        seconds after lockout activates.
+        Lockout countdown label must be shown (not hidden) and contain the
+        remaining seconds after lockout activates.
+
+        We check ``not isHidden()`` rather than ``isVisible()`` because in
+        headless tests the parent dialog is never shown, so Qt always returns
+        False from ``isVisible()`` for child widgets even after ``.show()``.
+        ``isHidden()`` reflects only the widget's own explicit show/hide state.
         """
         svc = _make_auth_service(correct_pin="1234")
         dlg = _make_dialog(svc)
@@ -381,8 +392,9 @@ class TestAdminPinDialogLockout:
             dlg._pin_field.setText("bad")
             dlg._attempt_auth()
 
-        assert dlg._lockout_label.isVisible(), (
-            "_lockout_label must be visible during lockout."
+        assert not dlg._lockout_label.isHidden(), (
+            "_lockout_label must not be hidden during lockout "
+            "(i.e. _start_lockout() called .show() on it)."
         )
         label_text = dlg._lockout_label.text()
         assert str(dlg._LOCKOUT_SECONDS) in label_text, (
@@ -519,15 +531,23 @@ class TestAdminPinDialogLockout:
         dlg.close()
 
     def test_end_lockout_hides_lockout_label(self, qapp):
-        """Lockout label must be hidden after lockout expires."""
+        """
+        Lockout label must be hidden after lockout expires.
+
+        Uses ``isHidden()`` for the same reason as the visibility test above —
+        the parent dialog is not shown in headless tests, so ``isVisible()``
+        always returns False even for explicitly shown child widgets.
+        """
         svc = _make_auth_service(correct_pin="1234")
         dlg = _make_dialog(svc)
 
         dlg._start_lockout()
-        assert dlg._lockout_label.isVisible(), "Precondition: label visible during lockout."
+        assert not dlg._lockout_label.isHidden(), (
+            "Precondition: label must be shown (not hidden) during lockout."
+        )
         dlg._end_lockout()
 
-        assert not dlg._lockout_label.isVisible(), (
+        assert dlg._lockout_label.isHidden(), (
             "_lockout_label must be hidden after _end_lockout()."
         )
         dlg.close()
@@ -629,7 +649,9 @@ class TestAdminPinDialogLockout:
         assert dlg._fail_count == 0
         assert dlg._lockout_remaining == 0
         assert dlg._lockout_timer is None
-        assert not dlg._lockout_label.isVisible()
+        assert dlg._lockout_label.isHidden(), (
+            "Lockout label must start hidden on a fresh dialog instance."
+        )
         assert dlg._pin_field.isEnabled()
         assert dlg._ok_button.isEnabled()
         dlg.close()
