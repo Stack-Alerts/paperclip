@@ -1552,7 +1552,21 @@ class MetricsDisplayPanel(QWidget):
         self._populate_ai_recommendations_panel()
         logger.info(f"[UI] ✅ Populated AI Recommendations Panel with full preview data")
         
-        # AUTO-SWITCH to Metrics tab to show user where recommendations are
+        # P4: Emit recommendations_generated signal with batch recommendations
+        # This wires to AIRecommendationsPanel.display_recommendations
+        if self.batch_recommendations:
+            self.recommendations_generated.emit(self.batch_recommendations)
+            logger.info(f"[UI] Emitted recommendations_generated signal ({len(self.batch_recommendations)} recs)")
+        
+        # P3: Push full AI diagnosis (assessment, root_cause_analysis, implementation_order)
+        # to the AI Recommendations Panel
+        if self.rec_engine is not None:
+            full_analysis = self.rec_engine.last_full_analysis
+            if full_analysis:
+                self._push_ai_analysis_to_panel(full_analysis)
+                logger.info("[UI] Pushed full AI analysis to panel")
+        
+        # AUTO-SWITCH to AI Recommendations tab to show user where results are
         self._switch_to_metrics_tab()
     
     def _on_ai_progress(self, message: str, percentage: int) -> None:
@@ -1811,7 +1825,7 @@ class MetricsDisplayPanel(QWidget):
         return "AI-ENHANCED:" in rec_text or "🤖" in rec_text
     
     def _get_generic_recommendation(self, metric_key: str, value, rating: str) -> str:
-        """Generate actionable recommendation text for performance metrics"""
+        """Generate actionable recommendation text for performance metrics, including actual value."""
         try:
             val = float(value)
             
@@ -1819,39 +1833,39 @@ class MetricsDisplayPanel(QWidget):
                 return ""  # No recommendation needed - performance is good
             elif rating == '⚠ Fair':
                 if metric_key == 'total_pnl':
-                    return "Positive but could be improved - optimize entry/exit rules"
+                    return f"Positive (${val:,.2f}) but could be improved - optimize entry/exit rules"
                 elif metric_key == 'total_return':
-                    return "Matches market - consider improving R:R ratio"
+                    return f"Matches market ({val:.2f}%) - consider improving R:R ratio"
                 elif metric_key == 'sharpe_ratio':
-                    return "Acceptable - reduce volatility or improve consistency"
+                    return f"Acceptable ({val:.3f}) - reduce volatility or improve consistency"
                 elif metric_key == 'win_rate':
-                    return "Average - balance with higher R:R ratio"
+                    return f"Average ({val:.1f}%) - balance with higher R:R ratio"
                 elif metric_key == 'profit_factor':
-                    return "Profitable but marginal - tighten entry criteria"
+                    return f"Profitable but marginal ({val:.3f}) - tighten entry criteria"
                 elif metric_key == 'avg_trade_pnl':
-                    return "Positive - increase position size cautiously"
+                    return f"Positive (${val:,.2f}/trade) - increase position size cautiously"
                 else:
-                    return "Monitor performance - room for improvement"
+                    return f"Monitor performance ({val}) - room for improvement"
             elif rating == '✗ Poor':
                 if metric_key == 'total_pnl':
-                    return "Strategy losing money - review all parameters urgently"
+                    return f"Strategy losing money (${val:,.2f}) - review all parameters urgently"
                 elif metric_key == 'total_return':
-                    return "Underperforming - consider alternative strategies"
+                    return f"Underperforming ({val:.2f}%) - consider alternative strategies"
                 elif metric_key == 'sharpe_ratio':
-                    return "Poor risk-adjusted returns - improve or abandon strategy"
+                    return f"Poor risk-adjusted returns ({val:.3f}) - improve or abandon strategy"
                 elif metric_key == 'win_rate':
                     if val < 50.0:
-                        return "Low win rate - need R:R ≥2.0 to be profitable"
+                        return f"Low win rate ({val:.1f}%) - need R:R >=2.0 to be profitable"
                     else:
-                        return "Review entry/exit criteria"
+                        return f"Win rate {val:.1f}% - review entry/exit criteria"
                 elif metric_key == 'profit_factor':
-                    return "Unprofitable - stop trading this strategy"
+                    return f"Unprofitable (PF={val:.3f}) - stop trading this strategy"
                 elif metric_key == 'total_trades':
-                    return "Insufficient sample size - collect more data before concluding"
+                    return f"Insufficient sample ({int(val)} trades) - collect more data before concluding"
                 elif metric_key == 'avg_trade_pnl':
-                    return "Losing per trade - stop and review strategy completely"
+                    return f"Losing per trade (${val:,.2f}) - stop and review strategy completely"
                 else:
-                    return "Needs immediate attention - review parameters"
+                    return f"Needs attention (value={val}) - review parameters"
             else:
                 return "Awaiting more data..."
         except:
@@ -2867,24 +2881,30 @@ class MetricsDisplayPanel(QWidget):
     
     def _switch_to_metrics_tab(self) -> None:
         """
-        Switch to Metrics tab after AI recommendations complete.
+        Switch to AI Recommendations tab after AI recommendations complete.
         
         This helps user discover where the AI recommendations were applied.
+        Prefers the 'AI Recommendations' tab; falls back to 'Metrics' tab.
         """
         try:
             # Find the tab widget containing this panel
-            dialog = self.window()
-            
             # Look for QTabWidget parent
             parent = self.parent()
             while parent and not isinstance(parent, QTabWidget):
                 parent = parent.parent()
             
             if parent and isinstance(parent, QTabWidget):
-                # Find index of "Metrics" or "AI Recommendations" tab
+                # Prefer AI Recommendations tab
                 for i in range(parent.count()):
                     tab_text = parent.tabText(i).lower()
-                    if 'metric' in tab_text or 'ai' in tab_text:
+                    if 'ai' in tab_text and 'rec' in tab_text:
+                        parent.setCurrentIndex(i)
+                        logger.info(f"[UI] ✅ Switched to tab: {parent.tabText(i)}")
+                        return
+                # Fallback: any tab with 'ai' or 'metric'
+                for i in range(parent.count()):
+                    tab_text = parent.tabText(i).lower()
+                    if 'ai' in tab_text or 'metric' in tab_text:
                         parent.setCurrentIndex(i)
                         logger.info(f"[UI] ✅ Switched to tab: {parent.tabText(i)}")
                         return
@@ -2968,3 +2988,29 @@ class MetricsDisplayPanel(QWidget):
             logger.error(f"❌ Failed to populate AI Recommendations Panel: {str(e)}")
             import traceback
             traceback.print_exc()
+
+    def _push_ai_analysis_to_panel(self, full_analysis: Dict) -> None:
+        """
+        Push full AI diagnosis (assessment, root_cause_analysis, implementation_order)
+        to the AI Recommendations Panel for display.
+
+        Args:
+            full_analysis: Dict from AIRecommendationEnhancer.last_full_analysis
+        """
+        try:
+            dialog = self.window()
+            if hasattr(dialog, 'backtest_panel'):
+                backtest_panel = dialog.backtest_panel
+                if hasattr(backtest_panel, 'ai_recommendations_panel'):
+                    ai_panel = backtest_panel.ai_recommendations_panel
+                    if hasattr(ai_panel, 'display_ai_analysis'):
+                        ai_panel.display_ai_analysis(full_analysis)
+                        logger.info("[UI] ✅ Full AI analysis pushed to AI Recommendations Panel")
+                    else:
+                        logger.warning("⚠️ AIRecommendationsPanel has no display_ai_analysis method")
+                else:
+                    logger.warning("⚠️ AI Recommendations Panel not found for analysis push")
+            else:
+                logger.warning("⚠️ Backtest panel not found for analysis push")
+        except Exception as e:
+            logger.error(f"❌ Failed to push AI analysis to panel: {str(e)}")

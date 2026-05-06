@@ -103,6 +103,9 @@ class AIRecommendationEnhancer:
         self.enabled = bool(self.api_key)
         self.model = os.getenv('AI_MODEL', 'anthropic/claude-3.5-sonnet')
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
+        # Stores the full AI diagnosis from the last successful response
+        # Fields: assessment, root_cause_analysis, implementation_order
+        self.last_full_analysis: Dict = {}
         
         if self.enabled:
             logger.info(f"✅ AI Enhancement ENABLED (Model: {self.model})")
@@ -335,7 +338,12 @@ class AIRecommendationEnhancer:
         preliminary_recommendations: List
     ) -> List[AIEnhancedRecommendation]:
         """
-        Parse AI response into enhanced recommendations
+        Parse AI response into enhanced recommendations.
+        
+        Also extracts and stores full AI diagnosis fields:
+        - assessment: Overall strategy assessment text
+        - root_cause_analysis: Structured root cause dict
+        - implementation_order: Ordered list of implementation steps
         
         Args:
             ai_response: Raw API response
@@ -361,7 +369,35 @@ class AIRecommendationEnhancer:
             # Parse JSON
             ai_data = json.loads(content)
             
-            # Extract recommendations
+            # ── P3: Extract full AI diagnosis fields ─────────────────────────
+            assessment = ai_data.get('assessment', '')
+            root_cause_analysis = ai_data.get('root_cause_analysis', {})
+            implementation_order = ai_data.get('implementation_order', [])
+            
+            # Log any additional top-level fields at debug level so they are
+            # discoverable without being silently discarded.
+            known_keys = {
+                'assessment', 'understanding', 'root_cause_analysis',
+                'recommendations', 'implementation_order', 'risk_assessment',
+                'estimated_improvement_timeline', 'overall_confidence', 'next_steps'
+            }
+            for key in ai_data:
+                if key not in known_keys:
+                    logger.debug(f"[AI Response] Extra field '{key}' (not displayed): {str(ai_data[key])[:200]}")
+            
+            # Store the full diagnosis for UI display
+            self.last_full_analysis = {
+                'assessment': assessment,
+                'root_cause_analysis': root_cause_analysis,
+                'implementation_order': implementation_order,
+            }
+            logger.debug(
+                f"[AI Response] assessment={bool(assessment)}, "
+                f"root_cause_analysis={bool(root_cause_analysis)}, "
+                f"implementation_order={len(implementation_order)} steps"
+            )
+            
+            # ── Extract recommendations ───────────────────────────────────────
             ai_recs = ai_data.get('recommendations', [])
             
             enhanced_recs = []

@@ -136,6 +136,16 @@ class IntelligentRecommendationEngine:
         
         self._update_status("✅ Intelligent Recommendation Engine ready")
     
+    @property
+    def last_full_analysis(self) -> Dict:
+        """
+        Return the full AI diagnosis from the last successful response.
+        
+        Contains: assessment, root_cause_analysis, implementation_order.
+        Empty dict when AI is disabled or no analysis has been run yet.
+        """
+        return self.ai_enhancer.last_full_analysis
+    
     def _default_status(self, message: str):
         """Default status callback (prints to console)"""
         logger.info(message)

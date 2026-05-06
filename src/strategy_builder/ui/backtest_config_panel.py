@@ -2569,6 +2569,56 @@ class BacktestConfigPanel(QWidget):
             # Total return %
             starting_capital = self.capital_spin.value()
             total_return = (total_pnl / starting_capital) * 100 if starting_capital > 0 else 0
+
+            # ── P1 Risk Metrics: calculated from real trade data ─────────────
+            # Max drawdown duration (number of trades in the longest drawdown period)
+            in_drawdown = drawdown < 0
+            max_dd_duration = 0
+            current_dd_len = 0
+            for is_dd in in_drawdown:
+                if is_dd:
+                    current_dd_len += 1
+                    if current_dd_len > max_dd_duration:
+                        max_dd_duration = current_dd_len
+                else:
+                    current_dd_len = 0
+
+            # Value at Risk 95% — 5th percentile of trade P&L distribution
+            var_95 = float(np.percentile(pnl_array, 5)) if trade_count > 0 else 0.0
+
+            # Expected Shortfall (CVaR) — mean of losses beyond VaR threshold
+            tail_threshold = var_95
+            tail_losses = pnl_array[pnl_array <= tail_threshold]
+            expected_shortfall = float(np.mean(tail_losses)) if len(tail_losses) > 0 else var_95
+
+            # Max consecutive losses and wins
+            max_consecutive_losses = 0
+            max_consecutive_wins = 0
+            _cur_losses = 0
+            _cur_wins = 0
+            for p in pnl_values:
+                if p < 0:
+                    _cur_losses += 1
+                    _cur_wins = 0
+                    if _cur_losses > max_consecutive_losses:
+                        max_consecutive_losses = _cur_losses
+                else:
+                    _cur_wins += 1
+                    _cur_losses = 0
+                    if _cur_wins > max_consecutive_wins:
+                        max_consecutive_wins = _cur_wins
+
+            # Average drawdown — mean of all drawdown values (non-zero only)
+            dd_values = drawdown[drawdown < 0]
+            avg_drawdown = float(np.mean(dd_values)) if len(dd_values) > 0 else 0.0
+
+            # Ulcer Index — RMS of percentage drawdowns (measures drawdown pain)
+            # UI = sqrt( mean( (drawdown_pct_i)^2 ) ) across all observations
+            if starting_capital > 0:
+                drawdown_pcts = (drawdown / starting_capital) * 100  # as % of capital
+            else:
+                drawdown_pcts = drawdown * 0
+            ulcer_index = float(np.sqrt(np.mean(drawdown_pcts ** 2))) if trade_count > 0 else 0.0
             
         else:
             # No trades - all zeros
@@ -2588,6 +2638,13 @@ class BacktestConfigPanel(QWidget):
             sharpe_ratio = 0
             sortino_ratio = 0
             total_return = 0
+            max_dd_duration = 0
+            var_95 = 0.0
+            expected_shortfall = 0.0
+            max_consecutive_losses = 0
+            max_consecutive_wins = 0
+            avg_drawdown = 0.0
+            ulcer_index = 0.0
         
         # Build metrics dict with REAL values ONLY
         metrics_data = {
@@ -2607,17 +2664,17 @@ class BacktestConfigPanel(QWidget):
             'recovery_factor': Decimal(str(total_pnl / abs(max_drawdown))) if max_drawdown != 0 else Decimal('0'),
             # Risk metrics
             'max_drawdown_pct': Decimal(str(max_drawdown_pct)),
-            'max_drawdown_duration': 0,  # TODO: Calculate actual duration
-            'var_95': Decimal('0'),  # TODO: Calculate VaR
-            'expected_shortfall': Decimal('0'),  # TODO: Calculate ES
+            'max_drawdown_duration': max_dd_duration,
+            'var_95': Decimal(str(var_95)),
+            'expected_shortfall': Decimal(str(expected_shortfall)),
             'sortino_ratio': Decimal(str(sortino_ratio)),
             'calmar_ratio': Decimal(str(total_return / abs(max_drawdown_pct))) if max_drawdown_pct != 0 else Decimal('0'),
-            'max_consecutive_losses': 0,  # TODO: Calculate from trades
-            'max_consecutive_wins': 0,  # TODO: Calculate from trades
-            'avg_drawdown': Decimal('0'),  # TODO: Calculate average drawdown
+            'max_consecutive_losses': max_consecutive_losses,
+            'max_consecutive_wins': max_consecutive_wins,
+            'avg_drawdown': Decimal(str(avg_drawdown)),
             'std_deviation': Decimal(str(std_dev)),
             'downside_deviation': Decimal(str(downside_dev)),
-            'ulcer_index': Decimal('0'),  # TODO: Calculate Ulcer Index
+            'ulcer_index': Decimal(str(ulcer_index)),
         }
         
         # Add metrics summary to Live Output
