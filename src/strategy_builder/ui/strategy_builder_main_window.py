@@ -137,43 +137,47 @@ class _RuntimeCandleUpdateThread(QThread):
             # never fires.  The T, T+15, T+30 … bars are therefore never
             # written during the session.
             #
-            # Fix: start one 15m bar BEFORE the last bar actually on disk so
-            # the trailing-edge detector in detect_gaps always sees the
-            # boundary correctly.  Fall back to session_start_time-15m when
-            # no bars exist on disk yet, and to now-2h when session_start is
-            # also unknown.
+            # RC4c NOTE: the original RC4c used ONLY the 15m anchor, reasoning
+            # "if 15m is current then 1h is always current too."  This is wrong
+            # when 1h was never updated in a prior session — the 1h can have a
+            # multi-hour gap while 15m is current.  The fix: compute the anchor
+            # separately for each managed timeframe (15m and 1h) as
+            # last_bar - 1_bar_period, then use the MINIMUM so the scan window
+            # covers whichever timeframe is furthest behind.
             #
             # Cap at MAX_SESSION_LOOKBACK_HOURS to prevent multi-day scan debt.
             max_lookback = now - timedelta(hours=self.MAX_SESSION_LOOKBACK_HOURS)
             try:
-                # RC4c FIX (BTCAAAAA-167): Use only the 15m last bar as the
-                # scan anchor.  The previous RC4b logic used min(last_15m,
-                # last_1h) which incorrectly picked the 1h timestamp when 1h
-                # was older than 15m — causing the anchor to be set too far
-                # back (e.g. 07:00 instead of 07:30).  Because 15m is the
-                # finest-grained timeframe, if 15m is current then 1h is
-                # always current too.  Using only the 15m anchor is both
-                # correct and simpler.
                 last_15m = manager.get_last_bar_timestamp('15m')
+                last_1h  = manager.get_last_bar_timestamp('1h')
+
+                anchor_candidates = []
                 if last_15m is not None:
-                    # Step back one 15m period to include the boundary bar in
-                    # the detect_gaps scan window.
-                    start_date = last_15m - timedelta(minutes=15)
-                    logger.info(f"[RuntimeUpdate] RC4c scan anchor: last_15m={last_15m.strftime('%H:%M:%S')}"
-                        f" → scan_start={start_date.strftime('%H:%M:%S')}"
-                        f" → now={now.strftime('%H:%M:%S')}")
+                    anchor_candidates.append(last_15m - timedelta(minutes=15))
+                if last_1h is not None:
+                    anchor_candidates.append(last_1h - timedelta(hours=1))
+
+                if anchor_candidates:
+                    # Use the earliest anchor so the widest gap is never missed.
+                    start_date = min(anchor_candidates)
+                    logger.info(
+                        f"[RuntimeUpdate] scan anchor: "
+                        f"last_15m={last_15m.strftime('%H:%M:%S') if last_15m else 'none'}, "
+                        f"last_1h={last_1h.strftime('%H:%M:%S') if last_1h else 'none'} "
+                        f"→ scan_start={start_date.strftime('%H:%M:%S')} UTC"
+                    )
                 else:
-                    # No 15m bars on disk yet — fall back to session_start - 15m
+                    # No bars on disk yet — fall back to session_start - 15m
                     fallback_base = self._session_start_time if self._session_start_time is not None else now
                     start_date = fallback_base - timedelta(minutes=15)
-                    logger.info(f"[RuntimeUpdate] RC4c: no 15m bars on disk; "
+                    logger.info(f"[RuntimeUpdate] no bars on disk; "
                         f"falling back to session_start-15m → {start_date.strftime('%H:%M:%S')}")
             except Exception as _anchor_exc:
                 # Defensive: if get_last_bar_timestamp raises, fall back
                 # gracefully to session_start_time or 2h window.
                 fallback_base = self._session_start_time if self._session_start_time is not None else now
                 start_date = fallback_base - timedelta(minutes=15)
-                logger.error(f"[RuntimeUpdate] RC4c anchor lookup failed ({_anchor_exc}); "
+                logger.error(f"[RuntimeUpdate] anchor lookup failed ({_anchor_exc}); "
                     f"falling back to {start_date.strftime('%H:%M:%S')}")
             # Apply hard lookback cap.
             start_date = max(start_date, max_lookback)
