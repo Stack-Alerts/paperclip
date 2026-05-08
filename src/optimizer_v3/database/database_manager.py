@@ -272,21 +272,75 @@ class DatabaseManagerFactory:
         return DatabaseManager(connection_string, **kwargs)
     
     @staticmethod
-    def for_testing(in_memory: bool = True) -> DatabaseManager:
+    def for_testing() -> "DatabaseManager":
         """
-        Create DatabaseManager for testing
-        
-        Args:
-            in_memory: Use in-memory SQLite database (faster for tests)
-            
+        Create DatabaseManager for testing using a real PostgreSQL test database.
+
+        Connects to the PostgreSQL instance identified by the standard project
+        environment variables (matching the ``pg_conn`` fixture pattern from
+        the ITM state tests introduced in BTCAAAAA-450).
+
+        Environment variables (all have sensible defaults matching the project
+        ``.env``):
+            POSTGRES_HOST     default: localhost
+            POSTGRES_PORT     default: 5432
+            POSTGRES_DB       default: optimizer_v3
+            POSTGRES_USER     default: optimizer_admin
+            POSTGRES_PASSWORD default: secure_password_change_me
+
+        Raises:
+            pytest.skip (when called from a pytest context): If the PostgreSQL
+                server is not reachable the method skips the test gracefully
+                rather than failing with an obscure connection error.
+            EnvironmentError: Outside a pytest context a clear error is raised
+                when ``POSTGRES_PASSWORD`` is not set (to prevent silent use of
+                the default in production-adjacent environments).
+
         Returns:
-            DatabaseManager: Test database manager instance
+            DatabaseManager: Test database manager instance backed by
+                PostgreSQL, not SQLite.
         """
-        if in_memory:
-            connection_string = "sqlite:///:memory:"
-        else:
-            connection_string = "sqlite:///test_database.db"
-        
+        import os
+
+        host = os.environ.get("POSTGRES_HOST", "localhost")
+        port = os.environ.get("POSTGRES_PORT", "5432")
+        db = os.environ.get("POSTGRES_DB", "optimizer_v3")
+        user = os.environ.get("POSTGRES_USER", "optimizer_admin")
+        password = os.environ.get("POSTGRES_PASSWORD", "secure_password_change_me")
+
+        connection_string = f"postgresql://{user}:{password}@{host}:{port}/{db}"
+
+        # Verify the connection is reachable before returning the manager so
+        # that callers get a clear skip/error rather than a cryptic SQLAlchemy
+        # exception deep in test code.
+        try:
+            import psycopg2
+            conn = psycopg2.connect(
+                host=host, port=int(port), dbname=db, user=user, password=password
+            )
+            conn.close()
+        except ImportError:
+            # psycopg2 not installed — try to skip via pytest if available
+            try:
+                import pytest
+                pytest.skip("psycopg2 not installed — skipping real-PostgreSQL tests")
+            except ImportError:
+                raise RuntimeError(
+                    "psycopg2 is required for DatabaseManagerFactory.for_testing(). "
+                    "Install it with: pip install psycopg2-binary"
+                )
+        except Exception as exc:
+            try:
+                import pytest
+                pytest.skip(
+                    f"Cannot connect to PostgreSQL ({host}:{port}/{db}): {exc}"
+                )
+            except ImportError:
+                raise RuntimeError(
+                    f"DatabaseManagerFactory.for_testing() could not connect to "
+                    f"PostgreSQL ({host}:{port}/{db}): {exc}"
+                ) from exc
+
         return DatabaseManager(
             connection_string,
             echo=False,
