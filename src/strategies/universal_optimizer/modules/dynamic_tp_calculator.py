@@ -196,8 +196,9 @@ class DynamicTPCalculator:
             return self._calculate_percentage_tps(entry_price, side, fallback_pcts)
         
         # ✅ FIX: Calculate swing range for projection (not direct retracement levels)
-        # Get recent swing high/low for range calculation
-        lookback = min(50, len(df_slice))
+        # Get recent swing high/low for range calculation — use 100-bar lookback (same as
+        # FibonacciRetracements.swing_lookback default) to capture the dominant recent swing.
+        lookback = min(100, len(df_slice))
         recent_data = df_slice.iloc[-lookback:]
         recent_high = recent_data['high'].max()
         recent_low = recent_data['low'].min()
