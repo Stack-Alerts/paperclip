@@ -1454,3 +1454,15 @@ class SettingsDialog(QDialog):
     def showEvent(self, event) -> None:  # type: ignore[override]
         super().showEvent(event)
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+        from PyQt5.QtCore import QSettings
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        geometry = settings.value("settingsDialog/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        """Save window geometry on close."""
+        from PyQt5.QtCore import QSettings
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        settings.setValue("settingsDialog/geometry", self.saveGeometry())
+        super().closeEvent(event)

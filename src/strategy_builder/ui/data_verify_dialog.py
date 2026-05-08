@@ -26,7 +26,7 @@ from PyQt5.QtWidgets import (
     QProgressBar, QTableWidget, QTableWidgetItem, QHeaderView,
     QGroupBox, QAbstractItemView
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSettings
 from PyQt5.QtGui import QColor
 
 from src.data_manager.unified_manager import UnifiedDataManager
@@ -206,7 +206,11 @@ class DataVerifyDialog(QDialog):
     def _init_ui(self):
         self.setWindowTitle("Verify Data — Data Integrity Check")
         self.setWindowFlags(
-            Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint
+            Qt.Window
+            | Qt.WindowTitleHint
+            | Qt.WindowCloseButtonHint
+            | Qt.WindowMinimizeButtonHint
+            | Qt.WindowMaximizeButtonHint
         )
         self.setModal(True)
         self.setMinimumWidth(1100)
@@ -588,10 +592,16 @@ class DataVerifyDialog(QDialog):
         super().showEvent(event)
         from PyQt5.QtCore import QTimer
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        geometry = settings.value("dataVerifyDialog/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
 
     def closeEvent(self, event):
         for thread in (self._verify_thread, self._repair_thread):
             if thread and thread.isRunning():
                 thread.quit()
                 thread.wait(2000)
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        settings.setValue("dataVerifyDialog/geometry", self.saveGeometry())
         super().closeEvent(event)

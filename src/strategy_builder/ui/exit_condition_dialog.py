@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (
     QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QSpinBox, QDoubleSpinBox, QRadioButton, QGroupBox, QCheckBox, QButtonGroup, QComboBox, QWidget
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSettings
 from src.strategy_builder.ui.styles import (
     get_exit_dialog_stylesheet, get_color, get_primary_button_stylesheet,
     get_secondary_button_stylesheet, get_label_style, get_radio_button_style,
@@ -77,7 +77,12 @@ class ExitConditionDialog(QMainWindow):
         super().__init__(parent)
         
         # Issue 3: Make window draggable (non-modal)
-        self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint)
+        self.setWindowFlags(
+            Qt.Window
+            | Qt.WindowCloseButtonHint
+            | Qt.WindowMinimizeButtonHint
+            | Qt.WindowMaximizeButtonHint
+        )
         
         self.signal_name = signal_name  # May be None - signal selector mode
         self.signal_selector_mode = (signal_name is None)
@@ -123,6 +128,12 @@ class ExitConditionDialog(QMainWindow):
     def showEvent(self, event):
         """Override showEvent to load signals after dialog is added to widget tree."""
         super().showEvent(event)
+        
+        # Restore saved geometry
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        geometry = settings.value("exitConditionDialog/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
         
         # Load signals on first show (after dialog is in widget tree)
         if self.signal_selector_mode and self.signal_selector and self.signal_selector.count() == 0:
@@ -849,6 +860,12 @@ class ExitConditionDialog(QMainWindow):
         """Reject the dialog - mark as rejected and close."""
         self._accepted = False
         self.close()
+    
+    def closeEvent(self, event):
+        """Save window geometry on close."""
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        settings.setValue("exitConditionDialog/geometry", self.saveGeometry())
+        super().closeEvent(event)
     
     def exec_(self):
         """
