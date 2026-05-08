@@ -10,22 +10,21 @@
 ## Table of Contents
 
 1. [Getting Started](#1-getting-started)
-2. [Dashboard Overview](#2-dashboard-overview)
-3. [Strategy Builder](#3-strategy-builder)
-4. [Running Walk-Forward Tests](#4-running-walk-forward-tests)
-5. [Autopilot / Live Trading](#5-autopilot--live-trading)
-6. [Settings & Configuration](#6-settings--configuration)
-7. [Monitoring & Logs](#7-monitoring--logs)
-8. [Troubleshooting](#8-troubleshooting)
-9. [Screenshot Requirements](#9-screenshot-requirements)
+2. [Application Overview](#2-application-overview)
+3. [Strategy Builder — Main Window](#3-strategy-builder--main-window)
+4. [The Four-Step Workflow](#4-the-four-step-workflow)
+5. [Strategy Browser](#5-strategy-browser)
+6. [Backtest Configuration Window](#6-backtest-configuration-window)
+7. [Settings](#7-settings)
+8. [Data Management](#8-data-management)
+9. [Debug Logger](#9-debug-logger)
+10. [Troubleshooting](#10-troubleshooting)
 
 ---
 
 ## 1. Getting Started
 
 ### 1.1 Prerequisites
-
-Before launching the platform, confirm your system meets the following requirements:
 
 | Requirement | Minimum | Recommended |
 |-------------|---------|-------------|
@@ -35,15 +34,15 @@ Before launching the platform, confirm your system meets the following requireme
 | Disk Space | 10 GB free | 50 GB free |
 | OS | Linux / macOS | Linux (Ubuntu 22.04+) |
 
-You will also need:
-- **PostgreSQL 12+** running locally or accessible over the network
-- An active internet connection for live data feeds (Binance API)
+You also need:
+- **PostgreSQL 12+** running locally or accessible over the network (all strategies are stored in the database)
+- An active internet connection for live data updates from Binance
 
 ### 1.2 Installation
 
 ```bash
 # 1. Navigate to the project directory
-cd /home/sirrus/projects/BTC-Trade-Engine-PaperClip
+cd /path/to/BTC-Trade-Engine-PaperClip
 
 # 2. Create and activate a Python virtual environment
 python3 -m venv venv
@@ -64,7 +63,7 @@ Copy the example environment file and fill in your credentials:
 cp .env.example .env
 ```
 
-Open `.env` in a text editor. The key settings are:
+Edit `.env` with your settings. Key variables:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
@@ -73,25 +72,17 @@ Open `.env` in a text editor. The key settings are:
 | `POSTGRES_DB` | Database name | `optimizer_v3` |
 | `POSTGRES_USER` | Database user | `optimizer_admin` |
 | `POSTGRES_PASSWORD` | Database password | `your_password` |
-| `BINANCE_API_KEY` | Binance API key (for live trading) | `your_api_key` |
-| `BINANCE_SECRET` | Binance API secret | `your_secret` |
-| `MAX_WORKERS` | Parallel backtest workers | `6` (CPU cores − 2) |
 
-> **Security note:** Never share your `.env` file or commit it to version control. The API key and secret grant access to your exchange account.
+> **Security note:** Never share your `.env` file or commit it to version control. API keys are stored securely in the OS keyring — do not put them in `.env`. Use **Tools → Settings** to configure API keys once the application is running.
 
 ### 1.4 Database Initialisation
 
 ```bash
+# Start PostgreSQL if it is not already running (Linux)
+sudo systemctl start postgresql
+
 # Initialise the database schema
 python -m src.optimizer_v3.database.init_db
-```
-
-If PostgreSQL is not yet running:
-
-```bash
-# Start PostgreSQL (Linux)
-sudo systemctl start postgresql
-sudo systemctl enable postgresql   # auto-start on boot
 ```
 
 ### 1.5 Launching the Application
@@ -100,501 +91,419 @@ sudo systemctl enable postgresql   # auto-start on boot
 python scripts/launch_strategy_builder.py
 ```
 
-The Strategy Builder main window will open. The platform is now ready to use.
-
-> **Screenshot needed (1):** The application main window immediately after launch, showing the default empty state.
+This starts the **BTC Trade Engine — Strategy Builder** main window. On first launch, a data update modal appears automatically to fetch the latest BTC/USDT candle data from Binance before the auto-update system starts.
 
 ---
 
-## 2. Dashboard Overview
+## 2. Application Overview
 
-The platform is built around a two-window layout:
+The BTC Trade Engine is a single-window desktop application (PyQt5) centred on one primary window: the **Strategy Builder**. All other windows — the Strategy Browser, Backtest Configuration, Validation Report, Settings, and Log Viewer — open as independent floating windows from the menu bar or toolbar.
 
-| Window | Purpose |
-|--------|---------|
-| **Window 1 — Strategy Builder** | Create, load, and edit trading strategies |
-| **Window 2 — Backtest & Optimizer** | Configure backtests, run optimizations, review results |
+### 2.1 Window Title
 
-### 2.1 Window 1 — Strategy Builder
+The window title always shows the currently loaded strategy name and an asterisk (`*`) when there are unsaved changes:
 
-> **Screenshot needed (2):** Strategy Builder window with a sample strategy loaded, annotated with section labels.
+```
+BTC Trade Engine - Strategy Builder — MyStrategy *
+```
 
-The Strategy Builder window is divided into four main areas:
+### 2.2 Layout
 
-**Block Search & Filter (left panel)**  
-Browse all available building blocks — patterns, oscillators, price levels, sessions, trend indicators, and more. Use the search bar to filter by name. Click a block to view its signals and description before adding it.
+The main window is split into two resizable panes separated by a draggable splitter handle:
 
-**Strategy Configuration (centre panel)**  
-The working area where you assemble your strategy. Blocks appear here after you add them. Each block shows its logic type (AND / OR), weight, and configured signals. Drag blocks up or down to reorder them, or use the ▲ / ▼ arrows.
+| Pane | Contents |
+|------|----------|
+| **Left (40%)** | Strategy Information Panel (top) + Strategy Blocks Panel (bottom) |
+| **Right (60%)** | Block Search Panel |
 
-**Strategy Info Panel (top)**  
-Shows the strategy name, auto-generated description, bullish/bearish type indicator, and the count of required signals (AND blocks).
-
-**Real-time Preview (right panel)**  
-A live mini-backtest that runs on the last 30 days of data whenever you change the strategy. Shows a candlestick chart with signal markers and quick metrics (signals triggered, estimated win rate, estimated P&L). Updates automatically within 500 ms of each change.
-
-### 2.2 Window 2 — Backtest & Optimizer
-
-> **Screenshot needed (3):** Backtest & Optimizer window showing all five tabs with Tab 1 (Configuration) active.
-
-Window 2 has five tabs:
-
-| Tab | Name | Purpose |
-|-----|------|---------|
-| 1 | Configuration | Set date range, risk parameters, optimization settings |
-| 2 | Live Output | Monitor progress in real time during a run |
-| 3 | Trades | Browse all trade records from the current run |
-| 4 | Metrics | Compare performance statistics across configurations |
-| 5 | Compare | Side-by-side view of the last three configurations |
+Both panes are non-collapsible — they cannot be dragged to zero width.
 
 ---
 
-## 3. Strategy Builder
+## 3. Strategy Builder — Main Window
 
-A *strategy* is a set of building blocks — each representing a market signal or condition — combined with logic rules that together define when to enter and exit a trade.
+### 3.1 Menu Bar
 
-### 3.1 Core Concepts
+The menu bar has four menus:
 
-**Building Blocks**  
-Self-contained market indicators or pattern detectors. Each block belongs to a category (e.g., PATTERNS, OSCILLATORS, PRICE_LEVELS) and emits one or more named signals (e.g., `BEARISH_BREAKDOWN`, `OVERBOUGHT`).
+#### File Menu
+| Action | Shortcut | Description |
+|--------|----------|-------------|
+| New Strategy | Ctrl+N | Reset to a blank strategy (prompts to save if unsaved changes exist) |
+| Open Strategy… | Ctrl+O | Open the **Strategy Browser** to load a saved strategy from the database |
+| Save Strategy | Ctrl+S | Save the current strategy to the database as a new version |
+| Save Strategy As… | Ctrl+Shift+S | Save a copy under a new name (creates a new strategy record) |
+| Exit | Ctrl+Q | Close the application |
 
-**AND vs. OR Logic**  
-When you add a block you choose its logic type:
-- **AND (Required):** The block's signal *must* fire for a trade entry to be considered.
-- **OR (Optional / Booster):** The block adds to the confluence score but is not required on its own.
+#### Edit Menu
+| Action | Description |
+|--------|-------------|
+| Clear All Blocks | Remove all building blocks from the current strategy (cannot be undone) |
 
-**Confluence Score**  
-Each block has a *weight* (a number, typically 10–40). The confluence score is the sum of weights of all blocks whose signals are currently active. A trade entry is only triggered when the score reaches the configured minimum (default: 70 out of 100).
+#### Tools Menu
+| Action | Description |
+|--------|-------------|
+| Update Data… | Manually open the data update modal to fetch the latest candles from Binance |
+| Verify Data… | Run a read-only integrity scan across all timeframes and report gaps |
+| Settings… | Open the Settings dialog (API keys, preferences, admin options) |
+| Debug Logger | Submenu to toggle console/logfile debug output and view the current log |
 
-**Signal Roles**  
-Within a block, each signal is assigned a role:
-- **SIGNAL** — The primary entry trigger.
-- **FILTER** — Must be true; eliminates low-quality setups.
-- **BOOSTER** — Increases confluence score when active.
+#### Help Menu
+| Action | Description |
+|--------|-------------|
+| About Strategy Builder | Show version and capability information |
 
-**Strategy Categories**  
-Reversal, Continuation, Scalping, Range Trading, Breakout, Momentum, Mean Reversion. Choose the category that best describes your trade thesis.
+### 3.2 Toolbar
 
-### 3.2 Creating a New Strategy
+The toolbar sits below the menu bar and contains:
 
-1. In Window 1, click **New Strategy**.
-2. Enter a descriptive name (e.g., `m_pattern_rsi_london`). Names must be unique.
-3. The strategy info panel appears at the top. The centre panel is now empty and ready for blocks.
+- **New** — create a new strategy
+- **Open** — open the Strategy Browser
+- **Save** — save the current strategy
+- **Stepper Ribbon** (centred) — the four-step workflow progress indicator
 
-### 3.3 Adding Building Blocks
+### 3.3 Stepper Ribbon
 
-1. In the search bar (left panel), type a block name (e.g., `double top`) or browse by category.
-2. Click the block to expand its detail card — review the available signals, typical occurrence rate, and weight range.
-3. Click **Add as AND** (required) or **Add as OR** (optional/booster).
-4. The block appears in the centre panel. A default signal is pre-selected.
+The stepper ribbon displays the four workflow steps as clickable buttons:
 
-> **Tip:** Start with one primary pattern block set to AND, then add one or two confirming blocks (oscillators, price levels) also as AND. Add further supporting blocks as OR boosters.
+```
+📝 Design  →  ✓ Validate  →  🧪 Test / Optimize  →  🚀 Publish
+```
 
-### 3.4 Configuring Signals Within a Block
+Each step button changes colour to reflect its state:
 
-1. Click on a block in the centre panel to expand its signal configuration.
-2. The default signal is shown. Click **Add Signal** to add another signal from the same block.
-3. For each signal, choose its role (SIGNAL / FILTER / BOOSTER).
-4. Optionally enable **Within X Candles**: tick the checkbox, enter a candle count (e.g., `20`), and choose a reference signal. This means signal B must have fired within 20 candles of signal A.
+| Colour | State |
+|--------|-------|
+| Grey | Pending (not yet reached) |
+| Blue | Currently active |
+| Green (✓) | Completed successfully |
+| Red (✗) | Failed (e.g. validation errors) |
 
-### 3.5 Configuring Stop Loss and Take Profit
+Clicking a step button advances to that step **if its prerequisites are met**:
 
-Expand the **Adaptive SL/TP Configuration** panel below the block list:
+- **Design (Step 0):** Always available.
+- **Validate (Step 1):** Requires a strategy name and at least one block.
+- **Test / Optimize (Step 2):** Requires validation to have passed (green).
+- **Publish (Step 3):** Requires a test to have been initiated.
 
-| Setting | Options | Description |
-|---------|---------|-------------|
-| Stop Loss Mode | Fibonacci, Aggressive, Conservative | How the stop loss distance is calculated |
-| SL Fibonacci Level | 0.236, 0.382, 0.5, 0.618 | Retracement level used as SL anchor |
-| Take Profit Mode | Fibonacci, Hybrid, Static | How profit targets are set |
-| TP1 / TP2 / TP3 | Percentage values | Partial exit levels (e.g., 1.5%, 3.0%, 5.0%) |
+> Any modification to the strategy (adding/removing blocks, changing the name or type, reconfiguring signals) resets the Validate step back to its default state and requires re-validation.
 
-> **Screenshot needed (4):** The Adaptive SL/TP panel in expanded state with example values filled in.
+### 3.4 Strategy Information Panel (Left — Top)
 
-### 3.6 Validating a Strategy
+The **Strategy Information Panel** is the upper section of the left pane, labelled **"Strategy Information"**. It contains:
 
-The platform validates your strategy continuously. Errors appear as a red badge on the affected block, with a tooltip explaining the issue. Common validation errors:
+- **Strategy Name** — editable text field; required before saving.
+- **Description** — auto-generated read-only text area that updates when blocks are added or removed.
+- **Strategy Type** — radio buttons: **Bullish** (long) or **Bearish** (short).
+- **Metadata summary row** — shows counts of required signals, optional signals, rechecked signals, exit conditions, and time constraints as the strategy is assembled.
 
-| Error | Meaning | Fix |
-|-------|---------|-----|
-| Main signal block not found | The main signal block name does not match any added block | Ensure the first AND block is the primary pattern |
-| Block not found in registry | A block name is misspelled or not yet available | Use the search panel to find the correct name |
-| Weight out of range | A block's weight is outside its allowed range | Adjust the weight slider to the valid range |
-| No SIGNAL role found | No signal has the SIGNAL role assigned | Assign SIGNAL role to at least one signal |
-| Conflicting patterns | Both bullish and bearish signals exist | Use only bullish OR bearish signals, not both |
+### 3.5 Strategy Blocks Panel (Left — Bottom)
 
-When all errors are cleared, the strategy is valid and ready to save.
+The **Strategy Blocks Panel** occupies the lower section of the left pane. It is a scrollable list showing every building block that has been added to the strategy, in the order they will be evaluated.
 
-### 3.7 Saving and Loading Strategies
+Each block entry shows:
+- The block name (formatted display name)
+- Its signals, with AND/OR logic badges
+- Timing constraints (if configured)
+- Recheck settings (if configured)
+- Exit conditions attached to each signal or block
+- Controls: **▲ Up**, **▼ Down** (reorder), **✕ Remove**
+- A gear button on each signal to configure recheck settings
+- Exit condition buttons to add, edit, or remove exit conditions
 
-**Save:** Click **Save Strategy**. The configuration is saved as a JSON file in `user_strategies/`. The strategy is auto-numbered (e.g., strategy 001).
+### 3.6 Block Search Panel (Right)
 
-**Load:** Click **Load Strategy**. A list of saved strategies appears, showing name, type (Bullish/Bearish), and last modified date. Click a strategy to load it back into the builder.
+The **Block Search Panel** on the right side lets you browse and add building blocks to your strategy.
 
-**Export / Import:** Use File → Export to save a strategy to a custom location. Use File → Import to bring in a strategy from another location (useful for sharing).
+Features:
+- **Search bar** — filter blocks by name in real time
+- **Category filter** — dropdown to filter by block category
+- **Block list** — expandable items; click to expand a block and see its available signals
+- **Signal checkboxes** — select which signals within a block to add
+- **Add as AND / Add as OR** — add selected signals with the chosen logic type
+- **Added indicator** — once a block is added, its button updates to show it has been added (green checkmark)
+
+> Signals marked as exit signals can also be added directly as exit conditions from this panel using the exit button alongside each signal.
 
 ---
 
-## 4. Running Walk-Forward Tests
+## 4. The Four-Step Workflow
 
-Walk-forward testing is the primary way to validate a strategy on historical data before risking real capital.
+### Step 0 — Design
 
-### 4.1 What Is Walk-Forward Testing?
+This is where you build your strategy:
 
-Walk-forward testing simulates trading your strategy on a historical data window, candle by candle. Unlike a simple backtest, the expanding-window approach avoids peeking at future data — giving a realistic picture of how the strategy would have performed in real conditions.
+1. Enter a **Strategy Name** in the Strategy Information Panel.
+2. Select **Bullish** or **Bearish** as the strategy type.
+3. In the Block Search Panel (right), find building blocks and expand them to view their signals.
+4. Select the signals you want, then click **Add as AND** or **Add as OR**.
+5. In the Strategy Blocks Panel (left), reorder blocks with the ▲/▼ arrows.
+6. Optionally configure **timing constraints** on signals (gear icon → timing constraint dialog) to require signals to fire within a set number of candles of each other.
+7. Optionally configure **recheck settings** to require a signal to be confirmed again after a bar delay.
+8. Optionally add **exit conditions** to define when to close positions.
 
-### 4.2 Configuring a Test (Tab 1)
+### Step 1 — Validate
 
-In Window 2, Tab 1:
+Click the **Validate** step button in the Stepper Ribbon. The application runs an institutional-grade validation check on the strategy configuration and opens the **Validation Report Window**.
 
-**Date Range**
+The Validation Report shows:
+- Blocking issues (must be fixed before proceeding)
+- Warnings (recommended but not mandatory)
+- Auto-fix suggestions for common issues (click "Apply Fix" where available)
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| Start Date | Beginning of test period | `2024-01-01` |
-| End Date | End of test period | `2024-12-31` |
-| Timeframe | Candle size | `15m` (default) |
+If validation passes, the Validate button turns green (✓) and the status is persisted to the database automatically.
 
-**Capital & Risk**
+If validation fails, the button turns red (✗) and you must address the blocking issues and re-run validation.
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| Starting Capital | Account size in USD | `$10,000` |
-| Risk Per Trade | Percentage of capital at risk | `1%` |
-| Max Position Size | Maximum BTC per trade | `0.1 BTC` |
+### Step 2 — Test / Optimize
 
-**Stop Loss & Take Profit**  
-Set values here if you want to test fixed parameters. Leave unchecked to use the Adaptive SL/TP configuration from the Strategy Builder.
+Click the **Test / Optimize** step button. This opens the **Backtest Configuration Window** — see [Section 6](#6-backtest-configuration-window) for full details.
 
-### 4.3 Test Modes
+Signal calibration runs automatically when you click **Run Test** inside that window.
 
-**Mode 1 — Historical Walk-Forward**  
-Tests your strategy from a point in the past to the present. Each candle is processed in sequence. Results are shown when the last candle is reached. Use this mode for strategy development and validation.
+### Step 3 — Publish
 
-**Mode 2 — Live Continuation**  
-Starts with a historical walk-forward phase, then continues processing new live candles as they arrive in real time. Use this mode to monitor a strategy that has been historically validated and to observe it on current market conditions.
+Click the **Publish** step button to manage the publish status of the strategy. *(Publish status management is a forthcoming feature.)*
 
-### 4.4 Running a Test
+---
 
-1. Ensure your strategy is loaded in Window 1 (it will be highlighted in the strategy list).
-2. In Window 2, Tab 1, fill in the date range, capital, and risk parameters.
-3. Click **Run Test**.
-4. Watch progress in **Tab 2 (Live Output)**.
+## 5. Strategy Browser
 
-> **Screenshot needed (5):** Tab 2 (Live Output) mid-run, showing progress bar, current config details, and resource monitor.
+The **Strategy Browser** is a standalone window that opens via **File → Open Strategy…** (Ctrl+O) or the **Open** toolbar button.
 
-### 4.5 Reading the Results
+### 5.1 Purpose
 
-**Tab 3 — Trades**  
-Each row is one completed trade. Columns include:
+The Strategy Browser is the primary way to **load, manage, and organise strategies stored in the database**. There are no JSON files — all strategy data is persisted in PostgreSQL.
+
+### 5.2 Window Layout
+
+The Strategy Browser window (`StrategyBrowserDialog`) is split into two vertical sections by a draggable splitter:
+
+- **Upper section** — strategy table
+- **Lower section** — strategy details panel (shown when a strategy is selected)
+
+### 5.3 Header and Filters
+
+At the top of the window:
+- **Search box** — type to filter strategies by name, description, type, or date in real time
+- **Strategy Type filter** — dropdown: All / Bullish / Bearish
+- **Strategy count** — shows how many strategies match the current filter
+
+### 5.4 Strategy Table
+
+The table has six columns:
 
 | Column | Description |
 |--------|-------------|
-| Entry Time | When the position was opened |
-| Exit Time | When the position was closed |
-| Side | Long or Short |
-| Entry Price | Price at entry |
-| Exit Price | Price at exit |
-| PnL | Profit or loss in USD |
-| Duration | How long the trade was held |
+| Strategy Name | Name and a colour-coded summary of the first three blocks and their signals |
+| Type | Bullish (green dot) or Bearish (red dot) |
+| Version | Dropdown to select which version to load (each save creates a new version) |
+| Last Modified | Date and time the version was created |
+| Validation | `Un-Validated` (grey), `Pass` (green), or `Fail` (red) |
+| Published | Draft / Published status |
 
-**Tab 4 — Metrics**  
-Performance statistics for the run (or, during optimisation, for every parameter combination tested):
+Clicking a row selects it and populates the details panel. **Double-clicking a row opens the strategy immediately.**
 
-| Metric | What It Means | Good Value |
-|--------|--------------|------------|
-| Sharpe Ratio | Risk-adjusted return | > 2.0 |
-| Win Rate | % of trades that were profitable | > 55% |
-| Profit Factor | Gross profit ÷ gross loss | > 1.5 |
-| Max Drawdown | Largest peak-to-trough decline | < 20% |
-| Total PnL | Net profit/loss in USD | Positive |
-| Trade Count | Number of completed trades | > 30 for statistical validity |
+Columns are sortable by clicking the header.
 
-> **Screenshot needed (6):** Tab 4 (Metrics) showing a results table with at least five configurations ranked by Sharpe Ratio.
+### 5.5 Strategy Details Panel
 
-**Tab 5 — Compare**  
-Shows the last three parameter configurations side-by-side. Cells highlighted in green are improvements; cells in red are regressions. Use this to quickly see which parameter change made the difference.
+When a strategy is selected, the lower panel shows three columns:
+
+- **Strategy Information** — name, type badge, description, version number, creation date, and tags
+- **Configuration** — a hierarchical display of all signals with their AND/OR logic, timing constraints, recheck settings, and exit conditions at signal, block, and strategy level
+- **Performance** — test count, best Sharpe ratio, win rate, total trades, and a brief summary from the best backtest result
+
+### 5.6 Action Buttons
+
+| Button | Availability | Description |
+|--------|-------------|-------------|
+| Delete | When a row is selected | Permanently delete the selected strategy (or specific versions) from the database |
+| Duplicate | When a row is selected | Create a copy of the selected strategy as a new database entry |
+| Export to JSON | When a row is selected | Export the strategy configuration to a JSON file for backup or transfer |
+| Import from JSON | Always | Import a previously exported JSON file back into the database |
+| Cancel | Always | Close the browser without loading anything |
+| Open | When a row is selected | Load the selected strategy (at the chosen version) into the Strategy Builder |
+
+### 5.7 Strategy Versioning
+
+Every **Save** (Ctrl+S) creates a **new version** of the strategy in the database — it does not overwrite the previous version. The Version column in the Strategy Browser shows a dropdown listing all available versions (v1, v2, v3, …). You can select an older version to load a historical snapshot.
+
+**Save As** creates an entirely new strategy record with a new name and its own independent version history.
 
 ---
 
-## 5. Autopilot / Live Trading
+## 6. Backtest Configuration Window
 
-> **Warning:** Live trading involves real financial risk. Only activate Autopilot after thorough walk-forward validation on multiple time periods and after careful review of your risk settings.
+The Backtest Configuration Window (`BacktestConfigDialog`) opens when you click the **Test / Optimize** step in the Stepper Ribbon or click **Open** in the relevant context. It is a non-modal floating window with six tabs.
 
-### 5.1 What Autopilot Does
+### 6.1 Tab 1 — Config
 
-Autopilot connects the platform to Binance Futures (BTC/USDT Perpetual) and places real orders automatically whenever your strategy's confluence conditions are met. The platform runs continuously, processing each new 15-minute candle.
+Configure and launch a backtest run. Key settings include:
 
-### 5.2 Prerequisites Before Going Live
+- **Lookback Days** — how many days of historical data to use
+- **Training Window** — the walk-forward training window size
+- **Mode 1 / Mode 2** — historical backtest or live replay mode
+- **TP/SL Configuration** — take-profit and stop-loss parameters
+- **Starting Capital** — initial account balance in USDT
 
-Before activating Autopilot:
+Click **▶ Run Test** to start. Signal calibration runs automatically before the backtest executes.
 
-- [ ] Binance API key and secret are entered in `.env`
-- [ ] The API key has **Futures trading enabled** on Binance (but *not* withdrawals)
-- [ ] The strategy has been walk-forward validated on at least 6 months of data
-- [ ] Sharpe Ratio > 1.5 on the validation period
-- [ ] Max Drawdown < 20% on the validation period
-- [ ] Risk per trade is set to a comfortable level (start with 0.5%–1%)
+### 6.2 Tab 2 — Live Output
 
-### 5.3 Activating Autopilot
+A real-time scrolling log of all output from the running backtest, including data loading progress, NautilusTrader engine messages, and any errors.
 
-1. In Window 1, load the strategy you wish to run live.
-2. In Window 2, Tab 1, confirm risk parameters.
-3. Switch to **Mode 2 (Live Continuation)** and click **Run Test** — this will run the historical phase first.
-4. Once the historical phase completes and you see "Historical complete. Waiting for live candles…", the strategy is now live.
-5. New candles are processed automatically every 15 minutes.
+### 6.3 Tab 3 — Trades
 
-> **Screenshot needed (7):** The Live Continuation status panel showing "LIVE" status, historical period complete, and real-time P&L updating.
+A live table of all trades executed during the backtest, updated in real time as the run progresses.
 
-### 5.4 Monitoring a Live Strategy
+### 6.4 Tab 4 — Metrics
 
-During live operation, Tab 2 shows:
+Performance analysis for the completed (or running) backtest, including:
+- Sharpe ratio, Sortino ratio, Calmar ratio
+- Win rate, profit factor, maximum drawdown
+- Total trades, average trade duration
+- Equity curve summary
 
+### 6.5 Tab 5 — AI Recommendations
+
+An AI-powered recommendations panel that previews and sends analysis requests to the configured AI model (via OpenRouter). Provides intelligent suggestions for improving strategy parameters based on backtest results.
+
+### 6.6 Tab 6 — Compare
+
+Side-by-side comparison of two different backtest configurations, allowing you to evaluate the impact of parameter changes.
+
+### 6.7 Pause, Resume, and Stop
+
+During a running backtest, controls are available to **Pause**, **Resume**, and **Stop** execution.
+
+---
+
+## 7. Settings
+
+Open via **Tools → Settings…**. The Settings dialog has three tabs:
+
+### 7.1 Tab — API Keys
+
+Secret fields for credentials. Each field shows a masked display (last 4 characters only). Controls:
+- **Show 10s** — reveals the full value in plain text for 10 seconds, then auto-masks
+- **Edit** — enter edit mode to change the value (leave blank to keep the existing value)
+
+API key fields:
 | Field | Description |
 |-------|-------------|
-| Test Status | 🟢 LIVE |
-| Historical Period | Days of historical data (complete) |
-| Live Period | Days/hours since live mode started |
-| New Candles Processed | Count of live candles seen |
-| Live P&L | Current running P&L since going live |
+| OpenRouter AI Key | API key for AI recommendations (via OpenRouter) |
+| LakeAPI Key | API key for LakeAPI market data |
+| LakeAPI Secret | API secret for LakeAPI |
 
-### 5.5 Stopping Autopilot
+> All secret values are stored in the **OS keyring** (GNOME Keyring on Linux, Keychain on macOS), never in `.env` or any plain-text file.
 
-Click **Stop Test** at any time. The platform will:
-1. Close any open positions (if configured to do so — check your risk settings)
-2. Generate a final performance report covering the full test period (historical + live)
-3. Return the window to idle state
+### 7.2 Tab — Preferences
 
-### 5.6 Risk Management Safeguards
+Non-secret user settings organised in groups:
 
-The platform has built-in safeguards:
+- **AI Configuration** — AI model identifier (e.g. `anthropic/claude-4.5-sonnet`)
+- **Performance & Resources** — CPU workers, memory limits, update intervals
+- **Data & API** — LakeAPI region, monthly transfer limit
+- **Alerts & Logging** — enable alerts, log level, alert email address
+- **UI Preferences** — dark theme, UI theme
 
-| Safeguard | Description |
-|-----------|-------------|
-| Per-trade risk limit | Each trade risks at most `RISK_PER_TRADE_PCT` of capital |
-| Max leverage cap | Leverage is capped at the value set in the strategy config (default: 2×) |
-| Stop loss enforcement | All entries place a stop loss order simultaneously |
-| Max bars held | Positions are force-closed after `MAX_BARS_HELD` candles (default: 1000) |
+### 7.3 Tab — Admin (PIN-Protected)
 
----
+The Admin tab is hidden until you authenticate with an admin PIN (click **"Admin Access"** below the tabs and enter your PIN).
 
-## 6. Settings & Configuration
+Admin settings cover database connection details, connection pool configuration, DB SSL, backup settings, risk management thresholds, optimization ranges, and performance metric weights.
 
-### 6.1 Environment Variables (`.env`)
-
-All runtime settings are controlled via the `.env` file. After editing, restart the application for changes to take effect.
-
-**Database**
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `POSTGRES_HOST` | PostgreSQL host | `localhost` |
-| `POSTGRES_PORT` | PostgreSQL port | `5432` |
-| `POSTGRES_DB` | Database name | `optimizer_v3` |
-| `POSTGRES_USER` | Database username | — |
-| `POSTGRES_PASSWORD` | Database password | — |
-
-**Exchange API**
-
-| Variable | Description |
-|----------|-------------|
-| `BINANCE_API_KEY` | Binance Futures API key |
-| `BINANCE_SECRET` | Binance Futures API secret |
-| `BINANCE_TESTNET` | Set to `true` to use Binance testnet (paper trading) |
-
-**Performance**
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `MAX_WORKERS` | Parallel backtest workers | CPU cores − 2 |
-| `TEST_CACHE_ENABLED` | Cache backtest data to disk | `true` |
-| `TEST_CACHE_TTL` | Cache lifetime in seconds | `3600` |
-| `PERF_HISTORY_LENGTH` | Candles kept in memory for metrics | `100` |
-| `LOG_LEVEL` | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
-
-**Optimiser**
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `EARLY_STOP_PATIENCE` | Stop after N configs with no improvement | `10` |
-| `EARLY_STOP_MIN_DELTA` | Minimum improvement threshold | `0.001` |
-| `ENABLE_CHECKPOINTS` | Save progress during optimisation | `true` |
-| `CHECKPOINT_INTERVAL` | Save every N configs | `5` |
-
-### 6.2 Strategy-Level Risk Settings
-
-Each strategy stores its own risk settings in its JSON configuration file (`user_strategies/`):
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `min_confluence` | Minimum score required to trigger a trade | `70` |
-| `risk_per_trade_pct` | % of capital risked per trade | `1.0` |
-| `max_leverage` | Maximum leverage multiplier | `2.0` |
-| `max_bars_held` | Force-close after this many candles | `1000` |
-| `risk_reward_ratio` | Minimum R:R target | `1:3` |
-
-### 6.3 Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl + O` | Open / load strategy |
-| `Ctrl + S` | Save strategy |
-| `Ctrl + B` | Run backtest |
-| `Ctrl + Shift + O` | Start optimisation |
-| `Ctrl + E` | Export results |
-| `F5` | Refresh current view |
-| `Esc` | Cancel running operation |
+> **First-time use:** If no admin PIN is set, you will be prompted to create one. The PIN is stored as a bcrypt hash in the OS keyring — it is never stored in plain text.
 
 ---
 
-## 7. Monitoring & Logs
+## 8. Data Management
 
-### 7.1 Log Files
+### 8.1 Automatic Data Updates
 
-The application writes logs to the `logs/` directory. Log files are named by date (e.g., `strategy_builder_2026-05-08.log`).
+When the application starts, it displays a **Data Update Modal** that checks for missing BTC/USDT candle data and fetches any gaps from Binance. This modal closes automatically once the update completes.
 
-| Log Level | What Is Recorded |
-|-----------|-----------------|
-| DEBUG | Detailed internal state (verbose; enable only when debugging) |
-| INFO | Normal operation events — trades opened/closed, candles processed |
-| WARNING | Non-fatal issues — missed candles, slow response from exchange |
-| ERROR | Failures that need attention — database errors, API failures |
+After startup, the application runs a **background auto-update cycle** every 15 minutes that:
+1. Detects any gaps in the 15-minute and 1-hour bar datasets
+2. Downloads missing bars from Binance
+3. Updates the status bar with a countdown to the next update
 
-To view logs in real time:
+### 8.2 Manual Data Update
 
-```bash
-tail -f logs/strategy_builder_$(date +%Y-%m-%d).log
-```
+Use **Tools → Update Data…** to open the Data Update Modal at any time and manually trigger a gap-fill from Binance.
 
-### 7.2 System Status Indicators
+### 8.3 Data Verification
 
-Within the application, status indicators appear in the Live Output tab:
-
-| Indicator | Meaning |
-|-----------|---------|
-| 🟢 LIVE | Strategy running, receiving live candles |
-| 🟡 RUNNING | Backtest or optimisation in progress |
-| 🔴 ERROR | An error occurred; check the error log panel |
-| ⚪ IDLE | Application ready, no active run |
-
-### 7.3 Resource Monitor
-
-Tab 2 shows live resource usage:
-
-| Metric | Good Range | Action If Exceeded |
-|--------|-----------|-------------------|
-| CPU | 70%–90% | Reduce `MAX_WORKERS` in `.env` |
-| Memory | < 2 GB | Reduce `PERF_HISTORY_LENGTH` or clear cache |
-| Disk | < 80% | Delete old optimiser output files or archive them |
+Use **Tools → Verify Data…** to run a **read-only** integrity scan across all timeframes. This reports any detected gaps without modifying any stored data.
 
 ---
 
-## 8. Troubleshooting
+## 9. Debug Logger
 
-### 8.1 Application Will Not Start
+The **Tools → Debug Logger** submenu provides controls for diagnostic logging:
 
-**Symptom:** Error on launch — `ImportError` or `ModuleNotFoundError`
+| Option | Description |
+|--------|-------------|
+| Enable Debugger in Console | Toggle debug output to the terminal console |
+| Enable Debugger in Log File | Toggle debug output to files in the `logs/` directory |
+| Clear Old Logs | Delete old log files from `logs/` to free disk space |
+| View Current Log File | Open the current session log in the built-in **Log Viewer** window |
 
-**Fix:**
-```bash
-# Ensure the virtual environment is active
-source venv/bin/activate
-
-# Reinstall dependencies
-pip install -r requirements.txt
-
-# Verify NautilusTrader
-python -c "import nautilus_trader; print('OK')"
-```
-
-### 8.2 Database Connection Failed
-
-**Symptom:** `Database connection failed` error on launch or when running a test.
-
-**Fix:**
-```bash
-# Confirm PostgreSQL is running
-sudo systemctl status postgresql
-
-# Test the connection manually
-psql -h localhost -U optimizer_admin -d optimizer_v3
-
-# Check .env credentials match PostgreSQL user and database
-```
-
-### 8.3 No Trades Generated
-
-**Symptom:** Backtest completes but the trade count is 0.
-
-**Possible causes and fixes:**
-
-| Cause | Fix |
-|-------|-----|
-| Confluence threshold too high | Lower `min_confluence` in strategy settings (try 60) |
-| No blocks with SIGNAL role | Ensure at least one signal has the SIGNAL role |
-| Date range has no market data | Check that your data covers the selected date range (`data/` folder) |
-| AND blocks too restrictive | Try changing some AND blocks to OR temporarily to verify signals fire |
-
-### 8.4 Optimisation Running Very Slowly
-
-**Symptom:** Estimated time is hours for a small number of configurations.
-
-**Fix:**
-- Reduce `MAX_WORKERS` to CPU cores − 2 (avoid over-parallelism)
-- Shorten the test date range
-- Reduce the number of parameters being optimised (2–3 at a time is ideal)
-- Enable `TEST_CACHE_ENABLED=true` in `.env` so historical data is not reloaded each run
-
-### 8.5 Out-of-Memory Error
-
-**Symptom:** Application crashes with a memory error during a large optimisation.
-
-**Fix:**
-```
-# In .env:
-MAX_WORKERS=2
-PERF_HISTORY_LENGTH=100
-
-# Delete cached data
-rm -rf profiles/*
-```
-
-### 8.6 Live Trading — Orders Not Placing
-
-**Symptom:** Live mode is running but no orders appear on Binance.
-
-**Checklist:**
-- [ ] `BINANCE_API_KEY` and `BINANCE_SECRET` are correctly set in `.env`
-- [ ] API key has Futures trading enabled (not just spot)
-- [ ] `BINANCE_TESTNET` is set to `false` (or removed from `.env`)
-- [ ] Account has sufficient margin for the configured position size
-- [ ] Strategy is in LIVE status (🟢), not just historical phase
-
-### 8.7 Signal Not Firing as Expected
-
-**Symptom:** You expect a pattern to trigger but no signal appears.
-
-**Fix:**
-- Use the Real-time Preview panel to verify signals on recent candles
-- Check the signal role is set to SIGNAL (not FILTER or BOOSTER)
-- Check timing constraints — a `Within X Candles` constraint may be filtering out valid setups
-- Review block weight — if the confluence threshold is 70 and the block weight is only 20, additional blocks must also fire
+Both console and log file logging are **enabled by default** on startup.
 
 ---
 
-## 9. Screenshot Requirements
+## 10. Troubleshooting
 
-The following screenshots are needed to complete this user guide. Please capture each on a real or representative system state:
+### Application does not start
 
-| # | Section | Screen / Window | What to Show |
-|---|---------|----------------|-------------|
-| 1 | 1.5 Launching | Main window after launch | Empty/default state of both windows |
-| 2 | 2.1 Strategy Builder | Window 1 with strategy loaded | Annotated: block search, centre panel, info panel, preview |
-| 3 | 2.2 Backtest Window | Window 2, Tab 1 active | All five tabs visible, Configuration tab fields |
-| 4 | 3.5 SL/TP Config | Adaptive SL/TP panel expanded | Example values: Fibonacci SL at 0.618, TP1=1.5%, TP2=3.0% |
-| 5 | 4.4 Running Test | Tab 2 during active run | Progress bar, current config info, resource monitor |
-| 6 | 4.5 Results | Tab 4 Metrics | Results table, at least 5 rows, sorted by Sharpe Ratio |
-| 7 | 5.3 Live Mode | Live Continuation status | "LIVE" status badge, historical complete, live P&L counter |
+- Confirm PostgreSQL is running: `sudo systemctl status postgresql`
+- Confirm your `.env` has the correct `POSTGRES_*` settings
+- Run `python scripts/launch_strategy_builder.py` from a terminal to see full error output
+
+### Strategy Browser shows no strategies
+
+- The database may be empty — create and save a strategy first
+- Check PostgreSQL connectivity: the status bar will show an error if the database is unreachable
+
+### Data update fails at startup
+
+- Check your internet connection — Binance is required for live data
+- If the update times out (60-second hard limit), the application will continue and retry at the next 15-minute boundary
+- Use **Tools → Verify Data…** to see which timeframes have gaps
+
+### Validation fails with unexpected errors
+
+- Use the Validation Report window to read the exact blocking issue messages
+- Apply auto-fix suggestions where available (click "Apply Fix" in the report)
+- If fixes are applied, save the strategy and re-run validation
+
+### Backtest produces no trades
+
+- Ensure the strategy has passed validation (green ✓ on the Validate step)
+- Check the **Live Output** tab for error messages during the run
+- Ensure the lookback period covers a date range that has data (use **Verify Data** to confirm)
+
+### Settings dialog — Admin tab not visible
+
+- Click **"Admin Access"** below the Settings tabs and enter your admin PIN
+- If you have not set a PIN, you will be prompted to create one on first access
 
 ---
 
-*For architecture and developer documentation, see `docs/architecture/`. For strategy reference, see `docs/strategies/`. For building block signal details, see `docs/building-blocks/`.*
+*Screenshot placeholders — exact window names from source code:*
+
+| Section | Window / Dialog Name |
+|---------|---------------------|
+| Main window | `StrategyBuilderMainWindow` |
+| Strategy Browser | `StrategyBrowserDialog` |
+| New Strategy dialog | `NewStrategyDialog` |
+| Backtest Configuration | `BacktestConfigDialog` |
+| Validation Report | `ValidationReportWindow` |
+| Exit Condition dialog | `ExitConditionDialog` |
+| Timing Constraint dialog | `TimingConstraintDialog` |
+| Settings | `SettingsDialog` |
+| Data Update Modal | `DataUpdateModal` |
+| Data Verify dialog | `DataVerifyDialog` |
+| Log Viewer | `LogViewerWindow` |
