@@ -77,6 +77,7 @@ class DataVerifyThread(QThread):
                 'total_missing_bars': int,       # across all gaps
                 'repairable_missing_bars': int,
                 'too_old_missing_bars': int,
+                'last_candle_ts': datetime|None, # most recent stored bar
             },
             ...
             '_error': str,  # only present on exception
@@ -105,6 +106,7 @@ class DataVerifyThread(QThread):
                 self.progress.emit(pct_start, 100, f"Scanning {tf} data for gaps…")
 
                 all_gaps: List[Dict] = manager.detect_gaps_in_binance_files(tf)
+                last_candle_ts: Optional[datetime] = manager.get_last_bar_timestamp(tf)
 
                 repairable = [g for g in all_gaps if g['gap_start'] >= horizon_cutoff]
                 too_old = [g for g in all_gaps if g['gap_start'] < horizon_cutoff]
@@ -118,6 +120,7 @@ class DataVerifyThread(QThread):
                     'total_missing_bars': sum(g['missing_bars'] for g in all_gaps),
                     'repairable_missing_bars': sum(g['missing_bars'] for g in repairable),
                     'too_old_missing_bars': sum(g['missing_bars'] for g in too_old),
+                    'last_candle_ts': last_candle_ts,
                 }
                 self.progress.emit(
                     pct_end, 100,
@@ -213,9 +216,9 @@ class DataVerifyDialog(QDialog):
             | Qt.WindowMaximizeButtonHint
         )
         self.setModal(True)
-        self.setMinimumWidth(1100)
+        self.setMinimumWidth(1300)
         self.setMinimumHeight(720)
-        self.resize(1160, 800)
+        self.resize(1380, 800)
         self.setStyleSheet(get_main_stylesheet())
 
         root = QVBoxLayout()
@@ -257,13 +260,13 @@ class DataVerifyDialog(QDialog):
         results_layout = QVBoxLayout()
         results_layout.setContentsMargins(10, 10, 10, 10)
 
-        self._table = QTableWidget(0, 5)
+        self._table = QTableWidget(0, 6)
         self._table.setHorizontalHeaderLabels(
-            ["Timeframe", "Status", "Gaps Found", "Missing Bars", "Notes"]
+            ["Timeframe", "Status", "Gaps Found", "Missing Bars", "Last Candle", "Notes"]
         )
         hdr = self._table.horizontalHeader()
         hdr.setSectionResizeMode(QHeaderView.ResizeToContents)
-        hdr.setSectionResizeMode(4, QHeaderView.Stretch)  # Notes gets all remaining space
+        hdr.setSectionResizeMode(5, QHeaderView.Stretch)  # Notes gets all remaining space
         self._table.setAlternatingRowColors(True)
         self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self._table.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -384,6 +387,7 @@ class DataVerifyDialog(QDialog):
             o_missing: int = tf_data.get('too_old_missing_bars', 0)
             r_gaps: List[Dict] = tf_data.get('repairable', [])
             o_gaps: List[Dict] = tf_data.get('too_old', [])
+            last_candle_ts: Optional[datetime] = tf_data.get('last_candle_ts')
 
             total_repairable += r_count
             total_too_old += o_count
@@ -394,6 +398,14 @@ class DataVerifyDialog(QDialog):
                 self._has_repairable_gaps = True
 
             gaps_found = r_count + o_count
+
+            # Format the last candle timestamp for display (col 4)
+            if last_candle_ts is not None:
+                last_candle_text = last_candle_ts.strftime('%Y-%m-%d %H:%M UTC')
+                last_candle_color = COLORS['text_secondary']
+            else:
+                last_candle_text = "—"
+                last_candle_color = COLORS['text_muted']
 
             # --- Primary row ---
             if gaps_found == 0:
@@ -432,7 +444,8 @@ class DataVerifyDialog(QDialog):
             self._table.setItem(row, 1, cell(status_text, status_color, bold=True))
             self._table.setItem(row, 2, cell(gaps_cell))
             self._table.setItem(row, 3, cell(missing_cell))
-            self._table.setItem(row, 4, cell(notes))
+            self._table.setItem(row, 4, cell(last_candle_text, last_candle_color))
+            self._table.setItem(row, 5, cell(notes))
 
             # --- Secondary row for mixed case: detail the too-old portion ---
             if r_count > 0 and o_count > 0:
@@ -443,8 +456,9 @@ class DataVerifyDialog(QDialog):
                 self._table.setItem(row2, 1, cell("Too Old — LakeAPI needed", COLORS['warning'], bold=True))
                 self._table.setItem(row2, 2, cell(str(o_count)))
                 self._table.setItem(row2, 3, cell(str(o_missing)))
+                self._table.setItem(row2, 4, cell("—", COLORS['text_muted']))  # no separate last-candle for sub-row
                 self._table.setItem(
-                    row2, 4,
+                    row2, 5,
                     cell(f"From {earliest_old.strftime('%Y-%m-%d')} — beyond {_BINANCE_HORIZON_DAYS}d horizon")
                 )
 
@@ -582,7 +596,7 @@ class DataVerifyDialog(QDialog):
         item = QTableWidgetItem(error_msg)
         item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         item.setForeground(QColor(COLORS['error']))
-        self._table.setItem(0, 4, item)
+        self._table.setItem(0, 5, item)
 
     # ------------------------------------------------------------------
     # Qt overrides
