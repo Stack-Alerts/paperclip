@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
     category='PATTERNS',
     class_name='InternalPivotPattern',
     default_weight=30,
+    description='Internal Pivot Pattern - Identifies internal swing highs/lows within larger structures as key reversal or continuation pivots. Used for precise entry timing at local turning points. Suitable for both directions.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular pattern signals
         'BEARISH_PIVOT_HIGH', 'BULLISH_PIVOT_LOW', 'PIVOT_HIGH', 'PIVOT_LOW',

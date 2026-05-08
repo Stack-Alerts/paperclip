@@ -108,6 +108,8 @@ logger = logging.getLogger(__name__)
     category='WYCKOFF',
     class_name='WyckoffAccumulation',
     default_weight=28,
+    description='Wyckoff Accumulation - Detects classic Wyckoff accumulation phases: PS, SC, AR, and Spring patterns indicating institutional buying. Bullish setup for entering longs after accumulation is confirmed. Best for longer timeframe swing strategies.',
+    direction='BULLISH',
     valid_signals=[
         # Granular Wyckoff accumulation signals
         'SOS_BREAKOUT', 'SPRING_DETECTED', 'ACCUMULATION_PHASE_A', 'ACCUMULATION_PHASE_B', 'NO_ACCUMULATION',

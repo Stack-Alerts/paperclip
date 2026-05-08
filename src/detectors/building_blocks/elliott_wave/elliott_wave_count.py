@@ -44,6 +44,7 @@ import numpy as np
     category='ELLIOTT_WAVE',
     class_name='ElliottWaveCount',
     default_weight=22,
+    direction='NEUTRAL',
     valid_signals=[
         # Wave Position Signals (1-5) - GRANULAR for advanced users
         'WAVE_1_BULLISH', 'WAVE_1_BEARISH',

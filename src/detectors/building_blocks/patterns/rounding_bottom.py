@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='RoundingBottomPattern',
     default_weight=30,
+    description='Rounding Bottom - Bullish reversal pattern with a slow, gradual curve from downtrend to uptrend (saucer shape). Signals long-term accumulation and sentiment shift. Best for longer timeframe trend-reversal strategies.',
+    direction='BULLISH',
     valid_signals=[
         # Granular pattern signals
         'BREAKOUT_CONFIRMED', 'PATTERN_FORMING', 'NO_PATTERN',

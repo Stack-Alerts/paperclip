@@ -87,6 +87,8 @@ logger = logging.getLogger(__name__)
     category='WYCKOFF',
     class_name='WyckoffDistribution',
     default_weight=28,
+    description='Wyckoff Distribution - Detects Wyckoff distribution phases: BC, UT, and LPSY patterns indicating institutional selling. Bearish setup for entering shorts after distribution is confirmed. Best for longer timeframe swing strategies.',
+    direction='BEARISH',
     valid_signals=[
         # Granular Wyckoff distribution signals
         'SOW_BREAKDOWN', 'UTAD_DETECTED', 'DISTRIBUTION_PHASE_A', 'DISTRIBUTION_PHASE_B', 'NO_DISTRIBUTION',

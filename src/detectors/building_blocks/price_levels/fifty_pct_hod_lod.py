@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
     category='PRICE_LEVELS',
     class_name='FiftyPctHODLOD',
     default_weight=18,
+    description='Fifty Percent HOD/LOD - Identifies the 50% midpoint between the high and low of the day. Key equilibrium level where price frequently finds support or resistance. Neutral reference for intraday mean-reversion strategies.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular position signals
         'ABOVE_EQUILIBRIUM',      # Price above yesterday's 50%

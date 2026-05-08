@@ -42,6 +42,7 @@ from src.utils.advanced_data_loader import advanced_data
     category='INSTITUTIONAL',
     class_name='OrderFlowImbalance',
     default_weight=15,
+    direction='NEUTRAL',
     valid_signals=[
         # Flow imbalances - GRANULAR
         'BUY_IMBALANCE', 'SELL_IMBALANCE', 'BALANCED',

@@ -34,6 +34,8 @@ import numpy as np
     category='SMC_ICT',
     class_name='MarketStructureShift',
     default_weight=20,
+    description='Market Structure Shift (MSS) - Detects a significant change in the dominant market structure (higher highs to lower highs or vice versa). Stronger than ChoCh, confirms trend reversal. Neutral — direction determined by shift type.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular SMC signals
         'BEARISH_MSS', 'BEARISH_RETEST', 'BULLISH_MSS', 'BULLISH_RETEST',

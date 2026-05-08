@@ -61,6 +61,8 @@ class InitialBalanceRange:
     category='PATTERNS',
     class_name='InitialBalanceBreakout',
     default_weight=30,
+    description='Initial Balance Breakout - Detects price breaking above or below the first-hour trading range (IB). Breakouts from the initial balance often set the day direction. Ideal for intraday momentum and session strategies.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular pattern signals
         'BULLISH_BREAKOUT', 'BEARISH_BREAKOUT', 'ABOVE_IB', 'BELOW_IB', 'INSIDE_IB', 'LOWER_IB', 'IB_FORMED', 'NO_IB',

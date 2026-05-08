@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='FlagPattern',
     default_weight=30,
+    description='Flag Pattern - Short consolidation pullback against a strong trend, followed by continuation in trend direction. Bullish flags form after strong up moves; bearish flags after strong down moves. High win-rate momentum continuation.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular pattern signals
         'BEARISH_BREAKOUT', 'BULLISH_BREAKOUT', 'PATTERN_FORMING', 'NO_PATTERN',

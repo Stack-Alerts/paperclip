@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
     category='SIGNALS',
     class_name='ASFXA2VWAP',
     default_weight=20,
+    description='ASFX A2 VWAP - Proprietary signal combining VWAP deviation with momentum filters. Detects institutional order flow bias relative to VWAP. Used to align trade direction with institutional activity.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular VWAP signals
         'ABOVE_VWAP', 'BELOW_VWAP', 'AT_VWAP', 'VWAP_CROSS_UP', 'VWAP_CROSS_DOWN',

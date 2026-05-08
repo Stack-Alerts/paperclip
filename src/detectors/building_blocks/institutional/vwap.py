@@ -30,6 +30,7 @@ import numpy as np
     category='INSTITUTIONAL',
     class_name='VWAP',
     default_weight=15,
+    direction='NEUTRAL',
     valid_signals=[
         # Position signals - GRANULAR
         'ABOVE_VWAP', 'BELOW_VWAP', 'AT_VWAP',

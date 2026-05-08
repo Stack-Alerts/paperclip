@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
     category='PRICE_LEVELS',
     class_name='ILOD',
     default_weight=20,
+    description='iLOD (Prior Low of Day) - Tracks the previous session low of day as a reference level. Prior LOD becomes support in bullish conditions or target in bearish. Neutral level for session continuation strategies.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular event signals
         'BEARISH_BREAK',      # Broke below previous ILOD

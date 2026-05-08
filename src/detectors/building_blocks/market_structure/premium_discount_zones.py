@@ -46,6 +46,7 @@ import numpy as np
     category='MARKET_STRUCTURE',
     class_name='PremiumDiscountZones',
     default_weight=14,
+    direction='NEUTRAL',
     valid_signals=[
         # Zone locations - GRANULAR
         'PRICE_IN_PREMIUM', 'PRICE_IN_DISCOUNT', 'PRICE_AT_EQUILIBRIUM',

@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
     category='PATTERNS',
     class_name='SwingBreakoutSequence',
     default_weight=30,
+    description='Swing Breakout Sequence - Detects a series of higher highs/lower lows with successive breakouts forming a trend sequence. Confirms trending market structure with momentum. Directionally neutral based on breakout direction.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular pattern signals
         'BEARISH_BREAKOUT_SEQUENCE', 'BULLISH_BREAKOUT_SEQUENCE',

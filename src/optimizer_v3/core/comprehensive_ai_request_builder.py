@@ -108,13 +108,25 @@ class ComprehensiveAIRequestBuilder:
         """
         logger.info("\n🔧 Building Comprehensive AI Request...")
         
+        # Derive strategy direction for catalog filtering (B2/B3)
+        strategy_type = (strategy_config or {}).get('strategy_type', '') if strategy_config else ''
+        strategy_direction = 'BEARISH' if 'bearish' in strategy_type.lower() else 'BULLISH' if 'bullish' in strategy_type.lower() else None
+        
+        # Determine which blocks are already in the current strategy (for B3 compact format)
+        current_block_names = set(
+            b.get('name', '') for b in (strategy_config or {}).get('blocks', [])
+        ) if strategy_config else set()
+        
         request = {
             'metadata': self._build_metadata(),
             'strategy_configuration': self._extract_strategy_config(strategy_config),
             'backtest_configuration': self._extract_backtest_config(backtest_config, backtest_results),
             'trade_results': self._extract_trade_results(backtest_results),
             'performance_metrics': self._extract_metrics(metrics_with_ratings, backtest_results),
-            'available_building_blocks': self._extract_available_blocks(),
+            'available_building_blocks': self._extract_available_blocks(
+                strategy_direction=strategy_direction,
+                current_block_names=current_block_names
+            ),
             'signal_statistics': self._extract_signal_statistics(backtest_results),
             'analysis_context': self._extract_analysis_context(analysis_report)
         }
@@ -473,55 +485,102 @@ class ComprehensiveAIRequestBuilder:
         
         return metrics
     
-    def _extract_available_blocks(self) -> List[Dict]:
-        """Extract ALL available building blocks from BlockRegistry with complete descriptions"""
+    def _extract_available_blocks(
+        self,
+        strategy_direction: Optional[str] = None,
+        current_block_names: Optional[set] = None
+    ) -> List[Dict]:
+        """Extract available building blocks from BlockRegistry.
+
+        B2 — Direction filter:
+            When strategy_direction is BEARISH, only BEARISH and NEUTRAL blocks
+            are included in the catalog.  BULLISH-only blocks are excluded so the
+            AI cannot recommend them for a short strategy.
+            When strategy_direction is BULLISH (or unknown), all blocks are shown.
+
+        B3 — Compact format for non-current blocks:
+            Blocks NOT already in the strategy are emitted as a compact record
+            (name, category, direction, one-line description only) to reduce
+            token footprint from ~135K chars to <20K chars.
+            Blocks already IN the strategy always emit the full signal-tier JSON
+            so the AI can reason about existing configuration.
+        """
         if not self.block_registry:
             return []
+        
+        if current_block_names is None:
+            current_block_names = set()
         
         try:
             all_blocks = self.block_registry.get_all_blocks()
             
             blocks_catalog = []
+            filtered_count = 0
+            
             for block_name, metadata in all_blocks.items():
-                # Handle empty descriptions properly (None, empty string, or whitespace-only)
+                # --- B2: Direction filter ---
+                block_direction = getattr(metadata, 'direction', 'NEUTRAL')
+                if strategy_direction == 'BEARISH' and block_direction == 'BULLISH':
+                    filtered_count += 1
+                    continue  # Exclude bullish-only blocks from bearish strategy catalog
+                
+                # Handle empty descriptions properly
                 description = (metadata.description or '').strip()
                 if not description:
                     description = f"{block_name.replace('_', ' ').title()} detector"
                 
-                block_info = {
-                    'name': block_name,
-                    'category': metadata.category,
-                    'description': description,
-                    'signals': []
-                }
+                is_in_strategy = block_name in current_block_names
                 
-                # Extract signals from signal_tiers (correct attribute name)
-                if hasattr(metadata, 'signal_tiers') and metadata.signal_tiers:
-                    for signal_name, tier_info in metadata.signal_tiers.items():
-                        if isinstance(tier_info, dict):
-                            # CRITICAL: Only include signals that are visible in UI
-                            # Skip signals with ui_visible: False (internal/hidden signals)
-                            ui_visible = tier_info.get('ui_visible', True)  # Default True if not specified
-                            if ui_visible is False:
-                                continue  # Skip this signal - not available in Strategy Builder UI
-                            
-                            # Get description from tier_info if it exists
-                            signal_description = tier_info.get('description', '')
-                            if not signal_description:
-                                # Generate basic description from signal name
-                                signal_description = signal_name.replace('_', ' ').title()
-                            
-                            signal_info = {
-                                'name': signal_name,
-                                'description': signal_description,
-                                'base_points': tier_info.get('base_points', tier_info.get('points', 0)),
-                                'formula': tier_info.get('formula', 'fixed')
-                            }
-                            block_info['signals'].append(signal_info)
-                
-                blocks_catalog.append(block_info)
+                if is_in_strategy:
+                    # --- B3: Full format for blocks already in strategy ---
+                    block_info = {
+                        'name': block_name,
+                        'category': metadata.category,
+                        'direction': block_direction,
+                        'description': description,
+                        'in_strategy': True,
+                        'signals': []
+                    }
+                    
+                    # Extract signals from signal_tiers (correct attribute name)
+                    if hasattr(metadata, 'signal_tiers') and metadata.signal_tiers:
+                        for signal_name, tier_info in metadata.signal_tiers.items():
+                            if isinstance(tier_info, dict):
+                                # Only include signals visible in Strategy Builder UI
+                                ui_visible = tier_info.get('ui_visible', True)
+                                if ui_visible is False:
+                                    continue
+                                
+                                signal_description = tier_info.get('description', '')
+                                if not signal_description:
+                                    signal_description = signal_name.replace('_', ' ').title()
+                                
+                                signal_info = {
+                                    'name': signal_name,
+                                    'description': signal_description,
+                                    'base_points': tier_info.get('base_points', tier_info.get('points', 0)),
+                                    'formula': tier_info.get('formula', 'fixed')
+                                }
+                                block_info['signals'].append(signal_info)
+                    
+                    blocks_catalog.append(block_info)
+                else:
+                    # --- B3: Compact format for blocks NOT in strategy ---
+                    # Only name, category, direction, and first sentence of description
+                    short_desc = description.split('.')[0].strip()
+                    blocks_catalog.append({
+                        'name': block_name,
+                        'category': metadata.category,
+                        'direction': block_direction,
+                        'description': short_desc,
+                    })
             
-            logger.info(f"   ✅ Extracted {len(blocks_catalog)} blocks with {sum(len(b['signals']) for b in blocks_catalog)} signals")
+            in_strategy_count = sum(1 for b in blocks_catalog if b.get('in_strategy'))
+            compact_count = len(blocks_catalog) - in_strategy_count
+            logger.info(
+                f"   ✅ Extracted {len(blocks_catalog)} blocks "
+                f"({in_strategy_count} full, {compact_count} compact, {filtered_count} filtered by direction)"
+            )
             return blocks_catalog
             
         except Exception as e:

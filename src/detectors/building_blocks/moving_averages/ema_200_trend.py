@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
     category='MOVING_AVERAGES',
     class_name='EMA200Trend',
     default_weight=12,
+    description='EMA 200 Trend - Tracks price position relative to the 200 EMA (major long-term trend filter). Bullish when price is above, bearish when below. Primary macro trend direction indicator for strategy alignment.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular signals
         'BULLISH_CROSS', 'BEARISH_CROSS', 'ABOVE_200EMA', 'BELOW_200EMA', 'AT_200EMA',

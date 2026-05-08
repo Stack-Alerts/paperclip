@@ -126,7 +126,9 @@ class LogViewerWindow(QDialog):
         # Window properties
         log_name = self.current_log_file.name if self.current_log_file else "All Logs"
         self.setWindowTitle(f"Log Viewer - {log_name}")
-        self.setGeometry(100, 100, 1600, 1000)  # Larger for institutional grade
+        # Minimum size; actual size/position is restored from QSettings in _restore_geometry.
+        self.setMinimumSize(1200, 700)
+        self.resize(1600, 1000)  # Default size for first run
         
         # Main layout
         main_layout = QVBoxLayout()

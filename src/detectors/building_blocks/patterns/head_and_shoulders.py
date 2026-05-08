@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='HeadAndShouldersPattern',
     default_weight=30,
+    description='Head and Shoulders - Classic bearish reversal pattern with three peaks (two lower shoulders flanking a head). Neckline break confirms reversal from uptrend. Use to enter shorts on confirmed breakdowns.',
+    direction='BEARISH',
     valid_signals=[
         # Granular pattern signals
         'PATTERN_CONFIRMED', 'PATTERN_FORMING', 'NO_PATTERN',

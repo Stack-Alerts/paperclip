@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
     category='PRICE_LEVELS',
     class_name='IHOD',
     default_weight=20,
+    description='iHOD (Prior High of Day) - Tracks the previous session high of day as a reference level. Prior HOD becomes support or resistance in the new session. Neutral level for gap and continuation strategies.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular event signals
         'BULLISH_BREAK',      # Broke above previous IHOD

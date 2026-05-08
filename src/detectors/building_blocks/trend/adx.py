@@ -30,6 +30,8 @@ import numpy as np
     category='TREND',
     class_name='ADX',
     default_weight=16,
+    description='ADX (Average Directional Index) - Measures trend strength without direction. High ADX confirms strong trend; low ADX indicates ranging market. Neutral signal used to filter trend-following blocks from counter-trend blocks.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular trend strength signals
         'WEAK_UPTREND', 'MODERATE_UPTREND', 'STRONG_UPTREND', 'VERY_STRONG_UPTREND',

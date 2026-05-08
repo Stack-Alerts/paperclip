@@ -34,6 +34,8 @@ import numpy as np
     category='SMC_ICT',
     class_name='Displacement',
     default_weight=20,
+    description='Displacement - SMC/ICT concept detecting a strong, impulsive move leaving a fair value gap (imbalance). Signals institutional participation and is used to identify the starting point of a new price leg. Neutral, direction context-dependent.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular SMC signals (FVG removed - too rare for 15min, tracked in metadata)
         'BEARISH_DISPLACEMENT', 'BULLISH_DISPLACEMENT',

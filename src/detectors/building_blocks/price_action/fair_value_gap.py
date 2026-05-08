@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
     category='PRICE_ACTION',
     class_name='FairValueGap',
     default_weight=25,
+    description='Fair Value Gap (FVG) - ICT concept identifying a three-candle price imbalance where the wicks of the first and third candles do not overlap. Bullish FVG supports price; bearish FVG acts as resistance. Price tends to fill gaps.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular signals
         'BEARISH_FVG', 'BULLISH_FVG', 'NO_FVG',

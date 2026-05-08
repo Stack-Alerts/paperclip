@@ -42,6 +42,8 @@ class SessionType(Enum):
     category='SIGNALS',
     class_name='ICTSilverBullet',
     default_weight=20,
+    description='ICT Silver Bullet - ICT-based precision entry during specific kill zone windows (10:00-11:00 NY). Identifies fair value gaps and liquidity sweeps to enter with smart money. Bearish or bullish depending on session context.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular ICT signals
         'BEARISH_FVG_IN_ZONE', 'BEARISH_FVG_RETEST', 'BULLISH_FVG_IN_ZONE', 'BULLISH_FVG_RETEST',

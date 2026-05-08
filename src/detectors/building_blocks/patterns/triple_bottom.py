@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='TripleBottomPattern',
     default_weight=30,
+    description='Triple Bottom - Strong bullish reversal with three roughly equal lows, indicating persistent buyer demand at support. More powerful than double bottom. Use for high-conviction reversal entries in oversold conditions.',
+    direction='BULLISH',
     valid_signals=[
         # Granular pattern signals
         'BULLISH_BREAKOUT', 'PATTERN_FORMING', 'NO_PATTERN',

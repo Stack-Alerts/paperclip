@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
     category='PRICE_LEVELS',
     class_name='LOD',
     default_weight=20,
+    description='LOD (Low of Day) - Tracks the lowest price reached during the current trading day. Key support level and stop-hunt target. Neutral reference; bullish bounce or bearish breakdown depending on context.',
+    direction='NEUTRAL',
     valid_signals=['BULLISH', 'BEARISH', 'NEUTRAL', 'LOD_BOUNCE', 'AT_LOD', 'ABOVE_LOD', 'BELOW_LOD', 'ERROR'],
     signal_tiers={
         'ERROR': {

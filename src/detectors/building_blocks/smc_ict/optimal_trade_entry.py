@@ -35,6 +35,8 @@ import numpy as np
     category='SMC_ICT',
     class_name='OptimalTradeEntry',
     default_weight=20,
+    description='Optimal Trade Entry (OTE) - ICT concept marking the 61.8%-79% Fibonacci retracement zone of an impulse move as the ideal entry area. High-probability pullback entry zone. Neutral but aligns with prior trend direction.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular SMC signals
         'BEARISH_OTE', 'BULLISH_OTE',

@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='DoubleTopPattern',
     default_weight=30,
+    description='Double Top - Bearish reversal pattern detecting two equal highs followed by neckline breakdown. Price sweeps prior high but fails to hold, confirming seller dominance. Use to enter shorts at reversal zones.',
+    direction='BEARISH',
     valid_signals=[
         # Granular pattern signals (Double Top is bearish-only)
         'BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN',

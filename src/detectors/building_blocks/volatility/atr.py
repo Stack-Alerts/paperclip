@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
     category='VOLATILITY',
     class_name='ATR',
     default_weight=10,
+    description='ATR (Average True Range) - Classic volatility indicator measuring average bar range over a period. Used to set dynamic stop losses and take profit targets. Neutral signal essential for risk management in all strategies.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular volatility level signals (absolute) - PRIMARY SIGNALS
         'EXTREME', 'VERY_HIGH', 'HIGH', 'NORMAL', 'CALM',

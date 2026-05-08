@@ -30,6 +30,7 @@ import numpy as np
     category='ELLIOTT_WAVE',
     class_name='ElliottWaveOscillator',
     default_weight=22,
+    direction='NEUTRAL',
     valid_signals=[
         # Divergence Signals (highest priority) - GRANULAR
         'BEARISH_DIVERGENCE', 'BULLISH_DIVERGENCE',

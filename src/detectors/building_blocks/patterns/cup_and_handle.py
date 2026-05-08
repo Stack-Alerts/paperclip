@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='CupAndHandlePattern',
     default_weight=30,
+    description='Cup and Handle - Bullish continuation pattern with rounded accumulation base and brief consolidation handle. Fires on breakout above handle resistance. High-confidence bullish setup for trending markets.',
+    direction='BULLISH',
     valid_signals=[
         # Granular pattern signals (Cup&Handle is bullish-only)
         'BREAKOUT_CONFIRMED', 'CUP_FORMING', 'PATTERN_FORMING', 'NO_PATTERN',

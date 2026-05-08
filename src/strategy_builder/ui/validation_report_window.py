@@ -31,7 +31,7 @@ from src.optimizer_v3.validation.institutional_validator import (
     ValidationSeverity
 )
 from src.strategy_builder.ui.styles import (
-    COLORS, create_font, get_main_stylesheet,
+    COLORS, create_font, create_monospace_font, get_main_stylesheet,
     get_primary_button_stylesheet, get_secondary_button_stylesheet,
     get_table_stylesheet, get_text_edit_stylesheet, get_scroll_area_stylesheet,
     get_tab_widget_stylesheet, set_hand_cursor, apply_hand_cursor_to_buttons,
@@ -94,6 +94,15 @@ class ValidationReportWindow(QMainWindow):
     def _init_ui(self):
         """Initialize UI with professional styling - QMainWindow is NON-BLOCKING by default"""
         self.setWindowTitle("BTC Trade Engine - Validation Report")
+        # Explicit flags required: QMainWindow with a parent can inherit
+        # limiting flags from the parent on some Linux window managers, which
+        # removes the native maximize/minimize buttons.
+        self.setWindowFlags(
+            Qt.Window |
+            Qt.WindowMaximizeButtonHint |
+            Qt.WindowMinimizeButtonHint |
+            Qt.WindowCloseButtonHint
+        )
         self.setMinimumSize(1400, 900)
         self.resize(1600, 1000)
         
@@ -662,7 +671,6 @@ class ValidationReportWindow(QMainWindow):
     def _create_metrics_collapsible_section(self, title: str, content: str, title_color: str = "#095983") -> dict:
         """Create a collapsible section for Metrics tab (copied from AI Request Preview pattern)"""
         from PyQt5.QtWidgets import QFrame, QSizePolicy
-        from PyQt5.QtGui import QFont as QFontImport
         from PyQt5.QtGui import QTextOption
         
         container = QFrame()
@@ -726,7 +734,7 @@ class ValidationReportWindow(QMainWindow):
         # Text editor - Use same background as Strategy Flow for consistency
         text_edit = QTextEdit()
         text_edit.setReadOnly(True)
-        text_edit.setFont(QFontImport("Courier New", 10))
+        text_edit.setFont(create_monospace_font(10))
         text_edit.setWordWrapMode(QTextOption.WrapMode.WordWrap)
         text_edit.setStyleSheet(f"QTextEdit {{ background-color: {COLORS['bg_input']}; color: {COLORS['text_primary']}; border: 1px solid {COLORS['border']}; padding: 8px; }}")
         text_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -1222,7 +1230,7 @@ class ValidationReportWindow(QMainWindow):
         flow_text_widget.setReadOnly(True)
         flow_text_widget.setMinimumHeight(300)  # Minimum height, but can expand
         # No maxHeight - let it fill available space
-        flow_text_widget.setFont(QFont("Courier New", 10))  # Monospace for alignment
+        flow_text_widget.setFont(create_monospace_font(10))  # Monospace for alignment
         flow_text_widget.setStyleSheet(f"QTextEdit {{ color: {COLORS['text_primary']}; background-color: {COLORS['bg_input']}; border: 1px solid {COLORS['border']}; padding: 8px; }}")
         
         # Generate flow visualization with error handling
