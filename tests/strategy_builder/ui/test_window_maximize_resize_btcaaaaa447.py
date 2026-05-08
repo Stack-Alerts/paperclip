@@ -437,9 +437,16 @@ class TestAlertDialogStyleDiscipline:
 
     def test_create_font_called(self):
         tree = _ast("alert_dialog.py")
-        assert _has_call(tree, "create_font"), (
-            "alert_dialog.py: create_font() is not called anywhere"
+        # create_font is a module-level function imported from styles.py, so
+        # it is called as a plain Name node (create_font(...)), not an
+        # attribute access (obj.create_font(...)).
+        found = any(
+            isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "create_font"
+            for n in ast.walk(tree)
         )
+        assert found, "alert_dialog.py: create_font() is not called anywhere"
 
     def test_qfont_not_imported_directly(self):
         src = _src("alert_dialog.py")
