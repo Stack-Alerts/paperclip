@@ -1868,8 +1868,18 @@ class WindowGeometryMixin:
         if maximized:
             # showMaximized() must be called AFTER show() / showEvent so the
             # OS window manager actually expands the window.
+            #
+            # A delay of 0 ms is not sufficient — it fires at the next event
+            # loop iteration but Qt may not have completed its initial layout
+            # pass yet.  The symptom is that maximize appears to do nothing on
+            # first open; clicking any widget (e.g. a tab) triggers a layout
+            # recalculation which incidentally corrects the state.
+            #
+            # 50 ms gives Qt and the OS window manager enough time to finish
+            # the initial layout/paint cycle so showMaximized() reliably fills
+            # the screen even without any prior user interaction.
             from PyQt5.QtCore import QTimer
-            QTimer.singleShot(0, self.showMaximized)
+            QTimer.singleShot(50, self.showMaximized)
 
     # ------------------------------------------------------------------ #
     # Internal helpers                                                     #
