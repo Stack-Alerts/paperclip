@@ -2499,41 +2499,63 @@ class MetricsDisplayPanel(QWidget):
             pass
         return None
     
+    def _find_main_window(self):
+        """
+        Locate StrategyBuilderMainWindow from within an embedded panel.
+
+        MetricsDisplayPanel lives inside BacktestConfigPanel → BacktestConfigDialog.
+        BacktestConfigDialog is parented to StrategyBuilderMainWindow, so
+        self.window() returns the dialog, not the main window.  We must walk up
+        one more level.  QApplication.activeWindow() is the last-resort fallback.
+        """
+        # Walk the Qt parent chain looking for a widget that owns blocks_panel
+        widget = self
+        while widget is not None:
+            if hasattr(widget, 'blocks_panel'):
+                return widget
+            widget = widget.parent()
+
+        # Fallback: check the active top-level window
+        active = QApplication.activeWindow()
+        if active and hasattr(active, 'blocks_panel'):
+            return active
+
+        # Fallback: scan all top-level widgets
+        for top in QApplication.topLevelWidgets():
+            if hasattr(top, 'blocks_panel'):
+                return top
+
+        return None
+
     def _refresh_strategy_builder_ui(self) -> None:
         """
-        Refresh Strategy Builder UI after applying recommendations
-        
-        Forces the Strategy Blocks Panel to reload and display updated configuration
+        Refresh Strategy Builder UI after applying recommendations.
+
+        Forces the Strategy Blocks Panel to reload and display the updated
+        configuration.  Uses refresh_from_orchestrator() which is the canonical
+        public API on StrategyBlocksPanel.
         """
         try:
-            main_window = self.window()
-            
-            # Access Strategy Blocks Panel (correct attribute: blocks_panel)
-            if hasattr(main_window, 'blocks_panel'):
-                blocks_panel = main_window.blocks_panel
-                
-                # Refresh the UI
-                if hasattr(blocks_panel, 'refresh_blocks'):
-                    blocks_panel.refresh_blocks()
-                    logger.info("🔄 Strategy Builder UI refreshed")
-                elif hasattr(blocks_panel, '_refresh_ui'):
-                    blocks_panel._refresh_ui()
-                    logger.info("🔄 Strategy Builder UI refreshed")
-                elif hasattr(blocks_panel, 'load_strategy'):
-                    # Reload current config
-                    orchestrator = self._get_orchestrator()
-                    if orchestrator:
-                        blocks_panel.load_strategy(orchestrator.get_current_config())
-                        logger.info("🔄 Strategy Builder UI reloaded")
-                else:
-                    logger.warning("⚠️ Strategy Blocks Panel has no refresh method - trying generic update")
-                    # Force Qt to update the widget
-                    blocks_panel.update()
-                    blocks_panel.repaint()
+            main_window = self._find_main_window()
+
+            if main_window is None:
+                logger.warning("⚠️ StrategyBuilderMainWindow not found — skipping UI refresh")
+                return
+
+            blocks_panel = main_window.blocks_panel
+            if blocks_panel is None:
+                logger.warning("⚠️ blocks_panel is None — skipping UI refresh")
+                return
+
+            # Primary: canonical public refresh method
+            if hasattr(blocks_panel, 'refresh_from_orchestrator'):
+                blocks_panel.refresh_from_orchestrator()
+                logger.info("🔄 Strategy Builder Building Blocks refreshed via refresh_from_orchestrator()")
             else:
-                logger.warning("⚠️ Strategy Blocks Panel not accessible for UI refresh")
-                logger.info("   (Main window may not be StrategyBuilderMainWindow)")
-                
+                logger.warning("⚠️ Strategy Blocks Panel missing refresh_from_orchestrator — forcing repaint")
+                blocks_panel.update()
+                blocks_panel.repaint()
+
         except Exception as e:
             logger.error(f"❌ UI refresh failed: {str(e)}")
     
@@ -3023,10 +3045,11 @@ class MetricsDisplayPanel(QWidget):
     
     def _switch_to_metrics_tab(self) -> None:
         """
-        Switch to AI Recommendations tab after AI recommendations complete.
+        Switch to Metrics tab after AI recommendations complete.
         
-        This helps user discover where the AI recommendations were applied.
-        Prefers the 'AI Recommendations' tab; falls back to 'Metrics' tab.
+        The Apply buttons (⚠ Fair / ✗ Poor rows) live on the Metrics tab, so after AI
+        recommendations are generated the user should land there first.
+        Prefers the 'Metrics' tab; falls back to 'AI Recommendations' tab.
         """
         try:
             # Find the tab widget containing this panel
@@ -3036,17 +3059,17 @@ class MetricsDisplayPanel(QWidget):
                 parent = parent.parent()
             
             if parent and isinstance(parent, QTabWidget):
-                # Prefer AI Recommendations tab
+                # Prefer Metrics tab (where Apply buttons live)
                 for i in range(parent.count()):
                     tab_text = parent.tabText(i).lower()
-                    if 'ai' in tab_text and 'rec' in tab_text:
+                    if 'metric' in tab_text:
                         parent.setCurrentIndex(i)
                         logger.info(f"[UI] ✅ Switched to tab: {parent.tabText(i)}")
                         return
-                # Fallback: any tab with 'ai' or 'metric'
+                # Fallback: AI Recommendations tab
                 for i in range(parent.count()):
                     tab_text = parent.tabText(i).lower()
-                    if 'ai' in tab_text or 'metric' in tab_text:
+                    if 'ai' in tab_text or 'rec' in tab_text:
                         parent.setCurrentIndex(i)
                         logger.info(f"[UI] ✅ Switched to tab: {parent.tabText(i)}")
                         return

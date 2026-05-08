@@ -1055,7 +1055,14 @@ class BacktestConfigPanel(QWidget):
         self.trades_panel = TradesPanel()
         self.tab_widget.addTab(self.trades_panel, "💰 Trades")
         
-        # Tab 4: Metrics (Optimizer v3 - INTEGRATED)
+        # Tab 4: AI Recommendations (Optimizer v3 - INTEGRATED)
+        # Placed before Metrics so the user sees this tab first when AI response arrives,
+        # then auto-switches to Metrics where the Apply buttons live.
+        from src.optimizer_v3.ui.ai_recommendations_panel import AIRecommendationsPanel
+        self.ai_recommendations_panel = AIRecommendationsPanel()
+        self.tab_widget.addTab(self.ai_recommendations_panel, "🤖 AI Recommendations")
+
+        # Tab 5: Metrics (Optimizer v3 - INTEGRATED)
         from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
         self.metrics_panel = MetricsDisplayPanel()
         self.tab_widget.addTab(self.metrics_panel, "💹 Metrics")
@@ -1064,12 +1071,6 @@ class BacktestConfigPanel(QWidget):
         # 🔥 CRITICAL FIX: Connect trades_panel metrics_updated signal (emitted every second)
         # to metrics_panel update_metrics() for real-time metric calculations
         self.trades_panel.metrics_updated.connect(self.metrics_panel.update_metrics)
-        
-        # Tab 5: AI Recommendations (Optimizer v3 - INTEGRATED)
-        # Simple panel that shows AI recommendations with apply buttons
-        from src.optimizer_v3.ui.ai_recommendations_panel import AIRecommendationsPanel
-        self.ai_recommendations_panel = AIRecommendationsPanel()
-        self.tab_widget.addTab(self.ai_recommendations_panel, "🤖 AI Recommendations")
 
         # Connect AI panel's send_approved signal to metrics panel's handler
         # When user clicks "Approve & Send to AI" button, trigger AI request
