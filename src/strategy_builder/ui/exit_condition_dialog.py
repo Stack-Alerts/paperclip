@@ -17,11 +17,12 @@ from PyQt5.QtWidgets import (
     QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QSpinBox, QDoubleSpinBox, QRadioButton, QGroupBox, QCheckBox, QButtonGroup, QComboBox, QWidget
 )
-from PyQt5.QtCore import Qt, QSettings
+from PyQt5.QtCore import Qt
 from src.strategy_builder.ui.styles import (
     get_exit_dialog_stylesheet, get_color, get_primary_button_stylesheet,
     get_secondary_button_stylesheet, get_label_style, get_radio_button_style,
-    get_checkbox_style, create_font, get_recheck_gear_button_stylesheet
+    get_checkbox_style, create_font, get_recheck_gear_button_stylesheet,
+    WindowGeometryMixin,
 )
 
 import logging
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 
-class ExitConditionDialog(QMainWindow):
+class ExitConditionDialog(WindowGeometryMixin, QMainWindow):
     """
     Window for configuring exit conditions.
     
@@ -41,7 +42,10 @@ class ExitConditionDialog(QMainWindow):
     - Tooltips for all fields
     - Fully resizable window
     """
-    
+
+    GEOMETRY_SETTINGS_KEY = "exitConditionDialog"
+    GEOMETRY_DEFAULT_SIZE = (800, 600)
+
     def __init__(
         self,
         signal_name: Optional[str] = None,
@@ -129,12 +133,9 @@ class ExitConditionDialog(QMainWindow):
         """Override showEvent to load signals after dialog is added to widget tree."""
         super().showEvent(event)
         
-        # Restore saved geometry
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        geometry = settings.value("exitConditionDialog/geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
-        
+        # Restore window geometry via mixin
+        self._restore_window_geometry(event)
+
         # Load signals on first show (after dialog is in widget tree)
         if self.signal_selector_mode and self.signal_selector and self.signal_selector.count() == 0:
             logger.debug("DEBUG: showEvent - Loading available signals now that dialog is shown")
@@ -863,8 +864,7 @@ class ExitConditionDialog(QMainWindow):
     
     def closeEvent(self, event):
         """Save window geometry on close."""
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        settings.setValue("exitConditionDialog/geometry", self.saveGeometry())
+        self._save_window_geometry()
         super().closeEvent(event)
     
     def exec_(self):

@@ -26,7 +26,7 @@ from PyQt5.QtWidgets import (
     QProgressBar, QTableWidget, QTableWidgetItem, QHeaderView,
     QGroupBox, QAbstractItemView
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSettings
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor
 
 from src.data_manager.unified_manager import UnifiedDataManager
@@ -42,6 +42,7 @@ from src.strategy_builder.ui.styles import (
     create_font,
     apply_hand_cursor_to_buttons,
     COLORS,
+    WindowGeometryMixin,
 )
 
 # Binance free API only serves the last N days — gaps older than this cannot
@@ -173,7 +174,7 @@ class DataRepairThread(QThread):
 # Dialog
 # ---------------------------------------------------------------------------
 
-class DataVerifyDialog(QDialog):
+class DataVerifyDialog(WindowGeometryMixin, QDialog):
     """
     Dialog for verifying (and repairing) data integrity.
 
@@ -195,6 +196,9 @@ class DataVerifyDialog(QDialog):
     # ------------------------------------------------------------------
     # Construction
     # ------------------------------------------------------------------
+
+    GEOMETRY_SETTINGS_KEY = "dataVerifyDialog"
+    GEOMETRY_DEFAULT_SIZE = (900, 650)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -606,16 +610,12 @@ class DataVerifyDialog(QDialog):
         super().showEvent(event)
         from PyQt5.QtCore import QTimer
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        geometry = settings.value("dataVerifyDialog/geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
+        self._restore_window_geometry(event)
 
     def closeEvent(self, event):
         for thread in (self._verify_thread, self._repair_thread):
             if thread and thread.isRunning():
                 thread.quit()
                 thread.wait(2000)
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        settings.setValue("dataVerifyDialog/geometry", self.saveGeometry())
+        self._save_window_geometry()
         super().closeEvent(event)

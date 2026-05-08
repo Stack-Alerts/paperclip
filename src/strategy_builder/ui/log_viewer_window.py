@@ -37,6 +37,7 @@ from src.strategy_builder.ui.styles import (
     get_color,
     create_font,
     create_monospace_font,
+    WindowGeometryMixin,
 )
 
 import logging
@@ -84,10 +85,13 @@ EVENT_PATTERNS = {
 }
 
 
-class LogViewerWindow(QDialog):
+class LogViewerWindow(WindowGeometryMixin, QDialog):
     """
     Institutional-grade log viewer with tabs and event-based filtering.
     """
+
+    GEOMETRY_SETTINGS_KEY = "logViewerWindow"
+    GEOMETRY_DEFAULT_SIZE = (1100, 700)
     
     def __init__(self, log_file_path: Path = None, parent=None):
         super().__init__(parent)
@@ -110,7 +114,7 @@ class LogViewerWindow(QDialog):
         self._init_ui()
         self._scan_logs_directory()
         self._load_initial_logs()
-        self._restore_geometry()
+        self._restore_last_tab()
     
     def _init_ui(self):
         """Initialize UI with tabs and filters"""
@@ -899,28 +903,28 @@ class LogViewerWindow(QDialog):
                 f"Error clearing logs:\n\n{str(e)}"
             )
     
-    def _restore_geometry(self):
-        """Restore window geometry"""
+    def _restore_last_tab(self):
+        """Restore last active tab from settings."""
         settings = QSettings("BTC_Engine", "LogViewer")
-        geometry = settings.value("geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
-        
-        # Restore last tab
         last_tab = settings.value("lastTab", 0, type=int)
         if 0 <= last_tab < self.tabs.count():
             self.tabs.setCurrentIndex(last_tab)
-    
+
+    def _restore_geometry(self):
+        """Deprecated: geometry is now restored via WindowGeometryMixin in showEvent."""
+        self._restore_last_tab()
+
     def showEvent(self, event):
         """Called when window is shown - apply hand cursors to all widgets"""
         super().showEvent(event)
+        self._restore_window_geometry(event)
         from PyQt5.QtCore import QTimer
         from .styles import apply_hand_cursor_to_buttons
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
 
     def closeEvent(self, event):
-        """Save geometry and state on close"""
+        """Save geometry and last tab on close"""
+        self._save_window_geometry()
         settings = QSettings("BTC_Engine", "LogViewer")
-        settings.setValue("geometry", self.saveGeometry())
         settings.setValue("lastTab", self.tabs.currentIndex())
         super().closeEvent(event)

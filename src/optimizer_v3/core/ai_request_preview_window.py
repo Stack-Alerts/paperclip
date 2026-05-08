@@ -993,23 +993,35 @@ PART 2: STRUCTURED DATA (JSON format for parsing)
         """Restore window geometry and state (EXACT Strategy Builder approach)"""
         settings = QSettings("BTC_Engine_v3", "AIRequestPreviewWindow")
         
-        # Restore geometry (position, size, screen)
+        # Restore geometry bytes (position, size, screen).
         geometry = settings.value("geometry")
         if geometry:
             self.restoreGeometry(geometry)
         
-        # Restore window state (toolbars, docks, screen info)
+        # Restore toolbar/dock layout (saveState/restoreState handles docks, NOT
+        # the maximized flag — that is stored separately below).
         window_state = settings.value("windowState")
         if window_state:
             self.restoreState(window_state)
+        
+        # Override maximized/normal using the explicitly-stored flag so a stale
+        # maximized bit in the geometry blob cannot cause desync after dragging.
+        saved_maximize = settings.value("windowMaximized", False, type=bool)
+        if saved_maximize:
+            self.showMaximized()
+        else:
+            self.showNormal()
     
     def _save_geometry(self):
         """Save window geometry and state (EXACT Strategy Builder approach)"""
         settings = QSettings("BTC_Engine_v3", "AIRequestPreviewWindow")
         
-        # Save both geometry AND state (like Strategy Builder does)
+        # Save both geometry AND dock/toolbar state.
         settings.setValue("geometry", self.saveGeometry())
         settings.setValue("windowState", self.saveState())
+        # Store the maximized flag separately to survive geometry-blob desync
+        # that occurs when a window is dragged while in a maximized state.
+        settings.setValue("windowMaximized", bool(self.windowState() & Qt.WindowMaximized))
         settings.sync()
     
     def closeEvent(self, event):

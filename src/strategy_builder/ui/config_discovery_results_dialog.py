@@ -47,6 +47,7 @@ from src.strategy_builder.ui.styles import (
     get_table_view_stylesheet,
     get_text_edit_stylesheet,
     MAIN_STYLESHEET,
+    WindowGeometryMixin,
 )
 from src.strategy_builder.ui.config_permutation_engine import DiscoveryResult
 
@@ -502,7 +503,7 @@ class _ApplyConfigDialog(QDialog):
 # Main dialog
 # ---------------------------------------------------------------------------
 
-class ConfigDiscoveryResultsDialog(QDialog):
+class ConfigDiscoveryResultsDialog(WindowGeometryMixin, QDialog):
     """
     Phase 3 Results Window.
 
@@ -522,6 +523,9 @@ class ConfigDiscoveryResultsDialog(QDialog):
     """
 
     config_applied = pyqtSignal(dict)
+
+    GEOMETRY_SETTINGS_KEY = "configDiscoveryDialog"
+    GEOMETRY_DEFAULT_SIZE = (1200, 800)
 
     def __init__(
         self,
@@ -914,18 +918,9 @@ class ConfigDiscoveryResultsDialog(QDialog):
     def showEvent(self, event):
         """Restore saved window geometry, or default to maximized on first run."""
         super().showEvent(event)
-        from PyQt5.QtCore import QSettings
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        geometry = settings.value("configDiscoveryDialog/geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
-        else:
-            # First run — open maximized so all columns have room to display
-            self.showMaximized()
+        self._restore_window_geometry(event)
 
     def closeEvent(self, event):
         """Save window geometry on close."""
-        from PyQt5.QtCore import QSettings
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        settings.setValue("configDiscoveryDialog/geometry", self.saveGeometry())
+        self._save_window_geometry()
         super().closeEvent(event)

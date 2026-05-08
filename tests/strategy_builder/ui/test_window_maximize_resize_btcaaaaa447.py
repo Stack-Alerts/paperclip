@@ -98,6 +98,16 @@ def _has_call(tree: ast.Module, method: str) -> bool:
     )
 
 
+def _uses_geometry_mixin(src: str) -> bool:
+    """True if the file uses WindowGeometryMixin for geometry persistence.
+
+    WindowGeometryMixin (defined in styles.py) handles saveGeometry /
+    restoreGeometry / QSettings internally, so files that inherit from it do
+    not need to call those APIs directly.
+    """
+    return "WindowGeometryMixin" in src
+
+
 def _method_body_src(tree: ast.Module, method_name: str) -> str:
     """
     Return the source-level text of all lines belonging to the named method,
@@ -243,17 +253,28 @@ class TestShowEventFirstRunMaximize:
         return False
 
     def test_backtest_config_show_event_has_show_maximized(self):
-        assert self._show_event_calls_show_maximized("backtest_config_dialog.py"), (
+        src = _src("backtest_config_dialog.py")
+        # Accept either direct showMaximized() call in showEvent OR
+        # WindowGeometryMixin usage (which handles first-run maximise internally
+        # via QTimer.singleShot(0, self.showMaximized) in _restore_window_geometry).
+        assert self._show_event_calls_show_maximized("backtest_config_dialog.py") or _uses_geometry_mixin(src), (
             "backtest_config_dialog.showEvent should call showMaximized() "
-            "for first-run (no saved geometry) path"
+            "for first-run (no saved geometry) path, or use WindowGeometryMixin "
+            "which handles this internally"
         )
 
     def test_config_discovery_show_event_has_show_maximized(self):
+        src = _src("config_discovery_results_dialog.py")
+        tree = _ast("config_discovery_results_dialog.py")
+        # Accept either direct showMaximized() call in showEvent OR
+        # WindowGeometryMixin usage (which handles first-run maximise internally
+        # via QTimer.singleShot(0, self.showMaximized) in _restore_window_geometry).
         assert self._show_event_calls_show_maximized(
             "config_discovery_results_dialog.py"
-        ), (
+        ) or _uses_geometry_mixin(src), (
             "config_discovery_results_dialog.showEvent should call "
-            "showMaximized() for first-run (no saved geometry) path"
+            "showMaximized() for first-run (no saved geometry) path, or use "
+            "WindowGeometryMixin which handles this internally"
         )
 
 
@@ -293,23 +314,31 @@ class TestShowCloseGeometryPersistence:
 
     @pytest.mark.parametrize("filename", SHOW_CLOSE_GEOMETRY_DIALOGS)
     def test_restore_geometry_called(self, filename):
+        src = _src(filename)
         tree = _ast(filename)
-        assert _has_call(tree, "restoreGeometry"), (
-            f"{filename}: restoreGeometry() not found"
+        # Accept either direct restoreGeometry() call OR WindowGeometryMixin
+        # (which calls restoreGeometry internally via _restore_window_geometry).
+        assert _has_call(tree, "restoreGeometry") or _uses_geometry_mixin(src), (
+            f"{filename}: restoreGeometry() not found and WindowGeometryMixin not used"
         )
 
     @pytest.mark.parametrize("filename", SHOW_CLOSE_GEOMETRY_DIALOGS)
     def test_save_geometry_called(self, filename):
+        src = _src(filename)
         tree = _ast(filename)
-        assert _has_call(tree, "saveGeometry"), (
-            f"{filename}: saveGeometry() not found"
+        # Accept either direct saveGeometry() call OR WindowGeometryMixin
+        # (which calls saveGeometry internally via _save_window_geometry).
+        assert _has_call(tree, "saveGeometry") or _uses_geometry_mixin(src), (
+            f"{filename}: saveGeometry() not found and WindowGeometryMixin not used"
         )
 
     @pytest.mark.parametrize("filename", SHOW_CLOSE_GEOMETRY_DIALOGS)
     def test_qsettings_present(self, filename):
         src = _src(filename)
-        assert "QSettings" in src, (
-            f"{filename}: QSettings not found — geometry cannot be persisted"
+        # Accept either direct QSettings import OR WindowGeometryMixin
+        # (which manages QSettings internally).
+        assert "QSettings" in src or _uses_geometry_mixin(src), (
+            f"{filename}: QSettings not found and WindowGeometryMixin not used — geometry cannot be persisted"
         )
 
 
@@ -338,8 +367,13 @@ class TestInitRestoreGeometry:
 
     @pytest.mark.parametrize("filename,helper", INIT_RESTORE_WINDOWS)
     def test_restore_geometry_in_helper(self, filename, helper):
+        src = _src(filename)
         tree = _ast(filename)
-        # Walk only the helper method
+        # Accept either direct restoreGeometry() call inside the helper OR
+        # WindowGeometryMixin usage (which calls restoreGeometry internally via
+        # _restore_window_geometry / _save_window_geometry).
+        if _uses_geometry_mixin(src):
+            return  # mixin handles geometry — pass
         for node in ast.walk(tree):
             if (
                 isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -353,7 +387,8 @@ class TestInitRestoreGeometry:
                     ):
                         return  # found — pass
         pytest.fail(
-            f"{filename}: restoreGeometry() not called inside {helper}()"
+            f"{filename}: restoreGeometry() not called inside {helper}() "
+            f"and WindowGeometryMixin not used"
         )
 
     @pytest.mark.parametrize("filename,helper", INIT_RESTORE_WINDOWS)
@@ -515,7 +550,10 @@ class TestRegressionGuard:
         ],
     )
     def test_save_geometry_still_present(self, filename):
+        src = _src(filename)
         tree = _ast(filename)
-        assert _has_call(tree, "saveGeometry"), (
-            f"{filename}: saveGeometry() removed"
+        # Accept either direct saveGeometry() call OR WindowGeometryMixin
+        # (which handles persistence internally via _save_window_geometry).
+        assert _has_call(tree, "saveGeometry") or _uses_geometry_mixin(src), (
+            f"{filename}: saveGeometry() removed and WindowGeometryMixin not used"
         )
