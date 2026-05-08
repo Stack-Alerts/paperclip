@@ -1,8 +1,8 @@
 # BTC Trade Engine — User Guide
 
-**Version:** 1.0  
-**Platform:** BTC Trade Engine (Powered by NautilusTrader)  
-**Audience:** Trade Engineers — systematic traders who build and automate strategies  
+**Version:** 1.0
+**Platform:** BTC Trade Engine (Powered by NautilusTrader)
+**Audience:** Trade Engineers — systematic traders who build and automate strategies
 **Last Updated:** 2026-05-08
 
 ---
@@ -101,7 +101,7 @@ The BTC Trade Engine is a single-window desktop application (PyQt5) centred on o
 
 ### 2.1 Window Title
 
-The window title always shows the currently loaded strategy name and an asterisk (`*`) when there are unsaved changes:
+The window title always shows the currently loaded strategy name. When there are unsaved changes an asterisk (`*`) is appended:
 
 ```
 BTC Trade Engine - Strategy Builder — MyStrategy *
@@ -109,12 +109,12 @@ BTC Trade Engine - Strategy Builder — MyStrategy *
 
 ### 2.2 Layout
 
-The main window is split into two resizable panes separated by a draggable splitter handle:
+The main window (`StrategyBuilderMainWindow`) opens at 1400 × 900 pixels by default. The central area is split into two resizable panes by a draggable 8-pixel splitter handle (dark `#3C4149` background with a `⋮⋮⋮` drag icon):
 
-| Pane | Contents |
-|------|----------|
-| **Left (40%)** | Strategy Information Panel (top) + Strategy Blocks Panel (bottom) |
-| **Right (60%)** | Block Search Panel |
+| Pane | Default width | Contents |
+|------|--------------|----------|
+| **Left (40%)** | 560 px | Strategy Information Panel (top) + Strategy Blocks Panel (bottom) |
+| **Right (60%)** | 840 px | Block Search Panel |
 
 Both panes are non-collapsible — they cannot be dragged to zero width.
 
@@ -127,6 +127,7 @@ Both panes are non-collapsible — they cannot be dragged to zero width.
 The menu bar has four menus:
 
 #### File Menu
+
 | Action | Shortcut | Description |
 |--------|----------|-------------|
 | New Strategy | Ctrl+N | Reset to a blank strategy (prompts to save if unsaved changes exist) |
@@ -136,94 +137,215 @@ The menu bar has four menus:
 | Exit | Ctrl+Q | Close the application |
 
 #### Edit Menu
+
 | Action | Description |
 |--------|-------------|
 | Clear All Blocks | Remove all building blocks from the current strategy (cannot be undone) |
 
 #### Tools Menu
+
 | Action | Description |
 |--------|-------------|
 | Update Data… | Manually open the data update modal to fetch the latest candles from Binance |
 | Verify Data… | Run a read-only integrity scan across all timeframes and report gaps |
 | Settings… | Open the Settings dialog (API keys, preferences, admin options) |
-| Debug Logger | Submenu to toggle console/logfile debug output and view the current log |
+| Debug Logger | Submenu — see [Section 9](#9-debug-logger) |
 
 #### Help Menu
+
 | Action | Description |
 |--------|-------------|
 | About Strategy Builder | Show version and capability information |
 
 ### 3.2 Toolbar
 
-The toolbar sits below the menu bar and contains:
+The toolbar sits below the menu bar. It is non-movable and shows icons with text labels (`ToolButtonTextBesideIcon`, 32 × 32 icons):
 
 - **New** — create a new strategy
 - **Open** — open the Strategy Browser
 - **Save** — save the current strategy
-- **Stepper Ribbon** (centred) — the four-step workflow progress indicator
+- **Stepper Ribbon** (centred in the window) — the four-step workflow progress indicator
 
 ### 3.3 Stepper Ribbon
 
-The stepper ribbon displays the four workflow steps as clickable buttons:
+The Stepper Ribbon displays four workflow steps as clickable buttons separated by `→` arrows:
 
 ```
 📝 Design  →  ✓ Validate  →  🧪 Test / Optimize  →  🚀 Publish
 ```
 
-Each step button changes colour to reflect its state:
+Each button reflects its current state with a colour:
 
-| Colour | State |
-|--------|-------|
-| Grey | Pending (not yet reached) |
-| Blue | Currently active |
-| Green (✓) | Completed successfully |
-| Red (✗) | Failed (e.g. validation errors) |
+| Colour | State | Button text prefix |
+|--------|-------|--------------------|
+| Grey (`#374151`) | Pending — not yet reached | Original icon |
+| Blue (`#204486`) | Currently active | Original icon |
+| Green (`#10B981`) | Completed successfully | `✓` replaces icon |
+| Red (`#C35252`) | Failed (e.g. validation errors) | `✗` replaces icon |
 
-Clicking a step button advances to that step **if its prerequisites are met**:
+The ribbon is dynamically centred in the window on resize.
 
-- **Design (Step 0):** Always available.
-- **Validate (Step 1):** Requires a strategy name and at least one block.
-- **Test / Optimize (Step 2):** Requires validation to have passed (green).
-- **Publish (Step 3):** Requires a test to have been initiated.
-
-> Any modification to the strategy (adding/removing blocks, changing the name or type, reconfiguring signals) resets the Validate step back to its default state and requires re-validation.
+> Any modification to the strategy (adding/removing blocks, changing the name or type, reconfiguring signals) resets the Validate step to its default state and requires re-validation before proceeding.
 
 ### 3.4 Strategy Information Panel (Left — Top)
 
-The **Strategy Information Panel** is the upper section of the left pane, labelled **"Strategy Information"**. It contains:
+**Source:** `StrategyInfoPanel` (`src/strategy_builder/ui/strategy_info_panel.py`)
 
-- **Strategy Name** — editable text field; required before saving.
-- **Description** — auto-generated read-only text area that updates when blocks are added or removed.
-- **Strategy Type** — radio buttons: **Bullish** (long) or **Bearish** (short).
-- **Metadata summary row** — shows counts of required signals, optional signals, rechecked signals, exit conditions, and time constraints as the strategy is assembled.
+The Strategy Information Panel is the upper section of the left pane, enclosed in a group box labelled **"💡 Strategy Information"** (bold 12pt title). It contains:
+
+**Strategy Name**
+An editable `QLineEdit` (placeholder: `"e.g., Example_MA_Crossover"`, max 100 characters, min-height 36 px). This field is required before saving. When a saved strategy is loaded its version number is shown in the display name (e.g. `My Strategy (v3)`), but the version suffix is stripped before saving.
+
+**Description**
+A read-only `QTextEdit` (min-height 130 px, max-height 190 px, word-wrap on). The description is auto-generated from the current block and signal configuration — it cannot be edited directly. The label above it updates to show a block and signal count summary once blocks are added:
+
+```
+Description: 2 block(s) (1 required, 1 optional), 4 signal(s) (2 required, 2 optional).
+```
+
+**Metadata summary row** — all on one horizontal line, separated by `|`:
+
+| Item | Colour | Notes |
+|------|--------|-------|
+| `Strategy Type:` + **Bullish** radio | Green | Long strategies |
+| `Strategy Type:` + **Bearish** radio | Red | Short strategies |
+| `Required:` + count | Green (bold) | Signals from all REQUIRED (AND) blocks |
+| `Optional:` + count | Blue (bold) | Signals from all OPTIONAL (OR) blocks |
+| `Rechecked:` + count | Orange (bold) | Signals with a recheck validation configured |
+| `Exit Conditions:` + count | Red (bold) | Total exit conditions at all binding levels |
+| `Time Constraint:` + `Yes`/`No` | Green bold / grey | Whether any signal has a timing constraint |
+
+[SCREENSHOT: StrategyInfoPanel — showing a loaded strategy with 2 blocks, metadata row populated]
 
 ### 3.5 Strategy Blocks Panel (Left — Bottom)
 
-The **Strategy Blocks Panel** occupies the lower section of the left pane. It is a scrollable list showing every building block that has been added to the strategy, in the order they will be evaluated.
+**Source:** `StrategyBlocksPanel` / `BlockConfigItem` (`src/strategy_builder/ui/strategy_blocks_panel.py`, `BlockConfigItem._init_ui()` lines 76–599)
 
-Each block entry shows:
-- The block name (formatted display name)
-- Its signals, with AND/OR logic badges
-- Timing constraints (if configured)
-- Recheck settings (if configured)
-- Exit conditions attached to each signal or block
-- Controls: **▲ Up**, **▼ Down** (reorder), **✕ Remove**
-- A gear button on each signal to configure recheck settings
-- Exit condition buttons to add, edit, or remove exit conditions
+The Strategy Blocks Panel occupies the lower section of the left pane. It is a scrollable list of all building blocks added to the strategy, shown in evaluation order.
+
+Each block is rendered as a `BlockConfigItem` widget with a blue border (`button_primary` color, 2 px, rounded corners) and a medium-dark background. The widget is divided into three areas: the **header row**, the **signals section**, and (when applicable) the **block-level exits section**.
+
+#### Header Row
+
+The header row is a horizontal layout containing, left to right:
+
+1. **Position label** — `#1`, `#2`, etc. — rendered in the primary blue colour, bold 12pt, minimum width 40 px.
+2. **Block name** — `📊 <FormattedBlockName>` — bold 10pt, default text colour.
+3. **Logic badge** — a fixed-size label showing:
+   - `REQUIRED` (green background) — for AND-logic blocks
+   - `OPTIONAL` (blue background) — for OR-logic blocks
+4. **Signal count** — `Signals: N` — muted text colour, 9pt.
+5. **Controls** (right side, stacked vertically):
+   - **Move row** (horizontal, right-aligned): `▴` (up) and `▾` (down) buttons — sharp small triangles, each max-width 40 px, font-size 18px bold. The up button is disabled at position #1; the down button is disabled at the last position.
+   - **`⚙️ Config` button** (min-width 100 px, primary/blue style) — **only rendered for blocks at position #2 or higher**. Opens the timing constraint dialog for block-level timing.
+   - **`✕ Remove` button** (min-width 100 px, red/danger style) — always present. Removes the block from the strategy.
+
+[SCREENSHOT: BlockConfigItem — header row showing position #2, REQUIRED badge, ▴▾ buttons, ⚙️ Config, and ✕ Remove]
+
+#### Signals Section
+
+Rendered as a dark `QFrame` with a light background (`bg_light`) and border, below the header row. It appears whenever the block has at least one signal.
+
+**Section header:** `Signals:` label in bold blue (info colour).
+
+**Per-signal row** (one row per signal, numbered from 1):
+
+- **Signal label** — `{N}. {SignalName} [{LOGIC}]` — green (`#4ADE80`) for AND signals, blue (`#60A5FA`) for OR signals, 9pt.
+  - If a timing constraint is configured: the label extends inline with an orange segment: `⏱️ Within {X} candles of {ref_signal}`.
+- **`Recheck On Delayed Candles` button** (min-width 180 px, min-height 28 px) — shown **only when no recheck is yet configured** for this signal. Clicking opens a dialog to set the bar delay and RECHECK mode (WITHIN or AT).
+- **`⚙️ Config` button** (min-width 90 px, min-height 28 px, primary/blue style) — shown **only for signals at index 2 or higher** (i.e. the second signal onwards in the block). Opens the timing constraint dialog for this signal.
+
+**RECHECK row** (indented 4 spaces, shown when a recheck is configured):
+
+```
+    └── RECHECK (WITHIN 5 bars)
+```
+
+Green/success colour, bold, 9pt. Three control buttons on the right:
+- `⚙` gear — configure the recheck (bar delay and mode).
+- `⎘` duplicate — add a nested RECHECK.
+- `✕` remove — delete this recheck.
+
+**Nested RECHECK row** (indented 8 spaces):
+
+```
+        └── RECHECK of Signal (WITHIN 3 bars)
+```
+
+Blue/info colour, 9pt. Same `⚙`, `⎘`, `✕` buttons.
+
+**Signal exit condition row** (indented 4 spaces, shown when exits are bound to this signal):
+
+```
+    └── 🔴 EXIT: exit_signal_name (50%)
+```
+
+Exit-tree-item style, 9pt. Three buttons: `⚙` configure, `⎘` duplicate, `✕` remove.
+
+**Exit recheck row** (indented 8 spaces, shown when the exit itself has a recheck):
+
+```
+        └── RECHECK (WITHIN 3 bars)
+```
+
+Green/success colour, bold, 9pt. Two buttons: `⚙` configure, `✕` remove.
+
+[SCREENSHOT: BlockConfigItem — signals section showing a signal with timing constraint, a RECHECK, and an EXIT condition]
+
+#### Block-Level Exits Section
+
+Shown below the signals section when exit conditions are bound at the block level (not to a specific signal). Rendered as a separate dark `QFrame`.
+
+**Section header:** `Block-Level Exit Conditions:` — red/error colour, bold.
+
+**Per exit row:**
+
+```
+🔴  exit_signal_name (50%) - ABSOLUTE mode
+```
+
+Exit-tree-item style, 9pt. Three buttons: `⚙` configure, `⎘` duplicate, `✕` remove.
+
+[SCREENSHOT: BlockConfigItem — block-level exits section]
 
 ### 3.6 Block Search Panel (Right)
 
-The **Block Search Panel** on the right side lets you browse and add building blocks to your strategy.
+**Source:** `BlockSearchPanel` / `BlockListItem` (`src/strategy_builder/ui/block_search_panel.py`)
 
-Features:
-- **Search bar** — filter blocks by name in real time
-- **Category filter** — dropdown to filter by block category
-- **Block list** — expandable items; click to expand a block and see its available signals
-- **Signal checkboxes** — select which signals within a block to add
-- **Add as AND / Add as OR** — add selected signals with the chosen logic type
-- **Added indicator** — once a block is added, its button updates to show it has been added (green checkmark)
+The Block Search Panel on the right side of the window is enclosed in a group box labelled **"🔧 Available Building Blocks"** (bold 12pt title).
 
-> Signals marked as exit signals can also be added directly as exit conditions from this panel using the exit button alongside each signal.
+#### Search and Filter Controls
+
+- **`🔍 Search:` label** + text input (min-height 36 px) — placeholder: `"Search by block name, description, or signal..."`. Filters the block list in real time by block name, description text, or signal name.
+- **`Category:` label** + dropdown — starts with `"All Categories"`, then populated with categories from the block registry.
+- **`Type:` label** + dropdown — starts with `"All Types"`, then populated with block types from the registry.
+
+#### Block List
+
+A scrollable area containing one `BlockListItem` per block from the registry. Each item shows:
+
+1. **`📊 {FormattedBlockName}`** — bold 12pt.
+2. **Metadata line** — `Category: {cat} | Type: {type}` (muted, 9pt). A weight value (`| Weight: N points`) is appended if the block has a `default_weight`.
+3. **Expand button** (min/max height 72 px, full width, dark background) — shows the signal count:
+   - Collapsed: `▶ Show Signals ({N})`
+   - Expanded: `▼ Hide Signals ({N})`
+   - When some signals have been added: `▶ Show Signals ({remaining} available, {added} added)`
+   - When all signals have been added: `✓ All Signals Added ({N})` — button is disabled.
+
+#### Expanded Signal List
+
+When the expand button is clicked, the panel shows:
+
+- **`"Select signals to add:"` header** — primary colour, 10pt bold.
+- **Per-signal checkbox** — signal name with optional occurrence count `({N} found, {X.Y}%)` appended if statistics are loaded. An italic description in muted text appears below each checkbox (indented 40 px), if available.
+  - Added signals have their checkboxes disabled and shown with a strikethrough (grey text, grey indicator).
+- **Button row:**
+  - `➕ Add as AND (Required)` — adds selected signals as a REQUIRED (AND) block. When the strategy has no blocks yet, this button's label changes to `➕ Add Required Signal`.
+  - `➕ Add as OR (Optional)` — adds selected signals as an OPTIONAL (OR) block. **Disabled when the strategy has no blocks yet.**
+  - `➕ Add as Exit` — opens the Exit Condition Dialog for one selected signal. **Disabled when the strategy has no blocks yet.**
+- **`"Note: Signal counts based on last 180 days of BTC data"`** — muted, 9pt, italic.
+
+[SCREENSHOT: BlockSearchPanel — showing an expanded block with signal checkboxes, AND/OR/Exit buttons]
 
 ---
 
@@ -235,41 +357,47 @@ This is where you build your strategy:
 
 1. Enter a **Strategy Name** in the Strategy Information Panel.
 2. Select **Bullish** or **Bearish** as the strategy type.
-3. In the Block Search Panel (right), find building blocks and expand them to view their signals.
-4. Select the signals you want, then click **Add as AND** or **Add as OR**.
-5. In the Strategy Blocks Panel (left), reorder blocks with the ▲/▼ arrows.
-6. Optionally configure **timing constraints** on signals (gear icon → timing constraint dialog) to require signals to fire within a set number of candles of each other.
-7. Optionally configure **recheck settings** to require a signal to be confirmed again after a bar delay.
-8. Optionally add **exit conditions** to define when to close positions.
+3. In the Block Search Panel (right), find a building block and click its expand button (`▶ Show Signals`) to view its signals.
+4. Select one or more signal checkboxes, then click **`➕ Add as AND (Required)`** or **`➕ Add as OR (Optional)`** to add them.
+5. In the Strategy Blocks Panel (left), reorder blocks with the `▴` (up) and `▾` (down) buttons.
+6. Optionally configure **timing constraints** on signals: click `⚙️ Config` on a signal (available from the second signal onwards) to specify that this signal must fire within N candles of a reference signal.
+7. Optionally configure **recheck validation** on signals: click `Recheck On Delayed Candles` on a signal to require the signal to reoccur within a bar window before counting as confirmed.
+8. Optionally add **exit conditions** to define when to close positions (signal-level, block-level, or strategy-level).
 
 ### Step 1 — Validate
 
-Click the **Validate** step button in the Stepper Ribbon. The application runs an institutional-grade validation check on the strategy configuration and opens the **Validation Report Window**.
+Click the **Validate** step button in the Stepper Ribbon. The application runs an institutional-grade validation check and opens the **Validation Report Window** (`ValidationReportWindow`).
 
-The Validation Report shows:
-- Blocking issues (must be fixed before proceeding)
-- Warnings (recommended but not mandatory)
-- Auto-fix suggestions for common issues (click "Apply Fix" where available)
+The report shows results in four sections:
+- **✅ Basic Validation** (green border) — structural checks
+- **✅ Standard Validation** (blue border) — logic and constraint checks
+- **✅ Strict Validation** (purple border) — circular dependency checks
+- **🔴 Exit Condition Validation** (red border) — shown only when exit conditions are present
+- **⚠️ Warnings** (orange border) — shown only when warnings exist
 
-If validation passes, the Validate button turns green (✓) and the status is persisted to the database automatically.
+A **NautilusTrader Compatibility** indicator is also shown (`✅ Compatible` when valid).
 
-If validation fails, the button turns red (✗) and you must address the blocking issues and re-run validation.
+If validation **passes**, the Validate button turns green (`✓ Validate`) and the validation status is persisted to the database automatically.
+
+If validation **fails**, the button turns red (`✗ Validate`) and you must address the blocking issues and re-run validation.
 
 ### Step 2 — Test / Optimize
 
-Click the **Test / Optimize** step button. This opens the **Backtest Configuration Window** — see [Section 6](#6-backtest-configuration-window) for full details.
+Click the **Test / Optimize** step button. This opens the **Backtest Configuration Window** (`BacktestConfigDialog`) — see [Section 6](#6-backtest-configuration-window) for full details.
 
-Signal calibration runs automatically when you click **Run Test** inside that window.
+Signal calibration runs automatically before the backtest executes when you click **▶ Run Test** inside that window.
 
 ### Step 3 — Publish
 
-Click the **Publish** step button to manage the publish status of the strategy. *(Publish status management is a forthcoming feature.)*
+Click the **Publish** step button to manage the publish status of the strategy.
 
 ---
 
 ## 5. Strategy Browser
 
-The **Strategy Browser** is a standalone window that opens via **File → Open Strategy…** (Ctrl+O) or the **Open** toolbar button.
+**Source:** `StrategyBrowserDialog` (`src/strategy_builder/ui/strategy_browser_dialog.py`)
+
+The Strategy Browser opens via **File → Open Strategy…** (Ctrl+O) or the **Open** toolbar button. It is a standalone `QMainWindow` (default size 1200 × 800 px) titled `"Strategy Browser"`.
 
 ### 5.1 Purpose
 
@@ -277,7 +405,7 @@ The Strategy Browser is the primary way to **load, manage, and organise strategi
 
 ### 5.2 Window Layout
 
-The Strategy Browser window (`StrategyBrowserDialog`) is split into two vertical sections by a draggable splitter:
+The Strategy Browser window is split into two vertical sections by a draggable splitter:
 
 - **Upper section** — strategy table
 - **Lower section** — strategy details panel (shown when a strategy is selected)
@@ -291,24 +419,11 @@ At the top of the window:
 
 ### 5.4 Strategy Table
 
-The table has six columns:
-
-| Column | Description |
-|--------|-------------|
-| Strategy Name | Name and a colour-coded summary of the first three blocks and their signals |
-| Type | Bullish (green dot) or Bearish (red dot) |
-| Version | Dropdown to select which version to load (each save creates a new version) |
-| Last Modified | Date and time the version was created |
-| Validation | `Un-Validated` (grey), `Pass` (green), or `Fail` (red) |
-| Published | Draft / Published status |
-
-Clicking a row selects it and populates the details panel. **Double-clicking a row opens the strategy immediately.**
-
-Columns are sortable by clicking the header.
+The table displays strategies with columns for name, type, version, last modified date, validation status, and published status. Clicking a row selects it and populates the details panel. **Double-clicking a row opens the strategy immediately.**
 
 ### 5.5 Strategy Details Panel
 
-When a strategy is selected, the lower panel shows three columns:
+When a strategy is selected, the lower panel shows:
 
 - **Strategy Information** — name, type badge, description, version number, creation date, and tags
 - **Configuration** — a hierarchical display of all signals with their AND/OR logic, timing constraints, recheck settings, and exit conditions at signal, block, and strategy level
@@ -327,17 +442,17 @@ When a strategy is selected, the lower panel shows three columns:
 
 ### 5.7 Strategy Versioning
 
-Every **Save** (Ctrl+S) creates a **new version** of the strategy in the database — it does not overwrite the previous version. The Version column in the Strategy Browser shows a dropdown listing all available versions (v1, v2, v3, …). You can select an older version to load a historical snapshot.
-
-**Save As** creates an entirely new strategy record with a new name and its own independent version history.
+Every **Save** (Ctrl+S) creates a **new version** of the strategy in the database — it does not overwrite the previous version. **Save As** creates an entirely new strategy record with a new name and its own independent version history.
 
 ---
 
 ## 6. Backtest Configuration Window
 
-The Backtest Configuration Window (`BacktestConfigDialog`) opens when you click the **Test / Optimize** step in the Stepper Ribbon or click **Open** in the relevant context. It is a non-modal floating window with six tabs.
+**Source:** `BacktestConfigDialog` (`src/strategy_builder/ui/backtest_config_dialog.py`)
 
-### 6.1 Tab 1 — Config
+The Backtest Configuration Window opens when you click the **Test / Optimize** step in the Stepper Ribbon. It is a non-modal floating window with six tabs.
+
+### 6.1 Tab 1 — 💠 Config
 
 Configure and launch a backtest run. Key settings include:
 
@@ -347,29 +462,25 @@ Configure and launch a backtest run. Key settings include:
 - **TP/SL Configuration** — take-profit and stop-loss parameters
 - **Starting Capital** — initial account balance in USDT
 
-Click **▶ Run Test** to start. Signal calibration runs automatically before the backtest executes.
+Click **▶ Run Test** to start. Signal calibration runs automatically before the backtest executes (the dedicated Calibrate tab was removed — calibration is now automatic).
 
-### 6.2 Tab 2 — Live Output
+### 6.2 Tab 2 — ● Live Output
 
 A real-time scrolling log of all output from the running backtest, including data loading progress, NautilusTrader engine messages, and any errors.
 
-### 6.3 Tab 3 — Trades
+### 6.3 Tab 3 — 💰 Trades
 
 A live table of all trades executed during the backtest, updated in real time as the run progresses.
 
-### 6.4 Tab 4 — Metrics
+### 6.4 Tab 4 — 💹 Metrics
 
-Performance analysis for the completed (or running) backtest, including:
-- Sharpe ratio, Sortino ratio, Calmar ratio
-- Win rate, profit factor, maximum drawdown
-- Total trades, average trade duration
-- Equity curve summary
+Performance analysis for the completed (or running) backtest, including Sharpe ratio, Sortino ratio, Calmar ratio, win rate, profit factor, maximum drawdown, total trades, average trade duration, and an equity curve summary.
 
-### 6.5 Tab 5 — AI Recommendations
+### 6.5 Tab 5 — 🤖 AI Recommendations
 
 An AI-powered recommendations panel that previews and sends analysis requests to the configured AI model (via OpenRouter). Provides intelligent suggestions for improving strategy parameters based on backtest results.
 
-### 6.6 Tab 6 — Compare
+### 6.6 Tab 6 — 🔁 Compare
 
 Side-by-side comparison of two different backtest configurations, allowing you to evaluate the impact of parameter changes.
 
@@ -381,15 +492,23 @@ During a running backtest, controls are available to **Pause**, **Resume**, and 
 
 ## 7. Settings
 
+**Source:** `SettingsDialog` (`src/strategy_builder/ui/settings_dialog.py`)
+
 Open via **Tools → Settings…**. The Settings dialog has three tabs:
 
 ### 7.1 Tab — API Keys
 
-Secret fields for credentials. Each field shows a masked display (last 4 characters only). Controls:
-- **Show 10s** — reveals the full value in plain text for 10 seconds, then auto-masks
-- **Edit** — enter edit mode to change the value (leave blank to keep the existing value)
+Secret fields for credentials. Each field is rendered by `SecretFieldWidget` and shows:
+
+```
+[ ••••••••••••last4 ]   [Show 10s]   [Edit]
+```
+
+- **Show 10s** — reveals the full value in plain text for 10 seconds, then auto-masks.
+- **Edit** — switches to an inline password-echo `QLineEdit`. Leaving the field blank keeps the existing value. Click **Cancel** to exit edit mode without changes.
 
 API key fields:
+
 | Field | Description |
 |-------|-------------|
 | OpenRouter AI Key | API key for AI recommendations (via OpenRouter) |
@@ -410,11 +529,15 @@ Non-secret user settings organised in groups:
 
 ### 7.3 Tab — Admin (PIN-Protected)
 
-The Admin tab is hidden until you authenticate with an admin PIN (click **"Admin Access"** below the tabs and enter your PIN).
+The Admin tab is hidden until you authenticate with an admin PIN. Click **"Admin Access"** below the tabs and enter your PIN in the `AdminPinDialog`.
 
-Admin settings cover database connection details, connection pool configuration, DB SSL, backup settings, risk management thresholds, optimization ranges, and performance metric weights.
+The PIN dialog supports two modes:
+- **Setup mode** — if no PIN is set, you are prompted to create one (enter and confirm).
+- **Authentication mode** — enter your existing PIN. After 3 consecutive failures the dialog locks for 30 seconds and shows a countdown.
 
-> **First-time use:** If no admin PIN is set, you will be prompted to create one. The PIN is stored as a bcrypt hash in the OS keyring — it is never stored in plain text.
+Admin settings cover database connection details, connection pool configuration, DB SSL, backup settings, risk management thresholds, optimisation ranges, and performance metric weights.
+
+> The admin PIN is stored as a bcrypt hash in the OS keyring — it is never stored in plain text.
 
 ---
 
@@ -422,12 +545,12 @@ Admin settings cover database connection details, connection pool configuration,
 
 ### 8.1 Automatic Data Updates
 
-When the application starts, it displays a **Data Update Modal** that checks for missing BTC/USDT candle data and fetches any gaps from Binance. This modal closes automatically once the update completes.
+When the application starts, it displays a **Data Update Modal** (`DataUpdateModal`) that checks for missing BTC/USDT candle data and fetches any gaps from Binance. This modal runs synchronously (blocking) and the auto-update system starts only after the modal closes — this prevents race conditions between the modal write and the background update thread.
 
-After startup, the application runs a **background auto-update cycle** every 15 minutes that:
-1. Detects any gaps in the 15-minute and 1-hour bar datasets
-2. Downloads missing bars from Binance
-3. Updates the status bar with a countdown to the next update
+After startup, the application runs a **background auto-update cycle** that:
+1. Detects any gaps in the 15-minute and 1-hour bar datasets, anchoring the scan to the last bar on disk for each timeframe.
+2. Downloads missing bars from Binance (60-second hard timeout per cycle).
+3. Updates the status bar with a countdown to the next update.
 
 ### 8.2 Manual Data Update
 
@@ -435,7 +558,7 @@ Use **Tools → Update Data…** to open the Data Update Modal at any time and m
 
 ### 8.3 Data Verification
 
-Use **Tools → Verify Data…** to run a **read-only** integrity scan across all timeframes. This reports any detected gaps without modifying any stored data.
+Use **Tools → Verify Data…** (`DataVerifyDialog`) to run a **read-only** integrity scan across all timeframes. This reports any detected gaps without modifying any stored data.
 
 ---
 
@@ -443,14 +566,14 @@ Use **Tools → Verify Data…** to run a **read-only** integrity scan across al
 
 The **Tools → Debug Logger** submenu provides controls for diagnostic logging:
 
-| Option | Description |
-|--------|-------------|
-| Enable Debugger in Console | Toggle debug output to the terminal console |
-| Enable Debugger in Log File | Toggle debug output to files in the `logs/` directory |
-| Clear Old Logs | Delete old log files from `logs/` to free disk space |
-| View Current Log File | Open the current session log in the built-in **Log Viewer** window |
+| Option | Default | Description |
+|--------|---------|-------------|
+| Enable Debugger in Console | On (checked) | Toggle debug output to the terminal console |
+| Enable Debugger in Log File | On (checked) | Toggle debug output to files in the `logs/` directory |
+| Clear Old Logs | — | Delete old log files from `logs/` to free disk space |
+| View Current Log File | — | Open the current session log in the built-in **Log Viewer** window (`LogViewerWindow`) |
 
-Both console and log file logging are **enabled by default** on startup.
+Both console and log file logging are enabled by default on startup.
 
 ---
 
@@ -470,32 +593,32 @@ Both console and log file logging are **enabled by default** on startup.
 ### Data update fails at startup
 
 - Check your internet connection — Binance is required for live data
-- If the update times out (60-second hard limit), the application will continue and retry at the next 15-minute boundary
+- If the update times out (60-second hard limit per cycle), the application will continue and retry at the next update boundary
 - Use **Tools → Verify Data…** to see which timeframes have gaps
 
 ### Validation fails with unexpected errors
 
-- Use the Validation Report window to read the exact blocking issue messages
-- Apply auto-fix suggestions where available (click "Apply Fix" in the report)
+- Read the exact blocking issue messages in the Validation Report window (`ValidationReportWindow`)
+- Apply auto-fix suggestions where available
 - If fixes are applied, save the strategy and re-run validation
 
 ### Backtest produces no trades
 
-- Ensure the strategy has passed validation (green ✓ on the Validate step)
-- Check the **Live Output** tab for error messages during the run
-- Ensure the lookback period covers a date range that has data (use **Verify Data** to confirm)
+- Ensure the strategy has passed validation (green `✓` on the Validate step)
+- Check the **● Live Output** tab for error messages during the run
+- Ensure the lookback period covers a date range with data — use **Verify Data** to confirm
 
 ### Settings dialog — Admin tab not visible
 
 - Click **"Admin Access"** below the Settings tabs and enter your admin PIN
-- If you have not set a PIN, you will be prompted to create one on first access
+- If no PIN has been set, you will be prompted to create one on first access
 
 ---
 
-*Screenshot placeholders — exact window names from source code:*
+*Source class reference — window/dialog names from source code:*
 
-| Section | Window / Dialog Name |
-|---------|---------------------|
+| Window / Dialog | Class name |
+|-----------------|-----------|
 | Main window | `StrategyBuilderMainWindow` |
 | Strategy Browser | `StrategyBrowserDialog` |
 | New Strategy dialog | `NewStrategyDialog` |
