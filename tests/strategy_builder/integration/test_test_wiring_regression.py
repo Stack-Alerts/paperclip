@@ -217,6 +217,9 @@ class TestBacktestConfigPanelWiringAPI:
         Inject minimal PyQt5 stubs if the real package isn't available,
         so tests can run in headless CI.
         """
+        import importlib.util
+        if importlib.util.find_spec("PyQt5") is not None:
+            return  # real PyQt5 available — do not inject stubs
         if "PyQt5" not in sys.modules:
             import types
             from unittest.mock import MagicMock
