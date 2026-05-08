@@ -227,6 +227,10 @@ _styles_stub.get_secondary_button_stylesheet = lambda: ""
 _styles_stub.get_table_stylesheet         = lambda: ""
 _styles_stub.create_font                  = lambda **kw: MagicMock()
 _styles_stub.apply_hand_cursor_to_buttons = lambda w: None
+_styles_stub.WindowGeometryMixin = type("WindowGeometryMixin", (), {
+    "showEvent": lambda self, e: None,
+    "closeEvent": lambda self, e: None,
+})
 _styles_stub.COLORS = {
     "success":        "#00ff00",
     "error":          "#ff0000",
