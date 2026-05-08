@@ -2319,27 +2319,7 @@ class BacktestConfigPanel(QWidget):
         self.stop_btn.setToolTip("Stop and cancel the currently running backtest")
         layout.addWidget(self.stop_btn)
         
-        # WIRING TEST Button (uses REAL backtest system!)
-        self.test_wiring_btn = QPushButton("🔬 Test Wiring")
-        self.test_wiring_btn.clicked.connect(self._on_test_wiring_clicked)
-        self.test_wiring_btn.setStyleSheet(
-            "QPushButton { background-color: #6C757D; color: white; font-weight: bold; padding: 8px; }"
-            "QPushButton:hover { background-color: #5A6268; }"
-        )
-        self.test_wiring_btn.setToolTip(
-            "🔬 Wiring Verification Test\n\n"
-            "Tests that ALL UI parameters actually affect backtest results.\n\n"
-            "How it works:\n"
-            "1. Runs 29 backtest scenarios (auto-changing UI parameters)\n"
-            "2. Saves results after each run\n"
-            "3. Compares results to verify parameters are wired\n"
-            "4. Generates report showing which parameters work\n\n"
-            "Uses YOUR actual backtest system (same as Run button).\n"
-            "Takes ~15-20 minutes (29 × 30-60 sec per test)."
-        )
-        layout.addWidget(self.test_wiring_btn)
-
-        # CONFIG DISCOVERY Button — Phase 3 launcher
+         # CONFIG DISCOVERY Button — Phase 3 launcher
         self.config_discovery_btn = QPushButton("Config Discovery")
         self.config_discovery_btn.clicked.connect(self._on_config_discovery_clicked)
         self.config_discovery_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
@@ -3534,159 +3514,8 @@ class BacktestConfigPanel(QWidget):
             self.capital_spin.setValue(int(amount))
         except (ValueError, TypeError):
             pass
-    
-    def _on_test_wiring_clicked(self):
-        """
-        Run wiring verification test - uses REAL backtest button!
-        
-        BRILLIANT SOLUTION: Instead of creating separate test framework,
-        this directly manipulates UI and clicks Run button 29 times!
-        
-        Each run:
-        1. Changes a UI parameter
-        2. Clicks actual Run button
-        3. Waits for completion
-        4. Saves results
-        5. Compares to verify parameter affects output
-        """
-        from PyQt5.QtWidgets import QMessageBox, QProgressDialog
-        from pathlib import Path
-        import json
-        from datetime import datetime
-        
-        # Confirm with user
-        msg = QMessageBox(self)
-        msg.setStyleSheet(MAIN_STYLESHEET)
-        msg.setIcon(QMessageBox.Question)
-        msg.setText("🔬 Wiring Verification Test\n\nThis will run 29 backtests to verify all UI parameters are wired correctly.")
-        msg.setInformativeText(
-            "Expected time: 15-20 minutes (29 × ~30 sec per test)\n\n"
-            "The test will:\n"
-            "• Auto-change UI parameters between runs\n"
-            "• Use your actual Run button (real system!)\n"
-            "• Compare results to detect wiring bugs\n"
-            "• Generate detailed report\n\n"
-            "Continue?"
-        )
-        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        msg.setDefaultButton(QMessageBox.No)
-        
-        if msg.exec_() != QMessageBox.Yes:
-            return
-        
-        # Load test scenarios
-        try:
-            from tests.integration.test_scenarios import (
-                CRITICAL_SCENARIOS,
-                EDGE_SCENARIOS,
-                PARAMETER_VARIATION_SCENARIOS
-            )
-            all_scenarios = CRITICAL_SCENARIOS + EDGE_SCENARIOS + PARAMETER_VARIATION_SCENARIOS
-        except ImportError:
-            QMessageBox.critical(
-                self,
-                "Error",
-                "Could not load test scenarios from tests/integration/test_scenarios.py"
-            )
-            return
-        
-        # Create progress dialog
-        progress = QProgressDialog(
-            "Running wiring verification tests...",
-            "Cancel",
-            0,
-            len(all_scenarios),
-            self
-        )
-        progress.setWindowTitle("🔬 Wiring Test")
-        progress.setWindowModality(Qt.WindowModal)
-        
-        # Results storage
-        test_results = []
-        
-        # Save original UI state
-        original_config = self._capture_ui_state()
-        
-        # Run each scenario
-        for i, scenario in enumerate(all_scenarios):
-            if progress.wasCanceled():
-                break
-            
-            progress.setValue(i)
-            progress.setLabelText(f"Test {i+1}/{len(all_scenarios)}: {scenario.description}")
-            
-            # Apply scenario config to UI
-            self._apply_scenario_to_ui(scenario.config)
-            
-            # Wait for UI to update
-            QApplication.processEvents()
-            
-            # WIRING TEST: Log COMPLETE config for this test
-            import logging
-            from pathlib import Path
-            Path("logs/wiring-test").mkdir(parents=True, exist_ok=True)
-            
-            wiring_logger = logging.getLogger('wiring_test')
-            if not wiring_logger.handlers:
-                wiring_logger.setLevel(logging.DEBUG)
-                fh = logging.FileHandler('logs/wiring-test/wiring_test.log')
-                fh.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s - %(message)s'))
-                wiring_logger.addHandler(fh)
-            
-            # Get COMPLETE config that will be used
-            full_config = self.get_config()
-            
-            wiring_logger.info("="*80)
-            wiring_logger.info(f"TEST #{i+1}/{len(all_scenarios)}: {scenario.description}")
-            wiring_logger.info(f"Scenario ID: {scenario.id}")
-            wiring_logger.info("="*80)
-            wiring_logger.info("COMPLETE BACKTEST CONFIGURATION:")
-            wiring_logger.info(f"  💰 Starting Capital: ${full_config['starting_capital']:,}")
-            wiring_logger.info(f"  📈 Risk per Trade: {full_config['risk_per_trade_pct']}%")
-            wiring_logger.info(f"  ⚖️  Min Risk:Reward: {full_config['min_risk_reward']}:1")
-            wiring_logger.info(f"  💪 Max Leverage: {full_config['max_leverage']}x")
-            wiring_logger.info(f"  ⏱️  Max Bars Held: {full_config['max_bars_held']} bars")
-            wiring_logger.info(f"  🎯 Confluence Threshold: {full_config['confluence_threshold']} pts")
-            wiring_logger.info(f"  📊 TP/SL Mode: {full_config['tpsl_mode']}")
-            wiring_logger.info(f"  🔄 SL Adjustment: {full_config['sl_mode']}")
-            wiring_logger.info("")
-            wiring_logger.info("ADAPTIVE SL v2.0 CONFIG:")
-            asl = full_config['adaptive_sl']
-            wiring_logger.info(f"  Enabled: {asl['enabled']}")
-            wiring_logger.info(f"  Delay Enabled: {asl['delay_enabled']}")
-            wiring_logger.info(f"  Delay Bars: {asl['delay_bars']}")
-            wiring_logger.info(f"  Emergency SL: {asl['emergency_sl_pct']}%")
-            wiring_logger.info(f"  Volatility Lookback: {asl['volatility_lookback']} bars")
-            wiring_logger.info(f"  Volatility Multiplier: {asl['volatility_multiplier']}x")
-            wiring_logger.info(f"  Min SL %: {asl['min_sl_pct']}")
-            wiring_logger.info(f"  Max SL %: {asl['max_sl_pct']}")
-            wiring_logger.info(f"  Use Structure SL: {asl['use_structure_sl']}")
-            wiring_logger.info("="*80)
-            wiring_logger.info("")
-            
-            # Click Run button and wait for completion
-            result = self._run_test_and_wait()
-            
-            # Store results
-            test_results.append({
-                'scenario_id': scenario.id,
-                'description': scenario.description,
-                'config': scenario.config,
-                'trades': result.get('trades', 0),
-                'trades_list': result.get('trades_list', []),  # PHASE 1.1: Full trade data
-                'total_candles': result.get('total_candles', 0),
-                'success': result.get('success', False)
-            })
-        
-        progress.setValue(len(all_scenarios))
-        
-        # Restore original UI state
-        self._restore_ui_state(original_config)
-        
-        # Analyze results and generate report
-        self._generate_wiring_report(test_results)
-    
-    def _capture_ui_state(self) -> dict:
+     
+     def _capture_ui_state(self) -> dict:
         """Capture current UI parameter values"""
         return {
             'lookback': self.lookback_spin.value(),
@@ -3800,17 +3629,7 @@ class BacktestConfigPanel(QWidget):
         
         return results
     
-    def _generate_wiring_report(self, test_results: list):
-        """
-        Wiring verification report — preserved for backwards compat.
-        
-        UPGRADED: Now delegates to _generate_discovery_report() which
-        produces full per-trade exit metrics (Phase 1.2).
-        Existing CSV output and 23-scenario behaviour are preserved.
-        """
-        self._generate_discovery_report(test_results, mode='wiring')
-
-    def _generate_discovery_report(self, test_results: list, mode: str = 'wiring'):
+     def _generate_discovery_report(self, test_results: list, mode: str = 'wiring'):
         """
         Generate enhanced Config Discovery report with per-trade exit metrics.
         
@@ -4123,42 +3942,40 @@ Detailed report saved to:
             )
             self.confluence_spin.setValue(40)
 
-    def _on_config_discovery_clicked(self):
-        """
-        Launch Config Discovery run using BacktestWorker via _run_test_and_wait().
+     def _on_config_discovery_clicked(self):
+         """
+         Launch Config Discovery run using BacktestWorker via _run_test_and_wait().
 
-        Replaces the broken ConfigPermutationWorker path which bypassed
-        BacktestWorker and produced 0 trades.  This implementation uses
-        the identical execution path as _on_test_wiring_clicked so every
-        scenario goes through the real BacktestWorker, emits Live Output,
-        and returns genuine trade data.
+         Replaces the broken ConfigPermutationWorker path which bypassed
+         BacktestWorker and produced 0 trades.  This implementation uses
+         the identical execution path so every scenario goes through the real
+         BacktestWorker, emits Live Output, and returns genuine trade data.
 
-        Threading contract:
-        - All Qt widget access (_apply_scenario_to_ui, _run_test_and_wait,
-          results_dialog.append_result) runs on the main thread.
-        - QProgressDialog + QApplication.processEvents() keeps the UI
-          responsive between sequential scenario runs.
-        - _run_test_and_wait() uses QEventLoop internally; no blocking I/O.
+         Threading contract:
+         - All Qt widget access (_apply_scenario_to_ui, _run_test_and_wait,
+           results_dialog.append_result) runs on the main thread.
+         - QProgressDialog + QApplication.processEvents() keeps the UI
+           responsive between sequential scenario runs.
+         - _run_test_and_wait() uses QEventLoop internally; no blocking I/O.
 
-        Flow:
-        1. Load 23 scenarios (CRITICAL + EDGE + PARAMETER_VARIATION)
-        2. Confirm with user (count + estimated time)
-        3. Save current UI state
-        4. Capture baseline result (current config, no UI change)
-        5. Open ConfigDiscoveryResultsDialog immediately (maximised)
-        6. Loop over each scenario on main thread:
-              a. _apply_scenario_to_ui(scenario.config)
-              b. QApplication.processEvents()
-              c. result = _run_test_and_wait()
-              d. build DiscoveryResult via aggregate_metrics()
-              e. results_dialog.append_result(dr)
-              f. update progress dialog
-        7. Restore UI state
-        8. Finalise dialog + generate CSV report
+         Flow:
+         1. Load 23 scenarios (CRITICAL + EDGE + PARAMETER_VARIATION)
+         2. Confirm with user (count + estimated time)
+         3. Save current UI state
+         4. Capture baseline result (current config, no UI change)
+         5. Open ConfigDiscoveryResultsDialog immediately (maximised)
+         6. Loop over each scenario on main thread:
+               a. _apply_scenario_to_ui(scenario.config)
+               b. QApplication.processEvents()
+               c. result = _run_test_and_wait()
+               d. build DiscoveryResult via aggregate_metrics()
+               e. results_dialog.append_result(dr)
+               f. update progress dialog
+         7. Restore UI state
+         8. Finalise dialog + generate CSV report
 
-        Does NOT modify _on_test_wiring_clicked.
-        Does NOT use ConfigPermutationWorker or MulticoreBacktestEngine.
-        """
+         Does NOT use ConfigPermutationWorker or MulticoreBacktestEngine.
+         """
         from PyQt5.QtWidgets import QMessageBox, QProgressDialog
         from src.strategy_builder.ui.config_permutation_engine import (
             DiscoveryScenario,
