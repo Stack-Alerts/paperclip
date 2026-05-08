@@ -459,6 +459,20 @@ class BacktestWorker(QThread):
                 from src.optimizer_v3.core.adaptive_sl_manager import get_adaptive_sl_manager
                 adaptive_sl_manager = get_adaptive_sl_manager()
             
+            # MODE 2 (Live Replay): Override use_multicore to force bar-by-bar sequential path.
+            # Mode 2 spec: "Feeds data bar-by-bar as if live" — multicore processes all bars
+            # in parallel chunks which breaks the sequential "only sees past data" guarantee.
+            # Mode 1 (Historical): can use multicore for speed.
+            # Mode 2 (Live Replay): always single-core to maintain strict temporal ordering.
+            mode = self.config.get('mode', 1)
+            if mode == 2:
+                self.use_multicore = False
+                self.live_message.emit(
+                    "🔄 Mode 2 (Live Replay): Switching to bar-by-bar sequential execution",
+                    "INFO",
+                    "SYSTEM"
+                )
+
             # PHASE 2: MULTICORE vs SINGLE-CORE ROUTING
             if self.use_multicore:
                 # ========== MULTICORE PATH: Parallel Processing ==========
@@ -604,7 +618,20 @@ class BacktestWorker(QThread):
                 return
             
             # ========== SINGLE-CORE PATH: Sequential Processing ==========
-            self.live_message.emit("Using single-core backtest engine", "INFO", "SYSTEM")
+            if mode == 2:
+                self.live_message.emit(
+                    "🔄 Mode 2 (Live Replay): Bar-by-bar sequential execution — simulating real-time feed",
+                    "INFO",
+                    "SYSTEM"
+                )
+                # Small per-bar delay (ms) to pace the replay and surface each candle
+                # in the progress bar clearly. Kept short (1 ms) to avoid making runs
+                # impractically slow while still guaranteeing sequential order and giving
+                # the UI event loop time to process signals.
+                mode2_bar_delay_ms = 1
+            else:
+                self.live_message.emit("Using single-core backtest engine", "INFO", "SYSTEM")
+                mode2_bar_delay_ms = 0
             
             for i in range(total_candles):  # Process bar-by-bar
                 if self.should_stop:
@@ -615,6 +642,10 @@ class BacktestWorker(QThread):
                 # Wait while paused
                 while self.is_paused and not self.should_stop:
                     self.msleep(100)
+                
+                # Mode 2: pace replay with a small inter-bar delay
+                if mode2_bar_delay_ms > 0:
+                    self.msleep(mode2_bar_delay_ms)
                 
                 # Get current bar and lookback window
                 current_bar = bars[i]
@@ -893,8 +924,12 @@ class BacktestWorker(QThread):
                 evaluator.exit_trade(result.exit_percentage)
                 
                 # Update progress bar every 100 candles
+                # Mode 2: label explicitly says "Candles X/Y" per spec
                 if i % 100 == 0:
-                    progress_msg = f"Processing candles {i}/{total_candles}"
+                    if mode == 2:
+                        progress_msg = f"Live Replay: Candles {i}/{total_candles}"
+                    else:
+                        progress_msg = f"Processing candles {i}/{total_candles}"
                     self.progress_updated.emit(i, total_candles, progress_msg)
                 
                 # Emit progress messages every 500 candles for summary  
@@ -906,7 +941,10 @@ class BacktestWorker(QThread):
                     )
             
             # Emit FINAL 100% progress update
-            self.progress_updated.emit(total_candles, total_candles, f"Processing candles {total_candles}/{total_candles}")
+            if mode == 2:
+                self.progress_updated.emit(total_candles, total_candles, f"Live Replay: Candles {total_candles}/{total_candles}")
+            else:
+                self.progress_updated.emit(total_candles, total_candles, f"Processing candles {total_candles}/{total_candles}")
             
             # Emit completion message LIVE
             self.live_message.emit(
