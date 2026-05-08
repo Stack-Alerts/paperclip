@@ -28,14 +28,15 @@ from PyQt5.QtWidgets import (
     QTabWidget, QWidget, QScrollArea
 )
 from PyQt5.QtCore import Qt, QSettings
-from PyQt5.QtGui import QFont
 
 from src.strategy_builder.ui.styles import (
     get_groupbox_header_stylesheet,
     get_label_style,
     get_panel_title_stylesheet,
     get_primary_button_stylesheet,
-    get_color
+    get_color,
+    create_font,
+    create_monospace_font,
 )
 
 import logging
@@ -317,10 +318,8 @@ class LogViewerWindow(QDialog):
         text_edit = QTextEdit()
         text_edit.setReadOnly(True)
         
-        # Large monospace font (26px institutional grade)
-        large_font = QFont("Courier New")
-        large_font.setPixelSize(26)
-        large_font.setStyleHint(QFont.Monospace)
+        # Large monospace font for institutional-grade readability
+        large_font = create_monospace_font(16)
         text_edit.setFont(large_font)
         text_edit.document().setDefaultFont(large_font)
         
@@ -426,11 +425,8 @@ class LogViewerWindow(QDialog):
                 checkbox = QCheckBox(display_name)
                 checkbox.setChecked(True)
                 
-                # Set font using QFont (NOT CSS - CSS gets overridden!)
-                checkbox_font = QFont()
-                checkbox_font.setPointSize(11)  # 11pt = readable but not too big
-                checkbox_font.setFamily("Segoe UI")
-                checkbox.setFont(checkbox_font)
+                # Set font using setFont (NOT CSS - CSS gets overridden!)
+                checkbox.setFont(create_font(11))
                 
                 checkbox.setFixedWidth(320)  # Fixed width for uniform grid - wider for full text
                 checkbox.setStyleSheet(f"""

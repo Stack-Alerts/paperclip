@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (
     QFrame, QScrollArea, QSplitter
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QModelIndex, QRectF
-from PyQt5.QtGui import QFont, QTextDocument, QAbstractTextDocumentLayout, QPalette, QColor
+from PyQt5.QtGui import QTextDocument, QAbstractTextDocumentLayout, QPalette, QColor
 
 from src.optimizer_v3.database import get_database_manager
 from .styles import (
