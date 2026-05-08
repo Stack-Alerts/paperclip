@@ -383,16 +383,60 @@ class TestAIRecommendationEnhancer:
 
 # ── TestIntelligentRecommendationEngine ──────────────────────────────────────
 
+# Canned OpenRouter response returned by the mock for all TestIntelligentRecommendationEngine tests
+_MOCK_OPENROUTER_RESPONSE = {
+    "choices": [{
+        "message": {
+            "content": json.dumps({
+                "recommendations": [
+                    {
+                        "type": "ADD_BLOCK",
+                        "primary": True,
+                        "block_name": "ema_trend",
+                        "signal_name": None,
+                        "parameter_name": None,
+                        "configuration": {},
+                        "reasoning": "EMA trend filter improves win rate on bearish strategies",
+                        "expected_impact": {"win_rate": "+10%"},
+                        "data_confidence": 0.7,
+                        "ai_confidence": 0.8,
+                        "confidence": 0.75,
+                        "warnings": [],
+                    }
+                ]
+            })
+        }
+    }]
+}
+
+
 class TestIntelligentRecommendationEngine:
-    """End-to-end tests for IntelligentRecommendationEngine."""
+    """End-to-end tests for IntelligentRecommendationEngine.
+
+    All tests in this class run with ``requests.post`` patched so that no live
+    HTTP calls are made to the OpenRouter API.  The patch is applied as a
+    class-scoped autouse fixture so it is active both during engine construction
+    (the ``engine`` fixture) and for every individual test method.
+    """
+
+    @pytest.fixture(scope="class", autouse=True)
+    def mock_openrouter(self):
+        """Patch requests.post for the entire test class to prevent live API calls."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = _MOCK_OPENROUTER_RESPONSE
+        mock_resp.raise_for_status = MagicMock()
+        with patch("requests.post", return_value=mock_resp):
+            yield mock_resp
 
     @pytest.fixture(scope="class")
-    def engine(self):
+    def engine(self, mock_openrouter):
         from src.optimizer_v3.core.intelligent_recommendation_engine import (
             IntelligentRecommendationEngine,
         )
         return IntelligentRecommendationEngine()
 
+    @pytest.mark.timeout(30)
     def test_generate_recommendations_returns_list(self, engine):
         """generate_recommendations() must return a list."""
         result = engine.generate_recommendations(
@@ -400,6 +444,7 @@ class TestIntelligentRecommendationEngine:
         )
         assert isinstance(result, list)
 
+    @pytest.mark.timeout(30)
     def test_all_returned_recs_have_valid_type(self, engine):
         """All returned IntegratedRecommendations must have a valid type field."""
         # Note: AI may return ADJUST_PARAMETER (full form) instead of ADJUST_PARAM
@@ -412,6 +457,7 @@ class TestIntelligentRecommendationEngine:
             assert rec.type in valid_types, \
                 f"Unexpected recommendation type: '{rec.type}'"
 
+    @pytest.mark.timeout(30)
     def test_combined_confidence_between_zero_and_one(self, engine):
         """combined_confidence must be in [0, 1] for all recommendations."""
         result = engine.generate_recommendations(
@@ -421,6 +467,7 @@ class TestIntelligentRecommendationEngine:
             assert 0.0 <= rec.combined_confidence <= 1.0, \
                 f"combined_confidence {rec.combined_confidence} out of [0, 1]"
 
+    @pytest.mark.timeout(30)
     def test_poor_strategy_produces_at_least_one_recommendation(self, engine):
         """A poor strategy (win_rate=45%, 15 trades) should get at least 1 recommendation."""
         poor_metrics = {
@@ -435,6 +482,7 @@ class TestIntelligentRecommendationEngine:
         assert len(result) >= 1, \
             f"Expected at least 1 recommendation for poor strategy, got 0"
 
+    @pytest.mark.timeout(30)
     def test_block_name_present_for_add_block_recs(self, engine):
         """ADD_BLOCK recommendations must have a non-empty block_name."""
         result = engine.generate_recommendations(
@@ -445,6 +493,7 @@ class TestIntelligentRecommendationEngine:
                 assert rec.block_name, \
                     "ADD_BLOCK recommendation missing block_name"
 
+    @pytest.mark.timeout(30)
     def test_format_recommendation_text_no_crash(self, engine):
         """format_recommendation_text() must not crash for any valid rec type."""
         from src.optimizer_v3.core.intelligent_recommendation_engine import IntegratedRecommendation
