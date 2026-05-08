@@ -316,7 +316,7 @@ class BinanceClient:
             )
 
         def on_open(ws):
-            logger.info("User-data WebSocket stream opened: %s", ws_url)
+            logger.info("User-data WebSocket stream opened (key=%s…)", self._listen_key[:8])
 
         ws_app = websocket.WebSocketApp(
             ws_url,
