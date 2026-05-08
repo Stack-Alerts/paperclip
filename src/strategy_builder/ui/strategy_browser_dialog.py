@@ -32,7 +32,8 @@ from .styles import (
     get_column_title_stylesheet,
     get_exit_icon,
     get_cumulative_exit_color,
-    get_recheck_depth_color
+    get_recheck_depth_color,
+    WindowGeometryMixin,
 )
 # Import universal combo box fix (EXACTLY like block_search_panel.py)
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
@@ -99,7 +100,10 @@ class HTMLDelegate(QStyledItemDelegate):
         return doc.size().toSize()
 
 
-class StrategyBrowserDialog(QMainWindow):
+class StrategyBrowserDialog(WindowGeometryMixin, QMainWindow):
+
+    GEOMETRY_SETTINGS_KEY = "strategyBrowser"
+    GEOMETRY_DEFAULT_SIZE = (1200, 800)
     """
     Strategy browser window for database-backed strategy management
     
@@ -133,7 +137,7 @@ class StrategyBrowserDialog(QMainWindow):
         self.db = None
         
         self._init_ui()
-        self._restore_settings()
+        self._restore_non_geometry_settings()
         self._load_strategies()
     
     def _init_ui(self):
@@ -1887,44 +1891,40 @@ class StrategyBrowserDialog(QMainWindow):
         self._save_settings()
         self.close()
     
-    def _restore_settings(self):
-        """Restore window geometry and state"""
+    def _restore_non_geometry_settings(self):
+        """Restore non-geometry settings (splitter sizes).
+
+        Geometry and maximized state are restored in showEvent via
+        WindowGeometryMixin._restore_window_geometry() to avoid the Qt5
+        window-state desync bug where restoreGeometry() before show() sets
+        the maximized flag without actually maximizing the OS window.
+        """
         settings = QSettings("BTC_Engine", "StrategyBuilder")
-        
-        # Restore geometry
-        geometry = settings.value("strategyBrowser/geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
-        else:
-            # Default size if no saved geometry
-            self.resize(1200, 800)
-        
-        # Restore window state
-        window_state = settings.value("strategyBrowser/windowState")
-        if window_state:
-            self.restoreState(window_state)
-        
-        # Restore splitter sizes (table vs details panel)
         splitter_sizes = settings.value("strategyBrowser/splitterSizes")
         if splitter_sizes:
             self.content_splitter.restoreState(splitter_sizes)
-    
+
+    def _restore_settings(self):
+        """Deprecated: kept for internal call compatibility — delegates to split helpers."""
+        self._restore_non_geometry_settings()
+
     def _save_settings(self):
         """Save window geometry and state"""
         settings = QSettings("BTC_Engine", "StrategyBuilder")
-        settings.setValue("strategyBrowser/geometry", self.saveGeometry())
-        settings.setValue("strategyBrowser/windowState", self.saveState())
+        self._save_window_geometry()
         # Save splitter sizes (user's preferred table/details ratio)
         settings.setValue("strategyBrowser/splitterSizes", self.content_splitter.saveState())
     
     def showEvent(self, event):
         """Called when window is shown - apply hand cursors to all widgets"""
         super().showEvent(event)
+        # Restore geometry via mixin (safe to call here — window is shown)
+        self._restore_window_geometry(event)
         # Apply hand cursor AFTER Qt finishes all stylesheet processing
         from PyQt5.QtCore import QTimer
         from .styles import apply_hand_cursor_to_buttons
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
-    
+
     def closeEvent(self, event):
         """Handle window close"""
         self._save_settings()

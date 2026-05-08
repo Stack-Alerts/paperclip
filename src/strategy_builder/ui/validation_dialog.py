@@ -10,21 +10,24 @@ Date: 2026-01-17
 
 from typing import Optional
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QHBoxLayout
-from PyQt5.QtCore import Qt, QSettings
+from PyQt5.QtCore import Qt
 
 from src.strategy_builder.ui.validation_panel import ValidationPanel
-from src.strategy_builder.ui.styles import get_main_stylesheet, get_secondary_button_stylesheet
+from src.strategy_builder.ui.styles import get_main_stylesheet, get_secondary_button_stylesheet, WindowGeometryMixin
 from src.strategy_builder.integration.strategy_builder_orchestrator import (
     StrategyBuilderOrchestrator
 )
 
 
-class ValidationDialog(QDialog):
+class ValidationDialog(WindowGeometryMixin, QDialog):
     """
     Modal dialog containing the validation panel.
-    
+
     Shows validation results in a separate window to save main UI space.
     """
+
+    GEOMETRY_SETTINGS_KEY = "validationDialog"
+    GEOMETRY_DEFAULT_SIZE = (800, 600)
     
     def __init__(self, orchestrator: StrategyBuilderOrchestrator, parent: Optional['QWidget'] = None):
         """
@@ -93,20 +96,15 @@ class ValidationDialog(QDialog):
     def showEvent(self, event):
         """
         Called when dialog is shown.
-        
+
         Auto-validate the current strategy when opening.
         """
         super().showEvent(event)
-        # Restore saved geometry
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        geometry = settings.value("validationDialog/geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
+        self._restore_window_geometry(event)
         # Auto-validate when dialog opens
         self.validation_panel.validate_strategy()
 
     def closeEvent(self, event):
         """Save window geometry on close."""
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        settings.setValue("validationDialog/geometry", self.saveGeometry())
+        self._save_window_geometry()
         super().closeEvent(event)

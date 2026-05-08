@@ -15,24 +15,26 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
     QComboBox, QCheckBox, QPushButton, QGroupBox, QFormLayout
 )
-from PyQt5.QtCore import Qt, QSettings
+from PyQt5.QtCore import Qt
 
-# Import universal combo box fix
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
-# Import centralized styles
-from src.strategy_builder.ui.styles import get_main_stylesheet, get_panel_title_stylesheet, get_label_style, create_font
+
+from src.strategy_builder.ui.styles import get_main_stylesheet, get_panel_title_stylesheet, get_label_style, create_font, WindowGeometryMixin
 
 
-class TimingConstraintDialog(QDialog):
+class TimingConstraintDialog(WindowGeometryMixin, QDialog):
     """
     Dialog for configuring timing constraints on signals.
-    
+
     Allows users to specify:
     - Whether a timing constraint is enabled
     - Number of candles for the constraint
     - Reference signal for the constraint
     """
     
+    GEOMETRY_SETTINGS_KEY = "timingConstraintDialog"
+    GEOMETRY_DEFAULT_SIZE = (700, 500)
+
     def __init__(self, block_name: str, signal_name: str, 
                  available_references: List[Tuple[str, str]], 
                  current_constraint: Optional[dict] = None,
@@ -248,15 +250,11 @@ class TimingConstraintDialog(QDialog):
         from PyQt5.QtCore import QTimer
         from .styles import apply_hand_cursor_to_buttons
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        geometry = settings.value("timingConstraintDialog/geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
+        self._restore_window_geometry(event)
 
     def closeEvent(self, event):
         """Save window geometry on close."""
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        settings.setValue("timingConstraintDialog/geometry", self.saveGeometry())
+        self._save_window_geometry()
         super().closeEvent(event)
 
     

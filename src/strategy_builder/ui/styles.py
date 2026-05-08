@@ -1676,3 +1676,125 @@ def format_block_name(block_name: str) -> str:
             capitalized_words.append(word.capitalize())
     
     return ' '.join(capitalized_words)
+
+
+# ---------------------------------------------------------------------------
+# WindowGeometryMixin — deep fix for Qt window state desync (BTCAAAAA-474)
+# ---------------------------------------------------------------------------
+# Qt5's saveGeometry()/restoreGeometry() bakes the Qt.WindowMaximized flag
+# into the binary blob.  When restoreGeometry() is called inside showEvent(),
+# it sets the internal windowState() to "maximized" without instructing the
+# OS window manager to actually fill the screen.  The OS title bar then shows
+# the "restore" icon (two overlapping squares) — clicking it calls showNormal()
+# which shrinks the window — and clicking "maximize" does nothing because Qt
+# already believes the window is maximized.
+#
+# This mixin avoids saveGeometry()/restoreGeometry() entirely.
+# It stores pos, size, and the maximized flag as three separate QSettings
+# keys and explicitly calls showMaximized() or showNormal() at the right
+# lifecycle point (after show()).
+#
+# Usage:
+#   class MyDialog(WindowGeometryMixin, QDialog):
+#       GEOMETRY_SETTINGS_KEY = "myDialog"   # unique per window class
+#       GEOMETRY_DEFAULT_SIZE = (900, 600)   # (w, h) fallback if no saved state
+#
+#   In showEvent:
+#       super().showEvent(event)
+#       self._restore_window_geometry(event)
+#
+#   In closeEvent:
+#       self._save_window_geometry()
+#       super().closeEvent(event)
+# ---------------------------------------------------------------------------
+
+from PyQt5.QtCore import QSettings as _QSettings, QPoint as _QPoint, QSize as _QSize
+from PyQt5.QtWidgets import QApplication as _QApplication
+
+
+class WindowGeometryMixin:
+    """Mixin that provides correct Qt5 window geometry/state persistence.
+
+    Subclasses must define:
+        GEOMETRY_SETTINGS_KEY: str  — unique QSettings key prefix, e.g. "backtestConfigDialog"
+        GEOMETRY_DEFAULT_SIZE: tuple[int,int]  — (width, height) used on first run
+    """
+
+    GEOMETRY_SETTINGS_KEY: str = "window"
+    GEOMETRY_DEFAULT_SIZE: tuple = (900, 600)
+
+    # ------------------------------------------------------------------ #
+    # Public API                                                           #
+    # ------------------------------------------------------------------ #
+
+    def _save_window_geometry(self) -> None:
+        """Save pos, size, and maximized state as three separate QSettings keys.
+
+        Call from closeEvent() BEFORE super().closeEvent().
+        Never call from moveEvent() or resizeEvent() — that captures
+        intermediate drag positions and corrupts saved state.
+        """
+        settings = _QSettings("BTC_Engine", "StrategyBuilder")
+        key = self.GEOMETRY_SETTINGS_KEY
+
+        if self.isMaximized():
+            # Only record that the window was maximized; do NOT save the
+            # maximized geometry (which is the full-screen rect).
+            settings.setValue(f"{key}/maximized", True)
+            # Keep the last *normal* pos/size already stored — they will be
+            # used when the user un-maximizes next time.
+        else:
+            settings.setValue(f"{key}/maximized", False)
+            settings.setValue(f"{key}/pos", self.pos())
+            settings.setValue(f"{key}/size", self.size())
+
+    def _restore_window_geometry(self, show_event=None) -> None:
+        """Restore window to its saved position, size, and maximized state.
+
+        Call from showEvent() AFTER super().showEvent().
+        The method is safe to call multiple times; subsequent calls are
+        guarded by an instance flag so geometry is only applied once per
+        window lifetime (prevents re-positioning on every showEvent).
+        """
+        if getattr(self, "_geometry_restored", False):
+            return
+        self._geometry_restored = True
+
+        settings = _QSettings("BTC_Engine", "StrategyBuilder")
+        key = self.GEOMETRY_SETTINGS_KEY
+
+        maximized = settings.value(f"{key}/maximized", False, type=bool)
+        saved_pos = settings.value(f"{key}/pos", None)
+        saved_size = settings.value(f"{key}/size", None)
+
+        default_w, default_h = self.GEOMETRY_DEFAULT_SIZE
+
+        if saved_size is not None:
+            self.resize(saved_size)
+        else:
+            self.resize(default_w, default_h)
+
+        if saved_pos is not None:
+            # Clamp to visible screen area so the window cannot be off-screen
+            screen = _QApplication.screenAt(saved_pos)
+            if screen is None:
+                screen = _QApplication.primaryScreen()
+            screen_rect = screen.availableGeometry()
+            clamped_x = max(screen_rect.left(),
+                            min(saved_pos.x(), screen_rect.right() - 100))
+            clamped_y = max(screen_rect.top(),
+                            min(saved_pos.y(), screen_rect.bottom() - 50))
+            self.move(clamped_x, clamped_y)
+        else:
+            # Centre on primary screen on first run
+            screen_rect = _QApplication.primaryScreen().availableGeometry()
+            self.move(
+                screen_rect.center().x() - default_w // 2,
+                screen_rect.center().y() - default_h // 2,
+            )
+
+        if maximized:
+            # showMaximized() must be called AFTER show() / showEvent so the
+            # OS window manager actually expands the window.
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(0, self.showMaximized)

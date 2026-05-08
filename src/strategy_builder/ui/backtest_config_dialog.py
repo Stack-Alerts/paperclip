@@ -8,18 +8,21 @@ Date: 2026-01-17
 """
 
 from PyQt5.QtWidgets import QDialog, QVBoxLayout
-from PyQt5.QtCore import Qt, QSettings
+from PyQt5.QtCore import Qt
 
 from .backtest_config_panel import BacktestConfigPanel
-from .styles import get_main_stylesheet
+from .styles import get_main_stylesheet, WindowGeometryMixin
 
 
-class BacktestConfigDialog(QDialog):
+class BacktestConfigDialog(WindowGeometryMixin, QDialog):
     """
     Modal dialog for backtest configuration.
-    
+
     Displays the backtest configuration panel in a standalone window.
     """
+
+    GEOMETRY_SETTINGS_KEY = "backtestConfigDialog"
+    GEOMETRY_DEFAULT_SIZE = (1200, 800)
     
     def __init__(self, orchestrator, parent=None):
         super().__init__(parent)
@@ -32,18 +35,11 @@ class BacktestConfigDialog(QDialog):
         from PyQt5.QtCore import QTimer
         from .styles import apply_hand_cursor_to_buttons
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        geometry = settings.value("backtestConfigDialog/geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
-        else:
-            # First run — start maximized
-            self.showMaximized()
+        self._restore_window_geometry(event)
 
     def closeEvent(self, event):
         """Save window geometry on close."""
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        settings.setValue("backtestConfigDialog/geometry", self.saveGeometry())
+        self._save_window_geometry()
         super().closeEvent(event)
 
     

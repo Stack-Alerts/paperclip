@@ -47,6 +47,7 @@ from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
 from src.strategy_builder.ui.styles import (
     get_main_stylesheet, apply_hand_cursor_to_buttons,
     get_dialog_stylesheet, create_font, get_primary_button_stylesheet,
+    WindowGeometryMixin,
 )
 from src.strategy_builder.ui.new_strategy_dialog import NewStrategyDialog
 from src.strategy_builder.ui.strategy_browser_dialog import StrategyBrowserDialog
@@ -228,12 +229,15 @@ class _RuntimeCandleUpdateThread(QThread):
             self.finished.emit(False, f"Runtime update error: {exc}\n{traceback.format_exc()}")
 
 
-class StrategyBuilderMainWindow(QMainWindow):
+class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
     """
     Main application window for Strategy Builder.
-    
+
     Integrates all UI components and provides menu bar, toolbar, and status bar.
     """
+
+    GEOMETRY_SETTINGS_KEY = "mainWindow"
+    GEOMETRY_DEFAULT_SIZE = (1400, 900)
     
     def __init__(self):
         """Initialize the main window."""
@@ -1610,20 +1614,12 @@ class StrategyBuilderMainWindow(QMainWindow):
         self.statusBar().showMessage(message)
     
     def _restore_settings(self):
-        """Restore window geometry and state from settings."""
+        """Restore non-geometry settings (splitter sizes).
+
+        Geometry and maximized state are restored in showEvent via
+        WindowGeometryMixin to avoid the Qt5 window-state desync bug.
+        """
         settings = QSettings("BTC_Engine", "StrategyBuilder")
-        
-        # Restore geometry
-        geometry = settings.value("geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
-        
-        # Restore window state
-        window_state = settings.value("windowState")
-        if window_state:
-            self.restoreState(window_state)
-        
-        # Restore splitter sizes (user's preferred panel ratio)
         splitter_sizes = settings.value("mainSplitterSizes")
         if splitter_sizes:
             self.main_splitter.restoreState(splitter_sizes)
@@ -2478,17 +2474,17 @@ class StrategyBuilderMainWindow(QMainWindow):
             self.enable_logfile_action.setText("Enable Debugger in Log File")
     
     def _save_settings(self):
-        """Save window geometry, state, and debug settings."""
+        """Save window geometry, splitter sizes, and debug settings."""
         settings = QSettings("BTC_Engine", "StrategyBuilder")
-        settings.setValue("geometry", self.saveGeometry())
-        settings.setValue("windowState", self.saveState())
+        self._save_window_geometry()
         # Save splitter sizes (user's preferred panel ratio)
         settings.setValue("mainSplitterSizes", self.main_splitter.saveState())
         self._save_debug_settings()
-    
+
     def showEvent(self, event):
         """Called when window is shown - apply hand cursors to all widgets"""
         super().showEvent(event)
+        self._restore_window_geometry(event)
         # Apply hand cursor AFTER Qt finishes all stylesheet processing
         # Qt may reapply stylesheets after showEvent, so delay cursor setting
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))

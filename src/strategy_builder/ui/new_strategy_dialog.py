@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLineEdit,
     QPushButton, QLabel, QTextEdit, QWidget
 )
-from PyQt5.QtCore import Qt, QSettings
+from PyQt5.QtCore import Qt
 
 from src.optimizer_v3.database import get_database_manager
 from .styles import (
@@ -21,17 +21,21 @@ from .styles import (
     get_input_field_stylesheet,
     get_text_edit_stylesheet,
     create_font,
-    get_color
+    get_color,
+    WindowGeometryMixin,
 )
 
 
-class NewStrategyDialog(QDialog):
+class NewStrategyDialog(WindowGeometryMixin, QDialog):
     """
     Dialog for creating new strategy in database
-    
+
     Simple form with name and optional description.
     Creates parent strategy record ready for version creation.
     """
+
+    GEOMETRY_SETTINGS_KEY = "newStrategyDialog"
+    GEOMETRY_DEFAULT_SIZE = (600, 400)
     
     def __init__(self, parent: Optional[QWidget] = None):
         """Initialize new strategy dialog"""
@@ -171,15 +175,11 @@ class NewStrategyDialog(QDialog):
         from PyQt5.QtCore import QTimer
         from .styles import apply_hand_cursor_to_buttons
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        geometry = settings.value("newStrategyDialog/geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
+        self._restore_window_geometry(event)
 
     def closeEvent(self, event):
         """Handle dialog close"""
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        settings.setValue("newStrategyDialog/geometry", self.saveGeometry())
+        self._save_window_geometry()
         if self.db:
             self.db.close()
         super().closeEvent(event)

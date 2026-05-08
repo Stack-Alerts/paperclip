@@ -35,7 +35,8 @@ from src.strategy_builder.ui.styles import (
     get_primary_button_stylesheet, get_secondary_button_stylesheet,
     get_table_stylesheet, get_text_edit_stylesheet, get_scroll_area_stylesheet,
     get_tab_widget_stylesheet, set_hand_cursor, apply_hand_cursor_to_buttons,
-    get_auto_fix_button_style
+    get_auto_fix_button_style,
+    WindowGeometryMixin,
 )
 from src.strategy_builder.validation.auto_fix import (
     auto_fix_strategy_type,
@@ -52,7 +53,7 @@ logger = logging.getLogger(__name__)
 
 
 
-class ValidationReportWindow(QMainWindow):
+class ValidationReportWindow(WindowGeometryMixin, QMainWindow):
     """
     Professional validation report window matching Strategy Browser style
     
@@ -67,6 +68,9 @@ class ValidationReportWindow(QMainWindow):
     
     # Signals
     fix_applied = pyqtSignal(str, dict)  # fix_type, fix_data
+
+    GEOMETRY_SETTINGS_KEY = "validationReportWindow"
+    GEOMETRY_DEFAULT_SIZE = (1000, 700)
     
     def __init__(self, report: ValidationReport, config: any, parent: Optional[QWidget] = None):
         """Initialize professional validation window"""
@@ -76,7 +80,6 @@ class ValidationReportWindow(QMainWindow):
         self.undo_manager = UndoManager()
         
         self._init_ui()
-        self._restore_geometry()
         self._populate_data()
 
     def update_config(self, new_config) -> None:
@@ -1607,23 +1610,19 @@ class ValidationReportWindow(QMainWindow):
         pass
     
     def _restore_geometry(self):
-        """Restore window geometry from settings"""
-        settings = QSettings("BTC_Engine", "ValidationReport")
-        geometry = settings.value("geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
+        """Deprecated: geometry is now restored via WindowGeometryMixin in showEvent."""
+        pass
     
     def showEvent(self, event):
         """Called when window is shown - apply hand cursors to all widgets"""
         super().showEvent(event)
+        self._restore_window_geometry(event)
         # Apply hand cursor AFTER Qt finishes all stylesheet processing
-        # Qt may reapply stylesheets after showEvent, so delay cursor setting
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
     
     def closeEvent(self, event):
         """Save window geometry on close"""
-        settings = QSettings("BTC_Engine", "ValidationReport")
-        settings.setValue("geometry", self.saveGeometry())
+        self._save_window_geometry()
         super().closeEvent(event)
     
     # =========================================================================

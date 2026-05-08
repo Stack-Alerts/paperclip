@@ -38,6 +38,7 @@ from src.strategy_builder.ui.styles import (
     get_transparent_scroll_area_stylesheet,
     create_font,
     apply_hand_cursor_to_buttons,
+    WindowGeometryMixin,
 )
 
 # ---------------------------------------------------------------------------
@@ -415,7 +416,7 @@ class AdminPinDialog(QDialog):
 # Settings Dialog
 # ---------------------------------------------------------------------------
 
-class SettingsDialog(QDialog):
+class SettingsDialog(WindowGeometryMixin, QDialog):
     """
     Main Settings dialog opened via Tools → Settings...
 
@@ -424,6 +425,9 @@ class SettingsDialog(QDialog):
       - "Preferences"  — always visible, non-secret user preferences
       - "Admin"        — HIDDEN until PIN verified; shown/hidden on role change
     """
+
+    GEOMETRY_SETTINGS_KEY = "settingsDialog"
+    GEOMETRY_DEFAULT_SIZE = (800, 600)
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         # Defect 5: Use Qt.Window (not Qt.Tool/Qt.Dialog) so the Settings
@@ -1454,15 +1458,9 @@ class SettingsDialog(QDialog):
     def showEvent(self, event) -> None:  # type: ignore[override]
         super().showEvent(event)
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
-        from PyQt5.QtCore import QSettings
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        geometry = settings.value("settingsDialog/geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
+        self._restore_window_geometry(event)
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         """Save window geometry on close."""
-        from PyQt5.QtCore import QSettings
-        settings = QSettings("BTC_Engine", "StrategyBuilder")
-        settings.setValue("settingsDialog/geometry", self.saveGeometry())
+        self._save_window_geometry()
         super().closeEvent(event)
