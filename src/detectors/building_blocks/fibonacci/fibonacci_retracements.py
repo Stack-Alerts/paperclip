@@ -413,7 +413,7 @@ class FibonacciRetracements:
         if not all(col in df.columns for col in ['open', 'high', 'low', 'close', 'volume', 'timestamp']):
             return {'signal': 'ERROR', 'confidence': 0, 'metadata': {}, 'timestamp': datetime.now(), 'timeframe': self.timeframe, 'confluence_factors': []}
         
-        if len(df) < max(20, self.swing_lookback):
+        if len(df) < 20:
             return {'signal': 'INSUFFICIENT_DATA', 'confidence': 0, 'metadata': {}, 'timestamp': datetime.now(), 'timeframe': self.timeframe, 'confluence_factors': []}
         
         current_price = df['close'].iloc[-1]

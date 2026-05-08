@@ -350,13 +350,16 @@ class TestTPSLIntegration:
         tp_calculator = DynamicTPCalculator(tp_mode='FIBONACCI')
         sl_calculator = AdaptiveSLCalculator()
         
-        # Create sample data
+        # Create sample data with clear swing structure (rise then fall)
+        # This gives FibonacciTP a meaningful swing range to project from,
+        # producing valid R:R ratios with the ATR-based SL.
+        prices_base = [45000 + i * 20 for i in range(50)] + [46000 - i * 20 for i in range(50)]
         df = pd.DataFrame({
             'timestamp': pd.date_range('2025-01-01', periods=100, freq='15min'),
-            'open': [45000 + i * 10 for i in range(100)],
-            'high': [45000 + i * 10 + 50 for i in range(100)],
-            'low': [45000 + i * 10 - 50 for i in range(100)],
-            'close': [45000 + i * 10 for i in range(100)],
+            'open': prices_base,
+            'high': [p + 100 for p in prices_base],
+            'low': [p - 100 for p in prices_base],
+            'close': prices_base,
             'volume': [100] * 100
         })
         
