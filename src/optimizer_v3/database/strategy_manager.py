@@ -233,11 +233,14 @@ class StrategyDatabaseManager:
         # Import StrategyVersion ORM model
         from src.optimizer_v3.database.models import StrategyVersion
         
-        # CRITICAL: Rollback any previous failed transaction before querying.
-        # Consistent with get_strategy_versions() and get_latest_version() which both
-        # rollback first; without this the ORM session can return stale identity-map
-        # data instead of issuing a fresh SELECT when the session is in a bad state.
-        self.session.rollback()
+        # Expire the identity-map so SQLAlchemy issues a fresh SELECT rather than
+        # returning a cached in-memory object.  We intentionally do NOT call
+        # self.session.rollback() here: an unconditional rollback would undo any
+        # data committed earlier in the *same* session (e.g. create_strategy_version
+        # called just before this method), causing the query to return None even
+        # when the row was successfully written.  expire_all() achieves the same
+        # cache-busting goal without discarding uncommitted writes.
+        self.session.expire_all()
         
         try:
             # Query using ORM
