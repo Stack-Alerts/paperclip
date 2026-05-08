@@ -212,11 +212,13 @@ def _make_qt_stubs():
     core.QPoint = MagicMock()
     core.QSize = MagicMock()
     core.QTimer = MagicMock()
+    core.QRect = MagicMock()
 
     # QtGui
     gui = types.ModuleType("PyQt5.QtGui")
     gui.QColor = type("QColor", (), {"__init__": lambda s, *a: None})
     gui.QFont = MagicMock()
+    gui.QGuiApplication = MagicMock()
 
     # Wire sub-modules
     pyqt5.QtWidgets = widgets
