@@ -13,8 +13,6 @@ Critical invariants to protect:
   4. All scenario IDs are unique across all lists.
   5. No scenario has an empty config dict.
   6. generate_pairwise_scenarios() returns a non-empty list.
-  7. _generate_wiring_report() / _on_test_wiring_clicked() remain callable
-     on BacktestConfigPanel (not renamed/deleted).
 
 These tests run WITHOUT Qt and WITHOUT a live backtest — pure import/structure
 validation.  They are cheap and should always be green.
@@ -204,11 +202,15 @@ class TestScenarioDataIntegrity:
 
 class TestBacktestConfigPanelWiringAPI:
     """
-    Verify the wiring-test entry points on BacktestConfigPanel remain callable.
+    Verify the preserved API methods on BacktestConfigPanel remain callable.
 
     We do not execute them (that requires Qt + live data), but we confirm:
       - The class is importable
-      - The key wiring methods exist and are callable
+      - The preserved methods exist and are callable:
+        _capture_ui_state, _restore_ui_state, _apply_scenario_to_ui, get_config
+
+    Note: _on_test_wiring_clicked and _generate_wiring_report were intentionally
+    removed in BTCAAAAA-565 and are no longer verified here.
     """
 
     @pytest.fixture(autouse=True)
@@ -279,26 +281,6 @@ class TestBacktestConfigPanelWiringAPI:
             importlib.import_module("src.strategy_builder.ui.backtest_config_panel")
         except ImportError as exc:
             pytest.skip(f"Cannot import backtest_config_panel (dependency issue): {exc}")
-
-    def test_on_test_wiring_clicked_exists(self):
-        """_on_test_wiring_clicked must remain defined (not renamed/deleted)."""
-        try:
-            from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
-            assert hasattr(BacktestConfigPanel, "_on_test_wiring_clicked"), (
-                "_on_test_wiring_clicked was removed or renamed — breaks existing Test Wiring flow"
-            )
-        except ImportError as exc:
-            pytest.skip(f"Import failed: {exc}")
-
-    def test_generate_wiring_report_exists(self):
-        """_generate_wiring_report must remain defined."""
-        try:
-            from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
-            assert hasattr(BacktestConfigPanel, "_generate_wiring_report"), (
-                "_generate_wiring_report was removed or renamed — breaks CSV report generation"
-            )
-        except ImportError as exc:
-            pytest.skip(f"Import failed: {exc}")
 
     def test_capture_ui_state_exists(self):
         """_capture_ui_state / _restore_ui_state must remain defined."""
