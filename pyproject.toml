@@ -67,6 +67,9 @@ testpaths = ["tests"]
 # Ensure src/ is always on sys.path so all test modules can import from src/
 # regardless of conftest.py load order (fixes namespace-package import ordering).
 pythonpath = ["src"]
+markers = [
+    "timeout: mark a test with a timeout in seconds (requires pytest-timeout)",
+]
 
 [tool.pylint.messages_control]
 max-line-length = 88
