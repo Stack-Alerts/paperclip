@@ -2664,7 +2664,19 @@ class MetricsDisplayPanel(QWidget):
             # Get available blocks with signals properly extracted
             # ComprehensiveAIRequestBuilder already imported at top of file (line 51)
             builder = ComprehensiveAIRequestBuilder()
-            available_blocks = builder._extract_available_blocks()
+            _strategy_type = strategy_config_dict.get("strategy_type", "")
+            _strategy_direction = (
+                "BEARISH" if "bearish" in _strategy_type.lower()
+                else "BULLISH" if "bullish" in _strategy_type.lower()
+                else None
+            )
+            _current_block_names = set(
+                b.get("name", "") for b in strategy_config_dict.get("blocks", [])
+            )
+            available_blocks = builder._extract_available_blocks(
+                strategy_direction=_strategy_direction,
+                current_block_names=_current_block_names,
+            )
             
             # Create preview window
             preview_window = AIRequestPreviewWindow(self)
@@ -3121,7 +3133,19 @@ class MetricsDisplayPanel(QWidget):
             # Get available blocks
             from src.optimizer_v3.core.comprehensive_ai_request_builder import ComprehensiveAIRequestBuilder
             builder = ComprehensiveAIRequestBuilder()
-            available_blocks = builder._extract_available_blocks()
+            _strategy_type = strategy_config_dict.get("strategy_type", "")
+            _strategy_direction = (
+                "BEARISH" if "bearish" in _strategy_type.lower()
+                else "BULLISH" if "bullish" in _strategy_type.lower()
+                else None
+            )
+            _current_block_names = set(
+                b.get("name", "") for b in strategy_config_dict.get("blocks", [])
+            )
+            available_blocks = builder._extract_available_blocks(
+                strategy_direction=_strategy_direction,
+                current_block_names=_current_block_names,
+            )
             
             # Access AI Recommendations Panel and populate it
             dialog = self.window()

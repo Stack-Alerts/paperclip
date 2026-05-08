@@ -510,6 +510,17 @@ class ComprehensiveAIRequestBuilder:
         
         if current_block_names is None:
             current_block_names = set()
+            if strategy_direction is None:
+                # Both params at defaults — likely a call-site that forgot to pass strategy context.
+                # Blocks in the active strategy will be silently treated as "not in strategy" and
+                # emitted in compact format with no signals key, causing ⚠️ Block X has NO signals!
+                # warnings.  This warning surfaces any future regressions early.
+                logger.warning(
+                    "_extract_available_blocks() called with no strategy context "
+                    "(strategy_direction=None, current_block_names=None). "
+                    "All blocks will receive compact format — signals key will be absent for every block. "
+                    "Pass strategy_direction and current_block_names from the active strategy config."
+                )
         
         try:
             all_blocks = self.block_registry.get_all_blocks()

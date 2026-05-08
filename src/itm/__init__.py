@@ -29,7 +29,13 @@ itm/
                     CapitalMetrics (Sharpe ratio, max drawdown, profit factor),
                     RiskGate (synchronous pre-trade gate: approve(order) → RiskDecision)
   adapters/      — NautilusTrader type mappers and event converters (Section D+)
-  engine/        — execution engine orchestration (Section G+)
+  engine/        — execution engine & order lifecycle (Section G)
+                     OrderFactory (LIMIT/MARKET/TWAP/DCA + clientOrderId dedup),
+                     OrderStateMachine (submitted→acknowledged→filled/cancelled/rejected),
+                     BracketManager (TP + SL/trailing-stop bracket, OCO-style management),
+                     BinanceClient (HMAC-SHA256 REST + WebSocket user-data stream),
+                     RateLimiter (1200 weight/min budget, 429/418 backoff),
+                     ExecutionEngine (orchestrates risk gate → order → bracket)
 """
 
-__version__ = "0.5.0"  # Section F added: Risk, Capital & Account Heat Management
+__version__ = "0.6.0"  # Section G added: Execution Engine & Order Lifecycle
