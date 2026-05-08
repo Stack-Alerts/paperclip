@@ -3515,7 +3515,7 @@ class BacktestConfigPanel(QWidget):
         except (ValueError, TypeError):
             pass
      
-     def _capture_ui_state(self) -> dict:
+    def _capture_ui_state(self) -> dict:
         """Capture current UI parameter values"""
         return {
             'lookback': self.lookback_spin.value(),
@@ -3629,7 +3629,7 @@ class BacktestConfigPanel(QWidget):
         
         return results
     
-     def _generate_discovery_report(self, test_results: list, mode: str = 'wiring'):
+    def _generate_discovery_report(self, test_results: list, mode: str = 'wiring'):
         """
         Generate enhanced Config Discovery report with per-trade exit metrics.
         
@@ -3942,40 +3942,40 @@ Detailed report saved to:
             )
             self.confluence_spin.setValue(40)
 
-     def _on_config_discovery_clicked(self):
-         """
-         Launch Config Discovery run using BacktestWorker via _run_test_and_wait().
+    def _on_config_discovery_clicked(self):
+        """
+        Launch Config Discovery run using BacktestWorker via _run_test_and_wait().
 
-         Replaces the broken ConfigPermutationWorker path which bypassed
-         BacktestWorker and produced 0 trades.  This implementation uses
-         the identical execution path so every scenario goes through the real
-         BacktestWorker, emits Live Output, and returns genuine trade data.
+        Replaces the broken ConfigPermutationWorker path which bypassed
+        BacktestWorker and produced 0 trades.  This implementation uses
+        the identical execution path so every scenario goes through the real
+        BacktestWorker, emits Live Output, and returns genuine trade data.
 
-         Threading contract:
-         - All Qt widget access (_apply_scenario_to_ui, _run_test_and_wait,
-           results_dialog.append_result) runs on the main thread.
-         - QProgressDialog + QApplication.processEvents() keeps the UI
-           responsive between sequential scenario runs.
-         - _run_test_and_wait() uses QEventLoop internally; no blocking I/O.
+        Threading contract:
+        - All Qt widget access (_apply_scenario_to_ui, _run_test_and_wait,
+          results_dialog.append_result) runs on the main thread.
+        - QProgressDialog + QApplication.processEvents() keeps the UI
+          responsive between sequential scenario runs.
+        - _run_test_and_wait() uses QEventLoop internally; no blocking I/O.
 
-         Flow:
-         1. Load 23 scenarios (CRITICAL + EDGE + PARAMETER_VARIATION)
-         2. Confirm with user (count + estimated time)
-         3. Save current UI state
-         4. Capture baseline result (current config, no UI change)
-         5. Open ConfigDiscoveryResultsDialog immediately (maximised)
-         6. Loop over each scenario on main thread:
-               a. _apply_scenario_to_ui(scenario.config)
-               b. QApplication.processEvents()
-               c. result = _run_test_and_wait()
-               d. build DiscoveryResult via aggregate_metrics()
-               e. results_dialog.append_result(dr)
-               f. update progress dialog
-         7. Restore UI state
-         8. Finalise dialog + generate CSV report
+        Flow:
+        1. Load 23 scenarios (CRITICAL + EDGE + PARAMETER_VARIATION)
+        2. Confirm with user (count + estimated time)
+        3. Save current UI state
+        4. Capture baseline result (current config, no UI change)
+        5. Open ConfigDiscoveryResultsDialog immediately (maximised)
+        6. Loop over each scenario on main thread:
+              a. _apply_scenario_to_ui(scenario.config)
+              b. QApplication.processEvents()
+              c. result = _run_test_and_wait()
+              d. build DiscoveryResult via aggregate_metrics()
+              e. results_dialog.append_result(dr)
+              f. update progress dialog
+        7. Restore UI state
+        8. Finalise dialog + generate CSV report
 
-         Does NOT use ConfigPermutationWorker or MulticoreBacktestEngine.
-         """
+        Does NOT use ConfigPermutationWorker or MulticoreBacktestEngine.
+        """
         from PyQt5.QtWidgets import QMessageBox, QProgressDialog
         from src.strategy_builder.ui.config_permutation_engine import (
             DiscoveryScenario,
