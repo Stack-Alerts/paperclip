@@ -26,6 +26,14 @@ import pytest
 
 # ---------------------------------------------------------------------------
 # Stub out Qt so we can import and test without a display / Qt install.
+# The conftest already provides basic PyQt5 stubs (MagicMock-based).  We
+# replace them here with precise test-doubles that track internal state
+# (column headers, cell contents, minimum size, etc.) so the acceptance
+# criteria can be verified directly.
+#
+# We ONLY replace PyQt5.* entries.  The real src.data_manager.unified_manager
+# and src.strategy_builder.ui.styles are used as-is; stubbing them at module
+# level was causing sys.modules pollution into test_data_manager_integrity.py.
 # ---------------------------------------------------------------------------
 
 def _make_qt_stubs():
@@ -146,30 +154,45 @@ def _make_qt_stubs():
     class _VBoxLayout(_Layout):
         pass
 
-    for name in ("QDialog", "QVBoxLayout", "QHBoxLayout", "QLabel", "QPushButton",
-                 "QProgressBar", "QTableWidget", "QTableWidgetItem", "QHeaderView",
-                 "QGroupBox", "QAbstractItemView"):
-        setattr(widgets, name, {
-            "QDialog": _Dialog,
-            "QVBoxLayout": _VBoxLayout,
-            "QHBoxLayout": _HBoxLayout,
-            "QLabel": _Label,
-            "QPushButton": _PushButton,
-            "QProgressBar": _ProgressBar,
-            "QTableWidget": _Table,
-            "QTableWidgetItem": _Item,
-            "QHeaderView": type("QHeaderView", (), {
-                "ResizeToContents": 3,
-                "Stretch": 1,
-                "setSectionResizeMode": lambda self, *a: None,
-                "height": lambda self: 26,
-            }),
-            "QGroupBox": _GroupBox,
-            "QAbstractItemView": type("QAbstractItemView", (), {
-                "NoEditTriggers": 0,
-                "SingleSelection": 1,
-            }),
-        }[name])
+    _widget_map = {
+        "QDialog": _Dialog,
+        "QVBoxLayout": _VBoxLayout,
+        "QHBoxLayout": _HBoxLayout,
+        "QLabel": _Label,
+        "QPushButton": _PushButton,
+        "QProgressBar": _ProgressBar,
+        "QTableWidget": _Table,
+        "QTableWidgetItem": _Item,
+        "QHeaderView": type("QHeaderView", (), {
+            "ResizeToContents": 3,
+            "Stretch": 1,
+            "setSectionResizeMode": lambda self, *a: None,
+            "height": lambda self: 26,
+        }),
+        "QGroupBox": _GroupBox,
+        "QAbstractItemView": type("QAbstractItemView", (), {
+            "NoEditTriggers": 0,
+            "SingleSelection": 1,
+        }),
+        "QApplication": MagicMock,
+        "QWidget": _Widget,
+    }
+
+    # Register all named widgets; unknown names fall back to MagicMock so
+    # any Qt widget imported by modules under test (e.g. QTextEdit, QMainWindow)
+    # is available without polluting test assertions.
+    for name in (
+        "QDialog", "QVBoxLayout", "QHBoxLayout", "QLabel", "QPushButton",
+        "QProgressBar", "QTableWidget", "QTableWidgetItem", "QHeaderView",
+        "QGroupBox", "QAbstractItemView", "QApplication", "QWidget",
+        "QTextEdit", "QMainWindow", "QScrollArea", "QFrame",
+        "QSplitter", "QTabWidget", "QStackedWidget", "QListWidget",
+        "QComboBox", "QLineEdit", "QCheckBox", "QRadioButton",
+        "QSpinBox", "QDoubleSpinBox", "QSlider", "QMenuBar",
+        "QMenu", "QAction", "QStatusBar", "QToolBar",
+        "QSizePolicy", "QSpacerItem",
+    ):
+        setattr(widgets, name, _widget_map.get(name, MagicMock))
 
     # QtCore
     core = types.ModuleType("PyQt5.QtCore")
@@ -186,10 +209,14 @@ def _make_qt_stubs():
     core.QSettings   = type("QSettings", (), {"__init__": lambda s, *a: None,
                                                "value": lambda s, k: None,
                                                "setValue": lambda s, k, v: None})
+    core.QPoint = MagicMock()
+    core.QSize = MagicMock()
+    core.QTimer = MagicMock()
 
     # QtGui
     gui = types.ModuleType("PyQt5.QtGui")
     gui.QColor = type("QColor", (), {"__init__": lambda s, *a: None})
+    gui.QFont = MagicMock()
 
     # Wire sub-modules
     pyqt5.QtWidgets = widgets
@@ -203,43 +230,11 @@ def _make_qt_stubs():
     return widgets, core, gui
 
 
-_QWidgets, _QCore, _QGui = _make_qt_stubs()
-
-
-# ---------------------------------------------------------------------------
-# Stub the heavy imports inside data_verify_dialog
-# ---------------------------------------------------------------------------
-
-# Stub UnifiedDataManager
-_um_stub = types.ModuleType("src.data_manager.unified_manager")
-_um_stub.UnifiedDataManager = MagicMock()
-sys.modules["src.data_manager.unified_manager"] = _um_stub
-
-# Stub styles module
-_styles_stub = types.ModuleType("src.strategy_builder.ui.styles")
-_styles_stub.get_main_stylesheet          = lambda: ""
-_styles_stub.get_panel_title_stylesheet   = lambda: ""
-_styles_stub.get_label_style              = lambda *a: ""
-_styles_stub.get_italic_label_style       = lambda *a: ""
-_styles_stub.get_status_label_style       = lambda *a: ""
-_styles_stub.get_primary_button_stylesheet   = lambda: ""
-_styles_stub.get_secondary_button_stylesheet = lambda: ""
-_styles_stub.get_table_stylesheet         = lambda: ""
-_styles_stub.create_font                  = lambda **kw: MagicMock()
-_styles_stub.apply_hand_cursor_to_buttons = lambda w: None
-_styles_stub.WindowGeometryMixin = type("WindowGeometryMixin", (), {
-    "showEvent": lambda self, e: None,
-    "closeEvent": lambda self, e: None,
-})
-_styles_stub.COLORS = {
-    "success":        "#00ff00",
-    "error":          "#ff0000",
-    "warning":        "#ffaa00",
-    "text_secondary": "#aaaaaa",
-    "text_muted":     "#666666",
-    "info":           "#0088ff",
-}
-sys.modules["src.strategy_builder.ui.styles"] = _styles_stub
+# Install Qt stubs (replaces conftest's MagicMock stubs with trackable doubles).
+# The real src.data_manager.unified_manager and src.strategy_builder.ui.styles
+# are intentionally NOT stubbed here — using them as-is prevents sys.modules
+# pollution into test_data_manager_integrity.py.
+_make_qt_stubs()
 
 # Now import the dialog (Qt objects are all stubs)
 from src.strategy_builder.ui.data_verify_dialog import (  # noqa: E402
