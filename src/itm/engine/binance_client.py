@@ -327,7 +327,7 @@ class BinanceClient:
         )
 
         def _run():
-            ws_app.run_forever(ping_interval=60, ping_timeout=10)
+            ws_app.run_forever(ping_interval=60, ping_timeout=10, reconnect=5)
 
         self._ws_thread = threading.Thread(target=_run, daemon=True, name="binance-ws")
         self._ws_thread.start()
