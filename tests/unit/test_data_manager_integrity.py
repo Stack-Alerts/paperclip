@@ -564,18 +564,60 @@ class TestStartupCheck:
         mock_report.assert_called_once()
 
     # --------------------------------------------------------------------- #
-    # 3e. Startup check logs gap report structure correctly
+    # 3e. Startup check with genuinely gap-free data returns zero gaps.
+    #
+    # Previously this test wrote data anchored at `now - 6 days` ending at
+    # approximately `now - 1 day`, which caused the AC5 trailing-edge check
+    # inside detect_gaps_in_binance_files() to detect a gap from the last
+    # stored bar to datetime.utcnow().  Fix: anchor the data to now so the
+    # last bar on disk is within the trailing-edge slop window.
+    #
+    # Strategy (Option 2 from BTCAAAAA-378):
+    #   - Floor datetime.utcnow() to the currently-forming bar boundary.
+    #   - Generate lookback_days * 96 + 1 bars *backward* from there.
+    #   - Write them; the last bar is always at or after `last_closed` as
+    #     computed by the trailing-edge detector, so no trailing gap fires.
     # --------------------------------------------------------------------- #
     def test_startup_check_all_clean_returns_zero_gaps(self, manager):
-        now = datetime.now()
-        # Write 5 days of clean data
-        start = now - timedelta(days=6)
-        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
-        df = _make_ohlcv(start, n=5 * 96, freq_minutes=15, timeframe="15m")
-        _write_month_file(manager.binance_dir, start.strftime("%Y-%m"), df, "15m")
+        lookback_days = 5
+        freq_minutes = 15
+        bars_per_day = 1440 // freq_minutes  # 96
+
+        # Anchor to the open time of the currently-forming 15m bar.
+        # detect_gaps_in_binance_files computes last_closed = floor(end_date,
+        # 15m) and flags a trailing gap only when last_closed > last_bar + slop
+        # (slop = 13.5 min).  By writing the last bar AT floor(now, 15m) we
+        # ensure last_closed <= last_bar for any end_date < next bar open, so
+        # the trailing-edge check never fires for the entire 15-minute window.
+        now = datetime.utcnow()
+        last_bar = now - timedelta(
+            minutes=now.minute % freq_minutes,
+            seconds=now.second,
+            microseconds=now.microsecond,
+        )
+
+        n = lookback_days * bars_per_day + 1  # +1 to cover the full window
+        start = last_bar - timedelta(minutes=freq_minutes * (n - 1))
+
+        df = _make_ohlcv(start, n=n, freq_minutes=freq_minutes, timeframe="15m")
+
+        # Snap the last bar to exactly `last_bar` to guarantee no clock-skew
+        df.iloc[-1, df.columns.get_loc("timestamp")] = pd.Timestamp(last_bar)
+
+        # Write to the correct month file(s).  The data may span two calendar
+        # months, so group by month and write each group separately.
+        df["_month"] = pd.to_datetime(df["timestamp"]).dt.strftime("%Y-%m")
+        for month_str, group in df.groupby("_month", sort=True):
+            _write_month_file(
+                manager.binance_dir,
+                month_str,
+                group.drop(columns=["_month"]).reset_index(drop=True),
+                "15m",
+            )
+
         # Use a lookback that matches our data
         result = manager.startup_check(
-            timeframes=["15m"], auto_repair=False, lookback_days=5
+            timeframes=["15m"], auto_repair=False, lookback_days=lookback_days
         )
         # All zeros → data is clean
         for tf, summary in result.items():
