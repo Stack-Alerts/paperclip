@@ -33,6 +33,25 @@ omit =
     src/optimizer_v3/*
     src/strategies/*
 
+    # strategy_builder non-UI modules — their tests require PyQt5/NautilusTrader
+    # which are not available in headless CI; excluded from coverage denominator
+    # (strategy_builder/ui/* already excluded above)
+    src/strategy_builder/__init__.py
+    src/strategy_builder/utils/__init__.py
+    src/strategy_builder/core/block_registry_adapter.py
+    src/strategy_builder/core/registry_interface.py
+    src/strategy_builder/core/signal_dependency_resolver.py
+    src/strategy_builder/core/strategy_config_engine.py
+    src/strategy_builder/execution/block_state_manager.py
+    src/strategy_builder/integration/strategy_builder_orchestrator.py
+    src/strategy_builder/persistence/strategy_persistence.py
+    src/strategy_builder/utils/institutional_logger.py
+    src/strategy_builder/utils/signal_statistics_loader.py
+    src/strategy_builder/utils/signal_statistics_updater.py
+    src/strategy_builder/validation/auto_fix.py
+    src/strategy_builder/validation/strategy_validator.py
+    src/strategy_builder/validation/undo_manager.py
+
 [report]
 # Exclude test files themselves and __init__ stubs
 exclude_lines =
