@@ -63,6 +63,7 @@ def _make_pyqt5_stubs() -> None:
     qt_core.QSettings = MagicMock()
     qt_core.QPoint = MagicMock()
     qt_core.QSize = MagicMock()
+    qt_core.QRect = MagicMock()
 
     # --- QtWidgets ---
     qt_widgets = ModuleType("PyQt5.QtWidgets")
@@ -76,6 +77,7 @@ def _make_pyqt5_stubs() -> None:
     # --- QtGui ---
     qt_gui = ModuleType("PyQt5.QtGui")
     qt_gui.QFont = MagicMock()
+    qt_gui.QGuiApplication = MagicMock()
 
     # Register all stubs
     sys.modules["PyQt5"] = pyqt5
