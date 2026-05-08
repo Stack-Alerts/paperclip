@@ -9,8 +9,8 @@ Design goals
 * Durable, append-only checkpoint table.
 * Latest snapshot query is fast: ``ORDER BY seq DESC LIMIT 1``.
 * Schema is self-bootstrapping: call ``ensure_table()`` on startup.
-* Connection passed in at construction (facilitates DI and testing with fakes /
-  in-memory SQLite for unit tests).
+ * Connection passed in at construction (facilitates DI and testing with fakes /
+  real PostgreSQL test fixtures — see tests/itm/state/conftest.py).
 * JSON column type for the full state payload.
 * Falls back gracefully — every public method returns success flags.
 

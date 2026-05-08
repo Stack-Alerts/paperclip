@@ -11,6 +11,22 @@ jobs:
     name: pytest + coverage gate
     runs-on: ubuntu-latest
 
+    # PostgreSQL service for ITM state store real-database tests (BTCAAAAA-450)
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: optimizer_v3
+          POSTGRES_USER: optimizer_admin
+          POSTGRES_PASSWORD: secure_password_change_me
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -31,7 +47,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install \
-            pytest pytest-cov pytest-qt pytest-mock \
+            pytest pytest-cov pytest-qt pytest-mock pytest-postgresql \
             PyQt5 PyQt5-Qt5 PyQt5-sip \
             SQLAlchemy alembic psycopg2-binary \
             pydantic
@@ -42,17 +58,27 @@ jobs:
       - name: Run tests with coverage gate
         env:
           QT_QPA_PLATFORM: offscreen
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: optimizer_v3
+          POSTGRES_USER: optimizer_admin
+          POSTGRES_PASSWORD: secure_password_change_me
         run: |
           # Run only the test modules that can execute in a headless CI
           # without nautilus_trader, jinja2, or psutil.
           # Coverage scope is controlled by .coveragerc (omits Qt UI and
           # NautilusTrader-dependent modules from the denominator).
+          #
+          # ITM state tests (tests/itm/state/) are included because they use
+          # only the itm.state / itm.domain modules (no NautilusTrader) and
+          # now include real-PostgreSQL tests via the pg_conn fixture.
           python -m pytest \
             tests/strategy_builder/validation/ \
             tests/strategy_builder/persistence/ \
             tests/strategy_builder/core/test_signal_dependency_resolver.py \
             tests/strategy_builder/core/test_strategy_config_engine.py \
             tests/optimizer_v3/test_error_recovery.py \
+            tests/itm/state/ \
             --cov=src \
             --cov-config=.coveragerc \
             --cov-report=term-missing \
