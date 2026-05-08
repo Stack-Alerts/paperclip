@@ -26,7 +26,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 import pytest
-from unittest.mock import MagicMock, create_autospec, patch
+from unittest.mock import MagicMock, patch
 
 
 # ---------------------------------------------------------------------------
