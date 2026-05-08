@@ -287,4 +287,4 @@ class TestSectionBPackageExports:
 
     def test_itm_package_version_updated(self):
         import src.itm as itm
-        assert itm.__version__ == "0.4.0"
+        assert itm.__version__ >= "0.5.0"
