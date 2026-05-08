@@ -15,15 +15,19 @@ from src.strategy_builder.ui.styles import (
     SPACING_UNIT,
     create_font,
     PRIMARY_COLOR,
-    SECONDARY_COLOR
+    SECONDARY_COLOR,
+    WindowGeometryMixin,
 )
 from decimal import Decimal
 import os
 from dotenv import load_dotenv, set_key
 
-class SystemConfigWindow(QMainWindow):
+class SystemConfigWindow(WindowGeometryMixin, QMainWindow):
     """System configuration window with consistent styling"""
-    
+
+    GEOMETRY_SETTINGS_KEY = "systemConfigWindow"
+    GEOMETRY_DEFAULT_SIZE = (900, 700)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("System Configuration")
@@ -374,11 +378,17 @@ class SystemConfigWindow(QMainWindow):
         set_key('.env', 'MONITOR_ENABLED', str(self.monitor_enabled.isChecked()).lower())
         set_key('.env', 'MONITOR_INTERVAL', str(self.monitor_interval.value()))
     def showEvent(self, event):
-        """Called when window is shown - apply hand cursors to all widgets"""
+        """Called when window is shown - restore geometry and apply hand cursors."""
         super().showEvent(event)
+        self._restore_window_geometry(event)
         from PyQt5.QtCore import QTimer
         from .styles import apply_hand_cursor_to_buttons
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+
+    def closeEvent(self, event):
+        """Save window geometry on close."""
+        self._save_window_geometry()
+        super().closeEvent(event)
 
     
     def reset_to_defaults(self):

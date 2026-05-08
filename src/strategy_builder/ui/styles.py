@@ -1678,8 +1678,9 @@ def format_block_name(block_name: str) -> str:
     return ' '.join(capitalized_words)
 
 
-# ---------------------------------------------------------------------------
+ # ---------------------------------------------------------------------------
 # WindowGeometryMixin — deep fix for Qt window state desync (BTCAAAAA-474)
+# Multi-monitor persistence fix (BTCAAAAA-530)
 # ---------------------------------------------------------------------------
 # Qt5's saveGeometry()/restoreGeometry() bakes the Qt.WindowMaximized flag
 # into the binary blob.  When restoreGeometry() is called inside showEvent(),
@@ -1693,6 +1694,17 @@ def format_block_name(block_name: str) -> str:
 # It stores pos, size, and the maximized flag as three separate QSettings
 # keys and explicitly calls showMaximized() or showNormal() at the right
 # lifecycle point (after show()).
+#
+# Multi-monitor design (BTCAAAAA-530):
+#   - _save_window_geometry() uses frameGeometry().topLeft() to capture
+#     absolute virtual-desktop coordinates (correct across all monitors).
+#   - _restore_window_geometry() validates that the full window rect
+#     intersects with at least one currently connected screen.  If no
+#     intersection is found (e.g. the monitor was disconnected) the window
+#     falls back to the primary screen gracefully.
+#   - Screen identity is saved alongside geometry; on restore the mixin
+#     tries the saved screen first, then any intersecting screen, then
+#     primary screen as a last resort.
 #
 # Usage:
 #   class MyDialog(WindowGeometryMixin, QDialog):
@@ -1708,12 +1720,17 @@ def format_block_name(block_name: str) -> str:
 #       super().closeEvent(event)
 # ---------------------------------------------------------------------------
 
-from PyQt5.QtCore import QSettings as _QSettings, QPoint as _QPoint, QSize as _QSize
+from PyQt5.QtCore import QSettings as _QSettings, QPoint as _QPoint, QSize as _QSize, QRect as _QRect
 from PyQt5.QtWidgets import QApplication as _QApplication
+from PyQt5.QtGui import QGuiApplication as _QGuiApplication
 
 
 class WindowGeometryMixin:
     """Mixin that provides correct Qt5 window geometry/state persistence.
+
+    Supports multi-monitor setups: saves absolute virtual-desktop coordinates
+    and validates the full window rect against connected screens on restore.
+    If the saved screen is no longer available, falls back to primary screen.
 
     Subclasses must define:
         GEOMETRY_SETTINGS_KEY: str  — unique QSettings key prefix, e.g. "backtestConfigDialog"
@@ -1728,7 +1745,10 @@ class WindowGeometryMixin:
     # ------------------------------------------------------------------ #
 
     def _save_window_geometry(self) -> None:
-        """Save pos, size, and maximized state as three separate QSettings keys.
+        """Save pos, size, maximized state, and screen name as QSettings keys.
+
+        Uses frameGeometry().topLeft() for absolute virtual-desktop coordinates
+        so that multi-monitor positions are correctly preserved.
 
         Call from closeEvent() BEFORE super().closeEvent().
         Never call from moveEvent() or resizeEvent() — that captures
@@ -1745,11 +1765,29 @@ class WindowGeometryMixin:
             # used when the user un-maximizes next time.
         else:
             settings.setValue(f"{key}/maximized", False)
-            settings.setValue(f"{key}/pos", self.pos())
+            # Use frameGeometry() for accurate absolute virtual-desktop coords.
+            # self.pos() can return coords relative to the parent widget when
+            # the window has a parent; frameGeometry().topLeft() is always in
+            # global/virtual-desktop space.
+            frame_top_left = self.frameGeometry().topLeft()
+            settings.setValue(f"{key}/pos", frame_top_left)
             settings.setValue(f"{key}/size", self.size())
+            # Save the screen name as a hint so we can prefer the same
+            # physical screen on restore even if the virtual-desktop layout
+            # has changed (e.g. resolution changed, display order swapped).
+            screen = _QGuiApplication.screenAt(frame_top_left)
+            if screen is not None:
+                settings.setValue(f"{key}/screen_name", screen.name())
+            else:
+                settings.remove(f"{key}/screen_name")
 
     def _restore_window_geometry(self, show_event=None) -> None:
         """Restore window to its saved position, size, and maximized state.
+
+        Validates the full window rect against all connected screens:
+        - If the saved geometry intersects any connected screen, restore it.
+        - If the saved screen is unavailable (monitor disconnected or layout
+          changed), fall back to the primary screen at a safe default position.
 
         Call from showEvent() AFTER super().showEvent().
         The method is safe to call multiple times; subsequent calls are
@@ -1766,35 +1804,83 @@ class WindowGeometryMixin:
         maximized = settings.value(f"{key}/maximized", False, type=bool)
         saved_pos = settings.value(f"{key}/pos", None)
         saved_size = settings.value(f"{key}/size", None)
+        saved_screen_name = settings.value(f"{key}/screen_name", None)
 
         default_w, default_h = self.GEOMETRY_DEFAULT_SIZE
 
-        if saved_size is not None:
-            self.resize(saved_size)
-        else:
-            self.resize(default_w, default_h)
+        # Determine the target size
+        target_size = saved_size if saved_size is not None else _QSize(default_w, default_h)
+        self.resize(target_size)
 
         if saved_pos is not None:
-            # Clamp to visible screen area so the window cannot be off-screen
-            screen = _QApplication.screenAt(saved_pos)
-            if screen is None:
-                screen = _QApplication.primaryScreen()
-            screen_rect = screen.availableGeometry()
-            clamped_x = max(screen_rect.left(),
-                            min(saved_pos.x(), screen_rect.right() - 100))
-            clamped_y = max(screen_rect.top(),
-                            min(saved_pos.y(), screen_rect.bottom() - 50))
-            self.move(clamped_x, clamped_y)
+            # Build the full rect the window would occupy at the saved position
+            saved_rect = _QRect(saved_pos, target_size)
+
+            # Find all currently connected screens
+            available_screens = _QGuiApplication.screens()
+
+            # Preferred screen: the one the window was on last time (by name)
+            preferred_screen = None
+            if saved_screen_name:
+                for s in available_screens:
+                    if s.name() == saved_screen_name:
+                        preferred_screen = s
+                        break
+
+            # Check whether the saved rect has meaningful overlap with any screen
+            # "Meaningful" = at least 100 px wide and 50 px tall of the window
+            # is on a connected screen — enough for the user to grab and move it.
+            MIN_VISIBLE_W = 100
+            MIN_VISIBLE_H = 50
+
+            def _rect_is_usable(rect, screen):
+                intersection = rect.intersected(screen.availableGeometry())
+                return (intersection.width() >= MIN_VISIBLE_W and
+                        intersection.height() >= MIN_VISIBLE_H)
+
+            # Try preferred screen first, then any screen
+            target_screen = None
+            if preferred_screen and _rect_is_usable(saved_rect, preferred_screen):
+                target_screen = preferred_screen
+            else:
+                for s in available_screens:
+                    if _rect_is_usable(saved_rect, s):
+                        target_screen = s
+                        break
+
+            if target_screen is not None:
+                # The saved position is usable — clamp to the screen's available
+                # geometry so the window cannot be pushed behind the OS taskbar
+                # or off the edge of the screen.
+                screen_rect = target_screen.availableGeometry()
+                clamped_x = max(screen_rect.left(),
+                                min(saved_pos.x(), screen_rect.right() - MIN_VISIBLE_W))
+                clamped_y = max(screen_rect.top(),
+                                min(saved_pos.y(), screen_rect.bottom() - MIN_VISIBLE_H))
+                self.move(clamped_x, clamped_y)
+            else:
+                # Saved screen is no longer available — fall back to primary screen
+                self._center_on_primary(default_w, default_h)
         else:
-            # Centre on primary screen on first run
-            screen_rect = _QApplication.primaryScreen().availableGeometry()
-            self.move(
-                screen_rect.center().x() - default_w // 2,
-                screen_rect.center().y() - default_h // 2,
-            )
+            # No saved position — centre on primary screen on first run
+            self._center_on_primary(default_w, default_h)
 
         if maximized:
             # showMaximized() must be called AFTER show() / showEvent so the
             # OS window manager actually expands the window.
             from PyQt5.QtCore import QTimer
             QTimer.singleShot(0, self.showMaximized)
+
+    # ------------------------------------------------------------------ #
+    # Internal helpers                                                     #
+    # ------------------------------------------------------------------ #
+
+    def _center_on_primary(self, default_w: int = None, default_h: int = None) -> None:
+        """Move window to the centre of the primary screen."""
+        if default_w is None or default_h is None:
+            default_w, default_h = self.GEOMETRY_DEFAULT_SIZE
+        screen_rect = _QGuiApplication.primaryScreen().availableGeometry()
+        self.move(
+            screen_rect.center().x() - default_w // 2,
+            screen_rect.center().y() - default_h // 2,
+        )
