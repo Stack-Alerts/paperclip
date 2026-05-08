@@ -1,7 +1,8 @@
 """
-ITM Section G — Execution Engine & Order Lifecycle
-====================================================
-Translates ITM Decisions into real orders on Binance USDT-M Futures.
+ITM Section G + H.1 — Execution Engine, Order Lifecycle & Position Verification
+=================================================================================
+Translates ITM Decisions into real orders on Binance USDT-M Futures and
+verifies that exchange positions match ITM internal state after every close.
 
 All production use MUST target the Binance **testnet** before mainnet.
 
@@ -14,6 +15,7 @@ engine/
   rate_limiter.py        — weight tracking, 429/418 backoff
   binance_client.py      — authenticated REST + WebSocket user-data stream
   execution_engine.py    — top-level orchestrator: risk gate → order → bracket
+  position_verifier.py   — Section H.1: close verification + reconciliation + halt
 
 Public API
 ----------
@@ -29,6 +31,9 @@ Public API
         BinanceError, InsufficientMarginError, InvalidLotSizeError,
         MinNotionalError, OrderNotFoundError,
         RateLimiter, RateLimitExceeded,
+        PositionVerifier, PositionVerifierConfig,
+        AlertSeverity, Alert,
+        LogAlertChannel, WebhookAlertChannel, FileAlertChannel, MultiAlertChannel,
     )
 """
 
@@ -58,9 +63,19 @@ from .order_state_machine import (
     OrderState,
     OrderStateMachine,
 )
+from .position_verifier import (
+    Alert,
+    AlertSeverity,
+    FileAlertChannel,
+    LogAlertChannel,
+    MultiAlertChannel,
+    PositionVerifier,
+    PositionVerifierConfig,
+    WebhookAlertChannel,
+)
 from .rate_limiter import RateLimitExceeded, RateLimiter
 
-__version__ = "0.6.0"  # Section G: Execution Engine & Order Lifecycle
+__version__ = "0.7.0"  # Section H.1: Exchange Position Verification
 
 __all__ = [
     # Execution engine
@@ -94,4 +109,13 @@ __all__ = [
     # Rate limiter
     "RateLimiter",
     "RateLimitExceeded",
+    # Position verifier (Section H.1)
+    "PositionVerifier",
+    "PositionVerifierConfig",
+    "AlertSeverity",
+    "Alert",
+    "LogAlertChannel",
+    "WebhookAlertChannel",
+    "FileAlertChannel",
+    "MultiAlertChannel",
 ]
