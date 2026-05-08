@@ -10,7 +10,7 @@ Date: 2026-01-17
 
 from typing import Optional
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QHBoxLayout
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSettings
 
 from src.strategy_builder.ui.validation_panel import ValidationPanel
 from src.strategy_builder.ui.styles import get_main_stylesheet, get_secondary_button_stylesheet
@@ -97,5 +97,16 @@ class ValidationDialog(QDialog):
         Auto-validate the current strategy when opening.
         """
         super().showEvent(event)
+        # Restore saved geometry
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        geometry = settings.value("validationDialog/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
         # Auto-validate when dialog opens
         self.validation_panel.validate_strategy()
+
+    def closeEvent(self, event):
+        """Save window geometry on close."""
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        settings.setValue("validationDialog/geometry", self.saveGeometry())
+        super().closeEvent(event)

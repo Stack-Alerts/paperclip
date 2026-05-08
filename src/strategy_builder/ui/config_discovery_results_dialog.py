@@ -899,3 +899,23 @@ class ConfigDiscoveryResultsDialog(QDialog):
             f"Discovery results exported to:\n{out_path}",
         )
         self._status_label.setText(f"Exported to {out_path.name}")
+
+    # ------------------------------------------------------------------
+    # Geometry persistence
+    # ------------------------------------------------------------------
+
+    def showEvent(self, event):
+        """Restore saved window geometry on show."""
+        super().showEvent(event)
+        from PyQt5.QtCore import QSettings
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        geometry = settings.value("configDiscoveryDialog/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+
+    def closeEvent(self, event):
+        """Save window geometry on close."""
+        from PyQt5.QtCore import QSettings
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        settings.setValue("configDiscoveryDialog/geometry", self.saveGeometry())
+        super().closeEvent(event)

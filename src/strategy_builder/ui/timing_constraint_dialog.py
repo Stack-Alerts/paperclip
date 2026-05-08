@@ -15,13 +15,12 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
     QComboBox, QCheckBox, QPushButton, QGroupBox, QFormLayout
 )
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt, QSettings
 
 # Import universal combo box fix
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
 # Import centralized styles
-from src.strategy_builder.ui.styles import get_main_stylesheet, get_panel_title_stylesheet, get_label_style
+from src.strategy_builder.ui.styles import get_main_stylesheet, get_panel_title_stylesheet, get_label_style, create_font
 
 
 class TimingConstraintDialog(QDialog):
@@ -56,6 +55,8 @@ class TimingConstraintDialog(QDialog):
             Qt.Window | 
             Qt.WindowTitleHint | 
             Qt.WindowCloseButtonHint |
+            Qt.WindowMinimizeButtonHint |
+            Qt.WindowMaximizeButtonHint |
             Qt.WindowStaysOnTopHint
         )
         # Still modal for keyboard focus, but not locked visually
@@ -91,10 +92,7 @@ class TimingConstraintDialog(QDialog):
         
         # Header with centralized styling
         header = QLabel(f"Configure timing constraint for signal:\n{self.block_name} → {self.signal_name}")
-        header_font = QFont()
-        header_font.setBold(True)
-        header_font.setPointSize(10)
-        header.setFont(header_font)
+        header.setFont(create_font(size=10, bold=True))
         header.setStyleSheet(get_panel_title_stylesheet())
         layout.addWidget(header)
         
@@ -108,11 +106,8 @@ class TimingConstraintDialog(QDialog):
         self.constraint_enabled = QCheckBox("Enable timing constraint")
         # Use default checkbox style (global stylesheet handles appearance)
         self.constraint_enabled.stateChanged.connect(self._on_enabled_changed)
-        # Apply font styling separately
-        checkbox_font = QFont()
-        checkbox_font.setBold(True)
-        checkbox_font.setPointSize(10)
-        self.constraint_enabled.setFont(checkbox_font)
+        # Apply font styling via create_font() from styles.py
+        self.constraint_enabled.setFont(create_font(size=10, bold=True))
         config_layout.addRow("", self.constraint_enabled)
         
         # Number of candles
@@ -253,6 +248,16 @@ class TimingConstraintDialog(QDialog):
         from PyQt5.QtCore import QTimer
         from .styles import apply_hand_cursor_to_buttons
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        geometry = settings.value("timingConstraintDialog/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+
+    def closeEvent(self, event):
+        """Save window geometry on close."""
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        settings.setValue("timingConstraintDialog/geometry", self.saveGeometry())
+        super().closeEvent(event)
 
     
     def get_constraint(self) -> Optional[dict]:

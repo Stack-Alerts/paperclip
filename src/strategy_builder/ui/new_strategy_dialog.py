@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLineEdit,
     QPushButton, QLabel, QTextEdit, QWidget
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSettings
 
 from src.optimizer_v3.database import get_database_manager
 from .styles import (
@@ -44,6 +44,13 @@ class NewStrategyDialog(QDialog):
     def _init_ui(self):
         """Initialize user interface"""
         self.setWindowTitle("New Strategy")
+        self.setWindowFlags(
+            Qt.Window
+            | Qt.WindowTitleHint
+            | Qt.WindowCloseButtonHint
+            | Qt.WindowMinimizeButtonHint
+            | Qt.WindowMaximizeButtonHint
+        )
         self.setMinimumSize(500, 300)
         self.setStyleSheet(get_dialog_stylesheet())
         
@@ -164,9 +171,15 @@ class NewStrategyDialog(QDialog):
         from PyQt5.QtCore import QTimer
         from .styles import apply_hand_cursor_to_buttons
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        geometry = settings.value("newStrategyDialog/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
 
     def closeEvent(self, event):
         """Handle dialog close"""
+        settings = QSettings("BTC_Engine", "StrategyBuilder")
+        settings.setValue("newStrategyDialog/geometry", self.saveGeometry())
         if self.db:
             self.db.close()
         super().closeEvent(event)
