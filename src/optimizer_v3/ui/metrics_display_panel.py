@@ -1510,6 +1510,11 @@ class MetricsDisplayPanel(QWidget):
         if hasattr(self, 'progress_dialog') and hasattr(self, '_recommendations_waiting'):
             logger.info("[UI] Minimum dialog time elapsed - closing now")
             self.progress_dialog.close()
+            # CRITICAL FIX: Finalize recommendations that were waiting for the timer.
+            # Without this call, recommendations_generated is never emitted and
+            # AIRecommendationsPanel.display_recommendations() is never invoked.
+            del self._recommendations_waiting  # Clear the flag before calling
+            self._finalize_recommendations()
     
     def _on_recommendations_ready(self, recommendations: List[IntegratedRecommendation]) -> None:
         """
