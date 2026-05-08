@@ -4,7 +4,9 @@ QA tests for BTCAAAAA-390: Fix maximize button and window resize issues.
 Verifies acceptance criteria from commit 7f73fa3:
 1. WindowMaximizeButtonHint and WindowMinimizeButtonHint present on all modified dialogs
 2. No window resizes when dragged (non-modal dialogs only — tested via code review)
-3. Geometry persistence — saveGeometry/restoreGeometry wired to showEvent/closeEvent
+3. Geometry persistence — saveGeometry/restoreGeometry wired to showEvent/closeEvent,
+   OR WindowGeometryMixin used (which implements geometry persistence internally
+   without direct saveGeometry/restoreGeometry calls — see BTCAAAAA-475).
 4. No regressions on already-correct windows
 5. Code review: QSettings key naming convention, no hardcoded styles,
    timing_constraint_dialog uses create_font() (not raw QFont())
@@ -14,6 +16,14 @@ checks.  Full manual interaction (drag, maximize click, pixel-perfect restore)
 cannot be automated reliably in a headless CI environment, but the structural
 checks below cover all acceptance-criteria items that can be verified
 programmatically.
+
+Note (BTCAAAAA-507): BTCAAAAA-475 introduced WindowGeometryMixin in styles.py as
+an architectural replacement for direct saveGeometry()/restoreGeometry() calls.
+The mixin deliberately avoids saveGeometry/restoreGeometry to fix a Qt5 window
+state desync bug (Qt5's saveGeometry bakes the maximized flag into the geometry
+blob, causing the OS window manager to get out of sync with Qt's window state).
+All geometry persistence checks have been updated to accept WindowGeometryMixin
+as a valid implementation.
 """
 
 from __future__ import annotations
@@ -75,6 +85,16 @@ def _read_source(filename: str) -> str:
 
 def _parse_ast(filename: str) -> ast.Module:
     return ast.parse(_read_source(filename))
+
+
+def _uses_geometry_mixin(src: str) -> bool:
+    """True if the file uses WindowGeometryMixin for geometry persistence.
+
+    WindowGeometryMixin (defined in styles.py) handles saveGeometry /
+    restoreGeometry / QSettings internally, so files that inherit from it do
+    not need direct calls to those APIs.
+    """
+    return "WindowGeometryMixin" in src
 
 
 def _has_flag_call(tree: ast.Module, flag_name: str) -> bool:
@@ -168,19 +188,33 @@ class TestGeometryPersistence:
 
     @pytest.mark.parametrize("filename", MODIFIED_DIALOGS)
     def test_save_geometry_called(self, filename):
-        """saveGeometry() must be called somewhere in the file."""
+        """saveGeometry() must be called, or WindowGeometryMixin must be used.
+
+        WindowGeometryMixin (BTCAAAAA-475) deliberately avoids saveGeometry()
+        to fix a Qt5 window-state desync bug; it stores pos/size/maximized
+        as separate QSettings keys instead.
+        """
+        src = _read_source(filename)
         tree = _parse_ast(filename)
-        assert _has_call(tree, "saveGeometry"), (
-            f"{filename}: saveGeometry() call not found — "
+        # Accept either a direct saveGeometry() call OR WindowGeometryMixin usage
+        assert _has_call(tree, "saveGeometry") or _uses_geometry_mixin(src), (
+            f"{filename}: saveGeometry() call not found and WindowGeometryMixin not used — "
             "dialog will not persist its size/position."
         )
 
     @pytest.mark.parametrize("filename", MODIFIED_DIALOGS)
     def test_restore_geometry_called(self, filename):
-        """restoreGeometry() must be called somewhere in the file."""
+        """restoreGeometry() must be called, or WindowGeometryMixin must be used.
+
+        WindowGeometryMixin (BTCAAAAA-475) deliberately avoids restoreGeometry()
+        to fix a Qt5 window-state desync bug; it restores pos/size/maximized
+        from separate QSettings keys instead.
+        """
+        src = _read_source(filename)
         tree = _parse_ast(filename)
-        assert _has_call(tree, "restoreGeometry"), (
-            f"{filename}: restoreGeometry() call not found — "
+        # Accept either a direct restoreGeometry() call OR WindowGeometryMixin usage
+        assert _has_call(tree, "restoreGeometry") or _uses_geometry_mixin(src), (
+            f"{filename}: restoreGeometry() call not found and WindowGeometryMixin not used — "
             "dialog will not restore its saved size/position."
         )
 
@@ -195,10 +229,16 @@ class TestGeometryPersistence:
 
     @pytest.mark.parametrize("filename", MODIFIED_DIALOGS)
     def test_qsettings_used(self, filename):
-        """QSettings must be imported/used to persist geometry."""
-        source = _read_source(filename)
-        assert "QSettings" in source, (
-            f"{filename}: QSettings not found — "
+        """QSettings must be used to persist geometry, directly or via WindowGeometryMixin.
+
+        WindowGeometryMixin (BTCAAAAA-475) owns the QSettings usage internally
+        in styles.py, so files using the mixin do not need a direct QSettings
+        reference.
+        """
+        src = _read_source(filename)
+        # Accept either direct QSettings reference OR WindowGeometryMixin usage
+        assert "QSettings" in src or _uses_geometry_mixin(src), (
+            f"{filename}: QSettings not found and WindowGeometryMixin not used — "
             "geometry persistence requires QSettings."
         )
 
@@ -206,22 +246,47 @@ class TestGeometryPersistence:
     def test_geometry_key_naming_convention(self, filename):
         """
         QSettings key must follow the BTC_Engine / StrategyBuilder convention
-        and use the expected per-dialog key.
+        and use the expected per-dialog key prefix.
+
+        For dialogs using WindowGeometryMixin (BTCAAAAA-475), BTC_Engine and
+        StrategyBuilder live in styles.py (not the dialog file), and the dialog
+        file sets GEOMETRY_SETTINGS_KEY to the expected key prefix.  We accept
+        this pattern as compliant.
         """
         expected_key = EXPECTED_GEOMETRY_KEYS[filename]
+        # Strip the /geometry suffix — the expected key prefix is the part before "/"
+        expected_prefix = expected_key.split("/")[0]
         source = _read_source(filename)
-        assert "BTC_Engine" in source, (
-            f"{filename}: QSettings must use application 'BTC_Engine' "
-            "(found mismatched or missing app name)."
-        )
-        assert "StrategyBuilder" in source, (
-            f"{filename}: QSettings must use organization 'StrategyBuilder' "
-            "(found mismatched or missing org name)."
-        )
-        assert expected_key in source, (
-            f"{filename}: Expected geometry key '{expected_key}' not found in source. "
-            "Keys must follow the agreed naming convention."
-        )
+        styles_source = (UI_DIR / "styles.py").read_text()
+
+        if _uses_geometry_mixin(source):
+            # BTC_Engine + StrategyBuilder live in styles.py for mixin-based dialogs
+            assert "BTC_Engine" in styles_source, (
+                "styles.py: WindowGeometryMixin must use QSettings('BTC_Engine', ...) "
+                "(found mismatched or missing app name in styles.py)."
+            )
+            assert "StrategyBuilder" in styles_source, (
+                "styles.py: WindowGeometryMixin must use QSettings(..., 'StrategyBuilder') "
+                "(found mismatched or missing org name in styles.py)."
+            )
+            assert expected_prefix in source, (
+                f"{filename}: Expected GEOMETRY_SETTINGS_KEY prefix '{expected_prefix}' not found. "
+                "Keys must follow the agreed naming convention."
+            )
+        else:
+            # Direct QSettings usage: BTC_Engine + StrategyBuilder + full key must be in the dialog file
+            assert "BTC_Engine" in source, (
+                f"{filename}: QSettings must use application 'BTC_Engine' "
+                "(found mismatched or missing app name)."
+            )
+            assert "StrategyBuilder" in source, (
+                f"{filename}: QSettings must use organization 'StrategyBuilder' "
+                "(found mismatched or missing org name)."
+            )
+            assert expected_key in source, (
+                f"{filename}: Expected geometry key '{expected_key}' not found in source. "
+                "Keys must follow the agreed naming convention."
+            )
 
 
 # ---------------------------------------------------------------------------
