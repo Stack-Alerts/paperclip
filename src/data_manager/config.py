@@ -63,7 +63,8 @@ import multiprocessing
 
 TOTAL_CORES = multiprocessing.cpu_count()
 SYSTEM_RESERVED_CORES = 2
-NUM_CORES = min(int(os.getenv('MULTICORE_WORKERS', str(TOTAL_CORES - SYSTEM_RESERVED_CORES))), 30)
+_raw = os.getenv('MULTICORE_WORKERS', '').strip()
+NUM_CORES = min(int(_raw) if _raw.isdigit() else (TOTAL_CORES - SYSTEM_RESERVED_CORES), 30)
 
 logger.info(f"⚙️  Multicore Config: Using {NUM_CORES} cores (Total: {TOTAL_CORES}, Reserved: {SYSTEM_RESERVED_CORES})")
 
