@@ -450,6 +450,8 @@ class Decision:
     created_at: datetime = field(default_factory=_now_utc)
     reason: Optional[str] = None  # human-readable rationale (especially for REJECT)
 
+    metadata: dict = field(default_factory=dict)  # execution params: quantity, entry_price, order_type, etc.
+
     def __post_init__(self) -> None:
         if not (Decimal("0") <= self.confidence <= Decimal("1")):
             raise ValueError(
