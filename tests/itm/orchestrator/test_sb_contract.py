@@ -63,11 +63,14 @@ def make_raw_strategy(
     }
 
 
-def make_export_doc(strategies=None):
+_SENTINEL = object()
+
+
+def make_export_doc(strategies=_SENTINEL):
     return {
         "sb_export_version": SB_EXPORT_VERSION,
         "exported_at": "2026-05-08T12:00:00Z",
-        "strategies": strategies or [make_raw_strategy()],
+        "strategies": [make_raw_strategy()] if strategies is _SENTINEL else strategies,
     }
 
 
