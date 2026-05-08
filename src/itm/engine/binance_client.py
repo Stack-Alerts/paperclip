@@ -145,6 +145,7 @@ class BinanceClient:
         "DELETE /fapi/v1/order": 1,
         "POST /fapi/v1/listenKey": 1,
         "PUT /fapi/v1/listenKey": 1,
+        "GET /fapi/v2/positionRisk": 5,
     }
 
     def __init__(
@@ -263,6 +264,54 @@ class BinanceClient:
                 client_order_id,
             )
             return False
+
+    def get_position_size(self, symbol: str = "BTCUSDT") -> Decimal:
+        """Query the current position size for *symbol* via the authoritative REST API.
+
+        Uses ``GET /fapi/v2/positionRisk`` which returns the current open
+        position for every symbol.  The ``positionAmt`` field is the signed
+        net quantity (positive = long, negative = short, 0 = flat).
+
+        Parameters
+        ----------
+        symbol:
+            Futures symbol to query.  Default ``"BTCUSDT"``.
+
+        Returns
+        -------
+        Decimal
+            Absolute position size (always ≥ 0).  Returns ``Decimal("0")``
+            if no position is found or the exchange response is ambiguous.
+
+        Raises
+        ------
+        BinanceError subclasses on exchange-level errors.
+        RateLimitExceeded if the rate budget is exhausted.
+        """
+        self._rate_limiter.consume(
+            weight=self.REST_WEIGHTS.get("GET /fapi/v2/positionRisk", 5),
+        )
+        response = self._signed_request(
+            method="GET",
+            path="/fapi/v2/positionRisk",
+            params={"symbol": symbol},
+        )
+        # Response is a list of position objects; find the one for our symbol
+        positions = response if isinstance(response, list) else [response]
+        for pos in positions:
+            if pos.get("symbol") == symbol:
+                amt = Decimal(str(pos.get("positionAmt", "0")))
+                size = abs(amt)
+                logger.debug(
+                    "BinanceClient get_position_size: symbol=%s positionAmt=%s abs=%s",
+                    symbol, amt, size,
+                )
+                return size
+        logger.debug(
+            "BinanceClient get_position_size: symbol=%s not found in response — returning 0",
+            symbol,
+        )
+        return Decimal("0")
 
     # ------------------------------------------------------------------ #
     # User-data WebSocket stream                                           #
