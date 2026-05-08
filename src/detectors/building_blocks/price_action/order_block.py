@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
     category='PRICE_ACTION',
     class_name='OrderBlock',
     default_weight=25,
+    description='Order Block - SMC/ICT concept identifying the last bullish or bearish candle before a strong displacement move. Represents institutional order placement zones. Bullish OBs act as demand; bearish OBs as supply for re-entry.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular signals
         'BEARISH_OB', 'BULLISH_OB', 'NO_OB',

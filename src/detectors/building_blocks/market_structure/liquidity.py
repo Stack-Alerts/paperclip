@@ -64,6 +64,7 @@ class LiquidityZone:
     category='MARKET_STRUCTURE',
     class_name='Liquidity',
     default_weight=15,
+    direction='NEUTRAL',
     valid_signals=[
         # Zone Touch Events (highest value) - GRANULAR
         'BUYSIDE_ZONE_TOUCH', 'SELLSIDE_ZONE_TOUCH',

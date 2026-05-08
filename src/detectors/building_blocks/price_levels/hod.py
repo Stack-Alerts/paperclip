@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
     category='PRICE_LEVELS',
     class_name='HOD',
     default_weight=20,
+    description='HOD (High of Day) - Tracks the highest price reached during the current trading day. Key resistance level and breakout target. Neutral reference; bullish breakout or bearish rejection depending on context.',
+    direction='NEUTRAL',
     valid_signals=['BEARISH', 'BULLISH', 'NEUTRAL', 'HOD_REJECTION', 'AT_HOD', 'BELOW_HOD', 'ABOVE_HOD', 'ERROR'],
     signal_tiers={
         'ERROR': {

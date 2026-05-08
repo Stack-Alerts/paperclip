@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='InverseHeadAndShouldersPattern',
     default_weight=30,
+    description='Inverse Head and Shoulders - Bullish reversal pattern with three troughs (two higher shoulders flanking a deeper head). Neckline break confirms reversal from downtrend. Use to enter longs on confirmed breakouts.',
+    direction='BULLISH',
     valid_signals=[
         # Granular pattern signals
         'PATTERN_CONFIRMED', 'PATTERN_FORMING', 'NO_PATTERN',

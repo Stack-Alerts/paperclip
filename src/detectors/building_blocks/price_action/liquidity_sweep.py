@@ -38,6 +38,8 @@ from src.utils.advanced_data_loader import advanced_data
     category='PRICE_ACTION',
     class_name='LiquiditySweep',
     default_weight=25,
+    description='Liquidity Sweep - Detects price sweeping beyond a recent swing high/low to absorb stop orders before reversing. Bearish sweep busts buy-side liquidity and signals downside; bullish sweep busts sell-side. Use to confirm rejection entries.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular signals
         'BEARISH_SWEEP', 'BULLISH_SWEEP', 'NO_SWEEP',

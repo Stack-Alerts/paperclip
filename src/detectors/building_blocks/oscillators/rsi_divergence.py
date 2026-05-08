@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
     category='OSCILLATORS',
     class_name='RSIDivergence',
     default_weight=25,
+    description='RSI Divergence - Detects bullish and bearish divergence between price action and RSI momentum. Bullish divergence (lower price, higher RSI) signals potential reversal up; bearish the opposite. High-accuracy reversal confirmation signal.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular signals
         'BEARISH_DIVERGENCE', 'BULLISH_DIVERGENCE', 'OVERBOUGHT', 'OVERSOLD',

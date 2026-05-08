@@ -139,6 +139,15 @@ class StrategyBrowserDialog(QMainWindow):
     def _init_ui(self):
         """Initialize user interface"""
         self.setWindowTitle("Strategy Browser" if self.mode == 'open' else "Save Strategy As")
+        # Explicit window flags ensure maximize/minimize buttons are visible on
+        # all platforms. QMainWindow with a parent can inherit limiting flags
+        # from the parent widget on some Linux window managers.
+        self.setWindowFlags(
+            Qt.Window |
+            Qt.WindowMaximizeButtonHint |
+            Qt.WindowMinimizeButtonHint |
+            Qt.WindowCloseButtonHint
+        )
         self.setMinimumSize(900, 600)
         self.setStyleSheet(get_main_stylesheet())
         

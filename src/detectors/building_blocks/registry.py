@@ -46,6 +46,7 @@ class BlockMetadata:
     valid_signals: List[str]
     signal_tiers: Dict[str, Any]
     description: str = ""
+    direction: str = "NEUTRAL"  # BULLISH, BEARISH, or NEUTRAL
     tags: List[str] = None
     
     def __post_init__(self):
@@ -173,6 +174,7 @@ class BlockRegistry:
             valid_signals=metadata['valid_signals'],
             signal_tiers=metadata.get('signal_tiers', {}),
             description=metadata.get('description', ''),
+            direction=metadata.get('direction', 'NEUTRAL'),
             tags=metadata.get('tags', [])
         )
         

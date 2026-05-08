@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
     category='MOVING_AVERAGES',
     class_name='EMA50Vector',
     default_weight=12,
+    direction='NEUTRAL',
     valid_signals=['BULLISH_CLIMAX', 'BEARISH_CLIMAX', 'BULLISH_PSEUDO', 'BEARISH_PSEUDO', 'BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
     signal_tiers={
         # Granular signals (advanced users) - PVSRA tiers

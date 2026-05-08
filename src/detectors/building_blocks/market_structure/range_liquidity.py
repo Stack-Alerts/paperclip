@@ -37,6 +37,7 @@ from src.utils.advanced_data_loader import advanced_data
     category='MARKET_STRUCTURE',
     class_name='RangeLiquidity',
     default_weight=15,
+    direction='NEUTRAL',
     valid_signals=[
         # Range positions - GRANULAR
         'NEAR_BUY_SIDE_LIQUIDITY', 'NEAR_SELL_SIDE_LIQUIDITY',

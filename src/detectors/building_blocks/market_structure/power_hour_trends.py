@@ -49,6 +49,7 @@ class VolatilityRegime(Enum):
     category='MARKET_STRUCTURE',
     class_name='PowerHourTrends',
     default_weight=15,
+    direction='NEUTRAL',
     valid_signals=[
         # Uptrend combinations - GRANULAR
         'UPTREND_LOW', 'UPTREND_MODERATE', 'UPTREND_HIGH', 'UPTREND_EXTREME',

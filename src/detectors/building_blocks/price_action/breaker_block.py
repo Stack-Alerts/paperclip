@@ -30,6 +30,8 @@ import numpy as np
     category='PRICE_ACTION',
     class_name='BreakerBlock',
     default_weight=25,
+    description='Breaker Block - A former order block that has been broken through and now acts as opposing support/resistance. Bullish breakers (former bearish OB) become support; bearish breakers become resistance. Directionally context-dependent.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular signals
         'BEARISH_BREAKER', 'BULLISH_BREAKER', 'NO_BREAKER',

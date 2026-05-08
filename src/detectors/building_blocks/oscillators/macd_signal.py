@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
     category='OSCILLATORS',
     class_name='MACDSignal',
     default_weight=25,
+    direction='NEUTRAL',
     valid_signals=['BULLISH_DIVERGENCE', 'BEARISH_DIVERGENCE', 'BULLISH_ZERO_CROSS', 'BEARISH_ZERO_CROSS', 'BULLISH_CROSS', 'BEARISH_CROSS', 'BULLISH', 'BEARISH', 'NEUTRAL', 'ERROR', 'INSUFFICIENT_DATA'],
     signal_tiers={
         # Divergences - Highest value (reversal signals, rare) - ADVANCED

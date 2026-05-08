@@ -30,6 +30,8 @@ import numpy as np
     category='SMC_ICT',
     class_name='BalancedPriceRange',
     default_weight=20,
+    description='Balanced Price Range (BPR) - ICT concept identifying an overlap between a bullish and bearish fair value gap. Acts as a balanced equilibrium zone. Neutral area where price is drawn for consolidation before directional move.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular position signals
         'IN_RANGE_LOW', 'IN_RANGE_HIGH', 'NOT_IN_RANGE',

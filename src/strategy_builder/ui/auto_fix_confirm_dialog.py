@@ -73,6 +73,14 @@ class AutoFixConfirmDialog(QDialog):
         self.setWindowTitle("Confirm Auto-Fix")
         self.setModal(True)
         self.setMinimumSize(900, 650)
+        # Explicit maximize/minimize hints so the OS title bar includes
+        # working maximize and minimize buttons on all platforms.
+        self.setWindowFlags(
+            Qt.Window |
+            Qt.WindowMaximizeButtonHint |
+            Qt.WindowMinimizeButtonHint |
+            Qt.WindowCloseButtonHint
+        )
 
         # Apply the global dark stylesheet so this dialog is consistent with
         # the rest of the Strategy Builder UI (no custom inline overrides)

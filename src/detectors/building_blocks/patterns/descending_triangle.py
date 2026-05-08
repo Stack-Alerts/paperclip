@@ -30,6 +30,8 @@ import numpy as np
     category='PATTERNS',
     class_name='DescendingTrianglePattern',
     default_weight=30,
+    description='Descending Triangle - Bearish continuation pattern with flat support and falling resistance. Detects breakdown below horizontal support with declining highs. Signals bearish pressure building.',
+    direction='BEARISH',
     valid_signals=[
         # Granular pattern signals (Descending Triangle is bearish-only)
         'BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN',

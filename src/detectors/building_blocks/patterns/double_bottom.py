@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='DoubleBottomPattern',
     default_weight=30,
+    description='Double Bottom - Classic bullish reversal pattern with two equal lows and neckline breakout. Detects price forming a W-shape, signaling exhaustion of sellers. Use to confirm trend reversals from downtrends.',
+    direction='BULLISH',
     valid_signals=[
         # Granular pattern signals (Double Bottom is bullish-only)
         'BULLISH_BREAKOUT', 'PATTERN_FORMING', 'NO_PATTERN',

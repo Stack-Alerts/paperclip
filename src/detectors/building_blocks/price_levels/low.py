@@ -30,6 +30,8 @@ import numpy as np
     category='PRICE_LEVELS',
     class_name='LOW',
     default_weight=20,
+    description='Low - Detects significant recent swing lows and structural price lows. Used as dynamic support reference and stop placement guide. Neutral indicator identifying where buyers have previously defended price.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular event signals
         'ABOVE_LOW', 'AT_LOW', 'BREAKDOWN_CONFIRMED', 'BREAKING_DOWN',

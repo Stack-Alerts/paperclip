@@ -50,6 +50,7 @@ from src.utils.advanced_data_loader import advanced_data
     category='INSTITUTIONAL',
     class_name='MarketDepth',
     default_weight=15,
+    direction='NEUTRAL',
     valid_signals=[
         # Liquidity levels - GRANULAR
         'HIGH_LIQUIDITY', 'NORMAL_LIQUIDITY', 'LOW_LIQUIDITY',

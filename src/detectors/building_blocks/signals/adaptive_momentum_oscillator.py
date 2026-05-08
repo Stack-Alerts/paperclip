@@ -48,6 +48,8 @@ class SignalType(Enum):
     category='SIGNALS',
     class_name='AdaptiveMomentumOscillator',
     default_weight=20,
+    description='Adaptive Momentum Oscillator - Dynamic oscillator that adjusts sensitivity to current volatility regime. Identifies overbought/oversold conditions more accurately in ranging and trending markets. Directionally neutral composite signal.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular momentum signals
         'BEARISH_CROSS', 'BEARISH_DIVERGENCE', 'BULLISH_CROSS', 'BULLISH_DIVERGENCE',

@@ -13,11 +13,10 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
-
 from src.strategy_builder.ui.styles import (
     get_main_stylesheet, get_panel_title_stylesheet,
-    get_primary_button_stylesheet, get_secondary_button_stylesheet
+    get_primary_button_stylesheet, get_secondary_button_stylesheet,
+    create_font, get_color
 )
 
 
@@ -77,17 +76,12 @@ class AlertDialog(QDialog):
         
         # Icon
         icon_label = QLabel(icon)
-        icon_font = QFont()
-        icon_font.setPointSize(32)
-        icon_label.setFont(icon_font)
+        icon_label.setFont(create_font(32))
         header_layout.addWidget(icon_label)
         
         # Heading
         heading_label = QLabel(heading)
-        heading_font = QFont()
-        heading_font.setBold(True)
-        heading_font.setPointSize(16)
-        heading_label.setFont(heading_font)
+        heading_label.setFont(create_font(16, bold=True))
         heading_label.setStyleSheet(get_panel_title_stylesheet())
         heading_label.setWordWrap(True)
         header_layout.addWidget(heading_label, stretch=1)
@@ -98,10 +92,8 @@ class AlertDialog(QDialog):
         message_label = QLabel(message)
         message_label.setWordWrap(True)
         message_label.setTextFormat(Qt.RichText)
-        message_font = QFont()
-        message_font.setPointSize(11)
-        message_label.setFont(message_font)
-        message_label.setStyleSheet("color: #d4d7d3; line-height: 1.6;")
+        message_label.setFont(create_font(11))
+        message_label.setStyleSheet(f"color: {get_color('text_secondary')}; line-height: 1.6;")
         layout.addWidget(message_label)
         
         layout.addStretch()
@@ -211,17 +203,12 @@ class QuestionDialog(QDialog):
         
         # Icon
         icon_label = QLabel(icon)
-        icon_font = QFont()
-        icon_font.setPointSize(32)
-        icon_label.setFont(icon_font)
+        icon_label.setFont(create_font(32))
         header_layout.addWidget(icon_label)
         
         # Heading
         heading_label = QLabel(heading)
-        heading_font = QFont()
-        heading_font.setBold(True)
-        heading_font.setPointSize(16)
-        heading_label.setFont(heading_font)
+        heading_label.setFont(create_font(16, bold=True))
         heading_label.setStyleSheet(get_panel_title_stylesheet())
         heading_label.setWordWrap(True)
         header_layout.addWidget(heading_label, stretch=1)
@@ -232,10 +219,8 @@ class QuestionDialog(QDialog):
         message_label = QLabel(message)
         message_label.setWordWrap(True)
         message_label.setTextFormat(Qt.RichText)
-        message_font = QFont()
-        message_font.setPointSize(11)
-        message_label.setFont(message_font)
-        message_label.setStyleSheet("color: #d4d7d3; line-height: 1.6;")
+        message_label.setFont(create_font(11))
+        message_label.setStyleSheet(f"color: {get_color('text_secondary')}; line-height: 1.6;")
         layout.addWidget(message_label)
         
         layout.addStretch()

@@ -39,6 +39,8 @@ logger = logging.getLogger(__name__)
     category='SESSIONS',
     class_name='KillZones',
     default_weight=16,
+    description='Kill Zones - ICT concept identifying high-probability trading windows: London Open (2-5 AM NY), NY Open (7-10 AM NY), and London Close (10-12 PM NY). Neutral timing filter — signals when institutional activity is most likely.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular session signals
         'LONDON_KZ', 'NY_AM_KZ', 'NY_PM_KZ', 'ASIAN_KZ', 'LONDON_OPEN_KZ',

@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='SymmetricalTrianglePattern',
     default_weight=30,
+    description='Symmetrical Triangle - Consolidation pattern with converging trendlines, neutral bias until breakout direction is confirmed. Equal probability of bullish or bearish breakout. Use to anticipate and trade the eventual move.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular pattern signals
         'BEARISH_BREAKOUT', 'BULLISH_BREAKOUT', 'PATTERN_FORMING', 'NO_PATTERN',

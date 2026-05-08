@@ -30,6 +30,8 @@ import numpy as np
     category='MOVING_AVERAGES',
     class_name='EMA2050Trend',
     default_weight=12,
+    description='EMA 20/50 Trend - Tracks the relative position and slope of 20 and 50 EMAs as a trend context indicator. Bullish when 20 > 50 and rising; bearish when 20 < 50 and falling. Use as continuous trend filter.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular trend states
         'STRONG_UPTREND', 'EARLY_UPTREND', 'STRONG_DOWNTREND', 'EARLY_DOWNTREND',

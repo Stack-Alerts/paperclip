@@ -221,10 +221,19 @@ class IntelligentRecommendationEngine:
             # Step 3: Generate preliminary recommendations
             self._update_status("\n💡 STEP 3/5: Generating Data-Driven Recommendations...")
             
+            # Derive strategy direction for filtering (B4)
+            strategy_type = (strategy_config or {}).get('strategy_type', '')
+            strategy_direction = (
+                'BEARISH' if 'bearish' in strategy_type.lower()
+                else 'BULLISH' if 'bullish' in strategy_type.lower()
+                else None
+            )
+            
             preliminary_recs = self._generate_preliminary_recommendations(
                 metrics,
                 analysis_report,
-                intelligence_db
+                intelligence_db,
+                strategy_direction=strategy_direction
             )
             
             self._update_status(f"   ✅ Generated {len(preliminary_recs)} preliminary recommendations")
@@ -325,11 +334,21 @@ class IntelligentRecommendationEngine:
         self,
         metrics: Dict[str, Dict],
         analysis_report: StrategyAnalysisReport,
-        intelligence_db: Dict[str, BlockIntelligence]
+        intelligence_db: Dict[str, BlockIntelligence],
+        strategy_direction: Optional[str] = None
     ) -> List[Dict]:
         """
         Generate preliminary data-driven recommendations
-        
+
+        Improvements (Sprint B):
+        - B4-1: Use actual improvement estimates from PURPOSE_METRICS_MAP instead
+                 of hardcoded 0.10.
+        - B4-2: Uniqueness — once a block is nominated for any metric it is excluded
+                 from consideration for all subsequent metrics in this call.
+        - B4-3: Direction filter — skip blocks whose direction is opposite to the
+                 strategy (e.g. BULLISH blocks skipped for a BEARISH strategy).
+        - B4-4: Cap at 5 preliminary recommendations total.
+
         Based on:
         - Poor metrics
         - Root causes
@@ -341,8 +360,17 @@ class IntelligentRecommendationEngine:
         # Get current blocks
         current_blocks = set(analysis_report.block_names)
         
+        # B4-2: track nominated blocks to ensure uniqueness across metrics
+        nominated_blocks: set = set()
+        
+        # B4-4: cap
+        MAX_PRELIMINARY = 5
+        
         # For each poor metric, find best block to improve it
         for metric_key, metric_data in metrics.items():
+            if len(recommendations) >= MAX_PRELIMINARY:
+                break
+            
             if not isinstance(metric_data, dict):
                 continue
             
@@ -360,11 +388,29 @@ class IntelligentRecommendationEngine:
                 if block_name in current_blocks:
                     continue
                 
+                # B4-2: Skip if already nominated for another metric this call
+                if block_name in nominated_blocks:
+                    continue
+                
+                # B4-3: Direction filter — skip blocks opposite to strategy
+                # (access direction from BlockRegistry if available)
+                if strategy_direction == 'BEARISH':
+                    try:
+                        from src.detectors.building_blocks.registry import BlockRegistry
+                        block_meta = BlockRegistry.get_block(block_name)
+                        if block_meta and getattr(block_meta, 'direction', 'NEUTRAL') == 'BULLISH':
+                            continue  # Skip bullish-only blocks for bearish strategy
+                    except Exception:
+                        pass  # If registry unavailable, don't filter
+                
                 # Check if improves this metric
                 if metric_key in intel.primary_metrics:
-                    # Estimate improvement based on block purpose
-                    # Default improvement estimate: 10% for any relevant metric
-                    improvement = 0.10
+                    # B4-1: Use actual improvement estimate from PURPOSE_METRICS_MAP
+                    from src.optimizer_v3.core.block_intelligence_extractor import BlockIntelligenceExtractor
+                    purpose_data = BlockIntelligenceExtractor.PURPOSE_METRICS_MAP.get(intel.purpose, {})
+                    improvements_map = purpose_data.get('improvements', {})
+                    # Look up this specific metric's estimate; fall back to 0.10
+                    improvement = improvements_map.get(metric_key, 0.10)
                     
                     candidates.append({
                         'block_name': block_name,
@@ -375,6 +421,9 @@ class IntelligentRecommendationEngine:
             if candidates:
                 # Sort by improvement potential
                 best = max(candidates, key=lambda x: abs(x['improvement']))
+                
+                # B4-2: Mark this block as nominated
+                nominated_blocks.add(best['block_name'])
                 
                 recommendations.append({
                     'action_type': 'ADD_BLOCK',

@@ -33,6 +33,8 @@ import numpy as np
     category='SMC_ICT',
     class_name='Inducement',
     default_weight=20,
+    description='Inducement - SMC/ICT concept where price is manipulated to trigger stops before the true move. Identifies liquidity grabs designed to induce retail traders before institutional entry. Neutral signal for stop-hunt confirmation.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular SMC signals
         'BEARISH_INDUCEMENT', 'BULLISH_INDUCEMENT',

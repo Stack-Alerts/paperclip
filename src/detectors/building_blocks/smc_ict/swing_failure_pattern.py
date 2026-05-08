@@ -35,6 +35,8 @@ import numpy as np
     category='SMC_ICT',
     class_name='SwingFailurePattern',
     default_weight=20,
+    description='Swing Failure Pattern (SFP) - Detects a false breakout beyond a prior swing high/low that immediately reverses (stop hunt). Bearish SFP busts buy-side liquidity; bullish SFP busts sell-side. Reversal signal neutral in bias.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular SMC signals
         'BEARISH_SFP', 'BULLISH_SFP',

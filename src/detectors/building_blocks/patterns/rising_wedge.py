@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='RisingWedgePattern',
     default_weight=30,
+    description='Rising Wedge - Bearish reversal/continuation pattern with converging rising trendlines. Despite upward slope, bearish breakdown is expected as buying pressure weakens. Use to anticipate reversal from extended uptrends.',
+    direction='BEARISH',
     valid_signals=[
         # Granular pattern signals
         'BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN',

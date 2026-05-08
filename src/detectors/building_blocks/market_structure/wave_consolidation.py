@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
     category='MARKET_STRUCTURE',
     class_name='WaveConsolidation',
     default_weight=15,
+    direction='NEUTRAL',
     valid_signals=[
         # Zone events - GRANULAR
         'BULLISH_ZONE_REJECTION', 'BEARISH_ZONE_REJECTION', 'BULLISH_ZONE_BREAK', 'BEARISH_ZONE_BREAK',

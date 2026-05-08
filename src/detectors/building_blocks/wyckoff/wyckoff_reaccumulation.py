@@ -96,6 +96,8 @@ logger = logging.getLogger(__name__)
     category='WYCKOFF',
     class_name='WyckoffReaccumulation',
     default_weight=28,
+    description='Wyckoff Reaccumulation - Detects Wyckoff re-accumulation (mid-trend consolidation before further upside). Bullish continuation signal identifying when institutions are adding to long positions during a trend pause.',
+    direction='BULLISH',
     valid_signals=[
         # Granular Wyckoff reaccumulation signals
         'BREAKOUT_CONTINUATION', 'REACCUMULATION_DETECTED', 'SPRING_DETECTED', 'NO_REACCUMULATION',

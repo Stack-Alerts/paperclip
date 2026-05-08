@@ -30,6 +30,8 @@ import numpy as np
     category='PATTERNS',
     class_name='AscendingTrianglePattern',
     default_weight=30,
+    description='Ascending Triangle - Bullish continuation pattern with flat resistance and rising support. Detects breakout above horizontal resistance with rising lows. Ideal for trending markets with momentum confirmation.',
+    direction='BULLISH',
     valid_signals=[
         # Granular pattern signals
         'BULLISH_BREAKOUT', 'PATTERN_FORMING', 'NO_PATTERN',

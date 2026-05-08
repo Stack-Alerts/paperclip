@@ -40,6 +40,8 @@ logger = logging.getLogger(__name__)
     category='RISK_MANAGEMENT',
     class_name='TrailingStop',
     default_weight=8,
+    description='Trailing Stop - Dynamic stop loss that moves with price to lock in profits as a trade moves favorably. Neutral risk management tool that does not generate entry signals. Used to manage exits and protect gains in trending moves.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular risk signals
         'STOP_TRIGGERED', 'STOP_UPDATED', 'STOP_ACTIVE', 'NO_STOP',

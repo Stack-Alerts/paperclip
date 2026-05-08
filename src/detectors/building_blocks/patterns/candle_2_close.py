@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
     category='PATTERNS',
     class_name='Candle2Close',
     default_weight=30,
+    description='Candle 2 Close - Detects two-candle confirmation sequences (engulfing, inside bar, pin bar setups). Directionally neutral signal used to confirm breakouts or reversals. Suited for entry timing after initial signal.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular pattern signals
         'BULLISH_C2_CLOSE', 'BEARISH_C2_CLOSE',

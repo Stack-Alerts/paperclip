@@ -538,15 +538,22 @@ class ConfigDiscoveryResultsDialog(QDialog):
         self.setMinimumSize(900, 600)
         self.setModal(False)
         # Qt.Window flag required for maximize to work on all platforms —
-        # QDialog defaults to Qt.Dialog which may suppress the maximize button
-        self.setWindowFlags(Qt.Window)
+        # QDialog defaults to Qt.Dialog which may suppress the maximize button.
+        # WindowMaximizeButtonHint / WindowMinimizeButtonHint are added
+        # explicitly for platforms (e.g. some Linux WMs) that do not
+        # infer them from Qt.Window alone.
+        self.setWindowFlags(
+            Qt.Window |
+            Qt.WindowMaximizeButtonHint |
+            Qt.WindowMinimizeButtonHint |
+            Qt.WindowCloseButtonHint
+        )
 
         # Apply global dark stylesheet
         self.setStyleSheet(MAIN_STYLESHEET)
 
         self._build_ui()
-        # Open maximized so all columns have room to display
-        self.showMaximized()
+        # Geometry/maximized state is handled in showEvent
 
     # ------------------------------------------------------------------
     # UI construction
@@ -905,13 +912,16 @@ class ConfigDiscoveryResultsDialog(QDialog):
     # ------------------------------------------------------------------
 
     def showEvent(self, event):
-        """Restore saved window geometry on show."""
+        """Restore saved window geometry, or default to maximized on first run."""
         super().showEvent(event)
         from PyQt5.QtCore import QSettings
         settings = QSettings("BTC_Engine", "StrategyBuilder")
         geometry = settings.value("configDiscoveryDialog/geometry")
         if geometry:
             self.restoreGeometry(geometry)
+        else:
+            # First run — open maximized so all columns have room to display
+            self.showMaximized()
 
     def closeEvent(self, event):
         """Save window geometry on close."""

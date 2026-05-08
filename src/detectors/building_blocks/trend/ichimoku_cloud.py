@@ -30,6 +30,8 @@ import numpy as np
     category='TREND',
     class_name='IchimokuCloud',
     default_weight=16,
+    description='Ichimoku Cloud - Multi-component trend system detecting price position relative to cloud, Tenkan/Kijun crosses, and Chikou confirmation. Bullish above cloud, bearish below. Comprehensive trend and momentum indicator.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular cloud position signals
         'ABOVE_CLOUD', 'BELOW_CLOUD', 'IN_CLOUD',

@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='TripleTopPattern',
     default_weight=30,
+    description='Triple Top - Strong bearish reversal with three roughly equal highs, indicating persistent seller supply at resistance. More powerful than double top. Use for high-conviction short entries in overbought conditions.',
+    direction='BEARISH',
     valid_signals=[
         # Granular pattern signals
         'BEARISH_BREAKDOWN', 'PATTERN_FORMING', 'NO_PATTERN',

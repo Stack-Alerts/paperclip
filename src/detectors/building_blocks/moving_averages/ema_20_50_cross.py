@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
     category='MOVING_AVERAGES',
     class_name='EMA2050Cross',
     default_weight=12,
+    direction='NEUTRAL',
     valid_signals=[
         # Cross events - GRANULAR
         'GOLDEN_CROSS', 'DEATH_CROSS',

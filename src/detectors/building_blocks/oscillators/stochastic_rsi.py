@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
     category='OSCILLATORS',
     class_name='StochasticRSI',
     default_weight=25,
+    description='Stochastic RSI - Applies stochastic formula to RSI values for more sensitive overbought/oversold detection. Fires faster than standard RSI. Neutral indicator used to time entries within larger trend context.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular signals
         'BEARISH_CROSS', 'BULLISH_CROSS', 'NEUTRAL_HIGH', 'NEUTRAL_LOW', 'NO_CROSS',

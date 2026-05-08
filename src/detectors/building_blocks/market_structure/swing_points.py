@@ -37,6 +37,7 @@ from src.detectors.building_blocks.registry import register_block
     category='MARKET_STRUCTURE',
     class_name='SwingPoints',
     default_weight=15,
+    direction='NEUTRAL',
     valid_signals=[
         # Swing events - GRANULAR
         'SWING_HIGH_DETECTED', 'SWING_LOW_DETECTED', 'MINOR_SWING_HIGH_DETECTED', 'MINOR_SWING_LOW_DETECTED', 'MAJOR_SWING_HIGH_DETECTED', 'MAJOR_SWING_LOW_DETECTED', 'NO_SWINGS',

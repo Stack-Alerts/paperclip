@@ -29,6 +29,7 @@ import pandas as pd
     category='INSTITUTIONAL',
     class_name='EMACrossover',
     default_weight=15,
+    direction='NEUTRAL',
     valid_signals=[
         # Cross Events (rare - 0.58% of time - highest value) - GRANULAR
         'GOLDEN_CROSS', 'DEATH_CROSS',

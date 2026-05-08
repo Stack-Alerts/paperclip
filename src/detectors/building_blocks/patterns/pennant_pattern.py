@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='PennantPattern',
     default_weight=30,
+    description='Pennant Pattern - Brief symmetrical consolidation after a sharp price move, followed by continuation in the original trend direction. Similar to flag but with converging trendlines. Short-duration momentum continuation.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular pattern signals
         'BEARISH_BREAKOUT', 'BULLISH_BREAKOUT', 'PATTERN_FORMING', 'NO_PATTERN',

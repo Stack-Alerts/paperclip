@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
     category='INSTITUTIONAL',
     class_name='AnchoredVWAP',
     default_weight=15,
+    direction='NEUTRAL',
     valid_signals=[
         # Touch Events (highest priority - reversal zones) - GRANULAR
         'AT_VWAP', 'NEAR_VWAP',

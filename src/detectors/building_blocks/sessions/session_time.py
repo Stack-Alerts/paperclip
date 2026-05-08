@@ -39,6 +39,8 @@ logger = logging.getLogger(__name__)
     category='SESSIONS',
     class_name='SessionTime',
     default_weight=15,
+    description='Session Time - General session timing indicator that identifies current trading session (Asia, London, New York). Used as a context filter for session-specific strategies. Neutral — determines which session rules apply.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular session signals
         'PEAK_HOURS', 'ACTIVE_SESSION', 'MODERATE_SESSION', 'QUIET_SESSION', 'OFF_SESSION',

@@ -30,6 +30,8 @@ import numpy as np
     category='PRICE_LEVELS',
     class_name='USSettlement',
     default_weight=20,
+    description='US Settlement - Marks the CME US settlement price (typically 4 PM Eastern). Key daily reference level for BTC futures. Price often gravitates to or reacts at settlement. Neutral but significant institutional reference.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular position signals
         'ABOVE_SETTLEMENT', 'BELOW_SETTLEMENT', 'AT_SETTLEMENT',

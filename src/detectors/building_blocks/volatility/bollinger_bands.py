@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
     category='VOLATILITY',
     class_name='BollingerBands',
     default_weight=10,
+    description='Bollinger Bands - Price envelope using standard deviations around a moving average. Detects overbought/oversold extremes, squeezes (low volatility), and band breakouts. Neutral to both directions, signals mean-reversion or breakout setups.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular BB position signals
         'ABOVE_UPPER', 'NEAR_UPPER', 'UPPER_HALF', 'LOWER_HALF', 'NEAR_LOWER', 'BELOW_LOWER',

@@ -54,6 +54,7 @@ import pandas as pd
     category='FIBONACCI',
     class_name='FibonacciRetracements',
     default_weight=18,
+    direction='NEUTRAL',
     valid_signals=[
         # Fibonacci Level Signals (price AT specific Fib level) - GRANULAR
         'AT_FIB_23', 'AT_FIB_38', 'AT_FIB_50', 'AT_FIB_61', 'AT_FIB_78',

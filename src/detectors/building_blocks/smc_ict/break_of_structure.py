@@ -34,6 +34,8 @@ import numpy as np
     category='SMC_ICT',
     class_name='BreakOfStructure',
     default_weight=20,
+    description='Break of Structure (BOS) - SMC/ICT concept detecting a break of the previous swing high (bullish BOS) or swing low (bearish BOS). Confirms trend continuation. Directionally neutral — signals trend direction based on which swing breaks.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular SMC signals
         'BEARISH_BOS', 'BULLISH_BOS',

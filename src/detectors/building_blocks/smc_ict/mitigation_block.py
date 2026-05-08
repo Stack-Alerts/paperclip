@@ -30,6 +30,8 @@ import numpy as np
     category='SMC_ICT',
     class_name='MitigationBlock',
     default_weight=20,
+    description='Mitigation Block - SMC concept identifying previous order blocks that have been partially filled and become re-entry zones. Price returns to mitigate unfilled orders. Neutral level for precision re-entry after reversal.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular SMC signals
         'BEARISH_MITIGATION', 'BULLISH_MITIGATION',

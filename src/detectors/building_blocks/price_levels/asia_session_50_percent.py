@@ -30,6 +30,8 @@ import numpy as np
     category='PRICE_LEVELS',
     class_name='AsiaSession50Percent',
     default_weight=20,
+    description='Asia Session 50% - Marks the midpoint of the Asian session range as a key reference level. Price often revisits this level during London/NY sessions. Neutral level used for support/resistance and mean-reversion setups.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular position signals
         'ABOVE_ASIA_50', 'AT_ASIA_50', 'BELOW_ASIA_50',

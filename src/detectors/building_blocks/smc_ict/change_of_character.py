@@ -30,6 +30,8 @@ import numpy as np
     category='SMC_ICT',
     class_name='ChangeOfCharacter',
     default_weight=20,
+    description='Change of Character (ChoCh) - SMC/ICT concept detecting the first counter-trend break that signals a potential trend reversal. Opposite of BOS — confirms trend change. Directionally neutral, signals reversal in either direction.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular SMC signals (CHOCH only - MSS/SWEEP are metadata enhancements)
         'BEARISH_CHOCH', 'BULLISH_CHOCH',

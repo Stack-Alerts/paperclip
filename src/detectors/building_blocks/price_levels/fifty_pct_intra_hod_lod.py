@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
     category='PRICE_LEVELS',
     class_name='FiftyPctIntraHODLOD',
     default_weight=18,
+    description='Fifty Percent Intra HOD/LOD - Dynamic intraday midpoint of current session high/low range. Updates as new HOD/LOD form. Neutral level used for real-time intraday support/resistance and scalping.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular position signals
         'ABOVE_INTRA_EQ',         # Price above today's 50%

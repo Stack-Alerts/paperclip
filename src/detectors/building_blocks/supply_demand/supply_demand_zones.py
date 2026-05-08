@@ -71,6 +71,8 @@ class VolumeZone:
     category='SUPPLY_DEMAND',
     class_name='SupplyDemandZones',
     default_weight=24,
+    description='Supply and Demand Zones - Identifies fresh supply (unfilled sell orders) and demand (unfilled buy orders) zones using strong impulsive moves. Bullish at demand zones, bearish at supply zones. Core levels for smart money strategies.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular supply/demand zone signals
         'DEMAND_ZONE', 'SUPPLY_ZONE', 'NEAR_DEMAND', 'NEAR_SUPPLY', 'NO_ZONE',

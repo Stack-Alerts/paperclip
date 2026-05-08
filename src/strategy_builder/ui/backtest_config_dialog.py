@@ -25,8 +25,9 @@ class BacktestConfigDialog(QDialog):
         super().__init__(parent)
         self.orchestrator = orchestrator
         self._init_ui()
+
     def showEvent(self, event):
-        """Called when window is shown - apply hand cursors to all widgets"""
+        """Restore geometry or default to maximized; apply hand cursors."""
         super().showEvent(event)
         from PyQt5.QtCore import QTimer
         from .styles import apply_hand_cursor_to_buttons
@@ -35,6 +36,9 @@ class BacktestConfigDialog(QDialog):
         geometry = settings.value("backtestConfigDialog/geometry")
         if geometry:
             self.restoreGeometry(geometry)
+        else:
+            # First run — start maximized
+            self.showMaximized()
 
     def closeEvent(self, event):
         """Save window geometry on close."""
@@ -48,7 +52,9 @@ class BacktestConfigDialog(QDialog):
         self.setWindowTitle("BTC Trade Engine - Backtest Configuration")
         self.setModal(False)  # Non-modal so user can see strategy
         
-        # Set window flags to enable maximize/minimize/close buttons
+        # Set window flags to enable maximize/minimize/close buttons.
+        # Qt.Window is required for an independent OS title bar with working
+        # maximize/minimize on all platforms.
         self.setWindowFlags(
             Qt.Window |
             Qt.WindowMaximizeButtonHint |
@@ -56,10 +62,7 @@ class BacktestConfigDialog(QDialog):
             Qt.WindowCloseButtonHint
         )
         
-        # Start fullscreen (like old Universal Optimizer)
-        self.showMaximized()
-        
-        # Layout
+        # Layout (geometry/maximized state is set in showEvent)
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         

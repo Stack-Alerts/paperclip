@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
     category='VOLATILITY',
     class_name='ADR',
     default_weight=8,
+    description='ADR (Average Daily Range) - Measures average daily price range to assess volatility and set realistic profit targets. Neutral indicator used for position sizing and stop placement. Alerts when price approaches daily range extension.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular volatility level signals
         'CALM', 'NORMAL', 'ELEVATED', 'HIGH', 'EXTREME', 'VOLATILE', 'NEAR_ADR', 'ABOVE_ADR', 'BELOW_ADR', 'WITHIN_ADR',

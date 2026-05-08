@@ -29,6 +29,8 @@ import numpy as np
     category='PATTERNS',
     class_name='FallingWedgePattern',
     default_weight=30,
+    description='Falling Wedge - Bullish reversal/continuation pattern with converging declining trendlines. Despite downward slope, bullish breakout is expected as selling pressure decreases. Use in oversold markets or corrections.',
+    direction='BULLISH',
     tags=['patterns', 'wedge', 'reversal', 'bullish_only_pattern', 'event_block'],
     valid_signals=[
         # Granular pattern signals

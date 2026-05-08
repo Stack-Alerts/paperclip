@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
     category='PRICE_LEVELS',
     class_name='HOW',
     default_weight=20,
+    description='HOW (High of Week) - Tracks the highest price of the current trading week. Major weekly resistance level used for swing-trading reference. Neutral level that identifies key longer-term supply zones.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular event signals
         'BELOW_HOW', 'BREAKING_OUT', 'BREAKOUT_CONFIRMED',

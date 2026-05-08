@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
     category='PATTERNS',
     class_name='ThreeBarReversal',
     default_weight=30,
+    description='Three Bar Reversal - Detects a three-candle reversal sequence (bullish or bearish). Strong directional reversal signal with well-defined risk/reward. Applicable to both tops and bottoms for entry timing.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular pattern signals
         'BULLISH_3BAR', 'BEARISH_3BAR',

@@ -44,6 +44,8 @@ class SignalType(Enum):
     category='SIGNALS',
     class_name='MACDPriceForecasting',
     default_weight=20,
+    description='MACD Price Forecasting - Uses MACD divergence and histogram patterns to forecast short-term price direction. Combines momentum and trend signals for predictive entries. Neutral until directional bias confirmed by histogram.',
+    direction='NEUTRAL',
     valid_signals=[
         # Granular forecast signals
         'BEARISH_FORECAST', 'BULLISH_FORECAST',
