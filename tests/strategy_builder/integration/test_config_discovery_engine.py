@@ -25,6 +25,9 @@ from unittest.mock import MagicMock, patch
 # Stub PyQt5 before any engine import (headless CI support)
 # ---------------------------------------------------------------------------
 def _ensure_pyqt5_stubs():
+    import importlib.util
+    if importlib.util.find_spec("PyQt5") is not None:
+        return  # real PyQt5 available — do not inject stubs
     if "PyQt5" in sys.modules:
         return
     import types
