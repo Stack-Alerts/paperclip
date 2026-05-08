@@ -1571,21 +1571,52 @@ class MetricsDisplayPanel(QWidget):
                 self._push_ai_analysis_to_panel(full_analysis)
                 logger.info("[UI] Pushed full AI analysis to panel")
         
-        # AUTO-SWITCH to AI Recommendations tab to show user where results are
-        self._switch_to_metrics_tab()
+        # AUTO-SWITCH to AI Recommendations tab (BTCAAAAA-391 Bug 3).
+        # Use a deferred QTimer.singleShot(0) so the tab switch runs after all
+        # pending Qt events (dialog-close cleanup, focus-change events, etc.) have
+        # been processed.  Without the deferral the tab switch could be overridden
+        # by a focus-return event emitted by the closing QProgressDialog.
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(0, self._switch_to_metrics_tab)
     
     def _on_ai_progress(self, message: str, percentage: int) -> None:
         """
         Handle progress updates from AI worker.
-        
+
         Args:
             message: Progress message
             percentage: Progress percentage (0-100, or -1 for unknown)
+
+        UX fix (BTCAAAAA-391): When STEP 4/5 is reached (80%) the worker blocks
+        on the AI API HTTP call for 15-30 seconds with no further updates.  The
+        progress bar appeared frozen.  We now switch to indeterminate / pulse mode
+        at that point so users see activity, and restore determinate mode when
+        STEP 5/5 arrives.
         """
-        if hasattr(self, 'progress_dialog'):
-            self.progress_dialog.setLabelText(message)
-            if percentage >= 0:
-                self.progress_dialog.setValue(percentage)
+        if not hasattr(self, 'progress_dialog'):
+            return
+
+        self.progress_dialog.setLabelText(message)
+
+        if percentage == 80:
+            # AI API call is about to start — switch to indeterminate (pulsing) mode
+            # so the bar animates during the long HTTP wait instead of looking frozen.
+            self.progress_dialog.setRange(0, 0)   # setRange(0, 0) = indeterminate
+            self.progress_dialog.setLabelText(
+                message + "\n\n⏳ Waiting for AI response... (may take 15–30 seconds)"
+            )
+        elif percentage == 95:
+            # STEP 5/5 received — API call returned, restore determinate mode
+            self.progress_dialog.setRange(0, 100)
+            self.progress_dialog.setValue(percentage)
+        elif percentage == 100:
+            # Completion — snap to 100%
+            self.progress_dialog.setRange(0, 100)
+            self.progress_dialog.setValue(percentage)
+        elif percentage >= 0:
+            self.progress_dialog.setRange(0, 100)
+            self.progress_dialog.setValue(percentage)
+        # percentage == -1 → unknown; label already updated above, no bar change
     
     def _on_ai_error(self, error_msg: str) -> None:
         """
