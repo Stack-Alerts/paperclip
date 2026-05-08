@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import (
     QSizePolicy
 )
 from PyQt5.QtCore import Qt, QSettings, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtGui import QColor
 from datetime import datetime
 import csv
 from src.optimizer_v3.validation.institutional_validator import (
