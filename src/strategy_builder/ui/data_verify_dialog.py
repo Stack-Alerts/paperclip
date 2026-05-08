@@ -243,13 +243,6 @@ class DataVerifyDialog(WindowGeometryMixin, QDialog):
         subtitle.setWordWrap(True)
         root.addWidget(subtitle)
 
-        # Current UTC time label — updated each time verification starts
-        self._utc_time_label = QLabel(self._format_utc_now())
-        self._utc_time_label.setFont(create_font(size=9))
-        self._utc_time_label.setStyleSheet(get_label_style('muted'))
-        self._utc_time_label.setAlignment(Qt.AlignRight)
-        root.addWidget(self._utc_time_label)
-
         # Summary banner
         summary_group = QGroupBox("Summary")
         summary_layout = QVBoxLayout()
@@ -265,6 +258,15 @@ class DataVerifyDialog(WindowGeometryMixin, QDialog):
 
         summary_group.setLayout(summary_layout)
         root.addWidget(summary_group)
+
+        # Current UTC time label — updated each time verification starts
+        # Positioned below the Summary block so it reads as a timestamp annotation
+        # for the verification run, not as part of the header section.
+        self._utc_time_label = QLabel(self._format_utc_now())
+        self._utc_time_label.setFont(create_font(size=9))
+        self._utc_time_label.setStyleSheet(get_label_style('muted'))
+        self._utc_time_label.setAlignment(Qt.AlignRight)
+        root.addWidget(self._utc_time_label)
 
         # Results table
         results_group = QGroupBox("Results")
