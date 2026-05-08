@@ -2582,7 +2582,7 @@ class BacktestConfigPanel(QWidget):
         # Apply green color
         self._set_live_output_color("green")
         
-        self.results_text.setText("🔄 Backtest started...\n")
+        self.results_text.append("🔄 Backtest started...")
     
     def _on_pause_clicked(self):
         """Handle pause button click"""
