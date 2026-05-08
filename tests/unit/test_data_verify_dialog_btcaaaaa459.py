@@ -197,7 +197,7 @@ def _make_qt_stubs():
     # QtCore
     core = types.ModuleType("PyQt5.QtCore")
     core.Qt = type("Qt", (), {
-        "AlignCenter": 4, "AlignLeft": 1, "AlignVCenter": 128,
+        "AlignCenter": 4, "AlignLeft": 1, "AlignRight": 2, "AlignVCenter": 128,
         "Window": 1, "WindowTitleHint": 2, "WindowCloseButtonHint": 4,
         "WindowMinimizeButtonHint": 8, "WindowMaximizeButtonHint": 16,
     })

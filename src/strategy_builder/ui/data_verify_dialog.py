@@ -243,6 +243,13 @@ class DataVerifyDialog(WindowGeometryMixin, QDialog):
         subtitle.setWordWrap(True)
         root.addWidget(subtitle)
 
+        # Current UTC time label — updated each time verification starts
+        self._utc_time_label = QLabel(self._format_utc_now())
+        self._utc_time_label.setFont(create_font(size=9))
+        self._utc_time_label.setStyleSheet(get_label_style('muted'))
+        self._utc_time_label.setAlignment(Qt.AlignRight)
+        root.addWidget(self._utc_time_label)
+
         # Summary banner
         summary_group = QGroupBox("Summary")
         summary_layout = QVBoxLayout()
@@ -336,6 +343,7 @@ class DataVerifyDialog(WindowGeometryMixin, QDialog):
            (self._repair_thread and self._repair_thread.isRunning()):
             return
 
+        self._utc_time_label.setText(self._format_utc_now())
         self._table.setRowCount(0)
         self._has_repairable_gaps = False
         self._fix_btn.setVisible(False)
@@ -582,6 +590,11 @@ class DataVerifyDialog(WindowGeometryMixin, QDialog):
     # ------------------------------------------------------------------
     # Shared helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _format_utc_now() -> str:
+        """Return a human-readable current UTC time string for display in the header."""
+        return "Current UTC time: " + datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
 
     def _on_progress(self, current: int, total: int, message: str):
         self._progress_bar.setMaximum(total)
