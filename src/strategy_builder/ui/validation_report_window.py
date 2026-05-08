@@ -2108,7 +2108,7 @@ class ValidationReportWindow(QMainWindow):
         """
         try:
             logger.info(f"\n{'='*80}")
-            logger.debug(f"DEBUG: RECHECK TIMING FIX - INSTITUTIONAL APPROACH")
+            logger.debug("RECHECK TIMING FIX - INSTITUTIONAL APPROACH")
             logger.info(f"{'='*80}")
             logger.info(f"Signal name: {signal_name}")
             logger.info(f"Current timing window: {timing_window} bars")
@@ -2117,56 +2117,54 @@ class ValidationReportWindow(QMainWindow):
             for block in self.config.blocks:
                 for signal in block.signals:
                     if signal.name == signal_name:
-                        logger.debug(f"  DEBUG: ✓ FOUND target signal '{signal_name}'")
+                        logger.debug(f"  ✓ FOUND target signal '{signal_name}'")
                         
                         # Calculate CUMULATIVE delay (same as validator)
                         cumulative_delay = 0
                         if hasattr(signal, 'recheck_config') and signal.recheck_config:
                             cumulative_delay = signal.recheck_config.bar_delay
-                            logger.debug(f"  DEBUG: Main recheck_config.bar_delay = {signal.recheck_config.bar_delay} bars")
+                            logger.debug(f"  Main recheck_config.bar_delay = {signal.recheck_config.bar_delay} bars")
                         
                         if hasattr(signal, 'recheck_chain') and signal.recheck_chain:
                             chain_delays = [rc.bar_delay for rc in signal.recheck_chain]
                             cumulative_delay += sum(chain_delays)
-                            logger.debug(f"  DEBUG: RECHECK CHAIN: {len(signal.recheck_chain)} items")
-                            logger.debug(f"  DEBUG: Chain delays: {chain_delays}")
+                            logger.debug(f"  RECHECK CHAIN: {len(signal.recheck_chain)} items")
+                            logger.debug(f"  Chain delays: {chain_delays}")
                         
-                        logger.debug(f"  DEBUG: CUMULATIVE RECHECK DELAY = {cumulative_delay} bars (PRESERVED)")
+                        logger.debug(f"  CUMULATIVE RECHECK DELAY = {cumulative_delay} bars (PRESERVED)")
                         
                         # INSTITUTIONAL FIX: Increase timing window to fit delays + buffer
                         # Add 20% buffer for safety
                         buffer = int(cumulative_delay * 0.2)
                         new_timing_window = cumulative_delay + buffer
                         
-                        logger.debug(f"  DEBUG: Required window = {cumulative_delay} + {buffer} buffer = {new_timing_window} bars")
+                        logger.debug(f"  Required window = {cumulative_delay} + {buffer} buffer = {new_timing_window} bars")
                         
                         # Update timing constraint
                         if hasattr(signal, 'timing_constraint') and signal.timing_constraint:
                             old_window = signal.timing_constraint.max_candles
                             signal.timing_constraint.max_candles = new_timing_window
                             
-                            logger.debug(f"  DEBUG: TIMING WINDOW BEFORE = {old_window} bars")
-                            logger.debug(f"  DEBUG: TIMING WINDOW AFTER = {new_timing_window} bars")
-                            logger.debug(f"  DEBUG: ✅ RECHECK delays PRESERVED (strategic choice)")
-                            logger.debug(f"  DEBUG: ✅ Timing window ADJUSTED (constraint)")
+                            logger.debug(f"  TIMING WINDOW BEFORE = {old_window} bars")
+                            logger.debug(f"  TIMING WINDOW AFTER = {new_timing_window} bars")
+                            logger.debug("  ✅ RECHECK delays PRESERVED (strategic choice)")
+                            logger.debug("  ✅ Timing window ADJUSTED (constraint)")
                         else:
-                            logger.error(f"  DEBUG: ❌ No timing_constraint found")
+                            logger.error(f"  ❌ No timing_constraint found for signal '{signal_name}'")
                             logger.info(f"{'='*80}\n")
                             return False
                         
-                        logger.debug(f"  DEBUG: ✅ Fix successful! Window {old_window} → {new_timing_window} bars")
+                        logger.debug(f"  ✅ Fix successful! Window {old_window} → {new_timing_window} bars")
                         logger.info(f"{'='*80}\n")
                         
                         return True
             
-            logger.error(f"DEBUG: ❌ Signal '{signal_name}' not found in config")
+            logger.error(f"❌ Signal '{signal_name}' not found in config")
             logger.info(f"{'='*80}\n")
             return False
             
         except Exception as e:
-            logger.error(f"DEBUG: ❌ EXCEPTION: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception(f"❌ Unexpected error in _apply_recheck_timing_fix for signal '{signal_name}': {e}")
             logger.info(f"{'='*80}\n")
             return False
     
