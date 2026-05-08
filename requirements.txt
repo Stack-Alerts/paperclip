@@ -25,6 +25,8 @@ plotly>=5.13.0
 
 # WebSocket (ITM Section B — Binance real-time feed)
 websockets>=12.0
+# WebSocket sync client (ITM Section G — BinanceClient user-data stream)
+websocket-client>=1.6.0
 
 # Testing
 pytest>=7.3.0

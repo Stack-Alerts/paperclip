@@ -73,6 +73,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -199,6 +200,10 @@ class ExecutionEngine:
         self._orders_submitted: int = 0
         self._orders_filled: int = 0
         self._orders_cancelled: int = 0
+
+        # Listen-key keepalive thread (started via start_listen_key_keepalive)
+        self._keepalive_stop: Optional[threading.Event] = None
+        self._keepalive_thread: Optional[threading.Thread] = None
 
         logger.info(
             "ExecutionEngine initialised: testnet=%s ttl=%ss",
@@ -419,6 +424,62 @@ class ExecutionEngine:
                         client_id,
                     )
         return cancelled_ids
+
+    # ------------------------------------------------------------------ #
+    # Listen-key keepalive                                                 #
+    # ------------------------------------------------------------------ #
+
+    def start_listen_key_keepalive(self, interval_secs: float = 1800.0) -> None:
+        """Start a background daemon thread that renews the Binance listen key.
+
+        Binance user-data listen keys expire after 60 minutes of inactivity.
+        This method launches a daemon thread that calls
+        ``BinanceClient.keep_alive_listen_key()`` every *interval_secs*
+        (default 1800 s = 30 min) to prevent expiry.
+
+        Call this after ``BinanceClient.start_user_data_stream()`` has been
+        invoked.  Call ``stop_listen_key_keepalive()`` before shutting down.
+
+        Parameters
+        ----------
+        interval_secs:
+            Keepalive interval in seconds.  Must be less than 3600 (Binance
+            listen-key TTL).  Default 1800 (30 min).
+        """
+        if self._keepalive_thread and self._keepalive_thread.is_alive():
+            logger.warning("start_listen_key_keepalive: keepalive thread already running")
+            return
+
+        self._keepalive_stop = threading.Event()
+        stop_event = self._keepalive_stop
+
+        def _keepalive_loop() -> None:
+            logger.info(
+                "Listen-key keepalive thread started (interval=%ss)",
+                interval_secs,
+            )
+            while not stop_event.wait(timeout=interval_secs):
+                try:
+                    self._client.keep_alive_listen_key()
+                    logger.debug("Listen-key keepalive: renewed successfully")
+                except Exception:
+                    logger.exception("Listen-key keepalive: renewal failed — will retry next interval")
+            logger.info("Listen-key keepalive thread stopped")
+
+        self._keepalive_thread = threading.Thread(
+            target=_keepalive_loop,
+            daemon=True,
+            name="binance-listen-key-keepalive",
+        )
+        self._keepalive_thread.start()
+
+    def stop_listen_key_keepalive(self) -> None:
+        """Signal the keepalive thread to stop and wait for it to exit."""
+        if self._keepalive_stop:
+            self._keepalive_stop.set()
+        if self._keepalive_thread:
+            self._keepalive_thread.join(timeout=5.0)
+            self._keepalive_thread = None
 
     # ------------------------------------------------------------------ #
     # Metrics snapshot                                                     #
