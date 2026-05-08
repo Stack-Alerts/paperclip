@@ -822,9 +822,9 @@ DO NOT make assumptions. Base ALL analysis on the actual data provided in sectio
 
 1. **ADD_BLOCK**: Add a new building block to improve signal quality
    - When: Missing confluence, need additional filters
-   - Example: Add `liquidity_sweep` to confirm price rejection
+   - Example: Add `[relevant_block]` to confirm price context
    
-2. **ADJUST_PARAMETER**: Modify strategy parameters
+2. **ADJUST_PARAM**: Modify strategy parameters
    - When: Win rate too low, drawdown too high, exits suboptimal
    - Example: Adjust `risk_per_trade_pct` from 10% to 5%
    
@@ -858,22 +858,22 @@ DO NOT make assumptions. Base ALL analysis on the actual data provided in sectio
 {{
   "type": "ADD_BLOCK",
   "priority": 1,
-  "block_name": "liquidity_sweep",
-  "signal_name": "SWEEP_DETECTED",
+  "block_name": "[relevant_block]",
+  "signal_name": "[RELEVANT_SIGNAL]",
   "configuration": {{
-    "lookback_bars": 50,
-    "min_liquidity_size": 100000
+    "parameter1": value1,
+    "parameter2": value2
   }},
-  "reasoning": "Current HOD_REJECTION has 54% win rate. Adding liquidity_sweep confirmation will filter out weak rejections where price hasn't swept liquidity yet, improving win rate to estimated 62-65% based on institutional analysis.",
+  "reasoning": "Current [entry_block] has [X]% win rate. Adding [relevant_block] confirmation will filter out weak signals where [condition not met], improving win rate to estimated [Y]-[Z]% based on [analysis basis].",
   "expected_impact": {{
-    "win_rate": "+8-11%",
-    "trade_frequency": "-15%",
-    "sharpe_ratio": "+0.3"
+    "win_rate": "+[X]-[Y]%",
+    "trade_frequency": "-[Z]%",
+    "sharpe_ratio": "+[N]"
   }},
   "confidence": 0.78,
   "warnings": [
-    "Will reduce trade frequency by ~15% (3-4 trades less per month)",
-    "Requires price to sweep liquidity before signal, may miss early entries"
+    "Will reduce trade frequency by ~[X]% ([N] trades less per month)",
+    "Requires [condition] before signal, may miss [edge case]"
   ]
 }}
 ```
@@ -894,7 +894,7 @@ DO NOT make assumptions. Base ALL analysis on the actual data provided in sectio
   
   "recommendations": [
     {{
-      "type": "ADD_BLOCK | ADD_TIMING | ADJUST_PARAMETER | ADD_RECHECK",
+      "type": "ADD_BLOCK | ADD_TIMING | ADJUST_PARAM | ADD_RECHECK",
       "priority": 1,
       "block_name": "exact_block_name_from_available_blocks",
       "signal_name": "EXACT_SIGNAL_NAME",

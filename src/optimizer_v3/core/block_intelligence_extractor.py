@@ -151,13 +151,14 @@ class BlockIntelligenceExtractor:
     }
     
     # Category to purpose mapping
+    # Keys must match the plural category names stored in BlockRegistry
     CATEGORY_PURPOSE_MAP = {
-        'PATTERN': BlockPurpose.REVERSAL_DETECTOR,
-        'OSCILLATOR': BlockPurpose.MOMENTUM_SHIFT,
+        'PATTERNS': BlockPurpose.REVERSAL_DETECTOR,
+        'OSCILLATORS': BlockPurpose.MOMENTUM_SHIFT,
         'TREND': BlockPurpose.TREND_FILTER,
         'SMC_ICT': BlockPurpose.LIQUIDITY_DETECTOR,
-        'PRICE_LEVEL': BlockPurpose.ENTRY_CONFIRMATION,
-        'SESSION': BlockPurpose.SESSION_FILTER,
+        'PRICE_LEVELS': BlockPurpose.ENTRY_CONFIRMATION,
+        'SESSIONS': BlockPurpose.SESSION_FILTER,
         'VOLATILITY': BlockPurpose.VOLATILITY_FILTER,
         'RISK_MANAGEMENT': BlockPurpose.RISK_MANAGEMENT,
         'WYCKOFF': BlockPurpose.STRUCTURE_BREAK,
@@ -166,7 +167,9 @@ class BlockIntelligenceExtractor:
         'ELLIOTT_WAVE': BlockPurpose.REVERSAL_DETECTOR,
         'SUPPLY_DEMAND': BlockPurpose.ENTRY_CONFIRMATION,
         'INSTITUTIONAL': BlockPurpose.VOLUME_CONFIRMATION,
-        'MOVING_AVERAGE': BlockPurpose.TREND_FILTER
+        'MOVING_AVERAGES': BlockPurpose.TREND_FILTER,
+        'PRICE_ACTION': BlockPurpose.ENTRY_CONFIRMATION,
+        'SIGNALS': BlockPurpose.ENTRY_CONFIRMATION,
     }
     
     # Purpose to metric improvements mapping
