@@ -103,6 +103,55 @@ class StdoutCapture:
             self._buffer = ""
 
 
+class QtLogHandler(logging.Handler):
+    """
+    Python logging handler that emits log records via a Qt signal.
+
+    Installed temporarily during BacktestWorker.run() so that
+    logger.info() / logger.warning() calls inside NautilusDataLoader,
+    UnifiedDataManager, and BarAggregator reach the Status panel in the
+    same way as print() output captured by StdoutCapture.
+
+    Only INFO and above are forwarded (DEBUG is too noisy).
+    The handler is installed on specific logger names to avoid routing
+    unrelated application logs into the Status panel.
+    """
+
+    # Loggers whose output should be routed to the Status panel
+    TARGET_LOGGERS = [
+        'src.data_manager.nautilus_loader',
+        'src.data_manager.unified_manager',
+        'src.optimizer_v3.core.backtest_data_provider',
+    ]
+
+    def __init__(self, signal):
+        super().__init__(level=logging.INFO)
+        self.signal = signal
+        self._installed_on: list = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            self.signal.emit(msg)
+        except Exception:
+            self.handleError(record)
+
+    def install(self) -> None:
+        """Attach this handler to each target logger."""
+        formatter = logging.Formatter('%(message)s')
+        self.setFormatter(formatter)
+        for name in self.TARGET_LOGGERS:
+            log = logging.getLogger(name)
+            log.addHandler(self)
+            self._installed_on.append(log)
+
+    def uninstall(self) -> None:
+        """Remove this handler from all loggers it was added to."""
+        for log in self._installed_on:
+            log.removeHandler(self)
+        self._installed_on.clear()
+
+
 class DictWrapper:
     """
     Lightweight wrapper to provide attribute access to Dict objects
@@ -324,6 +373,14 @@ class BacktestWorker(QThread):
                 original_stdout = sys.stdout
                 stdout_capture = StdoutCapture(self.status_message, original_stdout)
                 sys.stdout = stdout_capture
+
+                # CAPTURE LOGGER: Route logger.info() calls from NautilusDataLoader,
+                # UnifiedDataManager, and BacktestDataProvider to the Status panel.
+                # These loaders use Python's logging module, not print(), so StdoutCapture
+                # alone does not capture them.
+                import logging as _logging
+                qt_log_handler = QtLogHandler(self.status_message)
+                qt_log_handler.install()
                 
                 try:
                     # Load bars using data provider with progress callback
@@ -344,9 +401,10 @@ class BacktestWorker(QThread):
                         "SYSTEM"
                     )
                 finally:
-                    # ALWAYS restore stdout (even on error)
+                    # ALWAYS restore stdout and logger handler (even on error)
                     stdout_capture.flush()
                     sys.stdout = original_stdout
+                    qt_log_handler.uninstall()
             
             # Sprint 2.0.1 Task 2.0.1.4: Use REAL count from loaded bars
             total_candles = len(bars)
@@ -3093,20 +3151,21 @@ class BacktestConfigPanel(QWidget):
                 self.sl_combo.setCurrentText(str(saved['sl_mode']))
                 applied_any = True
             if 'starting_capital' in saved:
-                self.capital_spin.setValue(float(saved['starting_capital']))
+                # QSpinBox requires int; cast explicitly to avoid TypeError from float
+                self.capital_spin.setValue(int(float(saved['starting_capital'])))
                 applied_any = True
             if 'risk_per_trade_pct' in saved:
-                self.risk_spin.setValue(float(saved['risk_per_trade_pct']))
+                self.risk_spin.setValue(int(float(saved['risk_per_trade_pct'])))
                 applied_any = True
             if 'min_risk_reward' in saved:
-                # UI shows 10x the actual value (see get_config)
-                self.rr_spin.setValue(float(saved['min_risk_reward']) * 10.0)
+                # UI shows 10x the actual value (see get_config); cast to int for QSpinBox
+                self.rr_spin.setValue(int(float(saved['min_risk_reward']) * 10.0))
                 applied_any = True
             if 'max_leverage' in saved:
-                self.leverage_spin.setValue(float(saved['max_leverage']))
+                self.leverage_spin.setValue(int(float(saved['max_leverage'])))
                 applied_any = True
             if 'confluence_threshold' in saved:
-                self.confluence_spin.setValue(float(saved['confluence_threshold']))
+                self.confluence_spin.setValue(int(float(saved['confluence_threshold'])))
                 applied_any = True
             if 'max_bars_held' in saved:
                 self.max_bars_spin.setValue(int(saved['max_bars_held']))
