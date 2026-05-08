@@ -2,13 +2,17 @@ from PyQt6.QtWidgets import QMainWindow, QMenuBar, QMenu, QAction
 from src.strategy_builder.ui.styles import (
     WINDOW_STYLE,
     MENU_STYLE,
-    create_font
+    create_font,
+    WindowGeometryMixin,
 )
 from src.strategy_builder.ui.system_config import SystemConfigWindow
 
-class MainWindow(QMainWindow):
+class MainWindow(WindowGeometryMixin, QMainWindow):
     """Main application window with consistent styling"""
-    
+
+    GEOMETRY_SETTINGS_KEY = "mainWindowLegacy"
+    GEOMETRY_DEFAULT_SIZE = (1200, 800)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Strategy Builder")
@@ -48,11 +52,17 @@ class MainWindow(QMainWindow):
         
         self.setMenuBar(menubar)
     def showEvent(self, event):
-        """Called when window is shown - apply hand cursors to all widgets"""
+        """Called when window is shown - restore geometry and apply hand cursors."""
         super().showEvent(event)
+        self._restore_window_geometry(event)
         from PyQt5.QtCore import QTimer
         from .styles import apply_hand_cursor_to_buttons
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
+
+    def closeEvent(self, event):
+        """Save window geometry on close."""
+        self._save_window_geometry()
+        super().closeEvent(event)
 
     
     def show_system_config(self):
