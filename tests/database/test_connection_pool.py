@@ -37,7 +37,7 @@ class TestDatabaseMetrics:
         assert metrics.total_queries == 0
         assert metrics.failed_queries == 0
         assert metrics.last_error_time is None
-       assert len(metrics.connection_errors) == 0
+        assert len(metrics.connection_errors) == 0
     
     def test_record_connection_success(self):
         """Test recording successful connections"""
@@ -222,21 +222,26 @@ class TestDatabaseConnectionPool:
         with patch('src.optimizer_v3.database.connection_pool.get_db_config', return_value=mock_config):
             with patch('src.optimizer_v3.database.connection_pool.get_db_url', return_value=mock_db_url):
                 with patch('src.optimizer_v3.database.connection_pool.create_engine') as mock_engine:
-                    mock_engine_instance = MagicMock()
-                    mock_engine.return_value = mock_engine_instance
-                    
-                    # Mock successful connection
-                    mock_conn = MagicMock()
-                    mock_engine_instance.connect.return_value.__enter__.return_value = mock_conn
-                    
-                    pool = DatabaseConnectionPool()
-                    metrics = pool.close_all()
-                    
-                    assert isinstance(metrics, dict)
-                    assert 'total_connections' in metrics
-                    assert 'uptime_seconds' in metrics
-                    assert pool._session_factory.remove.called
-                    assert pool._engine.dispose.called
+                    with patch('src.optimizer_v3.database.connection_pool.scoped_session') as mock_scoped_session:
+                        mock_engine_instance = MagicMock()
+                        mock_engine.return_value = mock_engine_instance
+                        
+                        # Mock scoped_session so _session_factory is a MagicMock
+                        mock_session_factory = MagicMock()
+                        mock_scoped_session.return_value = mock_session_factory
+                        
+                        # Mock successful connection
+                        mock_conn = MagicMock()
+                        mock_engine_instance.connect.return_value.__enter__.return_value = mock_conn
+                        
+                        pool = DatabaseConnectionPool()
+                        metrics = pool.close_all()
+                        
+                        assert isinstance(metrics, dict)
+                        assert 'total_connections' in metrics
+                        assert 'uptime_seconds' in metrics
+                        assert pool._session_factory.remove.called
+                        assert pool._engine.dispose.called
     
     def test_get_pool_status(self, mock_config, mock_db_url):
         """Test getting pool status"""
@@ -298,12 +303,10 @@ class TestGlobalConnectionPool:
 class TestConnectionPoolIntegration:
     """Integration tests (require actual PostgreSQL)"""
     
-    @pytest.mark.skipif(
-        not pytest.config.getoption("--run-integration"),
-        reason="Integration tests require --run-integration flag"
-    )
-    def test_real_connection_pool(self):
+    def test_real_connection_pool(self, request):
         """Test with real PostgreSQL connection (if available)"""
+        if not request.config.getoption("--run-integration", default=False):
+            pytest.skip("Integration tests require --run-integration flag")
         try:
             pool = DatabaseConnectionPool()
             session = pool.get_session()
