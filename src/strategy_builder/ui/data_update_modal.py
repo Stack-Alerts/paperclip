@@ -406,24 +406,32 @@ class DataUpdateModal(QDialog):
             # system has been running continuously or restarted within 1 cycle.
             if self.auto_mode:
                 try:
-                    last_bar = self.manager.get_last_bar_timestamp('15m')
-                    if last_bar is not None:
-                        staleness_seconds = (datetime.utcnow() - last_bar).total_seconds()
-                        # 15 min candle + 2 min grace = 17 min = 1020s
-                        if staleness_seconds <= 1020:
+                    last_15m = self.manager.get_last_bar_timestamp('15m')
+                    last_1h = self.manager.get_last_bar_timestamp('1h')
+
+                    if last_15m is not None and last_1h is not None:
+                        now = datetime.utcnow()
+                        staleness_15m = (now - last_15m).total_seconds()
+                        staleness_1h = (now - last_1h).total_seconds()
+                        # 15m candle + 2 min grace = 17 min = 1020s
+                        # 1h candle + 2 min grace = 62 min = 3720s
+                        if staleness_15m <= 1020 and staleness_1h <= 3720:
                             logger.info(
                                 f"[DataUpdateModal] Data current — last 15m bar "
-                                f"{staleness_seconds:.0f}s ago, skipping startup download"
+                                f"{staleness_15m:.0f}s ago, last 1h bar {staleness_1h:.0f}s ago, "
+                                f"skipping startup download"
                             )
                             self.status_label.setText(
-                                f"✅ Data current — last bar {int(staleness_seconds//60)}m "
-                                f"{int(staleness_seconds%60)}s ago"
+                                f"✅ Data current — last 15m bar {int(staleness_15m//60)}m "
+                                f"{int(staleness_15m%60)}s ago"
                             )
                             self.status_label.setStyleSheet(get_status_label_style('success'))
                             self.details_text.setText(
                                 f"✅ Data is up to date.\n\n"
-                                f"Last 15m bar: {last_bar.strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
-                                f"Age: {int(staleness_seconds//60)}m {int(staleness_seconds%60)}s\n\n"
+                                f"Last 15m bar: {last_15m.strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+                                f"Age: {int(staleness_15m//60)}m {int(staleness_15m%60)}s\n\n"
+                                f"Last 1h bar: {last_1h.strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+                                f"Age: {int(staleness_1h//60)}m {int(staleness_1h%60)}s\n\n"
                                 f"Skipping startup download — proceeding directly to live update mode."
                             )
                             # Close immediately with no countdown in auto mode
