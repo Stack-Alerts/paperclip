@@ -2,7 +2,17 @@
 Pytest fixtures for database tests
 Sprint 1.6.1 - Institutional-grade database testing
 
-Provides proper database session fixtures using .env configuration
+Provides proper database session fixtures using .env configuration.
+
+PostgreSQL fixtures
+-------------------
+- ``db_engine``            — session-scoped SQLAlchemy engine (PostgreSQL)
+- ``db_session``           — function-scoped session with rollback isolation
+- ``db_manager_for_testing`` — session-scoped ``DatabaseManager`` created via
+                               ``DatabaseManagerFactory.for_testing()``.  Aligns
+                               with the ``pg_conn`` fixture pattern used by the
+                               ITM state tests (BTCAAAAA-450).  Skips gracefully
+                               when PostgreSQL is not reachable.
 """
 
 import pytest
@@ -70,3 +80,33 @@ def db_session(db_engine):
     session.close()
     transaction.rollback()
     connection.close()
+
+
+# ---------------------------------------------------------------------------
+# DatabaseManagerFactory.for_testing() fixture — BTCAAAAA-471
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def db_manager_for_testing():
+    """Session-scoped ``DatabaseManager`` created via
+    ``DatabaseManagerFactory.for_testing()``.
+
+    This fixture verifies that ``for_testing()`` returns a real PostgreSQL
+    connection (not SQLite).  It skips the test gracefully when PostgreSQL is
+    not reachable, consistent with the ``pg_conn`` fixture pattern from the
+    ITM state tests (BTCAAAAA-450).
+
+    Tests that need a ``DatabaseManager`` backed by the test PostgreSQL
+    instance should use this fixture instead of constructing one manually.
+    """
+    import sys
+    _src = str(Path(__file__).parent.parent.parent / "src")
+    if _src not in sys.path:
+        sys.path.insert(0, _src)
+
+    from src.optimizer_v3.database.database_manager import DatabaseManagerFactory
+
+    # for_testing() calls pytest.skip() internally when PG is unreachable.
+    manager = DatabaseManagerFactory.for_testing()
+    yield manager
+    manager.close()
