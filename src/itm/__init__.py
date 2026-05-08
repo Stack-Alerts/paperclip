@@ -19,8 +19,11 @@ itm/
   state/         — state management & recovery framework (Section C)
                    ITMSystemState, dual-write (Redis + Postgres), circuit breaker,
                    recovery protocol, graceful shutdown handler
+  orchestrator/  — multi-strategy framework & orchestrator (Section D)
+                   SBExportImporter, StrategyRegistry, SignalAggregator,
+                   CapitalAllocator, PerformanceMonitor, MultiStrategyOrchestrator
   adapters/      — NautilusTrader type mappers and event converters (Section D+)
   engine/        — execution engine orchestration (Section G+)
 """
 
-__version__ = "0.3.0"  # Section C added
+__version__ = "0.4.0"  # Section D added: Multi-Strategy Framework & Orchestrator
