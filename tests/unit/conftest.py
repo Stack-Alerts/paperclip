@@ -60,6 +60,9 @@ def _make_pyqt5_stubs() -> None:
     qt_core.QThread = _QThread
     qt_core.pyqtSignal = _pyqtSignal
     qt_core.QTimer = MagicMock()
+    qt_core.QSettings = MagicMock()
+    qt_core.QPoint = MagicMock()
+    qt_core.QSize = MagicMock()
 
     # --- QtWidgets ---
     qt_widgets = ModuleType("PyQt5.QtWidgets")
