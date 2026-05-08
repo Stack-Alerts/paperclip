@@ -50,7 +50,7 @@ from src.strategy_builder.ui.styles import (
     get_secondary_button_stylesheet,
     get_text_edit_stylesheet,
     get_checkbox_style,
-    COLORS
+    COLORS,
 )
 
 
@@ -82,8 +82,8 @@ class AIRequestPreviewWindow(QMainWindow):
         # Setup UI first
         self._setup_ui()
         
-        # Then restore window geometry (position, size, screen, maximized state) from last session
-        self._restore_geometry()
+        # Window geometry is restored in showEvent() after the window is shown,
+        # to avoid Qt window-state desync when restoreGeometry() is called before show().
     
     def _setup_ui(self):
         """Setup UI with tabs for request/response preview"""
@@ -990,40 +990,56 @@ PART 2: STRUCTURED DATA (JSON format for parsing)
         self.close()
     
     def _restore_geometry(self):
-        """Restore window geometry and state (EXACT Strategy Builder approach)"""
+        """Restore window geometry using separated pos/size/maximized keys.
+
+        Uses separate QSettings keys for pos, size, and maximized flag rather
+        than saveGeometry()/restoreGeometry() blob, which bakes in the maximized
+        flag and causes state desync after dragging.
+        """
+        from PyQt5.QtCore import QSettings, QTimer
+        from PyQt5.QtWidgets import QApplication
         settings = QSettings("BTC_Engine_v3", "AIRequestPreviewWindow")
-        
-        # Restore geometry bytes (position, size, screen).
-        geometry = settings.value("geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
-        
-        # Restore toolbar/dock layout (saveState/restoreState handles docks, NOT
-        # the maximized flag — that is stored separately below).
-        window_state = settings.value("windowState")
-        if window_state:
-            self.restoreState(window_state)
-        
-        # Override maximized/normal using the explicitly-stored flag so a stale
-        # maximized bit in the geometry blob cannot cause desync after dragging.
-        saved_maximize = settings.value("windowMaximized", False, type=bool)
-        if saved_maximize:
-            self.showMaximized()
+
+        maximized = settings.value("windowMaximized", False, type=bool)
+        saved_pos = settings.value("pos", None)
+        saved_size = settings.value("size", None)
+
+        if saved_size is not None:
+            self.resize(saved_size)
         else:
-            self.showNormal()
+            self.resize(1200, 800)
+
+        if saved_pos is not None:
+            screen = QApplication.screenAt(saved_pos)
+            if screen is None:
+                screen = QApplication.primaryScreen()
+            screen_rect = screen.availableGeometry()
+            clamped_x = max(screen_rect.left(), min(saved_pos.x(), screen_rect.right() - 100))
+            clamped_y = max(screen_rect.top(), min(saved_pos.y(), screen_rect.bottom() - 50))
+            self.move(clamped_x, clamped_y)
+
+        if maximized:
+            QTimer.singleShot(0, self.showMaximized)
     
     def _save_geometry(self):
-        """Save window geometry and state (EXACT Strategy Builder approach)"""
+        """Save window geometry using separated pos/size/maximized keys."""
         settings = QSettings("BTC_Engine_v3", "AIRequestPreviewWindow")
-        
-        # Save both geometry AND dock/toolbar state.
-        settings.setValue("geometry", self.saveGeometry())
-        settings.setValue("windowState", self.saveState())
-        # Store the maximized flag separately to survive geometry-blob desync
-        # that occurs when a window is dragged while in a maximized state.
-        settings.setValue("windowMaximized", bool(self.windowState() & Qt.WindowMaximized))
+        if self.isMaximized():
+            settings.setValue("windowMaximized", True)
+            # Do NOT overwrite pos/size when maximized — keep the last normal values
+        else:
+            settings.setValue("windowMaximized", False)
+            settings.setValue("pos", self.pos())
+            settings.setValue("size", self.size())
         settings.sync()
     
+    def showEvent(self, event):
+        """Restore window geometry on first show (avoids Qt state desync on drag)."""
+        super().showEvent(event)
+        if not getattr(self, "_ai_geometry_restored", False):
+            self._ai_geometry_restored = True
+            self._restore_geometry()
+
     def closeEvent(self, event):
         """Override close event to save window geometry"""
         logger.info(f"✓ Window closing, saving geometry...")
