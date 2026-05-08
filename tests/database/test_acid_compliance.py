@@ -17,12 +17,33 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+from src.optimizer_v3.database.manager import get_db_manager
+from src.optimizer_v3.database.connection_pool import get_connection_pool
 from src.optimizer_v3.database import (
-    get_db_manager,
-    get_connection_pool,
     OptimizationRun,
     StrategyVariation,
     SignalEvent,
+)
+
+
+def _check_db_available() -> bool:
+    """Return True if the configured PostgreSQL instance is reachable and schema exists."""
+    try:
+        pool = get_connection_pool()
+        with pool.engine.connect() as conn:
+            from sqlalchemy import text as _text
+            # Verify schema tables exist, not just connectivity
+            conn.execute(_text("SELECT 1 FROM optimization_runs LIMIT 0"))
+        return True
+    except Exception:
+        return False
+
+
+_DB_AVAILABLE = _check_db_available()
+
+pytestmark = pytest.mark.skipif(
+    not _DB_AVAILABLE,
+    reason="PostgreSQL is not available — skipping ACID compliance tests (infrastructure not present)",
 )
 
 
