@@ -26,7 +26,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, create_autospec, patch
 
 
 # ---------------------------------------------------------------------------
@@ -318,8 +318,13 @@ class TestBacktestConfigPanelWiringAPI:
         except ImportError as exc:
             pytest.skip(f"Import failed: {exc}")
 
-        # Patch all spin/combo widgets on the class so __init__ doesn't need Qt
-        mock_panel = MagicMock(spec=BacktestConfigPanel)
+        # Patch all spin/combo widgets on the class so __init__ doesn't need Qt.
+        # Use plain MagicMock() without a spec: MagicMock(spec=BacktestConfigPanel)
+        # and create_autospec(BacktestConfigPanel, instance=True) both restrict attrs
+        # to those visible on the class itself, but Qt widget attrs (lookback_spin,
+        # etc.) are assigned in __init__ and therefore unknown at class level.
+        # A spec-less MagicMock allows the test to configure each attr explicitly.
+        mock_panel = MagicMock()
         mock_panel.lookback_spin.value.return_value = 90
         mock_panel.training_spin.value.return_value = 60
         mock_panel.testing_spin.value.return_value = 30
