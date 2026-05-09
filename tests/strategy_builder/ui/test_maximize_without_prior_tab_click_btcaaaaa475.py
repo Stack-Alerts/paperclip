@@ -83,6 +83,15 @@ def _styles_ast() -> ast.Module:
     return ast.parse(_styles_src())
 
 
+def _find_method_node(tree: ast.Module, method_name: str) -> ast.FunctionDef | None:
+    """Return the first FunctionDef with the given name in the AST."""
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name == method_name:
+                return node
+    return None
+
+
 def _src(filename: str) -> str:
     return (UI_DIR / filename).read_text()
 
@@ -170,7 +179,8 @@ class TestTimerDelayAST:
 
     def test_callback_is_show_maximized(self):
         """
-        The singleShot callback must be self.showMaximized (the correct method).
+        The singleShot callback must ultimately invoke showMaximized — either
+        directly as self.showMaximized, or via a named closure that calls it.
         """
         tree = _styles_ast()
         calls = self._find_singlesshot_calls_in_restore(tree)
@@ -182,14 +192,37 @@ class TestTimerDelayAST:
                 "QTimer.singleShot must have at least 2 args: (delay, callback)."
             )
             callback_arg = args[1]
-            # Expect an Attribute node: self.showMaximized
-            assert (
+            # Accept either self.showMaximized directly, or a named closure
+            is_direct = (
                 isinstance(callback_arg, ast.Attribute)
                 and callback_arg.attr == "showMaximized"
-            ), (
-                f"singleShot callback is {ast.dump(callback_arg)!r}, "
-                "expected self.showMaximized."
             )
+            is_closure = isinstance(callback_arg, ast.Name)
+            assert is_direct or is_closure, (
+                f"singleShot callback is {ast.dump(callback_arg)!r}, "
+                "expected self.showMaximized or a named closure."
+            )
+            # If it's a closure, verify showMaximized is called inside it
+            if is_closure:
+                closure_name = callback_arg.id
+                restore_method = _find_method_node(_styles_ast(), "_restore_window_geometry")
+                closure_def = None
+                for node in ast.walk(restore_method):
+                    if isinstance(node, ast.FunctionDef) and node.name == closure_name:
+                        closure_def = node
+                        break
+                assert closure_def is not None, (
+                    f"Closure '{closure_name}' passed to singleShot not found in "
+                    "_restore_window_geometry."
+                )
+                has_show_maximized = any(
+                    isinstance(n, ast.Attribute) and n.attr == "showMaximized"
+                    for n in ast.walk(closure_def)
+                )
+                assert has_show_maximized, (
+                    f"Closure '{closure_name}' does not call showMaximized(). "
+                    "The 50ms deferral must ultimately invoke self.showMaximized()."
+                )
 
 
 # ---------------------------------------------------------------------------
