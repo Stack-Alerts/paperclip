@@ -478,3 +478,71 @@ class BinanceClient:
         key = response.get("listenKey", "")
         logger.info("Binance listen key created: %s…", key[:8])
         return key
+
+
+# ---------------------------------------------------------------------------
+# PaperBinanceClient — no-op drop-in for paper / kill-switch-OFF mode
+# ---------------------------------------------------------------------------
+
+
+class PaperBinanceClient:
+    """No-op Binance client used when paper_trading=True (kill-switch OFF).
+
+    Satisfies the same interface as ``BinanceClient`` but never makes any
+    outbound network calls.  No API credentials are required.
+
+    Read-only calls that may be useful in paper mode (get_position_size) return
+    safe sentinel values (Decimal("0")).  All mutating calls are suppressed and
+    logged at INFO level so the audit trail remains intact.
+    """
+
+    def __init__(self) -> None:
+        self._order_counter = 0
+        logger.info(
+            "PaperBinanceClient: paper trading mode — all exchange write calls suppressed"
+        )
+
+    @classmethod
+    def from_env(cls, use_testnet: bool = True) -> "PaperBinanceClient":  # noqa: ARG002
+        """Return a PaperBinanceClient; credentials are not read or required."""
+        return cls()
+
+    def place_order(self, spec) -> str:
+        """Return a deterministic fake exchange order ID; no network call made."""
+        self._order_counter += 1
+        fake_id = f"PAPER-{self._order_counter:06d}"
+        logger.info(
+            "PaperBinanceClient SUPPRESSED place_order: cid=%r fake_id=%r "
+            "type=%s side=%s qty=%s",
+            spec.client_order_id,
+            fake_id,
+            spec.binance_type.value,
+            spec.side,
+            spec.quantity,
+        )
+        return fake_id
+
+    def cancel_order(self, client_order_id: str, symbol: str = "BTCUSDT") -> bool:  # noqa: ARG002
+        """No-op cancel; always reports success."""
+        logger.info(
+            "PaperBinanceClient SUPPRESSED cancel_order: cid=%r", client_order_id
+        )
+        return True
+
+    def get_position_size(self, symbol: str = "BTCUSDT") -> Decimal:  # noqa: ARG002
+        """Return zero — no real position exists in paper mode."""
+        return Decimal("0")
+
+    def start_user_data_stream(
+        self,
+        on_execution_report: Callable[[dict], None],  # noqa: ARG002
+        on_account_update: Optional[Callable[[dict], None]] = None,  # noqa: ARG002
+    ) -> None:
+        """No-op — no WebSocket stream is started in paper mode."""
+        logger.info(
+            "PaperBinanceClient SUPPRESSED start_user_data_stream: "
+            "no WS stream in paper mode"
+        )
+
+    def keep_alive_listen_key(self) -> None:
+        """No-op."""

@@ -81,7 +81,7 @@ from typing import Callable, Dict, List, Optional
 
 from ..domain.entities import Decision, DecisionAction, Instrument, OrderSide
 from ..risk.risk_gate import OrderRequest, RiskGate
-from .binance_client import BinanceClient, BinanceError
+from .binance_client import BinanceClient, BinanceError, PaperBinanceClient
 from .bracket_manager import BracketConfig, BracketManager
 from .order_factory import OrderFactory
 from .order_state_machine import OrderState, OrderStateMachine
@@ -133,13 +133,18 @@ class ExecutionEngineConfig:
     dca_price_step_pct: Decimal = Decimal("0.005")
     min_fill_ratio: Decimal = Decimal("0.5")
     use_testnet: bool = True
+    # Kill-switch: when True all exchange write calls are suppressed and simulated
+    # fills are emitted so downstream state machines continue to work.
+    # Defaults to False so that paper mode must be explicitly opted into here;
+    # the ITMConfig.paper_trading field (default True) is the operator-facing gate.
+    paper_trading: bool = False
 
     def __post_init__(self) -> None:
         if self.order_ttl_secs <= 0:
             raise ValueError("order_ttl_secs must be positive")
         if self.default_quantity <= Decimal("0"):
             raise ValueError("default_quantity must be positive")
-        if not self.use_testnet:
+        if not self.use_testnet and not self.paper_trading:
             logger.warning(
                 "ExecutionEngineConfig: use_testnet=False — MAINNET MODE. "
                 "Ensure CTO approval before live trading."
@@ -206,9 +211,16 @@ class ExecutionEngine:
         self._keepalive_thread: Optional[threading.Thread] = None
 
         logger.info(
-            "ExecutionEngine initialised: testnet=%s ttl=%ss",
-            self._config.use_testnet, self._config.order_ttl_secs,
+            "ExecutionEngine initialised: testnet=%s paper_trading=%s ttl=%ss",
+            self._config.use_testnet,
+            self._config.paper_trading,
+            self._config.order_ttl_secs,
         )
+        if self._config.paper_trading:
+            logger.warning(
+                "ExecutionEngine PAPER_TRADING=ON — all outbound Binance write "
+                "calls suppressed; simulated fills will be emitted"
+            )
 
     # ------------------------------------------------------------------ #
     # Primary entry point                                                  #
@@ -412,17 +424,29 @@ class ExecutionEngine:
         for client_id, sm in list(self._orders.items()):
             if sm.is_timed_out():
                 logger.warning(
-                    "ExecutionEngine: order TTL expired cid=%r — sending cancel",
+                    "ExecutionEngine: order TTL expired cid=%r — %s",
                     client_id,
+                    "PAPER_CANCEL (suppressed)" if self._config.paper_trading else "sending cancel",
                 )
-                try:
-                    self._client.cancel_order(client_id)
-                    cancelled_ids.append(client_id)
-                except Exception:
-                    logger.exception(
-                        "ExecutionEngine: failed to cancel timed-out order %r",
-                        client_id,
-                    )
+                if self._config.paper_trading:
+                    # Paper mode: cancel the SM directly without touching the exchange
+                    try:
+                        sm.cancel("ttl_expired_paper")
+                        cancelled_ids.append(client_id)
+                    except Exception:
+                        logger.exception(
+                            "ExecutionEngine: failed to cancel timed-out paper order %r",
+                            client_id,
+                        )
+                else:
+                    try:
+                        self._client.cancel_order(client_id)
+                        cancelled_ids.append(client_id)
+                    except Exception:
+                        logger.exception(
+                            "ExecutionEngine: failed to cancel timed-out order %r",
+                            client_id,
+                        )
         return cancelled_ids
 
     # ------------------------------------------------------------------ #
@@ -592,6 +616,10 @@ class ExecutionEngine:
             ttl_secs=self._config.order_ttl_secs,
             on_state_change=self._on_state_change,
         )
+
+        if self._config.paper_trading:
+            return self._submit_spec_paper(sm, spec)
+
         try:
             exchange_id = self._client.place_order(spec)
         except BinanceError as exc:
@@ -626,6 +654,53 @@ class ExecutionEngine:
             spec.client_order_id, exchange_id,
             spec.binance_type.value, spec.side, spec.quantity,
         )
+        return sm
+
+    def _submit_spec_paper(self, sm: "OrderStateMachine", spec) -> "OrderStateMachine":
+        """Paper-mode order path — suppresses real exchange call, emits simulated fill.
+
+        The suppression boundary: all exchange write calls stop here.
+        A synthetic ACK + fill is emitted immediately so downstream state
+        machines (position state, P&L accounting, bracket manager, dry-run
+        report) continue to work exactly as in live mode.
+
+        Read-only calls (market data, position read-back) are NOT gated — they
+        are safe to pass through even in paper mode.
+        """
+        fake_id = f"PAPER-{spec.client_order_id[:12]}-{int(time.monotonic() * 1e6) % 1_000_000:06d}"
+
+        # Simulated fill price: use the spec's limit price for LIMIT orders.
+        # For MARKET/STOP orders price is None — use Decimal("1") as a neutral
+        # placeholder (positive, avoids downstream validation errors; callers
+        # should not rely on this value for P&L accuracy in paper mode).
+        fill_price = spec.price if (spec.price is not None and spec.price > Decimal("0")) else Decimal("1")
+
+        logger.info(
+            "PAPER_TRADE_SUPPRESSED: cid=%r fake_id=%r type=%s side=%s qty=%s "
+            "would_fill_price=%s",
+            spec.client_order_id,
+            fake_id,
+            spec.binance_type.value,
+            spec.side,
+            spec.quantity,
+            fill_price,
+        )
+
+        sm.acknowledge(fake_id)
+        self._exchange_to_client[fake_id] = spec.client_order_id
+        self._orders[spec.client_order_id] = sm
+        self._orders_submitted += 1
+
+        # Emit simulated fill so downstream (bracket manager, position state,
+        # P&L accounting, dry-run monitor) transitions correctly.
+        sm.fill(fill_price, spec.quantity, Decimal("0"))
+        self._orders_filled += 1
+
+        # Bracket legs (TP/SL) are also suppressed: BracketManager calls
+        # exchange_client.place_order which must be a PaperBinanceClient when
+        # paper_trading=True.  The runner is responsible for wiring this.
+        self._bracket_manager.on_entry_filled(sm)
+        self._emit_post_trade_record(sm, "filled")
         return sm
 
     # ------------------------------------------------------------------ #

@@ -52,6 +52,7 @@ class DryRunReportGenerator:
         issues_log: Optional[List[dict]] = None,
         outstanding_concerns: Optional[List[str]] = None,
         risk_parameter_review: Optional[dict] = None,
+        paper_trading_mode: bool = True,
     ) -> str:
         """Generate the full dry-run report as a markdown document.
 
@@ -145,11 +146,27 @@ class DryRunReportGenerator:
             else "_None loaded._"
         )
 
+        paper_mode_banner = ""
+        if paper_trading_mode:
+            paper_mode_banner = """
+> ⚠️  **PAPER TRADING MODE (kill-switch OFF)**
+> All orders shown below are **suppressed** — no real exchange calls were made.
+> Simulated fills were emitted for downstream state-machine continuity.
+>
+> Known gaps vs. live/testnet execution (not bugs):
+> - fill semantics: prices are synthetic, not real venue prices
+> - websocket reconnection: no WS stream was active
+> - rate limiting: exchange rate limits were not exercised
+> - auth refresh: API credentials were not loaded or refreshed
+
+"""
+        orders_label = "would-have-placed" if paper_trading_mode else "placed"
+
         generated_at = datetime.now(timezone.utc).isoformat()
         started_at = monitor_snapshot.get("started_at", "unknown")
 
         report = f"""# ITM Testnet Dry Run Report — Section H.2
-
+{paper_mode_banner}
 > Generated: {generated_at}
 > Run Started: {started_at}
 > Total Runtime: {runtime_hours:.1f} hours
@@ -175,8 +192,8 @@ class DryRunReportGenerator:
 | Total runtime (hours) | {runtime_hours:.1f}h |
 | Strategies loaded and active | {len(strategies_loaded)} |
 | Signals generated | {signals_generated} |
-| Orders placed | {orders_placed} |
-| Orders filled | {orders_filled} |
+| Orders {orders_label} | {orders_placed} |
+| Orders filled (simulated) | {orders_filled} |
 | Orders cancelled | {orders_cancelled} |
 | Fill rate | {round(orders_filled / orders_placed * 100, 1) if orders_placed > 0 else 0}% |
 | Positions opened | {positions.get("opened", 0)} |
@@ -192,8 +209,8 @@ class DryRunReportGenerator:
 
 | Stage | Count |
 |-------|-------|
-| Placed | {orders_placed} |
-| Filled | {orders_filled} |
+| {orders_label.capitalize()} | {orders_placed} |
+| Filled{"(simulated)" if paper_trading_mode else ""} | {orders_filled} |
 | Cancelled | {orders_cancelled} |
 | Rejected | {orders_placed - orders_filled - orders_cancelled if orders_placed > 0 else 0} |
 
