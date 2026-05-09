@@ -486,18 +486,19 @@ class ValidationPanel(QWidget):
             from datetime import datetime, timezone
             
             db = get_database_manager()
-            
+            from sqlalchemy import text as _sa_text
+
             # Determine status: Pass or Fail
             validation_status = 'Pass' if result.success else 'Fail'
-            
+
             # Update the strategy version in database
             db.strategy.session.execute(
-                """
+                _sa_text("""
                 UPDATE strategy_versions
                 SET validation_status = :status,
                     validation_timestamp = :timestamp
                 WHERE version_id = :version_id
-                """,
+                """),
                 {
                     'status': validation_status,
                     'timestamp': datetime.now(timezone.utc),
