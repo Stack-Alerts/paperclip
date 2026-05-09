@@ -2352,6 +2352,26 @@ class BacktestConfigPanel(QWidget):
         
         return layout
     
+    def _apply_calibration_results(self, blocks: list, delay_map: dict) -> None:
+        """Apply a delay_map from calibration results to strategy blocks in-place.
+
+        Called from both the cache-hit path and the live calibration path so
+        the delay-application logic lives in exactly one place.
+
+        Args:
+            blocks: List of block dicts from strategy_config_dict['blocks'].
+                    Each dict is modified in-place with ``optimal_delay``.
+            delay_map: Mapping of block name → optimal delay (int bars).
+        """
+        for block in blocks:
+            bname = block.get('name') or block.get('block_name', '')
+            if bname in delay_map:
+                block['optimal_delay'] = delay_map[bname]
+                logger.info(
+                    f"Auto-calibration: applied optimal_delay={delay_map[bname]} "
+                    f"to block '{bname}'"
+                )
+
     def _run_auto_calibration(self, strategy_config_dict: dict) -> None:
         """
         Run signal calibration automatically on all strategy blocks before backtest.
@@ -2402,18 +2422,11 @@ class BacktestConfigPanel(QWidget):
         ):
             logger.info("Auto-calibration: cache hit — applying cached delay_map.")
             self.results_text.setText(
-                "✓ Calibration already complete for current settings — skipping. Using cached parameters."
+                "✓ Calibration already complete for current settings — skipping. Using cached optimal parameters."
             )
             QApplication.processEvents()
-            # Apply cached delay_map to blocks
-            for block in blocks:
-                bname = block.get('name') or block.get('block_name', '')
-                if bname in self._calibration_cache:
-                    block['optimal_delay'] = self._calibration_cache[bname]
-                    logger.info(
-                        f"Auto-calibration cache: applied optimal_delay={self._calibration_cache[bname]} "
-                        f"to block '{bname}'"
-                    )
+            # Apply cached delay_map to blocks via shared helper
+            self._apply_calibration_results(blocks, self._calibration_cache)
             return
 
         # Cache-miss path: settings changed or first run — run calibration
@@ -2499,13 +2512,7 @@ class BacktestConfigPanel(QWidget):
                     if name and delay is not None:
                         delay_map[name] = int(delay)
 
-                for block in blocks:
-                    bname = block.get('name') or block.get('block_name', '')
-                    if bname in delay_map:
-                        block['optimal_delay'] = delay_map[bname]
-                        logger.info(
-                            f"Auto-calibration: applied optimal_delay={delay_map[bname]} to block '{bname}'"
-                        )
+                self._apply_calibration_results(blocks, delay_map)
 
                 # Store fingerprint and results for future cache hits
                 # (only cached when NOT in simulation mode so dummy delays are never reused)
