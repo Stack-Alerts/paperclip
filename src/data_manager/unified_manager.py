@@ -276,17 +276,23 @@ class UnifiedDataManager:
         Returns:
             Optimal data source
         """
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         threshold = now - timedelta(days=self.binance_threshold_days)
-        
+
+        # Normalize tz-naive incoming dates to UTC-aware for comparison
+        if end_date is not None and end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+        if start_date is not None and start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+
         # Default to now if not specified
         if end_date is None:
             end_date = now
-        
+
         if start_date is None:
             # Requesting recent data
             return DataSource.BINANCE
-        
+
         # Both in historical range
         if end_date < threshold:
             return DataSource.LAKEAPI
@@ -363,8 +369,8 @@ class UnifiedDataManager:
             DataFrame with last N bars
         """
         if end_date is None:
-            end_date = datetime.now()
-        
+            end_date = datetime.now(timezone.utc)
+
         logger.info(f"📊 Getting last {count} {timeframe} bars...")
         
         # Estimate required date range
@@ -412,11 +418,15 @@ class UnifiedDataManager:
             DataFrame with bars in date range
         """
         if end_date is None:
-            end_date = datetime.now()
-        
+            end_date = datetime.now(timezone.utc)
+        elif end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+
         if start_date is None:
             start_date = end_date - timedelta(days=30)
-        
+        elif start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+
         # Determine source if AUTO
         if source == DataSource.AUTO:
             source = self._determine_source(start_date, end_date)
@@ -621,17 +631,26 @@ class UnifiedDataManager:
             DataFrame with combined bars
         """
         logger.info("   🔀 Hybrid mode: Combining LakeAPI + Binance...")
-        
+
+        # Normalize tz-naive incoming dates to UTC-aware for comparisons below
+        if start_date is not None and start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        if end_date is not None and end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+
         # CRITICAL FIX: Dynamically detect earliest Binance file instead of hardcoded 30 days!
         earliest_binance = self._get_earliest_binance_date(timeframe)
-        
+
         if earliest_binance:
             # Use the ACTUAL earliest Binance date as threshold
             threshold = earliest_binance
+            # Normalize to UTC-aware for comparison with start_date/end_date
+            if threshold.tzinfo is None:
+                threshold = threshold.replace(tzinfo=timezone.utc)
             logger.info(f"   ✅ Using ALL Binance data from {threshold.strftime('%Y-%m-%d')}")
         else:
             # Fallback to 30-day threshold if no Binance files found
-            threshold = datetime.now() - timedelta(days=self.binance_threshold_days)
+            threshold = datetime.now(timezone.utc) - timedelta(days=self.binance_threshold_days)
             logger.warning(f"   ⚠️  No Binance files found, using {self.binance_threshold_days}-day threshold")
         
         all_bars = []
@@ -757,42 +776,48 @@ class UnifiedDataManager:
                     year, month = map(int, last_date_str.split('-'))
                     from calendar import monthrange
                     last_day = monthrange(year, month)[1]
-                    end_date = datetime(year, month, last_day, 23, 59, 59)
-                
+                    end_date = datetime(year, month, last_day, 23, 59, 59, tzinfo=timezone.utc)
+
+                # Normalize pd.to_datetime result to UTC-aware for consistent gap arithmetic
+                if end_date is not None and end_date.tzinfo is None:
+                    end_date = end_date.replace(tzinfo=timezone.utc)
+
                 # Calculate gap FIRST
-                gap_days = (datetime.now() - end_date).days
-                
+                gap_days = (datetime.now(timezone.utc) - end_date).days
+
                 # INSTITUTIONAL: Check DOWNLOADED Binance files (not API!)
                 # Read actual parquet files in data/binance/ directory
                 if gap_days > 0 and self.binance_dir.exists():
                     try:
                         # Find all 15m parquet files in Binance directory
                         binance_files = list(self.binance_dir.glob('**/BTCUSDT_PERP_15m_*.parquet'))
-                        
+
                         if binance_files:
                             # Read ALL files and find absolute latest timestamp
                             latest_timestamp = None
-                            
+
                             for file in binance_files:
                                 try:
                                     df_temp = pd.read_parquet(file, columns=['timestamp'])
                                     if len(df_temp) > 0:
                                         file_end = pd.to_datetime(df_temp['timestamp'].iloc[-1])
+                                        if file_end.tzinfo is None:
+                                            file_end = file_end.replace(tzinfo=timezone.utc)
                                         if latest_timestamp is None or file_end > latest_timestamp:
                                             latest_timestamp = file_end
                                 except:
                                     continue
-                            
+
                             if latest_timestamp and latest_timestamp > end_date:
                                 end_date = latest_timestamp
-                                gap_days = (datetime.now() - end_date).days
+                                gap_days = (datetime.now(timezone.utc) - end_date).days
                                 logger.info(f"   ✅ Downloaded Binance: last candle at {latest_timestamp} (gap: {gap_days}d)")
                     except Exception as e:
                         pass
-                
+
                 # For 15min futures, we need precision down to minutes
                 # Calculate gap in minutes for more accurate detection
-                gap_minutes = (datetime.now() - end_date).total_seconds() / 60
+                gap_minutes = (datetime.now(timezone.utc) - end_date).total_seconds() / 60
                 
                 # CRITICAL FIX: Don't count CURRENT unclosed bar as missing!
                 # For 15min bars: if gap is 0-15min, that's just the current forming bar
@@ -888,7 +913,7 @@ class UnifiedDataManager:
                     lakeapi_end = datetime(year, month, last_day, 23, 59, 59)
         
         # Check Binance (assumed to be current)
-        binance_end = datetime.now()
+        binance_end = datetime.now(timezone.utc)
         binance_start = binance_end - timedelta(days=30)  # Typical availability
         
         # Combine
@@ -1505,11 +1530,15 @@ class UnifiedDataManager:
         if timeframes is None:
             timeframes = ['15m', '1h', '1d']
         if end_date is None:
-            end_date = datetime.now()
+            end_date = datetime.now(timezone.utc)
+        elif end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
         if start_date is None:
             start_date = end_date - timedelta(days=binance_api_horizon_days)
+        elif start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
 
-        horizon_cutoff = datetime.now() - timedelta(days=binance_api_horizon_days)
+        horizon_cutoff = datetime.now(timezone.utc) - timedelta(days=binance_api_horizon_days)
 
         t0_total = _time_mod.monotonic()
         logger.info("\n" + "=" * 60)
@@ -1551,6 +1580,12 @@ class UnifiedDataManager:
                 gap_start: datetime = gap['gap_start']
                 gap_end: datetime = gap['gap_end']
                 missing: int = gap['missing_bars']
+
+                # Normalize gap dates to UTC-aware to match horizon_cutoff
+                if gap_start.tzinfo is None:
+                    gap_start = gap_start.replace(tzinfo=timezone.utc)
+                if gap_end.tzinfo is None:
+                    gap_end = gap_end.replace(tzinfo=timezone.utc)
 
                 logger.info(f"   Gap: {gap_start} → {gap_end} "
                     f"(~{missing} bars, duration {gap['duration']})")
@@ -1617,7 +1652,7 @@ class UnifiedDataManager:
                         # Poll every 2 seconds for up to 20 seconds before giving up.
                         # Historical gaps are not retried — their data is either present
                         # or absent and retrying won't help.
-                        age_seconds = (datetime.utcnow() - fetch_start).total_seconds()
+                        age_seconds = (datetime.now(timezone.utc) - fetch_start).total_seconds()
                         is_trailing_edge = age_seconds <= (2 * bar_td.total_seconds())
 
                         if is_trailing_edge:
