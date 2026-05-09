@@ -180,6 +180,11 @@ class _RuntimeCandleUpdateThread(QThread):
                 start_date = fallback_base - timedelta(minutes=15)
                 logger.error(f"[RuntimeUpdate] anchor lookup failed ({_anchor_exc}); "
                     f"falling back to {start_date.strftime('%H:%M:%S')}")
+            # Normalize start_date to UTC-aware before comparison.
+            # get_last_bar_timestamp returns tz-naive (on-disk convention);
+            # max_lookback is tz-aware because now = datetime.now(timezone.utc).
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
             # Apply hard lookback cap.
             start_date = max(start_date, max_lookback)
 
