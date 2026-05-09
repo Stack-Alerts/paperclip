@@ -26,8 +26,8 @@ Environment variables
   ITM_PAPER_TRADING           — Set to ``true`` / ``1`` / ``yes`` to run in
                                 paper-trading (kill-switch OFF) mode. No
                                 Binance credentials are required in this mode.
-                                Defaults to ``false`` (live mode) when unset or
-                                blank — do not leave this unset in production.
+                                Defaults to ``true`` (paper mode) when unset or
+                                blank — no outbound Binance calls by default.
 
   BINANCE_TESTNET_API_KEY     — Binance Futures Testnet API key.
                                 Required only when ``ITM_PAPER_TRADING`` is OFF.
@@ -42,7 +42,7 @@ When ``ITM_PAPER_TRADING=true``, the kill-switch suppresses all outbound Binance
 API calls (place / adjust / exit). The script runs fully without credentials and
 logs every suppressed order instead of sending it.
 
-When ``ITM_PAPER_TRADING`` is OFF (default), the script targets Binance Futures
+When ``ITM_PAPER_TRADING`` is OFF (``false``), the script targets Binance Futures
 TESTNET and will raise ``RuntimeError`` if credentials are not configured.
 
 After the run completes, the dry-run report is saved to:
