@@ -950,12 +950,68 @@ class StrategyBuilderOrchestrator:
     def get_current_config(self) -> StrategyConfig:
         """
         Get current strategy configuration (in-memory)
-        
+
         Returns:
             Current StrategyConfig
         """
         return self.config_engine.config
-    
+
+    def generate_code(self, output_dir: Optional[str] = None) -> WorkflowResult:
+        """
+        Generate NautilusTrader strategy code from current configuration.
+
+        Args:
+            output_dir: Directory to write the .py file (defaults to src/strategies/)
+
+        Returns:
+            WorkflowResult with success flag and output_path in data
+        """
+        from src.strategy_builder.core.nautilus_code_generator import NautilusCodeGenerator
+        import os
+
+        try:
+            config = self.get_current_config()
+            generator = NautilusCodeGenerator()
+            generated = generator.generate(config)
+
+            # Validate syntax before writing
+            validation = generator.validate_syntax(generated.strategy_code)
+            if not validation.is_valid:
+                return WorkflowResult(
+                    success=False,
+                    step=WorkflowStep.GENERATE_CODE,
+                    message="Generated code has syntax errors",
+                    errors=validation.errors,
+                )
+
+            dest_dir = output_dir or os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..", "..", "..", "src", "strategies"
+            )
+            os.makedirs(dest_dir, exist_ok=True)
+            output_path = os.path.join(dest_dir, generated.file_name)
+
+            with open(output_path, "w") as f:
+                f.write(generated.strategy_code)
+
+            logger.info(f"Generated strategy written to {output_path}")
+            result = WorkflowResult(
+                success=True,
+                step=WorkflowStep.GENERATE_CODE,
+                message=f"Strategy code written to {output_path}",
+            )
+            result.output_path = output_path  # type: ignore[attr-defined]
+            return result
+
+        except Exception as e:
+            logger.error(f"Code generation failed: {e}")
+            return WorkflowResult(
+                success=False,
+                step=WorkflowStep.GENERATE_CODE,
+                message=f"Code generation failed: {str(e)}",
+                errors=[str(e)],
+            )
+
     def serialize_config_for_backtest(self) -> dict:
         """
         Serialize in-memory strategy config to plain Dict for backtest execution
