@@ -227,15 +227,63 @@ class OpenAIProvider(LLMProvider):
         self._client = _openai.OpenAI(api_key=api_key)
         self._model = config.model or self._DEFAULT_MODEL
 
+    @staticmethod
+    def _adapt_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Convert Anthropic-format tool history to OpenAI message format."""
+        result: list[dict[str, Any]] = []
+        for m in messages:
+            role = m.get("role")
+            content = m.get("content")
+            if role == "assistant" and isinstance(content, list):
+                # Anthropic: [{"type":"text","text":"..."}, {"type":"tool_use","id":...}]
+                texts = [b["text"] for b in content if b.get("type") == "text"]
+                tool_uses = [b for b in content if b.get("type") == "tool_use"]
+                msg: dict[str, Any] = {
+                    "role": "assistant",
+                    "content": " ".join(texts) or None,
+                }
+                if tool_uses:
+                    msg["tool_calls"] = [
+                        {
+                            "id": b["id"],
+                            "type": "function",
+                            "function": {
+                                "name": b["name"],
+                                "arguments": json.dumps(b["input"]),
+                            },
+                        }
+                        for b in tool_uses
+                    ]
+                result.append(msg)
+            elif (
+                role == "user"
+                and isinstance(content, list)
+                and content
+                and content[0].get("type") == "tool_result"
+            ):
+                # Anthropic tool_result blocks → individual OpenAI tool messages
+                for block in content:
+                    if block.get("type") == "tool_result":
+                        result.append({
+                            "role": "tool",
+                            "tool_call_id": block["tool_use_id"],
+                            "content": block["content"],
+                        })
+            else:
+                result.append(m)
+        return result
+
     def chat(
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
     ) -> ChatResponse:
+        adapted = self._adapt_messages(messages)
+
         def _call() -> Any:
             kwargs: dict[str, Any] = {
                 "model": self._model,
-                "messages": messages,
+                "messages": adapted,
             }
             if tools:
                 kwargs["tools"] = self._format_tools(tools)
@@ -308,15 +356,22 @@ class OllamaProvider(LLMProvider):
         )
         self._http = httpx.Client(timeout=120.0)
 
+    @staticmethod
+    def _adapt_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Convert Anthropic-format tool history to Ollama/OpenAI message format."""
+        return OpenAIProvider._adapt_messages(messages)
+
     def chat(
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
     ) -> ChatResponse:
+        adapted = self._adapt_messages(messages)
+
         def _call() -> dict[str, Any]:
             payload: dict[str, Any] = {
                 "model": self._model,
-                "messages": messages,
+                "messages": adapted,
                 "stream": False,
             }
             if tools:
