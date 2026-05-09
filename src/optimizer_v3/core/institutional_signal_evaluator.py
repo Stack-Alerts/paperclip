@@ -270,9 +270,9 @@ class InstitutionalSignalEvaluator:
         exit_signals = set()
         
         # Strategy-level exit conditions
-        if hasattr(self.strategy_config, 'exit_conditions'):
-            for exit_cond in self.strategy_config.exit_conditions:
-                exit_signals.add(exit_cond.signal_name)
+        # DictWrapper returns None for missing/null keys; (getattr or []) guards against that.
+        for exit_cond in (getattr(self.strategy_config, 'exit_conditions', None) or []):
+            exit_signals.add(exit_cond.signal_name)
         
         # Block-level and Signal-level exit conditions
         for block in self.strategy_config.blocks:
@@ -303,8 +303,8 @@ class InstitutionalSignalEvaluator:
         }
         
         # Strategy-level exits
-        if hasattr(self.strategy_config, 'exit_conditions'):
-            for exit_cond in self.strategy_config.exit_conditions:
+        # DictWrapper returns None for missing/null keys; (getattr or []) guards against that.
+        for exit_cond in (getattr(self.strategy_config, 'exit_conditions', None) or []):
                 exits['STRATEGY'].append(ExitCondition(
                     signal_name=exit_cond.signal_name,
                     percentage=exit_cond.percentage,
