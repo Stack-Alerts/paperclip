@@ -905,6 +905,31 @@ class BacktestWorker(QThread):
                     }
                     self.trade_data_emit.emit(closed_trade_data)
                     
+                    # Persist trade to TradeRegistry (single-core path fix)
+                    # Previously only the multicore path wrote to the registry;
+                    # the single-core path emitted to UI but never persisted trades.
+                    from src.optimizer_v3.core.trade_registry import get_trade_registry as _get_trade_registry
+                    _registry = _get_trade_registry()
+                    _exit_timestamp = datetime.fromtimestamp(current_bar.ts_init / 1e9)
+                    _registry.add_trade({
+                        'entry_timestamp': evaluator.current_trade.entry_timestamp if evaluator.current_trade else None,
+                        'exit_timestamp': _exit_timestamp,
+                        'entry_price': entry_price,
+                        'exit_price': exit_price,
+                        'entry_bar': entry_bar if entry_bar is not None else 0,
+                        'exit_bar': i,
+                        'side': side,
+                        'pnl': pnl,
+                        'pnl_pct': pnl_pct,
+                        'bars_held': num_bars,
+                        'exit_reason': result.exit_reason,
+                        'exit_type': getattr(result, 'exit_type', None),
+                        'exit_condition_name': getattr(result, 'exit_condition_name', None),
+                        'partial_exit': not is_full_exit,
+                        'exit_percentage': float(result.exit_percentage),
+                        'status': 'CLOSED' if is_full_exit else 'PARTIAL',
+                    })
+                    
                     # Log exit
                     status = "WIN" if pnl > 0 else "LOSS"
                     self.live_message.emit(
