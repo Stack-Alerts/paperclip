@@ -3,9 +3,11 @@ Tests for PerformanceMonitor (Section D — performance_monitor.py)
 """
 from __future__ import annotations
 
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import pytest
+from freezegun import freeze_time
 
 from src.itm.orchestrator.performance_monitor import (
     PerformanceMonitor,
@@ -198,3 +200,64 @@ class TestPerformanceMonitorAutoPause:
         monitor, reg, config = setup_monitor()
         with pytest.raises(KeyError, match="not registered"):
             monitor.record_pnl("ghost", Decimal("100"), Decimal("10000"))
+
+
+# ---------------------------------------------------------------------------
+# Daily reset tests (FDR-854)
+# ---------------------------------------------------------------------------
+
+
+class TestDailyReset:
+    """Verify _check_daily_reset() rolls over at UTC midnight.
+
+    Uses freeze_time to control the perceived 'now' without relying on
+    system time — tests are therefore fully deterministic.
+    """
+
+    def _make_metrics(self, *, pnl: str = "100.00", on_date: date = date(2026, 5, 9)) -> StrategyMetrics:
+        return StrategyMetrics(
+            strategy_id="test-strat",
+            strategy_name="Test",
+            daily_pnl=Decimal(pnl),
+            daily_pnl_date=on_date,
+        )
+
+    @freeze_time("2026-05-09 14:30:00", tz_offset=0)
+    def test_same_day_call_does_not_reset(self):
+        """Calling _check_daily_reset() mid-day must leave daily_pnl untouched."""
+        metrics = self._make_metrics(pnl="250.00", on_date=date(2026, 5, 9))
+
+        metrics._check_daily_reset()
+
+        assert metrics.daily_pnl == Decimal("250.00"), (
+            "daily_pnl must not change when the UTC date has not rolled over"
+        )
+        assert metrics.daily_pnl_date == date(2026, 5, 9), (
+            "daily_pnl_date must remain unchanged within the same day"
+        )
+
+    @freeze_time("2026-05-10 08:00:00", tz_offset=0)
+    def test_new_day_resets_daily_pnl_to_zero(self):
+        """When UTC date has advanced, daily_pnl must be reset to 0."""
+        metrics = self._make_metrics(pnl="-123.45", on_date=date(2026, 5, 9))
+
+        metrics._check_daily_reset()
+
+        assert metrics.daily_pnl == Decimal("0"), (
+            "daily_pnl must be zeroed out when the UTC date rolls over"
+        )
+        assert metrics.daily_pnl_date == date(2026, 5, 10), (
+            "daily_pnl_date must advance to the current UTC date after reset"
+        )
+
+    @freeze_time("2026-05-10 00:00:00", tz_offset=0)
+    def test_midnight_boundary_fires_on_exact_rollover(self):
+        """Reset must fire at exactly UTC midnight (>= new date is sufficient)."""
+        metrics = self._make_metrics(pnl="-50.00", on_date=date(2026, 5, 9))
+
+        metrics._check_daily_reset()
+
+        assert metrics.daily_pnl == Decimal("0"), (
+            "daily_pnl must reset at exactly UTC 00:00:00 — not a second later"
+        )
+        assert metrics.daily_pnl_date == date(2026, 5, 10)
