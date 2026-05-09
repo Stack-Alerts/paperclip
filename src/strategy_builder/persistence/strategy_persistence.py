@@ -313,7 +313,8 @@ class StrategyPersistence:
             for signal in block.signals:
                 signal_data = {
                     'name': signal.name,
-                    'logic': signal.logic
+                    'logic': signal.logic,
+                    'weight': getattr(signal, 'weight', 10)  # Persist per-signal weight
                 }
                 
                 # Add timing constraint if present
@@ -429,6 +430,7 @@ class StrategyPersistence:
                 signal = SignalConfig(
                     name=signal_data['name'],
                     logic=signal_data['logic'],
+                    weight=signal_data.get('weight', 10),  # Load per-signal weight (default 10)
                     timing_constraint=timing_constraint,
                     recheck_config=recheck_config,
                     recheck_chain=recheck_chain
