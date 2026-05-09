@@ -2435,11 +2435,19 @@ class BacktestConfigPanel(QWidget):
         ):
             logger.info("Auto-calibration: cache hit — applying cached delay_map.")
             self.results_text.setText(
-                "✓ Calibration already complete for current settings — skipping. Using cached optimal parameters."
+                "✓ Calibration already complete for current settings — skipping. Using cached parameters."
             )
             QApplication.processEvents()
-            # Apply cached delay_map to blocks via shared helper
-            self._apply_calibration_results(blocks, self._calibration_cache)
+            # Apply cached delay_map to blocks in-place
+            cached_delay_map = self._calibration_cache
+            for block in blocks:
+                bname = block.get('name') or block.get('block_name', '')
+                if bname in cached_delay_map:
+                    block['optimal_delay'] = cached_delay_map[bname]
+                    logger.info(
+                        f"Auto-calibration: applied cached optimal_delay={cached_delay_map[bname]} "
+                        f"to block '{bname}'"
+                    )
             return
 
         # Cache-miss path: settings changed or first run — run calibration
@@ -2525,7 +2533,15 @@ class BacktestConfigPanel(QWidget):
                     if name and delay is not None:
                         delay_map[name] = int(delay)
 
-                self._apply_calibration_results(blocks, delay_map)
+                # Apply delay_map to blocks in-place
+                for block in blocks:
+                    bname = block.get('name') or block.get('block_name', '')
+                    if bname in delay_map:
+                        block['optimal_delay'] = delay_map[bname]
+                        logger.info(
+                            f"Auto-calibration: applied optimal_delay={delay_map[bname]} "
+                            f"to block '{bname}'"
+                        )
 
                 # Store fingerprint and results for future cache hits
                 # (only cached when NOT in simulation mode so dummy delays are never reused)
