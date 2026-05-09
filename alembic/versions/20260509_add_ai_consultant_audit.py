@@ -24,6 +24,7 @@ def upgrade() -> None:
             postgresql.UUID(as_uuid=False),
             primary_key=True,
             nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column("session_id", postgresql.UUID(as_uuid=False), nullable=False),
         sa.Column("event_type", sa.Text(), nullable=False),
