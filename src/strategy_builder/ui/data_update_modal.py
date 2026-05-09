@@ -11,7 +11,7 @@ Author: Strategy Builder Team
 Date: 2026-01-17
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import pandas as pd
 from PyQt5.QtWidgets import (
@@ -201,11 +201,10 @@ class DataUpdateThread(QThread):
                     raise ValueError(last_error)
 
             # Check freshness (how old is the latest candle?)
-            # Candle timestamps are tz-naive UTC after Fix 1 in rest_client.py.
-            # Must compare against utcnow() — not now() — to avoid a spurious
-            # +2h offset on CEST machines that would flag fresh candles as stale.
+            # Candle timestamps are tz-aware UTC after BTCAAAAA-816.
+            # Must compare against datetime.now(timezone.utc) to avoid TypeError.
             latest_candle = pd.to_datetime(bars['timestamp'].iloc[-1])
-            delay_minutes = (datetime.utcnow() - latest_candle).total_seconds() / 60
+            delay_minutes = (datetime.now(timezone.utc) - latest_candle).total_seconds() / 60
             
             # Per-timeframe staleness thresholds
             if timeframe == '15m':
@@ -410,9 +409,9 @@ class DataUpdateModal(QDialog):
                     last_1h = self.manager.get_last_bar_timestamp('1h')
 
                     if last_15m is not None and last_1h is not None:
-                        now = datetime.utcnow()
-                        staleness_15m = (now - last_15m).total_seconds()
-                        staleness_1h = (now - last_1h).total_seconds()
+                        now = datetime.now(timezone.utc)
+                        staleness_15m = (now - last_15m.replace(tzinfo=timezone.utc)).total_seconds()
+                        staleness_1h = (now - last_1h.replace(tzinfo=timezone.utc)).total_seconds()
                         # 15m candle + 2 min grace = 17 min = 1020s
                         # 1h candle + 2 min grace = 62 min = 3720s
                         if staleness_15m <= 1020 and staleness_1h <= 3720:
@@ -448,7 +447,7 @@ class DataUpdateModal(QDialog):
             max_gap = 0
             report_lines = []
             
-            self.current_time = datetime.now()
+            self.current_time = datetime.now(timezone.utc)
             report_lines.append("📊 DATA TYPE STATUS:\n")
             
             for data_type, info in all_status.items():
@@ -566,21 +565,21 @@ class DataUpdateModal(QDialog):
         # lakeapi_end is the LakeAPI cutoff date (e.g. 2026-03), not the last
         # Binance bar — using it as start_date causes the download to either
         # skip the recent gap or fetch from the wrong anchor.
-        # end_date uses utcnow() to be consistent with UTC-naive bar timestamps.
+        # end_date uses datetime.now(timezone.utc) — all bar timestamps are tz-aware UTC after BTCAAAAA-816.
         try:
             last_bar_ts = self.manager.get_last_bar_timestamp('15m')
         except Exception:
             last_bar_ts = None
 
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
 
         if last_bar_ts is not None:
-            start_date = last_bar_ts
+            start_date = last_bar_ts.replace(tzinfo=timezone.utc)
             logger.info(f"[DataUpdateModal] startup fetch: last_bar_on_disk={last_bar_ts} → "
                         f"fetching to {end_date.strftime('%H:%M:%S')} UTC")
         elif self.lakeapi_end is not None:
             # No Binance bars on disk yet — fall back to LakeAPI end date
-            start_date = self.lakeapi_end
+            start_date = self.lakeapi_end.replace(tzinfo=timezone.utc) if self.lakeapi_end.tzinfo is None else self.lakeapi_end
             logger.info(f"[DataUpdateModal] no Binance bars on disk; "
                         f"falling back to lakeapi_end={start_date}")
         else:
