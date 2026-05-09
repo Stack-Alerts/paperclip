@@ -516,12 +516,25 @@ class TestRestoreMaximizedToCorrectScreen:
             def showMaximized(self):
                 pass
 
+            def frameGeometry(self):
+                return MagicMock()
+
+            def geometry(self):
+                return MagicMock()
+
+            def windowState(self):
+                return 0
+
         win = TestWindow()
+
+        mock_qsize_instance = MagicMock()
+        mock_qsize_instance.width.return_value = 800
+        mock_qsize_instance.height.return_value = 600
 
         with (
             patch.object(styles_mod, "_QSettings", return_value=mock_settings),
             patch.object(styles_mod, "_QGuiApplication", mock_gui),
-            patch.object(styles_mod, "_QSize", MagicMock(return_value=MagicMock())),
+            patch.object(styles_mod, "_QSize", MagicMock(return_value=mock_qsize_instance)),
             patch("src.strategy_builder.ui.styles.QTimer", mock_qtimer, create=True),
         ):
             with patch.dict("sys.modules", {"PyQt5.QtCore": MagicMock(QTimer=mock_qtimer)}):
@@ -716,6 +729,15 @@ class TestRestoreMaximizedToCorrectScreen:
 
             def showMaximized(self):
                 pass
+
+            def frameGeometry(self):
+                return MagicMock()
+
+            def geometry(self):
+                return MagicMock()
+
+            def windowState(self):
+                return 0
 
         win = TestWindowNotMaximized()
 

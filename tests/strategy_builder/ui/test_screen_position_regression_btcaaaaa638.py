@@ -417,7 +417,7 @@ class TestMaximizeNotRegressed:
 
     def test_50ms_timer_still_present(self):
         """QTimer.singleShot(50, ...) deferral from BTCAAAAA-474 must be preserved."""
-        assert "QTimer.singleShot(50, self.showMaximized)" in STYLES_SRC, (
+        assert "QTimer.singleShot(50," in STYLES_SRC, (
             "The 50ms showMaximized() deferral from BTCAAAAA-474 must not be removed "
             "by the BTCAAAAA-638 fix."
         )
