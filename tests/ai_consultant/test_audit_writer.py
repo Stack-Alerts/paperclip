@@ -13,9 +13,10 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+pytestmark = pytest.mark.anyio
 
 from ai_consultant.audit_writer import AuditWriter, AuditEventType
 
@@ -41,7 +42,7 @@ def read_jsonl(path: Path) -> list[dict]:
 # Tests
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_session_start(tmp_path):
     async with make_writer(tmp_path) as w:
         await w.log_session_start(model="claude-3-5-sonnet-20241022")
@@ -54,7 +55,7 @@ async def test_session_start(tmp_path):
     assert r["session_id"] == "aaaabbbb-0000-0000-0000-000000000001"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_session_end(tmp_path):
     async with make_writer(tmp_path) as w:
         await w.log_session_end(reason="user_exit")
@@ -64,7 +65,7 @@ async def test_session_end(tmp_path):
     assert records[0]["payload"]["reason"] == "user_exit"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_tool_call(tmp_path):
     async with make_writer(tmp_path) as w:
         await w.log_tool_call(
@@ -81,7 +82,7 @@ async def test_tool_call(tmp_path):
     assert r["payload"]["result_summary"] == "Returned 412 bytes"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_llm_call(tmp_path):
     async with make_writer(tmp_path) as w:
         await w.log_llm_call(
@@ -98,7 +99,7 @@ async def test_llm_call(tmp_path):
     assert r["token_cost_usd"] == "0.00234"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_proposal_generated(tmp_path):
     async with make_writer(tmp_path) as w:
         await w.log_proposal_generated(
@@ -112,7 +113,7 @@ async def test_proposal_generated(tmp_path):
     assert "stop-loss" in r["payload"]["diff_summary"]
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_proposal_approved(tmp_path):
     async with make_writer(tmp_path) as w:
         await w.log_proposal_approved(user_id="user-99", strategy_id="strat-42")
@@ -123,7 +124,7 @@ async def test_proposal_approved(tmp_path):
     assert r["strategy_id"] == "strat-42"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_proposal_rejected(tmp_path):
     async with make_writer(tmp_path) as w:
         await w.log_proposal_rejected(
@@ -137,7 +138,7 @@ async def test_proposal_rejected(tmp_path):
     assert r["payload"]["reason"] == "risk too high"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_change_applied(tmp_path):
     async with make_writer(tmp_path) as w:
         await w.log_change_applied(
@@ -151,7 +152,7 @@ async def test_change_applied(tmp_path):
     assert r["payload"]["snapshot_path"] == "/snapshots/strat-42-20260509.json"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_rollback_executed(tmp_path):
     async with make_writer(tmp_path) as w:
         await w.log_rollback_executed(
@@ -164,7 +165,7 @@ async def test_rollback_executed(tmp_path):
     assert r["strategy_id"] == "strat-42"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_all_event_types_in_sequence(tmp_path):
     """All event types write and produce valid parseable JSONL."""
     async with make_writer(tmp_path) as w:
@@ -184,7 +185,7 @@ async def test_all_event_types_in_sequence(tmp_path):
     assert seen_types == {e.value for e in AuditEventType}
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_jsonl_is_human_readable(tmp_path):
     """Each line must be valid JSON with readable fields (not binary)."""
     async with make_writer(tmp_path) as w:
@@ -198,7 +199,7 @@ async def test_jsonl_is_human_readable(tmp_path):
     assert isinstance(parsed["payload"], dict)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_write_failure_does_not_crash(tmp_path, monkeypatch):
     """A broken JSONL path must not raise — only stderr output."""
     async with make_writer(tmp_path) as w:
@@ -208,7 +209,7 @@ async def test_write_failure_does_not_crash(tmp_path, monkeypatch):
         await w.log_session_start(model="claude-sonnet")
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_concurrent_writes_are_safe(tmp_path):
     """Concurrent log calls must not corrupt JSONL (lock test)."""
     async with make_writer(tmp_path) as w:
@@ -223,7 +224,7 @@ async def test_concurrent_writes_are_safe(tmp_path):
     assert tool_names == {f"tool_{i}" for i in range(20)}
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_optional_fields_nullable(tmp_path):
     """user_id, strategy_id, token_cost_usd may be None."""
     async with make_writer(tmp_path) as w:
