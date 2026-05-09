@@ -27,6 +27,7 @@ from src.optimizer_v3.core.multicore_backtest_engine import (
     ChunkData,
     ChunkResult
 )
+from src.optimizer_v3.core.trade_registry import get_trade_registry
 
 
 class TestBarChunking(unittest.TestCase):
@@ -127,50 +128,73 @@ class TestBarChunking(unittest.TestCase):
 
 class TestResultMerging(unittest.TestCase):
     """Test result merging and de-duplication"""
-    
+
+    def setUp(self):
+        """Reset global trade registry before each test to prevent state leakage"""
+        get_trade_registry().clear()
+
     def test_deduplicate_spanning_trades(self):
         """Test that trades appearing in multiple chunks are de-duplicated"""
+        # Use distinct timestamps so the registry unique key (entry_ts, exit_ts, exit_type)
+        # correctly identifies the duplicate trade in chunk 1.
+        ts_a_entry = datetime(2025, 1, 1, 10, 0)
+        ts_a_exit  = datetime(2025, 1, 1, 11, 0)
+        ts_b_entry = datetime(2025, 1, 1, 12, 0)
+        ts_b_exit  = datetime(2025, 1, 1, 13, 0)
+        ts_c_entry = datetime(2025, 1, 1, 20, 0)
+        ts_c_exit  = datetime(2025, 1, 1, 21, 0)
+        ts_d_entry = datetime(2025, 1, 2, 10, 0)
+        ts_d_exit  = datetime(2025, 1, 2, 11, 0)
+
         # Simulate results from 3 chunks
         chunk_results = [
             ChunkResult(
                 chunk_id=0,
                 trades=[
-                    {'entry_bar': 100, 'exit_bar': 150, 'pnl': 50.0},
-                    {'entry_bar': 200, 'exit_bar': 220, 'pnl': 30.0},  # Appears in chunk 1 too
+                    {'entry_bar': 100, 'exit_bar': 150, 'pnl': 50.0,
+                     'entry_timestamp': ts_a_entry, 'exit_timestamp': ts_a_exit},
+                    {'entry_bar': 200, 'exit_bar': 220, 'pnl': 30.0,
+                     'entry_timestamp': ts_b_entry, 'exit_timestamp': ts_b_exit},  # Appears in chunk 1 too
                 ],
                 open_trade=None,
                 total_bars_processed=300,
                 signals_evaluated=300,
-                errors=[]
+                errors=[],
+                messages=[]
             ),
             ChunkResult(
                 chunk_id=1,
                 trades=[
-                    {'entry_bar': 200, 'exit_bar': 220, 'pnl': 30.0},  # Duplicate
-                    {'entry_bar': 350, 'exit_bar': 400, 'pnl': 75.0},
+                    {'entry_bar': 200, 'exit_bar': 220, 'pnl': 30.0,
+                     'entry_timestamp': ts_b_entry, 'exit_timestamp': ts_b_exit},  # Duplicate
+                    {'entry_bar': 350, 'exit_bar': 400, 'pnl': 75.0,
+                     'entry_timestamp': ts_c_entry, 'exit_timestamp': ts_c_exit},
                 ],
                 open_trade=None,
                 total_bars_processed=300,
                 signals_evaluated=300,
-                errors=[]
+                errors=[],
+                messages=[]
             ),
             ChunkResult(
                 chunk_id=2,
                 trades=[
-                    {'entry_bar': 500, 'exit_bar': 550, 'pnl': 100.0},
+                    {'entry_bar': 500, 'exit_bar': 550, 'pnl': 100.0,
+                     'entry_timestamp': ts_d_entry, 'exit_timestamp': ts_d_exit},
                 ],
                 open_trade=None,
                 total_bars_processed=300,
                 signals_evaluated=300,
-                errors=[]
+                errors=[],
+                messages=[]
             )
         ]
-        
+
         merged = merge_chunk_results(chunk_results)
-        
+
         # Should have 4 unique trades (not 5)
         self.assertEqual(len(merged['trades']), 4)
-        
+
         # Trades should be sorted by entry_bar
         entry_bars = [t['entry_bar'] for t in merged['trades']]
         self.assertEqual(entry_bars, sorted(entry_bars))
@@ -184,7 +208,8 @@ class TestResultMerging(unittest.TestCase):
                 open_trade=None,
                 total_bars_processed=100,
                 signals_evaluated=100,
-                errors=[]
+                errors=[],
+                messages=[]
             )
         ]
         
