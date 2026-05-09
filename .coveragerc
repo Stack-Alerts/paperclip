@@ -33,6 +33,13 @@ omit =
     src/optimizer_v3/*
     src/strategies/*
 
+    # ITM live-trading modules — require exchange/WebSocket/DB infrastructure
+    src/itm/*
+
+    # AI Consultant DB and catalog modules — require PostgreSQL in CI
+    src/ai_consultant/db/*
+    src/ai_consultant/signal_catalog.py
+
     # strategy_builder non-UI modules — their tests require PyQt5/NautilusTrader
     # which are not available in headless CI; excluded from coverage denominator
     # (strategy_builder/ui/* already excluded above)
