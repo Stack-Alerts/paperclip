@@ -53,6 +53,9 @@ def _make_calibration_stub():
 
     stub = MagicMock()
     stub.results_text = MagicMock()
+    # Initialize cache attributes as None (mirrors BacktestConfigPanel.__init__)
+    stub._calibration_fingerprint = None
+    stub._calibration_cache = None
 
     stub._run_auto_calibration = types.MethodType(fn, stub)
     return stub
@@ -569,4 +572,309 @@ class TestCodeStructuralRequirements:
         assert "TrainingPanelUI" not in src, (
             "_init_ui() must not import or instantiate TrainingPanelUI "
             "(Calibrate tab was removed)"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Tests for calibration cache (BTCAAAAA-641) — fingerprint-based skip
+# ---------------------------------------------------------------------------
+
+class TestCalibrationCache:
+    """Tests for cache hit / cache miss / settings-change invalidation (BTCAAAAA-641)."""
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _run_calibration_with_results(self, stub, config, calib_results):
+        """Run _run_auto_calibration with a mock thread that fires results."""
+        mock_thread = MagicMock()
+        mock_thread.isRunning.return_value = False
+        mock_thread.is_simulation_mode = False
+        connected_callbacks = []
+
+        def _capture_connect(cb):
+            connected_callbacks.append(cb)
+
+        mock_thread.training_complete.connect.side_effect = _capture_connect
+
+        def _start():
+            for cb in connected_callbacks:
+                cb(calib_results)
+
+        mock_thread.start.side_effect = _start
+
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+            return_value=mock_thread,
+        ):
+            stub._run_auto_calibration(config)
+
+    # ------------------------------------------------------------------
+    # AC1: Cache initialisation in __init__
+    # ------------------------------------------------------------------
+
+    def test_cache_attributes_initialized_to_none(self):
+        """BacktestConfigPanel.__init__ must set _calibration_fingerprint and _calibration_cache to None."""
+        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
+        import inspect
+        src = inspect.getsource(BacktestConfigPanel.__init__)
+        assert "_calibration_fingerprint" in src, (
+            "_calibration_fingerprint must be initialized in __init__"
+        )
+        assert "_calibration_cache" in src, (
+            "_calibration_cache must be initialized in __init__"
+        )
+
+    # ------------------------------------------------------------------
+    # AC2: Cache stored after successful non-simulation calibration
+    # ------------------------------------------------------------------
+
+    def test_cache_stored_after_successful_calibration(self, qapp):
+        """After a successful non-simulation run, fingerprint and delay_map are stored."""
+        stub = _make_calibration_stub()
+        config = {'blocks': [{'name': 'Alpha'}]}
+        calib_results = [{'signal_name': 'Alpha', 'optimal_delay': 3}]
+
+        self._run_calibration_with_results(stub, config, calib_results)
+
+        assert stub._calibration_fingerprint is not None, (
+            "_calibration_fingerprint must be set after successful calibration"
+        )
+        assert stub._calibration_cache is not None, (
+            "_calibration_cache must be set after successful calibration"
+        )
+        assert stub._calibration_cache == {'Alpha': 3}, (
+            f"Cache should contain the delay_map; got {stub._calibration_cache}"
+        )
+
+    # ------------------------------------------------------------------
+    # AC3: Skip on cache hit — same settings
+    # ------------------------------------------------------------------
+
+    def test_skips_calibration_on_cache_hit(self, qapp):
+        """When fingerprint matches, calibration thread is NOT spawned and skip message shown."""
+        stub = _make_calibration_stub()
+        config = {'blocks': [{'name': 'Alpha'}]}
+        calib_results = [{'signal_name': 'Alpha', 'optimal_delay': 7}]
+
+        # First run: populates cache
+        self._run_calibration_with_results(stub, config, calib_results)
+
+        # Reset mocks for second run
+        stub.results_text.reset_mock()
+
+        # Second run: same config → should hit cache
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+        ) as MockThread:
+            stub._run_auto_calibration(config)
+
+        # TrainingThread must NOT have been instantiated on cache hit
+        MockThread.assert_not_called()
+
+        # Status must show skip message (exact spec string)
+        first_set_text = stub.results_text.setText.call_args_list[0].args[0]
+        assert "skipping" in first_set_text.lower() or "cached" in first_set_text.lower(), (
+            f"Expected skip/cached message on cache hit, got: {first_set_text!r}"
+        )
+
+    def test_cache_hit_skip_message_exact_string(self, qapp):
+        """Cache-hit status message must match the exact spec string."""
+        stub = _make_calibration_stub()
+        config = {'blocks': [{'name': 'Alpha'}]}
+        calib_results = [{'signal_name': 'Alpha', 'optimal_delay': 7}]
+
+        self._run_calibration_with_results(stub, config, calib_results)
+        stub.results_text.reset_mock()
+
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+        ):
+            stub._run_auto_calibration(config)
+
+        first_set_text = stub.results_text.setText.call_args_list[0].args[0]
+        expected = (
+            "✓ Calibration already complete for current settings — skipping. "
+            "Using cached parameters."
+        )
+        assert first_set_text == expected, (
+            f"Exact skip message required.\nExpected: {expected!r}\nGot:      {first_set_text!r}"
+        )
+
+    def test_cache_hit_applies_cached_delay_to_blocks(self, qapp):
+        """On cache hit, the cached optimal_delay is applied to blocks in-place."""
+        stub = _make_calibration_stub()
+        config = {'blocks': [{'name': 'Alpha'}]}
+        calib_results = [{'signal_name': 'Alpha', 'optimal_delay': 9}]
+
+        self._run_calibration_with_results(stub, config, calib_results)
+
+        # Second run with fresh block dict (simulates new Run Test click)
+        config2 = {'blocks': [{'name': 'Alpha'}]}
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+        ):
+            stub._run_auto_calibration(config2)
+
+        assert config2['blocks'][0].get('optimal_delay') == 9, (
+            f"Cached optimal_delay=9 must be applied on cache hit; got {config2['blocks'][0]}"
+        )
+
+    # ------------------------------------------------------------------
+    # AC4: Re-run on settings change (block added/removed)
+    # ------------------------------------------------------------------
+
+    def test_re_runs_when_blocks_change(self, qapp):
+        """After block list changes, fingerprint mismatches and calibration re-runs."""
+        stub = _make_calibration_stub()
+        config_a = {'blocks': [{'name': 'Alpha'}]}
+        calib_results_a = [{'signal_name': 'Alpha', 'optimal_delay': 5}]
+
+        self._run_calibration_with_results(stub, config_a, calib_results_a)
+
+        old_fingerprint = stub._calibration_fingerprint
+
+        # Change blocks
+        config_b = {'blocks': [{'name': 'Alpha'}, {'name': 'Beta'}]}
+        calib_results_b = [
+            {'signal_name': 'Alpha', 'optimal_delay': 5},
+            {'signal_name': 'Beta', 'optimal_delay': 2},
+        ]
+
+        stub.results_text.reset_mock()
+        self._run_calibration_with_results(stub, config_b, calib_results_b)
+
+        # Fingerprint should have changed
+        assert stub._calibration_fingerprint != old_fingerprint, (
+            "Fingerprint must change when block list changes"
+        )
+        assert stub._calibration_cache == {'Alpha': 5, 'Beta': 2}, (
+            f"Cache must be updated with new results; got {stub._calibration_cache}"
+        )
+
+    # ------------------------------------------------------------------
+    # AC5: Cache-miss status message (exact spec string)
+    # ------------------------------------------------------------------
+
+    def test_cache_miss_status_message_exact_string(self, qapp):
+        """Cache-miss (first run) status must match the exact spec string."""
+        stub = _make_calibration_stub()
+        config = {'blocks': [{'name': 'Alpha'}]}
+
+        mock_thread = MagicMock()
+        mock_thread.isRunning.return_value = False
+
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+            return_value=mock_thread,
+        ):
+            stub._run_auto_calibration(config)
+
+        first_set_text = stub.results_text.setText.call_args_list[0].args[0]
+        expected = "⚙️ Calibration required — running calibration before backtest..."
+        assert first_set_text == expected, (
+            f"Exact cache-miss message required.\nExpected: {expected!r}\nGot:      {first_set_text!r}"
+        )
+
+    # ------------------------------------------------------------------
+    # AC6: Simulation mode guard — never cache simulation results
+    # ------------------------------------------------------------------
+
+    def test_simulation_results_not_cached(self, qapp):
+        """Simulation-mode results must NOT be stored in the calibration cache."""
+        stub = _make_calibration_stub()
+        config = {'blocks': [{'name': 'Alpha'}]}
+        calib_results = [{'signal_name': 'Alpha', 'optimal_delay': 99}]
+
+        mock_thread = MagicMock()
+        mock_thread.isRunning.return_value = False
+        mock_thread.is_simulation_mode = True  # Simulation mode
+        connected_callbacks = []
+
+        def _capture_connect(cb):
+            connected_callbacks.append(cb)
+
+        mock_thread.training_complete.connect.side_effect = _capture_connect
+
+        def _start():
+            for cb in connected_callbacks:
+                cb(calib_results)
+
+        mock_thread.start.side_effect = _start
+
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+            return_value=mock_thread,
+        ):
+            stub._run_auto_calibration(config)
+
+        assert stub._calibration_fingerprint is None, (
+            "Fingerprint must NOT be stored when running in simulation mode"
+        )
+        assert stub._calibration_cache is None, (
+            "Cache must NOT be populated when running in simulation mode"
+        )
+
+    # ------------------------------------------------------------------
+    # AC7: Graceful degradation — exception does not update cache
+    # ------------------------------------------------------------------
+
+    def test_cache_not_updated_on_exception(self, qapp):
+        """When calibration raises, neither fingerprint nor cache should be set."""
+        stub = _make_calibration_stub()
+        config = {'blocks': [{'name': 'Alpha'}]}
+
+        with patch(
+            "src.strategy_builder.ui.backtest_config_panel.QApplication"
+        ), patch(
+            "src.optimizer_v3.core.training_thread.TrainingThread",
+            side_effect=RuntimeError("network error"),
+        ):
+            stub._run_auto_calibration(config)
+
+        assert stub._calibration_fingerprint is None, (
+            "Fingerprint must NOT be set when calibration fails with an exception"
+        )
+        assert stub._calibration_cache is None, (
+            "Cache must NOT be set when calibration fails with an exception"
+        )
+
+    # ------------------------------------------------------------------
+    # Static analysis: verify hashlib and json are imported at module level
+    # ------------------------------------------------------------------
+
+    def test_hashlib_imported_at_module_level(self):
+        """hashlib must be imported at the top of backtest_config_panel.py."""
+        import src.strategy_builder.ui.backtest_config_panel as mod
+        import hashlib
+        assert hasattr(mod, 'hashlib') or 'hashlib' in dir(mod), (
+            "hashlib must be imported at module level"
+        )
+        # Also verify by source inspection
+        import inspect
+        src_lines = inspect.getsource(mod).split('\n')
+        assert any(line.strip() == 'import hashlib' for line in src_lines[:50]), (
+            "'import hashlib' must appear in the first 50 lines of the module"
+        )
+
+    def test_json_imported_at_module_level(self):
+        """json must be imported at the top of backtest_config_panel.py."""
+        import src.strategy_builder.ui.backtest_config_panel as mod
+        import inspect
+        src_lines = inspect.getsource(mod).split('\n')
+        assert any(line.strip() == 'import json' for line in src_lines[:50]), (
+            "'import json' must appear in the first 50 lines of the module"
         )
