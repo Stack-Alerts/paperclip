@@ -3915,8 +3915,8 @@ Detailed report saved to:
                     continue
                 
                 for signal in block.signals:
-                    # Each signal typically contributes 10-15 points
-                    signal_weight = 10
+                    # Use actual signal weight if available, otherwise default to 10
+                    signal_weight = getattr(signal, 'weight', 10) or 10
                     
                     if hasattr(signal, 'logic'):
                         if signal.logic == 'AND':
@@ -3970,9 +3970,8 @@ Detailed report saved to:
                     continue
                 
                 for signal in block.signals:
-                    # Each signal typically contributes 10-15 points
-                    # This is a simplified calculation - backend may have more sophisticated weighting
-                    signal_weight = 10
+                    # Use actual signal weight if available, otherwise default to 10
+                    signal_weight = getattr(signal, 'weight', 10) or 10
                     
                     if hasattr(signal, 'logic'):
                         if signal.logic == 'AND':

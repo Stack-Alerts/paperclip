@@ -56,6 +56,7 @@ class SignalConfig:
     """Configuration for a single signal within a block"""
     name: str
     logic: str  # "AND" or "OR"
+    weight: int = 10  # Confluence points awarded when this signal fires (default 10)
     timing_constraint: Optional[TimingConstraint] = None
     recheck_config: Optional[RecheckConfig] = None
     recheck_chain: List[RecheckConfig] = field(default_factory=list)  # For nested rechecks
