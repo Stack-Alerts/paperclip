@@ -30,7 +30,7 @@ from PyQt5.QtWidgets import QDialog, QTextBrowser, QPushButton
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SBMW_PATH = REPO_ROOT / "src" / "strategy_builder" / "ui" / "strategy_builder_main_window.py"
-QTGUI_MW_PATH = REPO_ROOT / "src" / "utils" / "Strategy_Builder" / "qt_gui" / "main_window.py"
+QTGUI_MW_PATH = REPO_ROOT / "archived" / "utils_strategy_builder_legacy" / "qt_gui" / "main_window.py"
 
 
 # ---------------------------------------------------------------------------
