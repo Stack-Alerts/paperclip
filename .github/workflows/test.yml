@@ -84,3 +84,26 @@ jobs:
             --cov-report=term-missing \
             --cov-fail-under=20 \
             -v
+
+  integration-real-data:
+    name: Real-data regression (BTCAAAAA-745)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install nautilus_trader pandas pyarrow
+
+      - name: Run real-data multicore regression test
+        run: |
+          python -m pytest \
+            tests/integration/test_btcaaaaa_745_multicore_real_data_regression.py \
+            -v --timeout=300 --override-ini="addopts="
