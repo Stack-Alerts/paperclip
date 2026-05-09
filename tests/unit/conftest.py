@@ -124,6 +124,9 @@ def _make_pyqt5_stubs() -> None:
     qt_core.QT_VERSION = 0x050F02
     qt_core.QT_VERSION_STR = "5.15.2"
 
+    # Version query function required by pytest-qt header hook
+    qt_core.qVersion = lambda: "5.15.2"
+
     # Logging functions required by pytest-qt
     qt_core.qDebug = MagicMock()
     qt_core.qWarning = MagicMock()
