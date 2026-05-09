@@ -307,7 +307,7 @@ def _collect_env_overrides() -> dict:
 
     def _bool_env(name: str) -> bool | None:
         val = os.environ.get(name)
-        if val is None:
+        if val is None or not val.strip():
             return None
         return val.strip().lower() in ("true", "1", "yes")
 
