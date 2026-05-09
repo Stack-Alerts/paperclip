@@ -696,9 +696,13 @@ def merge_chunk_results(
         Dict with deduplicated trades and stats
     """
     from src.optimizer_v3.core.trade_registry import get_trade_registry
-    # Get global registry
+    # Get global registry and clear stale state from any previous run.
+    # Without this clear, trades from a prior run are still in the registry and
+    # identical (timestamp, exit_type) keys from the new run are rejected as
+    # duplicates, producing 0 visible trades on every run after the first.
     registry = get_trade_registry()
-    
+    registry.clear()
+
     total_bars = 0
     total_signals = 0
     all_errors = []
