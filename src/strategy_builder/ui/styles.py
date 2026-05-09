@@ -1822,6 +1822,16 @@ class WindowGeometryMixin:
                 settings.setValue(f"{key}/screen_name", screen.name())
             else:
                 settings.remove(f"{key}/screen_name")
+        import logging as _logging
+        _logging.getLogger("WindowGeometry").debug(
+            "[SAVE] %s: pos=%s size=%s maximized=%s screen=%s max_screen=%s",
+            key,
+            settings.value(f"{key}/pos"),
+            settings.value(f"{key}/size"),
+            settings.value(f"{key}/maximized"),
+            settings.value(f"{key}/screen_name"),
+            settings.value(f"{key}/maximized_screen_name"),
+        )
 
     def _restore_window_geometry(self, show_event=None) -> None:
         """Restore window to its saved position, size, and maximized state.
@@ -1850,6 +1860,19 @@ class WindowGeometryMixin:
         # BTCAAAAA-637: screen the window was maximized on (saved even when no
         # normal pos/size exists — e.g. window was always opened maximized).
         maximized_screen_name = settings.value(f"{key}/maximized_screen_name", None)
+
+        import logging as _logging
+        _wg_log = _logging.getLogger("WindowGeometry")
+        _wg_log.debug(
+            "[RESTORE] %s: saved_pos=%s saved_size=%s maximized=%s screen=%s max_screen=%s",
+            key, saved_pos, saved_size, maximized, saved_screen_name, maximized_screen_name,
+        )
+        _wg_log.debug(
+            "[SCREENS] %s",
+            [(s.name(), s.availableGeometry().x(), s.availableGeometry().y(),
+              s.availableGeometry().width(), s.availableGeometry().height())
+             for s in _QGuiApplication.screens()]
+        )
 
         default_w, default_h = self.GEOMETRY_DEFAULT_SIZE
 
@@ -1948,18 +1971,30 @@ class WindowGeometryMixin:
                 self._center_on_primary(default_w, default_h)
 
         if maximized:
-            # showMaximized() must be called AFTER show() / showEvent so the
-            # OS window manager actually expands the window.
-            #
-            # A delay of 0 ms is not sufficient — it fires at the next event
-            # loop iteration but Qt may not have completed its initial layout
-            # pass yet.  The symptom is that maximize appears to do nothing on
-            # first open; clicking any widget (e.g. a tab) triggers a layout
-            # recalculation which incidentally corrects the state.
-            #
-            # 50 ms gives Qt and the OS window manager enough time to finish
-            # the initial layout/paint cycle so showMaximized() reliably fills
-            # the screen even without any prior user interaction.
+            # BTCAAAAA-684: Ensure the window is on the correct screen before
+            # showMaximized() fires.  The preceding saved_pos branch positions
+            # the window at the last *normal* position, which may be on a
+            # different screen than where the window was last maximized.
+            # maximized_screen_name is authoritative for the maximize target.
+            if maximized_screen_name:
+                _avail = _QGuiApplication.screens()
+                for _s in _avail:
+                    if _s.name() == maximized_screen_name:
+                        _sr = _s.availableGeometry()
+                        self.move(
+                            _sr.center().x() - target_size.width() // 2,
+                            _sr.center().y() - target_size.height() // 2,
+                        )
+                        break
+            import logging as _logging
+            _logging.getLogger("WindowGeometry").debug(
+                "[MAXIMIZE] %s: moving to %s before showMaximized",
+                key, maximized_screen_name
+            )
+            # showMaximized() must be deferred: 50 ms gives Qt and the OS
+            # window manager enough time to finish the initial layout/paint
+            # cycle so showMaximized() reliably fills the screen.
+            # (See BTCAAAAA-474/475 for why 0 ms is insufficient.)
             from PyQt5.QtCore import QTimer
             QTimer.singleShot(50, self.showMaximized)
 
