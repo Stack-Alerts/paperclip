@@ -42,23 +42,8 @@ same pytest run; no explicit re-export needed here.)
 
 from __future__ import annotations
 
-import sys
 import pytest
 from unittest.mock import MagicMock, patch, call
-
-from PyQt5.QtWidgets import QApplication
-
-
-# ---------------------------------------------------------------------------
-# QApplication fixture
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    yield app
 
 
 # ---------------------------------------------------------------------------

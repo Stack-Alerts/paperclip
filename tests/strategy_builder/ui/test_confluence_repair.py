@@ -17,25 +17,11 @@ Covers:
 from __future__ import annotations
 
 import json
-import sys
 import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch, mock_open
 
 import pytest
-from PyQt5.QtWidgets import QApplication
-
-
-# ---------------------------------------------------------------------------
-# QApplication fixture
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    yield app
 
 
 # ---------------------------------------------------------------------------
