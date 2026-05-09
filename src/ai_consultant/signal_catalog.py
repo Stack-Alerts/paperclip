@@ -98,6 +98,7 @@ class SignalCatalogService:
         self._entries: dict[str, CatalogEntry] = {}
         self._signal_index: dict[str, list[str]] = {}   # signal → [block_names]
         self._global_stats: dict[str, SignalStats] = {}  # signal → aggregated stats
+        self._total_signal_declarations: int = 0  # sum of valid_signals across all blocks
         self._loaded = False
         self._loaded_at: datetime | None = None
         self._stats_source: str = "none"
@@ -261,7 +262,13 @@ class SignalCatalogService:
 
     @property
     def signal_count(self) -> int:
+        """Unique signal names across all blocks."""
         return len(self._signal_index)
+
+    @property
+    def total_signal_declarations(self) -> int:
+        """Total signal declarations (sum of valid_signals per block; counts duplicates)."""
+        return self._total_signal_declarations
 
     @property
     def categories(self) -> list[str]:
@@ -299,7 +306,11 @@ class SignalCatalogService:
             for sig in meta.valid_signals:
                 self._signal_index.setdefault(sig, []).append(name)
 
-        logger.debug("Registry loaded: %d blocks, %d unique signals", len(self._entries), len(self._signal_index))
+        self._total_signal_declarations = sum(len(e.valid_signals) for e in self._entries.values())
+        logger.debug(
+            "Registry loaded: %d blocks, %d unique signals, %d total declarations",
+            len(self._entries), len(self._signal_index), self._total_signal_declarations,
+        )
 
     # ------------------------------------------------------------------
     # Live stats loading
@@ -385,7 +396,7 @@ class SignalCatalogService:
         return (
             f"=== SIGNAL CATALOG v{self.VERSION} | "
             f"{len(self._entries)} blocks | "
-            f"{len(self._signal_index)} signals | "
+            f"{self._total_signal_declarations} sig-decls ({len(self._signal_index)} unique) | "
             f"{len(self.categories)} cats | "
             f"{ts}UTC | {stats_note} ==="
         )
