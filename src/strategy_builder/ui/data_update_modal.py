@@ -203,7 +203,7 @@ class DataUpdateThread(QThread):
             # Check freshness (how old is the latest candle?)
             # Candle timestamps are tz-aware UTC after BTCAAAAA-816.
             # Must compare against datetime.now(timezone.utc) to avoid TypeError.
-            latest_candle = pd.to_datetime(bars['timestamp'].iloc[-1])
+            latest_candle = pd.to_datetime(bars['timestamp'].iloc[-1], utc=True)
             delay_minutes = (datetime.now(timezone.utc) - latest_candle).total_seconds() / 60
             
             # Per-timeframe staleness thresholds

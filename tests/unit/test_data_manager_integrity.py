@@ -50,7 +50,7 @@ def _make_ohlcv(
 
     return pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(timestamps),
+            "timestamp": pd.to_datetime(timestamps, utc=True),
             "open": opens,
             "high": highs,
             "low": lows,
@@ -290,7 +290,7 @@ class TestVerifyAndRepair:
         seg1_start = gap_start - timedelta(minutes=freq_minutes * 49)
         seg1 = _make_ohlcv(seg1_start, n=50, freq_minutes=freq_minutes, timeframe=timeframe)
         # Ensure last timestamp == gap_start
-        seg1.iloc[-1, seg1.columns.get_loc("timestamp")] = pd.Timestamp(gap_start)
+        seg1.iloc[-1, seg1.columns.get_loc("timestamp")] = pd.Timestamp(gap_start).tz_localize('UTC')
 
         # Segment 2: 30 bars starting at gap_end
         seg2 = _make_ohlcv(gap_end, n=30, freq_minutes=freq_minutes, timeframe=timeframe)
@@ -602,7 +602,7 @@ class TestStartupCheck:
         df = _make_ohlcv(start, n=n, freq_minutes=freq_minutes, timeframe="15m")
 
         # Snap the last bar to exactly `last_bar` to guarantee no clock-skew
-        df.iloc[-1, df.columns.get_loc("timestamp")] = pd.Timestamp(last_bar)
+        df.iloc[-1, df.columns.get_loc("timestamp")] = pd.Timestamp(last_bar).tz_localize('UTC')
 
         # Write to the correct month file(s).  The data may span two calendar
         # months, so group by month and write each group separately.
