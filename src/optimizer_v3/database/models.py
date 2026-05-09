@@ -11,7 +11,7 @@ All models use NautilusTrader types stored as strings for precision:
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, Index
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, Index, Numeric
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -756,3 +756,35 @@ class ValidationReportDB(Base):
     def __repr__(self):
         status = "PASSED" if self.is_valid else "FAILED"
         return f"<ValidationReportDB(strategy_id='{self.strategy_id}', status='{status}', issues={self.total_issues})>"
+
+
+# ==============================================================================
+# AI CONSULTANT AUDIT
+# ==============================================================================
+
+class AiConsultantAudit(Base):
+    """
+    Compliance audit log for all AI Consultant activity.
+
+    id has a Python-side default (uuid.uuid4) AND a server_default (gen_random_uuid())
+    so the column is safe for both ORM inserts and raw SQL inserts.
+    """
+    __tablename__ = "ai_consultant_audit"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID(as_uuid=True), nullable=False)
+    event_type = Column(Text, nullable=False)
+    timestamp = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    user_id = Column(Text, nullable=True)
+    strategy_id = Column(Text, nullable=True)
+    payload = Column(JSONB, nullable=False)
+    token_cost_usd = Column(Numeric(precision=18, scale=8), nullable=True)
+
+    __table_args__ = (
+        Index("idx_ai_audit_session_id", "session_id"),
+        Index("idx_ai_audit_event_type", "event_type"),
+        Index("idx_ai_audit_timestamp", "timestamp"),
+    )
+
+    def __repr__(self):
+        return f"<AiConsultantAudit(id='{self.id}', event_type='{self.event_type}')>"
