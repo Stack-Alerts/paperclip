@@ -237,6 +237,7 @@ class AdminPinDialog(QDialog):
         # move the Strategy Browser.  Qt.Tool keeps it always-on-top of the app
         # without parenting it into the main-window widget tree.
         super().__init__(None, Qt.Tool)
+        self.setObjectName("admin_pin_dialog")
         self._setup_mode = setup_mode
         self._service = service  # Only used in auth mode
         self.setWindowTitle("Admin Authentication" if not setup_mode else "Set Admin PIN")
@@ -272,6 +273,7 @@ class AdminPinDialog(QDialog):
         layout.addWidget(msg)
 
         self._pin_field = QLineEdit()
+        self._pin_field.setObjectName("pin_input")
         self._pin_field.setEchoMode(QLineEdit.Password)
         self._pin_field.setPlaceholderText("PIN…")
         self._pin_field.setStyleSheet(get_input_field_stylesheet())
@@ -441,6 +443,7 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
             None,
             Qt.Window | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint,
         )
+        self.setObjectName("settings_dialog")
         self.setWindowTitle("Settings")
         self.setModal(True)
         # BTCAAAAA-87: Replace fixed pixel size with layout-driven sizing.
@@ -489,6 +492,7 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
 
         # Tab widget
         self._tabs = QTabWidget()
+        self._tabs.setObjectName("settings_tabs")
         self._tabs.setFont(create_font(10))
         self._tabs.setStyleSheet(get_tab_widget_stylesheet())
         # BTCAAAAA-92: resize the window when the user switches tabs so that
@@ -526,6 +530,7 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("Cancel")
+        cancel_btn.setObjectName("cancel_btn")
         cancel_btn.setFont(create_font(10))
         cancel_btn.setStyleSheet(get_secondary_button_stylesheet())
         cancel_btn.setToolTip("Discard all changes and close Settings")
@@ -533,6 +538,7 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         btn_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Save && Close")
+        save_btn.setObjectName("save_btn")
         save_btn.setFont(create_font(10, bold=True))
         save_btn.setStyleSheet(get_primary_button_stylesheet())
         save_btn.setToolTip("Save all settings changes and close the dialog")
@@ -1247,6 +1253,7 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         # Defect 3: Use clear, unambiguous labels; setMinimumWidth prevents
         # truncation while allowing the button to grow with content.
         self._admin_auth_btn = QPushButton("Unlock Admin")
+        self._admin_auth_btn.setObjectName("admin_auth_btn")
         self._admin_auth_btn.setFont(create_font(9))
         self._admin_auth_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
         self._admin_auth_btn.setMinimumWidth(130)
@@ -1255,6 +1262,7 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         layout.addWidget(self._admin_auth_btn)
 
         self._admin_lock_btn = QPushButton("Lock Admin")
+        self._admin_lock_btn.setObjectName("admin_lock_btn")
         self._admin_lock_btn.setFont(create_font(9))
         self._admin_lock_btn.setStyleSheet(get_danger_button_stylesheet())
         self._admin_lock_btn.setMinimumWidth(110)

@@ -47,6 +47,7 @@ class NewStrategyDialog(WindowGeometryMixin, QDialog):
     
     def _init_ui(self):
         """Initialize user interface"""
+        self.setObjectName("new_strategy_dialog")
         self.setWindowTitle("New Strategy")
         self.setWindowFlags(
             Qt.Window
@@ -75,6 +76,7 @@ class NewStrategyDialog(WindowGeometryMixin, QDialog):
         layout.addWidget(name_label)
         
         self.name_input = QLineEdit()
+        self.name_input.setObjectName("strategy_name_input")
         self.name_input.setPlaceholderText("Enter strategy name...")
         self.name_input.setStyleSheet(get_input_field_stylesheet())
         self.name_input.setToolTip("A unique name for your strategy — used as the identifier in the database")
@@ -88,6 +90,7 @@ class NewStrategyDialog(WindowGeometryMixin, QDialog):
         layout.addWidget(desc_label)
         
         self.desc_input = QTextEdit()
+        self.desc_input.setObjectName("strategy_desc_input")
         self.desc_input.setPlaceholderText("Enter strategy description...")
         self.desc_input.setStyleSheet(get_text_edit_stylesheet())
         self.desc_input.setMinimumHeight(100)
@@ -108,12 +111,14 @@ class NewStrategyDialog(WindowGeometryMixin, QDialog):
         button_layout.addStretch()
         
         self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setObjectName("cancel_btn")
         self.cancel_btn.setStyleSheet(get_secondary_button_stylesheet())
         self.cancel_btn.setToolTip("Discard and close this dialog without creating a strategy")
         self.cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_btn)
         
         self.create_btn = QPushButton("Create Strategy")
+        self.create_btn.setObjectName("create_strategy_btn")
         self.create_btn.setStyleSheet(get_primary_button_stylesheet())
         self.create_btn.setEnabled(False)
         self.create_btn.setToolTip("Create a new strategy record in the database with the given name")

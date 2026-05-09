@@ -15,6 +15,7 @@ class MainWindow(WindowGeometryMixin, QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.setObjectName("main_window")
         self.setWindowTitle("Strategy Builder")
         self.setStyleSheet(WINDOW_STYLE)
         self.setup_menu()

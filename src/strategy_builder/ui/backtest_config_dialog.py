@@ -45,6 +45,7 @@ class BacktestConfigDialog(WindowGeometryMixin, QDialog):
     
     def _init_ui(self):
         """Initialize the dialog UI"""
+        self.setObjectName("backtest_config_dialog")
         self.setWindowTitle("BTC Trade Engine - Backtest Configuration")
         self.setModal(False)  # Non-modal so user can see strategy
         

@@ -313,7 +313,8 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
     def __init__(self):
         """Initialize the main window."""
         super().__init__()
-        
+        self.setObjectName("strategy_builder_main_window")
+
         # Create orchestrator with real registry adapter if available
         if BLOCK_REGISTRY_ADAPTER_AVAILABLE:
             try:
