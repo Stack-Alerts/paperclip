@@ -859,26 +859,25 @@ class InstitutionalSignalEvaluator:
                         return True  # Signal configured for ENTRY
         
         # STEP 2: Check EXIT conditions (NEW - efficiency optimization)
+        # DictWrapper returns None for missing/null keys and hasattr() never raises AttributeError
+        # on DictWrapper, so we must use (getattr(...) or []) to safely iterate.
         # Strategy-level exits
-        if hasattr(self.strategy_config, 'exit_conditions'):
-            for exit_cond in self.strategy_config.exit_conditions:
-                if exit_cond.signal_name == signal_name:
-                    return True  # Signal configured for EXIT (strategy-level)
-        
+        for exit_cond in (getattr(self.strategy_config, 'exit_conditions', None) or []):
+            if exit_cond.signal_name == signal_name:
+                return True  # Signal configured for EXIT (strategy-level)
+
         # Block-level exits
         for block in self.strategy_config.blocks:
             if block.name == block_name:
-                if hasattr(block, 'exit_conditions'):
-                    for exit_cond in block.exit_conditions:
-                        if exit_cond.signal_name == signal_name:
-                            return True  # Signal configured for EXIT (block-level)
-                
+                for exit_cond in (getattr(block, 'exit_conditions', None) or []):
+                    if exit_cond.signal_name == signal_name:
+                        return True  # Signal configured for EXIT (block-level)
+
                 # Signal-level exits
                 for signal_config in block.signals:
-                    if hasattr(signal_config, 'exit_conditions'):
-                        for exit_cond in signal_config.exit_conditions:
-                            if exit_cond.signal_name == signal_name:
-                                return True  # Signal configured for EXIT (signal-level)
+                    for exit_cond in (getattr(signal_config, 'exit_conditions', None) or []):
+                        if exit_cond.signal_name == signal_name:
+                            return True  # Signal configured for EXIT (signal-level)
         
         return False  # Signal NOT configured anywhere
     
