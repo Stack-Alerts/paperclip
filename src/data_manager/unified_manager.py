@@ -237,9 +237,14 @@ class UnifiedDataManager:
             # Combine all months
             bars = pd.concat(all_bars, ignore_index=True)
             
-            # Ensure timestamp is datetime
-            bars['timestamp'] = pd.to_datetime(bars['timestamp'])
-            
+            # Ensure timestamp is tz-aware UTC datetime so filtering is consistent
+            # regardless of whether callers pass naive or tz-aware start/end dates.
+            bars['timestamp'] = pd.to_datetime(bars['timestamp'], utc=True)
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=timezone.utc)
+
             # Filter to exact date range
             bars = bars[
                 (bars['timestamp'] >= start_date) &
@@ -525,9 +530,11 @@ class UnifiedDataManager:
                 futures=True  # CRITICAL: Perpetual futures!
             )
             
-            # Filter to exact range
-            bars['timestamp'] = pd.to_datetime(bars['timestamp'])
-            
+            # Filter to exact range — parse as tz-aware UTC so comparison with
+            # tz-aware start_date_floored (set by BTCAAAAA-795) doesn't raise TypeError.
+            # rest_client strips UTC with .dt.tz_localize(None); re-localize here.
+            bars['timestamp'] = pd.to_datetime(bars['timestamp'], utc=True)
+
             # INSTITUTIONAL: Don't filter by end_date too strictly!
             # Binance returns ALL available candles including current forming one
             # We want everything >= start_date (don't cut off recent data)
@@ -547,6 +554,9 @@ class UnifiedDataManager:
                 start_date_floored = start_date.replace(minute=0, second=0, microsecond=0)
             else:
                 start_date_floored = start_date  # 15m and smaller: existing behaviour is correct
+            # Ensure start_date_floored is tz-aware to match the UTC-aware timestamp column
+            if start_date_floored.tzinfo is None:
+                start_date_floored = start_date_floored.replace(tzinfo=timezone.utc)
             bars = bars[bars['timestamp'] >= start_date_floored].copy()
             
             logger.info(f"   ✅ Binance: {len(bars)} bars loaded")

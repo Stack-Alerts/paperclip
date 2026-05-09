@@ -18,7 +18,7 @@ Date: 2026-05-02
 from __future__ import annotations
 
 import io
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List
 from unittest.mock import MagicMock, patch, PropertyMock
@@ -1377,3 +1377,169 @@ class TestDetermineSourceTzAwareness:
         start = end - timedelta(days=10)
         result = manager._determine_source(start_date=start, end_date=end)
         assert result == DataSource.LAKEAPI
+
+
+# ===========================================================================
+# 9. TZ-AWARE COMPARISON REGRESSION (BTCAAAAA-816)
+# ===========================================================================
+
+class TestGetBarsBinanceTzAwareRegression:
+    """
+    Regression tests for BTCAAAAA-816: _get_bars_binance and
+    _get_bars_from_local_files must not raise
+    "Invalid comparison between dtype=datetime64[ns] and datetime"
+    when called with tz-aware UTC start_date (which all callers produce
+    after the BTCAAAAA-795 normalisation pass).
+
+    Root cause: rest_client.get_klines() strips UTC with .dt.tz_localize(None),
+    producing naive timestamps. The post-fetch filter then compared naive
+    datetime64[ns] against tz-aware start_date_floored → TypeError caught as
+    "Binance error" → LakeAPI fallback → also fails for recent dates.
+
+    Fix: parse bars['timestamp'] with utc=True in both functions so the
+    naive-column is re-localized before comparison.
+    """
+
+    def _make_naive_klines_df(
+        self, start: datetime, n: int = 50, freq_minutes: int = 15
+    ) -> pd.DataFrame:
+        """
+        Simulate the DataFrame returned by BinanceRestClient.get_klines():
+        timestamps are naive datetime64[ns] (UTC info stripped by rest_client).
+        """
+        timestamps = [start + timedelta(minutes=freq_minutes * i) for i in range(n)]
+        rng = np.random.default_rng(seed=7)
+        base = 60_000.0
+        opens = base + rng.uniform(-500, 500, size=n)
+        closes = opens + rng.uniform(-200, 200, size=n)
+        highs = np.maximum(opens, closes) + rng.uniform(0, 100, size=n)
+        lows = np.minimum(opens, closes) - rng.uniform(0, 100, size=n)
+        return pd.DataFrame({
+            "timestamp": pd.to_datetime(timestamps),  # naive — matches rest_client output
+            "open": opens,
+            "high": highs,
+            "low": lows,
+            "close": closes,
+            "volume": rng.uniform(1.0, 50.0, size=n),
+            "quote_volume": rng.uniform(1_000, 10_000, size=n),
+            "trades": np.full(n, 100, dtype=int),
+        })
+
+    # --------------------------------------------------------------------- #
+    # 9a. _get_bars_binance: tz-aware start_date must not raise TypeError
+    # --------------------------------------------------------------------- #
+    def test_get_bars_binance_tz_aware_start_no_type_error(self, manager):
+        """
+        BTCAAAAA-816 regression: _get_bars_binance with a tz-aware UTC start_date
+        must not raise TypeError and must return a non-empty DataFrame.
+        """
+        now_utc = datetime.now(timezone.utc)
+        start_date = now_utc - timedelta(hours=12)
+        end_date = now_utc
+
+        # Build naive-timestamp klines response (mirrors real rest_client behaviour)
+        klines_df = self._make_naive_klines_df(
+            start=start_date.replace(tzinfo=None) - timedelta(hours=1),
+            n=100,
+        )
+
+        mock_client = MagicMock()
+        mock_client.get_klines.return_value = klines_df
+
+        with patch.object(manager, "_get_binance_client", return_value=mock_client):
+            try:
+                result = manager._get_bars_binance("15m", start_date, end_date)
+            except TypeError as exc:
+                pytest.fail(
+                    f"_get_bars_binance raised TypeError with tz-aware start_date: {exc}"
+                )
+
+        assert isinstance(result, pd.DataFrame), "Expected a DataFrame result"
+        assert len(result) > 0, (
+            "Expected non-empty DataFrame; the tz-aware filter dropped all rows"
+        )
+
+    # --------------------------------------------------------------------- #
+    # 9b. _get_bars_binance: naive start_date still works (no regression)
+    # --------------------------------------------------------------------- #
+    def test_get_bars_binance_naive_start_still_works(self, manager):
+        """Naive start_date (legacy caller) must also work after the fix."""
+        now = datetime.utcnow()
+        start_date = now - timedelta(hours=12)
+        end_date = now
+
+        klines_df = self._make_naive_klines_df(
+            start=start_date - timedelta(hours=1),
+            n=100,
+        )
+
+        mock_client = MagicMock()
+        mock_client.get_klines.return_value = klines_df
+
+        with patch.object(manager, "_get_binance_client", return_value=mock_client):
+            result = manager._get_bars_binance("15m", start_date, end_date)
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) > 0
+
+    # --------------------------------------------------------------------- #
+    # 9c. _get_bars_from_local_files: tz-aware start/end must not raise
+    # --------------------------------------------------------------------- #
+    def test_get_bars_from_local_files_tz_aware_no_type_error(self, manager):
+        """
+        BTCAAAAA-816 sibling: _get_bars_from_local_files reads parquet files
+        with naive timestamps; filtering against tz-aware start/end must not
+        raise TypeError.
+        """
+        start_naive = datetime(2026, 4, 1, 0, 0)
+        df = _make_ohlcv(start_naive, n=96, freq_minutes=15, timeframe="15m")
+        _write_month_file(manager.binance_dir, "2026-04", df, "15m")
+
+        start_utc = start_naive.replace(tzinfo=timezone.utc)
+        end_utc = (start_naive + timedelta(days=1)).replace(tzinfo=timezone.utc)
+
+        try:
+            result = manager._get_bars_from_local_files("15m", start_utc, end_utc)
+        except TypeError as exc:
+            pytest.fail(
+                f"_get_bars_from_local_files raised TypeError with tz-aware dates: {exc}"
+            )
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) > 0, (
+            "Expected non-empty DataFrame from local files with tz-aware filter"
+        )
+
+    # --------------------------------------------------------------------- #
+    # 9d. get_bars end-to-end: tz-aware start_date routes to Binance and returns data
+    # --------------------------------------------------------------------- #
+    def test_get_bars_end_to_end_tz_aware_binance_path(self, manager):
+        """
+        Full get_bars() → _get_bars_by_range() → _get_bars_binance() path
+        with a tz-aware start_date in the recent window must return a
+        non-empty DataFrame and emit no "Invalid comparison" error.
+        """
+        now_utc = datetime.now(timezone.utc)
+        start_date = now_utc - timedelta(hours=6)
+        end_date = now_utc
+
+        klines_df = self._make_naive_klines_df(
+            start=start_date.replace(tzinfo=None) - timedelta(hours=1),
+            n=60,
+        )
+
+        mock_client = MagicMock()
+        mock_client.get_klines.return_value = klines_df
+
+        with patch.object(manager, "_get_binance_client", return_value=mock_client):
+            result = manager.get_bars(
+                timeframe="15m",
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) > 0, (
+            "get_bars() with tz-aware start_date returned empty DataFrame — "
+            "tz comparison may still be failing silently via the exception handler"
+        )
