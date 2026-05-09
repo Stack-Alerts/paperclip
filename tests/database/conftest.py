@@ -13,6 +13,14 @@ PostgreSQL fixtures
                                with the ``pg_conn`` fixture pattern used by the
                                ITM state tests (BTCAAAAA-450).  Skips gracefully
                                when PostgreSQL is not reachable.
+
+Isolation guarantee (FDR-781)
+------------------------------
+``db_session`` uses ``join_transaction_mode="create_savepoint"`` so that any
+``session.commit()`` call inside a test only commits to a SAVEPOINT, never to
+the outer connection transaction.  The outer transaction is rolled back
+unconditionally in teardown, leaving the database state unchanged for the
+next test.
 """
 
 import pytest
@@ -20,7 +28,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session
 from src.optimizer_v3.database.models import Base
 
 # Load .env file from project root
@@ -57,26 +65,27 @@ def db_engine():
 @pytest.fixture(scope="function")
 def db_session(db_engine):
     """
-    Create a new database session for each test
-    
-    Provides transaction isolation - each test gets fresh session
-    Automatically rolls back after test completes
-    
-    Uses SAVEPOINT for proper isolation without affecting other tests
+    Create a new database session for each test with complete rollback isolation.
+
+    Each test function receives its own connection + outer transaction.
+    ``join_transaction_mode="create_savepoint"`` ensures that any
+    ``session.commit()`` call inside the test only releases a SAVEPOINT;
+    the outer transaction is never committed and is rolled back unconditionally
+    in teardown.  This guarantees that no test data persists to the database
+    regardless of what the test code does with the session.
+
+    FDR-781: per-test-function database session isolation with automatic rollback.
     """
-    # Create connection
     connection = db_engine.connect()
-    
-    # Begin a transaction
     transaction = connection.begin()
-    
-    # Create session bound to this connection
-    SessionLocal = sessionmaker(bind=connection)
-    session = SessionLocal()
-    
+
+    # SA 2.0: pass the connection directly; create_savepoint mode ensures
+    # session.commit() inside tests only commits to a SAVEPOINT, not the
+    # outer transaction, so teardown rollback always cleans up fully.
+    session = Session(connection, join_transaction_mode="create_savepoint")
+
     yield session
-    
-    # Cleanup - rollback transaction and close
+
     session.close()
     transaction.rollback()
     connection.close()
