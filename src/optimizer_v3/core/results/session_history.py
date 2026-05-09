@@ -12,7 +12,7 @@ Features:
 from decimal import Decimal
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
-from sqlalchemy import create_engine, and_, or_
+from sqlalchemy import create_engine, and_, or_, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
@@ -63,7 +63,7 @@ class SessionHistory:
             
             # Test connection
             with self.engine.connect() as conn:
-                conn.execute("SELECT 1")
+                conn.execute(text("SELECT 1"))
             
             return True
         
@@ -116,8 +116,8 @@ class SessionHistory:
                 
                 query += f" ORDER BY created_at DESC LIMIT {limit} OFFSET {offset}"
                 
-                result = session.execute(query)
-                
+                result = session.execute(text(query))
+
                 sessions = []
                 for row in result:
                     sessions.append({
@@ -172,7 +172,7 @@ class SessionHistory:
                     WHERE session_id = :session_id
                 """
                 
-                result = session.execute(query, {'session_id': session_id})
+                result = session.execute(text(query), {'session_id': session_id})
                 row = result.fetchone()
                 
                 if not row:
@@ -230,8 +230,8 @@ class SessionHistory:
                     ORDER BY updated_at DESC
                 """
                 
-                result = session.execute(query, {'cutoff_time': cutoff_time})
-                
+                result = session.execute(text(query), {'cutoff_time': cutoff_time})
+
                 interrupted = []
                 for row in result:
                     interrupted.append({
@@ -285,8 +285,8 @@ class SessionHistory:
                     ORDER BY created_at DESC
                 """
                 
-                result = session.execute(query, {'cutoff_time': cutoff_time})
-                
+                result = session.execute(text(query), {'cutoff_time': cutoff_time})
+
                 sessions = []
                 for row in result:
                     sessions.append({
@@ -350,8 +350,8 @@ class SessionHistory:
                 
                 query += " ORDER BY start_time DESC"
                 
-                result = session.execute(query, params)
-                
+                result = session.execute(text(query), params)
+
                 sessions = []
                 for row in result:
                     sessions.append(dict(row._mapping))
@@ -377,32 +377,32 @@ class SessionHistory:
             with self.Session() as session:
                 # Total sessions
                 total_query = "SELECT COUNT(*) FROM optimization_sessions"
-                total = session.execute(total_query).scalar()
-                
+                total = session.execute(text(total_query)).scalar()
+
                 # By status
                 status_query = """
-                    SELECT status, COUNT(*) 
-                    FROM optimization_sessions 
+                    SELECT status, COUNT(*)
+                    FROM optimization_sessions
                     GROUP BY status
                 """
-                status_result = session.execute(status_query)
+                status_result = session.execute(text(status_query))
                 status_counts = {row[0]: row[1] for row in status_result}
-                
+
                 # Recent activity (last 7 days)
                 recent_query = """
-                    SELECT COUNT(*) 
-                    FROM optimization_sessions 
+                    SELECT COUNT(*)
+                    FROM optimization_sessions
                     WHERE created_at >= NOW() - INTERVAL '7 days'
                 """
-                recent_count = session.execute(recent_query).scalar()
-                
+                recent_count = session.execute(text(recent_query)).scalar()
+
                 # Average configs per session
                 avg_configs_query = """
-                    SELECT AVG(total_configs) 
-                    FROM optimization_sessions 
+                    SELECT AVG(total_configs)
+                    FROM optimization_sessions
                     WHERE status = 'completed'
                 """
-                avg_configs = session.execute(avg_configs_query).scalar()
+                avg_configs = session.execute(text(avg_configs_query)).scalar()
                 
                 return {
                     'total_sessions': total,
@@ -439,11 +439,11 @@ class SessionHistory:
                     WHERE session_id = :session_id
                 """
                 
-                session.execute(query, {'session_id': session_id})
+                session.execute(text(query), {'session_id': session_id})
                 session.commit()
-                
+
                 return True
-        
+
         except Exception as e:
             logger.error(f"Error marking session as resumable: {e}")
             return False
@@ -483,11 +483,11 @@ class SessionHistory:
                     'summary': str(current_best) if current_best else None
                 }
                 
-                session.execute(query, params)
+                session.execute(text(query), params)
                 session.commit()
-                
+
                 return True
-        
+
         except Exception as e:
             logger.error(f"Error updating session progress: {e}")
             return False
@@ -517,7 +517,7 @@ class SessionHistory:
                     AND end_time < :cutoff_date
                 """
                 
-                result = session.execute(query, {'cutoff_date': cutoff_date})
+                result = session.execute(text(query), {'cutoff_date': cutoff_date})
                 session.commit()
                 
                 return result.rowcount

@@ -17,6 +17,7 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+from sqlalchemy import text
 from src.optimizer_v3.database.manager import get_db_manager
 from src.optimizer_v3.database.connection_pool import get_connection_pool
 from src.optimizer_v3.database import (
@@ -526,7 +527,7 @@ class TestTransactionManagement:
         # Create and close multiple sessions
         for i in range(10):
             with db.session_scope() as session:
-                result = session.execute("SELECT 1")
+                result = session.execute(text("SELECT 1"))
                 assert result.scalar() == 1
         
         # Active connections should return to baseline

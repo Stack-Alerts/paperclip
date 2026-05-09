@@ -15,7 +15,7 @@ Institutional-grade implementation with:
 from typing import Optional
 import logging
 from contextlib import contextmanager
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import NullPool
 
@@ -173,7 +173,7 @@ class DatabaseManager:
         """
         try:
             with self.session_scope() as session:
-                session.execute("SELECT 1")
+                session.execute(text("SELECT 1"))
             self.logger.info("Database connection test: SUCCESS")
             return True
         except Exception as e:
