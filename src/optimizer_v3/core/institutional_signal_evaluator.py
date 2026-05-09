@@ -160,15 +160,29 @@ class InstitutionalSignalEvaluator:
             strategy_config: StrategyConfig with blocks, signals, exits
         """
         self.strategy_config = strategy_config
-        
+
+        # BTCAAAAA-736 build sentinel — proves post-ad3b0b1 code is running.
+        # If this line appears in the log, the hasattr-guard fix and the
+        # reference/reference_signal key fix are both active.
+        logger.warning(
+            "InstitutionalSignalEvaluator INIT — "
+            "BTCAAAAA-685 fix ACTIVE "
+            "(hasattr guards patched, reference/reference_signal both read). "
+            "Signals will be diagnosed; check BTCAAAAA-736 log for fired-but-filtered entries."
+        )
+
         # Building blocks (instantiated from registry)
         self.building_blocks = self._instantiate_building_blocks()
-        
+
         # State management
         self.pending_rechecks: List[RecheckState] = []
         self.timing_constraints: Dict[str, TimingConstraint] = {}
         self.fired_signals: Dict[str, int] = {}  # signal_name → fire_bar
         self.current_trade: Optional[TradeState] = None
+
+        # BTCAAAAA-736 signal diagnostic counter
+        self._diag_signals_fired_total: int = 0
+        self._diag_signals_filtered_total: int = 0
         
         # Exit conditions (organized by level)
         self.exit_conditions = self._organize_exit_conditions()
@@ -481,14 +495,26 @@ class InstitutionalSignalEvaluator:
         
         # STEP 7: Check entry decision
         should_enter = confluence >= min_confluence
-        
+
+        # BTCAAAAA-736 diagnostic: log totals at last bar so the user can see in UI output
+        if total_bars > 0 and bar_index == total_bars - 1:
+            logger.warning(
+                "BTCAAAAA-736 DIAG SUMMARY at last bar: "
+                "accepted_configured_signals=%d, "
+                "filtered_nonconfigured_signals=%d. "
+                "If accepted=0 and filtered>0, signal name mismatch in strategy config. "
+                "If both=0, building blocks returned no non-neutral signals on real data.",
+                self._diag_signals_fired_total,
+                self._diag_signals_filtered_total,
+            )
+
         # DEBUG LOG: Entry decision (ONLY log if entry allowed OR signals actually fired)
         # Don't pollute logs with "NO ENTRY (Confluence: 0)" spam
         if total_bars > 0 and all_signals:  # Only log when signals actually fired
             reason = ""
             if confluence < min_confluence:
                 reason = f"Confluence too low ({confluence} < {min_confluence})"
-            
+
             self.logger.log_entry_decision(should_enter, confluence, reason)
         
         return SignalEvaluationResult(
@@ -563,7 +589,16 @@ class InstitutionalSignalEvaluator:
                     # Building blocks can fire many signals (e.g., ABOVE_ASIA_50, AT_ASIA_50, BELOW_ASIA_50)
                     # But user only configured subset - filter to configured signals only!
                     if not self._signal_exists_in_config(block_name, signal_name):
-                        # Signal NOT configured in strategy → silently ignore (don't process)
+                        # BTCAAAAA-736 diagnostic: count filtered signals so we can distinguish
+                        # "block fires but signal name mismatch" from "block never fires at all"
+                        if signal_name not in ('NEUTRAL', 'INSUFFICIENT_DATA', 'ERROR',
+                                               'NO_SIGNAL', 'NO_ASIA_DATA'):
+                            self._diag_signals_filtered_total += 1
+                            logger.debug(
+                                "BTCAAAAA-736 DIAG: %s::%s fired but NOT in strategy config "
+                                "(total filtered=%d)",
+                                block_name, signal_name, self._diag_signals_filtered_total,
+                            )
                         continue
                     
                     # Signal IS configured → process it
@@ -579,10 +614,17 @@ class InstitutionalSignalEvaluator:
                         result['timing_constraint'] = timing_constraint
                     
                     fired[signal_id] = result
-                    
+
                     # Record signal fire bar
                     self.fired_signals[signal_id] = len(lookback)  # Current index
-                    
+
+                    # BTCAAAAA-736 diagnostic: count accepted configured signals
+                    self._diag_signals_fired_total += 1
+                    logger.info(
+                        "BTCAAAAA-736 DIAG: %s::%s ACCEPTED (bar=%d, total_fired=%d)",
+                        block_name, signal_name, bar_index, self._diag_signals_fired_total,
+                    )
+
                     # DEBUG LOG: Only log when signal FIRES (not every bar)
                     if bar_index > 0:
                         self.logger.log_building_block_eval(block_name, result)
