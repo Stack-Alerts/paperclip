@@ -498,19 +498,19 @@ class BacktestWorker(QThread):
                 import logging
                 from pathlib import Path
                 Path("logs/wiring-test").mkdir(parents=True, exist_ok=True)
-                logger = logging.getLogger('multicore_config')
-                if not logger.handlers:
-                    logger.setLevel(logging.INFO)
+                mc_logger = logging.getLogger('multicore_config')
+                if not mc_logger.handlers:
+                    mc_logger.setLevel(logging.INFO)
                     fh = logging.FileHandler('logs/wiring-test/multicore_config.log')
                     fh.setFormatter(logging.Formatter('[%(asctime)s] %(message)s'))
-                    logger.addHandler(fh)
-                
+                    mc_logger.addHandler(fh)
+
                 # Log ACTUAL VALUES (not just counts!)
                 asl = mc_config.get('adaptive_sl', {})
-                logger.info(f"=== BACKTEST CONFIG ===")
-                logger.info(f"Vol Lookback: {asl.get('volatility_lookback')}, Vol Multi: {asl.get('volatility_multiplier')}")
-                logger.info(f"Delay Bars: {asl.get('delay_bars')}, Emergency SL: {asl.get('emergency_sl_pct')}%")
-                logger.info(f"Min SL: {asl.get('min_sl_pct')}, Max SL: {asl.get('max_sl_pct')}")
+                mc_logger.info(f"=== BACKTEST CONFIG ===")
+                mc_logger.info(f"Vol Lookback: {asl.get('volatility_lookback')}, Vol Multi: {asl.get('volatility_multiplier')}")
+                mc_logger.info(f"Delay Bars: {asl.get('delay_bars')}, Emergency SL: {asl.get('emergency_sl_pct')}%")
+                mc_logger.info(f"Min SL: {asl.get('min_sl_pct')}, Max SL: {asl.get('max_sl_pct')}")
                 
                 # Run multicore backtest
                 mc_results = engine.run_backtest(

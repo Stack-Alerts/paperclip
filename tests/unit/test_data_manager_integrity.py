@@ -1315,3 +1315,65 @@ class TestDataUpdateThreadDownloads1d:
         assert download_calls.index("1h") < download_calls.index("1d"), (
             "1h should be downloaded before 1d"
         )
+
+
+# ===========================================================================
+# Regression: _determine_source() tz-awareness (BTCAAAAA-795)
+# ===========================================================================
+
+class TestDetermineSourceTzAwareness:
+    """
+    Regression tests ensuring _determine_source() never raises TypeError when
+    end_date / start_date are tz-aware (UTC), tz-naive, or mixed.
+    Quick Preview passes datetime.now(timezone.utc) so all three cases must work.
+    """
+
+    def test_utc_aware_end_date_does_not_raise(self, manager):
+        """UTC-aware end_date must not crash — this was the Quick Preview crash case."""
+        from datetime import timezone
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=40)
+        # Must not raise TypeError: can't compare offset-naive and offset-aware datetimes
+        result = manager._determine_source(start_date=start, end_date=end)
+        assert result is not None, "_determine_source should return a DataSource value"
+
+    def test_naive_end_date_does_not_raise(self, manager):
+        """Naive end_date (legacy callers) must still work after the tz fix."""
+        end = datetime.now()
+        start = end - timedelta(days=40)
+        result = manager._determine_source(start_date=start, end_date=end)
+        assert result is not None
+
+    def test_mixed_aware_start_naive_end_does_not_raise(self, manager):
+        """Mixed tz inputs are normalized internally — no TypeError allowed."""
+        from datetime import timezone
+        end = datetime.now()  # naive
+        start = datetime.now(timezone.utc) - timedelta(days=40)  # aware
+        result = manager._determine_source(start_date=start, end_date=end)
+        assert result is not None
+
+    def test_mixed_naive_start_aware_end_does_not_raise(self, manager):
+        """Reverse-mixed case: naive start, aware end."""
+        from datetime import timezone
+        end = datetime.now(timezone.utc)  # aware
+        start = datetime.now() - timedelta(days=40)  # naive
+        result = manager._determine_source(start_date=start, end_date=end)
+        assert result is not None
+
+    def test_recent_range_returns_binance(self, manager):
+        """end_date in the recent window should still route to BINANCE."""
+        from datetime import timezone
+        from src.data_manager.unified_manager import DataSource
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=5)
+        result = manager._determine_source(start_date=start, end_date=end)
+        assert result == DataSource.BINANCE
+
+    def test_old_range_returns_lakeapi(self, manager):
+        """end_date well outside the Binance threshold should route to LAKEAPI."""
+        from datetime import timezone
+        from src.data_manager.unified_manager import DataSource
+        end = datetime.now(timezone.utc) - timedelta(days=manager.binance_threshold_days + 10)
+        start = end - timedelta(days=10)
+        result = manager._determine_source(start_date=start, end_date=end)
+        assert result == DataSource.LAKEAPI
