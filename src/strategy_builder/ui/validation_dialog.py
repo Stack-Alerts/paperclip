@@ -9,7 +9,7 @@ Date: 2026-01-17
 """
 
 from typing import Optional
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QHBoxLayout
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QHBoxLayout, QMessageBox
 from PyQt5.QtCore import Qt
 
 from src.strategy_builder.ui.validation_panel import ValidationPanel
@@ -83,15 +83,24 @@ class ValidationDialog(WindowGeometryMixin, QDialog):
         self.setLayout(layout)
     
     def _connect_signals(self):
-        """
-        Connect signals from validation panel to dialog.
-        
-        Note: The actual action button signals (save/generate/test) are connected
-        directly in the main window when the dialog is created, so we don't 
-        handle them here.
-        """
-        # No internal signal handling needed - parent handles all actions
-        pass
+        """Connect signals from validation panel to this dialog."""
+        self.validation_panel.generate_requested.connect(self._on_generate_requested)
+
+    def _on_generate_requested(self):
+        """Handle Generate Code button: invoke orchestrator and report result."""
+        result = self.orchestrator.generate_code()
+        if result.success:
+            QMessageBox.information(
+                self,
+                "Code Generated",
+                f"Strategy code written to:\n{result.message}",
+            )
+        else:
+            QMessageBox.critical(
+                self,
+                "Code Generation Failed",
+                f"Failed to generate strategy code:\n\n" + "\n".join(result.errors),
+            )
     
     def showEvent(self, event):
         """

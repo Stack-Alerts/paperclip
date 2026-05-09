@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Sprint 3 P1
+
+### Added
+
+#### NautilusCodeGenerator (`src/strategy_builder/core/nautilus_code_generator.py`)
+- Production module implementing `NautilusCodeGenerator` — converts `StrategyConfig` into
+  production-ready NautilusTrader `Strategy` subclass `.py` files.
+- `GeneratedCode` dataclass holds `strategy_code`, `config_dict`, `file_name`, and `metadata`.
+- `CodeValidationResult` dataclass carries `is_valid`, `errors`, and `warnings` from `ast.parse`.
+- `NautilusCodeGenerator.generate(config)` builds imports, class definition, `__init__`,
+  `on_start`, `on_bar`, and all per-block helper methods in a single pass.
+- `NautilusCodeGenerator.validate_syntax(code)` runs `ast.parse` and checks for common
+  NautilusTrader type-system violations (raw floats, string enums).
+- `NautilusCodeGenerator.generate_config_file(config, path)` writes the companion JSON config.
+- Risk enforcement embedded: `OrderSide` enum, `Quantity.from_str`, stop-loss stubs, and daily
+  loss limit comments are present in every generated file.
+
+#### Orchestrator integration (`src/strategy_builder/integration/strategy_builder_orchestrator.py`)
+- New `StrategyBuilderOrchestrator.generate_code(output_dir=None)` method orchestrates
+  generation, syntax validation, directory creation, and file write. Returns `WorkflowResult`
+  with `output_path` on success or error list on failure. Defaults output to `src/strategies/`.
+
+#### Builder UI hook (`src/strategy_builder/ui/validation_dialog.py`)
+- `ValidationDialog` now connects `ValidationPanel.generate_requested` to
+  `_on_generate_requested`, calling `orchestrator.generate_code()` and surfacing a
+  `QMessageBox` success/error dialog with the output path.
+
+---
+
 ## [1.0.0] - 2026-01-09
 
 ### 🎉 Phase 1 Complete - Foundation
