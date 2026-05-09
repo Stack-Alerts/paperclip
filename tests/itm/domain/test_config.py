@@ -518,3 +518,8 @@ class TestEnvVarOverrides:
         monkeypatch.setenv("ITM_EXEC_ORDER_TIMEOUT_MS", "8000")
         cfg = ITMConfigLoader().load(Environment.PROD)
         assert cfg.execution.order_timeout_ms == 8000
+
+    def test_itm_paper_trading_blank_string_defaults_to_true(self, monkeypatch) -> None:
+        monkeypatch.setenv("ITM_PAPER_TRADING", "")
+        cfg = ITMConfigLoader().load(Environment.DEV)
+        assert cfg.paper_trading is True, "Blank ITM_PAPER_TRADING must default to paper mode"
