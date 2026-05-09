@@ -584,6 +584,7 @@ class ComprehensiveAIRequestBuilder:
                         'category': metadata.category,
                         'direction': block_direction,
                         'description': short_desc,
+                        'signals': [],   # Ensure key is always present; empty list for non-strategy blocks
                     })
             
             in_strategy_count = sum(1 for b in blocks_catalog if b.get('in_strategy'))
