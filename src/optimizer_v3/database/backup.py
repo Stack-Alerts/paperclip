@@ -99,7 +99,9 @@ class DatabaseBackup:
                 '-d', self.db_config['database'],
                 '--verbose',
                 '--no-owner',  # Don't include ownership commands
-                '--no-acl',    # Don't include access privileges
+                # --no-acl intentionally removed: role grants (ai_readonly, ai_consultant)
+                # must survive restore. Without ACLs in the dump, alembic skips already-
+                # recorded grant migrations and the roles end up with no SELECT privileges.
             ]
             
             # Set password in environment
@@ -365,6 +367,68 @@ class DatabaseBackup:
         
         return stats
     
+    def reapply_ai_grants(self) -> None:
+        """
+        Re-apply all ai_readonly SELECT grants after a restore.
+
+        Call this after restore_backup() when restoring to a DB where the
+        ai_readonly role was created by a migration that is already recorded in
+        alembic_version (so alembic won't re-run it) but whose GRANT statements
+        were not present in the dump (e.g. old dumps taken before the --no-acl
+        fix landed).  Safe to call on a live DB as a one-off remediation too.
+        """
+        _READABLE_TABLES = [
+            'strategies', 'strategy_versions', 'strategy_block_versions',
+            'strategy_test_results', 'signal_events', 'signal_metrics',
+            'backtest_results', 'optimization_runs', 'strategy_variations',
+            'ai_recommendations', 'validation_reports',
+        ]
+
+        env = os.environ.copy()
+        env['PGPASSWORD'] = self.db_config['password']
+
+        def _run(sql: str) -> None:
+            result = subprocess.run(
+                ['psql', '-h', self.db_config['host'],
+                 '-p', str(self.db_config['port']),
+                 '-U', self.db_config['user'],
+                 '-d', self.db_config['database'],
+                 '-c', sql],
+                env=env, capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                raise RuntimeError(f"Grant statement failed: {result.stderr.strip()}")
+
+        role_exists = subprocess.run(
+            ['psql', '-h', self.db_config['host'],
+             '-p', str(self.db_config['port']),
+             '-U', self.db_config['user'],
+             '-d', self.db_config['database'],
+             '-tAc', "SELECT 1 FROM pg_roles WHERE rolname='ai_readonly'"],
+            env=env, capture_output=True, text=True
+        )
+        if role_exists.stdout.strip() != '1':
+            self.logger.info("ai_readonly role does not exist — skipping grant reapply")
+            return
+
+        _run("GRANT CONNECT ON DATABASE optimizer_v3 TO ai_readonly;")
+        _run("GRANT USAGE ON SCHEMA public TO ai_readonly;")
+        for table in _READABLE_TABLES:
+            check = subprocess.run(
+                ['psql', '-h', self.db_config['host'],
+                 '-p', str(self.db_config['port']),
+                 '-U', self.db_config['user'],
+                 '-d', self.db_config['database'],
+                 '-tAc', f"SELECT 1 FROM information_schema.tables WHERE table_name='{table}'"],
+                env=env, capture_output=True, text=True
+            )
+            if check.stdout.strip() == '1':
+                _run(f"GRANT SELECT ON TABLE {table} TO ai_readonly;")
+            else:
+                self.logger.debug(f"Table {table} not present — skipping grant")
+
+        self.logger.info("✅ ai_readonly grants reapplied successfully")
+
     def _drop_database(self, env: Dict[str, str]) -> None:
         """Drop database (internal use only)"""
         cmd = [
