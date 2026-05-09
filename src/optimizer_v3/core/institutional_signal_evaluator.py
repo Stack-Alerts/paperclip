@@ -262,14 +262,14 @@ class InstitutionalSignalEvaluator:
         
         # Block-level and Signal-level exit conditions
         for block in self.strategy_config.blocks:
-            # Block-level exits
-            if hasattr(block, 'exit_conditions'):
+            # Block-level exits (DictWrapper returns None for missing keys; None is falsy)
+            if block.exit_conditions:
                 for exit_cond in block.exit_conditions:
                     exit_signals.add(exit_cond.signal_name)
-            
+
             # Signal-level exits
             for signal in block.signals:
-                if hasattr(signal, 'exit_conditions'):
+                if signal.exit_conditions:
                     for exit_cond in signal.exit_conditions:
                         exit_signals.add(exit_cond.signal_name)
         
@@ -301,28 +301,28 @@ class InstitutionalSignalEvaluator:
         
         # Block and Signal-level exits
         for block in self.strategy_config.blocks:
-            # Block-level exits
-            if hasattr(block, 'exit_conditions'):
+            # Block-level exits (DictWrapper returns None for missing keys; None is falsy)
+            if block.exit_conditions:
                 exits['BLOCK'][block.name] = [
                     ExitCondition(
                         signal_name=ec.signal_name,
                         percentage=ec.percentage,
-                        mode=ec.exit_mode,  # FIX: use exit_mode not mode
+                        mode=ec.exit_mode,
                         binding_level='BLOCK',
                         recheck_config=self._extract_recheck_config(ec)
                     )
                     for ec in block.exit_conditions
                 ]
-            
+
             # Signal-level exits
             for signal in block.signals:
-                if hasattr(signal, 'exit_conditions'):
+                if signal.exit_conditions:
                     signal_id = f"{block.name}::{signal.name}"
                     exits['SIGNAL'][signal_id] = [
                         ExitCondition(
                             signal_name=ec.signal_name,
                             percentage=ec.percentage,
-                            mode=ec.exit_mode,  # FIX: use exit_mode not mode
+                            mode=ec.exit_mode,
                             binding_level='SIGNAL',
                             recheck_config=self._extract_recheck_config(ec)
                         )
@@ -934,13 +934,15 @@ class InstitutionalSignalEvaluator:
                             constraint = signal_config.timing_constraint
                             
                             # CRITICAL FIX: constraint can be dict OR object
-                            # Handle both cases
+                            # Also handle both 'reference' (config key) and 'reference_signal' (legacy)
                             if isinstance(constraint, dict):
-                                ref_signal = constraint.get('reference_signal')
+                                ref_signal = (constraint.get('reference_signal')
+                                              or constraint.get('reference'))
                                 max_candles = constraint.get('max_candles', 0)
                             else:
                                 # It's an object - use getattr
-                                ref_signal = getattr(constraint, 'reference_signal', None)
+                                ref_signal = (getattr(constraint, 'reference_signal', None)
+                                              or getattr(constraint, 'reference', None))
                                 max_candles = getattr(constraint, 'max_candles', 0)
                             
                             if ref_signal:
