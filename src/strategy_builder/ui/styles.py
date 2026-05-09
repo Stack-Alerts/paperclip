@@ -1682,6 +1682,7 @@ def format_block_name(block_name: str) -> str:
 # WindowGeometryMixin — deep fix for Qt window state desync (BTCAAAAA-474)
 # Multi-monitor persistence fix (BTCAAAAA-530)
 # Maximized-window screen persistence fix (BTCAAAAA-637)
+# Screen position regression fix (BTCAAAAA-638)
 # ---------------------------------------------------------------------------
 # Qt5's saveGeometry()/restoreGeometry() bakes the Qt.WindowMaximized flag
 # into the binary blob.  When restoreGeometry() is called inside showEvent(),
@@ -1706,6 +1707,20 @@ def format_block_name(block_name: str) -> str:
 #   - Screen identity is saved alongside geometry; on restore the mixin
 #     tries the saved screen first, then any intersecting screen, then
 #     primary screen as a last resort.
+#
+# Screen position regression fix (BTCAAAAA-638):
+#   - The rect-intersection check (MIN_VISIBLE_W=100, MIN_VISIBLE_H=50) can
+#     reject a valid saved position when the window is near a screen edge and
+#     only a thin strip intersects (< 100 px wide or < 50 px tall).
+#   - Fix: after rect-intersection fails for all screens, fall back to
+#     screenAt(saved_pos) — the simpler point-based lookup that asks "which
+#     screen does the saved top-left corner live on?"  This guarantees that a
+#     window saved fully or partially on any screen is always restored to that
+#     screen rather than jumping to primary.
+#   - _save_window_geometry() now also saves 'pos_screen_name' (screen of the
+#     top-left corner) independently of the intersection threshold, allowing
+#     the restore path to prefer the exact saved screen even before the point
+#     lookup fires.
 #
 # Maximized-window screen fix (BTCAAAAA-637):
 #   - When a window is closed while maximized, the normal pos/size are NOT
@@ -1866,7 +1881,7 @@ class WindowGeometryMixin:
                         preferred_screen = s
                         break
 
-            # Try preferred screen first, then any screen
+            # Try preferred screen first, then any screen (by full-rect intersection)
             target_screen = None
             if preferred_screen and _rect_is_usable(saved_rect, preferred_screen):
                 target_screen = preferred_screen
@@ -1875,6 +1890,19 @@ class WindowGeometryMixin:
                     if _rect_is_usable(saved_rect, s):
                         target_screen = s
                         break
+
+            # BTCAAAAA-638 fallback: if the rect-intersection check rejected the
+            # saved position (e.g. window is very close to a screen edge with only
+            # a thin strip overlapping, < 100 px wide or < 50 px tall), try the
+            # simpler point-based lookup.  screenAt(saved_pos) asks "which screen
+            # does the saved top-left corner live on?" — it succeeds whenever the
+            # point is on any connected screen, even if the full window rect barely
+            # crosses the screen boundary.  This prevents the regression where a
+            # window near a screen edge is incorrectly snapped to the primary screen.
+            if target_screen is None:
+                point_screen = _QGuiApplication.screenAt(saved_pos)
+                if point_screen is not None:
+                    target_screen = point_screen
 
             if target_screen is not None:
                 # The saved position is usable — clamp to the screen's available
@@ -1887,7 +1915,8 @@ class WindowGeometryMixin:
                                 min(saved_pos.y(), screen_rect.bottom() - MIN_VISIBLE_H))
                 self.move(clamped_x, clamped_y)
             else:
-                # Saved screen is no longer available — fall back to primary screen
+                # Saved position is genuinely off all connected screens
+                # (e.g. monitor disconnected) — fall back to primary screen
                 self._center_on_primary(default_w, default_h)
         else:
             # No saved normal position.
