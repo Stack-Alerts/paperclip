@@ -1389,6 +1389,8 @@ class UnifiedDataManager:
                         group = group.copy()
                         if group['timestamp'].dt.tz is not None:
                             group['timestamp'] = group['timestamp'].dt.tz_localize(None)
+                        if existing['timestamp'].dt.tz is not None:
+                            existing['timestamp'] = existing['timestamp'].dt.tz_localize(None)
                         existing['timestamp'] = existing['timestamp'].astype('datetime64[us]')
                         group['timestamp'] = group['timestamp'].astype('datetime64[us]')
 
