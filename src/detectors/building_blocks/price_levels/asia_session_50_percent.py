@@ -485,9 +485,11 @@ class AsiaSession50Percent:
             confirmed_bounce, confirmed_rejection, breached_50, crossed_50_up, crossed_50_down
         )
         
-        # Override signal with granular for consistency
-        signal = granular_signal if signal != 'NEUTRAL' else granular_signal
-        # But use simple_signal for simple mode compatibility
+        # Gate granular signal on is_new_event so AT_ASIA_50 only fires on new entry events,
+        # not on every bar where price is within 0.3% of the Asia mid.
+        # Without this gate the block fired on ~32% of all bars (positional noise).
+        signal = granular_signal if is_new_event else 'NEUTRAL'
+        # simple_signal retains its own event-driven logic (used for simple mode compatibility)
         
         metadata = {
             'asia_50': round(asia_50, 2),
@@ -512,7 +514,7 @@ class AsiaSession50Percent:
         }
         
         return {
-            'signal': granular_signal,  # Granular signal (primary)
+            'signal': signal,  # Granular signal gated on is_new_event (primary)
             'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
