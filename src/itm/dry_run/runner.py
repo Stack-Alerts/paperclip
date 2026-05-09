@@ -135,6 +135,11 @@ class DryRunRunnerConfig:
     daily_loss_limit_usd: Decimal = Decimal("500.00")
     max_position_btc: Decimal = Decimal("1.0")
     log_dir: str = "logs/dry_run"
+    # Kill-switch: True = paper trading (no real exchange calls).
+    # Mirrors ITMConfig.paper_trading; default True for safety.
+    # Set to False only after explicit CTO sign-off and testnet credentials
+    # are available in the environment.
+    paper_trading: bool = True
 
     def __post_init__(self) -> None:
         if self.daily_loss_limit_usd > Decimal("500"):
@@ -209,13 +214,27 @@ class DryRunRunner:
         """
         logger.info("=" * 70)
         logger.info("ITM TESTNET DRY RUN — SECTION H.2")
-        logger.info("Target: Binance Futures TESTNET (NOT MAINNET)")
+        logger.info("paper_trading (kill-switch): %s", self._config.paper_trading)
+        if self._config.paper_trading:
+            logger.info(
+                "Target: PAPER TRADING MODE — no outbound Binance calls will be made"
+            )
+            logger.info(
+                "NOTE: pseudo-live mode does not exercise real-venue fill semantics, "
+                "websocket reconnection, rate limiting, or auth refresh — "
+                "these are known gaps, not bugs"
+            )
+        else:
+            logger.info("Target: Binance Futures TESTNET (NOT MAINNET)")
         logger.info("Min runtime: %.0f hours", self._config.min_runtime_hours)
         logger.info("=" * 70)
 
-        # Validate testnet credentials first
-        _assert_testnet_env()
-        logger.info("Testnet credentials validated ✓")
+        # Validate testnet credentials only when live exchange calls are enabled
+        if not self._config.paper_trading:
+            _assert_testnet_env()
+            logger.info("Testnet credentials validated ✓")
+        else:
+            logger.info("Paper trading mode: testnet credentials not required")
 
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._handle_signal)
@@ -243,7 +262,7 @@ class DryRunRunner:
 
     def _initialise_components(self) -> None:
         """Wire together all ITM components."""
-        from src.itm.engine.binance_client import BinanceClient
+        from src.itm.engine.binance_client import BinanceClient, PaperBinanceClient
         from src.itm.engine.execution_engine import ExecutionEngine, ExecutionEngineConfig
         from src.itm.engine.order_factory import OrderFactory
         from src.itm.engine.bracket_manager import BracketConfig
@@ -267,18 +286,25 @@ class DryRunRunner:
         )
         self._monitor.start()
 
-        logger.info("Connecting to Binance Futures Testnet ...")
-        self._binance_client = BinanceClient.from_env(use_testnet=True)
-
-        # Test connectivity by querying position size (lightweight REST call)
-        try:
-            self._binance_client.get_position_size("BTCUSDT")
-            logger.info("Binance Testnet connectivity: ✓")
-        except Exception as exc:
-            raise RuntimeError(
-                f"Cannot connect to Binance Futures Testnet: {exc}\n"
-                "Check BINANCE_TESTNET_API_KEY / BINANCE_TESTNET_API_SECRET and network."
-            ) from exc
+        if self._config.paper_trading:
+            logger.info(
+                "Paper trading mode: using PaperBinanceClient — "
+                "no exchange credentials required"
+            )
+            self._binance_client = PaperBinanceClient()
+            logger.info("PaperBinanceClient ready ✓")
+        else:
+            logger.info("Connecting to Binance Futures Testnet ...")
+            self._binance_client = BinanceClient.from_env(use_testnet=True)
+            # Test connectivity by querying position size (lightweight REST call)
+            try:
+                self._binance_client.get_position_size("BTCUSDT")
+                logger.info("Binance Testnet connectivity: ✓")
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Cannot connect to Binance Futures Testnet: {exc}\n"
+                    "Check BINANCE_TESTNET_API_KEY / BINANCE_TESTNET_API_SECRET and network."
+                ) from exc
 
         # Alert channels: log + file
         alert_log_path = str(self._log_dir / "position_alerts.jsonl")
@@ -331,6 +357,7 @@ class DryRunRunner:
                 sl_pct=Decimal("0.02"),   # 2% SL (institutional requirement)
             ),
             use_testnet=True,  # ALWAYS testnet in this module
+            paper_trading=self._config.paper_trading,
         )
         self._execution_engine = ExecutionEngine(
             risk_gate=risk_gate,
@@ -357,13 +384,19 @@ class DryRunRunner:
         self._verifier.start()
         logger.info("PositionVerifier background reconciliation started ✓")
 
-        # Start WS user-data stream
-        self._execution_engine.start_listen_key_keepalive()
-        self._binance_client.start_user_data_stream(
-            on_execution_report=self._execution_engine.handle_execution_report,
-            on_account_update=self._on_account_update,
-        )
-        logger.info("Binance WebSocket user-data stream started ✓")
+        if self._config.paper_trading:
+            logger.info(
+                "Paper trading mode: skipping WS user-data stream and "
+                "listen-key keepalive — fills are simulated synchronously"
+            )
+        else:
+            # Start WS user-data stream (live/testnet only)
+            self._execution_engine.start_listen_key_keepalive()
+            self._binance_client.start_user_data_stream(
+                on_execution_report=self._execution_engine.handle_execution_report,
+                on_account_update=self._on_account_update,
+            )
+            logger.info("Binance WebSocket user-data stream started ✓")
 
     # ------------------------------------------------------------------ #
     # Strategy loading                                                    #
@@ -740,6 +773,7 @@ class DryRunRunner:
             orders_cancelled=eng_metrics.get("orders_cancelled", self._orders_cancelled),
             issues_log=issues_log,
             outstanding_concerns=concerns,
+            paper_trading_mode=self._config.paper_trading,
         )
 
         # Save report to file
