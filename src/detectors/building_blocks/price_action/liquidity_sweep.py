@@ -136,6 +136,8 @@ class LiquiditySweep:
         self.max_wick_pct = max_wick_pct
         self.lookback = lookback
         self.last_confirmed_sweep = None
+        self.exit_conditions: list = []
+        self.entry_conditions: list = []
     
     def _determine_dual_signals(self, signal: str, active_sweep: Dict = None) -> tuple:
         """DUAL SIGNAL ARCHITECTURE - Map current state to granular + simple"""
