@@ -12,7 +12,7 @@ Run:
 import pytest
 from datetime import datetime
 
-from PyQt5.QtWidgets import QTabWidget, QPushButton, QTableWidget
+from PyQt5.QtWidgets import QTabWidget, QPushButton, QTableWidget, QTextEdit
 
 from src.strategy_builder.ui.validation_report_window import ValidationReportWindow
 from src.optimizer_v3.validation.institutional_validator import (
@@ -20,6 +20,7 @@ from src.optimizer_v3.validation.institutional_validator import (
     ValidationIssue,
     ValidationSeverity,
 )
+from src.strategy_builder.testing.walkforward_test_engine import WalkforwardResult
 
 
 # ---------------------------------------------------------------------------
@@ -189,3 +190,84 @@ def test_report_window_has_close_or_action_button(qtbot):
     assert has_close, (
         f"No close/done/cancel/ok button found; available: {button_texts}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Walkforward adjustment counts — BTCAAAAA-757
+# ---------------------------------------------------------------------------
+
+def _make_walkforward_result(tp1=5, tp2=3, tp3=1, sl=2):
+    wf = WalkforwardResult()
+    wf.tp1_adjustments = tp1
+    wf.tp2_adjustments = tp2
+    wf.tp3_adjustments = tp3
+    wf.sl_adjustments = sl
+    wf.total_positions = 10
+    total_adj = tp1 + tp2 + tp3 + sl
+    wf.adjustments_per_position = total_adj / wf.total_positions if wf.total_positions else 0.0
+    return wf
+
+
+@pytest.mark.qt_real
+def test_walkforward_section_visible_with_result(qtbot):
+    """AC1: Walkforward adjustment counts section renders when walkforward_result provided."""
+    wf = _make_walkforward_result(tp1=5, tp2=3, tp3=1, sl=2)
+    window = ValidationReportWindow(
+        report=_empty_report(), config=None, walkforward_result=wf
+    )
+    qtbot.addWidget(window)
+
+    all_text = " ".join(t.toPlainText() for t in window.findChildren(QTextEdit))
+    assert "WALKFORWARD ADJUSTMENT COUNTS" in all_text
+    assert "TP1 Adjustments" in all_text
+    assert "TP2 Adjustments" in all_text
+    assert "TP3 Adjustments" in all_text
+    assert "SL Adjustments" in all_text
+
+
+@pytest.mark.qt_real
+def test_walkforward_section_absent_without_result(qtbot):
+    """AC2: Walkforward section must not appear when walkforward_result=None."""
+    window = ValidationReportWindow(
+        report=_empty_report(), config=None, walkforward_result=None
+    )
+    qtbot.addWidget(window)
+
+    all_text = " ".join(t.toPlainText() for t in window.findChildren(QTextEdit))
+    assert "WALKFORWARD ADJUSTMENT COUNTS" not in all_text
+
+
+@pytest.mark.qt_real
+def test_no_crash_without_walkforward_result(qtbot):
+    """AC2: Window opens cleanly when no walkforward_result is provided (validation-only path)."""
+    window = ValidationReportWindow(
+        report=_empty_report(), config=None, walkforward_result=None
+    )
+    qtbot.addWidget(window)
+    assert window.centralWidget() is not None
+    assert window.centralWidget().findChild(QTabWidget) is not None
+
+
+@pytest.mark.qt_real
+def test_walkforward_zero_counts_no_crash(qtbot):
+    """AC1 edge case: zero counts and zero positions render without division error."""
+    wf = WalkforwardResult()  # all fields default to 0
+    window = ValidationReportWindow(
+        report=_empty_report(), config=None, walkforward_result=wf
+    )
+    qtbot.addWidget(window)
+    assert window.centralWidget() is not None
+
+
+@pytest.mark.qt_real
+def test_existing_tabs_unaffected_with_walkforward(qtbot):
+    """AC3: Adding walkforward_result does not break existing tabs or issue rendering."""
+    wf = _make_walkforward_result()
+    window = ValidationReportWindow(
+        report=_empty_report(), config=None, walkforward_result=wf
+    )
+    qtbot.addWidget(window)
+
+    tab = window.centralWidget().findChild(QTabWidget)
+    assert tab is not None
+    assert tab.count() >= 3, f"Expected ≥3 tabs, got {tab.count()}"
