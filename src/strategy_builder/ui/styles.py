@@ -1681,6 +1681,7 @@ def format_block_name(block_name: str) -> str:
  # ---------------------------------------------------------------------------
 # WindowGeometryMixin — deep fix for Qt window state desync (BTCAAAAA-474)
 # Multi-monitor persistence fix (BTCAAAAA-530)
+# Maximized-window screen persistence fix (BTCAAAAA-637)
 # ---------------------------------------------------------------------------
 # Qt5's saveGeometry()/restoreGeometry() bakes the Qt.WindowMaximized flag
 # into the binary blob.  When restoreGeometry() is called inside showEvent(),
@@ -1705,6 +1706,15 @@ def format_block_name(block_name: str) -> str:
 #   - Screen identity is saved alongside geometry; on restore the mixin
 #     tries the saved screen first, then any intersecting screen, then
 #     primary screen as a last resort.
+#
+# Maximized-window screen fix (BTCAAAAA-637):
+#   - When a window is closed while maximized, the normal pos/size are NOT
+#     updated (correct — they preserve the last restored state).  But without
+#     a screen hint, restore fell back to primary screen before maximizing,
+#     so a window maximized on screen 4 would re-open maximized on screen 1.
+#   - Fix: _save_window_geometry() now also writes maximized_screen_name when
+#     the window is maximized.  _restore_window_geometry() uses this key to
+#     position the window on the correct screen before showMaximized() fires.
 #
 # Usage:
 #   class MyDialog(WindowGeometryMixin, QDialog):
@@ -1745,10 +1755,17 @@ class WindowGeometryMixin:
     # ------------------------------------------------------------------ #
 
     def _save_window_geometry(self) -> None:
-        """Save pos, size, maximized state, and screen name as QSettings keys.
+        """Save pos, size, maximized state, screen name, and maximized screen name.
 
         Uses frameGeometry().topLeft() for absolute virtual-desktop coordinates
         so that multi-monitor positions are correctly preserved.
+
+        Keys written per window (GEOMETRY_SETTINGS_KEY prefix):
+          maximized            — bool: was the window maximized on close?
+          pos                  — QPoint: normal (restored) position (only when NOT maximized)
+          size                 — QSize: normal (restored) size (only when NOT maximized)
+          screen_name          — str: screen the normal window was on
+          maximized_screen_name — str: screen the window was maximized on (BTCAAAAA-637)
 
         Call from closeEvent() BEFORE super().closeEvent().
         Never call from moveEvent() or resizeEvent() — that captures
@@ -1763,6 +1780,16 @@ class WindowGeometryMixin:
             settings.setValue(f"{key}/maximized", True)
             # Keep the last *normal* pos/size already stored — they will be
             # used when the user un-maximizes next time.
+            #
+            # BTCAAAAA-637 fix: also save which screen the window is maximized on
+            # so we can restore to the correct screen even when no normal pos/size
+            # has ever been saved (e.g. window was always opened maximized).
+            maximized_center = self.frameGeometry().center()
+            maximized_screen = _QGuiApplication.screenAt(maximized_center)
+            if maximized_screen is not None:
+                settings.setValue(f"{key}/maximized_screen_name", maximized_screen.name())
+            else:
+                settings.remove(f"{key}/maximized_screen_name")
         else:
             settings.setValue(f"{key}/maximized", False)
             # Use frameGeometry() for accurate absolute virtual-desktop coords.
@@ -1805,12 +1832,24 @@ class WindowGeometryMixin:
         saved_pos = settings.value(f"{key}/pos", None)
         saved_size = settings.value(f"{key}/size", None)
         saved_screen_name = settings.value(f"{key}/screen_name", None)
+        # BTCAAAAA-637: screen the window was maximized on (saved even when no
+        # normal pos/size exists — e.g. window was always opened maximized).
+        maximized_screen_name = settings.value(f"{key}/maximized_screen_name", None)
 
         default_w, default_h = self.GEOMETRY_DEFAULT_SIZE
 
         # Determine the target size
         target_size = saved_size if saved_size is not None else _QSize(default_w, default_h)
         self.resize(target_size)
+
+        # Helper: minimum visible overlap to consider a rect "on" a screen
+        MIN_VISIBLE_W = 100
+        MIN_VISIBLE_H = 50
+
+        def _rect_is_usable(rect, screen):
+            intersection = rect.intersected(screen.availableGeometry())
+            return (intersection.width() >= MIN_VISIBLE_W and
+                    intersection.height() >= MIN_VISIBLE_H)
 
         if saved_pos is not None:
             # Build the full rect the window would occupy at the saved position
@@ -1826,17 +1865,6 @@ class WindowGeometryMixin:
                     if s.name() == saved_screen_name:
                         preferred_screen = s
                         break
-
-            # Check whether the saved rect has meaningful overlap with any screen
-            # "Meaningful" = at least 100 px wide and 50 px tall of the window
-            # is on a connected screen — enough for the user to grab and move it.
-            MIN_VISIBLE_W = 100
-            MIN_VISIBLE_H = 50
-
-            def _rect_is_usable(rect, screen):
-                intersection = rect.intersected(screen.availableGeometry())
-                return (intersection.width() >= MIN_VISIBLE_W and
-                        intersection.height() >= MIN_VISIBLE_H)
 
             # Try preferred screen first, then any screen
             target_screen = None
@@ -1862,8 +1890,33 @@ class WindowGeometryMixin:
                 # Saved screen is no longer available — fall back to primary screen
                 self._center_on_primary(default_w, default_h)
         else:
-            # No saved position — centre on primary screen on first run
-            self._center_on_primary(default_w, default_h)
+            # No saved normal position.
+            # BTCAAAAA-637: If the window was last closed while maximized on a
+            # specific screen, position it on that screen before maximizing so
+            # showMaximized() expands to the correct monitor.  Without this,
+            # the window centres on the primary screen and maximizes there,
+            # ignoring the screen where the user had placed the window.
+            if maximized and maximized_screen_name:
+                available_screens = _QGuiApplication.screens()
+                target_screen = None
+                for s in available_screens:
+                    if s.name() == maximized_screen_name:
+                        target_screen = s
+                        break
+                if target_screen is not None:
+                    # Position the window's centre on the target screen so the
+                    # OS window manager maximizes it to that screen.
+                    screen_rect = target_screen.availableGeometry()
+                    self.move(
+                        screen_rect.center().x() - default_w // 2,
+                        screen_rect.center().y() - default_h // 2,
+                    )
+                else:
+                    # The maximized screen is no longer connected — fall back
+                    self._center_on_primary(default_w, default_h)
+            else:
+                # First run or no screen hint available — centre on primary
+                self._center_on_primary(default_w, default_h)
 
         if maximized:
             # showMaximized() must be called AFTER show() / showEvent so the
