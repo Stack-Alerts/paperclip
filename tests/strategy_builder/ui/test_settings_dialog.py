@@ -30,23 +30,8 @@ BTCAAAAA-97/98 — Save & Close dialog behaviour:
 
 from __future__ import annotations
 
-import sys
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
-
-from PyQt5.QtWidgets import QApplication
-
-
-# ---------------------------------------------------------------------------
-# QApplication fixture
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    yield app
 
 
 # ---------------------------------------------------------------------------

@@ -15,25 +15,13 @@ Verifies:
 from __future__ import annotations
 
 import ast
-import sys
 import textwrap
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QApplication, QDialog, QTextBrowser, QPushButton
-
-# ---------------------------------------------------------------------------
-# QApplication singleton fixture (module-scoped for speed)
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def qapp():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    yield app
+from PyQt5.QtWidgets import QDialog, QTextBrowser, QPushButton
 
 
 # ---------------------------------------------------------------------------

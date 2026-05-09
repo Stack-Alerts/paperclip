@@ -19,23 +19,10 @@ Coverage:
 from __future__ import annotations
 
 import inspect
-import sys
 import types
 from unittest.mock import MagicMock, patch, call
 
 import pytest
-
-# ---------------------------------------------------------------------------
-# Pytest must not import PyQt5 at collection time on headless CI — guard it
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def qapp():
-    from PyQt5.QtWidgets import QApplication
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    yield app
 
 
 # ---------------------------------------------------------------------------

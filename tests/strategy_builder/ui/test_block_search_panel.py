@@ -14,22 +14,11 @@ Date: 2026-01-16
 
 import pytest
 from unittest.mock import Mock, MagicMock
-from PyQt5.QtWidgets import QApplication
 from PyQt5.QtTest import QSignalSpy
-import sys
 
 from src.strategy_builder.ui.block_search_panel import BlockSearchPanel, BlockListItem
 from src.strategy_builder.integration.strategy_builder_orchestrator import StrategyBuilderOrchestrator
 from src.strategy_builder.core.registry_interface import BlockInfo, SignalInfo, SearchResult
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    """Create QApplication instance for testing Qt widgets."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    yield app
 
 
 @pytest.fixture
