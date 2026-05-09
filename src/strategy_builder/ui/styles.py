@@ -1270,28 +1270,35 @@ def set_hand_cursor(widget):
 def apply_hand_cursor_to_buttons(parent_widget):
     """
     Apply hand cursor to clickable widgets in a widget hierarchy.
-    
+
     Successfully applies to:
     ✓ QToolButton (toolbar buttons)
     ✓ QPushButton (when set during creation)
     ✓ QRadioButton
     ✓ QCheckBox
-    ✓ QComboBox  
+    ✓ QComboBox
     ✓ QTabBar
     ✓ QSpinBox (entire widget including up/down buttons)
     ✓ QDoubleSpinBox (entire widget including up/down buttons)
-    
+
     Note: Spinbox sub-controls (up/down buttons) are not separate widgets,
     so the cursor applies to the entire spinbox including the text field.
-    
+
     Args:
         parent_widget: Parent widget (QDialog, QMainWindow, etc.)
-    
+
     Usage:
         dialog = MyDialog()
         apply_hand_cursor_to_buttons(dialog)
         dialog.show()
     """
+    try:
+        from PyQt5 import sip as _sip
+        if _sip.isdeleted(parent_widget):
+            return
+    except (ImportError, AttributeError):
+        pass
+
     from PyQt5.QtWidgets import (
         QToolButton, QPushButton, QRadioButton, 
         QCheckBox, QComboBox, QTabBar, QSpinBox, QDoubleSpinBox
