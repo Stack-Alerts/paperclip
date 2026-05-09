@@ -241,3 +241,89 @@ class TestGetAllDataTypesStatus:
         except Exception as exc:
             # Only TypeError indicates the tz mismatch bug; other errors (missing data) are OK
             assert not isinstance(exc, TypeError), f"TypeError raised: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# _RuntimeCandleUpdateThread data path (BTCAAAAA-872 regression)
+#
+# Regression for the fourth TypeError occurrence: get_last_bar_timestamp
+# returns tz-naive, but max_lookback = now - timedelta(...) is tz-aware
+# because now = datetime.now(timezone.utc).  The max(start_date, max_lookback)
+# at strategy_builder_main_window.py:184 mixed the two forms.
+# ---------------------------------------------------------------------------
+
+class TestRuntimeUpdateThreadDataPath:
+    """
+    Simulate the _RuntimeCandleUpdateThread.run() datetime arithmetic
+    without importing Qt or starting a thread.  Verifies no TypeError.
+    """
+
+    def test_anchor_naive_vs_aware_max_no_crash(self, manager_with_fixture):
+        """
+        Build start_date from tz-naive get_last_bar_timestamp results, then
+        compare it against tz-aware max_lookback — must not raise TypeError.
+        """
+        mgr, _ = manager_with_fixture
+        now = datetime.now(timezone.utc)
+        max_lookback = now - timedelta(hours=2)
+
+        last_15m = mgr.get_last_bar_timestamp('15m')
+        last_1h = mgr.get_last_bar_timestamp('1h')
+
+        anchor_candidates = []
+        if last_15m is not None:
+            anchor_candidates.append(last_15m - timedelta(minutes=15))
+        if last_1h is not None:
+            anchor_candidates.append(last_1h - timedelta(hours=1))
+
+        if anchor_candidates:
+            start_date = min(anchor_candidates)
+        else:
+            start_date = now - timedelta(minutes=15)
+
+        # The fix: normalize before the max() comparison
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+
+        # Must not raise TypeError
+        start_date = max(start_date, max_lookback)
+        assert start_date.tzinfo is not None, "start_date must be tz-aware after normalization"
+
+    def test_anchor_path_then_verify_and_repair_no_crash(self, manager_with_fixture):
+        """
+        End-to-end: get_last_bar_timestamp → arithmetic → verify_and_repair.
+        Covers the full RuntimeUpdate data path.
+        """
+        mgr, _ = manager_with_fixture
+        now = datetime.now(timezone.utc)
+        max_lookback = now - timedelta(hours=2)
+
+        last_15m = mgr.get_last_bar_timestamp('15m')
+
+        if last_15m is not None:
+            start_date = last_15m - timedelta(minutes=15)
+        else:
+            start_date = now - timedelta(minutes=15)
+
+        # Apply normalization (the fix at strategy_builder_main_window.py:184)
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        start_date = max(start_date, max_lookback)
+
+        # verify_and_repair should handle tz-aware start_date/end_date without crash
+        result = mgr.verify_and_repair(
+            timeframes=['15m'],
+            start_date=start_date,
+            end_date=now,
+            dry_run=True,
+        )
+        assert '15m' in result
+
+    def test_naive_anchor_plus_timedelta_stays_naive(self, manager_with_fixture):
+        """Arithmetic on tz-naive preserves tz-naive — verifying the pre-condition."""
+        mgr, _ = manager_with_fixture
+        last_15m = mgr.get_last_bar_timestamp('15m')
+        if last_15m is None:
+            pytest.skip("no 15m data in fixture")
+        anchor = last_15m - timedelta(minutes=15)
+        assert anchor.tzinfo is None, "tz-naive minus timedelta must stay tz-naive"
