@@ -1896,11 +1896,64 @@ class WindowGeometryMixin:
             return (intersection.width() >= MIN_VISIBLE_W and
                     intersection.height() >= MIN_VISIBLE_H)
 
-        if saved_pos is not None:
-            # Build the full rect the window would occupy at the saved position
-            saved_rect = _QRect(saved_pos, target_size)
+        def _screen_name_at(pos):
+            s = _QGuiApplication.screenAt(pos)
+            return s.name() if s is not None else "None"
 
-            # Find all currently connected screens
+        def _log_pos(label):
+            _wg_log.debug(
+                "[%s] %s: frameGeometry=%s geometry=%s windowState=%s screen=%s",
+                label, key, self.frameGeometry(), self.geometry(),
+                int(self.windowState()), _screen_name_at(self.frameGeometry().center()),
+            )
+
+        if maximized:
+            # When restoring to a maximized state, skip saved_pos positioning
+            # entirely.  Moving to saved_pos first and then to the maximized-screen
+            # centre causes a double-move that races the WM: the window may still
+            # be "on" the first screen when showMaximized() fires 50 ms later.
+            # maximized_screen_name is the sole authority for the target screen.
+            if maximized_screen_name:
+                available_screens = _QGuiApplication.screens()
+                target_screen = None
+                for s in available_screens:
+                    if s.name() == maximized_screen_name:
+                        target_screen = s
+                        break
+                if target_screen is not None:
+                    screen_rect = target_screen.availableGeometry()
+                    dest_x = screen_rect.center().x() - target_size.width() // 2
+                    dest_y = screen_rect.center().y() - target_size.height() // 2
+                    _wg_log.debug(
+                        "[PRE-MAX MOVE] %s: -> (%d,%d) screen=%s rect=%s",
+                        key, dest_x, dest_y, maximized_screen_name, screen_rect,
+                    )
+                    self.move(dest_x, dest_y)
+                    _log_pos("POST-MOVE")
+                else:
+                    _wg_log.debug(
+                        "[PRE-MAX MOVE] %s: screen %s not found, centering on primary",
+                        key, maximized_screen_name,
+                    )
+                    self._center_on_primary(default_w, default_h)
+            else:
+                _wg_log.debug("[PRE-MAX MOVE] %s: no maximized_screen_name, centering on primary", key)
+                self._center_on_primary(default_w, default_h)
+
+            # showMaximized() must be deferred: 50 ms gives Qt and the OS WM
+            # enough time to process the preceding move() before maximizing.
+            from PyQt5.QtCore import QTimer
+            _wg_log.debug("[TIMER] %s: scheduling showMaximized in 50 ms", key)
+
+            def _do_maximize():
+                _log_pos("MAXIMIZE FIRED")
+                self.showMaximized()
+
+            QTimer.singleShot(50, _do_maximize)
+
+        elif saved_pos is not None:
+            # Normal (non-maximized) restore: position at the saved normal pos.
+            saved_rect = _QRect(saved_pos, target_size)
             available_screens = _QGuiApplication.screens()
 
             # Preferred screen: the one the window was on last time (by name)
@@ -1921,89 +1974,32 @@ class WindowGeometryMixin:
                         target_screen = s
                         break
 
-            # BTCAAAAA-638 fallback: if the rect-intersection check rejected the
-            # saved position (e.g. window is very close to a screen edge with only
-            # a thin strip overlapping, < 100 px wide or < 50 px tall), try the
-            # simpler point-based lookup.  screenAt(saved_pos) asks "which screen
-            # does the saved top-left corner live on?" — it succeeds whenever the
-            # point is on any connected screen, even if the full window rect barely
-            # crosses the screen boundary.  This prevents the regression where a
-            # window near a screen edge is incorrectly snapped to the primary screen.
+            # BTCAAAAA-638 fallback: point-based lookup for windows near screen edges
             if target_screen is None:
                 point_screen = _QGuiApplication.screenAt(saved_pos)
                 if point_screen is not None:
                     target_screen = point_screen
 
             if target_screen is not None:
-                # The saved position is usable — clamp to the screen's available
-                # geometry so the window cannot be pushed behind the OS taskbar
-                # or off the edge of the screen.
                 screen_rect = target_screen.availableGeometry()
                 clamped_x = max(screen_rect.left(),
                                 min(saved_pos.x(), screen_rect.right() - MIN_VISIBLE_W))
                 clamped_y = max(screen_rect.top(),
                                 min(saved_pos.y(), screen_rect.bottom() - MIN_VISIBLE_H))
+                _wg_log.debug(
+                    "[NORMAL MOVE] %s: -> (%d,%d) clamped from saved_pos=%s screen=%s",
+                    key, clamped_x, clamped_y, saved_pos, target_screen.name(),
+                )
                 self.move(clamped_x, clamped_y)
+                _log_pos("POST-MOVE")
             else:
-                # Saved position is genuinely off all connected screens
-                # (e.g. monitor disconnected) — fall back to primary screen
-                self._center_on_primary(default_w, default_h)
-        else:
-            # No saved normal position.
-            # BTCAAAAA-637: If the window was last closed while maximized on a
-            # specific screen, position it on that screen before maximizing so
-            # showMaximized() expands to the correct monitor.  Without this,
-            # the window centres on the primary screen and maximizes there,
-            # ignoring the screen where the user had placed the window.
-            if maximized and maximized_screen_name:
-                available_screens = _QGuiApplication.screens()
-                target_screen = None
-                for s in available_screens:
-                    if s.name() == maximized_screen_name:
-                        target_screen = s
-                        break
-                if target_screen is not None:
-                    # Position the window's centre on the target screen so the
-                    # OS window manager maximizes it to that screen.
-                    screen_rect = target_screen.availableGeometry()
-                    self.move(
-                        screen_rect.center().x() - default_w // 2,
-                        screen_rect.center().y() - default_h // 2,
-                    )
-                else:
-                    # The maximized screen is no longer connected — fall back
-                    self._center_on_primary(default_w, default_h)
-            else:
-                # First run or no screen hint available — centre on primary
+                _wg_log.debug("[NORMAL MOVE] %s: saved_pos off all screens, centering on primary", key)
                 self._center_on_primary(default_w, default_h)
 
-        if maximized:
-            # BTCAAAAA-684: Ensure the window is on the correct screen before
-            # showMaximized() fires.  The preceding saved_pos branch positions
-            # the window at the last *normal* position, which may be on a
-            # different screen than where the window was last maximized.
-            # maximized_screen_name is authoritative for the maximize target.
-            if maximized_screen_name:
-                _avail = _QGuiApplication.screens()
-                for _s in _avail:
-                    if _s.name() == maximized_screen_name:
-                        _sr = _s.availableGeometry()
-                        self.move(
-                            _sr.center().x() - target_size.width() // 2,
-                            _sr.center().y() - target_size.height() // 2,
-                        )
-                        break
-            import logging as _logging
-            _logging.getLogger("WindowGeometry").debug(
-                "[MAXIMIZE] %s: moving to %s before showMaximized",
-                key, maximized_screen_name
-            )
-            # showMaximized() must be deferred: 50 ms gives Qt and the OS
-            # window manager enough time to finish the initial layout/paint
-            # cycle so showMaximized() reliably fills the screen.
-            # (See BTCAAAAA-474/475 for why 0 ms is insufficient.)
-            from PyQt5.QtCore import QTimer
-            QTimer.singleShot(50, self.showMaximized)
+        else:
+            # No saved position and not maximized — first run or cleared state.
+            _wg_log.debug("[FIRST RUN] %s: centering on primary", key)
+            self._center_on_primary(default_w, default_h)
 
     # ------------------------------------------------------------------ #
     # Internal helpers                                                     #
