@@ -23,7 +23,7 @@ from typing import Optional
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QAction, QToolBar, QStatusBar, QFileDialog, QMessageBox, QLabel,
-    QDialog, QPushButton, QTextBrowser
+    QDialog, QPushButton, QTextBrowser, QGridLayout
 )
 from PyQt5.QtCore import Qt, QSize, QSettings, QTimer, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon, QKeySequence, QFont
@@ -47,10 +47,11 @@ from src.strategy_builder.ui.stepper_ribbon import StepperRibbon
 from src.strategy_builder.ui.styles import (
     get_main_stylesheet, apply_hand_cursor_to_buttons,
     get_dialog_stylesheet, create_font, get_primary_button_stylesheet,
-    WindowGeometryMixin,
+    get_color, WindowGeometryMixin,
 )
 from src.strategy_builder.ui.new_strategy_dialog import NewStrategyDialog
 from src.strategy_builder.ui.strategy_browser_dialog import StrategyBrowserDialog
+from src.strategy_builder.ui.backtest_config_panel import BacktestWorker
 from src.optimizer_v3.database import get_database_manager
 from src.strategy_builder.ui.settings_dialog import SettingsDialog
 
@@ -229,6 +230,71 @@ class _RuntimeCandleUpdateThread(QThread):
             self.finished.emit(False, f"Runtime update error: {exc}\n{traceback.format_exc()}")
 
 
+class QuickPreviewResultsDialog(QDialog):
+    """Simple popup showing 30-day backtest summary metrics."""
+
+    def __init__(self, win_rate: float, total_signals: int, total_trades: int,
+                 avg_return: float, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Quick Preview — 30-Day Backtest")
+        self.setModal(True)
+        self.setMinimumWidth(320)
+        self.setStyleSheet(get_dialog_stylesheet())
+        self._build_ui(win_rate, total_signals, total_trades, avg_return)
+
+    def _build_ui(self, win_rate: float, total_signals: int, total_trades: int,
+                  avg_return: float):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        title = QLabel("30-Day Backtest Summary")
+        title.setFont(create_font(13, bold=True))
+        title.setStyleSheet(f"color: {get_color('text_primary')};")
+        layout.addWidget(title)
+
+        grid = QGridLayout()
+        grid.setSpacing(8)
+        grid.setColumnMinimumWidth(0, 160)
+
+        metrics = [
+            ("Win Rate", f"{win_rate:.1f}%",
+             'success' if win_rate >= 50 else 'error'),
+            ("Total Signals", str(total_signals), 'text_primary'),
+            ("Total Trades", str(total_trades), 'text_primary'),
+            ("Avg Return / Trade", f"{avg_return:+.2f}%",
+             'success' if avg_return >= 0 else 'error'),
+        ]
+
+        for row, (label, value, color_key) in enumerate(metrics):
+            lbl = QLabel(f"{label}:")
+            lbl.setFont(create_font(10))
+            lbl.setStyleSheet(f"color: {get_color('text_muted')};")
+
+            val = QLabel(value)
+            val.setFont(create_font(11, bold=True))
+            val.setStyleSheet(f"color: {get_color(color_key)};")
+
+            grid.addWidget(lbl, row, 0)
+            grid.addWidget(val, row, 1)
+
+        layout.addLayout(grid)
+
+        if total_trades == 0:
+            note = QLabel("No trades found in this 30-day period.\n"
+                          "Try lowering the confluence threshold.")
+            note.setFont(create_font(9))
+            note.setWordWrap(True)
+            note.setStyleSheet(f"color: {get_color('text_muted')};")
+            layout.addWidget(note)
+
+        close_btn = QPushButton("Close")
+        close_btn.setFont(create_font(10))
+        close_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+
+
 class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
     """
     Main application window for Strategy Builder.
@@ -281,7 +347,12 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         self.browser_window: Optional[StrategyBrowserDialog] = None
         self.backtest_window: Optional[BacktestConfigDialog] = None
         self.log_viewer_window: Optional['LogViewerWindow'] = None
-        
+
+        # Quick Preview state
+        self._preview_worker: Optional[BacktestWorker] = None
+        self._preview_trades: list = []
+        self.preview_btn: Optional[QPushButton] = None
+
         # Auto-update timers
         self.candle_check_timer: Optional[QTimer] = None
         self.retry_timer: Optional[QTimer] = None
@@ -592,7 +663,19 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         save_action.setToolTip("Save the current strategy to the database (Ctrl+S)")
         save_action.triggered.connect(self._on_save_strategy)
         toolbar.addAction(save_action)
-        
+
+        # Quick Preview button
+        self.preview_btn = QPushButton("Quick Preview")
+        self.preview_btn.setFont(create_font(10, bold=True))
+        self.preview_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        self.preview_btn.setToolTip(
+            "Run a 30-day historical backtest preview in the background.\n"
+            "Shows win rate, total trades, and average return."
+        )
+        self.preview_btn.setStatusTip("Run 30-day quick preview backtest")
+        self.preview_btn.clicked.connect(self._on_quick_preview)
+        toolbar.addWidget(self.preview_btn)
+
         toolbar.addSeparator()
         
         # Add stepper - make it expand to fill toolbar so internal margin works
@@ -1331,7 +1414,121 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error opening backtest dialog: {str(e)}")
             self._update_status("Backtest configuration failed to open")
-    
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Quick Preview (BTCAAAAA-749)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _on_quick_preview(self):
+        """Start a 30-day historical backtest in a background thread."""
+        if self._preview_worker and self._preview_worker.isRunning():
+            QMessageBox.information(
+                self, "Preview Running",
+                "A quick preview is already running. Please wait."
+            )
+            return
+
+        config = self.orchestrator.get_current_config()
+        if not config or not getattr(config, 'blocks', None):
+            QMessageBox.warning(
+                self, "No Strategy",
+                "Add blocks to your strategy before running a preview."
+            )
+            return
+
+        try:
+            strategy_config = self.orchestrator.persistence._config_to_dict(config)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not read strategy config: {e}")
+            return
+
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=30)
+        backtest_config = {
+            'lookback_days': 30,
+            'mode': 1,
+            'tpsl_mode': 'Fibonacci',
+            'sl_mode': 'Static',
+            'timeframe': '15m',
+            'starting_capital': 10000,
+            'risk_per_trade_pct': 2.0,
+            'min_risk_reward': 1.5,
+            'max_leverage': 10,
+            'confluence_threshold': strategy_config.get('confluence_threshold', 40),
+            'max_bars_held': 200,
+            'use_multicore': False,
+            'start_date': start_date,
+            'end_date': end_date,
+            'training_window': 20,
+            'testing_window': 10,
+            'training_end': start_date + timedelta(days=20),
+            'testing_start': start_date + timedelta(days=20),
+            'adaptive_sl': {
+                'enabled': False,
+                'delay_enabled': False,
+                'delay_bars': 5,
+                'emergency_sl_pct': 3.0,
+                'volatility_lookback': 20,
+                'volatility_multiplier': 1.2,
+                'min_sl_pct': 0.5,
+                'max_sl_pct': 2.0,
+                'use_structure_sl': False,
+                'structure_sources': ['swing_points', 'supply_demand', 'fibonacci'],
+            },
+        }
+
+        self._preview_trades = []
+        self._preview_worker = BacktestWorker(strategy_config, backtest_config)
+        self._preview_worker.trade_data_emit.connect(self._on_preview_trade_data)
+        self._preview_worker.backtest_finished.connect(self._on_preview_finished)
+
+        if self.preview_btn:
+            self.preview_btn.setEnabled(False)
+            self.preview_btn.setText("Running...")
+
+        self._preview_worker.start()
+        self._update_status("Quick Preview running — 30-day backtest in background...")
+
+    def _on_preview_trade_data(self, trade: dict):
+        """Collect closed trade records emitted by the preview worker."""
+        if trade.get('status') == 'CLOSED':
+            self._preview_trades.append(trade)
+
+    def _on_preview_finished(self, success: bool, results: dict):
+        """Show the results popup once the preview worker finishes."""
+        if self.preview_btn:
+            self.preview_btn.setEnabled(True)
+            self.preview_btn.setText("Quick Preview")
+
+        if not success:
+            err = results.get('error', 'Unknown error')
+            QMessageBox.critical(
+                self, "Quick Preview Failed",
+                f"Preview failed:\n{err}"
+            )
+            self._update_status("Quick Preview failed")
+            return
+
+        total_trades = results.get('trades', 0)
+        closed = self._preview_trades
+
+        win_rate = 0.0
+        avg_return = 0.0
+        if closed:
+            winners = sum(1 for t in closed if t.get('pnl', 0) > 0)
+            win_rate = (winners / len(closed)) * 100
+            avg_return = sum(t.get('pnl_pct', 0) for t in closed) / len(closed)
+
+        dialog = QuickPreviewResultsDialog(
+            win_rate=win_rate,
+            total_signals=total_trades,
+            total_trades=total_trades,
+            avg_return=avg_return,
+            parent=self,
+        )
+        dialog.exec_()
+        self._update_status("Quick Preview complete")
+
     def _on_step_clicked(self, step: int):
         """
         Handle stepper ribbon step click with workflow enforcement.
