@@ -338,7 +338,21 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         # Window properties
         self.setWindowTitle("BTC Trade Engine - Strategy Builder")
         self.setGeometry(100, 100, 1400, 900)
-        
+
+        # BTCAAAAA-659: Explicit window flags guarantee the maximize/minimize
+        # buttons are present on all platforms (especially Linux window managers
+        # that do not expose these controls by default for a bare QMainWindow).
+        # Qt.Window ensures an independent top-level window; the three Hint flags
+        # make the standard OS title-bar controls unconditionally visible.
+        # This mirrors the pattern already used by SettingsDialog (BTCAAAAA-240)
+        # and StrategyBrowserDialog.
+        self.setWindowFlags(
+            Qt.Window
+            | Qt.WindowMaximizeButtonHint
+            | Qt.WindowMinimizeButtonHint
+            | Qt.WindowCloseButtonHint
+        )
+
         # Use OS title bar (change via GNOME theme - see TITLE_BAR_COLOR_FIX.md)
         
         # Apply centralized dark theme stylesheet
