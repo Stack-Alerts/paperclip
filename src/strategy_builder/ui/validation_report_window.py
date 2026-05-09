@@ -47,6 +47,7 @@ from src.strategy_builder.validation.auto_fix import (
 )
 from src.strategy_builder.validation.undo_manager import UndoManager
 from src.strategy_builder.ui.auto_fix_confirm_dialog import AutoFixConfirmDialog
+from src.strategy_builder.testing.walkforward_test_engine import WalkforwardResult
 
 import logging
 logger = logging.getLogger(__name__)
@@ -72,13 +73,20 @@ class ValidationReportWindow(WindowGeometryMixin, QMainWindow):
     GEOMETRY_SETTINGS_KEY = "validationReportWindow"
     GEOMETRY_DEFAULT_SIZE = (1000, 700)
     
-    def __init__(self, report: ValidationReport, config: any, parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        report: ValidationReport,
+        config: any,
+        parent: Optional[QWidget] = None,
+        walkforward_result: Optional[WalkforwardResult] = None,
+    ):
         """Initialize professional validation window"""
         super().__init__(parent)
         self.report = report
         self.config = config
+        self.walkforward_result = walkforward_result
         self.undo_manager = UndoManager()
-        
+
         self._init_ui()
         self._populate_data()
 
@@ -666,9 +674,18 @@ class ValidationReportWindow(WindowGeometryMixin, QMainWindow):
         )
         layout.addWidget(direction_section['widget'], 1)
         self.metrics_sections.append(direction_section)
-        
+
+        # Walkforward Adjustment Counts - only shown when walkforward_result is provided
+        if self.walkforward_result is not None:
+            walkforward_section = self._create_metrics_collapsible_section(
+                "📊 Walkforward Adjustment Counts",
+                self._get_walkforward_adjustment_info()
+            )
+            layout.addWidget(walkforward_section['widget'], 1)
+            self.metrics_sections.append(walkforward_section)
+
         # NO addStretch() - let sections expand to fill space
-        
+
         return widget
     
     def _create_metrics_collapsible_section(self, title: str, content: str, title_color: str = "#095983") -> dict:
@@ -1052,7 +1069,27 @@ class ValidationReportWindow(WindowGeometryMixin, QMainWindow):
         lines.append("✓ FLEXIBLE mode maximizes TP capture rate")
         
         return "\n".join(lines)
-    
+
+    def _get_walkforward_adjustment_info(self) -> str:
+        """Format walkforward adjustment counts for the Metrics tab section."""
+        wf = self.walkforward_result
+        lines = []
+        lines.append("WALKFORWARD ADJUSTMENT COUNTS")
+        lines.append("=" * 60)
+        lines.append("")
+        lines.append(f"  {'Metric':<35} {'Value':>10}")
+        lines.append(f"  {'-'*35} {'-'*10}")
+        lines.append(f"  {'TP1 Adjustments (total)':<35} {wf.tp1_adjustments:>10,}")
+        lines.append(f"  {'TP2 Adjustments (total)':<35} {wf.tp2_adjustments:>10,}")
+        lines.append(f"  {'TP3 Adjustments (total)':<35} {wf.tp3_adjustments:>10,}")
+        lines.append(f"  {'SL Adjustments (total)':<35} {wf.sl_adjustments:>10,}")
+        lines.append(f"  {'-'*35} {'-'*10}")
+        lines.append(f"  {'Avg Adjustments / Position':<35} {wf.adjustments_per_position:>10.2f}")
+        lines.append(f"  {'Total Positions':<35} {wf.total_positions:>10,}")
+        lines.append("")
+        lines.append("=" * 60)
+        return "\n".join(lines)
+
     def _get_timing_conflicts_info(self) -> str:
         """Get timing conflicts detailed info with clear explanation"""
         if not self.report.timing_conflicts:
