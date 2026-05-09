@@ -599,7 +599,14 @@ class AIRecommendationsPanel(QWidget):
                         signal_desc = signal.get('description', 'No description')
                         output += f"      - {signal_name}: {signal_desc}\n"
                 else:
-                    logger.warning(f"   ⚠️ Block {block.get('name')} has NO signals!")
+                    if block.get('in_strategy'):
+                        # Full (in-strategy) blocks should always have signals from registry
+                        logger.warning(
+                            "   ⚠️ Strategy block %s has NO signals! "
+                            "Check signal_tiers in BlockRegistry for this block.",
+                            block.get('name'),
+                        )
+                    # Compact (non-strategy) blocks have empty signals by design — no warning
                 output += "\n"
         
         self.blocks_text.setPlainText(output)

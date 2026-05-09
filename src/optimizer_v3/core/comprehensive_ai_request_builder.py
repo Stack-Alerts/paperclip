@@ -574,6 +574,16 @@ class ComprehensiveAIRequestBuilder:
                                 }
                                 block_info['signals'].append(signal_info)
                     
+                    # BTCAAAAA-736: log if a full (in-strategy) block ends up with empty signals
+                    if not block_info['signals']:
+                        tiers = metadata.signal_tiers if metadata.signal_tiers else {}
+                        logger.warning(
+                            "BTCAAAAA-736 DIAG: Strategy block '%s' has EMPTY signals in catalog. "
+                            "signal_tiers has %d entries. "
+                            "Check: are all entries marked ui_visible=False? "
+                            "block in registry: %s",
+                            block_name, len(tiers), bool(metadata),
+                        )
                     blocks_catalog.append(block_info)
                 else:
                     # --- B3: Compact format for blocks NOT in strategy ---
