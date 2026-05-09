@@ -28,6 +28,8 @@ Author: Strategy Builder Team
 Date: 2026-01-17
 """
 
+import hashlib
+import json
 from typing import Optional
 from decimal import Decimal, DecimalException
 from PyQt5.QtWidgets import (
@@ -1030,6 +1032,10 @@ class BacktestConfigPanel(QWidget):
         # Storage for custom preset values
         self.custom_values = {}
         self._loading_preset = False  # Flag to prevent auto-switch to Custom during preset load
+
+        # Calibration cache — in-memory only, not persisted across restarts
+        self._calibration_fingerprint: Optional[str] = None  # SHA-256 hex of last calibrated settings
+        self._calibration_cache: Optional[dict] = None  # delay_map from last successful calibration
         
         # INSTITUTIONAL PATTERN: Data cache manager (singleton)
         from src.optimizer_v3.core.data_cache_manager import get_data_cache_manager
@@ -2355,6 +2361,11 @@ class BacktestConfigPanel(QWidget):
         - Lookback: 180 days
         - Mode: production (full data)
 
+        A SHA-256 fingerprint of the calibration inputs (sorted block names,
+        timeframe, period, mode) is computed before each run.  If the fingerprint
+        matches the one from the last successful calibration, the cached
+        ``delay_map`` is applied directly and calibration is skipped.
+
         On success, optimal delay parameters are applied to each block in
         strategy_config_dict in-place.
 
@@ -2367,6 +2378,50 @@ class BacktestConfigPanel(QWidget):
             logger.info("Auto-calibration: no blocks found, skipping.")
             return
 
+        block_names = sorted(
+            b.get('name') or b.get('block_name') or f"block_{i}"
+            for i, b in enumerate(blocks)
+        )
+
+        # Compute fingerprint of the current calibration inputs
+        fingerprint_payload = {
+            "block_names": block_names,
+            "timeframe": "15m",
+            "period_days": 180,
+            "mode": "production",
+        }
+        current_fingerprint = hashlib.sha256(
+            json.dumps(fingerprint_payload, sort_keys=True).encode()
+        ).hexdigest()
+
+        # Cache-hit path: settings unchanged since last successful calibration
+        if (
+            self._calibration_fingerprint is not None
+            and self._calibration_cache is not None
+            and current_fingerprint == self._calibration_fingerprint
+        ):
+            logger.info("Auto-calibration: cache hit — applying cached delay_map.")
+            self.results_text.setText(
+                "✓ Calibration already complete for current settings — skipping. Using cached parameters."
+            )
+            QApplication.processEvents()
+            # Apply cached delay_map to blocks
+            for block in blocks:
+                bname = block.get('name') or block.get('block_name', '')
+                if bname in self._calibration_cache:
+                    block['optimal_delay'] = self._calibration_cache[bname]
+                    logger.info(
+                        f"Auto-calibration cache: applied optimal_delay={self._calibration_cache[bname]} "
+                        f"to block '{bname}'"
+                    )
+            return
+
+        # Cache-miss path: settings changed or first run — run calibration
+        self.results_text.setText(
+            "⚙️ Calibration required — running calibration before backtest..."
+        )
+        QApplication.processEvents()
+
         # Show indeterminate progress animation while calibration runs
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setFormat("Calibrating blocks...")
@@ -2374,7 +2429,7 @@ class BacktestConfigPanel(QWidget):
         self.run_btn.setEnabled(False)
         QApplication.processEvents()
 
-        self.results_text.setText(
+        self.results_text.append(
             "⚙️ Running signal calibration on all blocks (15m)...\n"
             "This may take a moment."
         )
@@ -2382,11 +2437,6 @@ class BacktestConfigPanel(QWidget):
 
         try:
             from src.optimizer_v3.core.training_thread import TrainingThread
-
-            block_names = [
-                b.get('name') or b.get('block_name') or f"block_{i}"
-                for i, b in enumerate(blocks)
-            ]
 
             # Run the training thread synchronously in the current thread by
             # calling its run() logic directly via a temporary QThread.
@@ -2456,6 +2506,12 @@ class BacktestConfigPanel(QWidget):
                         logger.info(
                             f"Auto-calibration: applied optimal_delay={delay_map[bname]} to block '{bname}'"
                         )
+
+                # Store fingerprint and results for future cache hits
+                # (only cached when NOT in simulation mode so dummy delays are never reused)
+                self._calibration_fingerprint = current_fingerprint
+                self._calibration_cache = delay_map
+                logger.info("Auto-calibration: cache updated with new fingerprint.")
 
             self.results_text.append("✓ Calibration complete. Starting backtest...")
             # Reset progress bar; run_btn remains disabled until backtest finishes
