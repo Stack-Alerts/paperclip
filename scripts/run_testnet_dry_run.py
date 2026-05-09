@@ -21,18 +21,29 @@ Usage
     # Quick smoke test (1 hour):
     python scripts/run_testnet_dry_run.py --min-hours 1
 
-Environment variables required
---------------------------------
-  BINANCE_TESTNET_API_KEY     — Binance Futures Testnet API key
-  BINANCE_TESTNET_API_SECRET  — Binance Futures Testnet API secret
+Environment variables
+---------------------
+  ITM_PAPER_TRADING           — Set to ``true`` / ``1`` / ``yes`` to run in
+                                paper-trading (kill-switch OFF) mode. No
+                                Binance credentials are required in this mode.
+                                Defaults to ``false`` (live mode) when unset or
+                                blank — do not leave this unset in production.
 
-Both must be set and non-empty. Testnet keys can be obtained from:
-  https://testnet.binancefuture.com
+  BINANCE_TESTNET_API_KEY     — Binance Futures Testnet API key.
+                                Required only when ``ITM_PAPER_TRADING`` is OFF.
+  BINANCE_TESTNET_API_SECRET  — Binance Futures Testnet API secret.
+                                Required only when ``ITM_PAPER_TRADING`` is OFF.
+
+Testnet keys can be obtained from:  https://testnet.binancefuture.com
 
 Safety
 ------
-This script ALWAYS targets Binance Futures TESTNET. It will refuse to run if
-the testnet credentials are not configured.
+When ``ITM_PAPER_TRADING=true``, the kill-switch suppresses all outbound Binance
+API calls (place / adjust / exit). The script runs fully without credentials and
+logs every suppressed order instead of sending it.
+
+When ``ITM_PAPER_TRADING`` is OFF (default), the script targets Binance Futures
+TESTNET and will raise ``RuntimeError`` if credentials are not configured.
 
 After the run completes, the dry-run report is saved to:
   logs/dry_run/dry_run_report.md
