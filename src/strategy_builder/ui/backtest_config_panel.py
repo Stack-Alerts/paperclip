@@ -2411,6 +2411,90 @@ class BacktestConfigPanel(QWidget):
                     f"to block '{bname}'"
                 )
 
+    def _repair_if_unreachable(self, strategy_config_dict: dict) -> Optional[dict]:
+        """Check whether the strategy can theoretically reach its confluence threshold.
+
+        If the sum of all configured signal weights is less than the threshold,
+        the backtest would produce zero trades regardless of market conditions.
+        In that case, attempt to repair by merging missing blocks from
+        ``user_strategies/current_strategy.json`` (the user's saved ground-truth).
+
+        Returns the (possibly repaired) config dict, or None to abort the run.
+        """
+        from pathlib import Path
+
+        blocks = strategy_config_dict.get('blocks', [])
+        threshold = strategy_config_dict.get('confluence_threshold', 40)
+        max_possible = sum(
+            s.get('weight', 10)
+            for block in blocks
+            for s in block.get('signals', [])
+        )
+
+        if max_possible >= threshold:
+            return strategy_config_dict  # Reachable — nothing to do
+
+        strategy_name = strategy_config_dict.get('name', '')
+        json_path = Path('user_strategies/current_strategy.json')
+        repaired = False
+
+        if json_path.exists():
+            try:
+                with open(json_path) as fh:
+                    ref = json.load(fh)
+
+                if ref.get('name') == strategy_name:
+                    current_block_names = {b['name'] for b in blocks}
+                    ref_blocks = ref.get('blocks', [])
+                    added = []
+                    for ref_block in ref_blocks:
+                        if ref_block['name'] not in current_block_names:
+                            blocks.append(ref_block)
+                            added.append(ref_block['name'])
+
+                    if added:
+                        strategy_config_dict['blocks'] = blocks
+                        new_max = sum(
+                            s.get('weight', 10)
+                            for block in blocks
+                            for s in block.get('signals', [])
+                        )
+                        logger.warning(
+                            f"⚠️ Confluence repair: added missing block(s) {added} "
+                            f"from current_strategy.json "
+                            f"(max now {new_max}pts, threshold {threshold}pts)"
+                        )
+                        self.results_text.setText(
+                            f"⚠️ Strategy repair: {len(added)} block(s) restored from "
+                            f"user_strategies/current_strategy.json\n"
+                            f"  Added: {', '.join(added)}\n"
+                            f"  Reason: without them max confluence = {max_possible}pts "
+                            f"< {threshold}pt threshold → guaranteed 0 trades.\n\n"
+                            f"Starting repaired backtest..."
+                        )
+                        repaired = True
+
+                        if new_max < threshold:
+                            self.results_text.setText(
+                                f"❌ Unreachable confluence threshold after repair.\n"
+                                f"Max achievable: {new_max}pts  Threshold: {threshold}pts\n\n"
+                                f"Lower the confluence threshold or add more blocks."
+                            )
+                            return None
+            except Exception as exc:
+                logger.warning(f"confluence repair: failed to load JSON fallback: {exc}")
+
+        if not repaired:
+            self.results_text.setText(
+                f"❌ Unreachable confluence threshold: {max_possible}pts max "
+                f"< {threshold}pt threshold.\n\n"
+                f"Every bar will score below threshold → 0 trades guaranteed.\n"
+                f"Lower the threshold or add more blocks to the strategy."
+            )
+            return None
+
+        return strategy_config_dict
+
     def _run_auto_calibration(self, strategy_config_dict: dict) -> None:
         """
         Run signal calibration automatically on all strategy blocks before backtest.
@@ -2651,6 +2735,13 @@ class BacktestConfigPanel(QWidget):
         # CRITICAL FIX: Inject UI confluence threshold into strategy config
         # The serialized config doesn't include UI values - must add manually
         strategy_config_dict['confluence_threshold'] = self.confluence_spin.value()
+
+        # CONFLUENCE REACHABILITY CHECK: if configured signals can never reach the
+        # threshold (e.g. a block was dropped from the DB copy of the strategy),
+        # try to repair by merging missing blocks from user_strategies/current_strategy.json.
+        strategy_config_dict = self._repair_if_unreachable(strategy_config_dict)
+        if strategy_config_dict is None:
+            return  # Blocked — error already shown in results_text
 
         # AUTO-CALIBRATION: Run signal calibration on all blocks before backtest
         self._run_auto_calibration(strategy_config_dict)

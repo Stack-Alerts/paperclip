@@ -590,7 +590,8 @@ class AIRequestPreviewWindow(QMainWindow):
                         signal_desc = signal.get('description', 'No description')
                         output += f"      - {signal_name}: {signal_desc}\n"
                 else:
-                    logger.warning(f"   ⚠️ Block {block.get('name')} has NO signals!")
+                    if block.get('in_strategy'):
+                        logger.warning(f"   ⚠️ Block {block.get('name')} has NO signals!")
                 output += "\n"
         
         self.blocks_text.setPlainText(output)
