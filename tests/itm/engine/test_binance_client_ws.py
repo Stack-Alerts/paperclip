@@ -177,3 +177,70 @@ class TestWebSocketReconnect:
             full_key[:8] in record.getMessage()
             for record in caplog.records
         ), "Expected first 8 chars of listen key in log, but not found"
+
+
+# ---------------------------------------------------------------------------
+# Keep-alive listen key tests (FDR-846)
+# ---------------------------------------------------------------------------
+
+
+class TestRealClientKeepAlive:
+    """Verify keep_alive_listen_key() issues a REST PUT to /fapi/v1/listenKey.
+
+    Mocks the session so no real HTTP traffic is generated.
+    """
+
+    def test_put_issued_with_valid_listen_key(self, client):
+        """PUT to /fapi/v1/listenKey is made when a listen key is set."""
+        client._listen_key = "test-listen-key-12345"
+
+        client.keep_alive_listen_key()
+
+        assert client._session.request.called
+        call_args = client._session.request.call_args
+        method = call_args[0][0] if call_args[0] else call_args[1].get("method")
+        url = call_args[0][1] if len(call_args[0]) > 1 else call_args[1].get("url")
+        assert method == "PUT"
+        assert "/fapi/v1/listenKey" in url
+
+    def test_listen_key_included_in_request_data(self, client):
+        """The PUT data must include the current listen key."""
+        client._listen_key = "abcdefgh-keepalive-token"
+
+        client.keep_alive_listen_key()
+
+        call_args = client._session.request.call_args
+        data = call_args[1].get("data") or (call_args[0][2] if len(call_args[0]) > 2 else {})
+        assert data.get("listenKey") == "abcdefgh-keepalive-token", (
+            "listenKey must be forwarded in the PUT data so Binance extends the TTL"
+        )
+
+    def test_no_request_when_listen_key_is_none(self, client):
+        """keep_alive_listen_key() must be a no-op when no listen key is active."""
+        client._listen_key = None
+
+        client.keep_alive_listen_key()
+
+        client._session.request.assert_not_called()
+
+    def test_no_request_when_listen_key_is_empty_string(self, client):
+        """keep_alive_listen_key() must be a no-op when listen key is empty string."""
+        client._listen_key = ""
+
+        client.keep_alive_listen_key()
+
+        client._session.request.assert_not_called()
+
+    def test_repeated_calls_each_issue_a_put(self, client):
+        """Each invocation (one per keepalive interval) issues its own PUT.
+
+        Simulates two interval firings: the session must be called twice.
+        """
+        client._listen_key = "repeating-keepalive-key"
+
+        client.keep_alive_listen_key()
+        client.keep_alive_listen_key()
+
+        assert client._session.request.call_count == 2, (
+            "Expected exactly 2 PUT calls — one per keepalive interval firing"
+        )
