@@ -599,7 +599,7 @@ class UnifiedDataManager:
                 try:
                     df_temp = pd.read_parquet(file, columns=['timestamp'])
                     if len(df_temp) > 0:
-                        file_start = pd.to_datetime(df_temp['timestamp'].iloc[0])
+                        file_start = pd.to_datetime(df_temp['timestamp'].iloc[0], utc=True)
                         if earliest_timestamp is None or file_start < earliest_timestamp:
                             earliest_timestamp = file_start
                             # Once we find the earliest file, we can break since files are sorted
@@ -775,11 +775,11 @@ class UnifiedDataManager:
                     try:
                         df = pd.read_parquet(last_file, columns=[col])
                         if len(df) > 0:
-                            end_date = pd.to_datetime(df[col].iloc[-1])
+                            end_date = pd.to_datetime(df[col].iloc[-1], utc=True)
                             break
                     except:
                         continue
-                
+
                 if end_date is None:
                     # Fallback to filename
                     last_date_str = last_file.stem.split('_')[-1]
@@ -787,10 +787,6 @@ class UnifiedDataManager:
                     from calendar import monthrange
                     last_day = monthrange(year, month)[1]
                     end_date = datetime(year, month, last_day, 23, 59, 59, tzinfo=timezone.utc)
-
-                # Normalize pd.to_datetime result to UTC-aware for consistent gap arithmetic
-                if end_date is not None and end_date.tzinfo is None:
-                    end_date = end_date.replace(tzinfo=timezone.utc)
 
                 # Calculate gap FIRST
                 gap_days = (datetime.now(timezone.utc) - end_date).days
@@ -810,9 +806,7 @@ class UnifiedDataManager:
                                 try:
                                     df_temp = pd.read_parquet(file, columns=['timestamp'])
                                     if len(df_temp) > 0:
-                                        file_end = pd.to_datetime(df_temp['timestamp'].iloc[-1])
-                                        if file_end.tzinfo is None:
-                                            file_end = file_end.replace(tzinfo=timezone.utc)
+                                        file_end = pd.to_datetime(df_temp['timestamp'].iloc[-1], utc=True)
                                         if latest_timestamp is None or file_end > latest_timestamp:
                                             latest_timestamp = file_end
                                 except:
@@ -905,7 +899,7 @@ class UnifiedDataManager:
                         try:
                             df = pd.read_parquet(last_parquet, columns=[col])
                             if len(df) > 0:
-                                lakeapi_end = pd.to_datetime(df[col].iloc[-1])
+                                lakeapi_end = pd.to_datetime(df[col].iloc[-1], utc=True)
                                 break
                         except:
                             continue
@@ -955,7 +949,11 @@ class UnifiedDataManager:
             timeframe: Timeframe to check (e.g. ``'15m'``, ``'1h'``).
 
         Returns:
-            Timezone-naive ``datetime`` of the last stored bar, or ``None``.
+            Timezone-naive UTC ``datetime`` of the last stored bar, or ``None``.
+            Intentionally tz-naive to match on-disk parquet convention.
+            Callers that pass this result into a comparison-path function must
+            either rely on that function's entry-point normalization or add
+            ``.replace(tzinfo=timezone.utc)`` themselves.
         """
         import pandas as pd
 
@@ -1020,6 +1018,12 @@ class UnifiedDataManager:
                     'timeframe': str,
                 }
         """
+        # Normalize caller datetimes — accept both naive (assumed UTC) and aware
+        if start_date is not None and start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        if end_date is not None and end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+
         tf_minutes = {
             '1m': 1, '3m': 3, '5m': 5, '15m': 15, '30m': 30,
             '1h': 60, '2h': 120, '4h': 240, '6h': 360, '12h': 720, '1d': 1440,
@@ -1054,9 +1058,9 @@ class UnifiedDataManager:
             try:
                 from calendar import monthrange
                 year, month = int(m.group(1)[:4]), int(m.group(1)[5:])
-                file_month_start = datetime(year, month, 1)
+                file_month_start = datetime(year, month, 1, tzinfo=timezone.utc)
                 last_day = monthrange(year, month)[1]
-                file_month_end = datetime(year, month, last_day, 23, 59, 59)
+                file_month_end = datetime(year, month, last_day, 23, 59, 59, tzinfo=timezone.utc)
                 if start_date is not None and file_month_end < start_date:
                     return False
                 if end_date is not None and file_month_start > end_date:
@@ -1075,7 +1079,7 @@ class UnifiedDataManager:
         for f in files:
             try:
                 df = pd.read_parquet(f, columns=['timestamp'])
-                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
                 frames.append(df)
             except Exception as exc:
                 logger.warning(f"   ⚠️  Could not read {f.name}: {exc}")
@@ -1317,6 +1321,9 @@ class UnifiedDataManager:
 
         Args:
             df:         DataFrame with new bars (must have 'timestamp' column).
+                        Timestamps may be tz-aware or tz-naive; tz info is
+                        stripped before writing to preserve the intentional
+                        tz-naive UTC on-disk convention.
             timeframe:  Timeframe string used in the filename (e.g. '15m').
         """
         if df.empty:

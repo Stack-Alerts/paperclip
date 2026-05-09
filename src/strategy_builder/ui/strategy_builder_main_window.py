@@ -121,12 +121,11 @@ class _RuntimeCandleUpdateThread(QThread):
             logger.info(f"[RuntimeUpdate] cycle start")
             manager = UnifiedDataManager(mode='live')
 
-            # Use utcnow() so end_date passed to verify_and_repair and
-            # detect_gaps is UTC-consistent with tz-naive bar timestamps on disk.
-            # datetime.now() (local CEST = UTC+2) produces a gap_end 2h ahead of
-            # any UTC bar, causing _fetch_binance_range's filter_end to exclude
-            # all bars except the first one (only 1 bar written per cycle).
-            now = datetime.utcnow()
+            # Use datetime.now(timezone.utc) for a tz-aware UTC now.
+            # detect_gaps_in_binance_files normalizes naive/aware at entry so
+            # both forms are accepted, but tz-aware is preferred going forward
+            # (datetime.utcnow() is deprecated since Python 3.12).
+            now = datetime.now(timezone.utc)
 
             # RC4b FIX: anchor the scan window to last_bar_on_disk rather than
             # session_start_time.
@@ -1992,7 +1991,7 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         """
         try:
             # Calculate time until next candle close (15-min candles)
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
 
             # RC4 FIX: Record session start time the first time the auto-update
             # system initialises.  This is the lower bound for verify_and_repair
@@ -2110,7 +2109,7 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         MAX_WAIT_MS = 5 * 60 * 1000   # 5-minute hard cap — prevents 38+ min gaps
         try:
             # Calculate time until next 15-min candle close
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             minutes_to_next = 15 - (now.minute % 15)
             seconds_to_next = (minutes_to_next * 60) - now.second
 

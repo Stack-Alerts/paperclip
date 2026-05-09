@@ -162,7 +162,7 @@ class BinanceRestClient:
         })
         
         # Convert types
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms', utc=True)
         df['price'] = df['price'].astype(float)
         df['quantity'] = df['quantity'].astype(float)
         df['side'] = df['is_sell'].apply(lambda x: 'sell' if x else 'buy')
@@ -204,7 +204,7 @@ class BinanceRestClient:
         
         all_trades = []
         from_id = None
-        target_time = datetime.now() - timedelta(hours=hours)
+        target_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         
         while True:
             params = {'symbol': symbol, 'limit': batch_size}
@@ -217,8 +217,8 @@ class BinanceRestClient:
                 break
             
             df_batch = pd.DataFrame(response)
-            df_batch['timestamp'] = pd.to_datetime(df_batch['time'], unit='ms')
-            
+            df_batch['timestamp'] = pd.to_datetime(df_batch['time'], unit='ms', utc=True)
+
             # Check if we've gone back far enough
             if df_batch['timestamp'].min() < target_time:
                 df_batch = df_batch[df_batch['timestamp'] >= target_time]
@@ -371,8 +371,8 @@ class BinanceRestClient:
                 
                 # Check if fallback is fresher
                 if len(df_fresh) > 0:
-                    fresh_latest = pd.to_datetime(df_fresh['timestamp'].iloc[-1])
-                    fresh_delay = (datetime.now(timezone.utc).replace(tzinfo=None) - fresh_latest).total_seconds() / 60
+                    fresh_latest = pd.to_datetime(df_fresh['timestamp'].iloc[-1], utc=True)
+                    fresh_delay = (datetime.now(timezone.utc) - fresh_latest).total_seconds() / 60
                     
                     if fresh_delay < delay_minutes:
                         logger.info(f"   ✅ Fallback successful: {delay_minutes:.0f}m → {fresh_delay:.0f}m")
