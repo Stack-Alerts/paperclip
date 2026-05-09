@@ -914,7 +914,9 @@ class BacktestWorker(QThread):
                     )
                     
                 # CRITICAL FIX #3: Track which TP was hit before clearing position
-                if hasattr(result, 'exit_condition_name') and result.exit_condition_name:
+                # Guard: current_trade may already be None if a prior partial-exit call
+                # consumed the remaining position and exit_trade() set it to None.
+                if evaluator.current_trade and hasattr(result, 'exit_condition_name') and result.exit_condition_name:
                     if result.exit_condition_name in ['TP1', 'TP2', 'TP3']:
                         # Record TP hit in trade state
                         evaluator.current_trade.tp_hits.append(result.exit_condition_name)
@@ -922,8 +924,11 @@ class BacktestWorker(QThread):
                         # FIX 2026-02-13: Increment TP counter for UI display
                         tp_sl_adjustments[result.exit_condition_name] += 1
 
-                # Clear trade (pass exit percentage from result)
-                evaluator.exit_trade(result.exit_percentage)
+                # Only call exit_trade when an actual exit is triggered.
+                # Calling unconditionally with exit_percentage=0.0 on every bar is
+                # architecturally wrong and could cause subtle accumulation issues.
+                if result.should_exit:
+                    evaluator.exit_trade(result.exit_percentage)
                 
                 # Update progress bar every 100 candles
                 # Mode 2: label explicitly says "Candles X/Y" per spec
@@ -969,7 +974,15 @@ class BacktestWorker(QThread):
             self.backtest_finished.emit(True, results)
             
         except Exception as e:
+            import traceback
+            full_tb = traceback.format_exc()
+            # Emit the full traceback to the live output so it is visible in the UI
+            # and does NOT silently swallow the exception (previous behaviour caused
+            # the backtest to appear to finish with 0 trades instead of surfacing
+            # the real AttributeError).
             self.live_message.emit(f"Error: {str(e)}", "ERROR", "SYSTEM")
+            self.live_message.emit(full_tb, "ERROR", "SYSTEM")
+            logger.error("BacktestWorker uncaught exception:\n%s", full_tb)
             self.backtest_finished.emit(False, {'error': str(e)})
     
     def _on_data_load_progress(self, current: int, total: int, message: str):
