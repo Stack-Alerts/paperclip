@@ -3098,13 +3098,18 @@ class MetricsDisplayPanel(QWidget):
         CRITICAL FIX: Directly access TradesPanel instead of waiting for 1-second timer emission.
         """
         try:
-            # Get strategy config
-            strategy_config_obj = self._get_current_strategy_config()
-            if not strategy_config_obj:
-                logger.warning("⚠️ No strategy config available - cannot populate AI panel")
-                return
-            
-            strategy_config_dict = self._convert_strategy_config_to_dict(strategy_config_obj)
+            # BTCAAAAA-736: Prefer the serialized strategy_config threaded from the backtest worker
+            # (already a plain dict with correct block/signal names). Fall back to the orchestrator
+            # path only when backtest results are unavailable (e.g. standalone AI panel open).
+            if self.full_backtest_results and self.full_backtest_results.get('strategy_config'):
+                strategy_config_dict = self.full_backtest_results['strategy_config']
+                logger.info("[AI Panel] Using strategy_config from backtest results (reliable path)")
+            else:
+                strategy_config_obj = self._get_current_strategy_config()
+                if not strategy_config_obj:
+                    logger.warning("⚠️ No strategy config available - cannot populate AI panel")
+                    return
+                strategy_config_dict = self._convert_strategy_config_to_dict(strategy_config_obj)
             
             # Get backtest config
             backtest_config = {}

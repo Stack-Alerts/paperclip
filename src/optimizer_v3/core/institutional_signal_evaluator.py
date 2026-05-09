@@ -592,7 +592,8 @@ class InstitutionalSignalEvaluator:
                         # BTCAAAAA-736 diagnostic: count filtered signals so we can distinguish
                         # "block fires but signal name mismatch" from "block never fires at all"
                         if signal_name not in ('NEUTRAL', 'INSUFFICIENT_DATA', 'ERROR',
-                                               'NO_SIGNAL', 'NO_ASIA_DATA'):
+                                               'NO_SIGNAL', 'NO_ASIA_DATA', 'NO_SWEEP',
+                                               'NO_DATA'):
                             self._diag_signals_filtered_total += 1
                             logger.debug(
                                 "BTCAAAAA-736 DIAG: %s::%s fired but NOT in strategy config "

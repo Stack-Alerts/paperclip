@@ -391,3 +391,79 @@ class TestMode1NotAffected:
             "run() must still emit 'Using single-core backtest engine' for Mode 1 "
             "(regression check: message must not have been removed)"
         )
+
+
+# ---------------------------------------------------------------------------
+# BTCAAAAA-736: strategy_config must be threaded from BacktestWorker → AI panel
+# ---------------------------------------------------------------------------
+
+class TestStrategyConfigThreadedToAIPanel:
+    """Regression tests for BTCAAAAA-736: empty signals in AI panel.
+
+    Root cause: _populate_ai_recommendations_panel rebuilt _current_block_names
+    from _convert_strategy_config_to_dict() which silently failed → empty blocks
+    → all 73 registry blocks shown in compact format with signals=[].
+
+    Fix: BacktestWorker.run() now includes 'strategy_config' in its results dict;
+    _populate_tabs_with_results threads it into full_results; and
+    _populate_ai_recommendations_panel uses it directly as the primary path.
+    """
+
+    def test_backtest_worker_results_include_strategy_config(self):
+        """BacktestWorker.run() must include 'strategy_config' in the results dict."""
+        from src.strategy_builder.ui.backtest_config_panel import BacktestWorker
+        src = inspect.getsource(BacktestWorker.run)
+        assert "'strategy_config'" in src or '"strategy_config"' in src, (
+            "BacktestWorker.run() results dict must include 'strategy_config' key "
+            "(BTCAAAAA-736: needed so AI panel can build correct block name set)"
+        )
+        assert "self.strategy_config" in src, (
+            "BacktestWorker.run() must assign self.strategy_config to results dict"
+        )
+
+    def test_populate_tabs_threads_strategy_config_into_full_results(self):
+        """_populate_tabs_with_results must pass strategy_config into full_results."""
+        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
+        src = inspect.getsource(BacktestConfigPanel._populate_tabs_with_results)
+        assert "'strategy_config'" in src or '"strategy_config"' in src, (
+            "_populate_tabs_with_results must include 'strategy_config' in full_results "
+            "(BTCAAAAA-736: threaded from worker results to metrics panel)"
+        )
+        assert "results.get('strategy_config'" in src or "results.get(\"strategy_config\"" in src, (
+            "_populate_tabs_with_results must read strategy_config from worker results dict"
+        )
+
+    def test_populate_ai_panel_uses_backtest_results_strategy_config(self):
+        """_populate_ai_recommendations_panel must use strategy_config from full_backtest_results."""
+        from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
+        src = inspect.getsource(MetricsDisplayPanel._populate_ai_recommendations_panel)
+        assert "strategy_config" in src, (
+            "_populate_ai_recommendations_panel must reference 'strategy_config' key "
+            "(BTCAAAAA-736: primary path to avoid silent _convert_strategy_config_to_dict failure)"
+        )
+        assert "full_backtest_results" in src, (
+            "_populate_ai_recommendations_panel must check full_backtest_results for strategy_config"
+        )
+
+    def test_populate_ai_panel_backtest_results_path_is_primary(self):
+        """The full_backtest_results path must appear before the orchestrator fallback."""
+        from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
+        src = inspect.getsource(MetricsDisplayPanel._populate_ai_recommendations_panel)
+        br_pos = src.find("full_backtest_results")
+        orchestrator_pos = src.find("_get_current_strategy_config")
+        assert br_pos != -1, "full_backtest_results must be referenced in _populate_ai_recommendations_panel"
+        assert orchestrator_pos != -1, "_get_current_strategy_config fallback must still exist"
+        assert br_pos < orchestrator_pos, (
+            "full_backtest_results path must appear BEFORE orchestrator fallback "
+            "(BTCAAAAA-736: backtest path is primary, orchestrator is fallback)"
+        )
+
+    def test_no_sweep_excluded_from_diagnostic_noise(self):
+        """NO_SWEEP must be in the sentinel exclusion set to avoid inflating filtered counter."""
+        from src.optimizer_v3.core.institutional_signal_evaluator import InstitutionalSignalEvaluator
+        src = inspect.getsource(InstitutionalSignalEvaluator._evaluate_building_blocks)
+        assert "NO_SWEEP" in src, (
+            "NO_SWEEP must be excluded from the diagnostic filtered-signal counter "
+            "(BTCAAAAA-736: liquidity_sweep returns NO_SWEEP when no pattern found, "
+            "not a real 'unconfigured signal' mismatch)"
+        )

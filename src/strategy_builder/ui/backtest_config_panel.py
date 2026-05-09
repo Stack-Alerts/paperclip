@@ -994,7 +994,8 @@ class BacktestWorker(QThread):
             results = {
                 'total_candles': total_candles,
                 'trades': trade_count,
-                'tp_adjustments': tp_sl_adjustments  # Real tracked adjustments
+                'tp_adjustments': tp_sl_adjustments,  # Real tracked adjustments
+                'strategy_config': self.strategy_config,  # BTCAAAAA-736: pass to AI panel
             }
             self.backtest_finished.emit(True, results)
             
@@ -3054,7 +3055,8 @@ class BacktestConfigPanel(QWidget):
             'metrics': metrics_data,
             'trades': [],  # Will be populated from trades_panel
             'total_candles': results.get('total_candles', 0),
-            'tp_adjustments': results.get('tp_adjustments', {})
+            'tp_adjustments': results.get('tp_adjustments', {}),
+            'strategy_config': results.get('strategy_config', {}),  # BTCAAAAA-736: thread through
         }
         
         # Get trade list from trades panel
