@@ -440,6 +440,10 @@ All methods generate the same high-quality, institutional-grade code compliant w
 
 ---
 
+> **Archival notice (2026-05-09):** The Tkinter + Jinja2 MVP described in this document (`src/utils/Strategy_Builder/`) has been relocated to `archived/utils_strategy_builder_legacy/` and is no longer on the active import path. The current production implementation lives in `src/strategy_builder/` (PyQt5). See [BTCAAAAA-753](/BTCAAAAA/issues/BTCAAAAA-753) for context.
+
+---
+
 **Status:** ✅ READY FOR PRODUCTION  
 **Date:** 2026-01-10  
 **GitHub:** All code committed and pushed
