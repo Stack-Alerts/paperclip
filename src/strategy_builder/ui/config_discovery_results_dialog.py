@@ -428,6 +428,9 @@ class _ApplyConfigDialog(QDialog):
         self.setWindowTitle("Apply Config")
         self.setModal(True)
         self.setMinimumWidth(520)
+        self.setMinimumHeight(400)
+        self.resize(760, 560)
+        self.setSizeGripEnabled(True)
         self.setStyleSheet(MAIN_STYLESHEET)
 
         layout = QVBoxLayout(self)
@@ -471,12 +474,13 @@ class _ApplyConfigDialog(QDialog):
             val_item = QTableWidgetItem(val)
             val_item.setFont(create_monospace_font(9))
             val_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            val_item.setToolTip(val)
             table.setItem(i, 0, key_item)
             table.setItem(i, 1, val_item)
 
         table.resizeRowsToContents()
-        # Cap height so the dialog doesn't exceed screen; min 3 rows visible
-        row_h = table.rowHeight(0) if rows else 24
+        # rowHeight(0) returns 0 before the widget is shown; use a fixed estimate
+        row_h = 24
         max_visible_rows = 12
         table.setMaximumHeight(row_h * min(len(rows) + 1, max_visible_rows) + 4)
         layout.addWidget(table)
