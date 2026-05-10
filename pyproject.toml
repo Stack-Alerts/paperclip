@@ -61,12 +61,12 @@ disallow_untyped_defs = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-# Coverage is scoped by .coveragerc which excludes Qt UI modules and
-# NautilusTrader/psutil/jinja2-dependent code not runnable in headless CI.
-# Threshold of 20% reflects actual achievable coverage from strategy_builder
-# unit tests (validation, persistence, core) against the non-UI src modules.
-# Target: raise incrementally as test coverage expands.
-addopts = "-ra -q --cov=src --cov-config=.coveragerc --cov-report=term-missing --cov-fail-under=20"
+# Coverage collection is global so any partial run still reports coverage.
+# --cov-fail-under is intentionally absent here: the threshold gate lives
+# exclusively in the dedicated CI "full-suite coverage" job
+# (pytest --cov=src --cov-fail-under=20) so isolated subset runs
+# (e.g. tests/ui_qt only) don't fail due to low aggregate coverage.
+addopts = "-ra -q --cov=src --cov-config=.coveragerc --cov-report=term-missing"
 testpaths = ["tests"]
 # Ensure src/ is always on sys.path so all test modules can import from src/
 # regardless of conftest.py load order (fixes namespace-package import ordering).

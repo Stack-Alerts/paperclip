@@ -21,6 +21,23 @@ from src.strategy_builder.core.strategy_config_engine import (
     ExitCondition
 )
 
+try:
+    from src.detectors.building_blocks.registry import BlockRegistry as _BlockRegistry
+    _BLOCK_REGISTRY_AVAILABLE = True
+except ImportError:
+    _BlockRegistry = None
+    _BLOCK_REGISTRY_AVAILABLE = False
+
+
+def _block_registry_lookup(block_name: str):
+    """Return BlockMetadata for block_name, or None if registry unavailable."""
+    if not _BLOCK_REGISTRY_AVAILABLE or _BlockRegistry is None:
+        return None
+    try:
+        return _BlockRegistry.get_block(block_name)
+    except Exception:
+        return None
+
 
 class PersistenceFormat(Enum):
     """File format for persistence"""
@@ -427,10 +444,17 @@ class StrategyPersistence:
                         )
                         recheck_chain.append(nested_recheck)
                     
+                _w = signal_data.get('weight')
+                if _w is None:
+                    _meta = _block_registry_lookup(block_data['name'])
+                    _w = (_meta.signal_tiers.get(signal_data['name'], {}).get('base_points')
+                          if _meta and _meta.signal_tiers else None)
+                weight = _w or 10
+
                 signal = SignalConfig(
                     name=signal_data['name'],
                     logic=signal_data['logic'],
-                    weight=signal_data.get('weight', 10),  # Load per-signal weight (default 10)
+                    weight=weight,
                     timing_constraint=timing_constraint,
                     recheck_config=recheck_config,
                     recheck_chain=recheck_chain

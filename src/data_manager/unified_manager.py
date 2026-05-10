@@ -1210,6 +1210,15 @@ class UnifiedDataManager:
         }
         bar_td = timedelta(minutes=tf_minutes.get(timeframe, 15))
 
+        # Normalize to tz-naive so cursor/filter comparisons against the tz-naive
+        # batch['timestamp'] series (which strips tz at line 1257) never raise
+        # "Invalid comparison between dtype=datetime64[ns] and Timestamp".
+        # _to_ms_utc re-attaches UTC before the actual API ms conversion below.
+        if start_ts.tzinfo is not None:
+            start_ts = start_ts.replace(tzinfo=None)
+        if end_ts.tzinfo is not None:
+            end_ts = end_ts.replace(tzinfo=None)
+
         all_frames: List[pd.DataFrame] = []
         cursor = start_ts
 

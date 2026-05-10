@@ -2426,7 +2426,7 @@ class BacktestConfigPanel(QWidget):
         blocks = strategy_config_dict.get('blocks', [])
         threshold = strategy_config_dict.get('confluence_threshold', 40)
         max_possible = sum(
-            s.get('weight', 10)
+            (s.get('weight') or 10)
             for block in blocks
             for s in block.get('signals', [])
         )
@@ -2455,7 +2455,7 @@ class BacktestConfigPanel(QWidget):
                     if added:
                         strategy_config_dict['blocks'] = blocks
                         new_max = sum(
-                            s.get('weight', 10)
+                            (s.get('weight') or 10)
                             for block in blocks
                             for s in block.get('signals', [])
                         )
