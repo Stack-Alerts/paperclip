@@ -744,7 +744,19 @@ class InstitutionalSignalEvaluator:
             entry_side=side,
             entry_signals=signals_fired if signals_fired else []
         )
-    
+
+        # P1.3 PRODUCTION PRICE RANGE WARNING (BTCAAAAA-991)
+        # Warn (not raise) so a mismatch is visible in logs without halting execution.
+        _ep = float(self.current_trade.entry_price)
+        _lo = float(bar.low)
+        _hi = float(bar.high)
+        if not (_lo <= _ep <= _hi):
+            logger.warning(
+                "PRICE RANGE WARNING: entry_price=%.2f is outside bar H/L "
+                "[%.2f, %.2f] at bar_index=%d. Entry bar and price bar mismatch.",
+                _ep, _lo, _hi, bar_index,
+            )
+
     def exit_trade(
         self,
         percentage: float
