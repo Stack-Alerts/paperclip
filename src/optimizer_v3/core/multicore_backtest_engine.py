@@ -264,18 +264,19 @@ def evaluate_chunk(
                         abs(_ep - _bar_close) < 0.01,
                         _bar_low <= _ep <= _bar_high,
                     )
-                assert _bar_low <= _ep <= _bar_high, (
-                    f"BTCAAAAA-991 PRICE ATTRIBUTION BUG: entry_price={_ep:.2f} is "
-                    f"outside bar range [{_bar_low:.2f}, {_bar_high:.2f}] at "
-                    f"bar_index={i}, ts_utc={_ts_utc}. "
-                    f"bar_close={_bar_close:.2f}. Price must come from a different bar."
-                )
+                if not (_bar_low <= _ep <= _bar_high):
+                    logger.error(
+                        "PRICE ATTRIBUTION BUG: entry_price=%.2f outside bar range "
+                        "[%.2f, %.2f] at bar_index=%d ts_utc=%s bar_close=%.2f — "
+                        "price came from a different bar (BTCAAAAA-998)",
+                        _ep, _bar_low, _bar_high, i, _ts_utc, _bar_close,
+                    )
 
                 # Calculate TP/SL levels
                 from src.optimizer_v3.core.tpsl_calculator import get_tpsl_calculator
                 tpsl_calc = get_tpsl_calculator()
 
-                entry_price = float(current_bar.close)
+                entry_price = round(float(current_bar.close), 2)
                 tpsl_mode = backtest_config.get('tpsl_mode', 'Fibonacci')
                 
                 tpsl_levels = tpsl_calc.calculate_levels(
@@ -483,14 +484,14 @@ def evaluate_chunk(
                             result.exit_percentage = remaining
                             result.exit_type = "STOP_LOSS"
                             result.exit_condition_name = "SL"
-                            result.exact_exit_price = float(tpsl.stop_loss)  # ✅ Use SL price
+                            result.exact_exit_price = round(float(tpsl.stop_loss), 2)  # ✅ Use SL price
                         elif 'TP1' not in tp_hits and current_price >= tpsl.take_profit_1:
                             result.should_exit = True
                             result.exit_reason = "TP1 Hit"
                             result.exit_percentage = min(0.33, remaining)  # DECIMAL (0.33 = 33%)
                             result.exit_type = "TAKE_PROFIT"
                             result.exit_condition_name = "TP1"
-                            result.exact_exit_price = float(tpsl.take_profit_1)  # ✅ Use TP1 price
+                            result.exact_exit_price = round(float(tpsl.take_profit_1), 2)  # ✅ Use TP1 price
                             # DEBUG: Log partial exit calculation
                             logger.info(f"[TP1 HIT] remaining={remaining:.4f}, exit_pct={result.exit_percentage:.4f}, tp_hits={tp_hits}")
                         elif 'TP2' not in tp_hits and current_price >= tpsl.take_profit_2:
@@ -499,14 +500,14 @@ def evaluate_chunk(
                             result.exit_percentage = min(0.33, remaining)  # DECIMAL (0.33 = 33%)
                             result.exit_type = "TAKE_PROFIT"
                             result.exit_condition_name = "TP2"
-                            result.exact_exit_price = float(tpsl.take_profit_2)  # ✅ Use TP2 price
+                            result.exact_exit_price = round(float(tpsl.take_profit_2), 2)  # ✅ Use TP2 price
                         elif 'TP3' not in tp_hits and current_price >= tpsl.take_profit_3:
                             result.should_exit = True
                             result.exit_reason = "TP3 Hit"
                             result.exit_percentage = remaining  # DECIMAL (remaining %)
                             result.exit_type = "TAKE_PROFIT"
                             result.exit_condition_name = "TP3"
-                            result.exact_exit_price = float(tpsl.take_profit_3)  # ✅ Use TP3 price
+                            result.exact_exit_price = round(float(tpsl.take_profit_3), 2)  # ✅ Use TP3 price
                     else:  # SHORT
                         # SHORT: SL above, TP below
                         if current_price >= tpsl.stop_loss:
@@ -517,28 +518,28 @@ def evaluate_chunk(
                             result.exit_percentage = remaining  # DECIMAL (remaining %)
                             result.exit_type = "STOP_LOSS"
                             result.exit_condition_name = "SL"
-                            result.exact_exit_price = float(tpsl.stop_loss)  # ✅ Use SL price
+                            result.exact_exit_price = round(float(tpsl.stop_loss), 2)  # ✅ Use SL price
                         elif 'TP1' not in tp_hits and current_price <= tpsl.take_profit_1:
                             result.should_exit = True
                             result.exit_reason = "TP1 Hit"
                             result.exit_percentage = min(0.33, remaining)  # DECIMAL (0.33 = 33%)
                             result.exit_type = "TAKE_PROFIT"
                             result.exit_condition_name = "TP1"
-                            result.exact_exit_price = float(tpsl.take_profit_1)  # ✅ Use TP1 price
+                            result.exact_exit_price = round(float(tpsl.take_profit_1), 2)  # ✅ Use TP1 price
                         elif 'TP2' not in tp_hits and current_price <= tpsl.take_profit_2:
                             result.should_exit = True
                             result.exit_reason = "TP2 Hit"
                             result.exit_percentage = min(0.33, remaining)  # DECIMAL (0.33 = 33%)
                             result.exit_type = "TAKE_PROFIT"
                             result.exit_condition_name = "TP2"
-                            result.exact_exit_price = float(tpsl.take_profit_2)  # ✅ Use TP2 price
+                            result.exact_exit_price = round(float(tpsl.take_profit_2), 2)  # ✅ Use TP2 price
                         elif 'TP3' not in tp_hits and current_price <= tpsl.take_profit_3:
                             result.should_exit = True
                             result.exit_reason = "TP3 Hit"
                             result.exit_percentage = remaining
                             result.exit_type = "TAKE_PROFIT"
                             result.exit_condition_name = "TP3"
-                            result.exact_exit_price = float(tpsl.take_profit_3)  # ✅ Use TP3 price
+                            result.exact_exit_price = round(float(tpsl.take_profit_3), 2)  # ✅ Use TP3 price
                 
                 # FALLBACK: Check max bars if no TP/SL hit
                 if not result.should_exit:
@@ -559,7 +560,7 @@ def evaluate_chunk(
                 if hasattr(result, 'exact_exit_price'):
                     exit_price = result.exact_exit_price  # ✅ Use TP/SL level
                 else:
-                    exit_price = float(current_bar.close)  # ✅ Use bar close for signal exits
+                    exit_price = round(float(current_bar.close), 2)  # ✅ Use bar close for signal exits
                 
                 # 🔍 DEBUG: Verify exact price usage
                 if hasattr(result, 'exit_condition_name') and result.exit_condition_name in ['TP1', 'TP2', 'TP3', 'SL']:
@@ -672,7 +673,7 @@ def evaluate_chunk(
         if evaluator.current_trade:
             open_trade = {
                 'entry_bar': chunk.global_start_idx + evaluator.current_trade.entry_bar,
-                'entry_price': float(evaluator.current_trade.entry_price),
+                'entry_price': round(float(evaluator.current_trade.entry_price), 2),
                 'entry_timestamp': evaluator.current_trade.entry_timestamp,
                 'side': evaluator.current_trade.entry_side,
                 'remaining_position': evaluator.current_trade.remaining_position

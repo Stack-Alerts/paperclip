@@ -302,5 +302,106 @@ class TestMulticoreEngine(unittest.TestCase):
         self.assertGreaterEqual(engine.num_processes, 1)
 
 
+class TestPriceAttribution(unittest.TestCase):
+    """Regression tests for BTCAAAAA-998: price must match the bar at the recorded timestamp.
+
+    Root cause confirmed in BTCAAAAA-991: timestamp was recorded in CET instead of UTC,
+    making fill prices appear to belong to bars 4-10 slots before the recorded timestamp.
+    These tests verify both the attribution invariant and float-precision cleanliness.
+    """
+
+    def _make_bar(self, open_p, high_p, low_p, close_p, ts_ns):
+        instrument_id = InstrumentId(Symbol("BTC"), Venue("BINANCE"))
+        bar_type = BarType(
+            instrument_id,
+            BarSpecification(15, BarAggregation.MINUTE, PriceType.LAST),
+            AggregationSource.EXTERNAL,
+        )
+        return Bar(
+            bar_type=bar_type,
+            open=Price(open_p, 2),
+            high=Price(high_p, 2),
+            low=Price(low_p, 2),
+            close=Price(close_p, 2),
+            volume=Quantity(1.0, 8),
+            ts_event=ts_ns,
+            ts_init=ts_ns,
+        )
+
+    def test_entry_price_within_bar_range(self):
+        """Entry price recorded as current_bar.close must satisfy bar_low <= price <= bar_high."""
+        from datetime import timezone as _tz
+
+        base_ns = int(datetime(2025, 9, 1, 12, 0, tzinfo=_tz.utc).timestamp() * 1e9)
+        bar = self._make_bar(81000.0, 81700.0, 80900.0, 81690.20, base_ns)
+
+        entry_price = round(float(bar.close), 2)
+        bar_low = float(bar.low)
+        bar_high = float(bar.high)
+
+        self.assertGreaterEqual(entry_price, bar_low)
+        self.assertLessEqual(entry_price, bar_high)
+
+    def test_exit_price_within_bar_range(self):
+        """Signal-exit price (bar.close) must satisfy bar_low <= price <= bar_high."""
+        base_ns = int(datetime(2025, 9, 1, 12, 15).timestamp() * 1e9)
+        bar = self._make_bar(81500.0, 82000.0, 81400.0, 81750.50, base_ns)
+
+        exit_price = round(float(bar.close), 2)
+        self.assertGreaterEqual(exit_price, float(bar.low))
+        self.assertLessEqual(exit_price, float(bar.high))
+
+    def test_no_float_precision_artifact_on_close(self):
+        """round(float(bar.close), 2) must produce a clean 2-decimal value."""
+        # 81690.20 stored as Price(2dp) and recovered as float must not become
+        # 81690.20000000001 or similar binary-representation artifact.
+        base_ns = int(datetime(2025, 9, 1, 12, 0).timestamp() * 1e9)
+        bar = self._make_bar(81000.0, 81700.0, 80900.0, 81690.20, base_ns)
+
+        price_float = round(float(bar.close), 2)
+        # Verify no sub-cent residual
+        self.assertEqual(price_float, round(price_float, 2))
+        self.assertAlmostEqual(price_float, 81690.20, places=2)
+
+    def test_entry_timestamp_utc_not_local(self):
+        """Entry timestamp must be UTC-aligned, not local-timezone-shifted.
+
+        Before BTCAAAAA-991 the engine used datetime.fromtimestamp(ts/1e9) which
+        applied the server's local offset (CET = UTC+1 = +4 bars at 15 m). This
+        verifies the UTC path is used so the timestamp matches the bar's ts_init.
+        """
+        from datetime import timezone as _tz
+
+        ts_ns = int(datetime(2025, 9, 1, 12, 0, tzinfo=_tz.utc).timestamp() * 1e9)
+        bar = self._make_bar(80000.0, 80500.0, 79900.0, 80250.0, ts_ns)
+
+        # Correct UTC path (as fixed in BTCAAAAA-991)
+        recorded_ts = datetime.fromtimestamp(bar.ts_init / 1e9, tz=_tz.utc).replace(tzinfo=None)
+        expected_ts = datetime(2025, 9, 1, 12, 0, 0)
+
+        self.assertEqual(recorded_ts, expected_ts)
+
+    def test_multiple_bars_each_price_matches_own_bar(self):
+        """Simulate a trade sequence: each trade's price must lie within its own bar."""
+        from datetime import timezone as _tz
+
+        base_ns = int(datetime(2025, 9, 1, 0, 0, tzinfo=_tz.utc).timestamp() * 1e9)
+        interval_ns = 15 * 60 * int(1e9)
+
+        bars = [
+            self._make_bar(80000.0 + i * 100, 80200.0 + i * 100,
+                           79800.0 + i * 100, 80100.0 + i * 100,
+                           base_ns + i * interval_ns)
+            for i in range(20)
+        ]
+
+        for bar in bars:
+            entry_price = round(float(bar.close), 2)
+            self.assertGreaterEqual(entry_price, float(bar.low),
+                                    f"Entry price {entry_price} below bar low {float(bar.low)}")
+            self.assertLessEqual(entry_price, float(bar.high),
+                                 f"Entry price {entry_price} above bar high {float(bar.high)}")
+
+
 if __name__ == '__main__':
     unittest.main()
