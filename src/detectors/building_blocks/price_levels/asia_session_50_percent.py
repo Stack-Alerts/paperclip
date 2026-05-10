@@ -117,6 +117,7 @@ class AsiaSession50Percent:
         self.prev_signal = None
         self.prev_asia_50 = None
         self.prev_price_above = None  # Track if price was above/below
+        self._last_session_date = None  # Reset crossing state when date changes
         
         # INSTITUTIONAL: Track bounce/rejection confirmation
         self.confirmation_candles = 3  # Default: 3 candles for confirmation
@@ -243,8 +244,17 @@ class AsiaSession50Percent:
                 'confluence_factors': []
             }
         
+        current_date = df['timestamp'].iloc[-1].date()
+        if self._last_session_date is not None and current_date != self._last_session_date:
+            self.prev_price_above = None
+            self.bounce_test_bars = []
+            self.rejection_test_bars = []
+            self.prev_signal = None
+            self.prev_asia_50 = None
+        self._last_session_date = current_date
+
         asia_50 = self.calculate_asia_50(df)
-        
+
         if asia_50 is None:
             return {
                 'signal': 'NO_ASIA_DATA',
