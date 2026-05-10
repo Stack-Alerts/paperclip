@@ -1481,6 +1481,8 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
             },
         }
 
+        strategy_config['confluence_threshold'] = strategy_config.get('confluence_threshold', 40)
+
         self._preview_trades = []
         self._preview_worker = BacktestWorker(strategy_config, backtest_config)
         self._preview_worker.trade_data_emit.connect(self._on_preview_trade_data)
