@@ -63,6 +63,32 @@ describe("isClaudeTransientUpstreamError", () => {
     ).toBe(true);
   });
 
+  it("classifies HTTP 502 / Bad Gateway / provider_unavailable as transient", () => {
+    expect(
+      isClaudeTransientUpstreamError({
+        stderr: "HTTP 502: Bad Gateway",
+      }),
+    ).toBe(true);
+    expect(
+      isClaudeTransientUpstreamError({
+        errorMessage: "Claude exited with code 1: 502 Bad Gateway",
+      }),
+    ).toBe(true);
+    expect(
+      isClaudeTransientUpstreamError({
+        parsed: {
+          is_error: true,
+          errors: [{ type: "provider_unavailable", message: "Provider unavailable" }],
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isClaudeTransientUpstreamError({
+        stderr: "Error: provider_unavailable — upstream provider returned 502",
+      }),
+    ).toBe(true);
+  });
+
   it("does not classify login/auth failures as transient", () => {
     expect(
       isClaudeTransientUpstreamError({
