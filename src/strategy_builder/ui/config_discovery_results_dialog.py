@@ -479,10 +479,6 @@ class _ApplyConfigDialog(QDialog):
             table.setItem(i, 1, val_item)
 
         table.resizeRowsToContents()
-        # rowHeight(0) returns 0 before the widget is shown; use a fixed estimate
-        row_h = 24
-        max_visible_rows = 12
-        table.setMaximumHeight(row_h * min(len(rows) + 1, max_visible_rows) + 4)
         layout.addWidget(table)
 
         # Buttons
