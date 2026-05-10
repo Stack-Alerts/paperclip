@@ -2624,6 +2624,14 @@ class BacktestConfigPanel(QWidget):
                 self.progress_bar.setFormat("%p%")
                 return
 
+            # Gap 2 fix: ensure thread fully terminated and signal queue flushed.
+            # isRunning() returning False does not guarantee training_complete has
+            # been delivered — wait() blocks until the QThread's event loop exits,
+            # and processEvents() drains any queued cross-thread signals so that
+            # _on_complete() fires before we read calibration_results below.
+            calibration_thread.wait()
+            QApplication.processEvents()
+
             # Guard: skip applying results when TrainingThread is in simulation
             # mode (random/dummy delays) to protect manually-tuned block delays.
             if calibration_thread.is_simulation_mode:
@@ -2634,27 +2642,34 @@ class BacktestConfigPanel(QWidget):
                 self.results_text.append(
                     "⚙️ Calibration skipped (simulation mode) — using configured block delays"
                 )
-            elif calibration_results:
-                # Apply optimal delay results to strategy_config_dict blocks
+            else:
+                # Gap 1 fix: store fingerprint unconditionally whenever calibration
+                # ran to completion — empty calibration_results means "calibration
+                # ran and produced no delay-map entries", which is still a valid
+                # cached outcome.  Without this, an empty-result run would never
+                # write _calibration_fingerprint and every subsequent call would
+                # bypass the cache and trigger a redundant full calibration run.
                 delay_map: dict = {}
-                for r in calibration_results:
-                    name = r.get('signal_name', '')
-                    delay = r.get('optimal_delay')
-                    if name and delay is not None:
-                        delay_map[name] = int(delay)
+                if calibration_results:
+                    for r in calibration_results:
+                        name = r.get('signal_name', '')
+                        delay = r.get('optimal_delay')
+                        if name and delay is not None:
+                            delay_map[name] = int(delay)
 
-                # Apply delay_map to blocks in-place
-                for block in blocks:
-                    bname = block.get('name') or block.get('block_name', '')
-                    if bname in delay_map:
-                        block['optimal_delay'] = delay_map[bname]
-                        logger.info(
-                            f"Auto-calibration: applied optimal_delay={delay_map[bname]} "
-                            f"to block '{bname}'"
-                        )
+                    # Apply delay_map to blocks in-place
+                    for block in blocks:
+                        bname = block.get('name') or block.get('block_name', '')
+                        if bname in delay_map:
+                            block['optimal_delay'] = delay_map[bname]
+                            logger.info(
+                                f"Auto-calibration: applied optimal_delay={delay_map[bname]} "
+                                f"to block '{bname}'"
+                            )
 
-                # Store fingerprint and results for future cache hits
-                # (only cached when NOT in simulation mode so dummy delays are never reused)
+                # Cache fingerprint and delay_map (empty or not) so the next
+                # call with the same blocks skips calibration entirely.
+                # (not reached in simulation_mode — see guard above)
                 self._calibration_fingerprint = current_fingerprint
                 self._calibration_cache = delay_map
                 logger.info("Auto-calibration: cache updated with new fingerprint.")
