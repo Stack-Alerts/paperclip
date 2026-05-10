@@ -198,7 +198,7 @@ class DataVerifyDialog(WindowGeometryMixin, QDialog):
     # ------------------------------------------------------------------
 
     GEOMETRY_SETTINGS_KEY = "dataVerifyDialog"
-    GEOMETRY_DEFAULT_SIZE = (900, 650)
+    GEOMETRY_DEFAULT_SIZE = (1380, 800)
 
     def __init__(self, parent=None):
         super().__init__(parent)
