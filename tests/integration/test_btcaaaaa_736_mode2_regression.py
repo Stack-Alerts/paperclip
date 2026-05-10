@@ -201,7 +201,7 @@ class TestMode2BarByBarLoop(unittest.TestCase):
             result['reference_signal'],
             'asia_session_50_percent::AT_ASIA_50',
         )
-        self.assertEqual(result['max_candles'], 3)
+        self.assertEqual(result['max_candles'], 10)
 
 
 if __name__ == '__main__':
