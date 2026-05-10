@@ -983,6 +983,53 @@ class UnifiedDataManager:
 
         return None
 
+    def post_ingest_sanity_check(
+        self,
+        timeframe: str,
+        expected_last_ts: datetime,
+        tolerance_s: float = 5.0,
+    ) -> None:
+        """
+        P3 (BTCAAAAA-995): Assert the most recent on-disk bar is within
+        *tolerance_s* seconds of *expected_last_ts*.
+
+        Raises RuntimeError when the delta exceeds the threshold so callers
+        catch silent truncation (API returning 0 bars, cursor logic stopping
+        early, wrong end_ts rounding, etc.).
+
+        Args:
+            timeframe:       Timeframe to check (e.g. '15m', '1h').
+            expected_last_ts: The bar timestamp we expect to be last on disk.
+                              Pass tz-naive UTC or tz-aware; both are handled.
+            tolerance_s:     Allowed deviation in seconds (default 5 s).
+        """
+        actual = self.get_last_bar_timestamp(timeframe)
+        if actual is None:
+            raise RuntimeError(
+                f"post_ingest_sanity_check/{timeframe}: no bars found on disk."
+            )
+
+        # Normalise both sides to tz-naive for comparison
+        if isinstance(expected_last_ts, pd.Timestamp):
+            exp = expected_last_ts.to_pydatetime()
+        else:
+            exp = expected_last_ts
+        if exp.tzinfo is not None:
+            exp = exp.replace(tzinfo=None)
+
+        delta_s = abs((actual - exp).total_seconds())
+        if delta_s > tolerance_s:
+            raise RuntimeError(
+                f"post_ingest_sanity_check/{timeframe}: "
+                f"last_stored={actual} expected={exp} "
+                f"delta={delta_s:.1f}s > {tolerance_s}s threshold. "
+                "Possible partial ingest or wrong end_ts."
+            )
+        logger.info(
+            "post_ingest_sanity_check/%s OK: last=%s expected=%s delta=%.3fs",
+            timeframe, actual, exp, delta_s,
+        )
+
     # =========================================================================
     # GAP DETECTION & AUTO-REPAIR  (added 2026-05-02)
     # =========================================================================
@@ -1582,6 +1629,13 @@ class UnifiedDataManager:
         for tf in timeframes:
             t0_tf = _time_mod.monotonic()
             logger.info(f"\n--- Checking {tf} ---")
+
+            tf_minutes = {
+                '1m': 1, '5m': 5, '15m': 15, '30m': 30,
+                '1h': 60, '4h': 240, '1d': 1440,
+            }
+            bar_td = timedelta(minutes=tf_minutes.get(tf, 15))
+
             t0_detect = _time_mod.monotonic()
             gaps = self.detect_gaps_in_binance_files(
                 tf, start_date=start_date, end_date=end_date
@@ -1598,11 +1652,9 @@ class UnifiedDataManager:
 
             if not gaps:
                 logger.info(f"   ✅ No gaps found — {tf} data is continuous in range.")
-                summary[tf] = tf_summary
-                continue
-
-            total_missing = sum(g['missing_bars'] for g in gaps)
-            logger.info(f"   Found {len(gaps)} gap(s), ~{total_missing} missing bars total.")
+            else:
+                total_missing = sum(g['missing_bars'] for g in gaps)
+                logger.info(f"   Found {len(gaps)} gap(s), ~{total_missing} missing bars total.")
 
             for gap in gaps:
                 gap_start: datetime = gap['gap_start']
@@ -1637,12 +1689,6 @@ class UnifiedDataManager:
                 # Fetch from Binance with explicit startTime/endTime
                 logger.info(f"   🌐 Fetching from Binance ({gap_start} → {gap_end}) ...")
                 try:
-                    tf_minutes = {
-                        '1m': 1, '5m': 5, '15m': 15, '30m': 30,
-                        '1h': 60, '4h': 240, '1d': 1440,
-                    }
-                    bar_td = timedelta(minutes=tf_minutes.get(tf, 15))
-
                     # fetch_start: one bar after the last-good bar (gap_start)
                     # fetch_end:   one bar before the first-bar-after-gap (gap_end)
                     # For single-missing-bar gaps: fetch_end = gap_end - bar_td
@@ -1734,6 +1780,35 @@ class UnifiedDataManager:
                     logger.error(f"   ❌ {msg}")
                     logger.error(msg)
                     tf_summary['errors'].append(msg)
+
+            # P3 post-ingest sanity check (BTCAAAAA-997): last stored bar must be
+            # within 5 s of the expected last complete bar boundary before end_date.
+            if not dry_run:
+                last_stored = self.get_last_bar_timestamp(tf)
+                if last_stored is not None:
+                    end_naive = end_date.replace(tzinfo=None) if end_date.tzinfo is not None else end_date
+                    epoch = datetime(1970, 1, 1)
+                    bar_secs = bar_td.total_seconds()
+                    elapsed_s = (end_naive - epoch).total_seconds()
+                    # Last complete bar: the bar that opened at floor(end_date, bar_td)
+                    # minus one bar_td (the current bar may still be open).
+                    expected_last_ts = epoch + timedelta(
+                        seconds=(int(elapsed_s // bar_secs) - 1) * bar_secs
+                    )
+                    diff_s = abs((last_stored - expected_last_ts).total_seconds())
+                    if diff_s > 5:
+                        msg = (
+                            f"Post-ingest sanity FAILED for {tf}: "
+                            f"last_stored={last_stored} expected≈{expected_last_ts} "
+                            f"(diff={diff_s:.1f}s > 5s threshold)"
+                        )
+                        logger.warning(f"   ⚠️  {msg}")
+                        tf_summary['errors'].append(msg)
+                    else:
+                        logger.info(
+                            f"   ✅ Sanity OK — last stored {last_stored} "
+                            f"within 5s of expected {expected_last_ts} (diff={diff_s:.1f}s)"
+                        )
 
             summary[tf] = tf_summary
             logger.info(f"   [timing] total/{tf}: {_time_mod.monotonic() - t0_tf:.2f}s")
