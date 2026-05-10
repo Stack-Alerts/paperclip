@@ -1386,13 +1386,14 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
     def _on_run_backtest(self):
         """Run backtest for the current strategy (singleton pattern)."""
         try:
-            # Check if backtest window already exists and is visible
-            if self.backtest_window and self.backtest_window.isVisible():
-                # Focus existing window instead of creating new one
+            # Reuse existing window (closed but not destroyed) so the calibration
+            # cache on BacktestConfigPanel survives close/reopen cycles.
+            if self.backtest_window:
+                self.backtest_window.show()
                 self.backtest_window.raise_()
                 self.backtest_window.activateWindow()
                 return
-            
+
             # Create and show backtest config dialog
             self.backtest_window = BacktestConfigDialog(self.orchestrator, self)
             
