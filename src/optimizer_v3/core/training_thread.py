@@ -219,7 +219,8 @@ class TrainingThread(QThread):
         Computes training period from period_days, builds InstrumentId for BTC,
         and delegates to the full NautilusTrainingSystem analysis stack.
         """
-        end_date = datetime.utcnow()
+        now = datetime.utcnow()
+        end_date = now.replace(hour=0, minute=0, second=0, microsecond=0)  # UTC midnight — stable cache key
         start_date = end_date - timedelta(days=self.period_days)
         period = (start_date, end_date)
 
