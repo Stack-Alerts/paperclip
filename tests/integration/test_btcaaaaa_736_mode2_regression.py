@@ -1,15 +1,20 @@
 """
 Regression test for BTCAAAAA-736: Mode 2 (Live Replay) produces 0 trades.
 
+JSON-path only — does not exercise the DB load path. NOT a proxy for UI correctness.
+The UI loads strategy config from the DB (via get_strategy_version → _dict_to_config),
+which resolves signal weights via BlockRegistry base_points. This test loads
+current_strategy.json, which carries explicit weights that may differ from DB values.
+
 This test exercises the full Mode 2 bar-by-bar evaluation path using:
-  - DictWrapper strategy config loaded from current_strategy.json  (same path the UI uses)
+  - DictWrapper strategy config loaded from current_strategy.json
   - Mocked building blocks that inject known AT_ASIA_50 → BELOW_ASIA_50 + BEARISH_CLIMAX
     sequences (same mocking strategy as test_btcaaaaa_685_timing_chain.py)
   - The COMPLETE evaluator loop from BacktestWorker (not just InstitutionalSignalEvaluator)
 
 Gap covered: test_btcaaaaa_685_timing_chain.py tests the evaluator in isolation.
 This test verifies that the DictWrapper strategy config, the timing chain, and the
-bar-by-bar loop all work end-to-end, exactly as Mode 2 does — so a regression in
+bar-by-bar loop all work end-to-end for the JSON-load path — a regression in
 the Mode 2 code path will fail here, not just in a UI run.
 
 Both tests fail on pre-ad3b0b1 code and pass after the fix.
