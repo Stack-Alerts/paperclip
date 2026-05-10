@@ -233,18 +233,49 @@ def evaluate_chunk(
             # ENTRY DECISION
             if result.should_enter and not evaluator.current_trade:
                 trade_count += 1
-                
+
                 # Enter trade with signals that fired
                 evaluator.enter_trade(current_bar, i, side, result.signals_fired)
-                
-                # Store entry timestamp
-                entry_timestamp = datetime.fromtimestamp(current_bar.ts_init / 1e9)
+
+                # Store entry timestamp — use UTC to match OHLCV CSV convention.
+                # BUG-FIX (BTCAAAAA-991): datetime.fromtimestamp() uses the server's
+                # local timezone (CET = UTC+1), causing a systematic +4-bar shift when
+                # the recorded timestamp is later compared against UTC-keyed OHLCV bars.
+                from datetime import timezone as _tz
+                entry_timestamp = datetime.fromtimestamp(current_bar.ts_init / 1e9, tz=_tz.utc).replace(tzinfo=None)
                 evaluator.current_trade.entry_timestamp = entry_timestamp
-                
+
+                # P1.1 PRICE AUDIT INSTRUMENTATION (BTCAAAAA-991)
+                # Logs bar context vs recorded entry_price for first 10 trades.
+                # Assert fires if the stored price is not within this bar's H/L, which
+                # would prove the price attribution offset is a code bug, not just a
+                # timestamp mismatch.
+                _ep = float(evaluator.current_trade.entry_price)
+                _bar_close = float(current_bar.close)
+                _bar_low = float(current_bar.low)
+                _bar_high = float(current_bar.high)
+                _ts_utc = entry_timestamp
+                if trade_count <= 10:
+                    logger.warning(
+                        "[PRICE_AUDIT] Trade #%d: bar_index=%d | ts_init_ns=%d | "
+                        "ts_utc=%s | bar_close=%.2f | bar_low=%.2f | bar_high=%.2f | "
+                        "entry_price=%.2f | price_matches_close=%s | price_in_range=%s",
+                        trade_count, i, current_bar.ts_init, _ts_utc,
+                        _bar_close, _bar_low, _bar_high, _ep,
+                        abs(_ep - _bar_close) < 0.01,
+                        _bar_low <= _ep <= _bar_high,
+                    )
+                assert _bar_low <= _ep <= _bar_high, (
+                    f"BTCAAAAA-991 PRICE ATTRIBUTION BUG: entry_price={_ep:.2f} is "
+                    f"outside bar range [{_bar_low:.2f}, {_bar_high:.2f}] at "
+                    f"bar_index={i}, ts_utc={_ts_utc}. "
+                    f"bar_close={_bar_close:.2f}. Price must come from a different bar."
+                )
+
                 # Calculate TP/SL levels
                 from src.optimizer_v3.core.tpsl_calculator import get_tpsl_calculator
                 tpsl_calc = get_tpsl_calculator()
-                
+
                 entry_price = float(current_bar.close)
                 tpsl_mode = backtest_config.get('tpsl_mode', 'Fibonacci')
                 
