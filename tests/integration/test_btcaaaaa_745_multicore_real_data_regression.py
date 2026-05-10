@@ -2,6 +2,13 @@
 Regression test for BTCAAAAA-745: real-data multicore backtest (8,632 bars)
 must produce trades > 0 on 3 consecutive runs.
 
+JSON-path only — does not exercise the DB load path. NOT a proxy for UI correctness.
+Weights below are sourced from BlockRegistry base_points (DB-load values per Fix 1
+of BTCAAAAA-925): AT_ASIA_50=20, BELOW_ASIA_50=15, BEARISH_CLIMAX=22.
+The UI loads strategy config from the DB via get_strategy_version → _dict_to_config,
+not from current_strategy.json; this inline config approximates that but is not the
+same code path. Do not cite this test as proof that the UI produces trades.
+
 Root cause: merge_chunk_results() called get_trade_registry() without clearing
 it first. On the second (or any subsequent) run, identical (entry_ts, exit_ts,
 exit_type) keys were rejected as duplicates → 0 trades on every run after the
@@ -12,7 +19,8 @@ Fix: registry.clear() at the start of merge_chunk_results() (commit c2d19ff).
 This test FAILS on pre-c2d19ff code and PASSES after.
 
 Strategy under test: "50% Asia Rejection Simple"
-  AT_ASIA_50 (15) + BELOW_ASIA_50 (15) + BEARISH_CLIMAX (20) → ≥40 confluence
+  AT_ASIA_50 (20) + BELOW_ASIA_50 (15) + BEARISH_CLIMAX (22) → ≥40 confluence
+  (weights reflect DB BlockRegistry base_points after Fix 1 of BTCAAAAA-925)
 Dataset: 15-minute BTCUSDT_PERP bars, Feb–May 2026 (≥8,000 bars)
 """
 
@@ -50,7 +58,7 @@ _STRATEGY_CONFIG: dict = {
                 {
                     "name": "AT_ASIA_50",
                     "logic": "AND",
-                    "weight": 15,
+                    "weight": 20,
                     "exit_conditions": [
                         {
                             "signal_name": "AT_IHOD",
@@ -93,7 +101,7 @@ _STRATEGY_CONFIG: dict = {
             "name": "ema_55_vector",
             "logic": "AND",
             "signals": [
-                {"name": "BEARISH_CLIMAX", "logic": "AND", "weight": 20},
+                {"name": "BEARISH_CLIMAX", "logic": "AND", "weight": 22},
             ],
         },
         {

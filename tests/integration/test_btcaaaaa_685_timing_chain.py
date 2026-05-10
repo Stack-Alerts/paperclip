@@ -32,7 +32,12 @@ from src.optimizer_v3.core.institutional_signal_evaluator import InstitutionalSi
 # ---------------------------------------------------------------------------
 
 def _load_strategy() -> DictWrapper:
-    """Load current_strategy.json as a DictWrapper (same path the engine uses)."""
+    """Load current_strategy.json as a DictWrapper.
+
+    JSON-path only — does not exercise the DB load path. NOT a proxy for UI correctness.
+    The UI loads via get_strategy_version → _dict_to_config, resolving weights from
+    BlockRegistry base_points. This path reads explicit weights from the JSON file.
+    """
     path = "user_strategies/current_strategy.json"
     with open(path) as f:
         return DictWrapper(json.load(f))
