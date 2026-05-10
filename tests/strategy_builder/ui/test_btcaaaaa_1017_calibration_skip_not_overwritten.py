@@ -133,13 +133,17 @@ class TestCalibrationSkipNotOverwritten:
         stub.cache_manager.get_cached_bars.return_value = [object()] * 100
         stub.cache_manager.get_metrics.return_value = {"hit_rate_pct": 75.0}
 
-        orchestrate_val = MagicMock()
-        orchestrate_val.success = True
-        stub.orchestrator.validate_strategy.return_value = orchestrate_val
-        stub.orchestrator.serialize_config_for_backtest.return_value = {
+        _config = {
             "blocks": [{"name": "Alpha"}],
             "name": "TestStrategy",
         }
+        orchestrate_val = MagicMock()
+        orchestrate_val.success = True
+        stub.orchestrator.validate_strategy.return_value = orchestrate_val
+        stub.orchestrator.serialize_config_for_backtest.return_value = _config
+        # _repair_if_unreachable must return the real dict so _run_auto_calibration
+        # inside _on_run_clicked sees block_names=["Alpha"] and hits the cache.
+        stub._repair_if_unreachable.return_value = _config
 
         with patch("src.optimizer_v3.database.get_database_manager"), \
              patch("src.strategy_builder.ui.backtest_config_panel.QApplication"), \
@@ -188,13 +192,15 @@ class TestCalibrationSkipNotOverwritten:
         stub.cache_manager.get_cached_bars.return_value = None
         stub.cache_manager.get_metrics.return_value = {"hit_rate_pct": 0.0}
 
-        orchestrate_val = MagicMock()
-        orchestrate_val.success = True
-        stub.orchestrator.validate_strategy.return_value = orchestrate_val
-        stub.orchestrator.serialize_config_for_backtest.return_value = {
+        _config = {
             "blocks": [{"name": "Alpha"}],
             "name": "TestStrategy",
         }
+        orchestrate_val = MagicMock()
+        orchestrate_val.success = True
+        stub.orchestrator.validate_strategy.return_value = orchestrate_val
+        stub.orchestrator.serialize_config_for_backtest.return_value = _config
+        stub._repair_if_unreachable.return_value = _config
 
         with patch("src.optimizer_v3.database.get_database_manager"), \
              patch("src.strategy_builder.ui.backtest_config_panel.QApplication"), \
