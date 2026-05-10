@@ -863,3 +863,101 @@ class TestCalibrationCache:
         assert any(line.strip() == 'import json' for line in src_lines[:50]), (
             "'import json' must appear in the first 50 lines of the module"
         )
+
+
+# ---------------------------------------------------------------------------
+# Real-widget integration test: calibration skip message not overwritten
+# (BTCAAAAA-1018)
+# ---------------------------------------------------------------------------
+
+class TestResultsTextNotOverwrittenOnCacheHit:
+    """Real-QTextEdit integration test guarding against setText overwrite regression."""
+
+    def test_calibration_skip_message_survives_cache_hit_append(self, qapp):
+        """
+        Reproduces BTCAAAAA-1018: _run_auto_calibration sets skip message via
+        setText; if _on_run_clicked then calls setText for cache status it
+        overwrites it.  After the fix both messages must be visible.
+        Uses a real QTextEdit (not MagicMock) so toPlainText() is authoritative.
+        """
+        import hashlib
+        import json
+        import types
+        from PyQt5.QtWidgets import QTextEdit
+        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
+
+        run_clicked_fn = BacktestConfigPanel._on_run_clicked
+        auto_calib_fn = BacktestConfigPanel._run_auto_calibration
+
+        stub = MagicMock()
+        real_results_text = QTextEdit()
+        stub.results_text = real_results_text
+        stub.confluence_spin = MagicMock()
+        stub.confluence_spin.value.return_value = 3
+
+        config_dict = {
+            'blocks': [{'name': 'Alpha'}],
+            'name': 'TestStrategy',
+        }
+
+        # Pre-populate calibration cache to trigger cache-HIT in _run_auto_calibration.
+        # Must match the exact fingerprint_payload structure in _run_auto_calibration.
+        block_names = sorted(['Alpha'])
+        fingerprint_payload = {
+            "block_names": block_names,
+            "timeframe": "15m",
+            "period_days": 180,
+            "mode": "production",
+        }
+        stub._calibration_fingerprint = hashlib.sha256(
+            json.dumps(fingerprint_payload, sort_keys=True).encode()
+        ).hexdigest()
+        stub._calibration_cache = {'Alpha': 7}
+
+        # Strategy validation passes
+        mock_val = MagicMock()
+        mock_val.success = True
+        stub.orchestrator.validate_strategy.return_value = mock_val
+        stub.orchestrator.serialize_config_for_backtest.return_value = config_dict
+        stub._repair_if_unreachable.return_value = config_dict
+
+        # Data cache: return bars to trigger the cache-HIT branch in _on_run_clicked
+        stub.cache_manager.get_cached_bars.return_value = [object()] * 100
+        stub.cache_manager.get_metrics.return_value = {'hit_rate_pct': 85.0}
+        stub.trades_panel = MagicMock()
+        stub.output_panel = MagicMock()
+        stub.run_btn = MagicMock()
+        stub.pause_btn = MagicMock()
+        stub.stop_btn = MagicMock()
+        stub.results_btn = MagicMock()
+        stub.live_output_tab_index = 1
+        stub.tab_widget = MagicMock()
+        stub.get_config = MagicMock(return_value={'timeframe': '15m', 'lookback_days': 180})
+
+        stub._run_auto_calibration = types.MethodType(auto_calib_fn, stub)
+        stub._on_run_clicked = types.MethodType(run_clicked_fn, stub)
+
+        EXPECTED_SKIP_MSG = (
+            "✓ Calibration already complete for current settings — skipping. "
+            "Using cached parameters."
+        )
+
+        with patch("src.optimizer_v3.database.get_database_manager"), \
+             patch("src.strategy_builder.ui.backtest_config_panel.QApplication"), \
+             patch("src.strategy_builder.ui.backtest_config_panel.BacktestWorker") as MockWorker, \
+             patch("src.optimizer_v3.core.trade_registry.get_trade_registry"):
+            MockWorker.return_value = MagicMock()
+            try:
+                stub._on_run_clicked()
+            except Exception:
+                pass
+
+        plain = real_results_text.toPlainText()
+        assert EXPECTED_SKIP_MSG in plain, (
+            f"Calibration skip message must survive data-cache append (not be overwritten).\n"
+            f"results_text.toPlainText():\n{plain!r}"
+        )
+        assert "Cache HIT" in plain, (
+            f"Data-cache HIT message must also be present in results_text.\n"
+            f"results_text.toPlainText():\n{plain!r}"
+        )
