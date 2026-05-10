@@ -1781,8 +1781,11 @@ class UnifiedDataManager:
                     logger.error(msg)
                     tf_summary['errors'].append(msg)
 
-            # P3 post-ingest sanity check (BTCAAAAA-997): last stored bar must be
-            # within 5 s of the expected last complete bar boundary before end_date.
+            # P3 post-ingest sanity check (BTCAAAAA-997): verify data is complete
+            # through end_date by checking the last stored bar is no more than 5s
+            # older than the last expected complete bar boundary.  We check one
+            # direction only (too short, not too new) because the catalog may
+            # legitimately extend past the repair window.
             if not dry_run:
                 last_stored = self.get_last_bar_timestamp(tf)
                 if last_stored is not None:
@@ -1795,19 +1798,21 @@ class UnifiedDataManager:
                     expected_last_ts = epoch + timedelta(
                         seconds=(int(elapsed_s // bar_secs) - 1) * bar_secs
                     )
-                    diff_s = abs((last_stored - expected_last_ts).total_seconds())
-                    if diff_s > 5:
+                    # Warn only if last_stored is older than expected (data too short).
+                    # If last_stored >= expected_last_ts the catalog extends past end_date — OK.
+                    deficit_s = (expected_last_ts - last_stored).total_seconds()
+                    if deficit_s > 5:
                         msg = (
                             f"Post-ingest sanity FAILED for {tf}: "
-                            f"last_stored={last_stored} expected≈{expected_last_ts} "
-                            f"(diff={diff_s:.1f}s > 5s threshold)"
+                            f"last_stored={last_stored} expected≥{expected_last_ts} "
+                            f"(data is {deficit_s:.1f}s short)"
                         )
                         logger.warning(f"   ⚠️  {msg}")
                         tf_summary['errors'].append(msg)
                     else:
                         logger.info(
                             f"   ✅ Sanity OK — last stored {last_stored} "
-                            f"within 5s of expected {expected_last_ts} (diff={diff_s:.1f}s)"
+                            f"covers through expected {expected_last_ts}"
                         )
 
             summary[tf] = tf_summary
