@@ -676,9 +676,9 @@ class BacktestWorker(QThread):
                     )
                     
                     # Create trade with real data
-                    from datetime import datetime
+                    from datetime import datetime, timezone as _tz
                     entry_price = float(current_bar.close)
-                    entry_timestamp = datetime.fromtimestamp(current_bar.ts_init / 1e9)
+                    entry_timestamp = datetime.fromtimestamp(current_bar.ts_init / 1e9, tz=_tz.utc).replace(tzinfo=None)
                     
                     # Enter trade via evaluator
                     evaluator.enter_trade(current_bar, i, side)
@@ -910,7 +910,7 @@ class BacktestWorker(QThread):
                     # the single-core path emitted to UI but never persisted trades.
                     from src.optimizer_v3.core.trade_registry import get_trade_registry as _get_trade_registry
                     _registry = _get_trade_registry()
-                    _exit_timestamp = datetime.fromtimestamp(current_bar.ts_init / 1e9)
+                    _exit_timestamp = datetime.fromtimestamp(current_bar.ts_init / 1e9, tz=_tz.utc).replace(tzinfo=None)
                     _registry.add_trade({
                         'entry_timestamp': evaluator.current_trade.entry_timestamp if evaluator.current_trade else None,
                         'exit_timestamp': _exit_timestamp,

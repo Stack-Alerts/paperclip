@@ -35,7 +35,7 @@ Date: February 11, 2026
 
 from typing import List, Dict, Optional, Callable, Any
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -241,8 +241,7 @@ def evaluate_chunk(
                 # BUG-FIX (BTCAAAAA-991): datetime.fromtimestamp() uses the server's
                 # local timezone (CET = UTC+1), causing a systematic +4-bar shift when
                 # the recorded timestamp is later compared against UTC-keyed OHLCV bars.
-                from datetime import timezone as _tz
-                entry_timestamp = datetime.fromtimestamp(current_bar.ts_init / 1e9, tz=_tz.utc).replace(tzinfo=None)
+                entry_timestamp = datetime.fromtimestamp(current_bar.ts_init / 1e9, tz=timezone.utc).replace(tzinfo=None)
                 evaluator.current_trade.entry_timestamp = entry_timestamp
 
                 # P1.1 PRICE AUDIT INSTRUMENTATION (BTCAAAAA-991)
@@ -634,7 +633,7 @@ def evaluate_chunk(
                     'entry_price': entry_price,
                     'exit_price': exit_price,
                     'entry_timestamp': evaluator.current_trade.entry_timestamp,
-                    'exit_timestamp': datetime.fromtimestamp(current_bar.ts_init / 1e9),
+                    'exit_timestamp': datetime.fromtimestamp(current_bar.ts_init / 1e9, tz=timezone.utc).replace(tzinfo=None),
                     'pnl': pnl,
                     'pnl_pct': pnl_pct,
                     'side': side,
