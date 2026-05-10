@@ -2755,7 +2755,7 @@ class BacktestConfigPanel(QWidget):
         if cached_bars:
             # Cache hit - show performance message
             metrics = self.cache_manager.get_metrics()
-            self.results_text.setText(
+            self.results_text.append(
                 f"⚡ Cache HIT: Using {len(cached_bars):,} cached bars\n"
                 f"⏱️ Time saved: ~12 seconds\n"
                 f"📊 Cache hit rate: {metrics['hit_rate_pct']:.1f}%\n\n"
@@ -2764,7 +2764,7 @@ class BacktestConfigPanel(QWidget):
             self._update_cache_status()
         else:
             # Cache miss - will load fresh data
-            self.results_text.setText(
+            self.results_text.append(
                 "🔄 Cache MISS: Loading fresh data from DataManager...\n"
                 "This will take ~10-15 seconds.\n\n"
                 "💡 Future tests with same data config will be instant!"
