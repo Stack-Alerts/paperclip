@@ -155,7 +155,7 @@ class TestHandlerPost:
 
         monkeypatch.setattr(
             "blast_radius.api_server.process_issue",
-            lambda issue_id, dry_run=False, old_status=None: {
+            lambda issue_id, dry_run=False, old_status=None, force_reprocess=False: {
                 "issue": "BTCAAAAA-100",
                 "dry_run": False,
             },
@@ -183,7 +183,7 @@ class TestHandlerPost:
 
         monkeypatch.setattr(
             "blast_radius.api_server.process_issue",
-            lambda issue_id, dry_run=False, old_status=None: {
+            lambda issue_id, dry_run=False, old_status=None, force_reprocess=False: {
                 "issue": "BTCAAAAA-100",
                 "dry_run": False,
             },
@@ -211,7 +211,7 @@ class TestHandlerPost:
 
         monkeypatch.setattr(
             "blast_radius.api_server.process_issue",
-            lambda issue_id, dry_run=False, old_status=None: None,
+            lambda issue_id, dry_run=False, old_status=None, force_reprocess=False: None,
         )
 
         handler.do_POST()
@@ -235,7 +235,7 @@ class TestHandlerPost:
 
         monkeypatch.setattr(
             "blast_radius.api_server.process_issue",
-            lambda issue_id, dry_run=False, old_status=None: (
+            lambda issue_id, dry_run=False, old_status=None, force_reprocess=False: (
                 (_ for _ in ()).throw(RuntimeError("API timeout"))
             ),
         )
@@ -262,7 +262,7 @@ class TestHandlerPost:
 
         captured = {}
 
-        def tracking_process(issue_id, dry_run=False, old_status=None):
+        def tracking_process(issue_id, dry_run=False, old_status=None, force_reprocess=False):
             captured["dry_run"] = dry_run
             return {"issue": "BTCAAAAA-100", "dry_run": dry_run}
 
@@ -277,6 +277,35 @@ class TestHandlerPost:
         handler._send_json.assert_called_once()
         args = handler._send_json.call_args[0]
         assert args[1]["dry_run"] is True
+
+    def test_passes_force_reprocess_flag(self, monkeypatch):
+        payload = {
+            "issue_id": "issue-uuid-42",
+            "force_reprocess": True,
+        }
+        handler = _make_handler(
+            "/api/webhook/issue-status-changed",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        captured = {}
+
+        def tracking_process(issue_id, dry_run=False, old_status=None, force_reprocess=False):
+            captured["force_reprocess"] = force_reprocess
+            return {"issue": "BTCAAAAA-100", "dry_run": dry_run}
+
+        monkeypatch.setattr(
+            "blast_radius.api_server.process_issue",
+            tracking_process,
+        )
+
+        handler.do_POST()
+
+        assert captured["force_reprocess"] is True
+        handler._send_json.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

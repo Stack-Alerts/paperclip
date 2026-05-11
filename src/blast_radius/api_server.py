@@ -133,10 +133,11 @@ class _Handler(BaseHTTPRequestHandler):
 
         old_status = body.get("previousStatus") or body.get("old_status")
         dry_run = body.get("dry_run", False)
+        force_reprocess = body.get("force_reprocess", False)
 
         log.info(
-            "Webhook: issue_status_changed for %s (old_status=%s, dry_run=%s)",
-            issue_id, old_status, dry_run,
+            "Webhook: issue_status_changed for %s (old_status=%s, dry_run=%s, force_reprocess=%s)",
+            issue_id, old_status, dry_run, force_reprocess,
         )
 
         try:
@@ -144,6 +145,7 @@ class _Handler(BaseHTTPRequestHandler):
                 issue_id,
                 dry_run=bool(dry_run),
                 old_status=old_status,
+                force_reprocess=bool(force_reprocess),
             )
             if result is None:
                 result = {"issue": issue_id, "status": "skipped", "reason": "not eligible"}
