@@ -67,9 +67,12 @@ def compute_coverage(engine: Engine) -> CoverageReport:
     total = len(all_fdr)
 
     with engine.connect() as conn:
-        indexed = conn.execute(
-            text("SELECT COUNT(DISTINCT fr_identifier) FROM touch_index_fr_files")
-        ).scalar() or 0
+        indexed = (
+            conn.execute(
+                text("SELECT COUNT(DISTINCT fr_identifier) FROM touch_index_fr_files")
+            ).scalar()
+            or 0
+        )
 
     pct = (indexed / total * 100) if total > 0 else 0.0
 
@@ -98,9 +101,10 @@ def compute_freshness(
 ) -> FreshnessReport:
     """Report age statistics for touch_index_fr_files entries."""
     with engine.connect() as conn:
-        total = conn.execute(
-            text("SELECT COUNT(*) FROM touch_index_fr_files")
-        ).scalar() or 0
+        total = (
+            conn.execute(text("SELECT COUNT(*) FROM touch_index_fr_files")).scalar()
+            or 0
+        )
 
         oldest = conn.execute(
             text("SELECT MIN(updated_at) FROM touch_index_fr_files")
@@ -116,10 +120,15 @@ def compute_freshness(
     cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_threshold_hours)
 
     with engine.connect() as conn:
-        stale = conn.execute(
-            text("SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at < :cutoff"),
-            {"cutoff": cutoff},
-        ).scalar() or 0
+        stale = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at < :cutoff"
+                ),
+                {"cutoff": cutoff},
+            ).scalar()
+            or 0
+        )
 
     return FreshnessReport(
         total_rows=total,
@@ -133,19 +142,28 @@ def compute_freshness(
 def check_consistency(engine: Engine) -> ConsistencyReport:
     """Check for orphan rows, null values, and duplicates."""
     with engine.connect() as conn:
-        null_owner = conn.execute(
-            text(
-                "SELECT COUNT(*) FROM touch_index_fr_files "
-                "WHERE fr_owner_agent_id = '00000000-0000-0000-0000-000000000000'"
-            )
-        ).scalar() or 0
+        null_owner = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_fr_files "
+                    "WHERE fr_owner_agent_id = '00000000-0000-0000-0000-000000000000'"
+                )
+            ).scalar()
+            or 0
+        )
 
-        null_updated = conn.execute(
-            text("SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at IS NULL")
-        ).scalar() or 0
+        null_updated = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at IS NULL"
+                )
+            ).scalar()
+            or 0
+        )
 
-        dups = conn.execute(
-            text("""
+        dups = (
+            conn.execute(
+                text("""
                 SELECT COUNT(*) FROM (
                     SELECT file_path, fr_issue_id, COUNT(*)
                     FROM touch_index_fr_files
@@ -153,7 +171,9 @@ def check_consistency(engine: Engine) -> ConsistencyReport:
                     HAVING COUNT(*) > 1
                 ) dups
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
         orphan_rows = conn.execute(
             text("SELECT DISTINCT fr_issue_id FROM touch_index_fr_files")
@@ -303,13 +323,18 @@ def compute_bug_coverage(engine: Engine) -> BugCoverageReport:
     }
     all_done = _paginate(f"/api/companies/{_company()}/issues", params)
     # Filter out FDR-labelled issues (those are handled by FR worker)
-    non_fdr_done = [i for i in all_done if FDR_LABEL_ID not in (i.get("labelIds") or [])]
+    non_fdr_done = [
+        i for i in all_done if FDR_LABEL_ID not in (i.get("labelIds") or [])
+    ]
     total = len(non_fdr_done)
 
     with engine.connect() as conn:
-        indexed = conn.execute(
-            text("SELECT COUNT(DISTINCT bug_identifier) FROM touch_index_bug_files")
-        ).scalar() or 0
+        indexed = (
+            conn.execute(
+                text("SELECT COUNT(DISTINCT bug_identifier) FROM touch_index_bug_files")
+            ).scalar()
+            or 0
+        )
 
     pct = (indexed / total * 100) if total > 0 else 0.0
 
@@ -338,9 +363,10 @@ def compute_bug_freshness(
 ) -> BugFreshnessReport:
     """Report age statistics for touch_index_bug_files entries using closed_at."""
     with engine.connect() as conn:
-        total = conn.execute(
-            text("SELECT COUNT(*) FROM touch_index_bug_files")
-        ).scalar() or 0
+        total = (
+            conn.execute(text("SELECT COUNT(*) FROM touch_index_bug_files")).scalar()
+            or 0
+        )
 
         oldest = conn.execute(
             text("SELECT MIN(closed_at) FROM touch_index_bug_files")
@@ -356,13 +382,16 @@ def compute_bug_freshness(
     cutoff = datetime.now(timezone.utc) - timedelta(days=stale_threshold_days)
 
     with engine.connect() as conn:
-        stale = conn.execute(
-            text(
-                "SELECT COUNT(*) FROM touch_index_bug_files "
-                "WHERE closed_at IS NOT NULL AND closed_at < :cutoff"
-            ),
-            {"cutoff": cutoff},
-        ).scalar() or 0
+        stale = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_bug_files "
+                    "WHERE closed_at IS NOT NULL AND closed_at < :cutoff"
+                ),
+                {"cutoff": cutoff},
+            ).scalar()
+            or 0
+        )
 
     return BugFreshnessReport(
         total_rows=total,
@@ -376,12 +405,18 @@ def compute_bug_freshness(
 def check_bug_consistency(engine: Engine) -> BugConsistencyReport:
     """Check for orphan rows, null closed_at, and duplicates in touch_index_bug_files."""
     with engine.connect() as conn:
-        null_closed = conn.execute(
-            text("SELECT COUNT(*) FROM touch_index_bug_files WHERE closed_at IS NULL")
-        ).scalar() or 0
+        null_closed = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_bug_files WHERE closed_at IS NULL"
+                )
+            ).scalar()
+            or 0
+        )
 
-        dups = conn.execute(
-            text("""
+        dups = (
+            conn.execute(
+                text("""
                 SELECT COUNT(*) FROM (
                     SELECT file_path, bug_issue_id, COUNT(*)
                     FROM touch_index_bug_files
@@ -389,7 +424,9 @@ def check_bug_consistency(engine: Engine) -> BugConsistencyReport:
                     HAVING COUNT(*) > 1
                 ) dups
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
         orphan_rows = conn.execute(
             text("SELECT DISTINCT bug_issue_id FROM touch_index_bug_files")

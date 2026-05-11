@@ -91,7 +91,9 @@ def ingest_bug_issue(
     if dry_run:
         logger.info(
             "Bug %s: DRY RUN — would index %d file(s) via %s",
-            issue_identifier, len(rows), source,
+            issue_identifier,
+            len(rows),
+            source,
         )
         for r in rows:
             logger.info("  DRY RUN row: file_path=%s", r["file_path"])
@@ -180,15 +182,20 @@ def main() -> None:
         description="Touch Index bug-close ingestion worker \u2014 upsert bug issue file references",
     )
     parser.add_argument(
-        "--issue-id", type=str, metavar="UUID",
+        "--issue-id",
+        type=str,
+        metavar="UUID",
         help="Process a single non-FDR issue by Paperclip UUID (webhook trigger)",
     )
     parser.add_argument(
-        "--lookback-minutes", type=int, default=30,
+        "--lookback-minutes",
+        type=int,
+        default=30,
         help="Process bug issues closed within this many minutes (default: 30)",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="Log what would be ingested without writing to DB",
     )
     args = parser.parse_args()
@@ -229,7 +236,9 @@ def main() -> None:
     skipped = sum(1 for r in results if r.skipped_no_commits)
     logger.info(
         "Bug worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits)",
-        len(results), total_files, skipped,
+        len(results),
+        total_files,
+        skipped,
     )
 
 
