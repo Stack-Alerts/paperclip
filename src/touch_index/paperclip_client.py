@@ -30,6 +30,18 @@ def _session() -> requests.Session:
     return s
 
 
+def _board_session() -> requests.Session:
+    key = os.environ.get("PAPERCLIP_BOARD_API_KEY") or os.environ["PAPERCLIP_API_KEY"]
+    s = requests.Session()
+    s.headers.update(
+        {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        }
+    )
+    return s
+
+
 def _base() -> str:
     return os.environ["PAPERCLIP_API_URL"]
 
@@ -185,3 +197,42 @@ def get_issue_assignee(issue: dict) -> str | None:
 def _is_bug(title: str) -> bool:
     lower = title.lower()
     return any(lower.startswith(p) for p in _BUG_TITLE_PREFIXES)
+
+
+def list_live_runs(
+    min_count: int = 50,
+    limit: int = 50,
+) -> list[dict]:
+    """List live (queued+running) heartbeat runs for the company.
+
+    Each run dict includes an ``outputSilence`` field with staleness metadata:
+      - level: "ok" | "suspicious" | "critical" | "snoozed" | "not_applicable"
+      - silenceAgeMs: milliseconds since last output (None if never)
+      - lastOutputAt: ISO timestamp or None
+    """
+    params: dict[str, Any] = {"minCount": str(min_count), "limit": str(limit)}
+    with _session() as sess:
+        resp = sess.get(
+            f"{_base()}/api/companies/{_company()}/live-runs",
+            params=params,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+def cancel_heartbeat_run(run_id: str) -> dict | None:
+    """Cancel a heartbeat run via the board-level admin endpoint.
+
+    Requires ``PAPERCLIP_BOARD_API_KEY`` or a board-privileged
+    ``PAPERCLIP_API_KEY``.  Returns the cancelled run dict or None if 404.
+    """
+    with _board_session() as sess:
+        resp = sess.post(
+            f"{_base()}/api/heartbeat-runs/{run_id}/cancel",
+            timeout=30,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()

@@ -1,0 +1,46 @@
+name: Backfill — Close Stale Running Runs
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # hourly
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (report only, do not cancel)'
+        required: false
+        default: 'true'
+      stale_minutes:
+        description: 'Silence threshold in minutes'
+        required: false
+        default: '60'
+
+jobs:
+  close-stale:
+    name: Close stale in_progress heartbeat runs
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run stale-run closer
+        env:
+          PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+          PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+          PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
+        run: |
+          FLAGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          if [ -n "${{ github.event.inputs.stale_minutes }}" ]; then
+            FLAGS="$FLAGS --stale-minutes ${{ github.event.inputs.stale_minutes }}"
+          fi
+          python scripts/backfill_close_stale_runs.py $FLAGS
