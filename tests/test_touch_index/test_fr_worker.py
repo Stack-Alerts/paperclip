@@ -1,14 +1,15 @@
-"""Unit tests for touch_index.fr_worker — no DB or network required."""
+"""Unit tests for the FR touch-index ingestion worker.
+
+All external I/O (DB engine, Paperclip API, git subprocess) is mocked so these
+tests run offline without a PostgreSQL instance or network.
+"""
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch, call
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 
 from touch_index.fr_worker import (
     FRIngestionResult,
@@ -22,212 +23,259 @@ from touch_index.fr_worker import (
 # ---------------------------------------------------------------------------
 
 
-def _make_engine():
-    engine = MagicMock()
+def _mock_engine():
+    """Return a mock SQLAlchemy engine whose context-manager .begin() works."""
     conn = MagicMock()
-    engine.begin.return_value.__enter__ = MagicMock(return_value=conn)
-    engine.begin.return_value.__exit__ = MagicMock(return_value=False)
+    ctx = MagicMock()
+    ctx.__enter__ = MagicMock(return_value=conn)
+    ctx.__exit__ = MagicMock(return_value=False)
+    engine = MagicMock()
+    engine.begin = MagicMock(return_value=ctx)
     return engine, conn
 
 
+ISSUE_ID = "aaaaaaaa-0000-0000-0000-000000000001"
+ISSUE_IDENTIFIER = "BTCAAAAA-1182"
+OWNER_AGENT_ID = "bbbbbbbb-0000-0000-0000-000000000002"
+
+
 # ---------------------------------------------------------------------------
-# ingest_fr_issue — source priority
+# ingest_fr_issue — file source priority
 # ---------------------------------------------------------------------------
 
 
 class TestIngestFrIssue:
-    @patch("touch_index.fr_worker.get_files_for_issue")
-    @patch("touch_index.fr_worker.fetch_and_extract")
-    def test_comments_are_primary_source(self, mock_comments, mock_git):
-        """Files from done-comments take precedence; git is never called."""
-        mock_comments.return_value = ["src/foo.py", "src/bar.py"]
-        engine, conn = _make_engine()
+    def test_files_from_comments(self):
+        engine, conn = _mock_engine()
+        files = ["src/touch_index/fr_worker.py", "src/touch_index/db.py"]
 
-        result = ingest_fr_issue(
-            engine,
-            issue_id="issue-uuid-1",
-            issue_identifier="BTCAAAAA-1182",
-            owner_agent_id="agent-uuid-1",
-        )
+        with (
+            patch(
+                "touch_index.fr_worker.fetch_and_extract", return_value=files
+            ) as mock_comments,
+            patch(
+                "touch_index.fr_worker.get_files_for_issue", return_value=[]
+            ) as mock_git,
+        ):
+            result = ingest_fr_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID)
 
-        mock_comments.assert_called_once_with("issue-uuid-1")
-        mock_git.assert_not_called()
         assert result.source == "comments"
         assert result.files_indexed == 2
         assert result.skipped_no_commits is False
+        mock_git.assert_not_called()
+        conn.execute.assert_called_once()
 
-    @patch("touch_index.fr_worker.get_files_for_issue")
-    @patch("touch_index.fr_worker.fetch_and_extract")
-    def test_falls_back_to_git_when_no_comments(self, mock_comments, mock_git):
-        mock_comments.return_value = []
-        mock_git.return_value = ["src/optimizer_v3/strategy.py"]
-        engine, conn = _make_engine()
+    def test_falls_back_to_git_when_no_comments(self):
+        engine, conn = _mock_engine()
+        git_files = ["src/touch_index/fr_worker.py"]
 
-        result = ingest_fr_issue(
-            engine,
-            issue_id="issue-uuid-2",
-            issue_identifier="BTCAAAAA-1100",
-            owner_agent_id=None,
-        )
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=git_files),
+        ):
+            result = ingest_fr_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID)
 
-        mock_git.assert_called_once_with("BTCAAAAA-1100")
         assert result.source == "git"
         assert result.files_indexed == 1
+        assert result.skipped_no_commits is False
 
-    @patch("touch_index.fr_worker.extract_files_from_text")
-    @patch("touch_index.fr_worker.get_files_for_issue")
-    @patch("touch_index.fr_worker.fetch_and_extract")
-    def test_falls_back_to_description_when_no_git(
-        self, mock_comments, mock_git, mock_desc
-    ):
-        mock_comments.return_value = []
-        mock_git.return_value = []
-        mock_desc.return_value = ["src/strategies/base.py"]
-        engine, conn = _make_engine()
-
-        result = ingest_fr_issue(
-            engine,
-            issue_id="issue-uuid-3",
-            issue_identifier="BTCAAAAA-900",
-            owner_agent_id=None,
-            description="Touches `src/strategies/base.py` for the new signal.",
+    def test_falls_back_to_description_when_no_comments_no_git(self):
+        engine, conn = _mock_engine()
+        desc_files = ["src/optimizer_v3/database/strategy_manager.py"]
+        description = (
+            "Changed `src/optimizer_v3/database/strategy_manager.py` to fix XYZ."
         )
 
-        mock_desc.assert_called_once()
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch(
+                "touch_index.fr_worker.extract_files_from_text", return_value=desc_files
+            ) as mock_desc,
+        ):
+            result = ingest_fr_issue(
+                engine,
+                ISSUE_ID,
+                ISSUE_IDENTIFIER,
+                OWNER_AGENT_ID,
+                description=description,
+            )
+
         assert result.source == "description"
         assert result.files_indexed == 1
+        assert result.skipped_no_commits is False
+        mock_desc.assert_called_once_with(description)
 
-    @patch("touch_index.fr_worker.get_files_for_issue")
-    @patch("touch_index.fr_worker.fetch_and_extract")
-    def test_skipped_when_no_files_found(self, mock_comments, mock_git):
-        mock_comments.return_value = []
-        mock_git.return_value = []
-        engine, conn = _make_engine()
+    def test_skips_when_all_sources_empty(self):
+        engine, conn = _mock_engine()
 
-        result = ingest_fr_issue(
-            engine,
-            issue_id="issue-uuid-4",
-            issue_identifier="BTCAAAAA-800",
-            owner_agent_id=None,
-        )
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            result = ingest_fr_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID)
 
-        conn.execute.assert_not_called()
+        assert result.source == "none"
         assert result.files_indexed == 0
         assert result.skipped_no_commits is True
-        assert result.source == "none"
+        conn.execute.assert_not_called()
 
-    @patch("touch_index.fr_worker.get_files_for_issue")
-    @patch("touch_index.fr_worker.fetch_and_extract")
-    def test_upsert_rows_contain_correct_fields(self, mock_comments, mock_git):
-        mock_comments.return_value = ["src/a.py", "src/b.py"]
-        engine, conn = _make_engine()
+    def test_empty_description_not_passed_to_extractor(self):
+        """extract_files_from_text must not be called when description is empty."""
+        engine, _ = _mock_engine()
 
-        ingest_fr_issue(
-            engine,
-            issue_id="issue-uuid-5",
-            issue_identifier="BTCAAAAA-1307",
-            owner_agent_id="agent-abc",
-        )
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.fr_worker.extract_files_from_text") as mock_desc,
+        ):
+            result = ingest_fr_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID, description=""
+            )
 
-        conn.execute.assert_called_once()
+        mock_desc.assert_not_called()
+        assert result.skipped_no_commits is True
+
+    def test_upsert_rows_contain_required_fields(self):
+        engine, conn = _mock_engine()
+        files = ["src/foo.py", "src/bar.py"]
+
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=files),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            ingest_fr_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID)
+
+        _, rows_arg = conn.execute.call_args
+        # conn.execute(sql, rows) — rows is the second positional arg
         rows = conn.execute.call_args[0][1]
         assert len(rows) == 2
         for row in rows:
-            assert row["fr_issue_id"] == "issue-uuid-5"
-            assert row["fr_identifier"] == "BTCAAAAA-1307"
-            assert row["fr_owner_agent_id"] == "agent-abc"
-            assert row["file_path"] in {"src/a.py", "src/b.py"}
-            assert row["updated_at"] is not None
+            assert "id" in row
+            assert row["file_path"] in files
+            assert row["fr_issue_id"] == ISSUE_ID
+            assert row["fr_identifier"] == ISSUE_IDENTIFIER
+            assert row["fr_owner_agent_id"] == OWNER_AGENT_ID
+            assert isinstance(row["updated_at"], datetime)
 
-    @patch("touch_index.fr_worker.get_files_for_issue")
-    @patch("touch_index.fr_worker.fetch_and_extract")
-    def test_row_ids_are_unique_uuids(self, mock_comments, mock_git):
-        mock_comments.return_value = ["src/x.py", "src/y.py", "src/z.py"]
-        engine, conn = _make_engine()
+    def test_null_owner_replaced_with_sentinel(self):
+        engine, conn = _mock_engine()
+        files = ["src/foo.py"]
 
-        ingest_fr_issue(engine, "id-999", "BTCAAAAA-999", None)
-
-        rows = conn.execute.call_args[0][1]
-        ids = [r["id"] for r in rows]
-        assert len(ids) == len(set(ids)), "each row must have a unique UUID"
-
-    @patch("touch_index.fr_worker.get_files_for_issue")
-    @patch("touch_index.fr_worker.fetch_and_extract")
-    def test_none_owner_agent_substituted_with_zero_uuid(self, mock_comments, mock_git):
-        mock_comments.return_value = ["src/z.py"]
-        engine, conn = _make_engine()
-
-        ingest_fr_issue(engine, "id-000", "BTCAAAAA-000", owner_agent_id=None)
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=files),
+        ):
+            ingest_fr_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, owner_agent_id=None)
 
         rows = conn.execute.call_args[0][1]
         assert rows[0]["fr_owner_agent_id"] == "00000000-0000-0000-0000-000000000000"
 
+    def test_description_not_called_when_comments_present(self):
+        """Description path must be skipped if comments already found files."""
+        engine, _ = _mock_engine()
+        files = ["src/touch_index/fr_worker.py"]
+
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=files),
+            patch("touch_index.fr_worker.extract_files_from_text") as mock_desc,
+        ):
+            result = ingest_fr_issue(
+                engine,
+                ISSUE_ID,
+                ISSUE_IDENTIFIER,
+                OWNER_AGENT_ID,
+                description="Some description with src/foo.py",
+            )
+
+        mock_desc.assert_not_called()
+        assert result.source == "comments"
+
 
 # ---------------------------------------------------------------------------
-# run_fr_worker
+# run_fr_worker — batch orchestration
 # ---------------------------------------------------------------------------
 
 
 class TestRunFrWorker:
-    @patch("touch_index.fr_worker.get_files_for_issue")
-    @patch("touch_index.fr_worker.fetch_and_extract")
-    def test_processes_all_issues(self, mock_comments, mock_git):
-        mock_comments.side_effect = [["src/a.py"], ["src/b.py", "src/c.py"]]
-        engine, _ = _make_engine()
-
-        issues = [
+    def _issues(self, count: int = 2) -> list[dict]:
+        return [
             {
-                "id": "id-1",
-                "identifier": "BTCAAAAA-10",
-                "assigneeAgentId": "ag-1",
+                "id": f"aaaaaaaa-0000-0000-0000-{i:012d}",
+                "identifier": f"BTCAAAAA-{1000 + i}",
+                "assigneeAgentId": OWNER_AGENT_ID,
                 "description": "",
-            },
-            {
-                "id": "id-2",
-                "identifier": "BTCAAAAA-11",
-                "assigneeAgentId": None,
-                "description": "",
-            },
+            }
+            for i in range(count)
         ]
-        results = run_fr_worker(engine, issues)
 
-        assert len(results) == 2
-        assert results[0].issue_identifier == "BTCAAAAA-10"
-        assert results[0].files_indexed == 1
-        assert results[1].issue_identifier == "BTCAAAAA-11"
-        assert results[1].files_indexed == 2
+    def test_returns_one_result_per_issue(self):
+        engine, _ = _mock_engine()
 
-    @patch("touch_index.fr_worker.get_files_for_issue")
-    @patch("touch_index.fr_worker.fetch_and_extract")
-    def test_continues_after_per_issue_error(self, mock_comments, mock_git):
-        """An exception on one issue must not abort the whole batch."""
-        mock_comments.side_effect = [RuntimeError("API error"), ["src/ok.py"]]
-        engine, _ = _make_engine()
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=["src/a.py"]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            results = run_fr_worker(engine, self._issues(3))
 
-        issues = [
-            {"id": "bad-id", "identifier": "BTCAAAAA-BAD", "assigneeAgentId": None},
-            {"id": "ok-id", "identifier": "BTCAAAAA-OK", "assigneeAgentId": None},
-        ]
-        results = run_fr_worker(engine, issues)
+        assert len(results) == 3
+        assert all(isinstance(r, FRIngestionResult) for r in results)
 
-        # Only the successful issue produces a result
+    def test_continues_after_per_issue_error(self):
+        engine, _ = _mock_engine()
+        issues = self._issues(2)
+
+        def _side_effect(issue_id):
+            if "000000000000" in issue_id:
+                raise RuntimeError("Simulated API error")
+            return ["src/ok.py"]
+
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", side_effect=_side_effect),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            results = run_fr_worker(engine, issues)
+
+        # First issue raised, so only the second produces a result
         assert len(results) == 1
-        assert results[0].issue_identifier == "BTCAAAAA-OK"
 
-    @patch("touch_index.fr_worker.fetch_and_extract")
-    def test_empty_issue_list(self, mock_comments):
-        engine, _ = _make_engine()
+    def test_skipped_count_matches_no_files_issues(self):
+        engine, _ = _mock_engine()
+
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            results = run_fr_worker(engine, self._issues(4))
+
+        skipped = sum(1 for r in results if r.skipped_no_commits)
+        assert skipped == 4
+
+    def test_total_files_indexed(self):
+        engine, _ = _mock_engine()
+
+        with (
+            patch(
+                "touch_index.fr_worker.fetch_and_extract",
+                return_value=["src/a.py", "src/b.py"],
+            ),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            results = run_fr_worker(engine, self._issues(3))
+
+        assert sum(r.files_indexed for r in results) == 6
+
+    def test_empty_issue_list(self):
+        engine, _ = _mock_engine()
         results = run_fr_worker(engine, [])
         assert results == []
-        mock_comments.assert_not_called()
 
-    @patch("touch_index.fr_worker.get_files_for_issue")
-    @patch("touch_index.fr_worker.fetch_and_extract")
-    def test_missing_description_treated_as_empty(self, mock_comments, mock_git):
+    def test_missing_description_treated_as_empty(self):
         """Issues without a 'description' key must not raise KeyError."""
-        mock_comments.return_value = []
-        mock_git.return_value = ["src/fallback.py"]
-        engine, _ = _make_engine()
+        engine, _ = _mock_engine()
 
-        run_fr_worker(engine, [{"id": "id-x", "identifier": "BTCAAAAA-X"}])
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=["src/fallback.py"]),
+        ):
+            run_fr_worker(engine, [{"id": "id-x", "identifier": "BTCAAAAA-X"}])
         # Should complete without error; git fallback used

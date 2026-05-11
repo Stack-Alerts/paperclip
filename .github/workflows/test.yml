@@ -63,9 +63,9 @@ jobs:
           POSTGRES_DB: optimizer_v3
           POSTGRES_USER: optimizer_admin
           POSTGRES_PASSWORD: secure_password_change_me
-          # PYTHONPATH ensures src/ takes priority over tests/touch_index/
-          # which would otherwise shadow the real touch_index package
-          # (it has an __init__.py that conflicts).
+          # PYTHONPATH ensures src/ is importable for conftest-based imports.
+          # The tests/test_touch_index/ path follows the standard test_<pkg>
+          # convention so there is no package-name shadowing.
           PYTHONPATH: src
         run: |
           # Run only the test modules that can execute in a headless CI
@@ -81,6 +81,7 @@ jobs:
           # live network — they mock all external dependencies.
           python -m pytest \
             tests/test_blast_radius/ \
+            tests/test_touch_index/ \
             tests/strategy_builder/validation/ \
             tests/strategy_builder/persistence/ \
             tests/strategy_builder/core/test_signal_dependency_resolver.py \
