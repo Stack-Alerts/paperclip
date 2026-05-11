@@ -257,3 +257,236 @@ def run_quality_checks(
         consistency=consistency,
         passed=failures == 0,
     )
+
+
+# ---------------------------------------------------------------------------
+# Bug data quality monitoring — touch_index_bug_files
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class BugCoverageReport:
+    total_bug_issues: int
+    indexed_bug_issues: int
+    coverage_pct: float
+    missing_issue_identifiers: list[str]
+
+
+@dataclass
+class BugFreshnessReport:
+    total_rows: int
+    max_age_hours: float
+    min_age_hours: float
+    stale_rows: int
+    stale_threshold_days: int
+
+
+@dataclass
+class BugConsistencyReport:
+    null_closed_at_rows: int
+    duplicate_pairs: int
+    orphan_bug_issue_ids: list[str]
+
+
+@dataclass
+class BugQualityReport:
+    coverage: BugCoverageReport | None
+    freshness: BugFreshnessReport | None
+    consistency: BugConsistencyReport | None
+    passed: bool
+
+
+def compute_bug_coverage(engine: Engine) -> BugCoverageReport:
+    """Compare done non-FDR issues in Paperclip vs touch_index_bug_files."""
+    params: dict[str, Any] = {
+        "status": "done",
+    }
+    all_done = _paginate(f"/api/companies/{_company()}/issues", params)
+    # Filter out FDR-labelled issues (those are handled by FR worker)
+    non_fdr_done = [i for i in all_done if FDR_LABEL_ID not in (i.get("labelIds") or [])]
+    total = len(non_fdr_done)
+
+    with engine.connect() as conn:
+        indexed = conn.execute(
+            text("SELECT COUNT(DISTINCT bug_identifier) FROM touch_index_bug_files")
+        ).scalar() or 0
+
+    pct = (indexed / total * 100) if total > 0 else 0.0
+
+    indexed_set = set()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT DISTINCT bug_identifier FROM touch_index_bug_files")
+        ).fetchall()
+        indexed_set = {r[0] for r in rows}
+
+    missing = sorted(
+        i["identifier"] for i in non_fdr_done if i["identifier"] not in indexed_set
+    )
+
+    return BugCoverageReport(
+        total_bug_issues=total,
+        indexed_bug_issues=indexed,
+        coverage_pct=round(pct, 1),
+        missing_issue_identifiers=missing,
+    )
+
+
+def compute_bug_freshness(
+    engine: Engine,
+    stale_threshold_days: int = 30,
+) -> BugFreshnessReport:
+    """Report age statistics for touch_index_bug_files entries using closed_at."""
+    with engine.connect() as conn:
+        total = conn.execute(
+            text("SELECT COUNT(*) FROM touch_index_bug_files")
+        ).scalar() or 0
+
+        oldest = conn.execute(
+            text("SELECT MIN(closed_at) FROM touch_index_bug_files")
+        ).scalar()
+        newest = conn.execute(
+            text("SELECT MAX(closed_at) FROM touch_index_bug_files")
+        ).scalar()
+
+    now = datetime.now(timezone.utc)
+    max_age = (now - oldest).total_seconds() / 3600 if oldest else 0.0
+    min_age = (now - newest).total_seconds() / 3600 if newest else 0.0
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=stale_threshold_days)
+
+    with engine.connect() as conn:
+        stale = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM touch_index_bug_files "
+                "WHERE closed_at IS NOT NULL AND closed_at < :cutoff"
+            ),
+            {"cutoff": cutoff},
+        ).scalar() or 0
+
+    return BugFreshnessReport(
+        total_rows=total,
+        max_age_hours=round(max_age, 1),
+        min_age_hours=round(min_age, 1),
+        stale_rows=stale,
+        stale_threshold_days=stale_threshold_days,
+    )
+
+
+def check_bug_consistency(engine: Engine) -> BugConsistencyReport:
+    """Check for orphan rows, null closed_at, and duplicates in touch_index_bug_files."""
+    with engine.connect() as conn:
+        null_closed = conn.execute(
+            text("SELECT COUNT(*) FROM touch_index_bug_files WHERE closed_at IS NULL")
+        ).scalar() or 0
+
+        dups = conn.execute(
+            text("""
+                SELECT COUNT(*) FROM (
+                    SELECT file_path, bug_issue_id, COUNT(*)
+                    FROM touch_index_bug_files
+                    GROUP BY file_path, bug_issue_id
+                    HAVING COUNT(*) > 1
+                ) dups
+            """)
+        ).scalar() or 0
+
+        orphan_rows = conn.execute(
+            text("SELECT DISTINCT bug_issue_id FROM touch_index_bug_files")
+        ).fetchall()
+
+    orphan_ids: list[str] = []
+    for row in orphan_rows:
+        issue_id = row[0]
+        try:
+            from .paperclip_client import get_issue_by_id
+
+            issue = get_issue_by_id(issue_id)
+            if issue is None:
+                orphan_ids.append(issue_id)
+        except Exception:
+            logger.warning("Could not verify bug issue %s — API error", issue_id)
+
+    return BugConsistencyReport(
+        null_closed_at_rows=null_closed,
+        duplicate_pairs=dups,
+        orphan_bug_issue_ids=orphan_ids,
+    )
+
+
+def run_bug_quality_checks(
+    engine: Engine,
+    stale_threshold_days: int = 30,
+) -> BugQualityReport:
+    """Run all bug data quality checks and return a consolidated report."""
+    coverage = None
+    freshness = None
+    consistency = None
+    failures = 0
+
+    try:
+        coverage = compute_bug_coverage(engine)
+        if coverage.coverage_pct < 90:
+            logger.warning(
+                "BUG COVERAGE: %.1f%% (%d/%d) — %d missing issues",
+                coverage.coverage_pct,
+                coverage.indexed_bug_issues,
+                coverage.total_bug_issues,
+                len(coverage.missing_issue_identifiers),
+            )
+            failures += 1
+        else:
+            logger.info(
+                "BUG COVERAGE: %.1f%% (%d/%d)",
+                coverage.coverage_pct,
+                coverage.indexed_bug_issues,
+                coverage.total_bug_issues,
+            )
+    except Exception:
+        logger.exception("Bug coverage check failed")
+        failures += 1
+
+    try:
+        freshness = compute_bug_freshness(engine, stale_threshold_days)
+        if freshness.stale_rows > 0:
+            logger.warning(
+                "BUG FRESHNESS: %d stale rows (>%d days), max age %.1f hours",
+                freshness.stale_rows,
+                freshness.stale_threshold_days,
+                freshness.max_age_hours,
+            )
+            failures += 1
+        else:
+            logger.info(
+                "BUG FRESHNESS: %d rows, max age %.1f hours",
+                freshness.total_rows,
+                freshness.max_age_hours,
+            )
+    except Exception:
+        logger.exception("Bug freshness check failed")
+        failures += 1
+
+    try:
+        consistency = check_bug_consistency(engine)
+        issues = []
+        if consistency.null_closed_at_rows:
+            issues.append(f"{consistency.null_closed_at_rows} null-closed_at rows")
+        if consistency.duplicate_pairs:
+            issues.append(f"{consistency.duplicate_pairs} duplicate pairs")
+        if consistency.orphan_bug_issue_ids:
+            issues.append(f"{len(consistency.orphan_bug_issue_ids)} orphans")
+        if issues:
+            logger.warning("BUG CONSISTENCY: %s", "; ".join(issues))
+            failures += 1
+        else:
+            logger.info("BUG CONSISTENCY: clean")
+    except Exception:
+        logger.exception("Bug consistency check failed")
+        failures += 1
+
+    return BugQualityReport(
+        coverage=coverage,
+        freshness=freshness,
+        consistency=consistency,
+        passed=failures == 0,
+    )
