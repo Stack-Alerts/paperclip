@@ -28,6 +28,8 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 - **Database Guide**: [`architecture/DATABASE_GUIDE.md`](architecture/DATABASE_GUIDE.md)
 - **Git Workflow**: [`architecture/GIT_WORKFLOW.md`](architecture/GIT_WORKFLOW.md)
 - **Touch Index**: [`architecture/DATABASE_GUIDE.md#8-touch_index_fr_files`](architecture/DATABASE_GUIDE.md) — FR ingestion worker, bug-close ingestion worker, file dependency tracking
+- **Blast Radius Worker**: [`../.github/workflows/blast-radius-worker.yml`](../.github/workflows/blast-radius-worker.yml) — detects fix→in_review transitions and posts Blast Radius Reports ([`src/blast_radius/`](../src/blast_radius/))
+- **Impact Gate Worker**: [`../.github/workflows/impact-gate-worker.yml`](../.github/workflows/impact-gate-worker.yml) — gates in_review fixes through Impact Gate validation ([`src/impact_gate/`](../src/impact_gate/))
 - **Expert Reviews**: [`building-blocks/expert-reviews/`](building-blocks/expert-reviews/) — 80 signal expert analysis docs
 - **LakeAPI Integration**: [`integrations/`](integrations/)
 
