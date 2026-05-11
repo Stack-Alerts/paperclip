@@ -209,6 +209,7 @@ def process_issue(
     issue_id: str,
     dry_run: bool = False,
     old_status: str | None = None,
+    force_reprocess: bool = False,
 ) -> dict | None:
     """Process a single issue (webhook entry point).
 
@@ -219,6 +220,9 @@ def process_issue(
     The function fetches the current issue state from the Paperclip API and
     validates that the issue is ``in_review`` and carries a fix/bug label
     before generating the report.
+
+    When *force_reprocess* is True, the already-processed guard is bypassed
+    so the issue report is regenerated even if previously processed.
     """
     try:
         issue = _get_issue(issue_id)
@@ -252,16 +256,17 @@ def process_issue(
     state = _load_state()
     processed: set[str] = set(state.get("processed_issue_ids", []))
     if issue_id in processed:
-        log.info("%s already processed -- skipping (webhook dedup)", identifier)
-        return None
+        if force_reprocess:
+            log.info("%s already processed -- force-reprocessing", identifier)
+        else:
+            log.info("%s already processed -- skipping (webhook dedup)", identifier)
+            return None
 
     log.info("Generating Blast Radius Report for %s (webhook trigger)", identifier)
     try:
         result = generate_and_post(issue_id, dry_run=dry_run)
 
         if not dry_run:
-            state = _load_state()
-            processed: set[str] = set(state.get("processed_issue_ids", []))
             if issue_id not in processed:
                 state["processed_issue_ids"] = list(processed | {issue_id})
             statuses = state.setdefault("issue_statuses", {})

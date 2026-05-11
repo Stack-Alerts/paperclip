@@ -734,6 +734,54 @@ class TestProcessIssue:
 
         assert result is None
 
+    def test_force_reprocess_bypasses_already_processed_guard(self, tmp_path, monkeypatch):
+        """force_reprocess=True should bypass the already-processed guard."""
+        from blast_radius.worker import process_issue
+
+        state_file = tmp_path / "state.json"
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": ["issue-uuid-42"],
+            "issue_statuses": {"issue-uuid-42": "in_review"},
+        }))
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+        posted = self._patch_gen(monkeypatch)
+
+        result = process_issue("issue-uuid-42", dry_run=False, force_reprocess=True)
+
+        assert result is not None
+        assert result.get("issue") == "BTCAAAAA-1507"
+        assert posted == ["issue-uuid-42"]
+
+    def test_force_reprocess_with_dry_run_does_not_post_or_save(self, tmp_path, monkeypatch):
+        """force_reprocess with dry_run should not post or save state."""
+        from blast_radius.worker import process_issue
+
+        state_file = tmp_path / "state.json"
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": ["issue-uuid-42"],
+            "issue_statuses": {"issue-uuid-42": "in_review"},
+        }))
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+        posted = self._patch_gen(monkeypatch)
+
+        result = process_issue("issue-uuid-42", dry_run=True, force_reprocess=True)
+
+        assert result is not None
+        assert result["dry_run"] is True
+        assert posted == []
+        state = json.loads(state_file.read_text())
+        assert state["processed_issue_ids"] == ["issue-uuid-42"]
+
 
 # ---------------------------------------------------------------------------
 # _get_issue

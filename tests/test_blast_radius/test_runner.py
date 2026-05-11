@@ -113,7 +113,7 @@ class TestRunnerIssueId:
             patch("run_blast_radius_worker.run_once") as mock_run_once,
         ):
             main()
-        mock_process.assert_called_once_with("uuid-1", dry_run=False, old_status=None)
+        mock_process.assert_called_once_with("uuid-1", dry_run=False, old_status=None, force_reprocess=False)
         mock_run_once.assert_not_called()
 
     def test_issue_id_with_old_status(self, monkeypatch):
@@ -125,7 +125,7 @@ class TestRunnerIssueId:
             patch("run_blast_radius_worker.run_once") as mock_run_once,
         ):
             main()
-        mock_process.assert_called_once_with("uuid-1", dry_run=False, old_status="in_progress")
+        mock_process.assert_called_once_with("uuid-1", dry_run=False, old_status="in_progress", force_reprocess=False)
         mock_run_once.assert_not_called()
 
     def test_issue_id_with_dry_run(self, monkeypatch):
@@ -137,7 +137,7 @@ class TestRunnerIssueId:
             patch("run_blast_radius_worker.run_once") as mock_run_once,
         ):
             main()
-        mock_process.assert_called_once_with("uuid-1", dry_run=True, old_status=None)
+        mock_process.assert_called_once_with("uuid-1", dry_run=True, old_status=None, force_reprocess=False)
         mock_run_once.assert_not_called()
 
     def test_issue_id_result_logged(self, monkeypatch, caplog):
