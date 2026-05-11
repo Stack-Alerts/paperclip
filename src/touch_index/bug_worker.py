@@ -108,7 +108,7 @@ def run_bug_worker(
     engine: Engine,
     issues: Sequence[dict],
 ) -> list[BugIngestionResult]:
-    """Ingest a list of closed bug issue dicts (from paperclip_client.get_closed_bug_issues)."""
+    """Ingest a list of closed bug issue dicts (from paperclip_client.get_closed_non_fdr_issues)."""
     results = []
     for issue in issues:
         try:
