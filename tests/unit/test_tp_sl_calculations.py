@@ -387,6 +387,119 @@ class TestTPSLIntegration:
         assert rr_tp3 >= 2.5, f"TP3 R:R {rr_tp3:.2f} below minimum 2.5:1"
 
 
+class TestTrailingStopActivation:
+    """Test trailing stop activation price calculation (profit protection)"""
+
+    def test_trailing_activation_long_only_tp1(self):
+        """Test LONG: trailing activation at 150% of TP1 distance when only TP1 is used"""
+        calculator = DynamicTPCalculator(tp_mode='PERCENTAGE')
+
+        df = pd.DataFrame({
+            'timestamp': pd.date_range('2025-01-01', periods=10, freq='15min'),
+            'open': [45000] * 10,
+            'high': [45100] * 10,
+            'low': [44900] * 10,
+            'close': [45000] * 10,
+            'volume': [100] * 10
+        })
+
+        entry_price = 45000.0
+        result = calculator.calculate_tp_levels(
+            df=df, entry_price=entry_price, entry_bar=5,
+            side='LONG', fallback_pcts={'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5}
+        )
+
+        # PERCENTAGE mode -> confidence=50 -> only use_tp1=True
+        # trailing activation = entry + 150% of (TP1 - entry)
+        expected = entry_price + ((entry_price * 1.01 - entry_price) * 1.5)
+        assert result.trailing_activation_price == pytest.approx(expected, rel=1e-9)
+        assert result.use_tp1 is True
+        assert result.use_tp2 is False
+        assert result.use_tp3 is False
+
+    def test_trailing_activation_short_only_tp1(self):
+        """Test SHORT: trailing activation at 150% of TP1 distance when only TP1 is used"""
+        calculator = DynamicTPCalculator(tp_mode='PERCENTAGE')
+
+        df = pd.DataFrame({
+            'timestamp': pd.date_range('2025-01-01', periods=10, freq='15min'),
+            'open': [45000] * 10,
+            'high': [45100] * 10,
+            'low': [44900] * 10,
+            'close': [45000] * 10,
+            'volume': [100] * 10
+        })
+
+        entry_price = 45000.0
+        result = calculator.calculate_tp_levels(
+            df=df, entry_price=entry_price, entry_bar=5,
+            side='SHORT', fallback_pcts={'tp1': 1.0, 'tp2': 2.0, 'tp3': 3.5}
+        )
+
+        # PERCENTAGE mode -> confidence=50 -> only use_tp1=True
+        # trailing activation = entry - 150% of (entry - TP1)
+        expected = entry_price - ((entry_price - entry_price * 0.99) * 1.5)
+        assert result.trailing_activation_price == pytest.approx(expected, rel=1e-9)
+        assert result.use_tp1 is True
+        assert result.use_tp2 is False
+        assert result.use_tp3 is False
+
+
+class TestDelayedSLActivation:
+    """Test delayed SL activation via get_active_sl (v2.0 innovation)"""
+
+    @pytest.fixture
+    def sample_df(self):
+        """Create sample data for SL testing"""
+        return pd.DataFrame({
+            'timestamp': pd.date_range('2025-01-01', periods=50, freq='15min'),
+            'open': [45000] * 50,
+            'high': [45100] * 50,
+            'low': [44900] * 50,
+            'close': [45000] * 50,
+            'volume': [500] * 50
+        })
+
+    def test_get_active_sl_switches_after_delay(self, sample_df):
+        """Test get_active_sl returns emergency_sl before delay, working_sl after"""
+        calculator = AdaptiveSLCalculator(
+            use_delayed_sl=True,
+            delay_bars=2,
+            emergency_sl_pct=2.5
+        )
+
+        result = calculator.calculate_sl_levels(
+            df=sample_df, entry_price=45200.0, entry_bar=30, side='LONG'
+        )
+
+        # Before delay period
+        assert calculator.get_active_sl(result, bars_held=0) == result.emergency_sl
+        assert calculator.get_active_sl(result, bars_held=1) == result.emergency_sl
+
+        # After delay period (bars_held >= delay_bars)
+        assert calculator.get_active_sl(result, bars_held=2) == result.working_sl
+        assert calculator.get_active_sl(result, bars_held=10) == result.working_sl
+
+    def test_get_active_sl_edge_cases(self, sample_df):
+        """Test get_active_sl edge cases: no delay, None delay_bars"""
+        calculator = AdaptiveSLCalculator(
+            use_delayed_sl=False,
+            emergency_sl_pct=2.5
+        )
+
+        result = calculator.calculate_sl_levels(
+            df=sample_df, entry_price=45200.0, entry_bar=30, side='LONG'
+        )
+
+        # No delayed activation -> always working_sl
+        assert calculator.get_active_sl(result, bars_held=0) == result.working_sl
+        assert calculator.get_active_sl(result, bars_held=100) == result.working_sl
+
+        # None delay_bars -> defensive fallback to working_sl
+        result.delay_bars = None
+        assert calculator.get_active_sl(result, bars_held=0) == result.working_sl
+
+
 # Run tests
 if __name__ == '__main__':
     pytest.main([__file__, '-v', '--tb=short'])
