@@ -44,30 +44,30 @@ def _paginate(
     *,
     page_size: int = 100,
 ) -> list[dict]:
-    sess = _session()
-    results: list[dict] = []
-    params = {**params, "limit": page_size, "offset": 0}
-    while True:
-        resp = sess.get(f"{_base()}{path}", params=params, timeout=30)
-        resp.raise_for_status()
-        page = resp.json()
-        if not page:
-            break
-        results.extend(page)
-        if len(page) < page_size:
-            break
-        params["offset"] += page_size
-    return results
+    with _session() as sess:
+        results: list[dict] = []
+        params = {**params, "limit": page_size, "offset": 0}
+        while True:
+            resp = sess.get(f"{_base()}{path}", params=params, timeout=30)
+            resp.raise_for_status()
+            page = resp.json()
+            if not page:
+                break
+            results.extend(page)
+            if len(page) < page_size:
+                break
+            params["offset"] += page_size
+        return results
 
 
 def get_issue_by_id(issue_id: str) -> dict | None:
     """Fetch a single issue by its UUID."""
-    sess = _session()
-    resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=30)
-    if resp.status_code == 404:
-        return None
-    resp.raise_for_status()
-    return resp.json()
+    with _session() as sess:
+        resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=30)
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()
 
 
 def get_issue_by_identifier(identifier: str) -> dict | None:
@@ -169,13 +169,13 @@ def transition_issue_status(issue_id: str, status: str) -> None:
     Raises:
         requests.RequestException on API error.
     """
-    sess = _session()
-    resp = sess.patch(
-        f"{_base()}/api/issues/{issue_id}",
-        json={"status": status},
-        timeout=30,
-    )
-    resp.raise_for_status()
+    with _session() as sess:
+        resp = sess.patch(
+            f"{_base()}/api/issues/{issue_id}",
+            json={"status": status},
+            timeout=30,
+        )
+        resp.raise_for_status()
 
 
 def get_issue_assignee(issue: dict) -> str | None:

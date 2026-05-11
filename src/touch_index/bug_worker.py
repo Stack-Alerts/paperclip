@@ -1,11 +1,13 @@
-"""Bug-close ingestion worker — upserts touch_index_bug_files rows.
+"""Bug-close Touch Index ingestion worker — upserts touch_index_bug_files rows.
 
-Triggered on: issue_status_changed to 'done' where the issue is a bug
-(title starts with 'Bug:' or 'BUG:').
+Triggered by run_touch_index_bug_worker.py every 15 minutes for all done
+non-FDR issues (bug titles and fix-type commits).  Excludes FDR-labelled
+issues which are ingested by the FR worker.
 
-For each closed bug:
+For each closed issue:
   - Find git commits that reference the issue identifier.
   - Collect the source files touched by those commits.
+  - Fall back to Paperclip issue comments if git returns nothing.
   - Upsert one row per (file_path, bug_issue_id) into touch_index_bug_files,
     setting closed_at from completedAt.
 
@@ -17,7 +19,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Sequence
 
 from sqlalchemy import text
