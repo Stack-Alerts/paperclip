@@ -306,7 +306,8 @@ def run_loop(
         time.sleep(interval_seconds)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """CLI entry point: parse args and dispatch to process_issue / run_loop / run_once."""
     import argparse
 
     logging.basicConfig(
@@ -358,3 +359,7 @@ if __name__ == "__main__":
     else:
         results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
         log.info("Results: %s", json.dumps(results, indent=2))
+
+
+if __name__ == "__main__":
+    main()
