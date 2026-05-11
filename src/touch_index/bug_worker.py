@@ -22,6 +22,7 @@ from typing import Sequence
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from .comment_extractor import fetch_and_extract
 from .git_extractor import get_files_for_issue
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ _UPSERT_SQL = text("""
 class BugIngestionResult:
     issue_identifier: str
     files_indexed: int
+    source: str  # "git" | "comments" | "none"
     skipped_no_commits: bool
 
 
@@ -52,12 +54,18 @@ def ingest_bug_issue(
 ) -> BugIngestionResult:
     """Process a single closed bug issue and upsert its touched files."""
     files = get_files_for_issue(issue_identifier)
+    source = "git"
 
     if not files:
-        logger.info("Bug %s: no git commits found — skipping", issue_identifier)
+        files = fetch_and_extract(issue_id)
+        source = "comments"
+
+    if not files:
+        logger.info("Bug %s: no files found in git or comments — skipping", issue_identifier)
         return BugIngestionResult(
             issue_identifier=issue_identifier,
             files_indexed=0,
+            source="none",
             skipped_no_commits=True,
         )
 
@@ -75,10 +83,11 @@ def ingest_bug_issue(
     with engine.begin() as conn:
         conn.execute(_UPSERT_SQL, rows)
 
-    logger.info("Bug %s: indexed %d file(s)", issue_identifier, len(rows))
+    logger.info("Bug %s: indexed %d file(s) via %s", issue_identifier, len(rows), source)
     return BugIngestionResult(
         issue_identifier=issue_identifier,
         files_indexed=len(rows),
+        source=source,
         skipped_no_commits=False,
     )
 
