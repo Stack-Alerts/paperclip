@@ -28,7 +28,6 @@ Author: Strategy Builder Team
 Date: 2026-01-17
 """
 
-import hashlib
 import json
 import os
 from datetime import datetime, timezone
@@ -74,8 +73,7 @@ from src.optimizer_v3.core.backtest_data_provider import get_backtest_provider
 import logging
 logger = logging.getLogger(__name__)
 
-_CALIBRATION_CACHE_SCHEMA_VERSION = 1
-_CALIBRATION_CACHE_TTL_DAYS = 7  # Disk cache expires after 7 days; forces fresh calibration
+from src.optimizer_v3.database import calibration_cache
 
 class StdoutCapture:
     """
@@ -2423,73 +2421,24 @@ class BacktestConfigPanel(QWidget):
     # Calibration disk-cache helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _get_calibration_cache_path() -> Path:
-        cache_dir = Path.home() / '.paperclip'
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        return cache_dir / 'calibration_cache.json'
-
     def _load_calibration_disk_cache(self) -> None:
-        """Populate in-memory calibration cache from disk on startup.
-
-        Safe no-op on any error (parse failure, schema mismatch, TTL expiry).
-        """
-        cache_path = self._get_calibration_cache_path()
-        if not cache_path.exists():
-            return
-        try:
-            with cache_path.open('r', encoding='utf-8') as fh:
-                data = json.load(fh)
-            if data.get('schema_version') != _CALIBRATION_CACHE_SCHEMA_VERSION:
-                logger.info("Auto-calibration: cache file schema mismatch, ignoring.")
-                return
-            stored_at_str = data.get('stored_at')
-            if stored_at_str:
-                stored_at = datetime.fromisoformat(stored_at_str)
-                age_days = (datetime.now(timezone.utc) - stored_at).days
-                if age_days > _CALIBRATION_CACHE_TTL_DAYS:
-                    logger.info(
-                        f"Auto-calibration: cache file expired ({age_days}d old), ignoring."
-                    )
-                    return
-            fingerprint = data.get('fingerprint')
-            delay_map = data.get('delay_map')
-            if not isinstance(fingerprint, str) or not isinstance(delay_map, dict):
-                logger.info("Auto-calibration: cache file invalid, ignoring.")
-                return
-            self._calibration_fingerprint = fingerprint
-            self._calibration_cache = delay_map
+        """Populate in-memory calibration cache from disk on startup."""
+        fp, dm = calibration_cache.load_cache()
+        if fp is not None:
+            self._calibration_fingerprint = fp
+            self._calibration_cache = dm
             self._calibration_cache_from_disk = True
             logger.info(
-                f"Auto-calibration: cache loaded from disk — "
-                f"cache hit (loaded from disk) on next matching run."
+                "Auto-calibration: cache loaded from disk — "
+                "cache hit (loaded from disk) on next matching run."
             )
-        except Exception as exc:
-            logger.info(f"Auto-calibration: cache file invalid, ignoring. ({exc})")
 
     def _save_calibration_disk_cache(self) -> None:
-        """Atomically write fingerprint + delay_map to disk via tmp+rename."""
-        if self._calibration_fingerprint is None or self._calibration_cache is None:
-            return
-        cache_path = self._get_calibration_cache_path()
-        payload = {
-            'schema_version': _CALIBRATION_CACHE_SCHEMA_VERSION,
-            'fingerprint': self._calibration_fingerprint,
-            'delay_map': self._calibration_cache,
-            'stored_at': datetime.now(timezone.utc).isoformat(),
-        }
-        tmp_path = cache_path.with_suffix('.json.tmp')
-        try:
-            with tmp_path.open('w', encoding='utf-8') as fh:
-                json.dump(payload, fh, indent=2)
-            tmp_path.replace(cache_path)
-            logger.info(f"Auto-calibration: cache persisted to {cache_path}.")
-        except Exception as exc:
-            logger.warning(f"Auto-calibration: failed to persist cache to disk: {exc}")
-            try:
-                tmp_path.unlink(missing_ok=True)
-            except Exception:
-                pass
+        """Atomically write fingerprint + delay_map to disk."""
+        calibration_cache.save_cache(
+            self._calibration_fingerprint,
+            self._calibration_cache,
+        )
 
     def _repair_if_unreachable(self, strategy_config_dict: dict) -> Optional[dict]:
         """Check whether the strategy can theoretically reach its confluence threshold.
@@ -2607,15 +2556,12 @@ class BacktestConfigPanel(QWidget):
         )
 
         # Compute fingerprint of the current calibration inputs
-        fingerprint_payload = {
-            "block_names": block_names,
-            "timeframe": "15m",
-            "period_days": 180,
-            "mode": "production",
-        }
-        current_fingerprint = hashlib.sha256(
-            json.dumps(fingerprint_payload, sort_keys=True).encode()
-        ).hexdigest()
+        current_fingerprint = calibration_cache.compute_fingerprint(
+            block_names=block_names,
+            timeframe="15m",
+            period_days=180,
+            mode="production",
+        )
 
         # Cache-hit path: settings unchanged since last successful calibration
         if (
