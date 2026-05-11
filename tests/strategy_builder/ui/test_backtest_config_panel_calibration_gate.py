@@ -838,21 +838,28 @@ class TestCalibrationCache:
         )
 
     # ------------------------------------------------------------------
-    # Static analysis: verify hashlib and json are imported at module level
+    # Static analysis: verify calibration_cache and json are imported at module level
     # ------------------------------------------------------------------
 
-    def test_hashlib_imported_at_module_level(self):
-        """hashlib must be imported at the top of backtest_config_panel.py."""
+    def test_calibration_cache_imported_at_module_level(self):
+        """calibration_cache must be imported at the top of backtest_config_panel.py.
+
+        hashlib was previously imported here directly; it was moved to the shared
+        calibration_cache module as part of BTCAAAAA-1096. The invariant is now
+        that calibration_cache (not hashlib) is imported at module level.
+        """
         import src.strategy_builder.ui.backtest_config_panel as mod
-        import hashlib
-        assert hasattr(mod, 'hashlib') or 'hashlib' in dir(mod), (
-            "hashlib must be imported at module level"
+        from src.optimizer_v3.database import calibration_cache as cc_mod
+        assert hasattr(mod, 'calibration_cache'), (
+            "calibration_cache must be imported at module level in backtest_config_panel"
         )
-        # Also verify by source inspection
+        assert mod.calibration_cache is cc_mod, (
+            "mod.calibration_cache must be the shared optimizer_v3 module"
+        )
         import inspect
         src_lines = inspect.getsource(mod).split('\n')
-        assert any(line.strip() == 'import hashlib' for line in src_lines[:50]), (
-            "'import hashlib' must appear in the first 50 lines of the module"
+        assert any('calibration_cache' in line for line in src_lines[:100]), (
+            "'calibration_cache' import must appear in the first 100 lines of the module"
         )
 
     def test_json_imported_at_module_level(self):
