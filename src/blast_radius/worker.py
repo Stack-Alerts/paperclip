@@ -23,7 +23,7 @@ import os
 import time
 from pathlib import Path
 
-from touch_index.paperclip_client import _session, _base, _company
+from touch_index.paperclip_client import _paginate, _base, _company
 
 from .generator import generate_and_post
 
@@ -58,16 +58,12 @@ def _save_state(state: dict) -> None:
 
 
 def _fetch_in_review_issues() -> list[dict]:
-    """Return all `in_review` issues from the company."""
-    sess = _session()
-    resp = sess.get(
-        f"{_base()}/api/companies/{_company()}/issues",
-        params={"status": "in_review"},
-        timeout=20,
+    """Return all `in_review` issues from the company (paginated)."""
+    return _paginate(
+        f"/api/companies/{_company()}/issues",
+        {"status": "in_review"},
+        page_size=100,
     )
-    resp.raise_for_status()
-    result = resp.json()
-    return result if isinstance(result, list) else []
 
 
 def _is_fix_issue(issue: dict) -> bool:

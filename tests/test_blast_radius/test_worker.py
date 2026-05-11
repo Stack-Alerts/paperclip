@@ -219,3 +219,50 @@ class TestRunOnce:
 
         assert results == []
         assert not state_file.exists()
+
+# ---------------------------------------------------------------------------
+# _fetch_in_review_issues (paginated wrapper)
+# ---------------------------------------------------------------------------
+
+class TestFetchInReviewIssues:
+    def test_delegates_to_paginate(self, monkeypatch):
+        expected = [{"id": "iss-1", "identifier": "BTCAAAAA-300"}]
+        captured_args = {}
+
+        def mock_paginate(path, params, *, page_size):
+            captured_args["path"] = path
+            captured_args["params"] = params
+            captured_args["page_size"] = page_size
+            return expected
+
+        monkeypatch.setattr(
+            "blast_radius.worker._paginate",
+            mock_paginate,
+        )
+        monkeypatch.setattr(
+            "blast_radius.worker._company",
+            lambda: "comp-uuid",
+        )
+
+        from blast_radius.worker import _fetch_in_review_issues
+
+        result = _fetch_in_review_issues()
+
+        assert result == expected
+        assert "in_review" in str(captured_args["params"])
+        assert captured_args["page_size"] == 100
+
+    def test_returns_empty_list_on_empty_result(self, monkeypatch):
+        monkeypatch.setattr(
+            "blast_radius.worker._paginate",
+            lambda path, params, *, page_size: [],
+        )
+        monkeypatch.setattr(
+            "blast_radius.worker._company",
+            lambda: "comp-uuid",
+        )
+
+        from blast_radius.worker import _fetch_in_review_issues
+
+        result = _fetch_in_review_issues()
+        assert result == []
