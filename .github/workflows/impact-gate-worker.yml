@@ -20,14 +20,6 @@ on:
         description: 'Dry run (log results, do not post comments or transition)'
         required: false
         default: 'false'
-      loop_seconds:
-        description: 'Loop interval in seconds (0 = run once)'
-        required: false
-        default: '0'
-      force_reprocess:
-        description: 'Re-process already-seen issues'
-        required: false
-        default: 'false'
 
 concurrency:
   group: impact-gate-worker
@@ -35,7 +27,7 @@ concurrency:
 
 jobs:
   worker:
-    name: Run Impact Gate on in_review issues
+    name: Run Impact Gate on in_review fix issues
     runs-on: ubuntu-latest
 
     env:
@@ -66,15 +58,6 @@ jobs:
             libxcb-randr0 libxcb-render-util0 libxcb-xkb1 \
             xvfb libgl1-mesa-glx
 
-      - name: Restore worker state cache
-        id: cache-state
-        uses: actions/cache/restore@v4
-        with:
-          path: data/impact_gate_worker_state.json
-          key: impact-gate-state-${{ github.run_id }}
-          restore-keys: |
-            impact-gate-state-
-
       - name: Ensure data directory exists
         run: mkdir -p data
 
@@ -82,13 +65,10 @@ jobs:
         id: resolve-issue
         run: |
           ISSUE_ID="${{ github.event.inputs.issue_id || '' }}"
-          OLD_STATUS="${{ github.event.inputs.old_status || '' }}"
           if [ -z "$ISSUE_ID" ] && [ -n "${{ github.event.client_payload.issue_id || '' }}" ]; then
             ISSUE_ID="${{ github.event.client_payload.issue_id }}"
-            OLD_STATUS="${{ github.event.client_payload.old_status || '' }}"
           fi
           echo "issue_id=$ISSUE_ID" >> $GITHUB_OUTPUT
-          echo "old_status=$OLD_STATUS" >> $GITHUB_OUTPUT
 
       - name: Run Impact Gate worker
         env:
@@ -99,26 +79,9 @@ jobs:
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             FLAGS="$FLAGS --dry-run"
           fi
-          if [ "${{ github.event.inputs.force_reprocess }}" = "true" ]; then
-            FLAGS="$FLAGS --force-reprocess"
-          fi
           ISSUE_ID="${{ steps.resolve-issue.outputs.issue_id }}"
-          OLD_STATUS="${{ steps.resolve-issue.outputs.old_status }}"
           if [ -n "$ISSUE_ID" ]; then
-            CMD="python scripts/run_impact_gate_worker.py --issue-id \"$ISSUE_ID\""
-            if [ -n "$OLD_STATUS" ]; then
-              CMD="$CMD --old-status \"$OLD_STATUS\""
-            fi
-            eval "$CMD $FLAGS"
-          elif [ "${{ github.event.inputs.loop_seconds }}" != "0" ] && [ -n "${{ github.event.inputs.loop_seconds }}" ]; then
-            python scripts/run_impact_gate_worker.py --loop ${{ github.event.inputs.loop_seconds }} $FLAGS
+            python scripts/impact_gate_worker.py --issue-id "$ISSUE_ID" $FLAGS
           else
             python scripts/run_impact_gate_worker.py $FLAGS
           fi
-
-      - name: Save worker state cache
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: data/impact_gate_worker_state.json
-          key: impact-gate-state-${{ github.run_id }}
