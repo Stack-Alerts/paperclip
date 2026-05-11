@@ -8,6 +8,7 @@ Usage
     blast-radius serve [--port 8765]
     blast-radius worker [--dry-run]
     blast-radius worker --loop 300 [--dry-run]
+    blast-radius worker --issue-id <uuid> [--old-status <status>] [--dry-run]
 
 `query` returns JSON to stdout:
 {
@@ -60,6 +61,21 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 
 def cmd_worker(args: argparse.Namespace) -> int:
+    if args.issue_id:
+        from blast_radius.worker import process_issue
+
+        result = process_issue(
+            args.issue_id,
+            dry_run=args.dry_run,
+            old_status=args.old_status,
+            force_reprocess=args.force_reprocess,
+        )
+        if result:
+            print(json.dumps(result, indent=2))  # noqa: T201
+        else:
+            print(json.dumps({"skipped": True, "issue": args.issue_id}))  # noqa: T201
+        return 0
+
     from blast_radius.worker import run_once, run_loop
 
     if args.loop:
@@ -118,6 +134,18 @@ def main() -> int:
     p_worker = sub.add_parser(
         "worker",
         help="Poll for fix/bug issues transitioning to in_review and post Blast Radius Reports",
+    )
+    p_worker.add_argument(
+        "--issue-id",
+        type=str,
+        metavar="UUID",
+        help="Process a single issue by Paperclip UUID (webhook trigger)",
+    )
+    p_worker.add_argument(
+        "--old-status",
+        type=str,
+        metavar="STATUS",
+        help="Previous status when called from a status-change webhook",
     )
     p_worker.add_argument(
         "--loop",
