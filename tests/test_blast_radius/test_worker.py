@@ -703,6 +703,7 @@ class TestProcessIssue:
         from unittest.mock import MagicMock
 
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_resp = MagicMock()
         mock_resp.raise_for_status.side_effect = RuntimeError("API timeout")
         mock_sess.get.return_value = mock_resp
@@ -803,6 +804,7 @@ class TestGetIssue:
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"id": "iss-1", "identifier": "BTCAAAAA-100"}
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.get.return_value = mock_resp
 
         monkeypatch.setattr(
@@ -821,6 +823,7 @@ class TestGetIssue:
         mock_resp = MagicMock()
         mock_resp.raise_for_status.side_effect = RuntimeError("404 Not Found")
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.get.return_value = mock_resp
 
         monkeypatch.setattr(

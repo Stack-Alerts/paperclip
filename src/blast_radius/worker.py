@@ -293,10 +293,10 @@ def process_issue(
 def _get_issue(issue_id: str) -> dict:
     from touch_index.paperclip_client import _session
 
-    sess = _session()
-    resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=15)
-    resp.raise_for_status()
-    return resp.json()
+    with _session() as sess:
+        resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=15)
+        resp.raise_for_status()
+        return resp.json()
 
 
 def run_loop(
