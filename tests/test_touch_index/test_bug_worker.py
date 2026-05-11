@@ -432,3 +432,97 @@ class TestProcessBugIssue:
 
         assert result is not None
         assert result.files_indexed == 1
+
+
+class TestBugWorkerDryRun:
+    def test_dry_run_skips_db_upsert(self):
+        """When dry_run=True, the DB upsert is not called but files are reported."""
+        engine, conn = _mock_engine()
+        files = ["src/touch_index/bug_worker.py", "src/touch_index/db.py"]
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=files
+            ) as mock_git,
+        ):
+            result = ingest_bug_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT, dry_run=True
+            )
+
+        assert result.source == "git"
+        assert result.files_indexed == 2
+        assert result.skipped_no_commits is False
+        conn.execute.assert_not_called()
+        mock_git.assert_called_once()
+
+    def test_dry_run_with_comments_fallback(self):
+        """Dry-run with comments fallback should still extract but not upsert."""
+        engine, conn = _mock_engine()
+        comment_files = ["src/touch_index/bug_worker.py"]
+
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch(
+                "touch_index.bug_worker.fetch_and_extract", return_value=comment_files
+            ),
+        ):
+            result = ingest_bug_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT, dry_run=True
+            )
+
+        assert result.source == "comments"
+        assert result.files_indexed == 1
+        assert result.skipped_no_commits is False
+        conn.execute.assert_not_called()
+
+    def test_dry_run_suppresses_db_upserts_in_batch(self):
+        """When dry_run=True on batch, DB upsert is skipped for all issues."""
+        engine, conn = _mock_engine()
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/a.py", "src/b.py"],
+            ),
+        ):
+            results = run_bug_worker(engine, _issues(2), dry_run=True)
+
+        assert len(results) == 2
+        assert all(not r.skipped_no_commits for r in results)
+        assert sum(r.files_indexed for r in results) == 4
+        conn.execute.assert_not_called()
+
+    def test_dry_run_passed_through_process_bug_issue(self):
+        """dry_run=True on process_bug_issue is passed through to ingest_bug_issue."""
+        engine, conn = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "completedAt": "2026-05-11T12:00:00Z",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_issue_by_id", return_value=issue
+            ),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/foo.py"],
+            ),
+        ):
+            result = process_bug_issue(engine, ISSUE_ID, dry_run=True)
+
+        assert result is not None
+        assert result.files_indexed == 1
+        conn.execute.assert_not_called()
+
+
+def _issues(count: int = 2) -> list[dict]:
+    return [
+        {
+            "id": f"cccccccc-0000-0000-0000-{i:012d}",
+            "identifier": f"BTCAAAAA-{1200 + i}",
+            "completedAt": "2026-05-11T12:00:00Z",
+        }
+        for i in range(count)
+    ]
