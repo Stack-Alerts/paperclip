@@ -1,7 +1,9 @@
 """Bug-close Touch Index polling worker — run by Paperclip routine every 15 minutes.
 
-Queries Paperclip for bug issues closed in the last 30 minutes (overlap
-window to avoid gaps), then upserts to touch_index_bug_files.
+Queries Paperclip for all done non-FDR issues closed in the last 30 minutes
+(overlap window to avoid gaps), then upserts to touch_index_bug_files for
+those that have git fix commits.  FDR-labelled issues are skipped (handled
+by the FR worker).
 
 Usage:
     python scripts/run_touch_index_bug_worker.py [--lookback-minutes N]
@@ -20,7 +22,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from touch_index.db import get_engine, health_check
-from touch_index.paperclip_client import get_closed_bug_issues
+from touch_index.paperclip_client import get_closed_non_fdr_issues
 from touch_index.bug_worker import run_bug_worker
 
 logging.basicConfig(
@@ -46,8 +48,8 @@ def main() -> None:
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
     logger.info("Fetching closed bug issues completed after %s", cutoff.isoformat())
 
-    issues = get_closed_bug_issues(closed_after=cutoff)
-    logger.info("Found %d closed bug issue(s) to process", len(issues))
+    issues = get_closed_non_fdr_issues(closed_after=cutoff)
+    logger.info("Found %d closed non-FDR issue(s) to process", len(issues))
 
     if not issues:
         logger.info("Nothing to do")
