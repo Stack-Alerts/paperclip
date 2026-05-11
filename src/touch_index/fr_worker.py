@@ -23,7 +23,7 @@ from sqlalchemy.engine import Engine
 
 from .comment_extractor import fetch_and_extract, extract_files_from_text
 from .git_extractor import get_files_for_issue
-from .paperclip_client import get_issue_by_id
+from .paperclip_client import FDR_LABEL_ID, get_issue_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,11 @@ def process_fr_issue(
     issue = get_issue_by_id(issue_id)
     if issue is None:
         logger.info("FR issue %s not found — skipping", issue_id)
+        return None
+    if FDR_LABEL_ID not in (issue.get("labelIds") or []):
+        logger.info(
+            "Issue %s is not FDR-labelled — skipping", issue.get("identifier")
+        )
         return None
     return ingest_fr_issue(
         engine,
