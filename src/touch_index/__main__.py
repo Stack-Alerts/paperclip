@@ -19,7 +19,7 @@ import sys
 
 
 def _print_help() -> None:
-    print(__doc__.strip())
+    sys.stdout.write(__doc__.strip() + "\n")
 
 
 def main() -> None:

@@ -63,9 +63,7 @@ def process_fr_issue(
         logger.info("FR issue %s not found — skipping", issue_id)
         return None
     if FDR_LABEL_ID not in (issue.get("labelIds") or []):
-        logger.info(
-            "Issue %s is not FDR-labelled — skipping", issue.get("identifier")
-        )
+        logger.info("Issue %s is not FDR-labelled — skipping", issue.get("identifier"))
         return None
     return ingest_fr_issue(
         engine,
@@ -130,14 +128,18 @@ def ingest_fr_issue(
     if dry_run:
         logger.info(
             "FR %s: DRY RUN — would index %d file(s) via %s",
-            issue_identifier, len(rows), source,
+            issue_identifier,
+            len(rows),
+            source,
         )
         for r in rows:
             logger.info("  DRY RUN row: file_path=%s", r["file_path"])
     else:
         with engine.begin() as conn:
             conn.execute(_UPSERT_SQL, rows)
-        logger.info("FR %s: indexed %d file(s) via %s", issue_identifier, len(rows), source)
+        logger.info(
+            "FR %s: indexed %d file(s) via %s", issue_identifier, len(rows), source
+        )
     return FRIngestionResult(
         issue_identifier=issue_identifier,
         files_indexed=len(rows),
@@ -184,15 +186,20 @@ def main() -> None:
         description="Touch Index FR ingestion worker — upsert FDR issue file references",
     )
     parser.add_argument(
-        "--issue-id", type=str, metavar="UUID",
+        "--issue-id",
+        type=str,
+        metavar="UUID",
         help="Process a single FDR issue by Paperclip UUID (webhook trigger)",
     )
     parser.add_argument(
-        "--lookback-minutes", type=int, default=30,
+        "--lookback-minutes",
+        type=int,
+        default=30,
         help="Process FDR issues updated within this many minutes (default: 30)",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="Log what would be ingested without writing to DB or transitioning issues",
     )
     args = parser.parse_args()
@@ -233,7 +240,9 @@ def main() -> None:
     skipped = sum(1 for r in results if r.skipped_no_commits)
     logger.info(
         "FR worker done — %d issues processed, %d files indexed, %d skipped (no commits)",
-        len(results), total_files, skipped,
+        len(results),
+        total_files,
+        skipped,
     )
 
 
