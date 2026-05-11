@@ -18,7 +18,15 @@ Usage
 import sys
 
 
+def _print_help() -> None:
+    print(__doc__.strip())
+
+
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
+        _print_help()
+        return
+
     worker = "fr"
     if len(sys.argv) > 1 and sys.argv[1] in ("fr", "bug"):
         worker = sys.argv.pop(1)
