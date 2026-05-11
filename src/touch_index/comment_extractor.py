@@ -71,11 +71,10 @@ def extract_files_from_comments(comments: Sequence[dict]) -> list[str]:
 
 def fetch_and_extract(issue_id: str) -> list[str]:
     """Fetch comments for an issue via Paperclip API and extract file paths."""
-    import os
-    import requests
+    from .paperclip_client import _base, _session
 
-    url = f"{os.environ['PAPERCLIP_API_URL']}/api/issues/{issue_id}/comments"
-    headers = {"Authorization": f"Bearer {os.environ['PAPERCLIP_API_KEY']}"}
-    resp = requests.get(url, headers=headers, timeout=30)
-    resp.raise_for_status()
-    return extract_files_from_comments(resp.json())
+    url = f"{_base()}/api/issues/{issue_id}/comments"
+    with _session() as sess:
+        resp = sess.get(url, timeout=30)
+        resp.raise_for_status()
+        return extract_files_from_comments(resp.json())
