@@ -38,7 +38,6 @@ def get_files_for_commit(sha: str, repo: Path = _REPO_ROOT) -> list[str]:
         [
             "git",
             "show",
-            "--stat",
             "--name-only",
             "--format=",  # suppress commit header
             "--diff-filter=ACMRT",

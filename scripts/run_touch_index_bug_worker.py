@@ -46,7 +46,7 @@ def main() -> None:
         sys.exit(1)
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
-    logger.info("Fetching closed bug issues completed after %s", cutoff.isoformat())
+    logger.info("Fetching closed non-FDR issues completed after %s", cutoff.isoformat())
 
     issues = get_closed_non_fdr_issues(closed_after=cutoff)
     logger.info("Found %d closed non-FDR issue(s) to process", len(issues))
