@@ -532,16 +532,6 @@ class TestProcessIssue:
 
     def test_processes_fix_in_review(self, tmp_path, monkeypatch):
         from blast_radius.worker import process_issue
-        from unittest.mock import MagicMock
-
-        mock_sess = MagicMock()
-        monkeypatch.setattr(
-            "touch_index.paperclip_client._session",
-            mock_session,
-        ) if False else monkeypatch.setattr(
-            "touch_index.paperclip_client._session",
-            lambda: mock_sess,
-        )
 
         monkeypatch.setattr(
             "blast_radius.worker._get_issue",
