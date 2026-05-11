@@ -1,0 +1,259 @@
+"""Data quality monitoring for Touch Index FR ingestion.
+
+Provides coverage, freshness, and consistency checks for the
+touch_index_fr_files table.  Designed to be called from the
+validation script, the ingestion worker, or a standalone monitoring
+cron job.
+
+Usage:
+    python -c "from touch_index.quality import run_quality_checks; print(run_quality_checks())"
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+from sqlalchemy import text
+from sqlalchemy.engine import Engine
+
+from .paperclip_client import FDR_LABEL_ID, _paginate, _company
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CoverageReport:
+    total_fdr_issues: int
+    indexed_fdr_issues: int
+    coverage_pct: float
+    missing_issue_identifiers: list[str]
+
+
+@dataclass
+class FreshnessReport:
+    total_rows: int
+    max_age_hours: float
+    min_age_hours: float
+    stale_rows: int
+    stale_threshold_hours: int
+
+
+@dataclass
+class ConsistencyReport:
+    null_owner_rows: int
+    null_updated_at_rows: int
+    duplicate_pairs: int
+    orphan_fr_issue_ids: list[str]
+
+
+@dataclass
+class QualityReport:
+    coverage: CoverageReport | None
+    freshness: FreshnessReport | None
+    consistency: ConsistencyReport | None
+    passed: bool
+
+
+def compute_coverage(engine: Engine) -> CoverageReport:
+    """Compare FDR issues in Paperclip vs touch_index_fr_files."""
+    params: dict[str, Any] = {
+        "labelId": FDR_LABEL_ID,
+        "status": "todo,in_progress,in_review,done",
+    }
+    all_fdr = _paginate(f"/api/companies/{_company()}/issues", params)
+    total = len(all_fdr)
+
+    with engine.connect() as conn:
+        indexed = conn.execute(
+            text("SELECT COUNT(DISTINCT fr_identifier) FROM touch_index_fr_files")
+        ).scalar() or 0
+
+    pct = (indexed / total * 100) if total > 0 else 0.0
+
+    indexed_set = set()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT DISTINCT fr_identifier FROM touch_index_fr_files")
+        ).fetchall()
+        indexed_set = {r[0] for r in rows}
+
+    missing = sorted(
+        i["identifier"] for i in all_fdr if i["identifier"] not in indexed_set
+    )
+
+    return CoverageReport(
+        total_fdr_issues=total,
+        indexed_fdr_issues=indexed,
+        coverage_pct=round(pct, 1),
+        missing_issue_identifiers=missing,
+    )
+
+
+def compute_freshness(
+    engine: Engine,
+    stale_threshold_hours: int = 168,
+) -> FreshnessReport:
+    """Report age statistics for touch_index_fr_files entries."""
+    with engine.connect() as conn:
+        total = conn.execute(
+            text("SELECT COUNT(*) FROM touch_index_fr_files")
+        ).scalar() or 0
+
+        oldest = conn.execute(
+            text("SELECT MIN(updated_at) FROM touch_index_fr_files")
+        ).scalar()
+        newest = conn.execute(
+            text("SELECT MAX(updated_at) FROM touch_index_fr_files")
+        ).scalar()
+
+    now = datetime.now(timezone.utc)
+    max_age = (now - oldest).total_seconds() / 3600 if oldest else 0.0
+    min_age = (now - newest).total_seconds() / 3600 if newest else 0.0
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_threshold_hours)
+
+    with engine.connect() as conn:
+        stale = conn.execute(
+            text("SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at < :cutoff"),
+            {"cutoff": cutoff},
+        ).scalar() or 0
+
+    return FreshnessReport(
+        total_rows=total,
+        max_age_hours=round(max_age, 1),
+        min_age_hours=round(min_age, 1),
+        stale_rows=stale,
+        stale_threshold_hours=stale_threshold_hours,
+    )
+
+
+def check_consistency(engine: Engine) -> ConsistencyReport:
+    """Check for orphan rows, null values, and duplicates."""
+    with engine.connect() as conn:
+        null_owner = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM touch_index_fr_files "
+                "WHERE fr_owner_agent_id = '00000000-0000-0000-0000-000000000000'"
+            )
+        ).scalar() or 0
+
+        null_updated = conn.execute(
+            text("SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at IS NULL")
+        ).scalar() or 0
+
+        dups = conn.execute(
+            text("""
+                SELECT COUNT(*) FROM (
+                    SELECT file_path, fr_issue_id, COUNT(*)
+                    FROM touch_index_fr_files
+                    GROUP BY file_path, fr_issue_id
+                    HAVING COUNT(*) > 1
+                ) dups
+            """)
+        ).scalar() or 0
+
+        orphan_rows = conn.execute(
+            text("SELECT DISTINCT fr_issue_id FROM touch_index_fr_files")
+        ).fetchall()
+
+    orphan_ids: list[str] = []
+    for row in orphan_rows:
+        issue_id = row[0]
+        try:
+            from .paperclip_client import get_issue_by_id
+
+            issue = get_issue_by_id(issue_id)
+            if issue is None:
+                orphan_ids.append(issue_id)
+        except Exception:
+            logger.warning("Could not verify issue %s — API error", issue_id)
+
+    return ConsistencyReport(
+        null_owner_rows=null_owner,
+        null_updated_at_rows=null_updated,
+        duplicate_pairs=dups,
+        orphan_fr_issue_ids=orphan_ids,
+    )
+
+
+def run_quality_checks(
+    engine: Engine,
+    stale_threshold_hours: int = 168,
+) -> QualityReport:
+    """Run all data quality checks and return a consolidated report."""
+    coverage = None
+    freshness = None
+    consistency = None
+    failures = 0
+
+    try:
+        coverage = compute_coverage(engine)
+        if coverage.coverage_pct < 90:
+            logger.warning(
+                "COVERAGE: %.1f%% (%d/%d) — %d missing issues",
+                coverage.coverage_pct,
+                coverage.indexed_fdr_issues,
+                coverage.total_fdr_issues,
+                len(coverage.missing_issue_identifiers),
+            )
+            failures += 1
+        else:
+            logger.info(
+                "COVERAGE: %.1f%% (%d/%d)",
+                coverage.coverage_pct,
+                coverage.indexed_fdr_issues,
+                coverage.total_fdr_issues,
+            )
+    except Exception:
+        logger.exception("Coverage check failed")
+        failures += 1
+
+    try:
+        freshness = compute_freshness(engine, stale_threshold_hours)
+        if freshness.stale_rows > 0:
+            logger.warning(
+                "FRESHNESS: %d stale rows (>%d hours), max age %.1f hours",
+                freshness.stale_rows,
+                freshness.stale_threshold_hours,
+                freshness.max_age_hours,
+            )
+            failures += 1
+        else:
+            logger.info(
+                "FRESHNESS: %d rows, max age %.1f hours",
+                freshness.total_rows,
+                freshness.max_age_hours,
+            )
+    except Exception:
+        logger.exception("Freshness check failed")
+        failures += 1
+
+    try:
+        consistency = check_consistency(engine)
+        issues = []
+        if consistency.null_owner_rows:
+            issues.append(f"{consistency.null_owner_rows} null-owner rows")
+        if consistency.null_updated_at_rows:
+            issues.append(f"{consistency.null_updated_at_rows} null-updated rows")
+        if consistency.duplicate_pairs:
+            issues.append(f"{consistency.duplicate_pairs} duplicate pairs")
+        if consistency.orphan_fr_issue_ids:
+            issues.append(f"{len(consistency.orphan_fr_issue_ids)} orphans")
+        if issues:
+            logger.warning("CONSISTENCY: %s", "; ".join(issues))
+            failures += 1
+        else:
+            logger.info("CONSISTENCY: clean")
+    except Exception:
+        logger.exception("Consistency check failed")
+        failures += 1
+
+    return QualityReport(
+        coverage=coverage,
+        freshness=freshness,
+        consistency=consistency,
+        passed=failures == 0,
+    )
