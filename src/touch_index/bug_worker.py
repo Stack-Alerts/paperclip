@@ -11,6 +11,7 @@ For each closed bug:
 
 The upsert is idempotent — safe to re-run on the same issues.
 """
+
 from __future__ import annotations
 
 import logging
@@ -61,7 +62,9 @@ def ingest_bug_issue(
         source = "comments"
 
     if not files:
-        logger.info("Bug %s: no files found in git or comments — skipping", issue_identifier)
+        logger.info(
+            "Bug %s: no files found in git or comments — skipping", issue_identifier
+        )
         return BugIngestionResult(
             issue_identifier=issue_identifier,
             files_indexed=0,
@@ -83,7 +86,9 @@ def ingest_bug_issue(
     with engine.begin() as conn:
         conn.execute(_UPSERT_SQL, rows)
 
-    logger.info("Bug %s: indexed %d file(s) via %s", issue_identifier, len(rows), source)
+    logger.info(
+        "Bug %s: indexed %d file(s) via %s", issue_identifier, len(rows), source
+    )
     return BugIngestionResult(
         issue_identifier=issue_identifier,
         files_indexed=len(rows),

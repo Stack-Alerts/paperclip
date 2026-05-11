@@ -9,6 +9,7 @@ File extraction strategy (in priority order):
   2. Git commits that reference the FDR identifier directly.
   3. Issue description text (lower-signal but catches spec-level file refs).
 """
+
 from __future__ import annotations
 
 import logging
@@ -41,7 +42,7 @@ _UPSERT_SQL = text("""
 class FRIngestionResult:
     issue_identifier: str
     files_indexed: int
-    source: str           # "comments" | "git" | "description" | "none"
+    source: str  # "comments" | "git" | "description" | "none"
     skipped_no_commits: bool  # True when no files found from any source
 
 
@@ -68,7 +69,9 @@ def ingest_fr_issue(
         source = "description"
 
     if not files:
-        logger.info("FR %s: no files found in comments, git, or description", issue_identifier)
+        logger.info(
+            "FR %s: no files found in comments, git, or description", issue_identifier
+        )
         return FRIngestionResult(
             issue_identifier=issue_identifier,
             files_indexed=0,

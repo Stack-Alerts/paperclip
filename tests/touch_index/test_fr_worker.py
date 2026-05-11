@@ -3,6 +3,7 @@
 All external I/O (DB engine, Paperclip API, git subprocess) is mocked so these
 tests run offline without a PostgreSQL instance or network.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -20,6 +21,7 @@ from touch_index.fr_worker import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _mock_engine():
     """Return a mock SQLAlchemy engine whose context-manager .begin() works."""
@@ -41,14 +43,19 @@ OWNER_AGENT_ID = "bbbbbbbb-0000-0000-0000-000000000002"
 # ingest_fr_issue — file source priority
 # ---------------------------------------------------------------------------
 
+
 class TestIngestFrIssue:
     def test_files_from_comments(self):
         engine, conn = _mock_engine()
         files = ["src/touch_index/fr_worker.py", "src/touch_index/db.py"]
 
         with (
-            patch("touch_index.fr_worker.fetch_and_extract", return_value=files) as mock_comments,
-            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]) as mock_git,
+            patch(
+                "touch_index.fr_worker.fetch_and_extract", return_value=files
+            ) as mock_comments,
+            patch(
+                "touch_index.fr_worker.get_files_for_issue", return_value=[]
+            ) as mock_git,
         ):
             result = ingest_fr_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID)
 
@@ -75,15 +82,23 @@ class TestIngestFrIssue:
     def test_falls_back_to_description_when_no_comments_no_git(self):
         engine, conn = _mock_engine()
         desc_files = ["src/optimizer_v3/database/strategy_manager.py"]
-        description = "Changed `src/optimizer_v3/database/strategy_manager.py` to fix XYZ."
+        description = (
+            "Changed `src/optimizer_v3/database/strategy_manager.py` to fix XYZ."
+        )
 
         with (
             patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
             patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
-            patch("touch_index.fr_worker.extract_files_from_text", return_value=desc_files) as mock_desc,
+            patch(
+                "touch_index.fr_worker.extract_files_from_text", return_value=desc_files
+            ) as mock_desc,
         ):
             result = ingest_fr_issue(
-                engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID, description=description
+                engine,
+                ISSUE_ID,
+                ISSUE_IDENTIFIER,
+                OWNER_AGENT_ID,
+                description=description,
             )
 
         assert result.source == "description"
@@ -165,8 +180,11 @@ class TestIngestFrIssue:
             patch("touch_index.fr_worker.extract_files_from_text") as mock_desc,
         ):
             result = ingest_fr_issue(
-                engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID,
-                description="Some description with src/foo.py"
+                engine,
+                ISSUE_ID,
+                ISSUE_IDENTIFIER,
+                OWNER_AGENT_ID,
+                description="Some description with src/foo.py",
             )
 
         mock_desc.assert_not_called()
@@ -176,6 +194,7 @@ class TestIngestFrIssue:
 # ---------------------------------------------------------------------------
 # run_fr_worker — batch orchestration
 # ---------------------------------------------------------------------------
+
 
 class TestRunFrWorker:
     def _issues(self, count: int = 2) -> list[dict]:
@@ -235,7 +254,10 @@ class TestRunFrWorker:
         engine, _ = _mock_engine()
 
         with (
-            patch("touch_index.fr_worker.fetch_and_extract", return_value=["src/a.py", "src/b.py"]),
+            patch(
+                "touch_index.fr_worker.fetch_and_extract",
+                return_value=["src/a.py", "src/b.py"],
+            ),
             patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
         ):
             results = run_fr_worker(engine, self._issues(3))

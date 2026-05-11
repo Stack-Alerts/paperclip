@@ -5,6 +5,7 @@ Strategy: find all commits whose message references the issue identifier
 This gives reliable coverage because the project enforces conventional commits
 with issue IDs in the scope token.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -35,8 +36,11 @@ def get_files_for_commit(sha: str, repo: Path = _REPO_ROOT) -> list[str]:
     """Return files changed in a single commit (relative paths, ACMRT only)."""
     out = _run(
         [
-            "git", "show", "--stat", "--name-only",
-            "--format=",          # suppress commit header
+            "git",
+            "show",
+            "--stat",
+            "--name-only",
+            "--format=",  # suppress commit header
             "--diff-filter=ACMRT",
             sha,
         ],
@@ -78,8 +82,18 @@ def _is_source_file(path: str) -> bool:
         "docs/",
     )
     skip_suffixes = (
-        ".sql", ".json", ".lock", ".txt", ".md", ".ini", ".cfg",
-        ".toml", ".yml", ".yaml", ".sh", ".csv",
+        ".sql",
+        ".json",
+        ".lock",
+        ".txt",
+        ".md",
+        ".ini",
+        ".cfg",
+        ".toml",
+        ".yml",
+        ".yaml",
+        ".sh",
+        ".csv",
     )
     if any(path.startswith(p) for p in skip_prefixes):
         return False

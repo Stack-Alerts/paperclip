@@ -11,6 +11,7 @@ Extraction priority:
 Normalisation: strip leading `BTC_Engine_v3/` or `projects/*/` repo prefixes
 so all paths are repo-relative (e.g. `src/foo/bar.py`).
 """
+
 from __future__ import annotations
 
 import re
@@ -19,9 +20,7 @@ from typing import Sequence
 _CODE_EXTS = r"(?:py|js|ts|sql)"
 
 # Backtick-wrapped paths
-_RE_BACKTICK = re.compile(
-    r"`([a-zA-Z0-9_/\-\.]+\.(?:" + _CODE_EXTS + r"))`"
-)
+_RE_BACKTICK = re.compile(r"`([a-zA-Z0-9_/\-\.]+\.(?:" + _CODE_EXTS + r"))`")
 
 # Bare paths starting with a known root
 _RE_PATH = re.compile(
@@ -40,7 +39,7 @@ def _normalise(path: str) -> str:
     for prefix in _STRIP_PREFIXES:
         if path.startswith(prefix):
             # strip everything up to and including the prefix's last segment
-            rest = path[len(prefix):]
+            rest = path[len(prefix) :]
             # If rest still starts with a "projects/name/" segment, strip again
             return rest
     return path

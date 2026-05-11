@@ -3,6 +3,7 @@
 Reads PAPERCLIP_API_URL and PAPERCLIP_API_KEY from environment.
 All methods return plain dicts (no schema binding).
 """
+
 from __future__ import annotations
 
 import os
@@ -20,10 +21,12 @@ _BUG_TITLE_PREFIXES = ("bug:", "bug ")
 
 def _session() -> requests.Session:
     s = requests.Session()
-    s.headers.update({
-        "Authorization": f"Bearer {os.environ['PAPERCLIP_API_KEY']}",
-        "Content-Type": "application/json",
-    })
+    s.headers.update(
+        {
+            "Authorization": f"Bearer {os.environ['PAPERCLIP_API_KEY']}",
+            "Content-Type": "application/json",
+        }
+    )
     return s
 
 
@@ -90,7 +93,8 @@ def get_fdr_issues(updated_after: datetime | None = None) -> list[dict]:
     if updated_after:
         cutoff = updated_after.astimezone(timezone.utc)
         issues = [
-            i for i in issues
+            i
+            for i in issues
             if datetime.fromisoformat(i["updatedAt"].replace("Z", "+00:00")) >= cutoff
         ]
     return issues
@@ -104,11 +108,11 @@ def get_closed_bug_issues(closed_after: datetime | None = None) -> list[dict]:
     if closed_after:
         cutoff = closed_after.astimezone(timezone.utc)
         bugs = [
-            b for b in bugs
+            b
+            for b in bugs
             if b.get("completedAt")
-            and datetime.fromisoformat(
-                b["completedAt"].replace("Z", "+00:00")
-            ) >= cutoff
+            and datetime.fromisoformat(b["completedAt"].replace("Z", "+00:00"))
+            >= cutoff
         ]
     return bugs
 
@@ -126,11 +130,11 @@ def get_closed_non_fdr_issues(closed_after: datetime | None = None) -> list[dict
     if closed_after:
         cutoff = closed_after.astimezone(timezone.utc)
         issues = [
-            i for i in issues
+            i
+            for i in issues
             if i.get("completedAt")
-            and datetime.fromisoformat(
-                i["completedAt"].replace("Z", "+00:00")
-            ) >= cutoff
+            and datetime.fromisoformat(i["completedAt"].replace("Z", "+00:00"))
+            >= cutoff
         ]
     return issues
 
@@ -146,11 +150,11 @@ def get_all_done_issues(completed_after: datetime | None = None) -> list[dict]:
     if completed_after:
         cutoff = completed_after.astimezone(timezone.utc)
         issues = [
-            i for i in issues
+            i
+            for i in issues
             if i.get("completedAt")
-            and datetime.fromisoformat(
-                i["completedAt"].replace("Z", "+00:00")
-            ) >= cutoff
+            and datetime.fromisoformat(i["completedAt"].replace("Z", "+00:00"))
+            >= cutoff
         ]
     return issues
 
