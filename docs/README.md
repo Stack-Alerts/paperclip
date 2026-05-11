@@ -27,6 +27,7 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 - **Strategy Developer Guide**: [`architecture/data-manager/STRATEGY_DEVELOPER_GUIDE.md`](architecture/data-manager/STRATEGY_DEVELOPER_GUIDE.md)
 - **Database Guide**: [`architecture/DATABASE_GUIDE.md`](architecture/DATABASE_GUIDE.md)
 - **Git Workflow**: [`architecture/GIT_WORKFLOW.md`](architecture/GIT_WORKFLOW.md)
+- **Touch Index**: [`architecture/DATABASE_GUIDE.md#8-touch_index_fr_files`](architecture/DATABASE_GUIDE.md) — FR ingestion worker, bug-close ingestion worker, file dependency tracking
 - **Expert Reviews**: [`building-blocks/expert-reviews/`](building-blocks/expert-reviews/) — 80 signal expert analysis docs
 - **LakeAPI Integration**: [`integrations/`](integrations/)
 
