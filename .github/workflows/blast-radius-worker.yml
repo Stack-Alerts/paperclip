@@ -14,6 +14,10 @@ on:
         description: 'Loop interval in seconds (0 = run once)'
         required: false
         default: '0'
+      force_reprocess:
+        description: 'Re-process already-seen issues'
+        required: false
+        default: 'false'
 
 concurrency:
   group: blast-radius-worker
@@ -62,15 +66,17 @@ jobs:
 
       - name: Run Blast Radius worker
         run: |
+          FLAGS=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-            DRY_FLAG="--dry-run"
-          else
-            DRY_FLAG=""
+            FLAGS="$FLAGS --dry-run"
+          fi
+          if [ "${{ github.event.inputs.force_reprocess }}" = "true" ]; then
+            FLAGS="$FLAGS --force-reprocess"
           fi
           if [ "${{ github.event.inputs.loop_seconds }}" != "0" ] && [ -n "${{ github.event.inputs.loop_seconds }}" ]; then
-            python scripts/run_blast_radius_worker.py --loop ${{ github.event.inputs.loop_seconds }} $DRY_FLAG
+            python scripts/run_blast_radius_worker.py --loop ${{ github.event.inputs.loop_seconds }} $FLAGS
           else
-            python scripts/run_blast_radius_worker.py $DRY_FLAG
+            python scripts/run_blast_radius_worker.py $FLAGS
           fi
 
       - name: Save worker state cache

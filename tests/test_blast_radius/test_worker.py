@@ -202,6 +202,8 @@ class TestRunOnce:
         assert len(results) == 1
         assert "error" in results[0]
         assert "DB down" in results[0]["error"]
+        # Failed issues must NOT be marked as processed
+        assert not state_file.exists()
 
     def test_mixed_issues(self, tmp_path, monkeypatch):
         issues = [_FIX_ISSUE, _NON_FIX_ISSUE]

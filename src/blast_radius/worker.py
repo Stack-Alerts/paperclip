@@ -99,7 +99,10 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
         identifier = issue.get("identifier", "")
 
         if not force_reprocess and issue_id in processed:
-            log.debug("Already processed %s — skipping (use --force-reprocess to override)", identifier)
+            log.debug(
+                "Already processed %s — skipping (use --force-reprocess to override)",
+                identifier,
+            )
             continue
 
         if not _is_fix_issue(issue):
@@ -110,11 +113,10 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
         try:
             result = generate_and_post(issue_id, dry_run=dry_run)
             results.append(result)
+            newly_processed.append(issue_id)
         except Exception as exc:
             log.error("Failed to generate report for %s: %s", identifier, exc)
             results.append({"issue": identifier, "error": str(exc)})
-
-        newly_processed.append(issue_id)
 
     if newly_processed and not dry_run:
         state["processed_issue_ids"] = list(processed | set(newly_processed))
@@ -124,11 +126,15 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
     return results
 
 
-def run_loop(interval_seconds: int = 120, dry_run: bool = False, force_reprocess: bool = False) -> None:
+def run_loop(
+    interval_seconds: int = 120, dry_run: bool = False, force_reprocess: bool = False
+) -> None:
     """Poll continuously, sleeping *interval_seconds* between runs."""
     log.info(
         "Starting Blast Radius worker loop (interval=%ds, dry_run=%s, force_reprocess=%s)",
-        interval_seconds, dry_run, force_reprocess,
+        interval_seconds,
+        dry_run,
+        force_reprocess,
     )
     while True:
         try:
@@ -141,16 +147,28 @@ def run_loop(interval_seconds: int = 120, dry_run: bool = False, force_reprocess
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     parser = argparse.ArgumentParser(description="Blast Radius polling worker")
-    parser.add_argument("--loop", type=int, metavar="SECONDS", help="Run in a loop with this interval")
-    parser.add_argument("--dry-run", action="store_true", help="Log reports but do not post comments")
-    parser.add_argument("--force-reprocess", action="store_true", help="Re-process already-seen issues")
+    parser.add_argument(
+        "--loop", type=int, metavar="SECONDS", help="Run in a loop with this interval"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Log reports but do not post comments"
+    )
+    parser.add_argument(
+        "--force-reprocess", action="store_true", help="Re-process already-seen issues"
+    )
     args = parser.parse_args()
 
     if args.loop:
-        run_loop(interval_seconds=args.loop, dry_run=args.dry_run, force_reprocess=args.force_reprocess)
+        run_loop(
+            interval_seconds=args.loop,
+            dry_run=args.dry_run,
+            force_reprocess=args.force_reprocess,
+        )
     else:
         results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
         log.info("Results: %s", json.dumps(results, indent=2))
