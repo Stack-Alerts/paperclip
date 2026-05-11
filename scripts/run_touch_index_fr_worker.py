@@ -1,14 +1,22 @@
-"""FR Touch Index polling worker — run by Paperclip routine every 15 minutes.
+"""FR Touch Index polling worker + webhook handler — run by Paperclip routine
+every 15 minutes or triggered via repository_dispatch webhook.
 
-Queries Paperclip for FDR issues updated in the last 30 minutes (overlap
-window to avoid gaps on late-firing routines), then upserts to
-touch_index_fr_files.
+Polling mode (default):
+  Queries Paperclip for FDR issues updated in the last 30 minutes (overlap
+  window to avoid gaps on late-firing routines), then upserts to
+  touch_index_fr_files.
+
+Webhook mode (--issue-id):
+  Processes a single FDR issue by UUID (triggered by Paperclip
+  issue_created/issue_updated webhook events).  The issue is fetched
+  from the Paperclip API and ingested immediately.
 
 Watermark strategy: the 30-minute look-back window with idempotent upsert
 means we can re-process safely without state tracking.
 
 Usage:
     python scripts/run_touch_index_fr_worker.py [--lookback-minutes N]
+    python scripts/run_touch_index_fr_worker.py --issue-id <uuid>
 """
 
 from __future__ import annotations
@@ -27,7 +35,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 from touch_index.db import get_engine, health_check
 from touch_index.paperclip_client import get_fdr_issues, transition_issue_status
-from touch_index.fr_worker import run_fr_worker
+from touch_index.fr_worker import run_fr_worker, process_fr_issue
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,6 +46,12 @@ logger = logging.getLogger("touch_index.fr_worker_runner")
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="FR Touch Index polling worker")
+    parser.add_argument(
+        "--issue-id",
+        type=str,
+        default=None,
+        help="Process a single FDR issue by Paperclip UUID (webhook trigger)",
+    )
     parser.add_argument(
         "--lookback-minutes",
         type=int,
@@ -50,6 +64,20 @@ def main() -> None:
     if not health_check(engine):
         logger.error("DB health check failed — aborting")
         sys.exit(1)
+
+    if args.issue_id:
+        result = process_fr_issue(engine, args.issue_id)
+        if result is None:
+            logger.info("No FR issue found for %s", args.issue_id)
+        else:
+            logger.info(
+                "FR worker (single) — %s: %d files indexed via %s, skipped=%s",
+                result.issue_identifier,
+                result.files_indexed,
+                result.source,
+                result.skipped_no_commits,
+            )
+        return
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
     logger.info("Fetching FDR issues updated after %s", cutoff.isoformat())

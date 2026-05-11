@@ -23,6 +23,7 @@ from sqlalchemy.engine import Engine
 
 from .comment_extractor import fetch_and_extract, extract_files_from_text
 from .git_extractor import get_files_for_issue
+from .paperclip_client import get_issue_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,28 @@ class FRIngestionResult:
     files_indexed: int
     source: str  # "comments" | "git" | "description" | "none"
     skipped_no_commits: bool  # True when no files found from any source
+
+
+def process_fr_issue(
+    engine: Engine,
+    issue_id: str,
+) -> FRIngestionResult | None:
+    """Fetch a single FDR issue from Paperclip API and ingest it.
+
+    This is the webhook/event-driven entry point.  Returns None if the
+    issue is not found or is not an FDR-labelled issue.
+    """
+    issue = get_issue_by_id(issue_id)
+    if issue is None:
+        logger.info("FR issue %s not found — skipping", issue_id)
+        return None
+    return ingest_fr_issue(
+        engine,
+        issue_id=issue["id"],
+        issue_identifier=issue["identifier"],
+        owner_agent_id=issue.get("assigneeAgentId"),
+        description=issue.get("description", "") or "",
+    )
 
 
 def ingest_fr_issue(

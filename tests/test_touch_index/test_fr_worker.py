@@ -14,6 +14,7 @@ import pytest
 from touch_index.fr_worker import (
     FRIngestionResult,
     ingest_fr_issue,
+    process_fr_issue,
     run_fr_worker,
 )
 
@@ -282,3 +283,99 @@ class TestRunFrWorker:
         ):
             run_fr_worker(engine, [{"id": "id-x", "identifier": "BTCAAAAA-X"}])
         # Should complete without error; git fallback used
+
+
+# ---------------------------------------------------------------------------
+# process_fr_issue — single-issue webhook entry point
+# ---------------------------------------------------------------------------
+
+
+class TestProcessFrIssue:
+    def test_fetches_and_ingests_issue(self):
+        """process_fr_issue fetches issue from API and delegates to ingest_fr_issue."""
+        engine, conn = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "assigneeAgentId": OWNER_AGENT_ID,
+            "description": "Some FR description",
+        }
+        files = ["src/touch_index/fr_worker.py"]
+
+        with (
+            patch(
+                "touch_index.fr_worker.get_issue_by_id", return_value=issue
+            ) as mock_get,
+            patch(
+                "touch_index.fr_worker.fetch_and_extract", return_value=files
+            ) as mock_comments,
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            result = process_fr_issue(engine, ISSUE_ID)
+
+        assert result is not None
+        assert result.files_indexed == 1
+        assert result.issue_identifier == ISSUE_IDENTIFIER
+        mock_get.assert_called_once_with(ISSUE_ID)
+
+    def test_returns_none_when_issue_not_found(self):
+        """When get_issue_by_id returns None, process_fr_issue returns None."""
+        engine, _ = _mock_engine()
+
+        with patch(
+            "touch_index.fr_worker.get_issue_by_id", return_value=None
+        ):
+            result = process_fr_issue(engine, "nonexistent-uuid")
+
+        assert result is None
+
+    def test_handles_missing_assignee_agent_id(self):
+        """Issue without assigneeAgentId should not crash."""
+        engine, conn = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "description": "",
+        }
+
+        with (
+            patch(
+                "touch_index.fr_worker.get_issue_by_id", return_value=issue
+            ),
+            patch(
+                "touch_index.fr_worker.fetch_and_extract",
+                return_value=["src/foo.py"],
+            ),
+        ):
+            result = process_fr_issue(engine, ISSUE_ID)
+
+        assert result is not None
+        assert result.files_indexed == 1
+
+    def test_passes_description_to_ingest(self):
+        """Description from the fetched issue must be passed to ingest_fr_issue."""
+        engine, _ = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "assigneeAgentId": OWNER_AGENT_ID,
+            "description": "Changed `src/optimizer_v3/core.py` to fix XYZ",
+        }
+
+        with (
+            patch(
+                "touch_index.fr_worker.get_issue_by_id", return_value=issue
+            ),
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch(
+                "touch_index.fr_worker.extract_files_from_text",
+                return_value=["src/optimizer_v3/core.py"],
+            ) as mock_desc,
+        ):
+            result = process_fr_issue(engine, ISSUE_ID)
+
+        assert result is not None
+        assert result.source == "description"
+        assert result.files_indexed == 1
+        mock_desc.assert_called_once_with(issue["description"])
