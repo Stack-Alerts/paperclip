@@ -19,7 +19,15 @@ from touch_index.quality import (
     compute_freshness,
     check_consistency,
     run_quality_checks,
-)
+
+    BugCoverageReport,
+    BugFreshnessReport,
+    BugConsistencyReport,
+    BugQualityReport,
+    compute_bug_coverage,
+    compute_bug_freshness,
+    check_bug_consistency,
+    run_bug_quality_checks,)
 
 
 # ---------------------------------------------------------------------------
@@ -360,6 +368,345 @@ class TestRunQualityChecks:
                   return_value=_make_consistency()),
         ):
             report = run_quality_checks(engine)
+
+        assert report.passed is False
+        assert report.coverage is None
+        assert report.freshness is not None
+        assert report.consistency is not None
+
+
+# ---------------------------------------------------------------------------
+# compute_bug_coverage
+# ---------------------------------------------------------------------------
+
+
+class TestComputeBugCoverage:
+    def test_full_coverage(self):
+        engine = _make_engine([
+            _make_scalar_result(2),           # COUNT(DISTINCT bug_identifier)
+            _make_scalar_result(0, rows=[      # DISTINCT bug_identifier rows
+                ("BTCAAAAA-100",),
+                ("BTCAAAAA-101",),
+            ]),
+        ])
+
+        with patch("touch_index.quality._paginate", return_value=[
+            {"identifier": "BTCAAAAA-100"},
+            {"identifier": "BTCAAAAA-101"},
+        ]) as mock_api:
+            report = compute_bug_coverage(engine)
+
+        assert report.total_bug_issues == 2
+        assert report.indexed_bug_issues == 2
+        assert report.coverage_pct == 100.0
+        assert report.missing_issue_identifiers == []
+        mock_api.assert_called_once()
+
+    def test_partial_coverage(self):
+        engine = _make_engine([
+            _make_scalar_result(1),
+            _make_scalar_result(0, rows=[("BTCAAAAA-100",)]),
+        ])
+
+        with patch("touch_index.quality._paginate", return_value=[
+            {"identifier": "BTCAAAAA-100"},
+            {"identifier": "BTCAAAAA-101"},
+            {"identifier": "BTCAAAAA-102"},
+        ]):
+            report = compute_bug_coverage(engine)
+
+        assert report.total_bug_issues == 3
+        assert report.indexed_bug_issues == 1
+        assert report.coverage_pct == pytest.approx(33.3, rel=0.1)
+        assert report.missing_issue_identifiers == ["BTCAAAAA-101", "BTCAAAAA-102"]
+
+    def test_zero_indexed(self):
+        engine = _make_engine([
+            _make_scalar_result(0),
+            _make_scalar_result(0, rows=[]),
+        ])
+
+        with patch("touch_index.quality._paginate", return_value=[
+            {"identifier": "BTCAAAAA-100"},
+            {"identifier": "BTCAAAAA-101"},
+        ]):
+            report = compute_bug_coverage(engine)
+
+        assert report.total_bug_issues == 2
+        assert report.indexed_bug_issues == 0
+        assert report.coverage_pct == 0.0
+        assert len(report.missing_issue_identifiers) == 2
+
+    def test_zero_issues(self):
+        engine = _make_engine([
+            _make_scalar_result(0),
+            _make_scalar_result(0, rows=[]),
+        ])
+
+        with patch("touch_index.quality._paginate", return_value=[]):
+            report = compute_bug_coverage(engine)
+
+        assert report.total_bug_issues == 0
+        assert report.indexed_bug_issues == 0
+        assert report.coverage_pct == 0.0
+        assert report.missing_issue_identifiers == []
+
+    def test_filters_fdr_labelled(self):
+        """FDR-labelled done issues are excluded from the coverage denominator."""
+        engine = _make_engine([
+            _make_scalar_result(1),
+            _make_scalar_result(0, rows=[("BTCAAAAA-200",)]),
+        ])
+
+        with patch("touch_index.quality._paginate", return_value=[
+            {"identifier": "BTCAAAAA-100", "labelIds": ["d523cb2d-acd9-423d-b87a-bb79cee42c40"]},
+            {"identifier": "BTCAAAAA-200"},
+        ]):
+            report = compute_bug_coverage(engine)
+
+        assert report.total_bug_issues == 1  # FDR filtered out
+        assert report.indexed_bug_issues == 1
+        assert report.coverage_pct == 100.0
+
+
+# ---------------------------------------------------------------------------
+# compute_bug_freshness
+# ---------------------------------------------------------------------------
+
+
+class TestComputeBugFreshness:
+    def test_empty_table(self):
+        now = datetime.now(timezone.utc)
+        engine = _make_engine([
+            _make_scalar_result(0),   # COUNT(*)
+            _make_scalar_result(None),  # MIN(closed_at)
+            _make_scalar_result(None),  # MAX(closed_at)
+            _make_scalar_result(0),     # stale
+        ])
+
+        with patch("touch_index.quality.datetime") as mock_dt:
+            mock_dt.now.return_value = now
+            report = compute_bug_freshness(engine)
+
+        assert report.total_rows == 0
+        assert report.max_age_hours == 0.0
+        assert report.stale_rows == 0
+
+    def test_fresh_data(self):
+        now = datetime(2026, 5, 12, 12, 0, 0, tzinfo=timezone.utc)
+        old_dt = datetime(2026, 5, 11, 12, 0, 0, tzinfo=timezone.utc)
+
+        engine = _make_engine([
+            _make_scalar_result(5),     # COUNT(*)
+            _make_scalar_result(old_dt), # MIN(closed_at)
+            _make_scalar_result(now),    # MAX(closed_at)
+            _make_scalar_result(0),      # stale
+        ])
+
+        with patch("touch_index.quality.datetime") as mock_dt_patch:
+            mock_dt_patch.now.return_value = now
+            mock_dt_patch.timedelta = __import__("datetime").timedelta
+            report = compute_bug_freshness(engine)
+
+        assert report.total_rows == 5
+        assert report.max_age_hours == 24.0
+        assert report.stale_rows == 0
+
+    def test_stale_data(self):
+        now = datetime(2026, 6, 12, 12, 0, 0, tzinfo=timezone.utc)
+        old_dt = datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+        engine = _make_engine([
+            _make_scalar_result(3),
+            _make_scalar_result(old_dt),
+            _make_scalar_result(now),
+            _make_scalar_result(1),  # stale
+        ])
+
+        with patch("touch_index.quality.datetime") as mock_dt_patch:
+            mock_dt_patch.now.return_value = now
+            mock_dt_patch.timedelta = __import__("datetime").timedelta
+            report = compute_bug_freshness(engine, stale_threshold_days=30)
+
+        assert report.total_rows == 3
+        assert report.stale_rows == 1
+
+
+# ---------------------------------------------------------------------------
+# check_bug_consistency
+# ---------------------------------------------------------------------------
+
+
+class TestCheckBugConsistency:
+    def test_clean_data(self):
+        engine = _make_engine([
+            _make_scalar_result(0),  # null_closed_at
+            _make_scalar_result(0),  # duplicates
+            _make_scalar_result(0, rows=[]),  # DISTINCT bug_issue_ids
+        ])
+
+        with patch(
+            "touch_index.paperclip_client.get_issue_by_id",
+            return_value={"id": "exists"},
+        ):
+            report = check_bug_consistency(engine)
+
+        assert report.null_closed_at_rows == 0
+        assert report.duplicate_pairs == 0
+        assert report.orphan_bug_issue_ids == []
+
+    def test_detects_null_closed_at(self):
+        engine = _make_engine([
+            _make_scalar_result(5),  # null_closed_at
+            _make_scalar_result(0),  # duplicates
+            _make_scalar_result(0, rows=[]),
+        ])
+
+        with patch(
+            "touch_index.paperclip_client.get_issue_by_id",
+            return_value={"id": "exists"},
+        ):
+            report = check_bug_consistency(engine)
+
+        assert report.null_closed_at_rows == 5
+        assert report.duplicate_pairs == 0
+
+    def test_detects_duplicates(self):
+        engine = _make_engine([
+            _make_scalar_result(0),  # null_closed_at
+            _make_scalar_result(3),  # duplicates
+            _make_scalar_result(0, rows=[]),
+        ])
+
+        with patch(
+            "touch_index.paperclip_client.get_issue_by_id",
+            return_value={"id": "exists"},
+        ):
+            report = check_bug_consistency(engine)
+
+        assert report.duplicate_pairs == 3
+
+    def test_detects_orphans(self):
+        engine = _make_engine([
+            _make_scalar_result(0),
+            _make_scalar_result(0),
+            _make_scalar_result(0, rows=[("orphan-1",), ("orphan-2",)]),
+        ])
+
+        with patch(
+            "touch_index.paperclip_client.get_issue_by_id",
+            return_value=None,
+        ):
+            report = check_bug_consistency(engine)
+
+        assert len(report.orphan_bug_issue_ids) == 2
+        assert "orphan-1" in report.orphan_bug_issue_ids
+
+
+# ---------------------------------------------------------------------------
+# run_bug_quality_checks
+# ---------------------------------------------------------------------------
+
+
+class TestRunBugQualityChecks:
+    def test_all_pass(self):
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.quality.compute_bug_coverage",
+                  return_value=BugCoverageReport(
+                      total_bug_issues=2, indexed_bug_issues=2, coverage_pct=100.0,
+                      missing_issue_identifiers=[])),
+            patch("touch_index.quality.compute_bug_freshness",
+                  return_value=BugFreshnessReport(
+                      total_rows=5, max_age_hours=2.0, min_age_hours=0.1,
+                      stale_rows=0, stale_threshold_days=30)),
+            patch("touch_index.quality.check_bug_consistency",
+                  return_value=BugConsistencyReport(
+                      null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[])),
+        ):
+            report = run_bug_quality_checks(engine)
+
+        assert report.passed is True
+        assert report.coverage is not None
+        assert report.freshness is not None
+        assert report.consistency is not None
+
+    def test_low_coverage_fails(self):
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.quality.compute_bug_coverage",
+                  return_value=BugCoverageReport(
+                      total_bug_issues=10, indexed_bug_issues=5, coverage_pct=50.0,
+                      missing_issue_identifiers=["BTCAAAAA-101"])),
+            patch("touch_index.quality.compute_bug_freshness",
+                  return_value=BugFreshnessReport(
+                      total_rows=5, max_age_hours=1.0, min_age_hours=0.1,
+                      stale_rows=0, stale_threshold_days=30)),
+            patch("touch_index.quality.check_bug_consistency",
+                  return_value=BugConsistencyReport(
+                      null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[])),
+        ):
+            report = run_bug_quality_checks(engine)
+
+        assert report.passed is False
+
+    def test_stale_rows_fails(self):
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.quality.compute_bug_coverage",
+                  return_value=BugCoverageReport(
+                      total_bug_issues=2, indexed_bug_issues=2, coverage_pct=100.0,
+                      missing_issue_identifiers=[])),
+            patch("touch_index.quality.compute_bug_freshness",
+                  return_value=BugFreshnessReport(
+                      total_rows=5, max_age_hours=800.0, min_age_hours=2.0,
+                      stale_rows=3, stale_threshold_days=30)),
+            patch("touch_index.quality.check_bug_consistency",
+                  return_value=BugConsistencyReport(
+                      null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[])),
+        ):
+            report = run_bug_quality_checks(engine)
+
+        assert report.passed is False
+
+    def test_consistency_issues_fail(self):
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.quality.compute_bug_coverage",
+                  return_value=BugCoverageReport(
+                      total_bug_issues=2, indexed_bug_issues=2, coverage_pct=100.0,
+                      missing_issue_identifiers=[])),
+            patch("touch_index.quality.compute_bug_freshness",
+                  return_value=BugFreshnessReport(
+                      total_rows=5, max_age_hours=1.0, min_age_hours=0.1,
+                      stale_rows=0, stale_threshold_days=30)),
+            patch("touch_index.quality.check_bug_consistency",
+                  return_value=BugConsistencyReport(
+                      null_closed_at_rows=3, duplicate_pairs=0, orphan_bug_issue_ids=[])),
+        ):
+            report = run_bug_quality_checks(engine)
+
+        assert report.passed is False
+
+    def test_exception_in_coverage_still_runs_others(self):
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.quality.compute_bug_coverage",
+                  side_effect=RuntimeError("API timeout")),
+            patch("touch_index.quality.compute_bug_freshness",
+                  return_value=BugFreshnessReport(
+                      total_rows=5, max_age_hours=1.0, min_age_hours=0.1,
+                      stale_rows=0, stale_threshold_days=30)),
+            patch("touch_index.quality.check_bug_consistency",
+                  return_value=BugConsistencyReport(
+                      null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[])),
+        ):
+            report = run_bug_quality_checks(engine)
 
         assert report.passed is False
         assert report.coverage is None
