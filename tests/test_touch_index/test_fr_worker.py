@@ -11,6 +11,8 @@ from unittest.mock import MagicMock, patch, call
 
 import pytest
 
+from touch_index.paperclip_client import FDR_LABEL_ID
+
 from touch_index.fr_worker import (
     FRIngestionResult,
     ingest_fr_issue,
@@ -299,6 +301,7 @@ class TestProcessFrIssue:
             "identifier": ISSUE_IDENTIFIER,
             "assigneeAgentId": OWNER_AGENT_ID,
             "description": "Some FR description",
+            "labelIds": [FDR_LABEL_ID],
         }
         files = ["src/touch_index/fr_worker.py"]
 
@@ -336,6 +339,7 @@ class TestProcessFrIssue:
             "id": ISSUE_ID,
             "identifier": ISSUE_IDENTIFIER,
             "description": "",
+            "labelIds": [FDR_LABEL_ID],
         }
 
         with (
@@ -352,6 +356,24 @@ class TestProcessFrIssue:
         assert result is not None
         assert result.files_indexed == 1
 
+    def test_returns_none_when_not_fdr_labelled(self):
+        """Issues without the FDR label should be rejected."""
+        engine, _ = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "assigneeAgentId": OWNER_AGENT_ID,
+            "description": "Some description",
+            "labelIds": ["other-label-uuid"],
+        }
+
+        with patch(
+            "touch_index.fr_worker.get_issue_by_id", return_value=issue
+        ):
+            result = process_fr_issue(engine, ISSUE_ID)
+
+        assert result is None
+
     def test_passes_description_to_ingest(self):
         """Description from the fetched issue must be passed to ingest_fr_issue."""
         engine, _ = _mock_engine()
@@ -360,6 +382,7 @@ class TestProcessFrIssue:
             "identifier": ISSUE_IDENTIFIER,
             "assigneeAgentId": OWNER_AGENT_ID,
             "description": "Changed `src/optimizer_v3/core.py` to fix XYZ",
+            "labelIds": [FDR_LABEL_ID],
         }
 
         with (
