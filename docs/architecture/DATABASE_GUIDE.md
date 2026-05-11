@@ -1,7 +1,7 @@
 # OPTIMIZER V3 DATABASE GUIDE
 **Institutional-Grade PostgreSQL Database Infrastructure**
 
-**Version**: 1.0.0  
+**Version**: 1.1.0  
 **Date**: 2026-01-20  
 **Status**: ✅ Production Ready
 
@@ -469,6 +469,105 @@ result = {
 
 ---
 
+---
+
+### 8. touch_index_fr_files
+
+**Purpose**: Track which source files were touched (created/modified) by each Feature Design Requirement (FDR/FR) issue. Auto-populated by the Touch Index FR ingestion worker which polls Paperclip for FDR-labelled issues, extracts file paths from done-comments, git commit messages, or issue descriptions, and upserts them here.
+
+**Columns**:
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| id | UUID | NO | Primary key, auto-generated via `gen_random_uuid()` |
+| file_path | TEXT | NO | Repo-relative path to the affected source file |
+| fr_issue_id | UUID | NO | Paperclip issue UUID for the FR |
+| fr_identifier | TEXT | NO | Human-readable issue identifier (e.g. 'BTCAAAAA-1085') |
+| fr_owner_agent_id | UUID | NO | Agent UUID of the FR owner/assignee |
+| updated_at | TIMESTAMPTZ | NO | Last upsert timestamp (server default `now()`) |
+
+**Indexes**:
+- PRIMARY KEY on `id`
+- UNIQUE on `(file_path, fr_issue_id)` — prevents duplicate file-per-FR rows
+- INDEX on `file_path` — fast file-to-FR lookups (blast radius queries)
+
+**Ingestion Worker**: `scripts/run_touch_index_fr_worker.py` — runs every 15 minutes via GitHub Actions cron (`touch-index-fr-worker.yml`), also accepts webhook triggers via `--issue-id`. Validate with `scripts/validate_touch_index_fr.py`.
+
+**Usage Example**:
+```python
+from sqlalchemy import text
+from touch_index.db import get_engine
+
+engine = get_engine()
+with engine.connect() as conn:
+    rows = conn.execute(
+        text("SELECT fr_identifier FROM touch_index_fr_files WHERE file_path = :path"),
+        {"path": "src/optimizer_v3/core.py"},
+    ).fetchall()
+    print([r[0] for r in rows])
+```
+
+---
+
+### 9. touch_index_bug_files
+
+**Purpose**: Track which source files were touched by each closed bug fix. Auto-populated by the Touch Index bug-close ingestion worker which scans git commits referencing closed non-FDR issues, extracts touched files, and upserts them here.
+
+**Columns**:
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| id | UUID | NO | Primary key, auto-generated via `gen_random_uuid()` |
+| file_path | TEXT | NO | Repo-relative path to the affected source file |
+| bug_issue_id | UUID | NO | Paperclip issue UUID for the bug |
+| bug_identifier | TEXT | NO | Human-readable issue identifier (e.g. 'BTCAAAAA-1202') |
+| closed_at | TIMESTAMPTZ | YES | When the bug was closed (nullable — some issues lack `completedAt`) |
+
+**Indexes**:
+- PRIMARY KEY on `id`
+- UNIQUE on `(file_path, bug_issue_id)` — prevents duplicate file-per-bug rows
+- INDEX on `file_path` — fast file-to-bug lookups
+
+**Ingestion Worker**: `scripts/run_touch_index_bug_worker.py` — runs every 15 minutes via GitHub Actions cron (`touch-index-bug-worker.yml`). Validate with `scripts/validate_touch_index_bug.py`.
+
+**Usage Example**:
+```python
+from sqlalchemy import text
+from touch_index.db import get_engine
+
+engine = get_engine()
+with engine.connect() as conn:
+    rows = conn.execute(
+        text("SELECT bug_identifier FROM touch_index_bug_files WHERE file_path = :path"),
+        {"path": "src/touch_index/db.py"},
+    ).fetchall()
+    print([r[0] for r in rows])
+```
+
+---
+
+### 10. touch_index_file_deps
+
+**Purpose**: Directed dependency edges between source files, derived from static import analysis. Phase 2 addition; the table is created in the Phase 1 migration as a placeholder so ingestion services have a stable join target. The `is_internal` flag distinguishes intra-repo edges from external references.
+
+**Columns**:
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| id | UUID | NO | Primary key, auto-generated via `gen_random_uuid()` |
+| source_file | TEXT | NO | The file that contains the import statement |
+| dep_file | TEXT | NO | The file being imported (dependency target) |
+| is_internal | BOOLEAN | NO | `TRUE` if both files are within the repo (default `FALSE`) |
+| updated_at | TIMESTAMPTZ | NO | Last refresh timestamp (server default `now()`) |
+
+**Indexes**:
+- PRIMARY KEY on `id`
+- UNIQUE on `(source_file, dep_file)` — prevents duplicate edges
+- INDEX on `source_file` — forward dependency traversal
+- INDEX on `dep_file` — reverse dependency (blast radius) traversal
+- PARTIAL INDEX on `dep_file WHERE is_internal = TRUE` — internal-only blast radius queries
+
+**Transitive Closure**: `touch_index_file_deps_transitive` — materialised transitive closure table truncated+reinserted on each refresh. Composite PK on `(source_file, dep_file)` with `min_depth` for shortest-path queries.
+
+---
+
 ## CONNECTION MANAGEMENT
 
 ### Connection Pool Configuration
@@ -898,6 +997,6 @@ For issues or questions:
 ---
 
 **Document Version**: 1.0.0  
-**Last Updated**: 2026-01-20  
-**Maintained By**: Development Team  
+**Last Updated**: 2026-05-12  
+**Maintained By**: Data Engineering Team  
 **Status**: ✅ Production Ready
