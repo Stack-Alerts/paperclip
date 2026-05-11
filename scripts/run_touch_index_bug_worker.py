@@ -8,6 +8,7 @@ by the FR worker).
 Usage:
     python scripts/run_touch_index_bug_worker.py [--lookback-minutes N]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -19,6 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from touch_index.db import get_engine, health_check
@@ -35,7 +37,9 @@ logger = logging.getLogger("touch_index.bug_worker_runner")
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bug-close Touch Index polling worker")
     parser.add_argument(
-        "--lookback-minutes", type=int, default=30,
+        "--lookback-minutes",
+        type=int,
+        default=30,
         help="Process bug issues closed within this many minutes (default: 30)",
     )
     args = parser.parse_args()
@@ -61,7 +65,9 @@ def main() -> None:
     skipped = sum(1 for r in results if r.skipped_no_commits)
     logger.info(
         "Bug worker done — %d issues processed, %d files indexed, %d skipped (no commits)",
-        len(results), total_files, skipped,
+        len(results),
+        total_files,
+        skipped,
     )
 
 
