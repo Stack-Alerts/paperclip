@@ -275,7 +275,10 @@ class TestRunFrWorker:
 
         with (
             patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
-            patch("touch_index.fr_worker.get_files_for_issue", return_value=["src/fallback.py"]),
+            patch(
+                "touch_index.fr_worker.get_files_for_issue",
+                return_value=["src/fallback.py"],
+            ),
         ):
             run_fr_worker(engine, [{"id": "id-x", "identifier": "BTCAAAAA-X"}])
         # Should complete without error; git fallback used

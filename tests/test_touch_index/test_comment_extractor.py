@@ -71,9 +71,7 @@ class TestExtractFilesFromText:
         assert files == ["src/foo.py"]
 
     def test_multiple_files_returned_sorted(self):
-        files = extract_files_from_text(
-            "Changed `src/b.py` and `src/a.py`"
-        )
+        files = extract_files_from_text("Changed `src/b.py` and `src/a.py`")
         assert files == ["src/a.py", "src/b.py"]
 
     def test_no_paths_returns_empty(self):
@@ -81,9 +79,7 @@ class TestExtractFilesFromText:
         assert files == []
 
     def test_deduplicates(self):
-        files = extract_files_from_text(
-            "Changed `src/foo.py` and also `src/foo.py`"
-        )
+        files = extract_files_from_text("Changed `src/foo.py` and also `src/foo.py`")
         assert files == ["src/foo.py"]
 
     def test_code_extensions_only(self):

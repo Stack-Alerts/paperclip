@@ -21,6 +21,7 @@ from blast_radius.worker import (
 class _BreakLoop(BaseException):
     """Used to break out of infinite run_loop during testing."""
 
+
 class TestIsFixIssue:
     def test_fix_label(self):
         issue = {"title": "Improve performance", "labels": [{"name": "fix"}]}
@@ -70,6 +71,7 @@ class TestIsFixIssue:
 # ---------------------------------------------------------------------------
 # State file helpers
 # ---------------------------------------------------------------------------
+
 
 class TestStateHelpers:
     def test_round_trip(self, tmp_path, monkeypatch):
@@ -162,9 +164,7 @@ class TestRunOnce:
 
     def test_skips_already_processed(self, tmp_path, monkeypatch):
         state_file = tmp_path / "state.json"
-        state_file.write_text(
-            json.dumps({"processed_issue_ids": ["issue-uuid-fix"]})
-        )
+        state_file.write_text(json.dumps({"processed_issue_ids": ["issue-uuid-fix"]}))
         self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
 
         results = run_once()
@@ -215,9 +215,7 @@ class TestRunOnce:
     def test_force_reprocess_overrides_processed_state(self, tmp_path, monkeypatch):
         """force_reprocess=True must process already-processed issues."""
         state_file = tmp_path / "state.json"
-        state_file.write_text(
-            json.dumps({"processed_issue_ids": ["issue-uuid-fix"]})
-        )
+        state_file.write_text(json.dumps({"processed_issue_ids": ["issue-uuid-fix"]}))
         monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
         monkeypatch.setattr(
             worker_mod,
@@ -241,12 +239,12 @@ class TestRunOnce:
         state = json.loads(state_file.read_text())
         assert "issue-uuid-fix" in state["processed_issue_ids"]
 
-    def test_force_reprocess_with_dry_run_does_not_save_state(self, tmp_path, monkeypatch):
+    def test_force_reprocess_with_dry_run_does_not_save_state(
+        self, tmp_path, monkeypatch
+    ):
         """force_reprocess + dry_run must not persist state."""
         state_file = tmp_path / "state.json"
-        state_file.write_text(
-            json.dumps({"processed_issue_ids": ["issue-uuid-fix"]})
-        )
+        state_file.write_text(json.dumps({"processed_issue_ids": ["issue-uuid-fix"]}))
         monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
         monkeypatch.setattr(
             worker_mod,
@@ -273,9 +271,11 @@ class TestRunOnce:
         assert results == []
         assert not state_file.exists()
 
+
 # ---------------------------------------------------------------------------
 # _fetch_in_review_issues (paginated wrapper)
 # ---------------------------------------------------------------------------
+
 
 class TestFetchInReviewIssues:
     def test_delegates_to_paginate(self, monkeypatch):
@@ -325,111 +325,6 @@ class TestFetchInReviewIssues:
 # run_loop
 # ---------------------------------------------------------------------------
 
-class TestRunLoop:
-    def test_catches_run_once_exception(self, monkeypatch):
-        """run_loop must catch exceptions from run_once and continue."""
-        from blast_radius.worker import run_loop
-
-        mock_exc = RuntimeError("DB connection lost")
-
-        def mock_run_once(dry_run=False):
-            raise mock_exc
-
-        monkeypatch.setattr(
-            "blast_radius.worker.run_once",
-            mock_run_once,
-        )
-        # Break the infinite loop on the first sleep
-        monkeypatch.setattr(
-            "blast_radius.worker.time.sleep",
-            lambda s: (_ for _ in ()).throw(StopIteration),
-        )
-
-        with pytest.raises(StopIteration):
-            run_loop(interval_seconds=1)
-
-    def test_passes_dry_run_flag(self, monkeypatch):
-        """run_loop must pass dry_run to run_once."""
-        from blast_radius.worker import run_loop
-
-        captured = {"dry_run": None}
-
-        def mock_run_once(dry_run=False):
-            captured["dry_run"] = dry_run
-            raise StopIteration  # break the loop
-
-        monkeypatch.setattr(
-            "blast_radius.worker.run_once",
-            mock_run_once,
-        )
-        monkeypatch.setattr(
-            "blast_radius.worker.time.sleep",
-            lambda s: None,
-        )
-
-        with pytest.raises(StopIteration):
-            run_loop(interval_seconds=1, dry_run=True)
-
-        assert captured["dry_run"] is True
-
-    def test_logs_error_on_failure(self, monkeypatch, caplog):
-        """run_loop must log the exception message."""
-        import logging
-
-        from blast_radius.worker import run_loop
-
-        def mock_run_once(dry_run=False, **kwargs):
-            raise RuntimeError("PostgreSQL connection refused")
-
-        monkeypatch.setattr(
-            "blast_radius.worker.run_once",
-            mock_run_once,
-        )
-        monkeypatch.setattr(
-            "blast_radius.worker.time.sleep",
-            lambda s: (_ for _ in ()).throw(StopIteration),
-        )
-
-        with (
-            pytest.raises(StopIteration),
-            caplog.at_level(logging.ERROR),
-        ):
-            run_loop(interval_seconds=1)
-
-        assert any("PostgreSQL connection refused" in r.message for r in caplog.records)
-        assert any("Worker iteration failed" in r.message for r in caplog.records)
-
-    def test_multiple_iterations(self, monkeypatch):
-        """run_loop should call run_once multiple times."""
-        from blast_radius.worker import run_loop
-
-        call_count = 0
-
-        def mock_run_once(dry_run=False):
-            nonlocal call_count
-            call_count += 1
-            if call_count >= 3:
-                raise StopIteration
-            return []
-
-        monkeypatch.setattr(
-            "blast_radius.worker.run_once",
-            mock_run_once,
-        )
-        monkeypatch.setattr(
-            "blast_radius.worker.time.sleep",
-            lambda s: None,
-        )
-
-        with pytest.raises(StopIteration):
-            run_loop(interval_seconds=60)
-
-        assert call_count == 3
-
-
-# ---------------------------------------------------------------------------
-# run_loop
-# ---------------------------------------------------------------------------
 
 class TestRunLoop:
     """Tests for the infinite-loop poller."""

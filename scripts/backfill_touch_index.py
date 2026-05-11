@@ -22,6 +22,7 @@ Coverage denominator:
 Usage:
     python scripts/backfill_touch_index.py [--days N]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -36,6 +37,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from touch_index.db import get_engine, health_check
@@ -57,17 +59,32 @@ logger = logging.getLogger("touch_index.backfill")
 _RE_ISSUE_ID = re.compile(r"BTCAAAAA-\d+")
 
 
+def _report(msg: str = "") -> None:
+    """Print a line to stdout (report output, not logging)."""
+    print(msg)  # noqa: T201 - intentional CLI report output
+
+
+def _report(msg: str = "") -> None:
+    """Print a line to stdout (report output, not logging)."""
+    print(msg)  # noqa: T201 - intentional CLI report output
+
+
 def _git_commits_in_window(days: int) -> list[tuple[str, str, datetime]]:
     """Return (sha, subject, commit_dt) for commits in the last `days` days."""
     since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
     out = subprocess.run(
         [
-            "git", "-C", str(_REPO_ROOT),
-            "log", "--all",
+            "git",
+            "-C",
+            str(_REPO_ROOT),
+            "log",
+            "--all",
             f"--since={since}",
             "--format=%H\x1f%s\x1f%aI",
         ],
-        capture_output=True, text=True, timeout=60,
+        capture_output=True,
+        text=True,
+        timeout=60,
     ).stdout.strip()
 
     results = []
@@ -104,7 +121,9 @@ def main() -> None:
     logger.info("Fetching FDR-labelled issues updated in window …")
     fdr_issues = get_fdr_issues(updated_after=cutoff)
     all_fdr_issues = get_fdr_issues(updated_after=None)
-    logger.info("FDR issues in window: %d / total: %d", len(fdr_issues), len(all_fdr_issues))
+    logger.info(
+        "FDR issues in window: %d / total: %d", len(fdr_issues), len(all_fdr_issues)
+    )
 
     fr_results: list[FRIngestionResult] = run_fr_worker(engine, fdr_issues)
     fr_indexed = sum(1 for r in fr_results if r.files_indexed > 0)
@@ -139,7 +158,9 @@ def main() -> None:
             logger.debug("Issue %s not found in Paperclip — skipping", identifier)
             continue
         if issue["status"] != "done":
-            logger.debug("Issue %s is %s (not done) — skipping", identifier, issue["status"])
+            logger.debug(
+                "Issue %s is %s (not done) — skipping", identifier, issue["status"]
+            )
             continue
         # Skip FDR-labelled issues (handled above)
         if FDR_LABEL_ID in (issue.get("labelIds") or []):
@@ -172,49 +193,51 @@ def main() -> None:
 
     # ── Coverage stats ─────────────────────────────────────────────────────
     fr_coverage = (fr_indexed / len(fdr_issues) * 100) if fdr_issues else 0.0
-    bug_coverage = (bug_indexed / bug_total_eligible * 100) if bug_total_eligible else 0.0
+    bug_coverage = (
+        (bug_indexed / bug_total_eligible * 100) if bug_total_eligible else 0.0
+    )
 
-    print("\n" + "=" * 60)
-    print("TOUCH INDEX BACKFILL — COVERAGE REPORT")
-    print("=" * 60)
-    print(f"Window         : last {args.days} days (since {cutoff.date()})")
-    print()
-    print("FRs (FDR-labelled issues):")
-    print(f"  Total FDRs in system              : {len(all_fdr_issues)}")
-    print(f"  FDRs in window                    : {len(fdr_issues)}")
-    print(f"  FDRs indexed (≥1 file)            : {fr_indexed}")
-    print(f"  FDRs with no extractable files    : {fr_skipped}")
-    print(f"  Total file rows upserted          : {fr_files_total}")
-    print(f"  Coverage (indexed / in-window)    : {fr_coverage:.1f}%")
-    print()
-    print("Bugs (done issues referenced by fix commits):")
-    print(f"  Unique issue IDs in git log       : {len(issue_ids_in_commits)}")
-    print(f"  Eligible done non-FDR issues      : {bug_total_eligible}")
-    print(f"  Bugs indexed (≥1 file)            : {bug_indexed}")
-    print(f"  Bugs with no git files found      : {bug_skipped}")
-    print(f"  Total file rows upserted          : {bug_files_total}")
-    print(f"  Coverage (indexed / eligible)     : {bug_coverage:.1f}%")
-    print()
+    _report("\n" + "=" * 60)
+    _report("TOUCH INDEX BACKFILL — COVERAGE REPORT")
+    _report("=" * 60)
+    _report(f"Window         : last {args.days} days (since {cutoff.date()})")
+    _report()
+    _report("FRs (FDR-labelled issues):")
+    _report(f"  Total FDRs in system              : {len(all_fdr_issues)}")
+    _report(f"  FDRs in window                    : {len(fdr_issues)}")
+    _report(f"  FDRs indexed (≥1 file)            : {fr_indexed}")
+    _report(f"  FDRs with no extractable files    : {fr_skipped}")
+    _report(f"  Total file rows upserted          : {fr_files_total}")
+    _report(f"  Coverage (indexed / in-window)    : {fr_coverage:.1f}%")
+    _report()
+    _report("Bugs (done issues referenced by fix commits):")
+    _report(f"  Unique issue IDs in git log       : {len(issue_ids_in_commits)}")
+    _report(f"  Eligible done non-FDR issues      : {bug_total_eligible}")
+    _report(f"  Bugs indexed (≥1 file)            : {bug_indexed}")
+    _report(f"  Bugs with no git files found      : {bug_skipped}")
+    _report(f"  Total file rows upserted          : {bug_files_total}")
+    _report(f"  Coverage (indexed / eligible)     : {bug_coverage:.1f}%")
+    _report()
 
     # Gate check
     gate_fr = fr_coverage >= 80.0 or not fdr_issues
     gate_bug = bug_coverage >= 80.0 or bug_total_eligible == 0
     if gate_fr and gate_bug:
-        print("RESULT: PASS — both coverage targets met (≥80%)")
+        _report("RESULT: PASS — both coverage targets met (≥80%)")
     else:
         failing = []
         if not gate_fr:
             failing.append(f"FR coverage {fr_coverage:.1f}% < 80%")
         if not gate_bug:
             failing.append(f"Bug coverage {bug_coverage:.1f}% < 80%")
-        print(f"RESULT: BELOW TARGET — {'; '.join(failing)}")
+        _report(f"RESULT: BELOW TARGET — {'; '.join(failing)}")
         if not gate_fr:
-            print()
-            print("  FR note: FDR issues are requirements specs, not implementation")
-            print("  issues. Coverage improves when implementing agents post done-")
-            print("  comments naming the files they changed.")
+            _report()
+            _report("  FR note: FDR issues are requirements specs, not implementation")
+            _report("  issues. Coverage improves when implementing agents post done-")
+            _report("  comments naming the files they changed.")
 
-    print("=" * 60)
+    _report("=" * 60)
 
     summary = {
         "window_days": args.days,
@@ -236,8 +259,8 @@ def main() -> None:
             "coverage_pct": round(bug_coverage, 1),
         },
     }
-    print("\nJSON summary:")
-    print(json.dumps(summary, indent=2))
+    _report("\nJSON summary:")
+    _report(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":
