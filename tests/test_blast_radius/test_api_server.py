@@ -9,32 +9,39 @@ from blast_radius.api_server import _Handler, serve, DEFAULT_PORT
 from blast_radius.query import BlastRadiusData
 
 
-class TestHandler:
-    def _make_handler(self, path: str):
-        handler = _Handler.__new__(_Handler)
-        handler.path = path
-        handler.command = "GET"
-        handler.headers = MagicMock()
-        handler.rfile = MagicMock()
-        handler.wfile = MagicMock()
-        handler.client_address = ("127.0.0.1", 12345)
-        handler.server = MagicMock()
-        handler.close_connection = True
-        handler.requestline = f"GET {path} HTTP/1.1"
-        handler.send_response = MagicMock()
-        handler.send_header = MagicMock()
-        handler.end_headers = MagicMock()
-        return handler
+def _make_handler(path: str, method: str = "GET", body: bytes | None = None):
+    handler = _Handler.__new__(_Handler)
+    handler.path = path
+    handler.command = method
+    handler.headers = MagicMock()
+    handler.rfile = MagicMock()
+    handler.rfile.read.return_value = body or b""
+    handler.wfile = MagicMock()
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.server = MagicMock()
+    handler.close_connection = True
+    handler.requestline = f"{method} {path} HTTP/1.1"
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+    return handler
 
+
+# ---------------------------------------------------------------------------
+# GET /api/blast-radius
+# ---------------------------------------------------------------------------
+
+
+class TestHandlerGet:
     def test_404_on_wrong_path(self):
-        handler = self._make_handler("/api/other")
+        handler = _make_handler("/api/other")
         handler._send_json = MagicMock()
         handler.do_GET()
 
         handler._send_json.assert_called_once_with(404, {"error": "not found"})
 
     def test_400_on_missing_files(self):
-        handler = self._make_handler("/api/blast-radius")
+        handler = _make_handler("/api/blast-radius")
         handler._send_json = MagicMock()
         handler.do_GET()
 
@@ -44,7 +51,7 @@ class TestHandler:
         assert "files" in args[1]["error"]
 
     def test_200_queries_and_returns_result(self, monkeypatch):
-        handler = self._make_handler("/api/blast-radius?files=src/foo.py&files=src/bar.py")
+        handler = _make_handler("/api/blast-radius?files=src/foo.py&files=src/bar.py")
         handler._send_json = MagicMock()
 
         monkeypatch.setattr(
@@ -60,7 +67,7 @@ class TestHandler:
         assert args[1]["fr_impact_set"] == []
 
     def test_500_on_query_error(self, monkeypatch):
-        handler = self._make_handler("/api/blast-radius?files=src/bad.py")
+        handler = _make_handler("/api/blast-radius?files=src/bad.py")
         handler._send_json = MagicMock()
 
         monkeypatch.setattr(
@@ -76,7 +83,7 @@ class TestHandler:
         assert "DB crashed" in args[1]["error"]
 
     def test_send_json_writes_correct_payload(self):
-        handler = self._make_handler("/api/blast-radius")
+        handler = _make_handler("/api/blast-radius")
 
         handler._send_json(200, {"status": "ok"})
 
@@ -86,6 +93,219 @@ class TestHandler:
         written = b"".join(c[0][0] for c in handler.wfile.write.call_args_list)
         payload = json.loads(written.decode())
         assert payload == {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# POST /api/webhook/issue-status-changed
+# ---------------------------------------------------------------------------
+
+
+class TestHandlerPost:
+    def test_404_on_wrong_path(self):
+        handler = _make_handler("/api/other", method="POST")
+        handler._send_json = MagicMock()
+        handler.do_POST()
+
+        handler._send_json.assert_called_once_with(404, {"error": "not found"})
+
+    def test_400_on_empty_body(self):
+        handler = _make_handler(
+            "/api/webhook/issue-status-changed",
+            method="POST",
+        )
+        handler.headers.get.return_value = "0"
+        handler._send_json = MagicMock()
+        handler.do_POST()
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 400
+        assert "invalid" in args[1]["error"]
+
+    def test_400_on_missing_issue_id(self):
+        handler = _make_handler(
+            "/api/webhook/issue-status-changed",
+            method="POST",
+            body=json.dumps({"event": "issue_status_changed"}).encode(),
+        )
+        handler.headers.get.return_value = str(len(
+            json.dumps({"event": "issue_status_changed"})
+        ))
+        handler._send_json = MagicMock()
+        handler.do_POST()
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 400
+        assert "missing" in args[1]["error"]
+
+    def test_200_processes_issue_from_nested_payload(self, monkeypatch):
+        payload = {
+            "event": "issue_status_changed",
+            "issue": {"id": "issue-uuid-42", "identifier": "BTCAAAAA-100"},
+            "previousStatus": "in_progress",
+        }
+        handler = _make_handler(
+            "/api/webhook/issue-status-changed",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server.process_issue",
+            lambda issue_id, dry_run=False, old_status=None: {
+                "issue": "BTCAAAAA-100",
+                "dry_run": False,
+            },
+        )
+
+        handler.do_POST()
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["issue"] == "BTCAAAAA-100"
+
+    def test_200_processes_issue_from_flat_payload(self, monkeypatch):
+        payload = {
+            "issue_id": "issue-uuid-42",
+            "old_status": "in_progress",
+        }
+        handler = _make_handler(
+            "/api/webhook/issue-status-changed",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server.process_issue",
+            lambda issue_id, dry_run=False, old_status=None: {
+                "issue": "BTCAAAAA-100",
+                "dry_run": False,
+            },
+        )
+
+        handler.do_POST()
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["issue"] == "BTCAAAAA-100"
+
+    def test_200_handles_skipped_result(self, monkeypatch):
+        payload = {
+            "issue_id": "issue-uuid-99",
+            "old_status": "in_progress",
+        }
+        handler = _make_handler(
+            "/api/webhook/issue-status-changed",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server.process_issue",
+            lambda issue_id, dry_run=False, old_status=None: None,
+        )
+
+        handler.do_POST()
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["status"] == "skipped"
+
+    def test_500_on_processing_error(self, monkeypatch):
+        payload = {
+            "issue_id": "issue-uuid-500",
+        }
+        handler = _make_handler(
+            "/api/webhook/issue-status-changed",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server.process_issue",
+            lambda issue_id, dry_run=False, old_status=None: (
+                (_ for _ in ()).throw(RuntimeError("API timeout"))
+            ),
+        )
+
+        handler.do_POST()
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 500
+        assert "API timeout" in args[1]["error"]
+
+    def test_passes_dry_run_flag(self, monkeypatch):
+        payload = {
+            "issue_id": "issue-uuid-42",
+            "dry_run": True,
+        }
+        handler = _make_handler(
+            "/api/webhook/issue-status-changed",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        captured = {}
+
+        def tracking_process(issue_id, dry_run=False, old_status=None):
+            captured["dry_run"] = dry_run
+            return {"issue": "BTCAAAAA-100", "dry_run": dry_run}
+
+        monkeypatch.setattr(
+            "blast_radius.api_server.process_issue",
+            tracking_process,
+        )
+
+        handler.do_POST()
+
+        assert captured["dry_run"] is True
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[1]["dry_run"] is True
+
+
+# ---------------------------------------------------------------------------
+# _read_body
+# ---------------------------------------------------------------------------
+
+
+class TestReadBody:
+    def test_returns_none_on_zero_length(self):
+        handler = _make_handler("/")
+        handler.headers.get.return_value = "0"
+        assert handler._read_body() is None
+
+    def test_returns_none_on_bad_json(self):
+        handler = _make_handler("/")
+        handler.headers.get.return_value = "5"
+        handler.rfile.read.return_value = b"NOT J"
+        assert handler._read_body() is None
+
+    def test_returns_parsed_json(self):
+        handler = _make_handler("/")
+        handler.headers.get.return_value = "20"
+        handler.rfile.read.return_value = b'{"key": "value"}'
+        assert handler._read_body() == {"key": "value"}
+
+
+# ---------------------------------------------------------------------------
+# serve()
+# ---------------------------------------------------------------------------
 
 
 class TestServe:

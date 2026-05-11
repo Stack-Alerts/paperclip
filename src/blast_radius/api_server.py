@@ -1,8 +1,17 @@
-"""Simple HTTP server for the Blast Radius query API.
+"""Simple HTTP server for the Blast Radius query API and webhook handler.
 
-Endpoint
---------
-GET /api/blast-radius?files=path/a.py&files=path/b.py
+Endpoints
+---------
+GET  /api/blast-radius?files=path/a.py&files=path/b.py
+
+POST /api/webhook/issue-status-changed
+  Paperclip issue_status_changed webhook receiver.  Expects JSON body:
+  {
+    "event": "issue_status_changed",
+    "issue": {"id": "<uuid>", ...},
+    "previousStatus": "in_progress"
+  }
+  Calls ``process_issue()`` and returns the report result.
 
 Returns JSON:
 {
@@ -26,6 +35,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
 from .query import query_blast_radius, to_json_dict
+from .worker import process_issue
 
 log = logging.getLogger(__name__)
 DEFAULT_PORT = int(__import__("os").environ.get("BLAST_RADIUS_PORT", "8765"))
@@ -42,6 +52,16 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
+
+    def _read_body(self) -> dict | None:
+        length = int(self.headers.get("Content-Length", 0))
+        if not length:
+            return None
+        try:
+            raw = self.rfile.read(length)
+            return json.loads(raw)
+        except (json.JSONDecodeError, OSError):
+            return None
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -62,6 +82,43 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception as exc:
             log.error("Query failed: %s", exc)
             self._send_json(500, {"error": str(exc)})
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path != "/api/webhook/issue-status-changed":
+            self._send_json(404, {"error": "not found"})
+            return
+
+        body = self._read_body()
+        if body is None:
+            self._send_json(400, {"error": "invalid or empty JSON body"})
+            return
+
+        issue_id = body.get("issue", {}).get("id") or body.get("issue_id")
+        if not issue_id:
+            self._send_json(400, {"error": "missing issue.id or issue_id in payload"})
+            return
+
+        old_status = body.get("previousStatus") or body.get("old_status")
+        dry_run = body.get("dry_run", False)
+
+        log.info(
+            "Webhook: issue_status_changed for %s (old_status=%s, dry_run=%s)",
+            issue_id, old_status, dry_run,
+        )
+
+        try:
+            result = process_issue(
+                issue_id,
+                dry_run=bool(dry_run),
+                old_status=old_status,
+            )
+            if result is None:
+                result = {"issue": issue_id, "status": "skipped", "reason": "not eligible"}
+            self._send_json(200, result)
+        except Exception as exc:
+            log.error("Webhook processing failed for %s: %s", issue_id, exc)
+            self._send_json(500, {"error": str(exc), "issue": issue_id})
 
 
 def serve(port: int = DEFAULT_PORT) -> None:
