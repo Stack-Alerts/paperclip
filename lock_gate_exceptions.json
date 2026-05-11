@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "description": "Lock gate exceptions — paths and reasons that are exempt from the lock gate. Only the PlatformEngineer or CTO may add entries here via an approved exception issue.",
+  "exceptions": [
+    {
+      "path": "scripts/lock_gate.py",
+      "reason": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock gate itself. The gate must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 §1.",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897",
+      "expires_at": null
+    },
+    {
+      "path": ".module_lock_registry.json",
+      "reason": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock registry itself. The registry must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 §1.",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897",
+      "expires_at": null
+    },
+    {
+      "path": "lock_gate_exceptions.json",
+      "reason": "Bootstrap exception BTCAAAAA-1486: initial creation of the exceptions file itself. The exceptions file must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 §1.",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897",
+      "expires_at": null
+    },
+    {
+      "path": ".github/workflows/lock-gate.yml",
+      "reason": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock gate CI workflow. The workflow must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 §1.",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897",
+      "expires_at": null
+    }
+  ]
+}

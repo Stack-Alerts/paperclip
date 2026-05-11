@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "description": "Module lock registry — paths that require explicit exception approval to modify. See plan BTCAAAAA-1479.",
+  "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897",
+  "created_at": "2026-05-11T19:00:00Z",
+  "entries": [
+    {
+      "path": "src/data_manager",
+      "reason": "UnifiedDataManager — shared single source of truth for data ingestion, caching, and retrieval. Any uncoordinated change risks cascading failures across backtesting, live trading, and dry-run pipelines.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    },
+    {
+      "path": "src/optimizer_v3/core/trade_registry.py",
+      "reason": "TradeRegistry — central ledger for all optimizer-produced trade records. Uncoordinated schema or logic changes can silently corrupt trade history and backtest replay.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    },
+    {
+      "path": "src/optimizer_v3/core/institutional_signal_evaluator.py",
+      "reason": "InstitutionalSignalEvaluator — evaluates and ranks institutional-grade signals before they enter the optimizer. Changes here can alter portfolio allocation logic across all modes.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    },
+    {
+      "path": "src/detectors/building_blocks/registry.py",
+      "reason": "Building block registry — dynamic discovery and registration of all detector building block types. Uncoordinated changes can break detector instantiation across the entire pipeline.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    },
+    {
+      "path": "src/itm/state/manager.py",
+      "reason": "ITM state manager — live position persistence layer for institutional trade management. Accidental changes can cause incorrect P&L tracking or position reconciliation failures.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    },
+    {
+      "path": "src/optimizer_v3/database/",
+      "reason": "9 ORM managers under optimizer_v3/database — unified database access layer for strategy configs, trade results, and calibration state. Uncoordinated schema or connection changes risk data corruption across all tools.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    },
+    {
+      "path": "scripts/lock_gate.py",
+      "reason": "Lock gate enforcement script — the CI gate itself must be locked to prevent tampering that would bypass module lock protections.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    },
+    {
+      "path": ".module_lock_registry.json",
+      "reason": "Module lock registry — the list of locked modules itself must be locked to prevent unauthorized modification of locked path entries.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    },
+    {
+      "path": "lock_gate_exceptions.json",
+      "reason": "Lock gate exceptions — the allowlist that bypasses the lock gate must itself be locked to prevent unapproved exceptions from being added.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    },
+    {
+      "path": ".github/workflows/lock-gate.yml",
+      "reason": "Lock gate CI workflow — the workflow that runs the lock gate must be locked to prevent disabling the gate in CI.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    },
+    {
+      "path": "tests/bug_regression/test_canary_trade_execution.py",
+      "reason": "Canary trade execution test — the zero-trades regression test that triggered this lock system must be preserved. Uncoordinated changes could mask a repeat of the original regression.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/qa-locked-module-exception.md",
+      "reason": "Locked module exception request template — the template for requesting exceptions must be locked to ensure the required approval fields and CTO sign-off gate remain intact.",
+      "locked_at": "2026-05-11T19:00:00Z",
+      "locked_by": "PlatformEngineer",
+      "approval_paperclip_issue": "BTCAAAAA-1479",
+      "approval_id": "54e7f534-cccd-4d74-ab45-84f5274cb897"
+    }
+  ]
+}
