@@ -1,0 +1,15 @@
+[Unit]
+Description=OpenCode hanging process watchdog
+Documentation=https://github.com/anomalyco/opencode
+Wants=opencode-watchdog.timer
+
+[Service]
+Type=oneshot
+ExecStart=%h/projects/BTC-Trade-Engine-PaperClip/scripts/opencode_watchdog.py
+User=%i
+Group=%i
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

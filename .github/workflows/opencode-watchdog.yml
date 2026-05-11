@@ -1,0 +1,47 @@
+name: OpenCode Watchdog
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log only, do not kill)'
+        required: false
+        default: 'true'
+      threshold:
+        description: 'Silent threshold in seconds'
+        required: false
+        default: '1800'
+
+jobs:
+  watchdog:
+    name: Kill hanging opencode processes
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run watchdog
+        run: |
+          FLAGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          if [ -n "${{ github.event.inputs.threshold }}" ]; then
+            FLAGS="$FLAGS --threshold ${{ github.event.inputs.threshold }}"
+          fi
+          python scripts/opencode_watchdog.py $FLAGS --verbose
+
+      - name: Upload watchdog logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: watchdog-logs
+          path: ~/.paperclip/opencode_watchdog*.log
+          retention-days: 7
