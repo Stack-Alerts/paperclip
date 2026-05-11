@@ -54,6 +54,7 @@ data/
 .env.local
 .env.*.local
 .env
+.env.*
 
 # Logs
 logs/
