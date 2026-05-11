@@ -2,39 +2,61 @@
 """0002 — add runId-based deduplication to stale-run evaluation creation.
 
 Patches the Paperclip server recovery service.js to add a pre-creation check
-for ANY existing stale-run evaluation (including done/cancelled ones) for the
-same runId, preventing duplicate review issues.
+for existing stale-run evaluations for the same runId, preventing duplicate
+review issues while allowing one re-alert at critical (4h+) silence level.
 
 Idempotent: skips files that already contain the marker comment.
 """
 
 import os
-import re
 import sys
 from pathlib import Path
 
 NPX_CACHE_BASE = Path.home() / ".npm" / "_npx"
 MARKER = "// paperclip-patch(0002): skip prior-eval dedup for runId"
-MATCH = "const ownerAgentId = await resolveStaleRunOwnerAgentId("
 
-INSERT_BLOCK = f"""\
+# Match lines for two insertion points:
+MATCH_OWNER = "const ownerAgentId = await resolveStaleRunOwnerAgentId("
+MATCH_DESC = "const description = buildStaleRunEvaluationDescription("
+
+INSERT_BLOCK_MAIN = f"""\
         {MARKER}
-        // Skip stale-run evaluation when a prior evaluation already exists for this
-        // runId (including done/cancelled ones): completing a stale-run evaluation
-        // and having the recovery scan re-detect the same silent run would create a
-        // new evaluation issue, producing duplicate noise that cannot be actioned.
-        const prior = await db
+        // Query ALL stale-run evaluations for this runId (any status).
+        // Dedup rules:
+        //   - count == 0           -> first-time alert, create normally
+        //   - count == 1 && critical -> one re-alert allowed (run silent >4h)
+        //   - count == 1 && !critical -> skip (not critical enough for re-alert)
+        //   - count >= 2           -> already had initial + re-alert, stop
+        const priorEvals = await db
             .select({{ id: issues.id }})
             .from(issues)
             .where(and(
                 eq(issues.companyId, input.run.companyId),
                 eq(issues.originKind, STALE_ACTIVE_RUN_EVALUATION_ORIGIN_KIND),
                 eq(issues.originId, input.run.id),
-            ))
-            .limit(1);
-        if (prior.length > 0) {{
-            return {{ kind: "skipped" }};
+            ));
+        if (priorEvals.length > 0) {{
+            if (priorEvals.length === 1 && level === "critical") {{
+                // Allow one re-alert when silence is critical (4h+ threshold).
+                // A note is appended to the description below.
+            }} else {{
+                return {{ kind: "skipped" }};
+            }}
         }}"""
+
+INSERT_BLOCK_REALERT_NOTE = """\
+        // Append re-alert note if this is a re-evaluation at critical level.
+        if (priorEvals.length === 1 && level === "critical") {
+            description += "\\n\\n---\\n**Note:** A prior stale-run evaluation for this run was already resolved. " +
+                "This is a re-alert triggered because the run has been silent beyond the critical threshold (4h).";
+        }"""
+
+
+def _find_line_number(lines: list[str], needle: str) -> int | None:
+    for i, line in enumerate(lines, 1):
+        if needle in line:
+            return i
+    return None
 
 
 def patch_file(path: Path) -> bool:
@@ -47,22 +69,56 @@ def patch_file(path: Path) -> bool:
         print(f"ALREADY PATCHED: {path}")
         return False
 
-    # Find the insertion point
-    match_line = None
-    for i, line in enumerate(text.splitlines(), 1):
-        if MATCH in line:
-            match_line = i
-            break
+    # --- Find both insertion points ---
+    lines = text.splitlines(keepends=True)
 
-    if match_line is None:
-        print(f"PATTERN NOT FOUND: {path} (unexpected file structure)")
+    line_owner = _find_line_number(lines, MATCH_OWNER)
+    line_desc = _find_line_number(lines, MATCH_DESC)
+
+    if line_owner is None:
+        print(f"PATTERN (ownerAgentId) NOT FOUND: {path}")
         return False
 
-    lines = text.splitlines(keepends=True)
-    insert_index = match_line - 1  # 0-indexed
-    lines.insert(insert_index, INSERT_BLOCK + "\n")
+    if line_desc is None:
+        print(f"PATTERN (description) NOT FOUND: {path}")
+
+    # Insert #1: before `const ownerAgentId`
+    insert1_idx = line_owner - 1
+    lines.insert(insert1_idx, INSERT_BLOCK_MAIN + "\n")
+
+    # Adjust line_desc if it was after insert1_idx
+    if line_desc is not None and line_desc >= line_owner:
+        line_desc += 1  # shifted by insertion #1
+
+    # Insert #2: before `const description = buildStaleRunEvaluationDescription(`
+    if line_desc is not None:
+        insert2_idx = line_desc - 1
+        # Find the end of the buildStaleRunEvaluationDescription call — it spans
+        # multiple lines.  Insert AFTER the closing `);` of that call, before
+        # `let evaluation;`
+        # Walk forward from insert2_idx to find the `);` that closes the call
+        paren_depth = 0
+        found_close = False
+        for i in range(insert2_idx, len(lines)):
+            for ch in lines[i]:
+                if ch == "(":
+                    paren_depth += 1
+                elif ch == ")":
+                    paren_depth -= 1
+            if paren_depth == 0 and ");" in lines[i]:
+                insert2_idx = i + 1  # insert after this line
+                found_close = True
+                break
+
+        if found_close:
+            lines.insert(insert2_idx, INSERT_BLOCK_REALERT_NOTE + "\n")
+        else:
+            print(f"WARNING: could not find closing of buildStaleRunEvaluationDescription in {path}")
+    else:
+        print(f"WARNING: skipping re-alert note insertion — description pattern not found")
+
     path.write_text("".join(lines))
-    print(f"PATCHED: {path} (inserted before line {match_line})")
+    print(f"PATCHED: {path} ({2 if line_desc else 1} insertions)")
     return True
 
 
