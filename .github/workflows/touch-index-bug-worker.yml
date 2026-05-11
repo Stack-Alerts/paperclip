@@ -4,8 +4,14 @@ on:
   schedule:
     # Every 15 minutes — process newly-closed bug issues
     - cron: '*/15 * * * *'
+  repository_dispatch:
+    types: [issue_created, issue_updated, issue_status_changed]
   workflow_dispatch:
     inputs:
+      issue_id:
+        description: 'Paperclip issue UUID (single-issue webhook trigger)'
+        required: false
+        default: ''
       lookback_minutes:
         description: 'Process bug issues closed within this many minutes'
         required: false
@@ -44,9 +50,21 @@ jobs:
           pip install -r requirements.txt
           pip install requests python-dotenv SQLAlchemy psycopg2-binary
 
+      - name: Resolve issue ID (event payload)
+        id: resolve-issue
+        run: |
+          ISSUE_ID="${{ github.event.inputs.issue_id || '' }}"
+          if [ -z "$ISSUE_ID" ] && [ -n "${{ github.event.client_payload.issue_id || '' }}" ]; then
+            ISSUE_ID="${{ github.event.client_payload.issue_id }}"
+          fi
+          echo "issue_id=$ISSUE_ID" >> $GITHUB_OUTPUT
+
       - name: Run bug ingestion worker
         run: |
-          if [ -n "${{ github.event.inputs.lookback_minutes }}" ]; then
+          ISSUE_ID="${{ steps.resolve-issue.outputs.issue_id }}"
+          if [ -n "$ISSUE_ID" ]; then
+            python scripts/run_touch_index_bug_worker.py --issue-id "$ISSUE_ID"
+          elif [ -n "${{ github.event.inputs.lookback_minutes }}" ]; then
             python scripts/run_touch_index_bug_worker.py \
               --lookback-minutes ${{ github.event.inputs.lookback_minutes }}
           else
