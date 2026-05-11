@@ -38,9 +38,11 @@ _STRIP_PREFIXES = (
 def _normalise(path: str) -> str:
     for prefix in _STRIP_PREFIXES:
         if path.startswith(prefix):
-            # strip everything up to and including the prefix's last segment
             rest = path[len(prefix) :]
-            # If rest still starts with a "projects/name/" segment, strip again
+            # "projects/X/..." — also strip the project directory
+            if prefix == "projects/":
+                parts = rest.split("/", 1)
+                return parts[1] if len(parts) > 1 else parts[0]
             return rest
     return path
 
