@@ -15,8 +15,8 @@ Watermark strategy: the 30-minute look-back window with idempotent upsert
 means we can re-process safely without state tracking.
 
 Usage:
-    python scripts/run_touch_index_fr_worker.py [--lookback-minutes N]
-    python scripts/run_touch_index_fr_worker.py --issue-id <uuid>
+    python scripts/run_touch_index_fr_worker.py [--lookback-minutes N] [--dry-run]
+    python scripts/run_touch_index_fr_worker.py --issue-id <uuid> [--dry-run]
 """
 
 from __future__ import annotations
@@ -58,6 +58,11 @@ def main() -> None:
         default=30,
         help="Process FDR issues updated within this many minutes (default: 30)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Log what would be ingested without writing to DB or transitioning issues",
+    )
     args = parser.parse_args()
 
     engine = get_engine()
@@ -66,7 +71,8 @@ def main() -> None:
         sys.exit(1)
 
     if args.issue_id:
-        result = process_fr_issue(engine, args.issue_id)
+        logger.info("Processing single issue %s (dry_run=%s)", args.issue_id, args.dry_run)
+        result = process_fr_issue(engine, args.issue_id, dry_run=args.dry_run)
         if result is None:
             logger.info("No FR issue found for %s", args.issue_id)
         else:
@@ -89,24 +95,28 @@ def main() -> None:
         logger.info("Nothing to do")
         return
 
-    results = run_fr_worker(engine, issues)
+    results = run_fr_worker(engine, issues, dry_run=args.dry_run)
 
     total_files = sum(r.files_indexed for r in results)
     skipped = sum(1 for r in results if r.skipped_no_commits)
 
     # Mark each processed issue as done in Paperclip.
     # Skip issues already in done status to avoid 403 on redundant transition.
-    for issue in issues:
-        issue_id = issue.get("id", "")
-        if not issue_id or issue.get("status") == "done":
-            continue
-        try:
-            transition_issue_status(issue_id, "done")
-            logger.info("Marked %s as done", issue.get("identifier", issue_id))
-        except Exception:
-            logger.exception(
-                "Failed to mark %s as done", issue.get("identifier", issue_id)
-            )
+    # Skip in dry-run mode — no side effects.
+    if args.dry_run:
+        logger.info("DRY RUN — skipping transition-to-done for %d issue(s)", len(issues))
+    else:
+        for issue in issues:
+            issue_id = issue.get("id", "")
+            if not issue_id or issue.get("status") == "done":
+                continue
+            try:
+                transition_issue_status(issue_id, "done")
+                logger.info("Marked %s as done", issue.get("identifier", issue_id))
+            except Exception:
+                logger.exception(
+                    "Failed to mark %s as done", issue.get("identifier", issue_id)
+                )
 
     logger.info(
         "FR worker done — %d issues processed, %d files indexed, %d skipped (no commits)",

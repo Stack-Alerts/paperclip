@@ -111,7 +111,7 @@ class TestBugRunnerMain:
         ):
             main()
 
-        mock_worker.assert_called_once_with(engine, issues)
+        mock_worker.assert_called_once_with(engine, issues, dry_run=False)
 
     def test_cutoff_is_within_lookback_window(self, monkeypatch):
         """The cutoff passed to get_closed_non_fdr_issues is ~30 min in the past."""
@@ -229,7 +229,7 @@ class TestBugRunnerIssueId:
         ):
             main()
 
-        mock_process.assert_called_once_with(engine, "uuid-1")
+        mock_process.assert_called_once_with(engine, "uuid-1", dry_run=False)
         mock_fetch.assert_not_called()
 
     def test_issue_id_not_found_logs_and_returns(self, monkeypatch, caplog):
@@ -276,3 +276,83 @@ class TestBugRunnerIssueId:
 
         assert any("2 files indexed" in r.message for r in caplog.records)
         assert any("via git" in r.message for r in caplog.records)
+
+
+class TestBugRunnerDryRun:
+    def test_dry_run_passed_to_run_bug_worker(self, monkeypatch):
+        """When --dry-run is passed, dry_run=True is forwarded to run_bug_worker."""
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_bug_worker.py", "--dry-run"]
+        )
+        issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "completedAt": "2026-05-11T10:00:00Z"}]
+        engine = _make_engine()
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=engine),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.get_closed_non_fdr_issues", return_value=issues
+            ),
+            patch(
+                "run_touch_index_bug_worker.run_bug_worker", return_value=[]
+            ) as mock_worker,
+        ):
+            main()
+
+        mock_worker.assert_called_once_with(engine, issues, dry_run=True)
+
+    def test_dry_run_logs_dry_run_message(self, monkeypatch, caplog):
+        """When --dry-run is passed, a DRY RUN log message is emitted."""
+        import logging
+
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_bug_worker.py", "--dry-run"]
+        )
+        issues = [
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
+        ]
+        results = [_make_result(files_indexed=2, skipped=False)]
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        assert any("DRY RUN" in r.message for r in caplog.records)
+
+    def test_issue_id_dry_run_logged(self, monkeypatch, caplog):
+        """Webhook mode --dry-run should log dry_run=True."""
+        import logging
+
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_bug_worker.py", "--issue-id", "uuid-1", "--dry-run"]
+        )
+        result = _make_result(files_indexed=2, skipped=False)
+        result.issue_identifier = "BTCAAAAA-100"
+        result.source = "git"
+        engine = _make_engine()
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=engine),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.process_bug_issue", return_value=result
+            ) as mock_process,
+            patch("run_touch_index_bug_worker.get_closed_non_fdr_issues"),
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        mock_process.assert_called_once_with(engine, "uuid-1", dry_run=True)
+        assert any("dry_run=True" in r.message for r in caplog.records)

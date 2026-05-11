@@ -50,6 +50,8 @@ class FRIngestionResult:
 def process_fr_issue(
     engine: Engine,
     issue_id: str,
+    *,
+    dry_run: bool = False,
 ) -> FRIngestionResult | None:
     """Fetch a single FDR issue from Paperclip API and ingest it.
 
@@ -71,6 +73,7 @@ def process_fr_issue(
         issue_identifier=issue["identifier"],
         owner_agent_id=issue.get("assigneeAgentId"),
         description=issue.get("description", "") or "",
+        dry_run=dry_run,
     )
 
 
@@ -80,6 +83,8 @@ def ingest_fr_issue(
     issue_identifier: str,
     owner_agent_id: str | None,
     description: str = "",
+    *,
+    dry_run: bool = False,
 ) -> FRIngestionResult:
     """Process a single FDR issue — extract files and upsert."""
     # 1. Comments (highest signal — implementing agent's done-comment)
@@ -122,10 +127,17 @@ def ingest_fr_issue(
         for f in files
     ]
 
-    with engine.begin() as conn:
-        conn.execute(_UPSERT_SQL, rows)
-
-    logger.info("FR %s: indexed %d file(s) via %s", issue_identifier, len(rows), source)
+    if dry_run:
+        logger.info(
+            "FR %s: DRY RUN — would index %d file(s) via %s",
+            issue_identifier, len(rows), source,
+        )
+        for r in rows:
+            logger.info("  DRY RUN row: file_path=%s", r["file_path"])
+    else:
+        with engine.begin() as conn:
+            conn.execute(_UPSERT_SQL, rows)
+        logger.info("FR %s: indexed %d file(s) via %s", issue_identifier, len(rows), source)
     return FRIngestionResult(
         issue_identifier=issue_identifier,
         files_indexed=len(rows),
@@ -137,6 +149,8 @@ def ingest_fr_issue(
 def run_fr_worker(
     engine: Engine,
     issues: Sequence[dict],
+    *,
+    dry_run: bool = False,
 ) -> list[FRIngestionResult]:
     """Ingest a list of FDR issue dicts (from paperclip_client.get_fdr_issues)."""
     results = []
@@ -148,6 +162,7 @@ def run_fr_worker(
                 issue_identifier=issue["identifier"],
                 owner_agent_id=issue.get("assigneeAgentId"),
                 description=issue.get("description", "") or "",
+                dry_run=dry_run,
             )
             results.append(result)
         except Exception:
