@@ -34,7 +34,7 @@ class TestRunnerMain:
             patch("run_blast_radius_worker.run_once", return_value=[]) as mock_run_once,
         ):
             main()
-        mock_run_once.assert_called_once_with(dry_run=False)
+        mock_run_once.assert_called_once_with(dry_run=False, force_reprocess=False)
 
     def test_dry_run_flag_passed_to_run_once(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", [_CLEAN_ARGV[0], "--dry-run"])
@@ -42,7 +42,7 @@ class TestRunnerMain:
             patch("run_blast_radius_worker.run_once", return_value=[]) as mock_run_once,
         ):
             main()
-        mock_run_once.assert_called_once_with(dry_run=True)
+        mock_run_once.assert_called_once_with(dry_run=True, force_reprocess=False)
 
     def test_loop_flag_calls_run_loop(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", [_CLEAN_ARGV[0], "--loop", "300"])
@@ -51,7 +51,7 @@ class TestRunnerMain:
             patch("run_blast_radius_worker.logger"),
         ):
             main()
-        mock_run_loop.assert_called_once_with(interval_seconds=300, dry_run=False)
+        mock_run_loop.assert_called_once_with(interval_seconds=300, dry_run=False, force_reprocess=False)
 
     def test_loop_with_dry_run(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", [_CLEAN_ARGV[0], "--loop", "120", "--dry-run"])
@@ -60,7 +60,7 @@ class TestRunnerMain:
             patch("run_blast_radius_worker.logger"),
         ):
             main()
-        mock_run_loop.assert_called_once_with(interval_seconds=120, dry_run=True)
+        mock_run_loop.assert_called_once_with(interval_seconds=120, dry_run=True, force_reprocess=False)
 
     def test_logs_result_count_on_completion(self, monkeypatch, caplog):
         import logging
