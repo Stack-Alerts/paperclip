@@ -2,8 +2,8 @@ name: Blast Radius Worker
 
 on:
   schedule:
-    # Every 15 minutes — matches the FR and Bug worker cadence
-    - cron: '*/15 * * * *'
+    # Every 5 minutes — detect fix→in_review transitions and post reports
+    - cron: '*/5 * * * *'
   repository_dispatch:
     types: [issue_status_changed]
   workflow_dispatch:
