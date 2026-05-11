@@ -6,6 +6,8 @@ Usage
     blast-radius query --files src/optimizer_v3/database/config.py src/strategies/base.py
     blast-radius generate --issue-id <paperclip-issue-id> [--dry-run]
     blast-radius serve [--port 8765]
+    blast-radius worker [--dry-run]
+    blast-radius worker --loop 300 [--dry-run]
 
 `query` returns JSON to stdout:
 {
@@ -57,6 +59,18 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_worker(args: argparse.Namespace) -> int:
+    from blast_radius.worker import run_once, run_loop
+
+    if args.loop:
+        run_loop(interval_seconds=args.loop, dry_run=args.dry_run)
+        return 0
+
+    results = run_once(dry_run=args.dry_run)
+    print(json.dumps(results, indent=2))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="blast-radius",
@@ -99,6 +113,24 @@ def main() -> int:
     p_serve = sub.add_parser("serve", help="Start the HTTP API server")
     p_serve.add_argument("--port", type=int, default=8765, metavar="PORT")
     p_serve.set_defaults(func=cmd_serve)
+
+    # blast-radius worker
+    p_worker = sub.add_parser(
+        "worker",
+        help="Poll for fix/bug issues transitioning to in_review and post Blast Radius Reports",
+    )
+    p_worker.add_argument(
+        "--loop",
+        type=int,
+        metavar="SECONDS",
+        help="Run continuously, sleeping SECONDS between polls (default: run once and exit)",
+    )
+    p_worker.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Log reports but do not post comments",
+    )
+    p_worker.set_defaults(func=cmd_worker)
 
     args = parser.parse_args()
 
