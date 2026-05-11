@@ -197,11 +197,14 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
 
     _sync_statuses(state, issues)
 
-    if newly_processed and not dry_run:
+    if dry_run:
+        return results
+
+    if newly_processed:
         state["processed_issue_ids"] = list(processed | set(newly_processed))
-        _save_state(state)
         log.info("Marked %d issues as processed", len(newly_processed))
 
+    _save_state(state)
     return results
 
 

@@ -265,7 +265,9 @@ class TestRunOnce:
         results = run_once()
 
         assert results == []
-        assert not state_file.exists()
+        state = json.loads(state_file.read_text())
+        assert state["processed_issue_ids"] == []
+        assert state["issue_statuses"]["issue-uuid-feat"] == "in_review"
 
     def test_skips_already_processed(self, tmp_path, monkeypatch):
         state_file = tmp_path / "state.json"
@@ -360,7 +362,9 @@ class TestRunOnce:
         assert len(results) == 1
         assert "error" in results[0]
         assert "DB down" in results[0]["error"]
-        assert not state_file.exists()
+        state = json.loads(state_file.read_text())
+        assert state["processed_issue_ids"] == []
+        assert state["issue_statuses"]["issue-uuid-fix"] == "in_review"
 
     def test_mixed_issues(self, tmp_path, monkeypatch):
         issues = [_FIX_ISSUE, _NON_FIX_ISSUE]
@@ -474,7 +478,9 @@ class TestRunOnce:
         results = run_once()
 
         assert results == []
-        assert not state_file.exists()
+        state = json.loads(state_file.read_text())
+        assert state["processed_issue_ids"] == []
+        assert state["issue_statuses"] == {}
 
 
 # ---------------------------------------------------------------------------
