@@ -1143,13 +1143,20 @@ def get_table_view_stylesheet() -> str:
     """
 
 
-def get_text_edit_stylesheet() -> str:
+def get_text_edit_stylesheet(font_size_pt: int = None) -> str:
     """
     Get stylesheet for QTextEdit output displays.
-    
+
+    Args:
+        font_size_pt: Optional font size in points. When None, uses the legacy
+            12px default. Pass an explicit value (e.g. 10 or 11) to override
+            the font size for a specific widget — use this instead of setFont()
+            so the stylesheet does not silently override the QFont.
+
     Returns:
         QTextEdit stylesheet with dark theme and monospace font
     """
+    font_size_css = f"{font_size_pt}pt" if font_size_pt is not None else "12px"
     return f"""
         QTextEdit {{
             background-color: {COLORS['bg_dark']};
@@ -1157,7 +1164,7 @@ def get_text_edit_stylesheet() -> str:
             border: 1px solid {COLORS['border']};
             padding: 8px;
             font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 12px;
+            font-size: {font_size_css};
         }}
     """
 
