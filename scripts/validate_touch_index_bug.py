@@ -1,11 +1,10 @@
 """Touch Index Bug data quality validation — run after ingestion.
 
 Checks:
-  1. touch_index_bug_files has no orphan rows (bug_issue_id must resolve in Paperclip).
-  2. No duplicate (file_path, bug_issue_id) pairs (UNIQUE constraint enforcement).
-  3. Each bug_issue_id has at least one file_path.
-  4. No stale rows: closed_at older than N days or NULL for very old issues.
-  5. count summary by source (git vs comments vs none).
+  1. No duplicate (file_path, bug_issue_id) pairs (UNIQUE constraint enforcement).
+  2. Rows with NULL closed_at (informational — acceptable if issue completedAt missing).
+  3. No stale rows: closed_at older than N days.
+  4. Total row count and distinct bug issue count.
 
 Usage:
     python scripts/validate_touch_index_bug.py [--stale-days 30]

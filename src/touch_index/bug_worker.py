@@ -55,6 +55,8 @@ def ingest_bug_issue(
     issue_id: str,
     issue_identifier: str,
     completed_at: datetime | None,
+    *,
+    dry_run: bool = False,
 ) -> BugIngestionResult:
     """Process a single closed bug issue and upsert its touched files."""
     files = get_files_for_issue(issue_identifier)
@@ -86,12 +88,19 @@ def ingest_bug_issue(
         for f in files
     ]
 
-    with engine.begin() as conn:
-        conn.execute(_UPSERT_SQL, rows)
-
-    logger.info(
-        "Bug %s: indexed %d file(s) via %s", issue_identifier, len(rows), source
-    )
+    if dry_run:
+        logger.info(
+            "Bug %s: DRY RUN — would index %d file(s) via %s",
+            issue_identifier, len(rows), source,
+        )
+        for r in rows:
+            logger.info("  DRY RUN row: file_path=%s", r["file_path"])
+    else:
+        with engine.begin() as conn:
+            conn.execute(_UPSERT_SQL, rows)
+        logger.info(
+            "Bug %s: indexed %d file(s) via %s", issue_identifier, len(rows), source
+        )
     return BugIngestionResult(
         issue_identifier=issue_identifier,
         files_indexed=len(rows),
@@ -110,6 +119,8 @@ def _parse_completed_at(issue: dict) -> datetime | None:
 def process_bug_issue(
     engine: Engine,
     issue_id: str,
+    *,
+    dry_run: bool = False,
 ) -> BugIngestionResult | None:
     """Fetch a single issue from Paperclip API and ingest as a bug.
 
@@ -128,12 +139,15 @@ def process_bug_issue(
         issue_id=issue["id"],
         issue_identifier=issue["identifier"],
         completed_at=_parse_completed_at(issue),
+        dry_run=dry_run,
     )
 
 
 def run_bug_worker(
     engine: Engine,
     issues: Sequence[dict],
+    *,
+    dry_run: bool = False,
 ) -> list[BugIngestionResult]:
     """Ingest a list of closed bug issue dicts (from paperclip_client.get_closed_non_fdr_issues)."""
     results = []
@@ -144,6 +158,7 @@ def run_bug_worker(
                 issue_id=issue["id"],
                 issue_identifier=issue["identifier"],
                 completed_at=_parse_completed_at(issue),
+                dry_run=dry_run,
             )
             results.append(result)
         except Exception:

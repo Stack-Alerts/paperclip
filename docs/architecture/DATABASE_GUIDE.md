@@ -526,7 +526,7 @@ with engine.connect() as conn:
 - UNIQUE on `(file_path, bug_issue_id)` — prevents duplicate file-per-bug rows
 - INDEX on `file_path` — fast file-to-bug lookups
 
-**Ingestion Worker**: `scripts/run_touch_index_bug_worker.py` — runs every 15 minutes via GitHub Actions cron (`touch-index-bug-worker.yml`). Validate with `scripts/validate_touch_index_bug.py`.
+**Ingestion Worker**: `scripts/run_touch_index_bug_worker.py` — runs every 15 minutes via GitHub Actions cron (`touch-index-bug-worker.yml`), also accepts webhook triggers via `--issue-id`. Validate with `scripts/validate_touch_index_bug.py`.
 
 **Usage Example**:
 ```python

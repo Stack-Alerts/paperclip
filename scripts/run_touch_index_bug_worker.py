@@ -13,8 +13,8 @@ Webhook mode (--issue-id):
   Paperclip API and ingested immediately.
 
 Usage:
-    python scripts/run_touch_index_bug_worker.py [--lookback-minutes N]
-    python scripts/run_touch_index_bug_worker.py --issue-id <uuid>
+    python scripts/run_touch_index_bug_worker.py [--lookback-minutes N] [--dry-run]
+    python scripts/run_touch_index_bug_worker.py --issue-id <uuid> [--dry-run]
 """
 
 from __future__ import annotations
@@ -56,6 +56,11 @@ def main() -> None:
         default=30,
         help="Process bug issues closed within this many minutes (default: 30)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Log what would be ingested without writing to DB",
+    )
     args = parser.parse_args()
 
     engine = get_engine()
@@ -64,7 +69,8 @@ def main() -> None:
         sys.exit(1)
 
     if args.issue_id:
-        result = process_bug_issue(engine, args.issue_id)
+        logger.info("Processing single issue %s (dry_run=%s)", args.issue_id, args.dry_run)
+        result = process_bug_issue(engine, args.issue_id, dry_run=args.dry_run)
         if result is None:
             logger.info("No bug issue found for %s", args.issue_id)
         else:
@@ -87,10 +93,13 @@ def main() -> None:
         logger.info("Nothing to do")
         return
 
-    results = run_bug_worker(engine, issues)
+    results = run_bug_worker(engine, issues, dry_run=args.dry_run)
 
     total_files = sum(r.files_indexed for r in results)
     skipped = sum(1 for r in results if r.skipped_no_commits)
+
+    if args.dry_run:
+        logger.info("DRY RUN — would have processed %d issue(s)", len(results))
 
     logger.info(
         "Bug worker done — %d issues processed, %d files indexed, %d skipped (no commits)",
