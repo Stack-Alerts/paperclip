@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -18,7 +18,6 @@ sys.path.insert(0, str(Path(__file__).parents[2] / "scripts"))
 sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 
 import importlib
-import types
 
 # Import the runner as a module (it uses __name__ == "__main__" guard only).
 # Register it in sys.modules so patch() targets the same object.
@@ -109,7 +108,6 @@ class TestBugRunnerMain:
                 "run_touch_index_bug_worker.run_bug_worker",
                 return_value=[_make_result()],
             ) as mock_worker,
-            patch("run_touch_index_bug_worker.transition_issue_status"),
         ):
             main()
 
@@ -169,64 +167,6 @@ class TestBugRunnerMain:
         expected_max = after - timedelta(minutes=59)
         assert expected_min <= cutoff <= expected_max
 
-    def test_marks_issues_done_after_processing(self, monkeypatch):
-        """Each processed issue is transitioned to "done" via Paperclip API."""
-        monkeypatch.setattr(sys, "argv", _CLEAN_ARGV)
-        issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
-            {"id": "id-2", "identifier": "BTCAAAAA-102", "completedAt": "2026-05-11T10:00:00Z"},
-        ]
-        results = [
-            _make_result(files_indexed=2, skipped=False),
-            _make_result(files_indexed=0, skipped=True),
-        ]
-
-        with (
-            patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
-            patch("run_touch_index_bug_worker.health_check", return_value=True),
-            patch(
-                "run_touch_index_bug_worker.get_closed_non_fdr_issues",
-                return_value=issues,
-            ),
-            patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
-            patch("run_touch_index_bug_worker.transition_issue_status") as mock_transition,
-        ):
-            main()
-
-        assert mock_transition.call_count == 2
-        mock_transition.assert_has_calls([
-            call("id-1", "done"),
-            call("id-2", "done"),
-        ])
-
-    def test_transition_error_does_not_crash(self, monkeypatch, caplog):
-        """A failure to mark an issue as done is logged but does not crash."""
-        import logging
-
-        monkeypatch.setattr(sys, "argv", _CLEAN_ARGV)
-        issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
-        ]
-        results = [_make_result(files_indexed=2, skipped=False)]
-
-        with (
-            patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
-            patch("run_touch_index_bug_worker.health_check", return_value=True),
-            patch(
-                "run_touch_index_bug_worker.get_closed_non_fdr_issues",
-                return_value=issues,
-            ),
-            patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
-            patch(
-                "run_touch_index_bug_worker.transition_issue_status",
-                side_effect=RuntimeError("API timeout"),
-            ),
-            caplog.at_level(logging.ERROR),
-        ):
-            main()
-
-        assert any("Failed to mark" in r.message for r in caplog.records)
-
     def test_summary_counts_files_and_skipped(self, monkeypatch, caplog):
         """Log summary reflects total files indexed and skipped count."""
         import logging
@@ -257,12 +197,11 @@ class TestBugRunnerMain:
                 return_value=issues,
             ),
             patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
-            patch("run_touch_index_bug_worker.transition_issue_status"),
             caplog.at_level(logging.INFO),
         ):
             main()
 
-        # The last log is now the marking logs; find the "done" summary
+        # Find the "done" summary
         summary_logs = [r for r in caplog.records if "issues processed" in r.message]
         assert len(summary_logs) == 1
         msg = summary_logs[0].message
@@ -287,7 +226,6 @@ class TestBugRunnerIssueId:
                 "run_touch_index_bug_worker.process_bug_issue", return_value=result
             ) as mock_process,
             patch("run_touch_index_bug_worker.get_closed_non_fdr_issues") as mock_fetch,
-            patch("run_touch_index_bug_worker.transition_issue_status"),
         ):
             main()
 
