@@ -1,0 +1,52 @@
+name: Blast Radius Worker
+
+on:
+  schedule:
+    # Every 15 minutes — matches the FR and Bug worker cadence
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log reports, do not post comments)'
+        required: false
+        default: 'false'
+      loop_seconds:
+        description: 'Loop interval in seconds (0 = run once)'
+        required: false
+        default: '0'
+
+jobs:
+  worker:
+    name: Detect fix->in_review and post Blast Radius Report
+    runs-on: ubuntu-latest
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests python-dotenv SQLAlchemy psycopg2-binary
+
+      - name: Run Blast Radius worker
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_FLAG="--dry-run"
+          else
+            DRY_FLAG=""
+          fi
+          if [ "${{ github.event.inputs.loop_seconds }}" != "0" ] && [ -n "${{ github.event.inputs.loop_seconds }}" ]; then
+            python scripts/run_blast_radius_worker.py --loop ${{ github.event.inputs.loop_seconds }} $DRY_FLAG
+          else
+            python scripts/run_blast_radius_worker.py $DRY_FLAG
+          fi
