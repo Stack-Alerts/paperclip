@@ -38,7 +38,7 @@ FIX_LABELS = {
 _STATE_PATH = Path(
     os.environ.get(
         "BLAST_RADIUS_STATE_FILE",
-        Path(__file__).resolve().parents[3] / "data" / "blast_radius_worker_state.json",
+        Path(__file__).resolve().parents[2] / "data" / "blast_radius_worker_state.json",
     )
 )
 
@@ -114,7 +114,7 @@ def run_once(dry_run: bool = False) -> list[dict]:
 
         newly_processed.append(issue_id)
 
-    if newly_processed:
+    if newly_processed and not dry_run:
         state["processed_issue_ids"] = list(processed | set(newly_processed))
         _save_state(state)
         log.info("Marked %d issues as processed", len(newly_processed))
