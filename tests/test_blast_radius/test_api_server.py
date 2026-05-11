@@ -569,3 +569,207 @@ class TestHandlerFrWebhook:
         handler._send_json.assert_called_once()
         args = handler._send_json.call_args[0]
         assert args[0] == 200
+
+class TestHandlerBugWebhook:
+    def test_404_on_wrong_path(self):
+        handler = _make_handler("/api/webhook/issue-status-changed", method="POST")
+        handler._send_json = MagicMock()
+        handler.do_POST()
+        # Should route to the existing status-changed handler, not 404
+        args = handler._send_json.call_args[0]
+        assert args[0] != 404 or "not found" not in args[1].get("error", "")
+
+    def test_400_on_empty_body(self):
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+        )
+        handler.headers.get.return_value = "0"
+        handler._send_json = MagicMock()
+        handler.do_POST()
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 400
+        assert "invalid" in args[1]["error"]
+
+    def test_400_on_missing_issue_id(self):
+        payload = {"event": "issue_created"}
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+        handler.do_POST()
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 400
+        assert "missing" in args[1]["error"]
+
+    def test_200_skipped_when_fdr_issue(self, monkeypatch):
+        payload = {
+            "event": "issue_created",
+            "issue": {"id": "fdr-uuid"},
+        }
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        def mock_process(engine, issue_id, dry_run=False):
+            return None  # FDR-labelled issue, skipped by process_bug_issue
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_bug_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.bug_worker.process_bug_issue",
+            mock_process,
+        )
+
+        handler.do_POST()
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["status"] == "skipped"
+
+    def test_200_ingests_bug_issue_successfully(self, monkeypatch):
+        payload = {
+            "event": "issue_updated",
+            "issue": {"id": "bug-uuid-42"},
+        }
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_bug_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.bug_worker.process_bug_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-1300", 2, "git", False,
+            ),
+        )
+
+        handler.do_POST()
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["issue"] == "BTCAAAAA-1300"
+        assert args[1]["files_indexed"] == 2
+        assert args[1]["source"] == "git"
+        assert args[1]["skipped_no_commits"] is False
+
+    def test_passes_dry_run_flag(self, monkeypatch):
+        payload = {
+            "event": "issue_created",
+            "issue": {"id": "bug-uuid-42"},
+            "dry_run": True,
+        }
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        captured = {}
+
+        def tracking_process(engine, issue_id, dry_run=False):
+            captured["dry_run"] = dry_run
+            return _MockResult("BTCAAAAA-1300", 1, "git", False)
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_bug_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.bug_worker.process_bug_issue",
+            tracking_process,
+        )
+
+        handler.do_POST()
+
+        assert captured["dry_run"] is True
+
+    def test_500_on_processing_error(self, monkeypatch):
+        payload = {
+            "event": "issue_created",
+            "issue": {"id": "bug-uuid-500"},
+        }
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_bug_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.bug_worker.process_bug_issue",
+            lambda engine, issue_id, dry_run=False: (
+                (_ for _ in ()).throw(RuntimeError("DB connection failed"))
+            ),
+        )
+
+        handler.do_POST()
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 500
+        assert "DB connection failed" in args[1]["error"]
+
+    def test_handles_flat_issue_id_payload(self, monkeypatch):
+        payload = {
+            "event": "issue_created",
+            "issue_id": "flat-bug-uuid-99",
+        }
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        captured = {}
+
+        def tracking_process(engine, issue_id, dry_run=False):
+            captured["issue_id"] = issue_id
+            return _MockResult("BTCAAAAA-99", 1, "git", False)
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_bug_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.bug_worker.process_bug_issue",
+            tracking_process,
+        )
+
+        handler.do_POST()
+
+        assert captured["issue_id"] == "flat-bug-uuid-99"
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200

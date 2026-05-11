@@ -24,13 +24,16 @@ POST /api/webhook/fr-issue-event
   references from done-comments, git commits, or the issue description.
   Returns the ingestion result.
 
-Returns JSON:
-{
-  "fr_impact_set": [...],
-  "regression_set": [...],
-  "downstream_set": [],
-  "downstream_note": "Phase 2 dep graph not yet available"
-}
+POST /api/webhook/bug-issue-event
+  Paperclip issue_created / issue_updated webhook receiver for bug (non-FDR)
+  issues.  Expects JSON body:
+  {
+    "event": "issue_created",
+    "issue": {"id": "<uuid>", ...}
+  }
+  Calls ``touch_index.bug_worker.process_bug_issue()`` to upsert file
+  references from git commits or issue comments.
+  Returns the ingestion result.
 
 Usage
 -----
@@ -51,8 +54,9 @@ from .worker import process_issue
 log = logging.getLogger(__name__)
 DEFAULT_PORT = int(__import__("os").environ.get("BLAST_RADIUS_PORT", "8765"))
 
-# Lazy engine for FR ingestion (created once, then reused across requests).
+# Lazy engines for webhook ingestion (created once, then reused across requests).
 _FR_ENGINE = None
+_BUG_ENGINE = None
 
 
 def _get_fr_engine():
@@ -66,6 +70,19 @@ def _get_fr_engine():
             _FR_ENGINE = None
             raise RuntimeError("Database health check failed")
     return _FR_ENGINE
+
+
+def _get_bug_engine():
+    global _BUG_ENGINE
+    if _BUG_ENGINE is None:
+        from touch_index.db import get_engine, health_check
+
+        _BUG_ENGINE = get_engine()
+        if not health_check(_BUG_ENGINE):
+            log.error("Bug webhook: DB health check failed — engine unusable")
+            _BUG_ENGINE = None
+            raise RuntimeError("Database health check failed")
+    return _BUG_ENGINE
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -112,6 +129,10 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+
+        if parsed.path == "/api/webhook/bug-issue-event":
+            self._handle_bug_webhook()
+            return
 
         if parsed.path == "/api/webhook/fr-issue-event":
             self._handle_fr_webhook()
@@ -197,6 +218,51 @@ class _Handler(BaseHTTPRequestHandler):
             })
         except Exception as exc:
             log.error("FR webhook processing failed for %s: %s", issue_id, exc)
+            self._send_json(500, {"error": str(exc), "issue": issue_id})
+
+    # ------------------------------------------------------------------
+    # Bug issue webhook
+    # ------------------------------------------------------------------
+
+    def _handle_bug_webhook(self):
+        """Handle POST /api/webhook/bug-issue-event (bug issue created/updated)."""
+        body = self._read_body()
+        if body is None:
+            self._send_json(400, {"error": "invalid or empty JSON body"})
+            return
+
+        issue_id = body.get("issue", {}).get("id") or body.get("issue_id")
+        if not issue_id:
+            self._send_json(400, {"error": "missing issue.id or issue_id in payload"})
+            return
+
+        event_type = body.get("event", "unknown")
+        dry_run = body.get("dry_run", False)
+
+        log.info(
+            "Bug webhook: %s for issue %s (dry_run=%s)", event_type, issue_id, dry_run,
+        )
+
+        try:
+            from touch_index.bug_worker import process_bug_issue
+
+            engine = _get_bug_engine()
+            result = process_bug_issue(engine, issue_id, dry_run=bool(dry_run))
+            if result is None:
+                self._send_json(200, {
+                    "issue": issue_id,
+                    "status": "skipped",
+                    "reason": "not a bug issue (FDR-labelled or not found)",
+                })
+                return
+            self._send_json(200, {
+                "issue": result.issue_identifier,
+                "files_indexed": result.files_indexed,
+                "source": result.source,
+                "skipped_no_commits": result.skipped_no_commits,
+            })
+        except Exception as exc:
+            log.error("Bug webhook processing failed for %s: %s", issue_id, exc)
             self._send_json(500, {"error": str(exc), "issue": issue_id})
 
 
