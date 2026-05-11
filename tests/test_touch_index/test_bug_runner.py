@@ -269,3 +269,72 @@ class TestBugRunnerMain:
         assert "2 issues" in msg
         assert "3 files" in msg
         assert "1 skipped" in msg
+
+
+class TestBugRunnerIssueId:
+    def test_issue_id_calls_process_bug_issue(self, monkeypatch):
+        """When --issue-id is provided, process_bug_issue is called instead of the polling path."""
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_bug_worker.py", "--issue-id", "uuid-1"]
+        )
+        result = _make_result(files_indexed=3, skipped=False)
+        engine = _make_engine()
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=engine),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.process_bug_issue", return_value=result
+            ) as mock_process,
+            patch("run_touch_index_bug_worker.get_closed_non_fdr_issues") as mock_fetch,
+            patch("run_touch_index_bug_worker.transition_issue_status"),
+        ):
+            main()
+
+        mock_process.assert_called_once_with(engine, "uuid-1")
+        mock_fetch.assert_not_called()
+
+    def test_issue_id_not_found_logs_and_returns(self, monkeypatch, caplog):
+        """When process_bug_issue returns None, a message is logged and we return cleanly."""
+        import logging
+
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_bug_worker.py", "--issue-id", "missing-uuid"]
+        )
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.process_bug_issue", return_value=None
+            ),
+            patch("run_touch_index_bug_worker.get_closed_non_fdr_issues"),
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        assert any("No bug issue found" in r.message for r in caplog.records)
+
+    def test_issue_id_result_logged(self, monkeypatch, caplog):
+        """When process_bug_issue succeeds, the result is logged with file count and source."""
+        import logging
+
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_bug_worker.py", "--issue-id", "uuid-1"]
+        )
+        result = _make_result(files_indexed=2, skipped=False)
+        result.issue_identifier = "BTCAAAAA-100"
+        result.source = "git"
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.process_bug_issue", return_value=result
+            ),
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        assert any("2 files indexed" in r.message for r in caplog.records)
+        assert any("via git" in r.message for r in caplog.records)

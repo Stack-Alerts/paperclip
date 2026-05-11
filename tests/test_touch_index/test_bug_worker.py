@@ -15,6 +15,7 @@ from touch_index.bug_worker import (
     BugIngestionResult,
     _parse_completed_at,
     ingest_bug_issue,
+    process_bug_issue,
     run_bug_worker,
 )
 
@@ -319,3 +320,115 @@ class TestRunBugWorker:
 
         rows = conn.execute.call_args[0][1]
         assert rows[0]["closed_at"] is None
+
+
+# ---------------------------------------------------------------------------
+# process_bug_issue — single-issue webhook entry point
+# ---------------------------------------------------------------------------
+
+
+class TestProcessBugIssue:
+    def test_fetches_and_ingests_issue(self):
+        """process_bug_issue fetches issue from API and delegates to ingest_bug_issue."""
+        engine, conn = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "completedAt": "2026-05-11T12:00:00Z",
+        }
+        files = ["src/touch_index/bug_worker.py"]
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_issue_by_id", return_value=issue
+            ) as mock_get,
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=files
+            ) as mock_git,
+            patch("touch_index.bug_worker.fetch_and_extract") as mock_comments,
+        ):
+            result = process_bug_issue(engine, ISSUE_ID)
+
+        assert result is not None
+        assert result.files_indexed == 1
+        assert result.issue_identifier == ISSUE_IDENTIFIER
+        mock_get.assert_called_once_with(ISSUE_ID)
+        mock_comments.assert_not_called()
+        conn.execute.assert_called_once()
+
+    def test_returns_none_when_issue_not_found(self):
+        """When get_issue_by_id returns None, process_bug_issue returns None."""
+        engine, _ = _mock_engine()
+
+        with patch(
+            "touch_index.bug_worker.get_issue_by_id", return_value=None
+        ):
+            result = process_bug_issue(engine, "nonexistent-uuid")
+
+        assert result is None
+
+    def test_skips_fdr_labelled_issues(self):
+        """FDR-labelled issues should be skipped (handled by FR worker)."""
+        engine, _ = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "labelIds": ["d523cb2d-acd9-423d-b87a-bb79cee42c40"],
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_issue_by_id", return_value=issue
+            ),
+        ):
+            result = process_bug_issue(engine, ISSUE_ID)
+
+        assert result is None
+
+    def test_handles_missing_completed_at(self):
+        """Issue without completedAt should not crash."""
+        engine, conn = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_issue_by_id", return_value=issue
+            ),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/foo.py"],
+            ),
+        ):
+            result = process_bug_issue(engine, ISSUE_ID)
+
+        assert result is not None
+        assert result.files_indexed == 1
+        rows = conn.execute.call_args[0][1]
+        assert rows[0]["closed_at"] is None
+
+    def test_filters_out_fdr_label_ids(self):
+        """Non-FDR issues with other labels should pass through."""
+        engine, conn = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "labelIds": ["some-other-label-uuid"],
+            "completedAt": "2026-05-11T12:00:00Z",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_issue_by_id", return_value=issue
+            ),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/bar.py"],
+            ),
+        ):
+            result = process_bug_issue(engine, ISSUE_ID)
+
+        assert result is not None
+        assert result.files_indexed == 1

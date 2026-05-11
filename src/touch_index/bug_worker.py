@@ -27,6 +27,7 @@ from sqlalchemy.engine import Engine
 
 from .comment_extractor import fetch_and_extract
 from .git_extractor import get_files_for_issue
+from .paperclip_client import FDR_LABEL_ID, get_issue_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,30 @@ def _parse_completed_at(issue: dict) -> datetime | None:
     if not raw:
         return None
     return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+
+
+def process_bug_issue(
+    engine: Engine,
+    issue_id: str,
+) -> BugIngestionResult | None:
+    """Fetch a single issue from Paperclip API and ingest as a bug.
+
+    This is the webhook/event-driven entry point.  Returns None if the
+    issue is not found or is FDR-labelled (handled by the FR worker).
+    """
+    issue = get_issue_by_id(issue_id)
+    if issue is None:
+        logger.info("Bug issue %s not found — skipping", issue_id)
+        return None
+    if FDR_LABEL_ID in (issue.get("labelIds") or []):
+        logger.info("Bug issue %s is FDR-labelled — skipping", issue_id)
+        return None
+    return ingest_bug_issue(
+        engine,
+        issue_id=issue["id"],
+        issue_identifier=issue["identifier"],
+        completed_at=_parse_completed_at(issue),
+    )
 
 
 def run_bug_worker(
