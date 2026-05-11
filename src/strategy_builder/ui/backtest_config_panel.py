@@ -995,9 +995,12 @@ class BacktestWorker(QThread):
             )
             
             # Calculate results (REAL adjustments, not hardcoded!)
+            from src.optimizer_v3.core.trade_registry import get_trade_registry as _get_registry_sc
+            trades_list = _get_registry_sc().get_all_trades()
             results = {
                 'total_candles': total_candles,
                 'trades': trade_count,
+                'trades_list': trades_list,
                 'tp_adjustments': tp_sl_adjustments,  # Real tracked adjustments
                 'strategy_config': self.strategy_config,  # BTCAAAAA-736: pass to AI panel
             }
