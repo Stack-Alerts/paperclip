@@ -343,6 +343,7 @@ if __name__ == "__main__":
             args.issue_id,
             dry_run=args.dry_run,
             old_status=args.old_status,
+            force_reprocess=args.force_reprocess,
         )
         if result:
             log.info("Result: %s", json.dumps(result, indent=2))
