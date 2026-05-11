@@ -40,7 +40,6 @@ from touch_index.paperclip_client import (
     _paginate,
     _base,
     _company,
-    transition_issue_status,
 )
 
 from .generator import generate_and_post
@@ -132,17 +131,6 @@ def _sync_statuses(state: dict, issues: list[dict]) -> None:
         if issue_id and status:
             statuses[issue_id] = status
 
-
-def _transition_to_done(issue_id: str, identifier: str) -> None:
-    """Transition an issue to ``done`` via the Paperclip API (best-effort)."""
-    try:
-        transition_issue_status(issue_id, "done")
-        log.info("Marked %s as done", identifier)
-    except Exception:
-        log.exception("Failed to mark %s as done", identifier)
-
-
-
 def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]:
     """Detect fix/bug issues that transitioned TO ``in_review`` and post reports.
 
@@ -202,8 +190,7 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
             result = generate_and_post(issue_id, dry_run=dry_run)
             results.append(result)
             newly_processed.append(issue_id)
-            if not dry_run and not result.get("skipped"):
-                _transition_to_done(issue_id, identifier)
+
         except Exception as exc:
             log.error("Failed to generate report for %s: %s", identifier, exc)
             results.append({"issue": identifier, "error": str(exc)})
@@ -271,9 +258,6 @@ def process_issue(
     log.info("Generating Blast Radius Report for %s (webhook trigger)", identifier)
     try:
         result = generate_and_post(issue_id, dry_run=dry_run)
-
-        if not dry_run and not result.get("skipped"):
-            _transition_to_done(issue_id, identifier)
 
         if not dry_run:
             state = _load_state()

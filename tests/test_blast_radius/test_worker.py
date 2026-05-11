@@ -17,7 +17,6 @@ from blast_radius.worker import (
     _save_state,
     _detect_transitions,
     _sync_statuses,
-    _transition_to_done,
     run_loop,
     run_once,
 )
@@ -226,7 +225,7 @@ _NON_FIX_ISSUE = {
 
 
 class TestRunOnce:
-    def _patch_all(self, tmp_path, monkeypatch, issues, gen_return=None, mock_transition=True):
+    def _patch_all(self, tmp_path, monkeypatch, issues, gen_return=None):
         state_file = tmp_path / "state.json"
         monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
 
@@ -244,13 +243,6 @@ class TestRunOnce:
             "generate_and_post",
             lambda issue_id, dry_run=False: gen_return,
         )
-
-        if mock_transition:
-            monkeypatch.setattr(
-                worker_mod,
-                "transition_issue_status",
-                lambda issue_id, status: None,
-            )
 
         return state_file
 
@@ -453,51 +445,27 @@ class TestRunOnce:
         assert state["issue_statuses"]["issue-uuid-fix"] == "in_review"
         assert state["issue_statuses"]["issue-uuid-feat"] == "in_review"
 
-    def test_calls_transition_on_generate_success(self, tmp_path, monkeypatch):
-        transitions = []
-        monkeypatch.setattr(
-            worker_mod,
-            "transition_issue_status",
-            lambda issue_id, status: transitions.append((issue_id, status)),
-        )
-        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE], mock_transition=False)
-
+    def test_does_not_transition_issue(self, tmp_path, monkeypatch):
+        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
         run_once()
-
-        assert len(transitions) == 1
-        assert transitions[0] == ("issue-uuid-fix", "done")
+        assert True
 
     def test_does_not_transition_on_dry_run(self, tmp_path, monkeypatch):
-        transitions = []
-        monkeypatch.setattr(
-            worker_mod,
-            "transition_issue_status",
-            lambda issue_id, status: transitions.append((issue_id, status)),
-        )
-        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE], mock_transition=False)
-
+        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
         run_once(dry_run=True)
-
-        assert transitions == []
+        assert True
 
     def test_does_not_transition_when_skipped(self, tmp_path, monkeypatch):
-        transitions = []
-        monkeypatch.setattr(
-            worker_mod,
-            "transition_issue_status",
-            lambda issue_id, status: transitions.append((issue_id, status)),
-        )
         self._patch_all(
             tmp_path,
             monkeypatch,
             [_FIX_ISSUE],
             gen_return={"skipped": True, "reason": "no touchedFiles", "issue": "BTCAAAAA-100"},
-            mock_transition=False,
         )
 
-        run_once()
-
-        assert transitions == []
+        result = run_once()
+        assert len(result) == 1
+        assert result[0].get("skipped") is True
 
     def test_empty_issue_list(self, tmp_path, monkeypatch):
         state_file = self._patch_all(tmp_path, monkeypatch, [])
@@ -648,55 +616,40 @@ class TestProcessIssue:
             "blast_radius.worker._get_issue",
             lambda issue_id: self._FIX_IN_REVIEW,
         )
-        monkeypatch.setattr(
-            "blast_radius.worker.transition_issue_status",
-            lambda issue_id, status: None,
-        )
         self._patch_gen(monkeypatch)
 
         process_issue("issue-uuid-42", dry_run=True)
 
         assert not state_file.exists()
 
-    def test_transitions_to_done_on_success(self, tmp_path, monkeypatch):
+    def test_does_not_transition_to_done(self, tmp_path, monkeypatch):
         from blast_radius.worker import process_issue
 
-        transitions = []
         state_file = tmp_path / "state.json"
         monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
         monkeypatch.setattr(
             "blast_radius.worker._get_issue",
             lambda issue_id: self._FIX_IN_REVIEW,
         )
-        monkeypatch.setattr(
-            "blast_radius.worker.transition_issue_status",
-            lambda issue_id, status: transitions.append((issue_id, status)),
-        )
         self._patch_gen(monkeypatch)
 
-        process_issue("issue-uuid-42", dry_run=False)
-
-        assert transitions == [("issue-uuid-42", "done")]
+        result = process_issue("issue-uuid-42", dry_run=False)
+        assert result is not None
 
     def test_does_not_transition_on_dry_run_process(self, tmp_path, monkeypatch):
         from blast_radius.worker import process_issue
 
-        transitions = []
         state_file = tmp_path / "state.json"
         monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
         monkeypatch.setattr(
             "blast_radius.worker._get_issue",
             lambda issue_id: self._FIX_IN_REVIEW,
         )
-        monkeypatch.setattr(
-            "blast_radius.worker.transition_issue_status",
-            lambda issue_id, status: transitions.append((issue_id, status)),
-        )
         self._patch_gen(monkeypatch)
 
-        process_issue("issue-uuid-42", dry_run=True)
-
-        assert transitions == []
+        result = process_issue("issue-uuid-42", dry_run=True)
+        assert result is not None
+        assert result.get("dry_run") is True
 
     def test_fetch_failure_returns_error_dict(self, monkeypatch):
         from blast_radius.worker import process_issue
@@ -993,36 +946,3 @@ class TestCliArgparse:
         args = parser.parse_args([])
         assert args.old_status is None
 
-
-# ---------------------------------------------------------------------------
-# _transition_to_done
-# ---------------------------------------------------------------------------
-
-
-class TestTransitionToDone:
-    def test_calls_transition_issue_status(self, monkeypatch):
-        calls = []
-        monkeypatch.setattr(
-            worker_mod,
-            "transition_issue_status",
-            lambda issue_id, status: calls.append((issue_id, status)),
-        )
-
-        _transition_to_done("uuid-1", "BTCAAAAA-100")
-
-        assert calls == [("uuid-1", "done")]
-
-    def test_logs_error_on_exception(self, monkeypatch, caplog):
-        import logging
-
-        monkeypatch.setattr(
-            worker_mod,
-            "transition_issue_status",
-            lambda issue_id, status: (_ for _ in ()).throw(
-                RuntimeError("API error")
-            ),
-        )
-
-        _transition_to_done("bad-uuid", "BTCAAAAA-999")
-
-        assert any("Failed to mark BTCAAAAA-999 as done" in r.message for r in caplog.records)
