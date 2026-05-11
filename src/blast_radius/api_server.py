@@ -13,6 +13,17 @@ POST /api/webhook/issue-status-changed
   }
   Calls ``process_issue()`` and returns the report result.
 
+POST /api/webhook/fr-issue-event
+  Paperclip issue_created / issue_updated webhook receiver for FDR (Feature
+  Design Requirement) issues.  Expects JSON body:
+  {
+    "event": "issue_created",
+    "issue": {"id": "<uuid>", ...}
+  }
+  Calls ``touch_index.fr_worker.process_fr_issue()`` to upsert file
+  references from done-comments, git commits, or the issue description.
+  Returns the ingestion result.
+
 Returns JSON:
 {
   "fr_impact_set": [...],
@@ -39,6 +50,22 @@ from .worker import process_issue
 
 log = logging.getLogger(__name__)
 DEFAULT_PORT = int(__import__("os").environ.get("BLAST_RADIUS_PORT", "8765"))
+
+# Lazy engine for FR ingestion (created once, then reused across requests).
+_FR_ENGINE = None
+
+
+def _get_fr_engine():
+    global _FR_ENGINE
+    if _FR_ENGINE is None:
+        from touch_index.db import get_engine, health_check
+
+        _FR_ENGINE = get_engine()
+        if not health_check(_FR_ENGINE):
+            log.error("FR webhook: DB health check failed — engine unusable")
+            _FR_ENGINE = None
+            raise RuntimeError("Database health check failed")
+    return _FR_ENGINE
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -85,6 +112,11 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+
+        if parsed.path == "/api/webhook/fr-issue-event":
+            self._handle_fr_webhook()
+            return
+
         if parsed.path != "/api/webhook/issue-status-changed":
             self._send_json(404, {"error": "not found"})
             return
@@ -118,6 +150,51 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_json(200, result)
         except Exception as exc:
             log.error("Webhook processing failed for %s: %s", issue_id, exc)
+            self._send_json(500, {"error": str(exc), "issue": issue_id})
+
+    # ------------------------------------------------------------------
+    # FR issue webhook
+    # ------------------------------------------------------------------
+
+    def _handle_fr_webhook(self):
+        """Handle POST /api/webhook/fr-issue-event (FR issue created/updated)."""
+        body = self._read_body()
+        if body is None:
+            self._send_json(400, {"error": "invalid or empty JSON body"})
+            return
+
+        issue_id = body.get("issue", {}).get("id") or body.get("issue_id")
+        if not issue_id:
+            self._send_json(400, {"error": "missing issue.id or issue_id in payload"})
+            return
+
+        event_type = body.get("event", "unknown")
+        dry_run = body.get("dry_run", False)
+
+        log.info(
+            "FR webhook: %s for issue %s (dry_run=%s)", event_type, issue_id, dry_run,
+        )
+
+        try:
+            from touch_index.fr_worker import process_fr_issue
+
+            engine = _get_fr_engine()
+            result = process_fr_issue(engine, issue_id, dry_run=bool(dry_run))
+            if result is None:
+                self._send_json(200, {
+                    "issue": issue_id,
+                    "status": "skipped",
+                    "reason": "not an FDR-labelled issue or not found",
+                })
+                return
+            self._send_json(200, {
+                "issue": result.issue_identifier,
+                "files_indexed": result.files_indexed,
+                "source": result.source,
+                "skipped_no_commits": result.skipped_no_commits,
+            })
+        except Exception as exc:
+            log.error("FR webhook processing failed for %s: %s", issue_id, exc)
             self._send_json(500, {"error": str(exc), "issue": issue_id})
 
 
