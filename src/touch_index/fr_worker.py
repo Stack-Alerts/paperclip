@@ -41,7 +41,8 @@ _UPSERT_SQL = text("""
 class FRIngestionResult:
     issue_identifier: str
     files_indexed: int
-    source: str   # "comments" | "git" | "description" | "none"
+    source: str           # "comments" | "git" | "description" | "none"
+    skipped_no_commits: bool  # True when no files found from any source
 
 
 def ingest_fr_issue(
@@ -68,7 +69,12 @@ def ingest_fr_issue(
 
     if not files:
         logger.info("FR %s: no files found in comments, git, or description", issue_identifier)
-        return FRIngestionResult(issue_identifier=issue_identifier, files_indexed=0, source="none")
+        return FRIngestionResult(
+            issue_identifier=issue_identifier,
+            files_indexed=0,
+            source="none",
+            skipped_no_commits=True,
+        )
 
     owner = owner_agent_id or "00000000-0000-0000-0000-000000000000"
     now = datetime.now(timezone.utc)
@@ -89,7 +95,12 @@ def ingest_fr_issue(
         conn.execute(_UPSERT_SQL, rows)
 
     logger.info("FR %s: indexed %d file(s) via %s", issue_identifier, len(rows), source)
-    return FRIngestionResult(issue_identifier=issue_identifier, files_indexed=len(rows), source=source)
+    return FRIngestionResult(
+        issue_identifier=issue_identifier,
+        files_indexed=len(rows),
+        source=source,
+        skipped_no_commits=False,
+    )
 
 
 def run_fr_worker(
