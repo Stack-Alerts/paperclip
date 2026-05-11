@@ -9,7 +9,8 @@ Usage
 -----
     python -m blast_radius.worker                 # run once, then exit
     python -m blast_radius.worker --loop 120      # poll every 120 s forever
-    python -m blast_radius.worker --dry-run       # log reports, don't post
+    python -m blast_radius.worker --dry-run             # log reports, don't post
+    python -m blast_radius.worker --force-reprocess  # re-process already-seen issues
 
 FIX_LABELS env var (comma-separated): label names that mark an issue as a fix/bug.
 Defaults to "fix,bug,bugfix".
@@ -77,8 +78,13 @@ def _is_fix_issue(issue: dict) -> bool:
     return any(kw in title_lower for kw in ("fix", "bug", "regression", "hotfix"))
 
 
-def run_once(dry_run: bool = False) -> list[dict]:
-    """Process all newly-in-review fix/bug issues. Returns list of result dicts."""
+def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]:
+    """Process fix/bug issues in_review. Returns list of result dicts.
+
+    When *force_reprocess* is True, already-processed issues are re-processed
+    and their reports are regenerated (useful when touchedFiles have been
+    updated after the initial run).
+    """
     state = _load_state()
     processed: set[str] = set(state.get("processed_issue_ids", []))
 
@@ -92,8 +98,8 @@ def run_once(dry_run: bool = False) -> list[dict]:
         issue_id = issue.get("id", "")
         identifier = issue.get("identifier", "")
 
-        if issue_id in processed:
-            log.debug("Already processed %s — skipping", identifier)
+        if not force_reprocess and issue_id in processed:
+            log.debug("Already processed %s — skipping (use --force-reprocess to override)", identifier)
             continue
 
         if not _is_fix_issue(issue):
@@ -118,15 +124,15 @@ def run_once(dry_run: bool = False) -> list[dict]:
     return results
 
 
-def run_loop(interval_seconds: int = 120, dry_run: bool = False) -> None:
+def run_loop(interval_seconds: int = 120, dry_run: bool = False, force_reprocess: bool = False) -> None:
     """Poll continuously, sleeping *interval_seconds* between runs."""
     log.info(
-        "Starting Blast Radius worker loop (interval=%ds, dry_run=%s)",
-        interval_seconds, dry_run,
+        "Starting Blast Radius worker loop (interval=%ds, dry_run=%s, force_reprocess=%s)",
+        interval_seconds, dry_run, force_reprocess,
     )
     while True:
         try:
-            run_once(dry_run=dry_run)
+            run_once(dry_run=dry_run, force_reprocess=force_reprocess)
         except Exception as exc:
             log.error("Worker iteration failed: %s", exc)
         time.sleep(interval_seconds)
@@ -140,10 +146,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Blast Radius polling worker")
     parser.add_argument("--loop", type=int, metavar="SECONDS", help="Run in a loop with this interval")
     parser.add_argument("--dry-run", action="store_true", help="Log reports but do not post comments")
+    parser.add_argument("--force-reprocess", action="store_true", help="Re-process already-seen issues")
     args = parser.parse_args()
 
     if args.loop:
-        run_loop(interval_seconds=args.loop, dry_run=args.dry_run)
+        run_loop(interval_seconds=args.loop, dry_run=args.dry_run, force_reprocess=args.force_reprocess)
     else:
-        results = run_once(dry_run=args.dry_run)
+        results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
         log.info("Results: %s", json.dumps(results, indent=2))

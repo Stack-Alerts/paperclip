@@ -63,10 +63,10 @@ def cmd_worker(args: argparse.Namespace) -> int:
     from blast_radius.worker import run_once, run_loop
 
     if args.loop:
-        run_loop(interval_seconds=args.loop, dry_run=args.dry_run)
+        run_loop(interval_seconds=args.loop, dry_run=args.dry_run, force_reprocess=args.force_reprocess)
         return 0
 
-    results = run_once(dry_run=args.dry_run)
+    results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
     print(json.dumps(results, indent=2))
     return 0
 
@@ -129,6 +129,11 @@ def main() -> int:
         "--dry-run",
         action="store_true",
         help="Log reports but do not post comments",
+    )
+    p_worker.add_argument(
+        "--force-reprocess",
+        action="store_true",
+        help="Re-process already-seen issues (useful after touchedFiles update)",
     )
     p_worker.set_defaults(func=cmd_worker)
 

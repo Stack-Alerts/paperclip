@@ -230,3 +230,210 @@ class TestGenerateAndPost:
 
         with pytest.raises(RuntimeError, match="API down"):
             generate_and_post(issue_id="bad-uuid", dry_run=True)
+
+
+# ---------------------------------------------------------------------------
+# Generator HTTP helper functions
+# ---------------------------------------------------------------------------
+
+class TestRunHeaders:
+    def test_returns_empty_without_env(self, monkeypatch):
+        import blast_radius.generator as gen_mod
+        monkeypatch.setattr(gen_mod, "PAPERCLIP_RUN_ID", "")
+        assert gen_mod._run_headers() == {}
+
+    def test_returns_run_id_header_when_set(self, monkeypatch):
+        import blast_radius.generator as gen_mod
+        monkeypatch.setattr(gen_mod, "PAPERCLIP_RUN_ID", "run-abc-123")
+        result = gen_mod._run_headers()
+        assert result == {"X-Paperclip-Run-Id": "run-abc-123"}
+
+
+class TestGetIssue:
+    def test_fetches_issue_by_id(self, monkeypatch):
+        from blast_radius.generator import _get_issue
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"id": "iss-1", "identifier": "BTCAAAAA-100"}
+        mock_sess = MagicMock()
+        mock_sess.get.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "blast_radius.generator._session",
+            lambda: mock_sess,
+        )
+
+        result = _get_issue("iss-1")
+        assert result == {"id": "iss-1", "identifier": "BTCAAAAA-100"}
+        mock_sess.get.assert_called_once()
+        assert "/api/issues/iss-1" in str(mock_sess.get.call_args[0][0])
+
+    def test_raises_on_http_error(self, monkeypatch):
+        from blast_radius.generator import _get_issue
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.side_effect = RuntimeError("404 Not Found")
+        mock_sess = MagicMock()
+        mock_sess.get.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "blast_radius.generator._session",
+            lambda: mock_sess,
+        )
+
+        with pytest.raises(RuntimeError, match="404 Not Found"):
+            _get_issue("bad-id")
+
+
+class TestGetAgentName:
+    def test_returns_name_on_success(self, monkeypatch):
+        from blast_radius.generator import _get_agent_name
+
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        mock_resp.json.return_value = {"name": "CoderBot"}
+        mock_sess = MagicMock()
+        mock_sess.get.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "blast_radius.generator._session",
+            lambda: mock_sess,
+        )
+
+        result = _get_agent_name("agent-uuid")
+        assert result == "CoderBot"
+
+    def test_falls_back_to_name_key(self, monkeypatch):
+        from blast_radius.generator import _get_agent_name
+
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        mock_resp.json.return_value = {"nameKey": "agent-coder-01"}
+        mock_sess = MagicMock()
+        mock_sess.get.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "blast_radius.generator._session",
+            lambda: mock_sess,
+        )
+
+        result = _get_agent_name("agent-uuid")
+        assert result == "agent-coder-01"
+
+    def test_returns_none_on_http_error(self, monkeypatch):
+        from blast_radius.generator import _get_agent_name
+
+        mock_resp = MagicMock()
+        mock_resp.ok = False
+        mock_sess = MagicMock()
+        mock_sess.get.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "blast_radius.generator._session",
+            lambda: mock_sess,
+        )
+
+        result = _get_agent_name("agent-uuid")
+        assert result is None
+
+    def test_returns_none_on_exception(self, monkeypatch):
+        from blast_radius.generator import _get_agent_name
+
+        def thrower(*args, **kwargs):
+            raise ConnectionError("Network timeout")
+
+        mock_sess = MagicMock()
+        mock_sess.get.side_effect = thrower
+
+        monkeypatch.setattr(
+            "blast_radius.generator._session",
+            lambda: mock_sess,
+        )
+
+        result = _get_agent_name("agent-uuid")
+        assert result is None
+
+    def test_returns_none_on_missing_both_name_and_name_key(self, monkeypatch):
+        from blast_radius.generator import _get_agent_name
+
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        mock_resp.json.return_value = {"id": "agent-uuid"}
+        mock_sess = MagicMock()
+        mock_sess.get.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "blast_radius.generator._session",
+            lambda: mock_sess,
+        )
+
+        result = _get_agent_name("agent-uuid")
+        assert result is None
+
+
+class TestPostComment:
+    def test_posts_comment(self, monkeypatch):
+        from blast_radius.generator import _post_comment
+
+        mock_resp = MagicMock()
+        mock_sess = MagicMock()
+        mock_sess.post.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "blast_radius.generator._session",
+            lambda: mock_sess,
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator._run_headers",
+            lambda: {},
+        )
+
+        _post_comment("iss-1", "Hello world")
+
+        mock_sess.post.assert_called_once()
+        call_args = mock_sess.post.call_args
+        assert "/api/issues/iss-1/comments" in str(call_args[0][0])
+        assert call_args[1]["json"] == {"body": "Hello world"}
+
+    def test_raises_on_http_error(self, monkeypatch):
+        from blast_radius.generator import _post_comment
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.side_effect = RuntimeError("422 Unprocessable")
+        mock_sess = MagicMock()
+        mock_sess.post.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "blast_radius.generator._session",
+            lambda: mock_sess,
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator._run_headers",
+            lambda: {},
+        )
+
+        with pytest.raises(RuntimeError, match="422 Unprocessable"):
+            _post_comment("bad-id", "body")
+
+    def test_includes_run_header(self, monkeypatch):
+        from blast_radius.generator import _post_comment
+
+        mock_resp = MagicMock()
+        mock_sess = MagicMock()
+        mock_sess.post.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "blast_radius.generator._session",
+            lambda: mock_sess,
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator._run_headers",
+            lambda: {"X-Paperclip-Run-Id": "run-xyz"},
+        )
+
+        _post_comment("iss-1", "body")
+
+        # _run_headers result should be merged into session headers
+        mock_sess.headers.update.assert_called_once_with(
+            {"X-Paperclip-Run-Id": "run-xyz"}
+        )

@@ -45,13 +45,21 @@ def main() -> None:
         action="store_true",
         help="Log reports but do not post comments",
     )
+    parser.add_argument(
+        "--force-reprocess",
+        action="store_true",
+        help="Re-process already-seen issues (useful after touchedFiles update)",
+    )
     args = parser.parse_args()
 
     if args.loop:
-        logger.info("Starting Blast Radius worker loop (interval=%ds, dry_run=%s)", args.loop, args.dry_run)
-        run_loop(interval_seconds=args.loop, dry_run=args.dry_run)
+        logger.info(
+            "Starting Blast Radius worker loop (interval=%ds, dry_run=%s, force_reprocess=%s)",
+            args.loop, args.dry_run, args.force_reprocess,
+        )
+        run_loop(interval_seconds=args.loop, dry_run=args.dry_run, force_reprocess=args.force_reprocess)
     else:
-        results = run_once(dry_run=args.dry_run)
+        results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
         logger.info("Blast Radius worker run complete — %d issue(s) processed", len(results))
         print(results)
 
