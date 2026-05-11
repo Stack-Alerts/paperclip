@@ -4,8 +4,14 @@ on:
   schedule:
     # Every 15 minutes — matches the FR and Bug worker cadence
     - cron: '*/15 * * * *'
+  repository_dispatch:
+    types: [issue_status_changed]
   workflow_dispatch:
     inputs:
+      issue_id:
+        description: 'Paperclip issue UUID (single-issue webhook trigger)'
+        required: false
+        default: ''
       dry_run:
         description: 'Dry run (log reports, do not post comments)'
         required: false
@@ -64,6 +70,17 @@ jobs:
       - name: Ensure data directory exists
         run: mkdir -p data
 
+      - name: Resolve issue ID (event payload)
+        id: resolve-issue
+        run: |
+          # workflow_dispatch
+          ISSUE_ID="${{ github.event.inputs.issue_id || '' }}"
+          # repository_dispatch client_payload
+          if [ -z "$ISSUE_ID" ] && [ -n "${{ github.event.client_payload.issue_id || '' }}" ]; then
+            ISSUE_ID="${{ github.event.client_payload.issue_id }}"
+          fi
+          echo "issue_id=$ISSUE_ID" >> $GITHUB_OUTPUT
+
       - name: Run Blast Radius worker
         run: |
           FLAGS=""
@@ -73,7 +90,10 @@ jobs:
           if [ "${{ github.event.inputs.force_reprocess }}" = "true" ]; then
             FLAGS="$FLAGS --force-reprocess"
           fi
-          if [ "${{ github.event.inputs.loop_seconds }}" != "0" ] && [ -n "${{ github.event.inputs.loop_seconds }}" ]; then
+          ISSUE_ID="${{ steps.resolve-issue.outputs.issue_id }}"
+          if [ -n "$ISSUE_ID" ]; then
+            python scripts/run_blast_radius_worker.py --issue-id "$ISSUE_ID" $FLAGS
+          elif [ "${{ github.event.inputs.loop_seconds }}" != "0" ] && [ -n "${{ github.event.inputs.loop_seconds }}" ]; then
             python scripts/run_blast_radius_worker.py --loop ${{ github.event.inputs.loop_seconds }} $FLAGS
           else
             python scripts/run_blast_radius_worker.py $FLAGS

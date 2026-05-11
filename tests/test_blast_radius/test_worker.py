@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import blast_radius.worker as worker_mod
+from blast_radius.query import BlastRadiusData
+
 from blast_radius.worker import (
     _is_fix_issue,
     _load_state,
@@ -272,6 +274,238 @@ class TestRunOnce:
 
         assert results == []
         assert not state_file.exists()
+
+
+# ---------------------------------------------------------------------------
+# process_issue (single-issue webhook entry point)
+# ---------------------------------------------------------------------------
+
+
+class TestProcessIssue:
+    _FIX_IN_REVIEW = {
+        "id": "issue-uuid-42",
+        "identifier": "BTCAAAAA-1507",
+        "title": "Fix the webhook handler",
+        "status": "in_review",
+        "labels": [{"name": "fix"}],
+        "description": (
+            '\"touchedFiles\": ["src/blast_radius/worker.py"]'
+        ),
+    }
+
+    _NON_FIX_IN_REVIEW = {
+        "id": "issue-uuid-43",
+        "identifier": "BTCAAAAA-1508",
+        "title": "Feature request",
+        "status": "in_review",
+        "labels": [{"name": "feature"}],
+    }
+
+    _ISSUE_NOT_IN_REVIEW = {
+        "id": "issue-uuid-44",
+        "identifier": "BTCAAAAA-1509",
+        "title": "Fix in progress",
+        "status": "in_progress",
+        "labels": [{"name": "fix"}],
+    }
+
+    def test_processes_fix_in_review(self, monkeypatch):
+        from blast_radius.worker import process_issue
+        from unittest.mock import MagicMock
+
+        mock_sess = MagicMock()
+
+        def mock_session():
+            return mock_sess
+
+        monkeypatch.setattr(
+            "touch_index.paperclip_client._session",
+            mock_session,
+        )
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+        posted = []
+        monkeypatch.setattr(
+            "blast_radius.generator._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator._get_agent_name",
+            lambda agent_id: "Bot",
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator._post_comment",
+            lambda issue_id, body: posted.append(issue_id),
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator.query_blast_radius",
+            lambda file_paths: BlastRadiusData(),
+        )
+
+        result = process_issue("issue-uuid-42", dry_run=False)
+
+        assert result is not None
+        assert result.get("issue") == "BTCAAAAA-1507"
+        assert posted == ["issue-uuid-42"]
+
+    def test_skips_non_fix_issue(self, monkeypatch):
+        from blast_radius.worker import process_issue
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._NON_FIX_IN_REVIEW,
+        )
+
+        result = process_issue("issue-uuid-43", dry_run=True)
+
+        assert result is None
+
+    def test_skips_not_in_review(self, monkeypatch):
+        from blast_radius.worker import process_issue
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._ISSUE_NOT_IN_REVIEW,
+        )
+
+        result = process_issue("issue-uuid-44", dry_run=True)
+
+        assert result is None
+
+    def test_dry_run_does_not_post(self, monkeypatch):
+        from blast_radius.worker import process_issue
+        from unittest.mock import MagicMock
+
+        mock_sess = MagicMock()
+        monkeypatch.setattr(
+            "touch_index.paperclip_client._session",
+            lambda: mock_sess,
+        )
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+        posted = []
+        monkeypatch.setattr(
+            "blast_radius.generator._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator._get_agent_name",
+            lambda agent_id: "Bot",
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator._post_comment",
+            lambda issue_id, body: posted.append(issue_id),
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator.query_blast_radius",
+            lambda file_paths: BlastRadiusData(),
+        )
+
+        result = process_issue("issue-uuid-42", dry_run=True)
+
+        assert result is not None
+        assert result["dry_run"] is True
+        assert posted == []
+
+    def test_fetch_failure_returns_error_dict(self, monkeypatch):
+        from blast_radius.worker import process_issue
+        from unittest.mock import MagicMock
+
+        mock_sess = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.side_effect = RuntimeError("API timeout")
+        mock_sess.get.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "touch_index.paperclip_client._session",
+            lambda: mock_sess,
+        )
+
+        result = process_issue("bad-uuid", dry_run=True)
+
+        assert result is not None
+        assert "error" in result
+        assert "API timeout" in result["error"]
+
+    def test_generator_failure_returns_error_dict(self, monkeypatch):
+        from blast_radius.worker import process_issue
+        from unittest.mock import MagicMock
+
+        mock_sess = MagicMock()
+        monkeypatch.setattr(
+            "touch_index.paperclip_client._session",
+            lambda: mock_sess,
+        )
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator._get_agent_name",
+            lambda agent_id: "Bot",
+        )
+        monkeypatch.setattr(
+            "blast_radius.generator.query_blast_radius",
+            lambda file_paths: (_ for _ in ()).throw(RuntimeError("DB down")),
+        )
+
+        result = process_issue("issue-uuid-42", dry_run=True)
+
+        assert result is not None
+        assert "error" in result
+        assert "DB down" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# _get_issue
+# ---------------------------------------------------------------------------
+
+
+class TestGetIssue:
+    def test_fetches_issue(self, monkeypatch):
+        from blast_radius.worker import _get_issue
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"id": "iss-1", "identifier": "BTCAAAAA-100"}
+        mock_sess = MagicMock()
+        mock_sess.get.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "touch_index.paperclip_client._session",
+            lambda: mock_sess,
+        )
+
+        result = _get_issue("iss-1")
+        assert result == {"id": "iss-1", "identifier": "BTCAAAAA-100"}
+        mock_sess.get.assert_called_once()
+        assert "/api/issues/iss-1" in str(mock_sess.get.call_args[0][0])
+
+    def test_raises_on_http_error(self, monkeypatch):
+        from blast_radius.worker import _get_issue
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.side_effect = RuntimeError("404 Not Found")
+        mock_sess = MagicMock()
+        mock_sess.get.return_value = mock_resp
+
+        monkeypatch.setattr(
+            "touch_index.paperclip_client._session",
+            lambda: mock_sess,
+        )
+
+        with pytest.raises(RuntimeError, match="404 Not Found"):
+            _get_issue("bad-id")
 
 
 # ---------------------------------------------------------------------------

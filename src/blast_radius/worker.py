@@ -1,16 +1,20 @@
-"""Blast Radius polling worker.
+"""Blast Radius polling worker + single-issue webhook handler.
 
 Polls Paperclip for fix/bug issues that have transitioned to `in_review` since
 the last run, generates a Blast Radius Report for each, and posts it as a comment.
+
+A process_issue() entry point is provided for event-driven use: call it with
+an issue ID obtained from a Paperclip webhook to process a single issue on demand.
 
 State is persisted in a JSON file so the worker is safe to restart.
 
 Usage
 -----
-    python -m blast_radius.worker                 # run once, then exit
-    python -m blast_radius.worker --loop 120      # poll every 120 s forever
-    python -m blast_radius.worker --dry-run             # log reports, don't post
-    python -m blast_radius.worker --force-reprocess  # re-process already-seen issues
+    python -m blast_radius.worker                      # run once, then exit
+    python -m blast_radius.worker --issue-id <uuid>    # process a single issue
+    python -m blast_radius.worker --loop 120           # poll every 120 s forever
+    python -m blast_radius.worker --dry-run            # log reports, don't post
+    python -m blast_radius.worker --force-reprocess    # re-process already-seen issues
 
 FIX_LABELS env var (comma-separated): label names that mark an issue as a fix/bug.
 Defaults to "fix,bug,bugfix".
@@ -126,6 +130,47 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
     return results
 
 
+def process_issue(
+    issue_id: str,
+    dry_run: bool = False,
+) -> dict | None:
+    try:
+        issue = _get_issue(issue_id)
+    except Exception as exc:
+        log.error("Failed to fetch issue %s: %s", issue_id, exc)
+        return {"issue": issue_id, "error": f"fetch failed: {exc}"}
+
+    identifier = issue.get("identifier", issue_id)
+    status = issue.get("status", "")
+
+    if status != "in_review":
+        log.info(
+            "%s has status=%r (not in_review) — skipping", identifier, status
+        )
+        return None
+
+    if not _is_fix_issue(issue):
+        log.info("%s is not a fix/bug issue — skipping", identifier)
+        return None
+
+    log.info("Generating Blast Radius Report for %s (webhook trigger)", identifier)
+    try:
+        result = generate_and_post(issue_id, dry_run=dry_run)
+        return result
+    except Exception as exc:
+        log.error("Failed to generate report for %s: %s", identifier, exc)
+        return {"issue": identifier, "error": str(exc)}
+
+
+def _get_issue(issue_id: str) -> dict:
+    from touch_index.paperclip_client import _session
+
+    sess = _session()
+    resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=15)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def run_loop(
     interval_seconds: int = 120, dry_run: bool = False, force_reprocess: bool = False
 ) -> None:
@@ -151,19 +196,34 @@ if __name__ == "__main__":
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
     )
 
-    parser = argparse.ArgumentParser(description="Blast Radius polling worker")
-    parser.add_argument(
-        "--loop", type=int, metavar="SECONDS", help="Run in a loop with this interval"
+    parser = argparse.ArgumentParser(
+        description="Blast Radius polling worker + webhook handler"
     )
     parser.add_argument(
-        "--dry-run", action="store_true", help="Log reports but do not post comments"
+        "--issue-id", type=str, metavar="UUID",
+        help="Process a single issue by Paperclip UUID (webhook trigger)"
     )
     parser.add_argument(
-        "--force-reprocess", action="store_true", help="Re-process already-seen issues"
+        "--loop", type=int, metavar="SECONDS",
+        help="Run in a loop with this interval"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Log reports but do not post comments"
+    )
+    parser.add_argument(
+        "--force-reprocess", action="store_true",
+        help="Re-process already-seen issues"
     )
     args = parser.parse_args()
 
-    if args.loop:
+    if args.issue_id:
+        result = process_issue(args.issue_id, dry_run=args.dry_run)
+        if result:
+            log.info("Result: %s", json.dumps(result, indent=2))
+        else:
+            log.info("No report generated (issue not eligible)")
+    elif args.loop:
         run_loop(
             interval_seconds=args.loop,
             dry_run=args.dry_run,

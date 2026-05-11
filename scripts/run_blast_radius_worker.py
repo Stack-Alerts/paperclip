@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from blast_radius.worker import run_once, run_loop
+from blast_radius.worker import process_issue, run_once, run_loop
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,7 +32,13 @@ logger = logging.getLogger("blast_radius.worker_runner")
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Blast Radius polling worker — detect fix->in_review and post report",
+        description="Blast Radius worker — detect fix->in_review and post report",
+    )
+    parser.add_argument(
+        "--issue-id",
+        type=str,
+        metavar="UUID",
+        help="Process a single issue by Paperclip UUID (webhook trigger)",
     )
     parser.add_argument(
         "--loop",
@@ -52,7 +58,14 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.loop:
+    if args.issue_id:
+        logger.info("Processing single issue %s (dry_run=%s)", args.issue_id, args.dry_run)
+        result = process_issue(args.issue_id, dry_run=args.dry_run)
+        if result:
+            logger.info("Issue %s result: %s", args.issue_id, result)
+        else:
+            logger.info("Issue %s not eligible — no report generated", args.issue_id)
+    elif args.loop:
         logger.info(
             "Starting Blast Radius worker loop (interval=%ds, dry_run=%s, force_reprocess=%s)",
             args.loop, args.dry_run, args.force_reprocess,
