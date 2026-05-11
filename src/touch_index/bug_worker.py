@@ -164,3 +164,74 @@ def run_bug_worker(
         except Exception:
             logger.exception("Bug worker error for %s", issue.get("identifier"))
     return results
+
+
+def main() -> None:
+    """CLI entry point: parse args and dispatch to process_bug_issue or run_bug_worker."""
+    import argparse
+    from datetime import datetime, timedelta, timezone
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
+
+    parser = argparse.ArgumentParser(
+        description="Touch Index bug-close ingestion worker \u2014 upsert bug issue file references",
+    )
+    parser.add_argument(
+        "--issue-id", type=str, metavar="UUID",
+        help="Process a single non-FDR issue by Paperclip UUID (webhook trigger)",
+    )
+    parser.add_argument(
+        "--lookback-minutes", type=int, default=30,
+        help="Process bug issues closed within this many minutes (default: 30)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Log what would be ingested without writing to DB",
+    )
+    args = parser.parse_args()
+
+    from .db import get_engine, health_check
+    from .paperclip_client import get_closed_non_fdr_issues
+
+    engine = get_engine()
+    if not health_check(engine):
+        logger.error("DB health check failed \u2014 aborting")
+        raise SystemExit(1)
+
+    if args.issue_id:
+        result = process_bug_issue(engine, args.issue_id, dry_run=args.dry_run)
+        if result is None:
+            logger.info("No bug issue found for %s", args.issue_id)
+        else:
+            logger.info(
+                "%s: %d files indexed via %s, skipped=%s",
+                result.issue_identifier,
+                result.files_indexed,
+                result.source,
+                result.skipped_no_commits,
+            )
+        return
+
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
+    logger.info("Fetching closed non-FDR issues completed after %s", cutoff.isoformat())
+    issues = get_closed_non_fdr_issues(closed_after=cutoff)
+    logger.info("Found %d closed non-FDR issue(s) to process", len(issues))
+
+    if not issues:
+        logger.info("Nothing to do")
+        return
+
+    results = run_bug_worker(engine, issues, dry_run=args.dry_run)
+    total_files = sum(r.files_indexed for r in results)
+    skipped = sum(1 for r in results if r.skipped_no_commits)
+    logger.info(
+        "Bug worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits)",
+        len(results), total_files, skipped,
+    )
+
+
+if __name__ == "__main__":
+    main()

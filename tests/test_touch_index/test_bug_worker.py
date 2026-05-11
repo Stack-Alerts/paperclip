@@ -526,3 +526,248 @@ def _issues(count: int = 2) -> list[dict]:
         }
         for i in range(count)
     ]
+
+
+# ---------------------------------------------------------------------------
+# main() — CLI entry point
+# ---------------------------------------------------------------------------
+
+
+class TestMain:
+    """Tests for bug_worker.main() CLI entry point."""
+
+    def test_main_issue_id_calls_process_bug_issue(self, monkeypatch):
+        """When --issue-id is provided, process_bug_issue is called."""
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+        result = BugIngestionResult(
+            issue_identifier="BTCAAAAA-100",
+            files_indexed=2,
+            source="git",
+            skipped_no_commits=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.bug_worker.process_bug_issue", return_value=result
+            ) as mock_process,
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "uuid-1"],
+            )
+            main()
+
+        mock_process.assert_called_once_with(engine, "uuid-1", dry_run=False)
+        mock_fetch.assert_not_called()
+
+    def test_main_issue_id_not_found_logs(self, monkeypatch, caplog):
+        """When process_bug_issue returns None, a message is logged."""
+        import logging
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.bug_worker.process_bug_issue", return_value=None),
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues"),
+            caplog.at_level(logging.INFO),
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "missing-uuid"],
+            )
+            main()
+
+        assert any("No bug issue found" in r.message for r in caplog.records)
+
+    def test_main_issue_id_dry_run(self, monkeypatch):
+        """--dry-run is passed through to process_bug_issue."""
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+        result = BugIngestionResult(
+            issue_identifier="BTCAAAAA-100",
+            files_indexed=2,
+            source="git",
+            skipped_no_commits=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.bug_worker.process_bug_issue", return_value=result
+            ) as mock_process,
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues"),
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "uuid-1", "--dry-run"],
+            )
+            main()
+
+        mock_process.assert_called_once_with(engine, "uuid-1", dry_run=True)
+
+    def test_main_polling_calls_run_bug_worker(self, monkeypatch):
+        """When no --issue-id, run_bug_worker is called with non-FDR issues."""
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-100", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch(
+                "touch_index.bug_worker.run_bug_worker",
+                return_value=[],
+            ) as mock_worker,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index"],
+            )
+            main()
+
+        mock_worker.assert_called_once()
+        args, kwargs = mock_worker.call_args
+        assert args[0] is engine
+        assert args[1] == issues
+        assert kwargs.get("dry_run") is False
+
+    def test_main_polling_dry_run(self, monkeypatch):
+        """--dry-run is passed through to run_bug_worker."""
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+        issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "completedAt": "2026-05-11T10:00:00Z"}]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch(
+                "touch_index.bug_worker.run_bug_worker",
+                return_value=[],
+            ) as mock_worker,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--dry-run"],
+            )
+            main()
+
+        mock_worker.assert_called_once()
+        _, kwargs = mock_worker.call_args
+        assert kwargs.get("dry_run") is True
+
+    def test_main_health_check_failure_exits(self, monkeypatch):
+        """When health_check returns False, SystemExit is raised."""
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=False),
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index"],
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_fetch.assert_not_called()
+
+    def test_main_no_issues_returns_early(self, monkeypatch, caplog):
+        """When no closed non-FDR issues found, run_bug_worker is never called."""
+        import logging
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[],
+            ),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            caplog.at_level(logging.INFO),
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index"],
+            )
+            main()
+
+        mock_worker.assert_not_called()
+        assert any("Nothing to do" in r.message for r in caplog.records)
+
+    def test_main_summary_counts_files_and_skipped(self, monkeypatch, caplog):
+        """Log summary reflects total files indexed and skipped count."""
+        import logging
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {"id": "id-2", "identifier": "BTCAAAAA-102", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+        results = [
+            BugIngestionResult(
+                issue_identifier="BTCAAAAA-101",
+                files_indexed=3,
+                source="git",
+                skipped_no_commits=False,
+            ),
+            BugIngestionResult(
+                issue_identifier="BTCAAAAA-102",
+                files_indexed=0,
+                source="none",
+                skipped_no_commits=True,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=results),
+            caplog.at_level(logging.INFO),
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index"],
+            )
+            main()
+
+        summary_logs = [r for r in caplog.records if "issues processed" in r.message]
+        assert len(summary_logs) == 1
+        msg = summary_logs[0].message
+        assert "2 issues" in msg
+        assert "3 files" in msg
+        assert "1 skipped" in msg
