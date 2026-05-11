@@ -1,4 +1,5 @@
 """Unit tests for touch_index.bug_worker — no DB or network required."""
+
 from __future__ import annotations
 
 import sys
@@ -103,7 +104,10 @@ class TestIngestBugIssue:
         engine, conn = self._make_engine()
 
         result = ingest_bug_issue(
-            engine, issue_id="cccc-3333", issue_identifier="BTCAAAAA-500", completed_at=None
+            engine,
+            issue_id="cccc-3333",
+            issue_identifier="BTCAAAAA-500",
+            completed_at=None,
         )
 
         rows = conn.execute.call_args[0][1]
@@ -141,8 +145,16 @@ class TestRunBugWorker:
         engine, _ = self._make_engine()
 
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-10", "completedAt": "2026-05-11T10:00:00Z"},
-            {"id": "id-2", "identifier": "BTCAAAAA-11", "completedAt": "2026-05-11T10:05:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-10",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
+            {
+                "id": "id-2",
+                "identifier": "BTCAAAAA-11",
+                "completedAt": "2026-05-11T10:05:00Z",
+            },
         ]
         results = run_bug_worker(engine, issues)
 

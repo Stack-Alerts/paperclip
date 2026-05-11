@@ -3,6 +3,7 @@
 All external I/O (DB engine, Paperclip API, sys.exit) is mocked so these
 tests run fully offline.
 """
+
 from __future__ import annotations
 
 import sys
@@ -22,7 +23,9 @@ import types
 # Import the runner as a module (it uses __name__ == "__main__" guard only).
 # Register it in sys.modules so patch() targets the same object.
 runner_path = Path(__file__).parents[2] / "scripts" / "run_touch_index_bug_worker.py"
-_spec = importlib.util.spec_from_file_location("run_touch_index_bug_worker", runner_path)
+_spec = importlib.util.spec_from_file_location(
+    "run_touch_index_bug_worker", runner_path
+)
 _runner = importlib.util.module_from_spec(_spec)
 sys.modules["run_touch_index_bug_worker"] = _runner
 _spec.loader.exec_module(_runner)
@@ -74,7 +77,9 @@ class TestBugRunnerMain:
         with (
             patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
             patch("run_touch_index_bug_worker.health_check", return_value=True),
-            patch("run_touch_index_bug_worker.get_closed_non_fdr_issues", return_value=[]),
+            patch(
+                "run_touch_index_bug_worker.get_closed_non_fdr_issues", return_value=[]
+            ),
             patch("run_touch_index_bug_worker.run_bug_worker") as mock_worker,
         ):
             main()
@@ -84,14 +89,26 @@ class TestBugRunnerMain:
     def test_issues_found_calls_run_bug_worker(self, monkeypatch):
         """When issues exist, run_bug_worker is called with engine and the issues."""
         monkeypatch.setattr(sys, "argv", _CLEAN_ARGV)
-        issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "completedAt": "2026-05-11T10:00:00Z"}]
+        issues = [
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-100",
+                "completedAt": "2026-05-11T10:00:00Z",
+            }
+        ]
         engine = _make_engine()
 
         with (
             patch("run_touch_index_bug_worker.get_engine", return_value=engine),
             patch("run_touch_index_bug_worker.health_check", return_value=True),
-            patch("run_touch_index_bug_worker.get_closed_non_fdr_issues", return_value=issues),
-            patch("run_touch_index_bug_worker.run_bug_worker", return_value=[_make_result()]) as mock_worker,
+            patch(
+                "run_touch_index_bug_worker.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch(
+                "run_touch_index_bug_worker.run_bug_worker",
+                return_value=[_make_result()],
+            ) as mock_worker,
         ):
             main()
 
@@ -109,7 +126,10 @@ class TestBugRunnerMain:
         with (
             patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
             patch("run_touch_index_bug_worker.health_check", return_value=True),
-            patch("run_touch_index_bug_worker.get_closed_non_fdr_issues", side_effect=_capture_cutoff),
+            patch(
+                "run_touch_index_bug_worker.get_closed_non_fdr_issues",
+                side_effect=_capture_cutoff,
+            ),
         ):
             before = datetime.now(timezone.utc)
             main()
@@ -122,7 +142,9 @@ class TestBugRunnerMain:
 
     def test_custom_lookback_minutes_arg(self, monkeypatch):
         """--lookback-minutes N overrides the default 30-minute window."""
-        monkeypatch.setattr(sys, "argv", ["run_touch_index_bug_worker.py", "--lookback-minutes", "60"])
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_bug_worker.py", "--lookback-minutes", "60"]
+        )
         captured = {}
 
         def _capture(closed_after=None):
@@ -132,7 +154,10 @@ class TestBugRunnerMain:
         with (
             patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
             patch("run_touch_index_bug_worker.health_check", return_value=True),
-            patch("run_touch_index_bug_worker.get_closed_non_fdr_issues", side_effect=_capture),
+            patch(
+                "run_touch_index_bug_worker.get_closed_non_fdr_issues",
+                side_effect=_capture,
+            ),
         ):
             before = datetime.now(timezone.utc)
             main()
@@ -146,17 +171,32 @@ class TestBugRunnerMain:
     def test_summary_counts_files_and_skipped(self, monkeypatch, caplog):
         """Log summary reflects total files indexed and skipped count."""
         import logging
+
         monkeypatch.setattr(sys, "argv", _CLEAN_ARGV)
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
-            {"id": "id-2", "identifier": "BTCAAAAA-102", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
+            {
+                "id": "id-2",
+                "identifier": "BTCAAAAA-102",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
-        results = [_make_result(files_indexed=3, skipped=False), _make_result(files_indexed=0, skipped=True)]
+        results = [
+            _make_result(files_indexed=3, skipped=False),
+            _make_result(files_indexed=0, skipped=True),
+        ]
 
         with (
             patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
             patch("run_touch_index_bug_worker.health_check", return_value=True),
-            patch("run_touch_index_bug_worker.get_closed_non_fdr_issues", return_value=issues),
+            patch(
+                "run_touch_index_bug_worker.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
             patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
             caplog.at_level(logging.INFO),
         ):

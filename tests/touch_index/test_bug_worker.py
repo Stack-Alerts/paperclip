@@ -3,6 +3,7 @@
 All external I/O (DB engine, Paperclip API, git subprocess) is mocked so these
 tests run offline without a PostgreSQL instance or network.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -20,6 +21,7 @@ from touch_index.bug_worker import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _mock_engine():
     """Return a mock SQLAlchemy engine whose context-manager .begin() works."""
@@ -41,6 +43,7 @@ COMPLETED_AT = datetime(2026, 5, 11, 12, 0, 0, tzinfo=timezone.utc)
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestIngestBugIssue:
     def test_ingest_uses_git_when_available(self):
         """Git returns files → source is 'git', comment API not called."""
@@ -48,7 +51,9 @@ class TestIngestBugIssue:
         git_files = ["src/touch_index/bug_worker.py", "src/touch_index/db.py"]
 
         with (
-            patch("touch_index.bug_worker.get_files_for_issue", return_value=git_files) as mock_git,
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=git_files
+            ) as mock_git,
             patch("touch_index.bug_worker.fetch_and_extract") as mock_comments,
         ):
             result = ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
@@ -66,7 +71,9 @@ class TestIngestBugIssue:
 
         with (
             patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
-            patch("touch_index.bug_worker.fetch_and_extract", return_value=comment_files) as mock_comments,
+            patch(
+                "touch_index.bug_worker.fetch_and_extract", return_value=comment_files
+            ) as mock_comments,
         ):
             result = ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
 
@@ -117,7 +124,9 @@ class TestIngestBugIssue:
 
         # git path
         with (
-            patch("touch_index.bug_worker.get_files_for_issue", return_value=["src/a.py"]),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=["src/a.py"]
+            ),
             patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
         ):
             r_git = ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
@@ -127,9 +136,13 @@ class TestIngestBugIssue:
         # comments path
         with (
             patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
-            patch("touch_index.bug_worker.fetch_and_extract", return_value=["src/b.py"]),
+            patch(
+                "touch_index.bug_worker.fetch_and_extract", return_value=["src/b.py"]
+            ),
         ):
-            r_comments = ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
+            r_comments = ingest_bug_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT
+            )
         assert hasattr(r_comments, "source")
         assert r_comments.source == "comments"
 
@@ -147,6 +160,7 @@ class TestIngestBugIssue:
 # run_bug_worker — batch orchestration
 # ---------------------------------------------------------------------------
 
+
 class TestRunBugWorker:
     def _issues(self, count: int = 2) -> list[dict]:
         return [
@@ -162,7 +176,9 @@ class TestRunBugWorker:
         engine, _ = _mock_engine()
 
         with (
-            patch("touch_index.bug_worker.get_files_for_issue", return_value=["src/a.py"]),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=["src/a.py"]
+            ),
             patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
         ):
             results = run_bug_worker(engine, self._issues(3))
@@ -180,7 +196,9 @@ class TestRunBugWorker:
             return ["src/ok.py"]
 
         with (
-            patch("touch_index.bug_worker.get_files_for_issue", side_effect=_side_effect),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", side_effect=_side_effect
+            ),
             patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
         ):
             results = run_bug_worker(engine, issues)
@@ -204,7 +222,10 @@ class TestRunBugWorker:
         engine, _ = _mock_engine()
 
         with (
-            patch("touch_index.bug_worker.get_files_for_issue", return_value=["src/a.py", "src/b.py"]),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/a.py", "src/b.py"],
+            ),
             patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
         ):
             results = run_bug_worker(engine, self._issues(3))
@@ -214,10 +235,14 @@ class TestRunBugWorker:
     def test_null_completed_at_is_accepted(self):
         """Issues without completedAt must not crash — closed_at is nullable."""
         engine, _ = _mock_engine()
-        issues = [{"id": ISSUE_ID, "identifier": ISSUE_IDENTIFIER}]  # no completedAt key
+        issues = [
+            {"id": ISSUE_ID, "identifier": ISSUE_IDENTIFIER}
+        ]  # no completedAt key
 
         with (
-            patch("touch_index.bug_worker.get_files_for_issue", return_value=["src/a.py"]),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=["src/a.py"]
+            ),
             patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
         ):
             results = run_bug_worker(engine, issues)

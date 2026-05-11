@@ -1,4 +1,5 @@
 """PostgreSQL engine factory for the Touch Index ingestion workers."""
+
 from __future__ import annotations
 
 import os

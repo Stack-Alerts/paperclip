@@ -1,4 +1,5 @@
 """Unit tests for touch_index.fr_worker — no DB or network required."""
+
 from __future__ import annotations
 
 import sys
@@ -175,8 +176,18 @@ class TestRunFrWorker:
         engine, _ = _make_engine()
 
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-10", "assigneeAgentId": "ag-1", "description": ""},
-            {"id": "id-2", "identifier": "BTCAAAAA-11", "assigneeAgentId": None, "description": ""},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-10",
+                "assigneeAgentId": "ag-1",
+                "description": "",
+            },
+            {
+                "id": "id-2",
+                "identifier": "BTCAAAAA-11",
+                "assigneeAgentId": None,
+                "description": "",
+            },
         ]
         results = run_fr_worker(engine, issues)
 
