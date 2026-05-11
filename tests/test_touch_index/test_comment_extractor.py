@@ -90,3 +90,130 @@ class TestExtractFilesFromText:
     def test_repo_prefix_in_backtick(self):
         files = extract_files_from_text("Fix in `BTC_Engine_v3/src/worker.py`")
         assert files == ["src/worker.py"]
+
+
+# ---------------------------------------------------------------------------
+# extract_files_from_comments
+# ---------------------------------------------------------------------------
+
+
+class TestExtractFilesFromComments:
+    def test_aggregates_across_multiple_comments(self):
+        from touch_index.comment_extractor import extract_files_from_comments
+
+        comments = [
+            {"body": "Changed `src/foo.py` in PR #1"},
+            {"body": "Also touched `src/bar.py`"},
+        ]
+        files = extract_files_from_comments(comments)
+        assert files == ["src/bar.py", "src/foo.py"]
+
+    def test_deduplicates_across_comments(self):
+        from touch_index.comment_extractor import extract_files_from_comments
+
+        comments = [
+            {"body": "Changed `src/foo.py`"},
+            {"body": "Re-fixed `src/foo.py`"},
+        ]
+        files = extract_files_from_comments(comments)
+        assert files == ["src/foo.py"]
+
+    def test_no_paths_returns_empty(self):
+        from touch_index.comment_extractor import extract_files_from_comments
+
+        comments = [{"body": "LGTM"}, {"body": "Approved"}]
+        assert extract_files_from_comments(comments) == []
+
+    def test_empty_comment_list(self):
+        from touch_index.comment_extractor import extract_files_from_comments
+
+        assert extract_files_from_comments([]) == []
+
+    def test_comment_without_body_key(self):
+        from touch_index.comment_extractor import extract_files_from_comments
+
+        comments = [{"id": "1"}, {"body": "Changed `src/a.py`"}]
+        files = extract_files_from_comments(comments)
+        assert files == ["src/a.py"]
+
+
+# ---------------------------------------------------------------------------
+# fetch_and_extract  (unit — mocks paperclip_client._session / _base)
+# ---------------------------------------------------------------------------
+
+
+class TestFetchAndExtract:
+    def test_returns_files_from_api_response(self):
+        from unittest.mock import MagicMock, patch
+        from touch_index.comment_extractor import fetch_and_extract
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [
+            {"body": "Fixed in `src/worker.py`"},
+            {"body": "Also `src/db.py`"},
+        ]
+        mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
+        mock_sess.get.return_value = mock_resp
+
+        with (
+            patch("touch_index.paperclip_client._base", return_value="https://api.x"),
+            patch("touch_index.paperclip_client._session", return_value=mock_sess),
+        ):
+            files = fetch_and_extract("issue-uuid-1")
+
+        assert files == ["src/db.py", "src/worker.py"]
+        mock_sess.get.assert_called_once_with(
+            "https://api.x/api/issues/issue-uuid-1/comments", timeout=30
+        )
+
+    def test_empty_comments_returns_empty(self):
+        from unittest.mock import MagicMock, patch
+        from touch_index.comment_extractor import fetch_and_extract
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = []
+        mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
+        mock_sess.get.return_value = mock_resp
+
+        with (
+            patch("touch_index.paperclip_client._base", return_value="https://api.x"),
+            patch("touch_index.paperclip_client._session", return_value=mock_sess),
+        ):
+            assert fetch_and_extract("issue-uuid-2") == []
+
+    def test_api_error_propagates(self):
+        from unittest.mock import MagicMock, patch
+        import pytest
+        from touch_index.comment_extractor import fetch_and_extract
+
+        mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
+        mock_sess.get.side_effect = RuntimeError("API timeout")
+
+        with (
+            patch("touch_index.paperclip_client._base", return_value="https://api.x"),
+            patch("touch_index.paperclip_client._session", return_value=mock_sess),
+        ):
+            with pytest.raises(RuntimeError, match="API timeout"):
+                fetch_and_extract("issue-uuid-3")
+
+    def test_http_error_raises(self):
+        from unittest.mock import MagicMock, patch
+        import pytest
+        from requests import HTTPError
+        from touch_index.comment_extractor import fetch_and_extract
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.side_effect = HTTPError("403 Forbidden")
+        mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
+        mock_sess.get.return_value = mock_resp
+
+        with (
+            patch("touch_index.paperclip_client._base", return_value="https://api.x"),
+            patch("touch_index.paperclip_client._session", return_value=mock_sess),
+        ):
+            with pytest.raises(HTTPError, match="403 Forbidden"):
+                fetch_and_extract("issue-uuid-4")
