@@ -8,6 +8,7 @@ State is persisted in ``BLAST_RADIUS_STATE_FILE`` (defaults to
 
 Usage:
     python scripts/run_blast_radius_worker.py [--loop SECONDS] [--dry-run]
+    python scripts/run_blast_radius_worker.py --issue-id <uuid> [--old-status <status>]
 """
 from __future__ import annotations
 
@@ -32,13 +33,19 @@ logger = logging.getLogger("blast_radius.worker_runner")
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Blast Radius worker — detect fix->in_review and post report",
+        description="Blast Radius worker -- detect fix->in_review and post report",
     )
     parser.add_argument(
         "--issue-id",
         type=str,
         metavar="UUID",
         help="Process a single issue by Paperclip UUID (webhook trigger)",
+    )
+    parser.add_argument(
+        "--old-status",
+        type=str,
+        metavar="STATUS",
+        help="Previous status when called from a status-change webhook",
     )
     parser.add_argument(
         "--loop",
@@ -59,21 +66,32 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.issue_id:
-        logger.info("Processing single issue %s (dry_run=%s)", args.issue_id, args.dry_run)
-        result = process_issue(args.issue_id, dry_run=args.dry_run)
+        logger.info(
+            "Processing single issue %s (dry_run=%s, old_status=%s)",
+            args.issue_id, args.dry_run, args.old_status,
+        )
+        result = process_issue(
+            args.issue_id,
+            dry_run=args.dry_run,
+            old_status=args.old_status,
+        )
         if result:
             logger.info("Issue %s result: %s", args.issue_id, result)
         else:
-            logger.info("Issue %s not eligible — no report generated", args.issue_id)
+            logger.info("Issue %s not eligible -- no report generated", args.issue_id)
     elif args.loop:
         logger.info(
             "Starting Blast Radius worker loop (interval=%ds, dry_run=%s, force_reprocess=%s)",
             args.loop, args.dry_run, args.force_reprocess,
         )
-        run_loop(interval_seconds=args.loop, dry_run=args.dry_run, force_reprocess=args.force_reprocess)
+        run_loop(
+            interval_seconds=args.loop,
+            dry_run=args.dry_run,
+            force_reprocess=args.force_reprocess,
+        )
     else:
         results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
-        logger.info("Blast Radius worker run complete — %d issue(s) processed", len(results))
+        logger.info("Blast Radius worker run complete -- %d issue(s) processed", len(results))
         logger.info("Results: %s", results)
 
 
