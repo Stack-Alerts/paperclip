@@ -1,4 +1,4 @@
-"""Unit tests for touch_index.comment_extractor — file path extraction from text.
+"""Unit tests for touch_index.comment_extractor -- file path extraction from text.
 
 All extraction logic is pure string processing; no external I/O needed.
 """

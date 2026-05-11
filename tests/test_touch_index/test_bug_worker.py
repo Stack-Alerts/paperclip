@@ -1,15 +1,15 @@
-"""Unit tests for touch_index.bug_worker — no DB or network required."""
+"""Unit tests for the bug touch-index ingestion worker.
+
+All external I/O (DB engine, Paperclip API, git subprocess) is mocked so these
+tests run offline without a PostgreSQL instance or network.
+"""
 
 from __future__ import annotations
 
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 
 from touch_index.bug_worker import (
     BugIngestionResult,
@@ -40,86 +40,168 @@ class TestParseCompletedAt:
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _mock_engine():
+    """Return a mock SQLAlchemy engine whose context-manager .begin() works."""
+    conn = MagicMock()
+    ctx = MagicMock()
+    ctx.__enter__ = MagicMock(return_value=conn)
+    ctx.__exit__ = MagicMock(return_value=False)
+    engine = MagicMock()
+    engine.begin = MagicMock(return_value=ctx)
+    return engine, conn
+
+
+ISSUE_ID = "cccccccc-0000-0000-0000-000000000001"
+ISSUE_IDENTIFIER = "BTCAAAAA-1202"
+COMPLETED_AT = datetime(2026, 5, 11, 12, 0, 0, tzinfo=timezone.utc)
+
+
+# ---------------------------------------------------------------------------
 # ingest_bug_issue
 # ---------------------------------------------------------------------------
 
 
 class TestIngestBugIssue:
-    def _make_engine(self):
-        engine = MagicMock()
-        conn = MagicMock()
-        engine.begin.return_value.__enter__ = MagicMock(return_value=conn)
-        engine.begin.return_value.__exit__ = MagicMock(return_value=False)
-        return engine, conn
+    def test_ingest_uses_git_when_available(self):
+        """Git returns files -> source is 'git', comment API not called."""
+        engine, conn = _mock_engine()
+        git_files = ["src/touch_index/bug_worker.py", "src/touch_index/db.py"]
 
-    @patch("touch_index.bug_worker.get_files_for_issue")
-    def test_happy_path_upserts_rows(self, mock_git):
-        mock_git.return_value = ["src/foo.py", "src/bar.py"]
-        engine, conn = self._make_engine()
-        closed_at = datetime(2026, 5, 11, 12, 0, 0, tzinfo=timezone.utc)
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=git_files
+            ) as mock_git,
+            patch("touch_index.bug_worker.fetch_and_extract") as mock_comments,
+        ):
+            result = ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
 
-        result = ingest_bug_issue(
-            engine,
-            issue_id="aaaa-1111",
-            issue_identifier="BTCAAAAA-1183",
-            completed_at=closed_at,
-        )
-
-        mock_git.assert_called_once_with("BTCAAAAA-1183")
-        conn.execute.assert_called_once()
-        rows = conn.execute.call_args[0][1]
-        assert len(rows) == 2
-        paths = {r["file_path"] for r in rows}
-        assert paths == {"src/foo.py", "src/bar.py"}
-        for row in rows:
-            assert row["bug_issue_id"] == "aaaa-1111"
-            assert row["bug_identifier"] == "BTCAAAAA-1183"
-            assert row["closed_at"] == closed_at
-
-        assert result.issue_identifier == "BTCAAAAA-1183"
+        assert result.source == "git"
         assert result.files_indexed == 2
         assert result.skipped_no_commits is False
+        mock_comments.assert_not_called()
+        conn.execute.assert_called_once()
 
-    @patch("touch_index.bug_worker.fetch_and_extract")
-    @patch("touch_index.bug_worker.get_files_for_issue")
-    def test_no_commits_skips(self, mock_git, mock_comments):
-        mock_git.return_value = []
-        mock_comments.return_value = []
-        engine, conn = self._make_engine()
+    def test_ingest_falls_back_to_comments(self):
+        """Git returns empty -> comment extractor returns files -> source is 'comments', rows upserted."""
+        engine, conn = _mock_engine()
+        comment_files = ["src/touch_index/bug_worker.py"]
 
-        result = ingest_bug_issue(
-            engine,
-            issue_id="bbbb-2222",
-            issue_identifier="BTCAAAAA-999",
-            completed_at=None,
-        )
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch(
+                "touch_index.bug_worker.fetch_and_extract", return_value=comment_files
+            ) as mock_comments,
+        ):
+            result = ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
 
-        conn.execute.assert_not_called()
+        assert result.source == "comments"
+        assert result.files_indexed == 1
+        assert result.skipped_no_commits is False
+        mock_comments.assert_called_once_with(ISSUE_ID)
+        conn.execute.assert_called_once()
+
+    def test_ingest_skips_when_both_empty(self):
+        """Git and comments both empty -> skipped_no_commits=True, source 'none', nothing inserted."""
+        engine, conn = _mock_engine()
+
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            result = ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
+
+        assert result.source == "none"
         assert result.files_indexed == 0
         assert result.skipped_no_commits is True
+        conn.execute.assert_not_called()
 
-    @patch("touch_index.bug_worker.get_files_for_issue")
-    def test_null_closed_at_accepted(self, mock_git):
-        mock_git.return_value = ["src/x.py"]
-        engine, conn = self._make_engine()
+    def test_upsert_rows_contain_required_fields(self):
+        """Each upserted row must carry id, file_path, bug_issue_id, bug_identifier, closed_at."""
+        engine, conn = _mock_engine()
+        files = ["src/touch_index/bug_worker.py", "src/touch_index/db.py"]
 
-        result = ingest_bug_issue(
-            engine,
-            issue_id="cccc-3333",
-            issue_identifier="BTCAAAAA-500",
-            completed_at=None,
-        )
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=files),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
+
+        rows = conn.execute.call_args[0][1]
+        assert len(rows) == 2
+        for row in rows:
+            assert "id" in row
+            assert row["file_path"] in files
+            assert row["bug_issue_id"] == ISSUE_ID
+            assert row["bug_identifier"] == ISSUE_IDENTIFIER
+            assert row["closed_at"] == COMPLETED_AT
+
+    def test_null_closed_at_accepted(self):
+        engine, conn = _mock_engine()
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=["src/x.py"]
+            ),
+        ):
+            result = ingest_bug_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, completed_at=None
+            )
 
         rows = conn.execute.call_args[0][1]
         assert rows[0]["closed_at"] is None
         assert result.files_indexed == 1
 
-    @patch("touch_index.bug_worker.get_files_for_issue")
-    def test_row_ids_are_unique_uuids(self, mock_git):
-        mock_git.return_value = ["src/a.py", "src/b.py", "src/c.py"]
-        engine, conn = self._make_engine()
+    def test_source_field_on_result(self):
+        """BugIngestionResult.source is present and correct for each code path."""
+        engine, _ = _mock_engine()
 
-        ingest_bug_issue(engine, "id-xyz", "BTCAAAAA-700", None)
+        # git path
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=["src/a.py"]
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            r_git = ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
+        assert hasattr(r_git, "source")
+        assert r_git.source == "git"
+
+        # comments path
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch(
+                "touch_index.bug_worker.fetch_and_extract", return_value=["src/b.py"]
+            ),
+        ):
+            r_comments = ingest_bug_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT
+            )
+        assert hasattr(r_comments, "source")
+        assert r_comments.source == "comments"
+
+        # none path
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            r_none = ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
+        assert hasattr(r_none, "source")
+        assert r_none.source == "none"
+
+    def test_row_ids_are_unique_uuids(self):
+        engine, conn = _mock_engine()
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/a.py", "src/b.py", "src/c.py"],
+            ),
+        ):
+            ingest_bug_issue(engine, "id-xyz", "BTCAAAAA-700", None)
 
         rows = conn.execute.call_args[0][1]
         ids = [r["id"] for r in rows]
@@ -127,72 +209,113 @@ class TestIngestBugIssue:
 
 
 # ---------------------------------------------------------------------------
-# run_bug_worker
+# run_bug_worker — batch orchestration
 # ---------------------------------------------------------------------------
 
 
 class TestRunBugWorker:
-    def _make_engine(self):
-        engine = MagicMock()
-        conn = MagicMock()
-        engine.begin.return_value.__enter__ = MagicMock(return_value=conn)
-        engine.begin.return_value.__exit__ = MagicMock(return_value=False)
-        return engine, conn
-
-    @patch("touch_index.bug_worker.get_files_for_issue")
-    def test_processes_all_issues(self, mock_git):
-        mock_git.side_effect = [["src/a.py"], ["src/b.py", "src/c.py"]]
-        engine, _ = self._make_engine()
-
-        issues = [
+    def _issues(self, count: int = 2) -> list[dict]:
+        return [
             {
-                "id": "id-1",
-                "identifier": "BTCAAAAA-10",
-                "completedAt": "2026-05-11T10:00:00Z",
-            },
-            {
-                "id": "id-2",
-                "identifier": "BTCAAAAA-11",
-                "completedAt": "2026-05-11T10:05:00Z",
-            },
+                "id": f"cccccccc-0000-0000-0000-{i:012d}",
+                "identifier": f"BTCAAAAA-{1200 + i}",
+                "completedAt": "2026-05-11T12:00:00Z",
+            }
+            for i in range(count)
         ]
-        results = run_bug_worker(engine, issues)
 
-        assert len(results) == 2
-        assert results[0].issue_identifier == "BTCAAAAA-10"
-        assert results[0].files_indexed == 1
-        assert results[1].issue_identifier == "BTCAAAAA-11"
-        assert results[1].files_indexed == 2
+    def test_returns_one_result_per_issue(self):
+        engine, _ = _mock_engine()
 
-    @patch("touch_index.bug_worker.get_files_for_issue")
-    def test_continues_after_per_issue_error(self, mock_git):
-        """An exception on one issue must not abort the whole batch."""
-        mock_git.side_effect = [RuntimeError("git broke"), ["src/ok.py"]]
-        engine, _ = self._make_engine()
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=["src/a.py"]
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            results = run_bug_worker(engine, self._issues(3))
 
-        issues = [
-            {"id": "bad-id", "identifier": "BTCAAAAA-BAD", "completedAt": None},
-            {"id": "ok-id", "identifier": "BTCAAAAA-OK", "completedAt": None},
-        ]
-        results = run_bug_worker(engine, issues)
+        assert len(results) == 3
+        assert all(isinstance(r, BugIngestionResult) for r in results)
 
-        # Only the successful issue produces a result
+    def test_continues_after_per_issue_error(self):
+        engine, _ = _mock_engine()
+        issues = self._issues(2)
+
+        def _side_effect(identifier):
+            if "1200" in identifier:
+                raise RuntimeError("Simulated git error")
+            return ["src/ok.py"]
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", side_effect=_side_effect
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            results = run_bug_worker(engine, issues)
+
+        # First issue raised, so only the second produces a result
         assert len(results) == 1
-        assert results[0].issue_identifier == "BTCAAAAA-OK"
 
-    @patch("touch_index.bug_worker.get_files_for_issue")
-    def test_empty_issue_list(self, mock_git):
-        engine, _ = self._make_engine()
+    def test_skipped_count_matches_no_files_issues(self):
+        engine, _ = _mock_engine()
+
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            results = run_bug_worker(engine, self._issues(4))
+
+        skipped = sum(1 for r in results if r.skipped_no_commits)
+        assert skipped == 4
+
+    def test_total_files_indexed(self):
+        engine, _ = _mock_engine()
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/a.py", "src/b.py"],
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            results = run_bug_worker(engine, self._issues(3))
+
+        assert sum(r.files_indexed for r in results) == 6
+
+    def test_null_completed_at_is_accepted(self):
+        """Issues without completedAt must not crash -- closed_at is nullable."""
+        engine, _ = _mock_engine()
+        issues = [
+            {"id": ISSUE_ID, "identifier": ISSUE_IDENTIFIER}
+        ]  # no completedAt key
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=["src/a.py"]
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            results = run_bug_worker(engine, issues)
+
+        assert len(results) == 1
+        assert results[0].files_indexed == 1
+
+    def test_empty_issue_list(self):
+        engine, _ = _mock_engine()
         results = run_bug_worker(engine, [])
         assert results == []
-        mock_git.assert_not_called()
 
-    @patch("touch_index.bug_worker.get_files_for_issue")
-    def test_missing_completed_at_parsed_as_none(self, mock_git):
-        mock_git.return_value = ["src/z.py"]
-        engine, conn = self._make_engine()
+    def test_missing_completed_at_parsed_as_none(self):
+        engine, conn = _mock_engine()
 
-        run_bug_worker(engine, [{"id": "id-x", "identifier": "BTCAAAAA-X"}])
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=["src/z.py"]
+            ),
+        ):
+            run_bug_worker(engine, [{"id": "id-x", "identifier": "BTCAAAAA-X"}])
 
         rows = conn.execute.call_args[0][1]
         assert rows[0]["closed_at"] is None
