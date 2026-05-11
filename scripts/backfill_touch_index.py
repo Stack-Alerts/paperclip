@@ -113,9 +113,12 @@ def main() -> None:
     logger.info("Backfill window: last %d days (since %s)", args.days, cutoff.date())
 
     # ── Step 1: FR ingestion (FDR-labelled issues) ─────────────────────────
-    logger.info("Fetching FDR-labelled issues updated in window …")
-    fdr_issues = get_fdr_issues(updated_after=cutoff)
+    logger.info("Fetching FDR-labelled issues for backfill …")
     all_fdr_issues = get_fdr_issues(updated_after=None)
+    fdr_issues = [
+        i for i in all_fdr_issues
+        if datetime.fromisoformat(i["updatedAt"].replace("Z", "+00:00")) >= cutoff
+    ]
     logger.info(
         "FDR issues in window: %d / total: %d", len(fdr_issues), len(all_fdr_issues)
     )
@@ -138,7 +141,6 @@ def main() -> None:
     logger.info("Unique issue IDs referenced in commits: %d", len(issue_ids_in_commits))
 
     fdr_identifiers = {i["identifier"] for i in all_fdr_issues}
-    fdr_ids_set = {i["id"] for i in all_fdr_issues}
 
     bug_results: list[BugIngestionResult] = []
     bug_total_eligible = 0

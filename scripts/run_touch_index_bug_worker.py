@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from touch_index.db import get_engine, health_check
-from touch_index.paperclip_client import get_closed_non_fdr_issues
+from touch_index.paperclip_client import get_closed_non_fdr_issues, transition_issue_status
 from touch_index.bug_worker import run_bug_worker
 
 logging.basicConfig(
@@ -63,6 +63,19 @@ def main() -> None:
 
     total_files = sum(r.files_indexed for r in results)
     skipped = sum(1 for r in results if r.skipped_no_commits)
+
+    # Mark each processed issue as done in Paperclip
+    for issue in issues:
+        issue_id = issue.get("id", "")
+        if issue_id:
+            try:
+                transition_issue_status(issue_id, "done")
+                logger.info("Marked %s as done", issue.get("identifier", issue_id))
+            except Exception:
+                logger.exception(
+                    "Failed to mark %s as done", issue.get("identifier", issue_id)
+                )
+
     logger.info(
         "Bug worker done — %d issues processed, %d files indexed, %d skipped (no commits)",
         len(results),
