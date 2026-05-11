@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from impact_gate.worker import process_issue
-from touch_index.paperclip_client import _paginate, _company, _get_issue_by_identifier
+from touch_index.paperclip_client import _paginate, _company
 
 logging.basicConfig(
     level=logging.INFO,

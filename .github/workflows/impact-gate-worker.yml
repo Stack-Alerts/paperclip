@@ -3,7 +3,7 @@ name: Impact Gate Worker
 on:
   schedule:
     # Every 15 minutes — matches the FR and Bug worker cadence
-    - cron: '*/15 * * * *'
+    - cron: '*/5 * * * *'
   repository_dispatch:
     types: [issue_status_changed]
   workflow_dispatch:
