@@ -79,9 +79,11 @@ class TestIngestBugIssue:
         assert result.files_indexed == 2
         assert result.skipped_no_commits is False
 
+    @patch("touch_index.bug_worker.fetch_and_extract")
     @patch("touch_index.bug_worker.get_files_for_issue")
-    def test_no_commits_skips(self, mock_git):
+    def test_no_commits_skips(self, mock_git, mock_comments):
         mock_git.return_value = []
+        mock_comments.return_value = []
         engine, conn = self._make_engine()
 
         result = ingest_bug_issue(
