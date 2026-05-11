@@ -159,6 +159,25 @@ def get_all_done_issues(completed_after: datetime | None = None) -> list[dict]:
     return issues
 
 
+def transition_issue_status(issue_id: str, status: str) -> None:
+    """Transition an issue to *status* via the Paperclip API.
+
+    Args:
+        issue_id: The Paperclip issue UUID.
+        status:   Target status (e.g. "done").
+
+    Raises:
+        requests.RequestException on API error.
+    """
+    sess = _session()
+    resp = sess.patch(
+        f"{_base()}/api/issues/{issue_id}",
+        json={"status": status},
+        timeout=30,
+    )
+    resp.raise_for_status()
+
+
 def get_issue_assignee(issue: dict) -> str | None:
     return issue.get("assigneeAgentId")
 
