@@ -146,4 +146,4 @@ if __name__ == "__main__":
         run_loop(interval_seconds=args.loop, dry_run=args.dry_run)
     else:
         results = run_once(dry_run=args.dry_run)
-        print(json.dumps(results, indent=2))
+        log.info("Results: %s", json.dumps(results, indent=2))
