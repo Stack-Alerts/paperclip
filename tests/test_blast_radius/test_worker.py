@@ -19,6 +19,7 @@ from blast_radius.worker import (
     _sync_statuses,
     run_loop,
     run_once,
+    main as worker_main,
 )
 
 
@@ -983,4 +984,181 @@ class TestCliArgparse:
         parser.add_argument("--old-status", type=str, default=None)
         args = parser.parse_args([])
         assert args.old_status is None
+
+
+# ---------------------------------------------------------------------------
+# main() CLI entry point
+# ---------------------------------------------------------------------------
+
+
+class TestMainCli:
+    """Tests for blast_radius.worker.main() — CLI entry point.
+
+    Verifies command-line flags are dispatched to the underlying
+    ``process_issue``, ``run_once``, and ``run_loop`` functions.
+    """
+
+    _CLEAN_ARGV = ["blast_radius.worker"]
+
+    def test_default_calls_run_once(self, monkeypatch):
+        import sys
+        monkeypatch.setattr(sys, "argv", self._CLEAN_ARGV)
+        with (
+            patch("blast_radius.worker.run_once", return_value=[]) as mock_run_once,
+        ):
+            worker_main()
+        mock_run_once.assert_called_once_with(dry_run=False, force_reprocess=False)
+
+    def test_dry_run_flag_passed_to_run_once(self, monkeypatch):
+        import sys
+        monkeypatch.setattr(
+            sys, "argv", self._CLEAN_ARGV + ["--dry-run"]
+        )
+        with (
+            patch("blast_radius.worker.run_once", return_value=[]) as mock_run_once,
+        ):
+            worker_main()
+        mock_run_once.assert_called_once_with(dry_run=True, force_reprocess=False)
+
+    def test_force_reprocess_flag_passed_to_run_once(self, monkeypatch):
+        import sys
+        monkeypatch.setattr(
+            sys, "argv", self._CLEAN_ARGV + ["--force-reprocess"]
+        )
+        with (
+            patch("blast_radius.worker.run_once", return_value=[]) as mock_run_once,
+        ):
+            worker_main()
+        mock_run_once.assert_called_once_with(dry_run=False, force_reprocess=True)
+
+    def test_loop_flag_calls_run_loop(self, monkeypatch):
+        import sys
+        monkeypatch.setattr(
+            sys, "argv", self._CLEAN_ARGV + ["--loop", "300"]
+        )
+        with (
+            patch("blast_radius.worker.run_loop") as mock_run_loop,
+        ):
+            worker_main()
+        mock_run_loop.assert_called_once_with(
+            interval_seconds=300, dry_run=False, force_reprocess=False
+        )
+
+    def test_loop_with_dry_run(self, monkeypatch):
+        import sys
+        monkeypatch.setattr(
+            sys, "argv",
+            self._CLEAN_ARGV + ["--loop", "120", "--dry-run"],
+        )
+        with (
+            patch("blast_radius.worker.run_loop") as mock_run_loop,
+        ):
+            worker_main()
+        mock_run_loop.assert_called_once_with(
+            interval_seconds=120, dry_run=True, force_reprocess=False
+        )
+
+    def test_loop_with_force_reprocess(self, monkeypatch):
+        import sys
+        monkeypatch.setattr(
+            sys, "argv",
+            self._CLEAN_ARGV + ["--loop", "60", "--force-reprocess"],
+        )
+        with (
+            patch("blast_radius.worker.run_loop") as mock_run_loop,
+        ):
+            worker_main()
+        mock_run_loop.assert_called_once_with(
+            interval_seconds=60, dry_run=False, force_reprocess=True
+        )
+
+    def test_issue_id_calls_process_issue(self, monkeypatch):
+        import sys
+        monkeypatch.setattr(
+            sys, "argv",
+            self._CLEAN_ARGV + ["--issue-id", "uuid-1"],
+        )
+        with (
+            patch("blast_radius.worker.process_issue", return_value=None) as mock_process,
+            patch("blast_radius.worker.run_once") as mock_run_once,
+        ):
+            worker_main()
+        mock_process.assert_called_once_with(
+            "uuid-1", dry_run=False, old_status=None, force_reprocess=False
+        )
+        mock_run_once.assert_not_called()
+
+    def test_issue_id_with_old_status(self, monkeypatch):
+        import sys
+        monkeypatch.setattr(
+            sys, "argv",
+            self._CLEAN_ARGV + ["--issue-id", "uuid-1", "--old-status", "in_progress"],
+        )
+        with (
+            patch("blast_radius.worker.process_issue", return_value=None) as mock_process,
+            patch("blast_radius.worker.run_once") as mock_run_once,
+        ):
+            worker_main()
+        mock_process.assert_called_once_with(
+            "uuid-1", dry_run=False, old_status="in_progress", force_reprocess=False
+        )
+        mock_run_once.assert_not_called()
+
+    def test_issue_id_with_dry_run(self, monkeypatch):
+        import sys
+        monkeypatch.setattr(
+            sys, "argv",
+            self._CLEAN_ARGV + ["--issue-id", "uuid-1", "--dry-run"],
+        )
+        with (
+            patch("blast_radius.worker.process_issue", return_value=None) as mock_process,
+            patch("blast_radius.worker.run_once") as mock_run_once,
+        ):
+            worker_main()
+        mock_process.assert_called_once_with(
+            "uuid-1", dry_run=True, old_status=None, force_reprocess=False
+        )
+        mock_run_once.assert_not_called()
+
+    def test_result_logged_for_process_issue(self, monkeypatch, caplog):
+        import logging, sys
+
+        monkeypatch.setattr(
+            sys, "argv",
+            self._CLEAN_ARGV + ["--issue-id", "uuid-1"],
+        )
+        result = {"issue": "BTCAAAAA-100", "dry_run": False}
+        with (
+            patch("blast_radius.worker.process_issue", return_value=result),
+            caplog.at_level(logging.INFO),
+        ):
+            worker_main()
+        assert any("BTCAAAAA-100" in r.message for r in caplog.records)
+
+    def test_no_report_logged_when_not_eligible(self, monkeypatch, caplog):
+        import logging, sys
+
+        monkeypatch.setattr(
+            sys, "argv",
+            self._CLEAN_ARGV + ["--issue-id", "missing-uuid"],
+        )
+        with (
+            patch("blast_radius.worker.process_issue", return_value=None),
+            caplog.at_level(logging.INFO),
+        ):
+            worker_main()
+        assert any("not eligible" in r.message for r in caplog.records)
+
+    def test_results_logged_on_run_once(self, monkeypatch, caplog):
+        import logging, sys
+
+        monkeypatch.setattr(sys, "argv", self._CLEAN_ARGV)
+        results = [{"issue": "BTCAAAAA-100", "dry_run": False}]
+        with (
+            patch("blast_radius.worker.run_once", return_value=results),
+            caplog.at_level(logging.INFO),
+        ):
+            worker_main()
+        assert any("Results" in r.message for r in caplog.records)
+        assert any("BTCAAAAA-100" in r.message for r in caplog.records)
 
