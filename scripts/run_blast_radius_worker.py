@@ -67,13 +67,14 @@ def main() -> None:
 
     if args.issue_id:
         logger.info(
-            "Processing single issue %s (dry_run=%s, old_status=%s)",
-            args.issue_id, args.dry_run, args.old_status,
+            "Processing single issue %s (dry_run=%s, old_status=%s, force_reprocess=%s)",
+            args.issue_id, args.dry_run, args.old_status, args.force_reprocess,
         )
         result = process_issue(
             args.issue_id,
             dry_run=args.dry_run,
             old_status=args.old_status,
+            force_reprocess=args.force_reprocess,
         )
         if result:
             logger.info("Issue %s result: %s", args.issue_id, result)
