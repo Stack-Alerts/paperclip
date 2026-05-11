@@ -2,7 +2,7 @@ name: Backfill — Close Stale Running Runs
 
 on:
   schedule:
-    - cron: '0 * * * *'  # hourly
+    - cron: '0 * * * *'  # hourly — auto-cleanup, runs for real
   workflow_dispatch:
     inputs:
       dry_run:
@@ -13,10 +13,14 @@ on:
         description: 'Silence threshold in minutes'
         required: false
         default: '60'
+      issue_ids:
+        description: 'Comma-separated issue identifiers to close (e.g. BTCAAAAA-1317,BTCAAAAA-1278)'
+        required: false
+        default: ''
 
 jobs:
   close-stale:
-    name: Close stale in_progress heartbeat runs
+    name: Close stale in_progress runs and issues
     runs-on: ubuntu-latest
 
     steps:
@@ -37,10 +41,14 @@ jobs:
           PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
         run: |
           FLAGS=""
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+          SCHEDULED="${{ github.event_name == 'schedule' }}"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ] && [ "$SCHEDULED" != "true" ]; then
             FLAGS="$FLAGS --dry-run"
           fi
           if [ -n "${{ github.event.inputs.stale_minutes }}" ]; then
             FLAGS="$FLAGS --stale-minutes ${{ github.event.inputs.stale_minutes }}"
+          fi
+          if [ -n "${{ github.event.inputs.issue_ids }}" ]; then
+            FLAGS="$FLAGS --issue-ids ${{ github.event.inputs.issue_ids }}"
           fi
           python scripts/backfill_close_stale_runs.py $FLAGS

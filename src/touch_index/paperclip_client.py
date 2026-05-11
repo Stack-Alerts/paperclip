@@ -236,3 +236,64 @@ def cancel_heartbeat_run(run_id: str) -> dict | None:
             return None
         resp.raise_for_status()
         return resp.json()
+
+
+def list_issues(
+    status: str | None = None,
+    limit: int = 200,
+    offset: int = 0,
+) -> list[dict]:
+    """List issues for the company, optionally filtered by *status*.
+
+    Status can be a single value ("in_progress") or comma-separated
+    ("todo,in_progress,done").
+    """
+    params: dict[str, Any] = {"limit": str(limit), "offset": str(offset)}
+    if status:
+        params["status"] = status
+    with _session() as sess:
+        resp = sess.get(
+            f"{_base()}/api/companies/{_company()}/issues",
+            params=params,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+def transition_issue_status_board(issue_id: str, status: str) -> None:
+    """Transition an issue to *status* using the board-level API key.
+
+    Bypasses the checkoutRunId validation that would block normal agent
+    transitions for ``in_progress`` issues owned by a dead/ghost run.
+
+    Requires ``PAPERCLIP_BOARD_API_KEY`` or a board-privileged key.
+    """
+    with _board_session() as sess:
+        resp = sess.patch(
+            f"{_base()}/api/issues/{issue_id}",
+            json={"status": status},
+            timeout=30,
+        )
+        resp.raise_for_status()
+
+
+def force_release_issue(
+    issue_id: str,
+    clear_assignee: bool = False,
+) -> dict | None:
+    """Admin force-release an issue, clearing its checkout lock.
+
+    Requires board-level API key.  Returns the release result dict
+    or None if 404.
+    """
+    with _board_session() as sess:
+        params = "?clearAssignee=true" if clear_assignee else ""
+        resp = sess.post(
+            f"{_base()}/api/issues/{issue_id}/admin/force-release{params}",
+            timeout=30,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()
