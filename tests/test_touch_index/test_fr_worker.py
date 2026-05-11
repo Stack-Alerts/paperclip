@@ -173,6 +173,57 @@ class TestIngestFrIssue:
         rows = conn.execute.call_args[0][1]
         assert rows[0]["fr_owner_agent_id"] == "00000000-0000-0000-0000-000000000000"
 
+    def test_dry_run_skips_db_upsert(self):
+        """When dry_run=True, the DB upsert is not called but files are reported."""
+        engine, conn = _mock_engine()
+        files = ["src/touch_index/fr_worker.py", "src/touch_index/db.py"]
+
+        with (
+            patch(
+                "touch_index.fr_worker.fetch_and_extract", return_value=files
+            ) as mock_comments,
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            result = ingest_fr_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID, dry_run=True
+            )
+
+        assert result.source == "comments"
+        assert result.files_indexed == 2
+        assert result.skipped_no_commits is False
+        conn.execute.assert_not_called()
+        mock_comments.assert_called_once()
+
+    def test_dry_run_still_extracts_files_from_all_sources(self):
+        """Dry-run should still attempt all file extraction strategies."""
+        engine, conn = _mock_engine()
+        desc_files = ["src/optimizer_v3/database/strategy_manager.py"]
+        description = (
+            "Changed `src/optimizer_v3/database/strategy_manager.py` to fix XYZ."
+        )
+
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch(
+                "touch_index.fr_worker.extract_files_from_text", return_value=desc_files
+            ) as mock_desc,
+        ):
+            result = ingest_fr_issue(
+                engine,
+                ISSUE_ID,
+                ISSUE_IDENTIFIER,
+                OWNER_AGENT_ID,
+                description=description,
+                dry_run=True,
+            )
+
+        assert result.source == "description"
+        assert result.files_indexed == 1
+        assert result.skipped_no_commits is False
+        mock_desc.assert_called_once_with(description)
+        conn.execute.assert_not_called()
+
     def test_description_not_called_when_comments_present(self):
         """Description path must be skipped if comments already found files."""
         engine, _ = _mock_engine()
@@ -271,6 +322,24 @@ class TestRunFrWorker:
         engine, _ = _mock_engine()
         results = run_fr_worker(engine, [])
         assert results == []
+
+    def test_dry_run_suppresses_db_upserts(self):
+        """When dry_run=True on batch, DB upsert is skipped for all issues."""
+        engine, conn = _mock_engine()
+
+        with (
+            patch(
+                "touch_index.fr_worker.fetch_and_extract",
+                return_value=["src/a.py", "src/b.py"],
+            ),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            results = run_fr_worker(engine, self._issues(2), dry_run=True)
+
+        assert len(results) == 2
+        assert all(not r.skipped_no_commits for r in results)
+        assert sum(r.files_indexed for r in results) == 4
+        conn.execute.assert_not_called()
 
     def test_missing_description_treated_as_empty(self):
         """Issues without a 'description' key must not raise KeyError."""
@@ -373,6 +442,32 @@ class TestProcessFrIssue:
             result = process_fr_issue(engine, ISSUE_ID)
 
         assert result is None
+
+    def test_dry_run_passed_to_ingest(self):
+        """dry_run=True on process_fr_issue is passed through to ingest_fr_issue."""
+        engine, _ = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "assigneeAgentId": OWNER_AGENT_ID,
+            "description": "",
+            "labelIds": [FDR_LABEL_ID],
+        }
+
+        with (
+            patch(
+                "touch_index.fr_worker.get_issue_by_id", return_value=issue
+            ),
+            patch(
+                "touch_index.fr_worker.fetch_and_extract",
+                return_value=["src/foo.py"],
+            ) as mock_comments,
+        ):
+            result = process_fr_issue(engine, ISSUE_ID, dry_run=True)
+
+        assert result is not None
+        assert result.files_indexed == 1
+        mock_comments.assert_called_once()
 
     def test_passes_description_to_ingest(self):
         """Description from the fetched issue must be passed to ingest_fr_issue."""

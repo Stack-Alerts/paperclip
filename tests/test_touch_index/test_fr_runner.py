@@ -98,7 +98,7 @@ class TestFrRunnerMain:
         ):
             main()
 
-        mock_worker.assert_called_once_with(engine, issues)
+        mock_worker.assert_called_once_with(engine, issues, dry_run=False)
 
     def test_cutoff_is_within_lookback_window(self, monkeypatch):
         """The cutoff passed to get_fdr_issues is ~30 min in the past."""
@@ -202,6 +202,56 @@ class TestFrRunnerMain:
 
         assert any("Failed to mark" in r.message for r in caplog.records)
 
+    def test_dry_run_skips_transition_to_done(self, monkeypatch, caplog):
+        """When --dry-run is passed, issues are NOT transitioned to done."""
+        import logging
+
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_fr_worker.py", "--dry-run"]
+        )
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "description": ""},
+            {"id": "id-2", "identifier": "BTCAAAAA-102", "description": ""},
+        ]
+        results = [
+            _make_result(files_indexed=2, skipped=False),
+            _make_result(files_indexed=0, skipped=True),
+        ]
+
+        with (
+            patch("run_touch_index_fr_worker.get_engine", return_value=_make_engine()),
+            patch("run_touch_index_fr_worker.health_check", return_value=True),
+            patch("run_touch_index_fr_worker.get_fdr_issues", return_value=issues),
+            patch("run_touch_index_fr_worker.run_fr_worker", return_value=results),
+            patch("run_touch_index_fr_worker.transition_issue_status") as mock_transition,
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        mock_transition.assert_not_called()
+        assert any("DRY RUN" in r.message for r in caplog.records)
+
+    def test_dry_run_passed_to_run_fr_worker(self, monkeypatch):
+        """When --dry-run is passed, dry_run=True is forwarded to run_fr_worker."""
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_fr_worker.py", "--dry-run"]
+        )
+        issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "description": ""}]
+        engine = _make_engine()
+
+        with (
+            patch("run_touch_index_fr_worker.get_engine", return_value=engine),
+            patch("run_touch_index_fr_worker.health_check", return_value=True),
+            patch("run_touch_index_fr_worker.get_fdr_issues", return_value=issues),
+            patch(
+                "run_touch_index_fr_worker.run_fr_worker", return_value=[]
+            ) as mock_worker,
+            patch("run_touch_index_fr_worker.transition_issue_status"),
+        ):
+            main()
+
+        mock_worker.assert_called_once_with(engine, issues, dry_run=True)
+
     def test_summary_counts_files_and_skipped(self, monkeypatch, caplog):
         """Log summary reflects total files indexed and skipped count."""
         import logging
@@ -255,7 +305,7 @@ class TestFrRunnerIssueId:
         ):
             main()
 
-        mock_process.assert_called_once_with(engine, "uuid-1")
+        mock_process.assert_called_once_with(engine, "uuid-1", dry_run=False)
         mock_fetch.assert_not_called()
 
     def test_issue_id_not_found_logs_and_returns(self, monkeypatch, caplog):
@@ -279,6 +329,34 @@ class TestFrRunnerIssueId:
 
         assert any("No FR issue found" in r.message for r in caplog.records)
 
+
+    def test_issue_id_dry_run_logged(self, monkeypatch, caplog):
+        """Webhook mode --dry-run should log dry_run=True and not transition."""
+        import logging
+
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_fr_worker.py", "--issue-id", "uuid-1", "--dry-run"]
+        )
+        result = _make_result(files_indexed=2, skipped=False)
+        engine = _make_engine()
+        result.issue_identifier = "BTCAAAAA-100"
+        result.source = "git"
+
+        with (
+            patch("run_touch_index_fr_worker.get_engine", return_value=engine),
+            patch("run_touch_index_fr_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_fr_worker.process_fr_issue", return_value=result
+            ) as mock_process,
+            patch("run_touch_index_fr_worker.get_fdr_issues"),
+            patch("run_touch_index_fr_worker.transition_issue_status") as mock_transition,
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        mock_process.assert_called_once_with(engine, "uuid-1", dry_run=True)
+        mock_transition.assert_not_called()
+        assert any("dry_run=True" in r.message for r in caplog.records)
 
     def test_issue_id_result_logged(self, monkeypatch, caplog):
         """When process_fr_issue succeeds, the result is logged with file count and source."""
@@ -304,7 +382,7 @@ class TestFrRunnerIssueId:
         ):
             main()
 
-        mock_process.assert_called_once_with(engine, "uuid-1")
+        mock_process.assert_called_once_with(engine, "uuid-1", dry_run=False)
         mock_fetch.assert_not_called()
         assert any("2 files indexed" in r.message for r in caplog.records)
         assert any("via git" in r.message for r in caplog.records)
