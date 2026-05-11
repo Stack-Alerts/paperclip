@@ -626,9 +626,8 @@ class ConfigDiscoveryResultsDialog(WindowGeometryMixin, QDialog):
         summary_layout = QVBoxLayout(summary_group)
         self._summary_text = QTextEdit()
         self._summary_text.setReadOnly(True)
-        self._summary_text.setStyleSheet(get_text_edit_stylesheet())
-        # Monospace font for detail pane — 13pt per UX spec (one size up from prior 12pt)
-        self._summary_text.setFont(create_monospace_font(13))
+        # 11pt: stylesheet font-size takes precedence over setFont(); pass size directly
+        self._summary_text.setStyleSheet(get_text_edit_stylesheet(font_size_pt=11))
         summary_layout.addWidget(self._summary_text)
         splitter.addWidget(summary_group)
 
