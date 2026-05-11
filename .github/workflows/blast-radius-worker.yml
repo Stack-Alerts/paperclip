@@ -48,6 +48,7 @@ jobs:
       POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'optimizer_v3' }}
       POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'optimizer_admin' }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      PYTHONPATH: src
 
     steps:
       - uses: actions/checkout@v4
@@ -61,7 +62,9 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install requests python-dotenv SQLAlchemy psycopg2-binary
+
+      - name: Ensure data directory exists
+        run: mkdir -p data
 
       - name: Restore worker state cache
         id: cache-state
@@ -72,16 +75,11 @@ jobs:
           restore-keys: |
             blast-radius-state-
 
-      - name: Ensure data directory exists
-        run: mkdir -p data
-
       - name: Resolve issue ID and old_status (event payload)
         id: resolve-issue
         run: |
-          # workflow_dispatch
           ISSUE_ID="${{ github.event.inputs.issue_id || '' }}"
           OLD_STATUS="${{ github.event.inputs.old_status || '' }}"
-          # repository_dispatch client_payload
           if [ -z "$ISSUE_ID" ] && [ -n "${{ github.event.client_payload.issue_id || '' }}" ]; then
             ISSUE_ID="${{ github.event.client_payload.issue_id }}"
             OLD_STATUS="${{ github.event.client_payload.old_status || '' }}"
@@ -101,15 +99,13 @@ jobs:
           ISSUE_ID="${{ steps.resolve-issue.outputs.issue_id }}"
           OLD_STATUS="${{ steps.resolve-issue.outputs.old_status }}"
           if [ -n "$ISSUE_ID" ]; then
-            CMD="python scripts/run_blast_radius_worker.py --issue-id \"$ISSUE_ID\""
-            if [ -n "$OLD_STATUS" ]; then
-              CMD="$CMD --old-status \"$OLD_STATUS\""
-            fi
-            eval "$CMD $FLAGS"
+            python -m blast_radius --issue-id "$ISSUE_ID" \
+              ${OLD_STATUS:+--old-status "$OLD_STATUS"} \
+              $FLAGS
           elif [ "${{ github.event.inputs.loop_seconds }}" != "0" ] && [ -n "${{ github.event.inputs.loop_seconds }}" ]; then
-            python scripts/run_blast_radius_worker.py --loop ${{ github.event.inputs.loop_seconds }} $FLAGS
+            python -m blast_radius --loop ${{ github.event.inputs.loop_seconds }} $FLAGS
           else
-            python scripts/run_blast_radius_worker.py $FLAGS
+            python -m blast_radius $FLAGS
           fi
 
       - name: Save worker state cache
