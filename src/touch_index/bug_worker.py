@@ -127,11 +127,18 @@ def process_bug_issue(
     """Fetch a single issue from Paperclip API and ingest as a bug.
 
     This is the webhook/event-driven entry point.  Returns None if the
-    issue is not found or is FDR-labelled (handled by the FR worker).
+    issue is not found, is not done, or is FDR-labelled (handled by
+    the FR worker).
     """
     issue = get_issue_by_id(issue_id)
     if issue is None:
         logger.info("Bug issue %s not found — skipping", issue_id)
+        return None
+    if issue.get("status") != "done":
+        logger.info(
+            "Bug issue %s has status %r — skipping (only done issues are ingested)",
+            issue.get("identifier"), issue.get("status"),
+        )
         return None
     if FDR_LABEL_ID in (issue.get("labelIds") or []):
         logger.info("Bug issue %s is FDR-labelled — skipping", issue_id)
