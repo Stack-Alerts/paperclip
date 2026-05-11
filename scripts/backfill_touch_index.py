@@ -64,11 +64,6 @@ def _report(msg: str = "") -> None:
     print(msg)  # noqa: T201 - intentional CLI report output
 
 
-def _report(msg: str = "") -> None:
-    """Print a line to stdout (report output, not logging)."""
-    print(msg)  # noqa: T201 - intentional CLI report output
-
-
 def _git_commits_in_window(days: int) -> list[tuple[str, str, datetime]]:
     """Return (sha, subject, commit_dt) for commits in the last `days` days."""
     since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
