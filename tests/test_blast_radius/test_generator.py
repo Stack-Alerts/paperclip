@@ -256,6 +256,7 @@ class TestGetIssue:
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"id": "iss-1", "identifier": "BTCAAAAA-100"}
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.get.return_value = mock_resp
 
         monkeypatch.setattr(
@@ -274,6 +275,7 @@ class TestGetIssue:
         mock_resp = MagicMock()
         mock_resp.raise_for_status.side_effect = RuntimeError("404 Not Found")
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.get.return_value = mock_resp
 
         monkeypatch.setattr(
@@ -293,6 +295,7 @@ class TestGetAgentName:
         mock_resp.ok = True
         mock_resp.json.return_value = {"name": "CoderBot"}
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.get.return_value = mock_resp
 
         monkeypatch.setattr(
@@ -310,6 +313,7 @@ class TestGetAgentName:
         mock_resp.ok = True
         mock_resp.json.return_value = {"nameKey": "agent-coder-01"}
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.get.return_value = mock_resp
 
         monkeypatch.setattr(
@@ -326,6 +330,7 @@ class TestGetAgentName:
         mock_resp = MagicMock()
         mock_resp.ok = False
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.get.return_value = mock_resp
 
         monkeypatch.setattr(
@@ -343,6 +348,7 @@ class TestGetAgentName:
             raise ConnectionError("Network timeout")
 
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.get.side_effect = thrower
 
         monkeypatch.setattr(
@@ -360,6 +366,7 @@ class TestGetAgentName:
         mock_resp.ok = True
         mock_resp.json.return_value = {"id": "agent-uuid"}
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.get.return_value = mock_resp
 
         monkeypatch.setattr(
@@ -377,6 +384,7 @@ class TestPostComment:
 
         mock_resp = MagicMock()
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.post.return_value = mock_resp
 
         monkeypatch.setattr(
@@ -401,6 +409,7 @@ class TestPostComment:
         mock_resp = MagicMock()
         mock_resp.raise_for_status.side_effect = RuntimeError("422 Unprocessable")
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.post.return_value = mock_resp
 
         monkeypatch.setattr(
@@ -420,6 +429,7 @@ class TestPostComment:
 
         mock_resp = MagicMock()
         mock_sess = MagicMock()
+        mock_sess.__enter__.return_value = mock_sess
         mock_sess.post.return_value = mock_resp
 
         monkeypatch.setattr(

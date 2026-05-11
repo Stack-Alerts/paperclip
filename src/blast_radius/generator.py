@@ -31,33 +31,33 @@ def _run_headers() -> dict[str, str]:
 
 
 def _get_issue(issue_id: str) -> dict:
-    sess = _session()
-    resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=15)
-    resp.raise_for_status()
-    return resp.json()
+    with _session() as sess:
+        resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=15)
+        resp.raise_for_status()
+        return resp.json()
 
 
 def _get_agent_name(agent_id: str) -> str | None:
     try:
-        sess = _session()
-        resp = sess.get(f"{_base()}/api/agents/{agent_id}", timeout=10)
-        if resp.ok:
-            data = resp.json()
-            return data.get("name") or data.get("nameKey") or None
+        with _session() as sess:
+            resp = sess.get(f"{_base()}/api/agents/{agent_id}", timeout=10)
+            if resp.ok:
+                data = resp.json()
+                return data.get("name") or data.get("nameKey") or None
     except Exception:
         pass
     return None
 
 
 def _post_comment(issue_id: str, body: str) -> None:
-    sess = _session()
-    sess.headers.update(_run_headers())
-    resp = sess.post(
-        f"{_base()}/api/issues/{issue_id}/comments",
-        json={"body": body},
-        timeout=15,
-    )
-    resp.raise_for_status()
+    with _session() as sess:
+        sess.headers.update(_run_headers())
+        resp = sess.post(
+            f"{_base()}/api/issues/{issue_id}/comments",
+            json={"body": body},
+            timeout=15,
+        )
+        resp.raise_for_status()
 
 
 def generate_and_post(
