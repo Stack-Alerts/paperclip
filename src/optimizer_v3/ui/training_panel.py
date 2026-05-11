@@ -28,6 +28,7 @@ Provided a forward-looking signal analysis UI with:
 - Resource estimation, progress tracking, and results export
 """
 
+import logging
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -56,6 +57,9 @@ from src.strategy_builder.ui.styles import (
 
 # Import configuration
 from src.optimizer_v3.config.training_config import get_training_config
+from src.optimizer_v3.database import calibration_cache
+
+logger = logging.getLogger(__name__)
 
 
 class TrainingPanelUI(QWidget):
@@ -95,10 +99,22 @@ class TrainingPanelUI(QWidget):
         
         # Training worker
         self.training_thread = None
-        
+
         # Timeframe checkboxes (inline, replaces QListWidget)
         self.timeframe_checkboxes = {}
-        
+
+        # Calibration cache — shared with BacktestConfigPanel via disk store
+        self._calibration_fingerprint: Optional[str] = None
+        self._calibration_cache: Optional[dict] = None
+        self._calibration_cache_from_disk: bool = False
+        self._pending_fingerprint: Optional[str] = None  # fingerprint in-flight during TrainingThread
+        _fp, _dm = calibration_cache.load_cache()
+        if _fp is not None:
+            self._calibration_fingerprint = _fp
+            self._calibration_cache = _dm
+            self._calibration_cache_from_disk = True
+            logger.info("Manual calibration: shared cache loaded from disk.")
+
         # Setup UI
         self._setup_ui()
     
@@ -582,6 +598,63 @@ class TrainingPanelUI(QWidget):
     
     def _execute_training(self, config: dict):
         """Execute calibration with given configuration"""
+        # ------------------------------------------------------------------
+        # Cache gate — check shared calibration cache before spawning TrainingThread
+        # ------------------------------------------------------------------
+        block_names = config['blocks']  # list[str] from checkbox text
+        timeframe = ",".join(sorted(config['timeframes']))
+        current_fingerprint = calibration_cache.compute_fingerprint(
+            block_names=block_names,
+            timeframe=timeframe,
+            period_days=config['period_days'],
+            mode=config['mode'],
+        )
+
+        if (
+            self._calibration_fingerprint is not None
+            and self._calibration_cache is not None
+            and current_fingerprint == self._calibration_fingerprint
+        ):
+            _source = "loaded from disk" if self._calibration_cache_from_disk else "in-session"
+            logger.info(f"Manual calibration: cache hit ({_source}).")
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Cached Results Available")
+            msg_box.setText(
+                "Cached calibration results are available for the selected settings.\n\n"
+                "Use cached results, or re-calibrate?"
+            )
+            use_btn = msg_box.addButton("Use Cached", QMessageBox.AcceptRole)
+            msg_box.addButton("Re-calibrate", QMessageBox.DestructiveRole)
+            msg_box.setDefaultButton(use_btn)
+            msg_box.exec_()
+
+            if msg_box.clickedButton() == use_btn:
+                cached_delay_map = self._calibration_cache
+                logger.info(
+                    f"Manual calibration: applying cached delay_map "
+                    f"(cache hit — skipping TrainingThread). "
+                    f"Blocks: {list(cached_delay_map.keys())}"
+                )
+                result_lines = ["✓ Cached calibration results applied.\n", "Block → Optimal Delay:"]
+                for name, delay in cached_delay_map.items():
+                    result_lines.append(f"  {name}: {delay} bars")
+                    logger.info(
+                        f"Manual calibration: cached optimal_delay={delay} for block '{name}'"
+                    )
+                self.results_text.setPlainText("\n".join(result_lines))
+                self.status_label.setText("Status: Using cached calibration results ✓")
+                self.status_label.setStyleSheet(
+                    f"color: {get_color('success')}; font-weight: bold;"
+                )
+                self.export_btn.setEnabled(True)
+                return
+
+            logger.info("Manual calibration: user chose re-calibrate, ignoring cache.")
+
+        # Store fingerprint so _on_training_complete can write the cache on success
+        self._pending_fingerprint = current_fingerprint
+        # ------------------------------------------------------------------
+
         self.training_running = True
         
         # Update UI state
@@ -703,28 +776,45 @@ class TrainingPanelUI(QWidget):
     def _on_training_complete(self, results: list):
         """Handle calibration completion"""
         self._reset_ui_state()
-        
+
         # Update status
         self.status_label.setText("Status: Calibration complete ✓")
         self.status_label.setStyleSheet(f"color: {get_color('success')}; font-weight: bold;")
         self.progress_bar.setValue(100)
         self.eta_label.setText("ETA: Complete")
-        
+
         # Enable export
         self.export_btn.setEnabled(True)
-        
+
+        # Write results to shared calibration cache
+        if self._pending_fingerprint is not None:
+            delay_map: dict = {}
+            for r in results:
+                name = r.get('signal_name', '')
+                delay = r.get('optimal_delay')
+                if name and delay is not None:
+                    delay_map[name] = int(delay)
+            if delay_map:
+                self._calibration_fingerprint = self._pending_fingerprint
+                self._calibration_cache = delay_map
+                self._calibration_cache_from_disk = False
+                calibration_cache.save_cache(self._pending_fingerprint, delay_map)
+                logger.info("Manual calibration: shared cache updated with new fingerprint.")
+            self._pending_fingerprint = None
+
         # Display summary
         summary = f"\n\n{'='*50}\nCALIBRATION COMPLETE\n{'='*50}\n"
         summary += f"Total results: {len(results)}\n"
         summary += f"High confidence (>80%): {len([r for r in results if r.get('confidence', 0) > 0.8])}\n"
         summary += f"Medium confidence (50-80%): {len([r for r in results if 0.5 <= r.get('confidence', 0) <= 0.8])}\n"
         summary += f"Low confidence (<50%): {len([r for r in results if r.get('confidence', 0) < 0.5])}\n"
-        
+
         current_text = self.results_text.toPlainText()
         self.results_text.setPlainText(current_text + summary)
     
     def _on_training_error(self, error_message: str):
         """Handle calibration error"""
+        self._pending_fingerprint = None
         self._reset_ui_state()
         
         # Update status
