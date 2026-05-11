@@ -278,3 +278,33 @@ class TestFrRunnerIssueId:
             main()
 
         assert any("No FR issue found" in r.message for r in caplog.records)
+
+
+    def test_issue_id_result_logged(self, monkeypatch, caplog):
+        """When process_fr_issue succeeds, the result is logged with file count and source."""
+        import logging
+
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_fr_worker.py", "--issue-id", "uuid-1"]
+        )
+        result = _make_result(files_indexed=2, skipped=False)
+        engine = _make_engine()
+        result.issue_identifier = "BTCAAAAA-100"
+        result.source = "git"
+
+        with (
+            patch("run_touch_index_fr_worker.get_engine", return_value=engine),
+            patch("run_touch_index_fr_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_fr_worker.process_fr_issue", return_value=result
+            ) as mock_process,
+            patch("run_touch_index_fr_worker.get_fdr_issues") as mock_fetch,
+            patch("run_touch_index_fr_worker.transition_issue_status"),
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        mock_process.assert_called_once_with(engine, "uuid-1")
+        mock_fetch.assert_not_called()
+        assert any("2 files indexed" in r.message for r in caplog.records)
+        assert any("via git" in r.message for r in caplog.records)
