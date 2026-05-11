@@ -334,6 +334,7 @@ class TestProcessBugIssue:
         issue = {
             "id": ISSUE_ID,
             "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
             "completedAt": "2026-05-11T12:00:00Z",
         }
         files = ["src/touch_index/bug_worker.py"]
@@ -391,6 +392,7 @@ class TestProcessBugIssue:
         issue = {
             "id": ISSUE_ID,
             "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
         }
 
         with (
@@ -415,6 +417,7 @@ class TestProcessBugIssue:
         issue = {
             "id": ISSUE_ID,
             "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
             "labelIds": ["some-other-label-uuid"],
             "completedAt": "2026-05-11T12:00:00Z",
         }
@@ -432,6 +435,24 @@ class TestProcessBugIssue:
 
         assert result is not None
         assert result.files_indexed == 1
+
+    def test_skips_non_done_issues(self):
+        """Issues not in done status should be skipped."""
+        engine, _ = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "in_progress",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_issue_by_id", return_value=issue
+            ),
+        ):
+            result = process_bug_issue(engine, ISSUE_ID)
+
+        assert result is None
 
 
 class TestBugWorkerDryRun:
@@ -498,6 +519,7 @@ class TestBugWorkerDryRun:
         issue = {
             "id": ISSUE_ID,
             "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
             "completedAt": "2026-05-11T12:00:00Z",
         }
 
