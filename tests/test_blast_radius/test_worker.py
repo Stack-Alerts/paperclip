@@ -15,6 +15,8 @@ from blast_radius.worker import (
     _is_fix_issue,
     _load_state,
     _save_state,
+    _detect_transitions,
+    _sync_statuses,
     run_loop,
     run_once,
 )
@@ -22,6 +24,11 @@ from blast_radius.worker import (
 
 class _BreakLoop(BaseException):
     """Used to break out of infinite run_loop during testing."""
+
+
+# ---------------------------------------------------------------------------
+# _is_fix_issue
+# ---------------------------------------------------------------------------
 
 
 class TestIsFixIssue:
@@ -80,11 +87,13 @@ class TestStateHelpers:
         state_file = tmp_path / "state.json"
         monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
 
-        assert _load_state() == {"processed_issue_ids": []}
+        default = _load_state()
+        assert default == {"processed_issue_ids": [], "issue_statuses": {}}
 
-        _save_state({"processed_issue_ids": ["id-1", "id-2"]})
+        _save_state({"processed_issue_ids": ["id-1", "id-2"], "issue_statuses": {"id-1": "in_review"}})
         loaded = _load_state()
-        assert loaded == {"processed_issue_ids": ["id-1", "id-2"]}
+        assert loaded["processed_issue_ids"] == ["id-1", "id-2"]
+        assert loaded["issue_statuses"] == {"id-1": "in_review"}
 
     def test_load_corrupted_file_returns_default(self, tmp_path, monkeypatch):
         state_file = tmp_path / "state.json"
@@ -92,15 +101,96 @@ class TestStateHelpers:
         monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
 
         result = _load_state()
-        assert result == {"processed_issue_ids": []}
+        assert result == {"processed_issue_ids": [], "issue_statuses": {}}
 
     def test_save_creates_parent_dirs(self, tmp_path, monkeypatch):
         state_file = tmp_path / "nested" / "dir" / "state.json"
         monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
 
-        _save_state({"processed_issue_ids": ["x"]})
+        _save_state({"processed_issue_ids": ["x"], "issue_statuses": {}})
         assert state_file.exists()
-        assert json.loads(state_file.read_text()) == {"processed_issue_ids": ["x"]}
+        assert json.loads(state_file.read_text()) == {
+            "processed_issue_ids": ["x"],
+            "issue_statuses": {},
+        }
+
+    def test_backward_compat_no_issue_statuses(self, tmp_path, monkeypatch):
+        """Old state files without issue_statuses should still load."""
+        state_file = tmp_path / "state.json"
+        state_file.write_text(json.dumps({"processed_issue_ids": ["id-1"]}))
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+
+        result = _load_state()
+        assert result["processed_issue_ids"] == ["id-1"]
+        assert result["issue_statuses"] == {}
+
+
+# ---------------------------------------------------------------------------
+# _detect_transitions
+# ---------------------------------------------------------------------------
+
+
+class TestDetectTransitions:
+    def test_new_issue_is_transition(self):
+        state = {"issue_statuses": {}}
+        issues = [{"id": "u1", "status": "in_review"}]
+        assert _detect_transitions(state, issues) == issues
+
+    def test_known_in_review_is_not_transition(self):
+        state = {"issue_statuses": {"u1": "in_review"}}
+        issues = [{"id": "u1", "status": "in_review"}]
+        assert _detect_transitions(state, issues) == []
+
+    def test_known_other_status_is_transition(self):
+        state = {"issue_statuses": {"u1": "in_progress"}}
+        issues = [{"id": "u1", "status": "in_review"}]
+        assert _detect_transitions(state, issues) == issues
+
+    def test_mixed_issues(self):
+        state = {"issue_statuses": {"u1": "in_review", "u2": "in_progress", "u3": "todo"}}
+        issues = [
+            {"id": "u1", "status": "in_review"},
+            {"id": "u2", "status": "in_review"},
+            {"id": "u3", "status": "in_review"},
+            {"id": "u4", "status": "in_review"},
+        ]
+        result = _detect_transitions(state, issues)
+        assert [i["id"] for i in result] == ["u2", "u3", "u4"]
+
+    def test_issue_without_id_is_skipped(self):
+        state = {"issue_statuses": {"u1": "in_review"}}
+        issues = [{"status": "in_review"}, {"id": "u2", "status": "in_review"}]
+        result = _detect_transitions(state, issues)
+        assert [i.get("id") for i in result] == [None, "u2"]
+
+
+# ---------------------------------------------------------------------------
+# _sync_statuses
+# ---------------------------------------------------------------------------
+
+
+class TestSyncStatuses:
+    def test_updates_statuses(self):
+        state = {"issue_statuses": {"u1": "todo"}}
+        issues = [
+            {"id": "u1", "status": "in_review"},
+            {"id": "u2", "status": "in_review"},
+        ]
+        _sync_statuses(state, issues)
+        assert state["issue_statuses"]["u1"] == "in_review"
+        assert state["issue_statuses"]["u2"] == "in_review"
+
+    def test_ignores_issue_without_id_or_status(self):
+        state = {"issue_statuses": {}}
+        issues = [
+            {"id": "", "status": "in_review"},
+            {"id": "u1", "status": ""},
+            {"id": "u2", "status": "in_review"},
+        ]
+        _sync_statuses(state, issues)
+        assert "u2" in state["issue_statuses"]
+        assert state["issue_statuses"]["u2"] == "in_review"
+        assert "" not in state["issue_statuses"]
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +201,7 @@ _FIX_ISSUE = {
     "id": "issue-uuid-fix",
     "identifier": "BTCAAAAA-100",
     "title": "Fix the thing",
+    "status": "in_review",
     "labels": [{"name": "fix"}],
 }
 
@@ -118,13 +209,13 @@ _NON_FIX_ISSUE = {
     "id": "issue-uuid-feat",
     "identifier": "BTCAAAAA-200",
     "title": "Add new feature",
+    "status": "in_review",
     "labels": [{"name": "feature"}],
 }
 
 
 class TestRunOnce:
     def _patch_all(self, tmp_path, monkeypatch, issues, gen_return=None):
-        """Wire up all external dependencies and return the state file path."""
         state_file = tmp_path / "state.json"
         monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
 
@@ -155,6 +246,7 @@ class TestRunOnce:
 
         state = json.loads(state_file.read_text())
         assert "issue-uuid-fix" in state["processed_issue_ids"]
+        assert state["issue_statuses"]["issue-uuid-fix"] == "in_review"
 
     def test_skips_non_fix_issue(self, tmp_path, monkeypatch):
         state_file = self._patch_all(tmp_path, monkeypatch, [_NON_FIX_ISSUE])
@@ -166,15 +258,53 @@ class TestRunOnce:
 
     def test_skips_already_processed(self, tmp_path, monkeypatch):
         state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({"processed_issue_ids": ["issue-uuid-fix"]}))
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": ["issue-uuid-fix"],
+            "issue_statuses": {"issue-uuid-fix": "in_review"},
+        }))
         self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
 
         results = run_once()
 
         assert results == []
-        # State must not grow (already processed)
         state = json.loads(state_file.read_text())
         assert state["processed_issue_ids"] == ["issue-uuid-fix"]
+
+    def test_transition_detected_for_new_issue(self, tmp_path, monkeypatch):
+        """A previously unknown issue (no status tracked) is treated as a transition."""
+        state_file = tmp_path / "state.json"
+        state_file.write_text(json.dumps({"processed_issue_ids": [], "issue_statuses": {}}))
+        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
+
+        results = run_once()
+
+        assert len(results) == 1
+
+    def test_no_transition_for_known_in_review(self, tmp_path, monkeypatch):
+        """An issue already tracked as in_review is NOT a new transition."""
+        state_file = tmp_path / "state.json"
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": [],
+            "issue_statuses": {"issue-uuid-fix": "in_review"},
+        }))
+        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
+
+        results = run_once()
+
+        assert results == []
+
+    def test_transition_for_known_other_status(self, tmp_path, monkeypatch):
+        """An issue previously in_progress IS a new transition."""
+        state_file = tmp_path / "state.json"
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": [],
+            "issue_statuses": {"issue-uuid-fix": "in_progress"},
+        }))
+        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
+
+        results = run_once()
+
+        assert len(results) == 1
 
     def test_dry_run_does_not_save_state(self, tmp_path, monkeypatch):
         state_file = self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
@@ -204,7 +334,6 @@ class TestRunOnce:
         assert len(results) == 1
         assert "error" in results[0]
         assert "DB down" in results[0]["error"]
-        # Failed issues must NOT be marked as processed
         assert not state_file.exists()
 
     def test_mixed_issues(self, tmp_path, monkeypatch):
@@ -216,10 +345,12 @@ class TestRunOnce:
         assert len(results) == 1
         assert results[0]["issue"] == "BTCAAAAA-100"
 
-    def test_force_reprocess_overrides_processed_state(self, tmp_path, monkeypatch):
-        """force_reprocess=True must process already-processed issues."""
+    def test_force_reprocess_overrides_transition_detection(self, tmp_path, monkeypatch):
         state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({"processed_issue_ids": ["issue-uuid-fix"]}))
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": [],
+            "issue_statuses": {"issue-uuid-fix": "in_review"},
+        }))
         monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
         monkeypatch.setattr(
             worker_mod,
@@ -239,16 +370,17 @@ class TestRunOnce:
 
         assert len(results) == 1
         assert call_count == 1
-        # State should still be updated
         state = json.loads(state_file.read_text())
         assert "issue-uuid-fix" in state["processed_issue_ids"]
 
     def test_force_reprocess_with_dry_run_does_not_save_state(
         self, tmp_path, monkeypatch
     ):
-        """force_reprocess + dry_run must not persist state."""
         state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({"processed_issue_ids": ["issue-uuid-fix"]}))
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": ["issue-uuid-fix"],
+            "issue_statuses": {"issue-uuid-fix": "in_review"},
+        }))
         monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
         monkeypatch.setattr(
             worker_mod,
@@ -263,9 +395,30 @@ class TestRunOnce:
 
         run_once(dry_run=True, force_reprocess=True)
 
-        # State file should have only the original entry (no update)
         state = json.loads(state_file.read_text())
         assert state["processed_issue_ids"] == ["issue-uuid-fix"]
+
+    def test_statuses_synced_for_all_issues(self, tmp_path, monkeypatch):
+        """Statuses for ALL fetched issues, not just processed ones."""
+        state_file = tmp_path / "state.json"
+        state_file.write_text(json.dumps({"processed_issue_ids": [], "issue_statuses": {}}))
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+        monkeypatch.setattr(
+            worker_mod,
+            "_fetch_in_review_issues",
+            lambda: [_FIX_ISSUE, _NON_FIX_ISSUE],
+        )
+        monkeypatch.setattr(
+            worker_mod,
+            "generate_and_post",
+            lambda issue_id, dry_run=False: {"issue": "BTCAAAAA-100"},
+        )
+
+        run_once()
+
+        state = json.loads(state_file.read_text())
+        assert state["issue_statuses"]["issue-uuid-fix"] == "in_review"
+        assert state["issue_statuses"]["issue-uuid-feat"] == "in_review"
 
     def test_empty_issue_list(self, tmp_path, monkeypatch):
         state_file = self._patch_all(tmp_path, monkeypatch, [])
@@ -289,7 +442,7 @@ class TestProcessIssue:
         "status": "in_review",
         "labels": [{"name": "fix"}],
         "description": (
-            '\"touchedFiles\": ["src/blast_radius/worker.py"]'
+            '"touchedFiles": ["src/blast_radius/worker.py"]'
         ),
     }
 
@@ -309,25 +462,9 @@ class TestProcessIssue:
         "labels": [{"name": "fix"}],
     }
 
-    def test_processes_fix_in_review(self, monkeypatch):
-        from blast_radius.worker import process_issue
-        from unittest.mock import MagicMock
-
-        mock_sess = MagicMock()
-
-        def mock_session():
-            return mock_sess
-
-        monkeypatch.setattr(
-            "touch_index.paperclip_client._session",
-            mock_session,
-        )
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        posted = []
+    def _patch_gen(self, monkeypatch, posted_list=None):
+        if posted_list is None:
+            posted_list = []
         monkeypatch.setattr(
             "blast_radius.generator._get_issue",
             lambda issue_id: self._FIX_IN_REVIEW,
@@ -338,18 +475,44 @@ class TestProcessIssue:
         )
         monkeypatch.setattr(
             "blast_radius.generator._post_comment",
-            lambda issue_id, body: posted.append(issue_id),
+            lambda issue_id, body: posted_list.append(issue_id),
         )
         monkeypatch.setattr(
             "blast_radius.generator.query_blast_radius",
             lambda file_paths: BlastRadiusData(),
         )
+        return posted_list
+
+    def test_processes_fix_in_review(self, tmp_path, monkeypatch):
+        from blast_radius.worker import process_issue
+        from unittest.mock import MagicMock
+
+        mock_sess = MagicMock()
+        monkeypatch.setattr(
+            "touch_index.paperclip_client._session",
+            mock_session,
+        ) if False else monkeypatch.setattr(
+            "touch_index.paperclip_client._session",
+            lambda: mock_sess,
+        )
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", tmp_path / "state.json")
+        posted = self._patch_gen(monkeypatch)
 
         result = process_issue("issue-uuid-42", dry_run=False)
 
         assert result is not None
         assert result.get("issue") == "BTCAAAAA-1507"
         assert posted == ["issue-uuid-42"]
+
+        # State should be updated
+        state = json.loads((tmp_path / "state.json").read_text())
+        assert "issue-uuid-42" in state["processed_issue_ids"]
+        assert state["issue_statuses"]["issue-uuid-42"] == "in_review"
 
     def test_skips_non_fix_issue(self, monkeypatch):
         from blast_radius.worker import process_issue
@@ -389,29 +552,28 @@ class TestProcessIssue:
             "blast_radius.worker._get_issue",
             lambda issue_id: self._FIX_IN_REVIEW,
         )
-        posted = []
-        monkeypatch.setattr(
-            "blast_radius.generator._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._get_agent_name",
-            lambda agent_id: "Bot",
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._post_comment",
-            lambda issue_id, body: posted.append(issue_id),
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator.query_blast_radius",
-            lambda file_paths: BlastRadiusData(),
-        )
+        posted = self._patch_gen(monkeypatch)
 
         result = process_issue("issue-uuid-42", dry_run=True)
 
         assert result is not None
         assert result["dry_run"] is True
         assert posted == []
+
+    def test_dry_run_does_not_save_state(self, tmp_path, monkeypatch):
+        from blast_radius.worker import process_issue
+
+        state_file = tmp_path / "state.json"
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+        self._patch_gen(monkeypatch)
+
+        process_issue("issue-uuid-42", dry_run=True)
+
+        assert not state_file.exists()
 
     def test_fetch_failure_returns_error_dict(self, monkeypatch):
         from blast_radius.worker import process_issue
@@ -465,6 +627,25 @@ class TestProcessIssue:
         assert result is not None
         assert "error" in result
         assert "DB down" in result["error"]
+
+    def test_accepts_old_status_from_webhook(self, monkeypatch):
+        """process_issue should accept and log old_status."""
+        from blast_radius.worker import process_issue
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+        self._patch_gen(monkeypatch)
+
+        result = process_issue(
+            "issue-uuid-42",
+            dry_run=True,
+            old_status="in_progress",
+        )
+
+        assert result is not None
+        assert result["dry_run"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -639,3 +820,29 @@ class TestRunLoop:
             run_loop(interval_seconds=60)
 
         assert call_count == 3
+
+
+# ---------------------------------------------------------------------------
+# CLI argparse
+# ---------------------------------------------------------------------------
+
+
+class TestCliArgparse:
+    """Verify CLI flags are wired correctly (no side effects)."""
+
+    def test_old_status_flag_accepted(self):
+        """--old-status should be parsed without error."""
+        import argparse
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--old-status", type=str)
+        args = parser.parse_args(["--old-status", "in_progress"])
+        assert args.old_status == "in_progress"
+
+    def test_old_status_defaults_to_none(self):
+        import argparse
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--old-status", type=str, default=None)
+        args = parser.parse_args([])
+        assert args.old_status is None

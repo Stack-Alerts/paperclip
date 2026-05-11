@@ -1,23 +1,31 @@
-"""Blast Radius polling worker + single-issue webhook handler.
+"""Blast Radius polling worker — detect fix→in_review transitions and post reports.
 
-Polls Paperclip for fix/bug issues that have transitioned to `in_review` since
-the last run, generates a Blast Radius Report for each, and posts it as a comment.
+Polls Paperclip for fix/bug issues that have transitioned to ``in_review``
+since the last run, generates a Blast Radius Report for each, and posts it
+as a comment.
 
-A process_issue() entry point is provided for event-driven use: call it with
-an issue ID obtained from a Paperclip webhook to process a single issue on demand.
+Transition detection is explicit: the worker tracks the last-known status of
+each issue in the state file and only generates reports when the previous
+status was *not* ``in_review``.  This avoids re-processing issues that were
+already ``in_review`` during a prior poll cycle.
+
+A ``process_issue()`` entry point is provided for event-driven use: call it
+with an issue ID and optional ``old_status`` (from a Paperclip webhook
+payload) to process a single issue on demand.
 
 State is persisted in a JSON file so the worker is safe to restart.
 
 Usage
 -----
-    python -m blast_radius.worker                      # run once, then exit
-    python -m blast_radius.worker --issue-id <uuid>    # process a single issue
-    python -m blast_radius.worker --loop 120           # poll every 120 s forever
-    python -m blast_radius.worker --dry-run            # log reports, don't post
-    python -m blast_radius.worker --force-reprocess    # re-process already-seen issues
+    python -m blast_radius.worker                         # run once, then exit
+    python -m blast_radius.worker --issue-id <uuid>       # process a single issue
+    python -m blast_radius.worker --issue-id <uuid> --old-status in_progress
+    python -m blast_radius.worker --loop 120              # poll every 120 s forever
+    python -m blast_radius.worker --dry-run               # log reports, don't post
+    python -m blast_radius.worker --force-reprocess       # re-process already-seen issues
 
 FIX_LABELS env var (comma-separated): label names that mark an issue as a fix/bug.
-Defaults to "fix,bug,bugfix".
+Defaults to ``fix,bug,bugfix``.
 """
 
 from __future__ import annotations
@@ -49,12 +57,26 @@ _STATE_PATH = Path(
 
 
 def _load_state() -> dict:
+    """Load persisted state or return defaults.
+
+    State shape::
+
+        {
+            "processed_issue_ids": ["<uuid>", ...],
+            "issue_statuses": {"<uuid>": "in_review", ...},
+        }
+    """
     if _STATE_PATH.exists():
         try:
-            return json.loads(_STATE_PATH.read_text())
+            data = json.loads(_STATE_PATH.read_text())
+            if "issue_statuses" not in data:
+                data["issue_statuses"] = {}
+            if "processed_issue_ids" not in data:
+                data["processed_issue_ids"] = []
+            return data
         except Exception:
             pass
-    return {"processed_issue_ids": []}
+    return {"processed_issue_ids": [], "issue_statuses": {}}
 
 
 def _save_state(state: dict) -> None:
@@ -63,7 +85,7 @@ def _save_state(state: dict) -> None:
 
 
 def _fetch_in_review_issues() -> list[dict]:
-    """Return all `in_review` issues from the company (paginated)."""
+    """Return all ``in_review`` issues from the company (paginated)."""
     return _paginate(
         f"/api/companies/{_company()}/issues",
         {"status": "in_review"},
@@ -82,12 +104,41 @@ def _is_fix_issue(issue: dict) -> bool:
     return any(kw in title_lower for kw in ("fix", "bug", "regression", "hotfix"))
 
 
-def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]:
-    """Process fix/bug issues in_review. Returns list of result dicts.
+def _detect_transitions(
+    state: dict,
+    issues: list[dict],
+) -> list[dict]:
+    """From *issues*, return those that transitioned TO ``in_review``.
 
-    When *force_reprocess* is True, already-processed issues are re-processed
-    and their reports are regenerated (useful when touchedFiles have been
-    updated after the initial run).
+    An issue is considered a new transition when its *previous known status*
+    (from the state file) was *not* ``in_review``.  Never-seen-before issues
+    are included as transitions.
+    """
+    known: dict[str, str] = state.get("issue_statuses", {})
+    return [i for i in issues if known.get(i.get("id", "")) != "in_review"]
+
+
+def _sync_statuses(state: dict, issues: list[dict]) -> None:
+    """Bulk-update the ``issue_statuses`` map from a list of fetched issues."""
+    statuses = state.setdefault("issue_statuses", {})
+    for issue in issues:
+        issue_id = issue.get("id", "")
+        status = issue.get("status", "")
+        if issue_id and status:
+            statuses[issue_id] = status
+
+
+def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]:
+    """Detect fix/bug issues that transitioned TO ``in_review`` and post reports.
+
+    Compared to the earlier approach (which processed every unprocessed
+    ``in_review`` issue), this version uses explicit transition detection:
+    the state file's ``issue_statuses`` map is compared against the current
+    fetch to identify issues that genuinely moved to ``in_review`` since the
+    last poll.
+
+    When *force_reprocess* is True, status tracking is overridden and all
+    ``in_review`` fix issues are processed (regardless of previous status).
     """
     state = _load_state()
     processed: set[str] = set(state.get("processed_issue_ids", []))
@@ -95,25 +146,43 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
     issues = _fetch_in_review_issues()
     log.info("Fetched %d in_review issues", len(issues))
 
+    fix_issues = [i for i in issues if _is_fix_issue(i)]
+
+    if force_reprocess:
+        candidates = fix_issues
+    else:
+        candidates = _detect_transitions(state, fix_issues)
+
+    if force_reprocess:
+        log.info(
+            "Force-reprocess: %d fix/bug issues in_review",
+            len(candidates),
+        )
+    else:
+        log.info(
+            "Detected %d fix->in_review transition(s) (out of %d fix issues)",
+            len(candidates),
+            len(fix_issues),
+        )
+
     results = []
     newly_processed: list[str] = []
 
-    for issue in issues:
+    for issue in candidates:
         issue_id = issue.get("id", "")
         identifier = issue.get("identifier", "")
 
         if not force_reprocess and issue_id in processed:
             log.debug(
-                "Already processed %s — skipping (use --force-reprocess to override)",
+                "Already processed %s -- skipping (use --force-reprocess to override)",
                 identifier,
             )
             continue
 
-        if not _is_fix_issue(issue):
-            log.debug("%s is not a fix/bug issue — skipping", identifier)
-            continue
-
-        log.info("Generating Blast Radius Report for %s", identifier)
+        log.info(
+            "Generating Blast Radius Report for %s (fix->in_review)",
+            identifier,
+        )
         try:
             result = generate_and_post(issue_id, dry_run=dry_run)
             results.append(result)
@@ -121,6 +190,8 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
         except Exception as exc:
             log.error("Failed to generate report for %s: %s", identifier, exc)
             results.append({"issue": identifier, "error": str(exc)})
+
+    _sync_statuses(state, issues)
 
     if newly_processed and not dry_run:
         state["processed_issue_ids"] = list(processed | set(newly_processed))
@@ -133,7 +204,18 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
 def process_issue(
     issue_id: str,
     dry_run: bool = False,
+    old_status: str | None = None,
 ) -> dict | None:
+    """Process a single issue (webhook entry point).
+
+    When called from a Paperclip ``issue_status_changed`` webhook, the caller
+    should pass the previous status via *old_status* for logging and audit
+    purposes.
+
+    The function fetches the current issue state from the Paperclip API and
+    validates that the issue is ``in_review`` and carries a fix/bug label
+    before generating the report.
+    """
     try:
         issue = _get_issue(issue_id)
     except Exception as exc:
@@ -145,17 +227,36 @@ def process_issue(
 
     if status != "in_review":
         log.info(
-            "%s has status=%r (not in_review) — skipping", identifier, status
+            "%s has status=%r (not in_review) -- skipping", identifier, status
         )
         return None
 
+    if old_status:
+        log.info(
+            "%s transitioned %r -> in_review (webhook)",
+            identifier,
+            old_status,
+        )
+    else:
+        log.info("%s is in_review (webhook, no old_status provided)", identifier)
+
     if not _is_fix_issue(issue):
-        log.info("%s is not a fix/bug issue — skipping", identifier)
+        log.info("%s is not a fix/bug issue -- skipping", identifier)
         return None
 
     log.info("Generating Blast Radius Report for %s (webhook trigger)", identifier)
     try:
         result = generate_and_post(issue_id, dry_run=dry_run)
+
+        if not dry_run:
+            state = _load_state()
+            processed: set[str] = set(state.get("processed_issue_ids", []))
+            if issue_id not in processed:
+                state["processed_issue_ids"] = list(processed | {issue_id})
+            statuses = state.setdefault("issue_statuses", {})
+            statuses[issue_id] = status
+            _save_state(state)
+
         return result
     except Exception as exc:
         log.error("Failed to generate report for %s: %s", identifier, exc)
@@ -201,24 +302,32 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--issue-id", type=str, metavar="UUID",
-        help="Process a single issue by Paperclip UUID (webhook trigger)"
+        help="Process a single issue by Paperclip UUID (webhook trigger)",
+    )
+    parser.add_argument(
+        "--old-status", type=str, metavar="STATUS",
+        help="Previous status when called from a status-change webhook",
     )
     parser.add_argument(
         "--loop", type=int, metavar="SECONDS",
-        help="Run in a loop with this interval"
+        help="Run in a loop with this interval",
     )
     parser.add_argument(
         "--dry-run", action="store_true",
-        help="Log reports but do not post comments"
+        help="Log reports but do not post comments",
     )
     parser.add_argument(
         "--force-reprocess", action="store_true",
-        help="Re-process already-seen issues"
+        help="Re-process already-seen issues (bypasses transition detection)",
     )
     args = parser.parse_args()
 
     if args.issue_id:
-        result = process_issue(args.issue_id, dry_run=args.dry_run)
+        result = process_issue(
+            args.issue_id,
+            dry_run=args.dry_run,
+            old_status=args.old_status,
+        )
         if result:
             log.info("Result: %s", json.dumps(result, indent=2))
         else:
