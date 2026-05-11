@@ -15,6 +15,10 @@ on:
         required: false
         default: '0'
 
+concurrency:
+  group: blast-radius-worker
+  cancel-in-progress: false
+
 jobs:
   worker:
     name: Detect fix->in_review and post Blast Radius Report
@@ -24,6 +28,11 @@ jobs:
       PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
       PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
       PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+      POSTGRES_HOST: ${{ secrets.POSTGRES_HOST || 'localhost' }}
+      POSTGRES_PORT: ${{ secrets.POSTGRES_PORT || '5432' }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'optimizer_v3' }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'optimizer_admin' }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +45,20 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
+          pip install -r requirements.txt
           pip install requests python-dotenv SQLAlchemy psycopg2-binary
+
+      - name: Restore worker state cache
+        id: cache-state
+        uses: actions/cache/restore@v4
+        with:
+          path: data/blast_radius_worker_state.json
+          key: blast-radius-state-${{ github.run_id }}
+          restore-keys: |
+            blast-radius-state-
+
+      - name: Ensure data directory exists
+        run: mkdir -p data
 
       - name: Run Blast Radius worker
         run: |
@@ -50,3 +72,10 @@ jobs:
           else
             python scripts/run_blast_radius_worker.py $DRY_FLAG
           fi
+
+      - name: Save worker state cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/blast_radius_worker_state.json
+          key: blast-radius-state-${{ github.run_id }}

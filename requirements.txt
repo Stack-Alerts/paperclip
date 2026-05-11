@@ -12,9 +12,12 @@ PyQtChart>=6.4.0
 psutil>=5.9.0
 
 # Database
-psycopg2-binary>=2.9.5
 SQLAlchemy>=2.0.0
 alembic>=1.9.0
+psycopg2-binary>=2.9.5
+
+# HTTP Client (Paperclip API, Touch Index workers)
+requests>=2.28.0
 
 # Data Processing
 numpy>=1.23.0
