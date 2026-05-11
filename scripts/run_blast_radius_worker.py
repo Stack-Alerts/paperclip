@@ -61,7 +61,7 @@ def main() -> None:
     else:
         results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
         logger.info("Blast Radius worker run complete — %d issue(s) processed", len(results))
-        print(results)
+        logger.info("Results: %s", results)
 
 
 if __name__ == "__main__":
