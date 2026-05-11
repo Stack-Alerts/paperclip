@@ -30,6 +30,9 @@ Date: 2026-01-17
 
 import hashlib
 import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 from decimal import Decimal, DecimalException
 from PyQt5.QtWidgets import (
@@ -70,6 +73,9 @@ from src.optimizer_v3.core.backtest_data_provider import get_backtest_provider
 
 import logging
 logger = logging.getLogger(__name__)
+
+_CALIBRATION_CACHE_SCHEMA_VERSION = 1
+_CALIBRATION_CACHE_TTL_DAYS = 7  # Disk cache expires after 7 days; forces fresh calibration
 
 class StdoutCapture:
     """
@@ -1072,9 +1078,11 @@ class BacktestConfigPanel(QWidget):
         self.custom_values = {}
         self._loading_preset = False  # Flag to prevent auto-switch to Custom during preset load
 
-        # Calibration cache — in-memory only, not persisted across restarts
+        # Calibration cache — populated from disk on init, updated on each successful run
         self._calibration_fingerprint: Optional[str] = None  # SHA-256 hex of last calibrated settings
         self._calibration_cache: Optional[dict] = None  # delay_map from last successful calibration
+        self._calibration_cache_from_disk: bool = False  # True when fingerprint was loaded from disk
+        self._load_calibration_disk_cache()
         
         # INSTITUTIONAL PATTERN: Data cache manager (singleton)
         from src.optimizer_v3.core.data_cache_manager import get_data_cache_manager
@@ -2411,6 +2419,78 @@ class BacktestConfigPanel(QWidget):
                     f"to block '{bname}'"
                 )
 
+    # ------------------------------------------------------------------
+    # Calibration disk-cache helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_calibration_cache_path() -> Path:
+        cache_dir = Path.home() / '.paperclip'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir / 'calibration_cache.json'
+
+    def _load_calibration_disk_cache(self) -> None:
+        """Populate in-memory calibration cache from disk on startup.
+
+        Safe no-op on any error (parse failure, schema mismatch, TTL expiry).
+        """
+        cache_path = self._get_calibration_cache_path()
+        if not cache_path.exists():
+            return
+        try:
+            with cache_path.open('r', encoding='utf-8') as fh:
+                data = json.load(fh)
+            if data.get('schema_version') != _CALIBRATION_CACHE_SCHEMA_VERSION:
+                logger.info("Auto-calibration: cache file schema mismatch, ignoring.")
+                return
+            stored_at_str = data.get('stored_at')
+            if stored_at_str:
+                stored_at = datetime.fromisoformat(stored_at_str)
+                age_days = (datetime.now(timezone.utc) - stored_at).days
+                if age_days > _CALIBRATION_CACHE_TTL_DAYS:
+                    logger.info(
+                        f"Auto-calibration: cache file expired ({age_days}d old), ignoring."
+                    )
+                    return
+            fingerprint = data.get('fingerprint')
+            delay_map = data.get('delay_map')
+            if not isinstance(fingerprint, str) or not isinstance(delay_map, dict):
+                logger.info("Auto-calibration: cache file invalid, ignoring.")
+                return
+            self._calibration_fingerprint = fingerprint
+            self._calibration_cache = delay_map
+            self._calibration_cache_from_disk = True
+            logger.info(
+                f"Auto-calibration: cache loaded from disk — "
+                f"cache hit (loaded from disk) on next matching run."
+            )
+        except Exception as exc:
+            logger.info(f"Auto-calibration: cache file invalid, ignoring. ({exc})")
+
+    def _save_calibration_disk_cache(self) -> None:
+        """Atomically write fingerprint + delay_map to disk via tmp+rename."""
+        if self._calibration_fingerprint is None or self._calibration_cache is None:
+            return
+        cache_path = self._get_calibration_cache_path()
+        payload = {
+            'schema_version': _CALIBRATION_CACHE_SCHEMA_VERSION,
+            'fingerprint': self._calibration_fingerprint,
+            'delay_map': self._calibration_cache,
+            'stored_at': datetime.now(timezone.utc).isoformat(),
+        }
+        tmp_path = cache_path.with_suffix('.json.tmp')
+        try:
+            with tmp_path.open('w', encoding='utf-8') as fh:
+                json.dump(payload, fh, indent=2)
+            tmp_path.replace(cache_path)
+            logger.info(f"Auto-calibration: cache persisted to {cache_path}.")
+        except Exception as exc:
+            logger.warning(f"Auto-calibration: failed to persist cache to disk: {exc}")
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
     def _repair_if_unreachable(self, strategy_config_dict: dict) -> Optional[dict]:
         """Check whether the strategy can theoretically reach its confluence threshold.
 
@@ -2543,7 +2623,8 @@ class BacktestConfigPanel(QWidget):
             and self._calibration_cache is not None
             and current_fingerprint == self._calibration_fingerprint
         ):
-            logger.info("Auto-calibration: cache hit — applying cached delay_map.")
+            _source = "loaded from disk" if self._calibration_cache_from_disk else "in-session"
+            logger.info(f"Auto-calibration: cache hit ({_source}) — applying cached delay_map.")
             self.results_text.setText(
                 "✓ Calibration already complete for current settings — skipping. Using cached parameters."
             )
@@ -2672,7 +2753,9 @@ class BacktestConfigPanel(QWidget):
                 # (not reached in simulation_mode — see guard above)
                 self._calibration_fingerprint = current_fingerprint
                 self._calibration_cache = delay_map
+                self._calibration_cache_from_disk = False
                 logger.info("Auto-calibration: cache updated with new fingerprint.")
+                self._save_calibration_disk_cache()
 
             self.results_text.append("✓ Calibration complete. Starting backtest...")
             # Reset progress bar; run_btn remains disabled until backtest finishes
