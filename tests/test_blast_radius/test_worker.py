@@ -125,6 +125,16 @@ class TestStateHelpers:
         assert result["processed_issue_ids"] == ["id-1"]
         assert result["issue_statuses"] == {}
 
+    def test_backward_compat_no_processed_ids(self, tmp_path, monkeypatch):
+        """Old state files without processed_issue_ids should still load."""
+        state_file = tmp_path / "state.json"
+        state_file.write_text(json.dumps({"issue_statuses": {"id-1": "in_review"}}))
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+
+        result = _load_state()
+        assert result["processed_issue_ids"] == []
+        assert result["issue_statuses"] == {"id-1": "in_review"}
+
 
 # ---------------------------------------------------------------------------
 # _detect_transitions
@@ -269,6 +279,21 @@ class TestRunOnce:
         state_file.write_text(json.dumps({
             "processed_issue_ids": ["issue-uuid-fix"],
             "issue_statuses": {"issue-uuid-fix": "in_review"},
+        }))
+        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
+
+        results = run_once()
+
+        assert results == []
+        state = json.loads(state_file.read_text())
+        assert state["processed_issue_ids"] == ["issue-uuid-fix"]
+
+    def test_skips_already_processed_when_transition(self, tmp_path, monkeypatch):
+        """Issue in processed_issue_ids is skipped even when it IS a new transition."""
+        state_file = tmp_path / "state.json"
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": ["issue-uuid-fix"],
+            "issue_statuses": {"issue-uuid-fix": "in_progress"},
         }))
         self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
 
@@ -744,6 +769,26 @@ class TestProcessIssue:
 
         assert result is not None
         assert result["dry_run"] is True
+
+    def test_skips_already_processed_webhook(self, tmp_path, monkeypatch):
+        """Webhook should skip if issue already in processed_issue_ids."""
+        from blast_radius.worker import process_issue
+
+        state_file = tmp_path / "state.json"
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": ["issue-uuid-42"],
+            "issue_statuses": {"issue-uuid-42": "in_review"},
+        }))
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._FIX_IN_REVIEW,
+        )
+
+        result = process_issue("issue-uuid-42", dry_run=True)
+
+        assert result is None
 
 
 # ---------------------------------------------------------------------------
