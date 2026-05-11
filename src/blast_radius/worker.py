@@ -261,6 +261,13 @@ def process_issue(
         log.info("%s is not a fix/bug issue -- skipping", identifier)
         return None
 
+    # Pre-check: skip if already processed (prevents duplicate webhook processing)
+    state = _load_state()
+    processed: set[str] = set(state.get("processed_issue_ids", []))
+    if issue_id in processed:
+        log.info("%s already processed -- skipping (webhook dedup)", identifier)
+        return None
+
     log.info("Generating Blast Radius Report for %s (webhook trigger)", identifier)
     try:
         result = generate_and_post(issue_id, dry_run=dry_run)
