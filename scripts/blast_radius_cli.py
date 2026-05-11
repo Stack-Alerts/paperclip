@@ -36,7 +36,7 @@ def cmd_query(args: argparse.Namespace) -> int:
     from blast_radius.query import query_blast_radius, to_json_dict
 
     data = query_blast_radius(args.files)
-    print(json.dumps(to_json_dict(data), indent=2))
+    print(json.dumps(to_json_dict(data), indent=2))  # noqa: T201
     return 0
 
 
@@ -48,7 +48,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
         touched_files=args.files or None,
         dry_run=args.dry_run,
     )
-    print(json.dumps(result, indent=2))
+    print(json.dumps(result, indent=2))  # noqa: T201
     return 0
 
 
@@ -67,7 +67,7 @@ def cmd_worker(args: argparse.Namespace) -> int:
         return 0
 
     results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
-    print(json.dumps(results, indent=2))
+    print(json.dumps(results, indent=2))  # noqa: T201
     return 0
 
 
