@@ -100,20 +100,6 @@ def _run_checks(stale_days: int) -> int:
         ).scalar() or 0
         logger.info("Distinct bug issues indexed: %d", bug_count)
 
-        # 6. Empty bug issues (in table but no file rows)
-        empty_issues = conn.execute(
-            text("""
-                SELECT bg.bug_identifier
-                FROM touch_index_bug_files bg
-                GROUP BY bg.bug_issue_id, bg.bug_identifier
-                HAVING COUNT(*) = 0
-            """)
-        ).fetchall()
-        if empty_issues:
-            logger.info(
-                "Bug issues with no file rows: %d", len(empty_issues)
-            )
-
     if failures:
         logger.error("VALIDATION COMPLETE: %d check(s) FAILED — investigate", failures)
     else:

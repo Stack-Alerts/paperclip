@@ -98,20 +98,6 @@ def _run_checks(stale_hours: int) -> int:
         ).scalar() or 0
         logger.info("Distinct FR issues indexed: %d", fr_count)
 
-        # 6. Empty FR issues (in table but no file rows)
-        #    Not a hard failure — some FDRs legitimately have no code changes yet.
-        empty_issues = conn.execute(
-            text("""
-                SELECT fr_identifier FROM touch_index_fr_files
-                GROUP BY fr_issue_id, fr_identifier
-                HAVING COUNT(*) = 0
-            """)
-        ).fetchall()
-        if empty_issues:
-            logger.info(
-                "FR issues with no file rows: %d", len(empty_issues)
-            )
-
     if failures:
         logger.error("VALIDATION COMPLETE: %d check(s) FAILED — investigate", failures)
     else:
