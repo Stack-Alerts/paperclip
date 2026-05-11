@@ -113,6 +113,28 @@ def get_closed_bug_issues(closed_after: datetime | None = None) -> list[dict]:
     return bugs
 
 
+def get_closed_non_fdr_issues(closed_after: datetime | None = None) -> list[dict]:
+    """Return done non-FDR issues, optionally filtered by completedAt.
+
+    Broader than get_closed_bug_issues: captures any issue that has
+    ``fix(BTCAAAAA-NNN)`` commits in git, regardless of title prefix.
+    FDR-labelled issues are excluded (they are ingested by the FR worker).
+    """
+    params: dict[str, Any] = {"status": "done"}
+    issues = _paginate(f"/api/companies/{_company()}/issues", params)
+    issues = [i for i in issues if FDR_LABEL_ID not in (i.get("labelIds") or [])]
+    if closed_after:
+        cutoff = closed_after.astimezone(timezone.utc)
+        issues = [
+            i for i in issues
+            if i.get("completedAt")
+            and datetime.fromisoformat(
+                i["completedAt"].replace("Z", "+00:00")
+            ) >= cutoff
+        ]
+    return issues
+
+
 def get_all_done_issues(completed_after: datetime | None = None) -> list[dict]:
     """Return ALL done issues, optionally filtered by completedAt.
 
