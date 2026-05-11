@@ -6,8 +6,6 @@ Wants=opencode-watchdog.timer
 [Service]
 Type=oneshot
 ExecStart=%h/projects/BTC-Trade-Engine-PaperClip/scripts/opencode_watchdog.py
-User=%i
-Group=%i
 StandardOutput=journal
 StandardError=journal
 

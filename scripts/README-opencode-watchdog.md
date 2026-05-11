@@ -30,21 +30,28 @@ Controls:
 
 ### 2. Process Watchdog (`opencode_watchdog.py`)
 
-Scans for `opencode run` processes that have been alive for >30 minutes
-with <1% CPU, and kills them.
+Three detection layers, each sufficient to trigger a kill:
+
+| Layer | Trigger | Rationale |
+|-------|---------|-----------|
+| **Low-CPU ghost** | elapsed > 30 min AND cpu ≤ 0.5% | Process is alive but doing no work (typical adapter hang) |
+| **Output-inactive ghost** | elapsed > 30 min AND no stdout/stderr writes in 10 min | Catches retry-loop processes burning >0.5% CPU but producing no output |
+| **Absolute max-age** | elapsed > 60 min (unconditional) | Last resort — kill any opencode process older than 1 hour regardless of CPU or output |
 
 **Usage:**
 ```bash
-python scripts/opencode_watchdog.py            # normal run
-python scripts/opencode_watchdog.py --dry-run  # report only
-python scripts/opencode_watchdog.py --verbose  # verbose logging
+python scripts/opencode_watchdog.py                         # normal run
+python scripts/opencode_watchdog.py --dry-run                # report only
+python scripts/opencode_watchdog.py --verbose                # verbose logging
+python scripts/opencode_watchdog.py --max-age 7200           # custom max age
+python scripts/opencode_watchdog.py --threshold 900          # custom silent threshold
 ```
 
 **Install as systemd timer (run every 15 min):**
 ```bash
-bash scripts/setup_opencode_watchdog.sh        # install
-bash scripts/setup_opencode_watchdog.sh --status  # check
-bash scripts/setup_opencode_watchdog.sh --remove   # uninstall
+bash scripts/setup_opencode_watchdog.sh          # install
+bash scripts/setup_opencode_watchdog.sh --status # check
+bash scripts/setup_opencode_watchdog.sh --remove # uninstall
 ```
 
 ### 3. GitHub Actions Workflow
@@ -56,7 +63,7 @@ Useful for self-hosted runners. On standard GitHub runners it runs as a dry-run
 ## Logs
 
 - `~/.paperclip/opencode_watchdog.log` — all runs
-- `~/.paperclip/opencode_watchdog_killed.log` — killed processes only
+- `~/.paperclip/opencode_watchdog_killed.log` — killed processes only (includes reason code)
 
 ## Testing
 

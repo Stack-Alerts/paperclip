@@ -4,6 +4,12 @@
 Detects opencode run processes that are alive but producing zero output
 for longer than SILENT_THRESHOLD_SEC, and terminates them.
 
+Detection layers:
+  1. Low-CPU ghost: elapsed > SILENT_THRESHOLD_SEC AND cpu <= 0.5% AND (no output recently)
+  2. Output-inactive ghost: elapsed > SILENT_THRESHOLD_SEC AND no stdout/stderr writes
+     in the last OUTPUT_INACTIVE_WINDOW_SEC, regardless of CPU
+  3. Absolute max-age: elapsed > MAX_ABSOLUTE_AGE_SEC, kill unconditionally (last resort)
+
 Usage:
     python scripts/opencode_watchdog.py           # normal run (kills)
     python scripts/opencode_watchdog.py --dry-run  # report only, no kill
@@ -20,7 +26,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-SILENT_THRESHOLD_SEC = 1800  # 30 minutes
+DEFAULT_SILENT_THRESHOLD_SEC = 1800  # 30 minutes
+OUTPUT_INACTIVE_WINDOW_SEC = 600  # 10 minutes since last stdout/stderr write
+DEFAULT_MAX_ABSOLUTE_AGE_SEC = 3600  # 60 minutes
 WATCHDOG_LOG = Path.home() / ".paperclip" / "opencode_watchdog.log"
 KILL_LOG = Path.home() / ".paperclip" / "opencode_watchdog_killed.log"
 
@@ -114,6 +122,67 @@ def _get_process_state(pid: int) -> str | None:
     return None
 
 
+def _get_output_inactive_since(pid: int) -> float | None:
+    """Return seconds since last write to stdout or stderr, or None if unknown."""
+    now = time.time()
+    last_write = None
+    for fd_name in ["1", "2"]:
+        fd_path = f"/proc/{pid}/fd/{fd_name}"
+        try:
+            st = os.stat(fd_path)
+            mtime = getattr(st, "st_mtime", None) or st.st_mtime
+            if last_write is None or mtime > last_write:
+                last_write = mtime
+        except (OSError, FileNotFoundError, PermissionError):
+            continue
+    if last_write is None:
+        return None
+    return now - last_write
+
+
+def classify_process(
+    proc: OpenCodeProcess,
+    silent_threshold_sec: int = DEFAULT_SILENT_THRESHOLD_SEC,
+    max_absolute_age_sec: int = DEFAULT_MAX_ABSOLUTE_AGE_SEC,
+) -> tuple[str, dict]:
+    """Classify a process's status, returning (reason_key, metadata).
+
+    Reason keys:
+      - "absolute-max-age": unconditional kill, process too old
+      - "low-cpu": low CPU usage for extended period
+      - "output-inactive": no output writes recently despite CPU usage
+      - "zombie": defunct process
+      - "too-young": not old enough to evaluate
+      - "active": appears to be doing work
+    """
+    state = _get_process_state(proc.pid)
+    if state and "Z" in state:
+        return ("zombie", {"state": state})
+
+    if proc.elapsed_seconds >= max_absolute_age_sec:
+        return ("absolute-max-age", {"cpu": proc.cpu_percent, "elapsed": proc.elapsed_seconds})
+
+    if proc.elapsed_seconds < silent_threshold_sec:
+        return ("too-young", {"elapsed": proc.elapsed_seconds})
+
+    inactive_since = _get_output_inactive_since(proc.pid)
+    output_inactive = (
+        inactive_since is not None and inactive_since > OUTPUT_INACTIVE_WINDOW_SEC
+    )
+
+    if proc.cpu_percent <= 0.5:
+        return ("low-cpu", {"cpu": proc.cpu_percent, "inactive_since": inactive_since})
+
+    if output_inactive:
+        return ("output-inactive",
+                {"cpu": proc.cpu_percent, "inactive_since": inactive_since})
+
+    return ("active", {"cpu": proc.cpu_percent, "inactive_since": inactive_since})
+
+
+KILLABLE_REASONS = frozenset({"low-cpu", "output-inactive", "absolute-max-age"})
+
+
 def kill_process_group(pid: int) -> bool:
     pgid = pid
     try:
@@ -139,20 +208,29 @@ def kill_process_group(pid: int) -> bool:
         return False
 
 
-def log_kill(proc: OpenCodeProcess):
+def log_kill(proc: OpenCodeProcess, reason: str, metadata: dict | None = None):
+    meta_str = ""
+    if metadata:
+        meta_str = " " + " ".join(f"{k}={v}" for k, v in metadata.items())
     entry = (
         f"{datetime.now(timezone.utc).isoformat()} "
-        f"KILLED pid={proc.pid} ppid={proc.ppid} "
+        f"KILLED reason={reason} pid={proc.pid} ppid={proc.ppid} "
         f"elapsed={proc.elapsed_seconds:.0f}s cpu={proc.cpu_percent:.1f}% "
-        f"session={proc.session_id or 'N/A'} model={proc.model or 'N/A'}\n"
+        f"session={proc.session_id or 'N/A'} model={proc.model or 'N/A'}"
+        f"{meta_str}\n"
     )
     with open(KILL_LOG, "a") as f:
         f.write(entry)
-    logger.info("Killed hanging opencode process: pid=%d elapsed=%.0fs model=%s",
-                proc.pid, proc.elapsed_seconds, proc.model or "unknown")
+    logger.info("Killed opencode process: reason=%s pid=%d elapsed=%.0fs model=%s",
+                reason, proc.pid, proc.elapsed_seconds, proc.model or "unknown")
 
 
-def run(dry_run: bool = False, verbose: bool = False):
+def run(
+    dry_run: bool = False,
+    verbose: bool = False,
+    silent_threshold_sec: int = DEFAULT_SILENT_THRESHOLD_SEC,
+    max_absolute_age_sec: int = DEFAULT_MAX_ABSOLUTE_AGE_SEC,
+):
     processes = get_opencode_processes()
     if verbose:
         logger.info("Found %d opencode run processes", len(processes))
@@ -161,32 +239,37 @@ def run(dry_run: bool = False, verbose: bool = False):
                         p.pid, p.elapsed_seconds, p.cpu_percent,
                         p.model or "N/A")
 
-    killed = 0
+    would_kill = 0
+    actually_killed = 0
     for proc in processes:
-        if proc.elapsed_seconds < SILENT_THRESHOLD_SEC:
+        reason, metadata = classify_process(
+            proc,
+            silent_threshold_sec=silent_threshold_sec,
+            max_absolute_age_sec=max_absolute_age_sec,
+        )
+
+        if reason not in KILLABLE_REASONS:
+            if verbose and reason == "active":
+                logger.info("  SKIP pid=%d reason=%s cpu=%.1f%% elapsed=%.0fs",
+                            proc.pid, reason, proc.cpu_percent, proc.elapsed_seconds)
             continue
 
-        state = _get_process_state(proc.pid)
-        if state and "Z" in state:
-            continue
-
-        if proc.cpu_percent > 1.0:
-            continue
-
+        would_kill += 1
         logger.warning(
-            "Hanging opencode process: pid=%d elapsed=%.0fs cpu=%.1f%% model=%s session=%s",
-            proc.pid, proc.elapsed_seconds, proc.cpu_percent,
+            "Hanging opencode process: reason=%s pid=%d elapsed=%.0fs cpu=%.1f%% "
+            "model=%s session=%s",
+            reason, proc.pid, proc.elapsed_seconds, proc.cpu_percent,
             proc.model or "unknown", proc.session_id or "none",
         )
 
         if not dry_run:
             if kill_process_group(proc.pid):
-                log_kill(proc)
-                killed += 1
+                log_kill(proc, reason, metadata)
+                actually_killed += 1
             else:
                 logger.error("Failed to kill pid=%d", proc.pid)
 
-    return killed
+    return would_kill, actually_killed
 
 
 def clear_old_logs(max_age_days: int = 7):
@@ -201,22 +284,29 @@ def main():
     parser = argparse.ArgumentParser(description="OpenCode hanging process watchdog")
     parser.add_argument("--dry-run", action="store_true", help="Report only, do not kill")
     parser.add_argument("--verbose", action="store_true", help="Log all inspected processes")
-    parser.add_argument("--threshold", type=int, default=SILENT_THRESHOLD_SEC,
-                        help=f"Silent threshold in seconds (default: {SILENT_THRESHOLD_SEC})")
+    parser.add_argument("--threshold", type=int, default=DEFAULT_SILENT_THRESHOLD_SEC,
+                        help=f"Silent threshold in seconds (default: {DEFAULT_SILENT_THRESHOLD_SEC})")
+    parser.add_argument("--max-age", type=int, default=DEFAULT_MAX_ABSOLUTE_AGE_SEC,
+                        help=f"Absolute max age in seconds (default: {DEFAULT_MAX_ABSOLUTE_AGE_SEC})")
     args = parser.parse_args()
 
-    killed = run(dry_run=args.dry_run, verbose=args.verbose)
+    would_kill, actually_killed = run(
+        dry_run=args.dry_run,
+        verbose=args.verbose,
+        silent_threshold_sec=args.threshold,
+        max_absolute_age_sec=args.max_age,
+    )
     clear_old_logs()
 
     if args.dry_run:
-        logger.info("Dry-run: %d processes would be killed", killed)
+        logger.info("Dry-run: %d processes would be killed", would_kill)
     else:
-        logger.info("Watchdog complete: %d processes killed", killed)
+        logger.info("Watchdog complete: %d processes killed", actually_killed)
 
-    if killed > 0:
-        logger.warning("Killed %d hanging opencode process(es)", killed)
+    if actually_killed > 0 or would_kill > 0:
+        logger.warning("Killed %d hanging opencode process(es)", actually_killed)
 
-    return 1 if killed > 0 else 0
+    return 1 if actually_killed > 0 else 0
 
 
 if __name__ == "__main__":
