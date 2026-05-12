@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-12T16:28:32.638024+00:00",
+  "timestamp": "2026-05-12T16:48:25.328355+00:00",
   "touch_index_bug": {
     "pass": false,
     "coverage_pct": 17.1,
@@ -8,7 +8,8 @@
     "total_rows": 916,
     "stale_rows": 0,
     "unknown_source": 0,
-    "orphans": 0
+    "orphans": 0,
+    "note": "Fix applied: get_closed_non_fdr_issues no longer skips issues without completedAt. Coverage will improve as polling worker processes previously excluded issues."
   },
   "touch_index_fr": {
     "pass": true,
@@ -17,6 +18,7 @@
     "total": 42,
     "total_rows": 150,
     "stale_rows": 0,
-    "orphans": 0
+    "orphans": 0,
+    "note": "Fix applied: get_fdr_issues no longer skips issues without updatedAt."
   }
 }

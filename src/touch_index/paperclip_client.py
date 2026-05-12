@@ -138,10 +138,7 @@ def get_fdr_issues(updated_after: datetime | None = None) -> list[dict]:
         for i in issues:
             ts = _parse_iso_ts(i.get("updatedAt"))
             if ts is None:
-                logger.warning(
-                    "FDR issue %s has missing/malformed updatedAt — skipping",
-                    i.get("identifier", "unknown"),
-                )
+                filtered.append(i)
                 continue
             if ts >= cutoff:
                 filtered.append(i)
@@ -160,10 +157,7 @@ def get_closed_bug_issues(closed_after: datetime | None = None) -> list[dict]:
         for b in bugs:
             ts = _parse_iso_ts(b.get("completedAt"))
             if ts is None:
-                logger.warning(
-                    "Bug issue %s has missing/malformed completedAt — skipping",
-                    b.get("identifier", "unknown"),
-                )
+                filtered.append(b)
                 continue
             if ts >= cutoff:
                 filtered.append(b)
@@ -187,10 +181,7 @@ def get_closed_non_fdr_issues(closed_after: datetime | None = None) -> list[dict
         for i in issues:
             ts = _parse_iso_ts(i.get("completedAt"))
             if ts is None:
-                logger.warning(
-                    "Non-FDR issue %s has missing/malformed completedAt — skipping",
-                    i.get("identifier", "unknown"),
-                )
+                filtered.append(i)
                 continue
             if ts >= cutoff:
                 filtered.append(i)
@@ -212,10 +203,7 @@ def get_all_done_issues(completed_after: datetime | None = None) -> list[dict]:
         for i in issues:
             ts = _parse_iso_ts(i.get("completedAt"))
             if ts is None:
-                logger.warning(
-                    "Done issue %s has missing/malformed completedAt — skipping",
-                    i.get("identifier", "unknown"),
-                )
+                filtered.append(i)
                 continue
             if ts >= cutoff:
                 filtered.append(i)
