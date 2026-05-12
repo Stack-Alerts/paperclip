@@ -195,7 +195,7 @@ class TestIngestBugIssue:
         conn.execute.assert_not_called()
 
     def test_upsert_rows_contain_required_fields(self):
-        """Each upserted row must carry id, file_path, bug_issue_id, bug_identifier, closed_at, source."""
+        """Each upserted row must carry id, file_path, bug_issue_id, bug_identifier, closed_at, source, updated_at."""
         engine, conn = _mock_engine()
         files = ["src/touch_index/bug_worker.py", "src/touch_index/db.py"]
 
@@ -214,6 +214,7 @@ class TestIngestBugIssue:
             assert row["bug_identifier"] == ISSUE_IDENTIFIER
             assert row["closed_at"] == COMPLETED_AT
             assert row["source"] == "git"
+            assert "updated_at" in row
 
     def test_null_closed_at_accepted(self):
         engine, conn = _mock_engine()

@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Sequence
 
 from sqlalchemy import text
@@ -33,13 +33,14 @@ logger = logging.getLogger(__name__)
 
 _UPSERT_SQL = text("""
     INSERT INTO touch_index_bug_files
-        (id, file_path, bug_issue_id, bug_identifier, closed_at, source)
+        (id, file_path, bug_issue_id, bug_identifier, closed_at, source, updated_at)
     VALUES
-        (:id, :file_path, :bug_issue_id, :bug_identifier, :closed_at, :source)
+        (:id, :file_path, :bug_issue_id, :bug_identifier, :closed_at, :source, :updated_at)
     ON CONFLICT (file_path, bug_issue_id)
     DO UPDATE SET
-        closed_at = COALESCE(EXCLUDED.closed_at, touch_index_bug_files.closed_at),
-        source    = EXCLUDED.source
+        closed_at  = COALESCE(EXCLUDED.closed_at, touch_index_bug_files.closed_at),
+        source     = EXCLUDED.source,
+        updated_at = EXCLUDED.updated_at
 """)
 
 
@@ -93,6 +94,7 @@ def ingest_bug_issue(
             "bug_identifier": issue_identifier,
             "closed_at": completed_at,
             "source": source,
+            "updated_at": datetime.now(timezone.utc),
         }
         for f in files
     ]
