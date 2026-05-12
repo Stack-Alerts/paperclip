@@ -1,9 +1,14 @@
 # Replacements file for git filter-repo --replace-text / --replace-message
 # Format: {literal,regex,glob}:<needle>==><replacement>
-# See: https://htmlpreview.github.io/?https://github.com/newren/git-filter-repo/blob/docs/html/git-filter-repo.html
+# 
+# SECURITY NOTE: The secret access key value below has been redacted.
+# Before running the purge, replace REDACTED_ACTUAL_SECRET with the real
+# AWS Secret Access Key value from the security incident report.
+# The key ID (AKIA************DBUD) is preserved since it is an
+# AWS Access Key ID (not a secret), but must still be purged from history.
 
-# AWS Secret Access Key (P0 — must never appear in git history)
-literal:REDACTED_AWS_SECRET_ACCESS_KEY>REDACTED_AWS_SECRET_ACCESS_KEY
+# AWS Secret Access Key (P0 — fill in actual value before running)
+literal:REDACTED_ACTUAL_SECRET==>REDACTED_AWS_SECRET_ACCESS_KEY
 
-# AWS Access Key ID (P1 — identifying credential, must be purged)
+# AWS Access Key ID (identifying credential, must be purged)
 literal:AKIA************DBUD==>AKIA************DBUD
