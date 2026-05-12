@@ -95,10 +95,11 @@ def _make_consistency(**kw):
         null_owner_rows=0,
         null_updated_at_rows=0,
         duplicate_pairs=0,
+        unknown_source_rows=0,
         orphan_fr_issue_ids=[],
     )
     defaults.update(kw)
-    return ConsistencyReport(unknown_source_rows=0, **defaults)
+    return ConsistencyReport(**defaults)
 
 
 # ---------------------------------------------------------------------------
@@ -351,6 +352,33 @@ class TestRunQualityChecks:
         assert report.coverage is not None
         assert report.freshness is not None
         assert report.consistency is not None
+
+    def test_unknown_source_rows_fails(self):
+        engine = MagicMock()
+
+        with (
+            patch(
+                "touch_index.quality.compute_coverage",
+                return_value=_make_coverage(
+                    total_fdr_issues=2, indexed_fdr_issues=2, coverage_pct=100.0
+                ),
+            ),
+            patch(
+                "touch_index.quality.compute_freshness",
+                return_value=_make_freshness(total_rows=5, max_age_hours=1.0),
+            ),
+            patch(
+                "touch_index.quality.check_consistency",
+                return_value=_make_consistency(unknown_source_rows=3),
+            ),
+        ):
+            report = run_quality_checks(engine)
+
+        assert report.passed is False
+        assert report.consistency is not None
+        assert report.consistency.unknown_source_rows == 3
+
+
 
     def test_low_coverage_fails(self):
         engine = MagicMock()
