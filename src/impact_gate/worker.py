@@ -40,6 +40,12 @@ BYPASS_LABEL = "impact-gate-bypass"
 
 COMPANY_PREFIX = "BTCAAAAA"
 
+# Minimum test bar - the Impact Gate must collect at least this many
+# individual test cases (FR acceptance + bug regression combined) before
+# it can declare a PASS.  This is the "10-fix bar" required for production
+# acceptance: sufficient coverage to justify promoting a fix to done.
+MIN_TESTS_BAR = 10
+
 
 # ---------------------------------------------------------------------------
 # Paperclip API helpers
@@ -170,6 +176,7 @@ def _build_fail_comment(
     blocking_issues: list[dict],
 ) -> str:
     summary = result.get("summary", {})
+    bar_reason = result.get("_bar_fail_reason")
     lines = [
         "## Impact Gate: FAIL ❌",
         "",
@@ -177,6 +184,15 @@ def _build_fail_comment(
         "",
         "One or more tests failed. Gate has reverted this issue to **in_progress**.",
         "",
+    ]
+
+    if bar_reason:
+        lines.append("> **Minimum test bar not met**")
+        lines.append(">")
+        lines.append(f"> {bar_reason}")
+        lines.append("")
+
+    lines += [
         "### Summary",
         f"- Total tests: {summary.get('total', 0)}",
         f"- Passed: {summary.get('passed', 0)}",
@@ -346,6 +362,23 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
         if not dry_run:
             _post_comment(issue_id, _build_escalation_comment(identifier, error_msg))
         return {"issue": identifier, "gate_status": "ERROR", "error": error_msg}
+
+    # Enforce the minimum test bar (10-fix bar)
+    total_tests = result.get("summary", {}).get("total", 0)
+    if total_tests < MIN_TESTS_BAR and result.get("status") == "PASS":
+        log.warning(
+            "Impact Gate for %s: %d tests collected but bar requires %d — demoting PASS to FAIL",
+            identifier, total_tests, MIN_TESTS_BAR,
+        )
+        result["status"] = "FAIL"
+        bar_parts = [
+            f"Insufficient test coverage: only {total_tests} test(s) collected ",
+            f"(minimum bar is {MIN_TESTS_BAR}).  ",
+            f"FR IDs: {fr_ids}, bug IDs: {bug_ids}.  ",
+            f"Add more FR acceptance or bug regression test files covering ",
+            f"the touched code paths.",
+        ]
+        result["_bar_fail_reason"] = "".join(bar_parts)
 
     gate_status = result.get("status", "ERROR")
     log.info("Impact Gate result for %s: %s", identifier, gate_status)
