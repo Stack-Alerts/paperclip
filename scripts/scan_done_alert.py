@@ -120,8 +120,8 @@ def main() -> None:
         help="Path to JSON file produced by scan_fix_issues_done.py --json-summary",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Log actions without creating issues",
+        "--dry-run", action="store_true", default=None,
+        help="Log actions without creating issues (default: follow scan output dry_run field)",
     )
     args = parser.parse_args()
 
@@ -133,9 +133,12 @@ def main() -> None:
     with open(scan_path) as f:
         scan_data = json.load(f)
 
+    # If --dry-run was not explicitly set, respect the scan's own dry_run field
+    dry_run = args.dry_run if args.dry_run is not None else scan_data.get("dry_run", False)
+
     sess, base_url, company_id = _setup_session()
 
-    ok = create_alert(base_url, company_id, sess, scan_data, args.dry_run)
+    ok = create_alert(base_url, company_id, sess, scan_data, dry_run)
     if not ok:
         sys.exit(1)
 
