@@ -1,4 +1,5 @@
 """
+import os
 Download Historical Order Book Data from Crypto-lake API
 
 Uses AWS S3 access to download:
@@ -17,8 +18,8 @@ import gzip
 from io import BytesIO
 
 # AWS credentials (Crypto-lake)
-AWS_ACCESS_KEY = "REDACTED_AWS_KEY"
-AWS_SECRET_KEY = "REDACTED_AWS_SECRET_ACCESS_KEY"
+AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID", "")
+AWS_SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
 BUCKET_NAME = "crypto-lake"
 
 def setup_s3_client():
