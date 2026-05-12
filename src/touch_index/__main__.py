@@ -97,6 +97,8 @@ def _run_bug_cli() -> None:
             result = process_bug_issue(engine, args.issue_id, dry_run=args.dry_run)
         except Exception:
             logger.exception("Failed to process bug issue %s", args.issue_id)
+            if args.json_summary:
+                _emit_json_summary(args, worker="bug")
             raise SystemExit(1)
         if result is None:
             logger.info("No bug issue found for %s", args.issue_id)
@@ -307,6 +309,8 @@ def _run_fr_cli() -> None:
             result = process_fr_issue(engine, args.issue_id, dry_run=args.dry_run)
         except Exception:
             logger.exception("Failed to process FR issue %s", args.issue_id)
+            if args.json_summary:
+                _emit_json_summary(args, worker="fr")
             raise SystemExit(1)
         if result is None:
             logger.info("No FR issue found for %s", args.issue_id)
