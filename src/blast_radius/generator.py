@@ -14,7 +14,7 @@ import logging
 import os
 from typing import Sequence
 
-from touch_index.paperclip_client import _session, _base
+from touch_index.paperclip_client import _session, _base, get_issue_by_id
 
 from .query import query_blast_radius, to_json_dict
 from .report import render_report, extract_touched_files
@@ -31,10 +31,10 @@ def _run_headers() -> dict[str, str]:
 
 
 def _get_issue(issue_id: str) -> dict:
-    with _session() as sess:
-        resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=15)
-        resp.raise_for_status()
-        return resp.json()
+    issue = get_issue_by_id(issue_id)
+    if issue is None:
+        raise RuntimeError(f"Issue {issue_id} not found")
+    return issue
 
 
 def _get_agent_name(agent_id: str) -> str | None:
