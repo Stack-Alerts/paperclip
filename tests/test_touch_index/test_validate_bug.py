@@ -45,28 +45,23 @@ def _mock_engine(scalars: dict | None = None):
 class TestValidateBug:
     def test_returns_zero_on_clean(self):
         engine = _mock_engine()
-        with patch("validate_touch_index_bug.get_engine", return_value=engine):
-            result = _run_checks(stale_days=30)
+        result = _run_checks(stale_days=30, engine=engine)
         assert result == 0
 
     def test_returns_nonzero_on_duplicates(self):
         engine = _mock_engine(scalars=5)
-        with patch("validate_touch_index_bug.get_engine", return_value=engine):
-            result = _run_checks(stale_days=30)
+        result = _run_checks(stale_days=30, engine=engine)
         assert result == 1
 
     def test_stale_days_passed_to_stale_query(self):
         engine = _mock_engine()
-        with patch("validate_touch_index_bug.get_engine", return_value=engine):
-            _run_checks(stale_days=7)
+        _run_checks(stale_days=7, engine=engine)
         conn = engine.connect.return_value.__enter__.return_value
         calls = conn.execute.call_args_list
-        # Check any call has a stale-date query (cutoff param + 'closed_at' in SQL)
         has_stale = any(
             len(c.args) >= 2 and "cutoff" in c.kwargs
             for c in calls
         )
-        # Also try positional args: (text, params_dict)
         has_stale_pos = any(
             len(c.args) >= 2 and isinstance(c.args[1], dict) and "cutoff" in c.args[1]
             for c in calls
@@ -74,14 +69,28 @@ class TestValidateBug:
         assert has_stale or has_stale_pos
 
     def test_health_check_failure_exits(self):
-        engine = MagicMock()
         with (
-            patch("validate_touch_index_bug.get_engine", return_value=engine),
+            patch("validate_touch_index_bug.get_engine", return_value=MagicMock()),
             patch("validate_touch_index_bug.health_check", return_value=False),
         ):
             with pytest.raises(SystemExit) as exc:
                 _run_checks(stale_days=30)
         assert exc.value.code == 1
+
+    def test_accepts_pre_configured_engine(self):
+        engine = _mock_engine()
+        result = _run_checks(stale_days=30, engine=engine)
+        assert result == 0
+        engine.connect.assert_called_once()
+
+    def test_creates_engine_when_none_passed(self):
+        engine = _mock_engine()
+        with (
+            patch("validate_touch_index_bug.get_engine", return_value=engine),
+            patch("validate_touch_index_bug.health_check", return_value=True),
+        ):
+            result = _run_checks(stale_days=30)
+        assert result == 0
 
     def test_main_exits_nonzero_on_failures(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", ["validate_touch_index_bug.py"])
@@ -104,5 +113,4 @@ class TestValidateBug:
         ):
             from validate_touch_index_bug import main
             main()
-        # If no exception raised, test passes
         assert True
