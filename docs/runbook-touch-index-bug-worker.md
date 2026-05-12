@@ -94,6 +94,7 @@ CREATE TABLE touch_index_bug_files (
     bug_identifier TEXT        NOT NULL,
     source         TEXT        NOT NULL DEFAULT 'unknown',
     closed_at      TIMESTAMPTZ,
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (id)
 );
 
@@ -107,6 +108,8 @@ CREATE INDEX idx_touch_bug_file_path
 - `source` values: `'git'`, `'comments'`, `'description'`, `'none'`, `'unknown'`
 - `closed_at` is nullable — rows may be inserted before the bug is closed;
   the ingestion job updates this field on close
+- `updated_at` tracks when each row was last upserted by the ingestion worker (server default `now()`)
+- `null_updated_at_rows` is monitored as part of bug consistency checks
 - The unique constraint on `(file_path, bug_issue_id)` makes upserts idempotent
 
 ## Local Development
@@ -183,6 +186,7 @@ older than the threshold, default 30 days).
 
 Detects:
 - Null `closed_at` values
+- Null `updated_at` values
 - Duplicate `(file_path, bug_issue_id)` pairs
 - Unknown `source` values (rows where source has not been set)
 - Orphan `bug_issue_id` values (issue no longer exists in Paperclip)
@@ -207,6 +211,7 @@ Detects:
   },
   "consistency": {
     "null_closed_at_rows": 0,
+    "null_updated_at_rows": 0,
     "duplicate_pairs": 0,
     "unknown_source_rows": 0,
     "orphan_bug_issue_ids": []
