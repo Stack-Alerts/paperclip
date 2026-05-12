@@ -18,6 +18,10 @@ import logging
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Engine
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -35,14 +39,21 @@ logging.basicConfig(
 logger = logging.getLogger("touch_index.validate_fr")
 
 
-def _run_checks(stale_hours: int) -> int:
-    """Run all validation checks. Returns number of failures (0 = clean)."""
+def _run_checks(stale_hours: int, engine: Engine | None = None) -> int:
+    """Run all validation checks. Returns number of failures (0 = clean).
+
+    Args:
+        stale_hours: Alert if updated_at is older than this many hours.
+        engine: Optional pre-configured SQLAlchemy engine. If not provided,
+                a new engine is created from environment variables.
+    """
     failures = 0
 
-    engine = get_engine()
-    if not health_check(engine):
-        logger.error("DB health check failed — aborting")
-        sys.exit(1)
+    if engine is None:
+        engine = get_engine()
+        if not health_check(engine):
+            logger.error("DB health check failed — aborting")
+            sys.exit(1)
 
     with engine.connect() as conn:
         # 1. Duplicate check
