@@ -2,8 +2,8 @@
 Secrets Audit — Scan scripts/ for leaked credentials (DIAG-2).
 
 Required patterns (case-insensitive where noted):
-  1. api_key = '...' (8+ chars)
-  2. secret = '...' (8+ chars)
+  1. api_key / aws_access_key_id / AWS_ACCESS_KEY = '...' (8+ chars)
+  2. secret / aws_secret_access_key / AWS_SECRET_KEY = '...' (8+ chars)
   3. Binance literal strings (BNBBTC, api_key, secret_key) not via os.environ
   4. BINANCE_API_KEY / BINANCE_SECRET as string literals
   5. .env file present at repo root
@@ -21,6 +21,13 @@ PROJECT_ROOT = THIS_FILE.parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 
 # ── Patterns ──────────────────────────────────────────────────────────────────
+# AWS access key patterns
+PAT_AWS_ACCESS_KEY = re.compile(
+    r"(?:aws_access_key_id|AWS_ACCESS_KEY)\s*=\s*['\"]([^'\"]{8,})['\"]",
+)
+PAT_AWS_SECRET_KEY = re.compile(
+    r"(?:aws_secret_access_key|AWS_SECRET_KEY)\s*=\s*['\"]([^'\"]{8,})['\"]",
+)
 
 PAT_API_KEY = re.compile(r"api_key\s*=\s*['\"]([^'\"]{8,})['\"]", re.IGNORECASE)
 PAT_SECRET = re.compile(r"secret\s*=\s*['\"]([^'\"]{8,})['\"]", re.IGNORECASE)
@@ -46,6 +53,19 @@ def _is_placeholder(val: str) -> bool:
     return val.lower() in KNOWN_PLACEHOLDERS or val.startswith("${")
 
 
+def _check_pattern(
+    pattern: re.Pattern, line: str, lineno: int, file_str: str, label: str, findings: list[str]
+) -> bool:
+    m = pattern.search(line)
+    if m:
+        val = m.group(1)
+        if not _is_placeholder(val):
+            snippet = line.strip()[:80]
+            findings.append(f"{file_str}:{lineno}: {label}: {snippet}")
+        return True
+    return False
+
+
 def scan_file(path: Path) -> list[str]:
     findings: list[str] = []
 
@@ -64,21 +84,17 @@ def scan_file(path: Path) -> list[str]:
         if _is_benign(line):
             continue
 
-        m = PAT_API_KEY.search(line)
-        if m:
-            val = m.group(1)
-            if not _is_placeholder(val):
-                snippet = line.strip()[:80]
-                findings.append(f"{file_str}:{lineno}: hardcoded_api_key: {snippet}")
-                continue
+        if _check_pattern(PAT_AWS_ACCESS_KEY, line, lineno, file_str, "hardcoded_aws_access_key", findings):
+            continue
 
-        m = PAT_SECRET.search(line)
-        if m:
-            val = m.group(1)
-            if not _is_placeholder(val):
-                snippet = line.strip()[:80]
-                findings.append(f"{file_str}:{lineno}: hardcoded_secret: {snippet}")
-                continue
+        if _check_pattern(PAT_AWS_SECRET_KEY, line, lineno, file_str, "hardcoded_aws_secret_key", findings):
+            continue
+
+        if _check_pattern(PAT_API_KEY, line, lineno, file_str, "hardcoded_api_key", findings):
+            continue
+
+        if _check_pattern(PAT_SECRET, line, lineno, file_str, "hardcoded_secret", findings):
+            continue
 
         m = PAT_BINANCE_ENV_LITERAL.search(line)
         if m:
@@ -108,6 +124,8 @@ def main() -> None:
     py_files = sorted(SCRIPTS_DIR.rglob("*.py"))
     for fpath in py_files:
         if "__pycache__" in str(fpath):
+            continue
+        if "/archived/" in str(fpath):
             continue
         all_findings.extend(scan_file(fpath))
 
