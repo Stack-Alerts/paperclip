@@ -878,4 +878,4 @@ Design → Validate (in-sample) → Validate (out-of-sample) → Testnet → Liv
 
 ---
 
-*For day-to-day operational reference, see the [User Guide](user-guide.md). For architecture and developer documentation, see `docs/architecture/`.*
+*For day-to-day operational reference, see the [User Guide](user-guide.md). For architecture and developer documentation, see `docs/architecture/`. For operational procedures (CI/CD, migrations, incident response), see `docs/runbook-*.md`.*
