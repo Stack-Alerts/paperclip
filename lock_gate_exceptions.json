@@ -37,6 +37,14 @@
       "expires_iso": null,
       "approval_id": "plan:BTCAAAAA-1479",
       "approved_by": "board"
+    },
+    {
+      "module": "src/data_manager",
+      "scope_description": "BTCAAAAA-2182 Fix 1: Add startTime pagination to _get_bars_binance() (unified_manager.py:526-531) and start_time param to rest_client.get_klines() (rest_client.py:296). Closes zero-trades regression \u2014 4 incidents in 72h. Pattern from _fetch_binance_range() already in same file. Rollback risk: Low. Bounded to runtime backtest path only.",
+      "expires_iso": "2026-05-26",
+      "approval_id": "434fe69a-ebac-4beb-8698-d94a7134d31f",
+      "approved_by": "board",
+      "cto_agent_id": "41b5ede6-e209-40ba-b923-dc969c722e6d"
     }
   ]
 }
