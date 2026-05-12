@@ -62,11 +62,21 @@ def main() -> int:
         action="store_true",
         help="Log results but do not post comments or transition issues",
     )
+    parser.add_argument(
+        "--old-status",
+        type=str,
+        default=None,
+        metavar="STATUS",
+        help="Previous issue status (from webhook payload)",
+    )
     args = parser.parse_args()
 
-    logger.info("Starting Impact Gate for issue %s (dry_run=%s)", args.issue_id, args.dry_run)
+    logger.info(
+        "Starting Impact Gate for issue %s (dry_run=%s, old_status=%s)",
+        args.issue_id, args.dry_run, args.old_status,
+    )
 
-    result = process_issue(args.issue_id, dry_run=args.dry_run)
+    result = process_issue(args.issue_id, dry_run=args.dry_run, old_status=args.old_status)
     print(json.dumps(result, indent=2))
 
     gate_status = result.get("gate_status", "ERROR")
