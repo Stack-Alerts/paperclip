@@ -40,9 +40,7 @@ def _run(args: list[str], cwd: Path) -> str:
         logger.error("git executable not found — cannot extract commit files")
         return ""
     except subprocess.TimeoutExpired:
-        logger.error(
-            "git command timed out after 30s: %s", " ".join(args)
-        )
+        logger.error("git command timed out after 30s: %s", " ".join(args))
         return ""
     except OSError as exc:
         logger.error("git subprocess error: %s", exc)
