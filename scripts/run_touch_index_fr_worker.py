@@ -95,6 +95,13 @@ def main() -> None:
                 result.source,
                 result.skipped_no_commits,
             )
+        if args.validate:
+            logger.info("Running FR data quality validation after single-issue ingestion…")
+            failures = _run_validation(engine)
+            if failures:
+                logger.error("VALIDATION FAILED: %d check(s) — investigate", failures)
+                sys.exit(1)
+            logger.info("VALIDATION PASSED: all checks clean")
         return
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
