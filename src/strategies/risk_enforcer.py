@@ -12,8 +12,8 @@ from nautilus_trader.model.objects import Money, Price, Quantity
 from nautilus_trader.model.currencies import USD
 from nautilus_trader.trading.strategy import Strategy
 
-MAX_POSITION_SIZE = Quantity(1.0)
-MIN_POSITION_SIZE = Quantity(0.001)
+MAX_POSITION_SIZE = Quantity.from_int(1)
+MIN_POSITION_SIZE = Quantity.from_str("0.001")
 DAILY_LOSS_LIMIT = Money("500.00", USD)
 STOP_LOSS_PCT = 0.02
 
@@ -52,7 +52,7 @@ class RiskEnforcer:
         else:
             stop_price_value = round(entry_price * (1.0 + STOP_LOSS_PCT), 2)
 
-        stop_price = Price(str(stop_price_value))
+        stop_price = Price.from_str(str(stop_price_value))
 
         entry_order = self._strategy.order_factory.market(
             instrument_id=instrument_id,

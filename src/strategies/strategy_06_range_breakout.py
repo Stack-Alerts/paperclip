@@ -75,6 +75,9 @@ class RangeBreakoutConfirmation(Strategy):
     """
     
     def __init__(self, config):
+        if isinstance(config, dict):
+            from nautilus_trader.trading.config import StrategyConfig
+            config = StrategyConfig(strategy_id=config.get('strategy_id', '06_RANGE_BREAKOUT'))
         super().__init__(config)
         
         # Strategy identification

@@ -71,6 +71,9 @@ class StrategyLodRejection(Strategy):
 
     
     def __init__(self, config):
+        if isinstance(config, dict):
+            from nautilus_trader.trading.config import StrategyConfig
+            config = StrategyConfig(strategy_id=config.get('strategy_id', '002_LOD_REJECTION'))
         super().__init__(config)
         
         # Strategy identification

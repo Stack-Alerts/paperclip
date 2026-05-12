@@ -90,6 +90,9 @@ class MPatternReversalStandard(Strategy):
 
     
     def __init__(self, config):
+        if isinstance(config, dict):
+            from nautilus_trader.trading.config import StrategyConfig
+            config = StrategyConfig(strategy_id=config.get('strategy_id', '01_M_PATTERN_REVERSAL'))
         super().__init__(config)
         
         # Strategy identification

@@ -159,6 +159,14 @@ class RecheckMetricsCalculator:
             Dictionary containing all calculated metrics
         """
         total_chains = len(self.chain_metrics)
+        with_recheck_winrate = float(
+            self.trade_impact['with_recheck']['wins'] / self.trade_impact['with_recheck']['total']
+            if self.trade_impact['with_recheck']['total'] > 0 else 0
+        )
+        without_recheck_winrate = float(
+            self.trade_impact['without_recheck']['wins'] / self.trade_impact['without_recheck']['total']
+            if self.trade_impact['without_recheck']['total'] > 0 else 0
+        )
         if total_chains == 0:
             return {
                 'error': 'No data available for metrics calculation',
@@ -166,19 +174,13 @@ class RecheckMetricsCalculator:
                 'trade_impact': {
                     'with_recheck': {
                         **self.trade_impact['with_recheck'],
-                        'winrate': float(
-                            self.trade_impact['with_recheck']['wins'] / self.trade_impact['with_recheck']['total']
-                            if self.trade_impact['with_recheck']['total'] > 0 else 0
-                        )
+                        'winrate': with_recheck_winrate
                     },
                     'without_recheck': {
                         **self.trade_impact['without_recheck'],
-                        'winrate': float(
-                            self.trade_impact['without_recheck']['wins'] / self.trade_impact['without_recheck']['total']
-                            if self.trade_impact['without_recheck']['total'] > 0 else 0
-                        )
+                        'winrate': without_recheck_winrate
                     },
-                    'winrate_difference': 0.0
+                    'winrate_difference': float(with_recheck_winrate - without_recheck_winrate)
                 }
             }
         
