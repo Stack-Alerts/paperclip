@@ -224,6 +224,11 @@ def process_issue(
     validates that the issue is ``in_review`` and carries a fix/bug label
     before generating the report.
 
+    When the issue is NOT ``in_review`` and *old_status* is ``in_review``,
+    the state file is updated to reflect the transition out of ``in_review``
+    so that a future re-transition to ``in_review`` is correctly detected
+    as a new transition.
+
     When *force_reprocess* is True, the already-processed guard is bypassed
     so the issue report is regenerated even if previously processed.
     """
@@ -240,6 +245,18 @@ def process_issue(
         log.info(
             "%s has status=%r (not in_review) -- skipping", identifier, status
         )
+        # Track status change for issues leaving in_review so that
+        # a future transition back to in_review is correctly detected
+        # as a new transition rather than suppressed.
+        if not dry_run and old_status == "in_review":
+            state = _load_state()
+            statuses = state.setdefault("issue_statuses", {})
+            statuses[issue_id] = status
+            _save_state(state)
+            log.info(
+                "Updated state for %s: status %r (was in_review)",
+                identifier, status,
+            )
         return None
 
     if old_status:

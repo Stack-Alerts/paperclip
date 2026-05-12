@@ -799,6 +799,120 @@ class TestProcessIssue:
         assert state["processed_issue_ids"] == ["issue-uuid-42"]
 
 
+
+# ---------------------------------------------------------------------------
+# process_issue — leaving in_review state tracking
+# ---------------------------------------------------------------------------
+
+
+class TestProcessIssueLeavingInReview:
+    """Tests for state tracking when an issue leaves in_review status."""
+
+    _ISSUE_LEAVING_REVIEW = {
+        "id": "issue-uuid-45",
+        "identifier": "BTCAAAAA-1510",
+        "title": "Fix that went back to in_progress",
+        "status": "in_progress",
+        "labels": [{"name": "fix"}],
+    }
+
+    def test_updates_state_when_leaving_in_review(self, tmp_path, monkeypatch):
+        """When old_status=in_review and current status is not, state should update."""
+        from blast_radius.worker import process_issue
+
+        state_file = tmp_path / "state.json"
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": [],
+            "issue_statuses": {"issue-uuid-45": "in_review"},
+        }))
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._ISSUE_LEAVING_REVIEW,
+        )
+
+        result = process_issue(
+            "issue-uuid-45", dry_run=False, old_status="in_review",
+        )
+
+        assert result is None  # skipped because not in_review
+        state = json.loads(state_file.read_text())
+        assert state["issue_statuses"]["issue-uuid-45"] == "in_progress"
+        # processed_issue_ids should NOT have been updated
+        assert state["processed_issue_ids"] == []
+
+    def test_dry_run_does_not_update_state(self, tmp_path, monkeypatch):
+        """Dry-run mode must not persist state when issue leaves in_review."""
+        from blast_radius.worker import process_issue
+
+        state_file = tmp_path / "state.json"
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": [],
+            "issue_statuses": {"issue-uuid-45": "in_review"},
+        }))
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._ISSUE_LEAVING_REVIEW,
+        )
+
+        process_issue(
+            "issue-uuid-45", dry_run=True, old_status="in_review",
+        )
+
+        state = json.loads(state_file.read_text())
+        # State should still show in_review (not updated)
+        assert state["issue_statuses"]["issue-uuid-45"] == "in_review"
+
+    def test_no_update_when_old_status_not_in_review(self, tmp_path, monkeypatch):
+        """When old_status is not in_review, state should not update."""
+        from blast_radius.worker import process_issue
+
+        state_file = tmp_path / "state.json"
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": [],
+            "issue_statuses": {"issue-uuid-45": "in_progress"},
+        }))
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._ISSUE_LEAVING_REVIEW,
+        )
+
+        process_issue(
+            "issue-uuid-45", dry_run=False, old_status="in_progress",
+        )
+
+        state = json.loads(state_file.read_text())
+        # State should still show in_progress (not updated to in_progress again)
+        assert state["issue_statuses"]["issue-uuid-45"] == "in_progress"
+
+    def test_no_update_when_old_status_is_none(self, tmp_path, monkeypatch):
+        """When old_status is None, state should not update."""
+        from blast_radius.worker import process_issue
+
+        state_file = tmp_path / "state.json"
+        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+        state_file.write_text(json.dumps({
+            "processed_issue_ids": [],
+            "issue_statuses": {"issue-uuid-45": "in_review"},
+        }))
+
+        monkeypatch.setattr(
+            "blast_radius.worker._get_issue",
+            lambda issue_id: self._ISSUE_LEAVING_REVIEW,
+        )
+
+        process_issue(
+            "issue-uuid-45", dry_run=False, old_status=None,
+        )
+
+        state = json.loads(state_file.read_text())
+        assert state["issue_statuses"]["issue-uuid-45"] == "in_review"
+
 # ---------------------------------------------------------------------------
 # _get_issue
 # ---------------------------------------------------------------------------
