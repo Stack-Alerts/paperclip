@@ -50,6 +50,8 @@ from urllib.parse import urlparse, parse_qs
 
 from .query import query_blast_radius, to_json_dict
 from .worker import process_issue
+from typing import Any
+
 
 log = logging.getLogger(__name__)
 DEFAULT_PORT = int(__import__("os").environ.get("BLAST_RADIUS_PORT", "8765"))
@@ -238,14 +240,16 @@ class _Handler(BaseHTTPRequestHandler):
 
         event_type = body.get("event", "unknown")
         dry_run = body.get("dry_run", False)
+        validate = body.get("validate", False)
 
         log.info(
-            "Bug webhook: %s for issue %s (dry_run=%s)", event_type, issue_id, dry_run,
+            "Bug webhook: %s for issue %s (dry_run=%s, validate=%s)", event_type, issue_id, dry_run, validate,
         )
 
         try:
             from touch_index.bug_worker import process_bug_issue
             from touch_index.paperclip_client import transition_issue_status
+            from touch_index.quality import run_bug_quality_checks
 
             engine = _get_bug_engine()
             result = process_bug_issue(engine, issue_id, dry_run=bool(dry_run))
@@ -266,13 +270,29 @@ class _Handler(BaseHTTPRequestHandler):
                 except Exception as exc:
                     log.error("Bug webhook: failed to mark %s as done: %s", result.issue_identifier, exc)
 
-            self._send_json(200, {
+            validation_passed: bool | None = None
+            if validate:
+                try:
+                    report = run_bug_quality_checks(engine)
+                    validation_passed = report.passed
+                    if not report.passed:
+                        log.error("Bug webhook: VALIDATION FAILED after ingestion for %s", result.issue_identifier)
+                    else:
+                        log.info("Bug webhook: VALIDATION PASSED for %s", result.issue_identifier)
+                except Exception as exc:
+                    log.error("Bug webhook: validation error for %s: %s", result.issue_identifier, exc)
+                    validation_passed = False
+
+            response: dict[str, Any] = {
                 "issue": result.issue_identifier,
                 "files_indexed": result.files_indexed,
                 "source": result.source,
                 "skipped_no_commits": result.skipped_no_commits,
                 "transitioned_to_done": transitioned,
-            })
+            }
+            if validation_passed is not None:
+                response["validation_passed"] = validation_passed
+            self._send_json(200, response)
         except Exception as exc:
             log.error("Bug webhook processing failed for %s: %s", issue_id, exc)
             self._send_json(500, {"error": str(exc), "issue": issue_id})
