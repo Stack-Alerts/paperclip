@@ -151,6 +151,15 @@ class TestStatePersistence:
         assert "issue_statuses" in state
         assert "processed_issue_ids" in state
 
+    def test_load_missing_processed_ids_filled(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        path = tmp_path / "partial_no_pids.json"
+        path.write_text(json.dumps({"issue_statuses": {"uuid-1": "in_review"}}))
+        with patch.object(worker_mod, "_STATE_PATH", path):
+            state = worker_mod._load_state()
+        assert state["processed_issue_ids"] == []
+        assert state["issue_statuses"] == {"uuid-1": "in_review"}
+
     def test_save_and_load_roundtrip(self, tmp_path):
         import blast_radius.worker as worker_mod
         path = tmp_path / "roundtrip.json"
