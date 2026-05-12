@@ -402,6 +402,39 @@ class TestRunOnce:
         error_results = [r for r in results if "error" in r]
         assert len(error_results) == 1
 
+    def test_failed_candidate_not_persisted_as_in_review(self, tmp_path):
+        """A candidate that fails during generate_and_post should NOT have
+        its status persisted as ``in_review``, so it can be re-detected as a
+        transition on the next poll rather than silently dropped forever."""
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issues = _IN_REVIEW_ISSUES
+
+        def _side_effect(issue_id, **kw):
+            if issue_id == "uuid-fix-1":
+                raise RuntimeError("API timeout")
+            return {"ok": True}
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=issues),
+            patch("blast_radius.worker.generate_and_post", side_effect=_side_effect),
+        ):
+            worker_mod.run_once(dry_run=False)
+
+        state = json.loads(state_file.read_text())
+        statuses = state.get("issue_statuses", {})
+        # The failed issue's status should NOT be "in_review" in state
+        assert "uuid-fix-1" not in statuses or statuses["uuid-fix-1"] != "in_review", (
+            "Failed candidate should not be persisted as in_review"
+        )
+        # Other issues should still have their statuses synced
+        assert statuses.get("uuid-bug-1") == "in_review"
+        assert statuses.get("uuid-title-match") == "in_review"
+        # The failed issue should NOT be in processed_issue_ids
+        assert "uuid-fix-1" not in state.get("processed_issue_ids", [])
+
+
     def test_no_fix_issues_in_review(self, tmp_path):
         import blast_radius.worker as worker_mod
         state_file = _patch_state(tmp_path)

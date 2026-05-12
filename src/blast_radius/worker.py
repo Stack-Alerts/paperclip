@@ -185,6 +185,7 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
 
     results = []
     newly_processed: list[str] = []
+    failed_ids: set[str] = set()
 
     for issue in candidates:
         issue_id = issue.get("id", "")
@@ -209,8 +210,14 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
         except Exception as exc:
             log.error("Failed to generate report for %s: %s", identifier, exc)
             results.append({"issue": identifier, "error": str(exc)})
+            failed_ids.add(issue_id)
 
     _sync_statuses(state, issues)
+
+    # Remove status entries for failed candidates so they are re-detected
+    # as transitions on the next poll rather than silently dropped.
+    for iid in failed_ids:
+        state["issue_statuses"].pop(iid, None)
 
     if dry_run:
         return results
