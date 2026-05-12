@@ -190,6 +190,26 @@ class DictWrapper:
             return value
         return None
     
+    def keys(self):
+        if isinstance(self._data, dict):
+            return self._data.keys()
+        return []
+
+    def __getitem__(self, key):
+        if isinstance(self._data, dict):
+            return self._data[key]
+        raise KeyError(key)
+
+    def __iter__(self):
+        if isinstance(self._data, dict):
+            return iter(self._data)
+        return iter([])
+
+    def __len__(self):
+        if isinstance(self._data, dict):
+            return len(self._data)
+        return 0
+
     def __repr__(self):
         return f"DictWrapper({self._data})"
 
