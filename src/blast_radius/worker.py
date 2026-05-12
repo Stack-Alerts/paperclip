@@ -49,7 +49,9 @@ log = logging.getLogger(__name__)
 
 FIX_LABELS = {
     lbl.strip().lower()
-    for lbl in os.environ.get("FIX_LABELS", "fix,bug,bugfix,regression,hotfix").split(",")
+    for lbl in os.environ.get("FIX_LABELS", "fix,bug,bugfix,regression,hotfix").split(
+        ","
+    )
     if lbl.strip()
 }
 
@@ -105,7 +107,7 @@ def _is_fix_issue(issue: dict) -> bool:
         name = (lbl.get("name") or "").strip().lower()
         if name in FIX_LABELS:
             return True
-    title = (issue.get("title") or "")
+    title = issue.get("title") or ""
     return bool(
         re.match(r"(?:fix|bug|bugfix|regression|hotfix)\b", title, re.IGNORECASE)
     )

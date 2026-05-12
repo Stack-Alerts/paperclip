@@ -165,11 +165,10 @@ class TestIsFixIssue:
             is False
         )
         assert (
-            worker_mod._is_fix_issue(
-                {"labels": [], "title": "Prefix bug in the title"}
-            )
+            worker_mod._is_fix_issue({"labels": [], "title": "Prefix bug in the title"})
             is False
         )
+
 
 # ---------------------------------------------------------------------------
 # _load_state / _save_state
