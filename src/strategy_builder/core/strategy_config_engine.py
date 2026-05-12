@@ -73,6 +73,7 @@ class BlockConfig:
     indented: bool = False
     depends_on: Optional['BlockConfig'] = None
     exit_conditions: List[ExitCondition] = field(default_factory=list)
+    parameters: dict = field(default_factory=dict)
 
 
 @dataclass
