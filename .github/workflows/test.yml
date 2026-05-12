@@ -1,10 +1,18 @@
 name: Test and Coverage
 
 on:
+  schedule:
+    # Nightly at 04:00 UTC — full test suite with alerting on failure
+    - cron: '0 4 * * *'
   push:
     branches: ["main", "master"]
   pull_request:
     branches: ["main", "master"]
+
+env:
+  PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+  PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+  PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
 
 jobs:
   test:
@@ -56,6 +64,7 @@ jobs:
         run: rm -f .coverage
 
       - name: Run tests with coverage gate
+        id: tests
         env:
           QT_QPA_PLATFORM: offscreen
           POSTGRES_HOST: localhost
@@ -63,22 +72,8 @@ jobs:
           POSTGRES_DB: optimizer_v3
           POSTGRES_USER: optimizer_admin
           POSTGRES_PASSWORD: secure_password_change_me
-          # PYTHONPATH ensures src/ is importable for conftest-based imports.
-          # The tests/test_touch_index/ path follows the standard test_<pkg>
-          # convention so there is no package-name shadowing.
           PYTHONPATH: src
         run: |
-          # Run only the test modules that can execute in a headless CI
-          # without nautilus_trader, jinja2, or psutil.
-          # Coverage scope is controlled by .coveragerc (omits Qt UI and
-          # NautilusTrader-dependent modules from the denominator).
-          #
-          # ITM state tests (tests/itm/state/) are included because they use
-          # only the itm.state / itm.domain modules (no NautilusTrader) and
-          # now include real-PostgreSQL tests via the pg_conn fixture.
-          #
-          # Blast Radius tests (tests/test_blast_radius/) require no DB or
-          # live network — they mock all external dependencies.
           python -m pytest \
             tests/test_blast_radius/ \
             tests/test_impact_gate/ \
@@ -93,7 +88,18 @@ jobs:
             --cov-config=.coveragerc \
             --cov-report=term-missing \
             --cov-fail-under=20 \
-            -v
+            -v 2>&1 | tee /tmp/test-output.txt
+
+      - name: Alert on nightly test failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/nightly_test_alert.py \
+            --workflow "Test and Coverage" \
+            --run-id "${{ github.run_id }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --test-output /tmp/test-output.txt
 
   integration-real-data:
     name: Real-data regression (BTCAAAAA-745)

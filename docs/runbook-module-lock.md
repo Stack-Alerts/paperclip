@@ -156,41 +156,39 @@ lookup used by the lock gate is up to date.
 - `.github/ISSUE_TEMPLATE/qa-locked-module-exception.md` — Exception request template
 - `.github/CODEOWNERS` — CEO + board approval requirement for exceptions file
 
-## Automated Exception Sign-Off (Webhook)
+## Auto-Create CTO Sign-Off on Gate Block
 
-When an exception request is approved on a Paperclip issue, the **RepoSteward
-CTO sign-off webhook** automates steps 3–5 of the Path A/B procedures:
+`.github/workflows/lock-gate.yml` is extended to auto-create a CTO sign-off
+Paperclip issue when the lock gate blocks a PR.  This happens in two steps:
 
-1. RepoSteward sends a `repository_dispatch` event with type
-   `lock_exception_signed_off` containing the approval payload.
-2. `.github/workflows/lock-exception-signoff.yml` catches the event and runs
-   `scripts/lock_exception_signoff.py`.
-3. The script validates the payload, appends the entry to
-   `lock_gate_exceptions.json`, commits, and pushes.
-4. A confirmation comment is posted on the Paperclip issue.
-5. The issue is transitioned to `done`.
+1. `scripts/lock_gate.py --json-summary` emits a structured JSON report of
+   the blocked modules, PR number, commit SHA, and PR URL.
+2. On gate failure, `scripts/lock_gate_create_signoff.py` reads that JSON and:
+   - Checks idempotency: if a sign-off issue already exists for the same
+     PR + commit SHA, it comments on the existing issue instead of creating
+     a duplicate.
+   - Creates a `high`-priority Paperclip issue with the `cto-signoff-required`
+     label, assigned to the CTO agent.
+   - Includes the blocked module details, gate output, and PR link in the
+     issue body.
 
-The webhook payload must include:
+The sign-off issue contains a deduplication marker (`<!-- dedup:... -->`) in
+its body.  Force-pushes with the same SHA are idempotent — only a comment is
+added.  New commits on the same PR create new sign-off issues.
 
-| Field | Description |
-|---|---|
-| `issue_id` | Paperclip issue UUID |
-| `module` | Locked module path from `.module_lock_registry.json` |
-| `scope` | Scope description of the approved change |
-| `approved_by` | `"board"` or `"ceo-emergency"` |
-| `approval_id` | Board-approved plan ID or `COMMENT:<url>` |
-| `expires_iso` | ISO 8601 UTC expiry, or omit for permanent (Path A only) |
+## Nightly CI Test Alert
 
-## Nightly Alert
+`.github/workflows/test.yml` runs on a **nightly schedule** (04:00 UTC) in
+addition to push/PR triggers.  When the scheduled run fails:
 
-`.github/workflows/lock-gate-nightly-alert.yml` runs nightly at 03:00 UTC and
-creates a Paperclip alert issue if any exceptions have expired, are expiring
-within 24h, or have schema validation errors. The alert is posted as a `todo`
-issue with the `lock-gate` and `nightly-alert` labels.
+1. The test output is captured to `/tmp/test-output.txt`.
+2. `scripts/nightly_test_alert.py` creates a `critical`-priority Paperclip
+   issue assigned to the CTO with the CI run URL and test output.
+3. On a successful nightly run, no Paperclip issue is created.
 
 ## Related Workflows
 
-- `.github/workflows/lock-exception-signoff.yml` — Automated exception entry
-- `.github/workflows/lock-gate-nightly-alert.yml` — Nightly status alert
-- `.github/workflows/lock-gate.yml` — CI gate
+- `.github/workflows/lock-gate.yml` — CI gate with auto CTO sign-off on block
+- `.github/workflows/test.yml` — Nightly tests with failure alerting
+- `.github/workflows/lock-exception-signoff.yml` — Exception entry automation
 - `.github/workflows/dep-graph-refresh.yml` — Nightly dependency graph refresh

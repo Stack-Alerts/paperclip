@@ -10,6 +10,12 @@ jobs:
   lock-gate:
     name: Module lock gate
     runs-on: ubuntu-latest
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,5 +26,34 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Run lock gate
-        run: python scripts/lock_gate.py
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests python-dotenv
+
+      - name: Run lock gate with JSON summary
+        id: gate
+        env:
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_PR_URL: ${{ github.event.pull_request.html_url || github.event.head_commit.url || '' }}
+        run: |
+          python scripts/lock_gate.py --json-summary > /tmp/lock-gate-output.json 2>&1
+          rc=$?
+          echo "exit_code=$rc" >> $GITHUB_OUTPUT
+          if [ "$rc" -eq 1 ]; then
+            echo "gate=blocked" >> $GITHUB_OUTPUT
+          else
+            echo "gate=passed" >> $GITHUB_OUTPUT
+          fi
+          # Re-run for human-readable log output
+          cat /tmp/lock-gate-output.json
+          exit $rc
+
+      - name: Create CTO sign-off issue on gate block
+        if: steps.gate.outputs.gate == 'blocked'
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/lock_gate_create_signoff.py \
+            --gate-output /tmp/lock-gate-output.json
