@@ -67,11 +67,21 @@ def main() -> None:
         action="store_true",
         help="Log results but do not post comments or transition issues",
     )
+    parser.add_argument(
+        "--old-status",
+        type=str,
+        default=None,
+        metavar="STATUS",
+        help="Previous issue status (from webhook payload)",
+    )
     args = parser.parse_args()
 
     if args.issue_id:
-        logger.info("Processing single issue %s (dry_run=%s)", args.issue_id, args.dry_run)
-        result = process_issue(args.issue_id, dry_run=args.dry_run)
+        logger.info(
+            "Processing single issue %s (dry_run=%s, old_status=%s)",
+            args.issue_id, args.dry_run, args.old_status,
+        )
+        result = process_issue(args.issue_id, dry_run=args.dry_run, old_status=args.old_status)
         logger.info("Result: %s", result)
         return
 

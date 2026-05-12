@@ -241,8 +241,11 @@ def _build_bypass_comment(identifier: str) -> str:
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def process_issue(issue_id: str, dry_run: bool = False) -> dict:
+def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None = None) -> dict:
     """Run the Impact Gate for a single fix issue.
+
+    When called from a Paperclip ``issue_status_changed`` webhook, the caller
+    may pass the previous status via *old_status* for logging and audit.
 
     Returns a dict with keys:
       - issue: identifier
@@ -261,7 +264,13 @@ def process_issue(issue_id: str, dry_run: bool = False) -> dict:
     description = issue.get("description", "") or ""
     title = issue.get("title", "")
 
-    log.info("Processing issue %s (status=%s, title=%s)", identifier, status, title)
+    if old_status:
+        log.info(
+            "Processing issue %s (status=%s, old_status=%s, title=%s)",
+            identifier, status, old_status, title,
+        )
+    else:
+        log.info("Processing issue %s (status=%s, title=%s)", identifier, status, title)
 
     # --- Bypass check ---
     if _has_bypass_label(issue):
