@@ -5,6 +5,7 @@ description = "Institutional-grade trading strategy optimizer"
 authors = ["Stack Alerts <info@stackalerts.com>"]
 
 [tool.poetry.scripts]
+blast-radius = "blast_radius.__main__:main"
 touch-index = "touch_index.__main__:main"
 touch-index-fr = "touch_index.fr_worker:main"
 touch-index-bug = "touch_index.bug_worker:main"
