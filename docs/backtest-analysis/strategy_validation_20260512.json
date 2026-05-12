@@ -1,0 +1,160 @@
+{
+  "timestamp": "2026-05-12T21:40:00Z",
+  "strategies": [
+    {
+      "name": "M Pattern Reversal - Standard",
+      "module": "strategy_01_reversal_m_pattern",
+      "class": "MPatternReversalStandard",
+      "status": "OK",
+      "notes": [
+        "Instantiated OK: M Pattern Reversal - Standard (01_M_PATTERN_REVERSAL)",
+        "RiskEnforcer present"
+      ],
+      "strategy_id": "01_M_PATTERN_REVERSAL",
+      "strategy_name": "M Pattern Reversal - Standard",
+      "risk_enforcer": true
+    },
+    {
+      "name": "LOD Rejection",
+      "module": "strategy_002_lod_rejection",
+      "class": "StrategyLodRejection",
+      "status": "OK",
+      "notes": [
+        "Instantiated OK: LOD Rejection (002_LOD_REJECTION)",
+        "RiskEnforcer present"
+      ],
+      "strategy_id": "002_LOD_REJECTION",
+      "strategy_name": "LOD Rejection",
+      "risk_enforcer": true
+    },
+    {
+      "name": "HOD Continuation",
+      "module": "strategy_003_hod_continuation",
+      "class": "StrategyHodContinuation",
+      "status": "OK",
+      "notes": [
+        "Instantiated OK: HOD Continuation (003_HOD_CONTINUATION)",
+        "RiskEnforcer present"
+      ],
+      "strategy_id": "003_HOD_CONTINUATION",
+      "strategy_name": "HOD Continuation",
+      "risk_enforcer": true
+    },
+    {
+      "name": "EMA Trend Continuation",
+      "module": "strategy_04_ema_trend_continuation",
+      "class": "EMATrendContinuation",
+      "status": "OK",
+      "notes": [
+        "Instantiated OK: EMA Trend Continuation (04_EMA_TREND_CONTINUATION)",
+        "RiskEnforcer present"
+      ],
+      "strategy_id": "04_EMA_TREND_CONTINUATION",
+      "strategy_name": "EMA Trend Continuation",
+      "risk_enforcer": true
+    },
+    {
+      "name": "Range Breakout with Confirmation",
+      "module": "strategy_06_range_breakout",
+      "class": "RangeBreakoutConfirmation",
+      "status": "OK",
+      "notes": [
+        "Instantiated OK: Range Breakout with Confirmation (06_RANGE_BREAKOUT)",
+        "RiskEnforcer present"
+      ],
+      "strategy_id": "06_RANGE_BREAKOUT",
+      "strategy_name": "Range Breakout with Confirmation",
+      "risk_enforcer": true
+    },
+    {
+      "name": "Micro Trend Scalping",
+      "module": "strategy_08_micro_trend_scalping",
+      "class": "MicroTrendScalping",
+      "status": "OK",
+      "notes": [
+        "Instantiated OK: Micro Trend Scalping (08_MICRO_TREND_SCALPING)",
+        "RiskEnforcer present"
+      ],
+      "strategy_id": "08_MICRO_TREND_SCALPING",
+      "strategy_name": "Micro Trend Scalping",
+      "risk_enforcer": true
+    },
+    {
+      "name": "Order Flow Scalping",
+      "module": "strategy_09_order_flow_scalping",
+      "class": "OrderFlowScalping",
+      "status": "OK",
+      "notes": [
+        "Instantiated OK: Order Flow Scalping (09_ORDER_FLOW_SCALPING)",
+        "RiskEnforcer present"
+      ],
+      "strategy_id": "09_ORDER_FLOW_SCALPING",
+      "strategy_name": "Order Flow Scalping",
+      "risk_enforcer": true
+    },
+    {
+      "name": "Bollinger Band Mean Reversion",
+      "module": "strategy_15_bollinger_mean_reversion",
+      "class": "BollingerMeanReversion",
+      "status": "OK",
+      "notes": [
+        "Instantiated OK: Bollinger Band Mean Reversion (15_BOLLINGER_MEAN_REVERSION)",
+        "RiskEnforcer present"
+      ],
+      "strategy_id": "15_BOLLINGER_MEAN_REVERSION",
+      "strategy_name": "Bollinger Band Mean Reversion",
+      "risk_enforcer": true
+    },
+    {
+      "name": "draft: hod_rejection.json",
+      "status": "OK",
+      "config_keys": [
+        "name",
+        "description",
+        "blocks",
+        "version",
+        "strategy_type",
+        "validation_status",
+        "generation_status"
+      ],
+      "notes": [
+        "Valid JSON, 7 top-level keys"
+      ]
+    },
+    {
+      "name": "draft: hod_rejection_2.json",
+      "status": "OK",
+      "config_keys": [
+        "name",
+        "description",
+        "blocks",
+        "version",
+        "strategy_type",
+        "validation_status",
+        "generation_status"
+      ],
+      "notes": [
+        "Valid JSON, 7 top-level keys"
+      ]
+    },
+    {
+      "name": "draft: rsi_vwap_50_asia_rejection.json",
+      "status": "OK",
+      "config_keys": [
+        "name",
+        "description",
+        "strategy_type",
+        "blocks"
+      ],
+      "notes": [
+        "Valid JSON, 4 top-level keys"
+      ]
+    }
+  ],
+  "summary": {
+    "total": 11,
+    "passed": 11,
+    "failed": 0,
+    "errors": []
+  }
+}
