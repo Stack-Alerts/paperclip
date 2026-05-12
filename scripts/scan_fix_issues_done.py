@@ -60,6 +60,8 @@ logger = logging.getLogger("scan_fix_issues_done")
 _GATE_HEADER_RE = re.compile(
     r"^## Impact Gate:\s+(PASS|FAIL|BYPASSED|ERROR|SKIPPED)", re.MULTILINE
 )
+
+
 def _check_gate_status(issue_id: str) -> str | None:
     """Check comments for an Impact Gate result.
 
@@ -78,6 +80,8 @@ def _check_gate_status(issue_id: str) -> str | None:
         if m:
             return m.group(1)
     return None
+
+
 def scan(
     days_back: int | None = None,
     dry_run: bool = False,
@@ -228,6 +232,8 @@ def scan(
         )
 
     return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Scan done fix/bug issues for Impact Gate coverage",
@@ -289,5 +295,7 @@ def main() -> int:
         print(json.dumps(result))  # noqa: T201
 
     return 0 if result["ungated_count"] == 0 else 1
+
+
 if __name__ == "__main__":
     sys.exit(main())
