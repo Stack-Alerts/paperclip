@@ -101,11 +101,11 @@ jobs:
           if [ -n "$ISSUE_ID" ]; then
             python -m blast_radius --issue-id "$ISSUE_ID" \
               ${OLD_STATUS:+--old-status "$OLD_STATUS"} \
-              $FLAGS > /tmp/br-output.json 2>&1
+              $FLAGS > /tmp/br-output.json
           elif [ "${{ github.event.inputs.loop_seconds }}" != "0" ] && [ -n "${{ github.event.inputs.loop_seconds }}" ]; then
-            python -m blast_radius --loop ${{ github.event.inputs.loop_seconds }} $FLAGS > /tmp/br-output.json 2>&1
+            python -m blast_radius --loop ${{ github.event.inputs.loop_seconds }} $FLAGS > /tmp/br-output.json
           else
-            python -m blast_radius $FLAGS > /tmp/br-output.json 2>&1
+            python -m blast_radius $FLAGS > /tmp/br-output.json
           fi
 
       - name: Upload worker output artifact
