@@ -325,7 +325,11 @@ def run_loop(
 
 
 def main() -> None:
-    """CLI entry point: parse args and dispatch to process_issue / run_loop / run_once."""
+    """CLI entry point: parse args and dispatch to process_issue / run_loop / run_once.
+
+    .. deprecated:: Use python -m blast_radius (or python -m blast_radius worker)
+       instead of calling this function directly.
+    """
     import argparse
 
     logging.basicConfig(
