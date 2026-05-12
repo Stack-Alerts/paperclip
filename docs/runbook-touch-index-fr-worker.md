@@ -166,7 +166,7 @@ cp .env.example .env
 ### Run tests
 
 ```bash
-# All touch index tests (314 tests)
+# All touch index tests (315 tests)
 python -m pytest tests/test_touch_index/ -v
 
 # FR worker-specific tests

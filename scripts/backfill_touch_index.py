@@ -120,11 +120,24 @@ def main() -> None:
     # ── Step 1: FR ingestion (FDR-labelled issues) ─────────────────────────
     logger.info("Fetching FDR-labelled issues for backfill …")
     all_fdr_issues = get_fdr_issues(updated_after=None)
-    fdr_issues = [
-        i
-        for i in all_fdr_issues
-        if datetime.fromisoformat(i["updatedAt"].replace("Z", "+00:00")) >= cutoff
-    ]
+    fdr_issues = []
+    for i in all_fdr_issues:
+        raw_ts = i.get("updatedAt")
+        if not raw_ts:
+            fdr_issues.append(i)
+            continue
+        try:
+            ts = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
+        except ValueError:
+            logger.warning(
+                "FDR issue %s has malformed updatedAt %r — including anyway",
+                i.get("identifier", "unknown"),
+                raw_ts,
+            )
+            fdr_issues.append(i)
+            continue
+        if ts >= cutoff:
+            fdr_issues.append(i)
     logger.info(
         "FDR issues in window: %d / total: %d", len(fdr_issues), len(all_fdr_issues)
     )
