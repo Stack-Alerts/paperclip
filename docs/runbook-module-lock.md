@@ -155,3 +155,42 @@ lookup used by the lock gate is up to date.
 - `lock_gate_exceptions.schema.md` — Exception entry schema documentation
 - `.github/ISSUE_TEMPLATE/qa-locked-module-exception.md` — Exception request template
 - `.github/CODEOWNERS` — CEO + board approval requirement for exceptions file
+
+## Automated Exception Sign-Off (Webhook)
+
+When an exception request is approved on a Paperclip issue, the **RepoSteward
+CTO sign-off webhook** automates steps 3–5 of the Path A/B procedures:
+
+1. RepoSteward sends a `repository_dispatch` event with type
+   `lock_exception_signed_off` containing the approval payload.
+2. `.github/workflows/lock-exception-signoff.yml` catches the event and runs
+   `scripts/lock_exception_signoff.py`.
+3. The script validates the payload, appends the entry to
+   `lock_gate_exceptions.json`, commits, and pushes.
+4. A confirmation comment is posted on the Paperclip issue.
+5. The issue is transitioned to `done`.
+
+The webhook payload must include:
+
+| Field | Description |
+|---|---|
+| `issue_id` | Paperclip issue UUID |
+| `module` | Locked module path from `.module_lock_registry.json` |
+| `scope` | Scope description of the approved change |
+| `approved_by` | `"board"` or `"ceo-emergency"` |
+| `approval_id` | Board-approved plan ID or `COMMENT:<url>` |
+| `expires_iso` | ISO 8601 UTC expiry, or omit for permanent (Path A only) |
+
+## Nightly Alert
+
+`.github/workflows/lock-gate-nightly-alert.yml` runs nightly at 03:00 UTC and
+creates a Paperclip alert issue if any exceptions have expired, are expiring
+within 24h, or have schema validation errors. The alert is posted as a `todo`
+issue with the `lock-gate` and `nightly-alert` labels.
+
+## Related Workflows
+
+- `.github/workflows/lock-exception-signoff.yml` — Automated exception entry
+- `.github/workflows/lock-gate-nightly-alert.yml` — Nightly status alert
+- `.github/workflows/lock-gate.yml` — CI gate
+- `.github/workflows/dep-graph-refresh.yml` — Nightly dependency graph refresh

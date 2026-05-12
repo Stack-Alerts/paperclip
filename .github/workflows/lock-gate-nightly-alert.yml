@@ -1,0 +1,56 @@
+name: Lock Gate Nightly Alert
+
+on:
+  schedule:
+    # Nightly at 03:00 UTC — after dep-graph-refresh (02:00) so dep_graph is fresh
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log only, do not create alert issue)'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: lock-gate-nightly-alert
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    name: Generate nightly lock gate alert
+    runs-on: ubuntu-latest
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests python-dotenv
+
+      - name: Run nightly alert
+        env:
+          PYTHONPATH: src
+        run: |
+          FLAGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          python scripts/lock_gate_nightly_alert.py $FLAGS
+
+      - name: Log alert result
+        if: always()
+        run: |
+          echo "## Lock Gate Nightly Alert" >> $GITHUB_STEP_SUMMARY
+          echo "- Exit code: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
