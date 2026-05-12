@@ -245,10 +245,10 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
         except OSError:
             pass
 
-    total = passed_total = failed_total = error_total = 0
+    total = passed_total = failed_total = error_total = zero_test_files = 0
 
     def _populate(id_path_map: dict[str, Path], results_dict: dict[str, dict]) -> None:
-        nonlocal total, passed_total, failed_total, error_total
+        nonlocal total, passed_total, failed_total, error_total, zero_test_files
         for tid, path in id_path_map.items():
             if not path.exists():
                 continue
@@ -259,7 +259,7 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
             errors = sum(1 for t in file_tests if t["outcome"] == "error")
 
             if not file_tests:
-                error_total += 1
+                zero_test_files += 1
                 results_dict[tid] = {
                     "status": "ERROR",
                     "test_file": rel,
@@ -286,7 +286,10 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
     _populate(bug_paths, bug_results)
 
     overall_failed = failed_total + error_total + len(missing)
-    overall = "PASS" if overall_failed == 0 else "FAIL"
+    if zero_test_files > 0:
+        overall = "ERROR"
+    else:
+        overall = "PASS" if overall_failed == 0 else "FAIL"
 
     return {
         "timestamp": timestamp,
@@ -296,6 +299,7 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
             "passed": passed_total,
             "failed": failed_total,
             "errors": error_total,
+            "zero_test_files": zero_test_files,
             "missing_test_files": len(missing),
         },
         "fr_results": fr_results,
