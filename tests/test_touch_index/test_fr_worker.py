@@ -1016,3 +1016,35 @@ class TestMain:
         mock_transition.assert_called_once_with("id-1", "done")
         assert any("Failed to mark" in r.message for r in caplog.records)
 
+
+    def test_main_issue_id_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
+        """Single-issue mode: transition failure is logged but does not crash."""
+        import logging
+        engine = MagicMock()
+        result = FRIngestionResult(
+            issue_identifier="BTCAAAAA-100",
+            issue_id="uuid-1",
+            files_indexed=2,
+            source="comments",
+            skipped_no_commits=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.fr_worker.process_fr_issue", return_value=result),
+            patch("touch_index.paperclip_client.get_fdr_issues"),
+            patch(
+                "touch_index.paperclip_client.transition_issue_status",
+                side_effect=RuntimeError("API timeout"),
+            ) as mock_transition,
+            caplog.at_level(logging.ERROR),
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "uuid-1"],
+            )
+            main()
+
+        mock_transition.assert_called_once_with("uuid-1", "done")
+        assert any("Failed to mark" in r.message for r in caplog.records)
