@@ -221,7 +221,11 @@ class TestFetchIssueComments:
         mock_resp = MagicMock()
         mock_resp.json.return_value = [
             {"id": "c1", "body": "Fixed it", "createdAt": "2026-05-11T10:00:00Z"},
-            {"id": "c2", "body": "Also touched src/db.py", "createdAt": "2026-05-11T10:01:00Z"},
+            {
+                "id": "c2",
+                "body": "Also touched src/db.py",
+                "createdAt": "2026-05-11T10:01:00Z",
+            },
         ]
         mock_sess = MagicMock()
         mock_sess.__enter__.return_value = mock_sess

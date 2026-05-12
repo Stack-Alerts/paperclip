@@ -47,7 +47,12 @@ from touch_index.paperclip_client import (
     get_issue_by_identifier,
 )
 from touch_index.fr_worker import run_fr_worker, FRIngestionResult
-from touch_index.bug_worker import run_bug_worker, BugIngestionResult, ingest_bug_issue, _parse_completed_at
+from touch_index.bug_worker import (
+    run_bug_worker,
+    BugIngestionResult,
+    ingest_bug_issue,
+    _parse_completed_at,
+)
 from touch_index.git_extractor import get_files_for_issue, _REPO_ROOT
 
 logging.basicConfig(
@@ -116,7 +121,8 @@ def main() -> None:
     logger.info("Fetching FDR-labelled issues for backfill …")
     all_fdr_issues = get_fdr_issues(updated_after=None)
     fdr_issues = [
-        i for i in all_fdr_issues
+        i
+        for i in all_fdr_issues
         if datetime.fromisoformat(i["updatedAt"].replace("Z", "+00:00")) >= cutoff
     ]
     logger.info(

@@ -250,7 +250,10 @@ class TestIngestFrIssue:
 
         # comments path
         with (
-            patch("touch_index.fr_worker.fetch_and_extract", return_value=["src/comments.py"]),
+            patch(
+                "touch_index.fr_worker.fetch_and_extract",
+                return_value=["src/comments.py"],
+            ),
             patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
         ):
             ingest_fr_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID)
@@ -261,7 +264,9 @@ class TestIngestFrIssue:
         # git path
         with (
             patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
-            patch("touch_index.fr_worker.get_files_for_issue", return_value=["src/git.py"]),
+            patch(
+                "touch_index.fr_worker.get_files_for_issue", return_value=["src/git.py"]
+            ),
         ):
             ingest_fr_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID)
         rows = conn.execute.call_args[0][1]
@@ -272,10 +277,16 @@ class TestIngestFrIssue:
         with (
             patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
             patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
-            patch("touch_index.fr_worker.extract_files_from_text", return_value=["src/desc.py"]),
+            patch(
+                "touch_index.fr_worker.extract_files_from_text",
+                return_value=["src/desc.py"],
+            ),
         ):
             ingest_fr_issue(
-                engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID,
+                engine,
+                ISSUE_ID,
+                ISSUE_IDENTIFIER,
+                OWNER_AGENT_ID,
                 description="Changed src/desc.py",
             )
         rows = conn.execute.call_args[0][1]
@@ -431,9 +442,7 @@ class TestProcessFrIssue:
         """When get_issue_by_id returns None, process_fr_issue returns None."""
         engine, _ = _mock_engine()
 
-        with patch(
-            "touch_index.fr_worker.get_issue_by_id", return_value=None
-        ):
+        with patch("touch_index.fr_worker.get_issue_by_id", return_value=None):
             result = process_fr_issue(engine, "nonexistent-uuid")
 
         assert result is None
@@ -449,9 +458,7 @@ class TestProcessFrIssue:
         }
 
         with (
-            patch(
-                "touch_index.fr_worker.get_issue_by_id", return_value=issue
-            ),
+            patch("touch_index.fr_worker.get_issue_by_id", return_value=issue),
             patch(
                 "touch_index.fr_worker.fetch_and_extract",
                 return_value=["src/foo.py"],
@@ -473,9 +480,7 @@ class TestProcessFrIssue:
             "labelIds": ["other-label-uuid"],
         }
 
-        with patch(
-            "touch_index.fr_worker.get_issue_by_id", return_value=issue
-        ):
+        with patch("touch_index.fr_worker.get_issue_by_id", return_value=issue):
             result = process_fr_issue(engine, ISSUE_ID)
 
         assert result is None
@@ -492,9 +497,7 @@ class TestProcessFrIssue:
         }
 
         with (
-            patch(
-                "touch_index.fr_worker.get_issue_by_id", return_value=issue
-            ),
+            patch("touch_index.fr_worker.get_issue_by_id", return_value=issue),
             patch(
                 "touch_index.fr_worker.fetch_and_extract",
                 return_value=["src/foo.py"],
@@ -518,9 +521,7 @@ class TestProcessFrIssue:
         }
 
         with (
-            patch(
-                "touch_index.fr_worker.get_issue_by_id", return_value=issue
-            ),
+            patch("touch_index.fr_worker.get_issue_by_id", return_value=issue),
             patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
             patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
             patch(
@@ -534,6 +535,8 @@ class TestProcessFrIssue:
         assert result.source == "description"
         assert result.files_indexed == 1
         mock_desc.assert_called_once_with(issue["description"])
+
+
 # ---------------------------------------------------------------------------
 # main() — CLI entry point
 # ---------------------------------------------------------------------------
@@ -587,9 +590,7 @@ class TestMain:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch(
-                "touch_index.fr_worker.process_fr_issue", return_value=None
-            ),
+            patch("touch_index.fr_worker.process_fr_issue", return_value=None),
             patch("touch_index.paperclip_client.get_fdr_issues"),
             caplog.at_level(logging.INFO),
         ):
@@ -647,9 +648,7 @@ class TestMain:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch(
-                "touch_index.paperclip_client.get_fdr_issues", return_value=issues
-            ),
+            patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch(
                 "touch_index.fr_worker.run_fr_worker",
                 return_value=worker_results,
@@ -766,7 +765,6 @@ class TestMain:
         mock_worker.assert_not_called()
         assert any("Nothing to do" in r.message for r in caplog.records)
 
-
     # -------------------------------------------------------------------
     # --validate flag (polling mode)
     # -------------------------------------------------------------------
@@ -774,6 +772,7 @@ class TestMain:
     def test_main_validate_polling_passed(self, monkeypatch, caplog):
         """--validate with issues: validation runs and passes."""
         import logging
+
         engine = MagicMock()
         issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "description": ""}]
         worker_results = [
@@ -840,6 +839,7 @@ class TestMain:
     def test_main_validate_no_issues_passed(self, monkeypatch, caplog):
         """--validate with no issues: validation runs on existing data."""
         import logging
+
         engine = MagicMock()
 
         with (
@@ -884,6 +884,7 @@ class TestMain:
     def test_main_validate_issue_id_passed(self, monkeypatch, caplog):
         """--validate --issue-id: validation runs after single-issue processing."""
         import logging
+
         engine = MagicMock()
         result = FRIngestionResult(
             issue_identifier="BTCAAAAA-100",
@@ -899,9 +900,7 @@ class TestMain:
             patch("touch_index.fr_worker.process_fr_issue", return_value=result),
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-            patch(
-                "touch_index.paperclip_client.transition_issue_status"
-            ),
+            patch("touch_index.paperclip_client.transition_issue_status"),
             caplog.at_level(logging.INFO),
         ):
             mock_quality.return_value.passed = True
@@ -931,9 +930,7 @@ class TestMain:
             patch("touch_index.fr_worker.process_fr_issue", return_value=result),
             patch("touch_index.paperclip_client.get_fdr_issues"),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-            patch(
-                "touch_index.paperclip_client.transition_issue_status"
-            ),
+            patch("touch_index.paperclip_client.transition_issue_status"),
         ):
             mock_quality.return_value.passed = False
             monkeypatch.setattr(
@@ -979,6 +976,7 @@ class TestMain:
         mock_process.assert_called_once()
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["worker"] == "fr"
         assert data["mode"] == "single-issue"
@@ -1018,6 +1016,7 @@ class TestMain:
 
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["worker"] == "fr"
         assert data["mode"] == "polling"
@@ -1057,13 +1056,17 @@ class TestMain:
 
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["dry_run"] is True
         assert "quality" not in data
 
-    def test_main_validate_issue_id_not_found_skips_validation(self, monkeypatch, caplog):
+    def test_main_validate_issue_id_not_found_skips_validation(
+        self, monkeypatch, caplog
+    ):
         """--validate --issue-id when issue not found: validation is skipped."""
         import logging
+
         engine = MagicMock()
 
         with (
@@ -1081,9 +1084,11 @@ class TestMain:
             main()
 
         mock_quality.assert_not_called()
+
     def test_main_json_summary_issue_id_not_found(self, monkeypatch, capsys):
         """--json-summary --issue-id with no match outputs JSON without result field."""
         import json
+
         engine = MagicMock()
 
         with (
@@ -1103,6 +1108,7 @@ class TestMain:
         assert data["worker"] == "fr"
         assert data["mode"] == "single-issue"
         assert "result" not in data
+
     def test_main_summary_counts_files_and_skipped(self, monkeypatch, caplog):
         """Log summary reflects total files indexed and skipped count."""
         import logging
@@ -1146,10 +1152,12 @@ class TestMain:
             main()
 
         assert mock_transition.call_count == 2
-        mock_transition.assert_has_calls([
-            call("id-1", "done"),
-            call("id-2", "done"),
-        ])
+        mock_transition.assert_has_calls(
+            [
+                call("id-1", "done"),
+                call("id-2", "done"),
+            ]
+        )
         summary_logs = [r for r in caplog.records if "issues processed" in r.message]
         assert len(summary_logs) == 1
         msg = summary_logs[0].message
@@ -1160,14 +1168,37 @@ class TestMain:
     def test_main_transitions_all_processed_results(self, monkeypatch, caplog):
         """All processed results are transitioned regardless of original issue status."""
         import logging
+
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "status": "done", "description": ""},
-            {"id": "id-2", "identifier": "BTCAAAAA-102", "status": "in_progress", "description": ""},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "status": "done",
+                "description": "",
+            },
+            {
+                "id": "id-2",
+                "identifier": "BTCAAAAA-102",
+                "status": "in_progress",
+                "description": "",
+            },
         ]
         results = [
-            FRIngestionResult(issue_identifier="BTCAAAAA-101", issue_id="id-1", files_indexed=2, source="comments", skipped_no_commits=False),
-            FRIngestionResult(issue_identifier="BTCAAAAA-102", issue_id="id-2", files_indexed=1, source="git", skipped_no_commits=False),
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-101",
+                issue_id="id-1",
+                files_indexed=2,
+                source="comments",
+                skipped_no_commits=False,
+            ),
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-102",
+                issue_id="id-2",
+                files_indexed=1,
+                source="git",
+                skipped_no_commits=False,
+            ),
         ]
 
         with (
@@ -1175,7 +1206,9 @@ class TestMain:
             patch("touch_index.db.health_check", return_value=True),
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=results),
-            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
             caplog.at_level(logging.INFO),
         ):
             monkeypatch.setattr("sys.argv", ["touch_index"])
@@ -1183,20 +1216,29 @@ class TestMain:
 
         # Both results are transitioned (results-based iteration, not issues)
         assert mock_transition.call_count == 2
-        mock_transition.assert_has_calls([
-            call("id-1", "done"),
-            call("id-2", "done"),
-        ])
+        mock_transition.assert_has_calls(
+            [
+                call("id-1", "done"),
+                call("id-2", "done"),
+            ]
+        )
 
     def test_main_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
         """A failed transition is logged but does not halt the worker."""
         import logging
+
         engine = MagicMock()
         issues = [
             {"id": "id-1", "identifier": "BTCAAAAA-101", "description": ""},
         ]
         results = [
-            FRIngestionResult(issue_identifier="BTCAAAAA-101", issue_id="id-1", files_indexed=2, source="comments", skipped_no_commits=False),
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-101",
+                issue_id="id-1",
+                files_indexed=2,
+                source="comments",
+                skipped_no_commits=False,
+            ),
         ]
 
         with (
@@ -1216,10 +1258,12 @@ class TestMain:
         mock_transition.assert_called_once_with("id-1", "done")
         assert any("Failed to mark" in r.message for r in caplog.records)
 
-
-    def test_main_issue_id_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
+    def test_main_issue_id_transition_error_logged_does_not_crash(
+        self, monkeypatch, caplog
+    ):
         """Single-issue mode: transition failure is logged but does not crash."""
         import logging
+
         engine = MagicMock()
         result = FRIngestionResult(
             issue_identifier="BTCAAAAA-100",
@@ -1266,7 +1310,9 @@ class TestMainProcessFrIssueError:
                 side_effect=RuntimeError("API timeout"),
             ),
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
-            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -1324,7 +1370,9 @@ class TestMainProcessFrIssueError:
                 side_effect=RuntimeError("API timeout"),
             ),
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
-            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -1345,6 +1393,7 @@ class TestMainProcessFrIssueError:
     def test_main_json_summary_with_validate_single_issue(self, monkeypatch, capsys):
         """--json-summary with --validate --issue-id includes quality in JSON."""
         import json
+
         engine = MagicMock()
         result = FRIngestionResult(
             issue_identifier="BTCAAAAA-100",
@@ -1380,6 +1429,7 @@ class TestMainProcessFrIssueError:
     def test_main_json_summary_with_validate_polling(self, monkeypatch, capsys):
         """--json-summary with --validate in polling mode includes quality in JSON."""
         import json
+
         engine = MagicMock()
         issues = [{"id": "id-1", "identifier": "BTCAAAAA-101", "description": ""}]
         results = [
@@ -1417,6 +1467,7 @@ class TestMainProcessFrIssueError:
     def test_main_json_summary_no_issues(self, monkeypatch, capsys):
         """--json-summary with no FDR issues outputs JSON with zero counts."""
         import json
+
         engine = MagicMock()
 
         with (
@@ -1442,6 +1493,7 @@ class TestMainProcessFrIssueError:
     def test_main_json_summary_no_issues_with_validate(self, monkeypatch, capsys):
         """--json-summary --validate with no issues outputs quality in JSON."""
         import json
+
         engine = MagicMock()
 
         with (

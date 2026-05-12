@@ -39,7 +39,8 @@ class TestFrRunnerDelegation:
     def test_passes_sys_argv_through(self, monkeypatch):
         """fr_worker.main() receives the full argv (no pre-processing)."""
         monkeypatch.setattr(
-            sys, "argv",
+            sys,
+            "argv",
             ["run_touch_index_fr_worker.py", "--issue-id", "uuid-1", "--dry-run"],
         )
         with (

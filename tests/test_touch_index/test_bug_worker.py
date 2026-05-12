@@ -41,7 +41,9 @@ class TestParseCompletedAt:
 
     def test_malformed_timestamp(self):
         """Malformed completedAt returns None instead of crashing."""
-        result = _parse_completed_at({"completedAt": "not-a-date", "identifier": "BTCAAAAA-999"})
+        result = _parse_completed_at(
+            {"completedAt": "not-a-date", "identifier": "BTCAAAAA-999"}
+        )
         assert result is None
 
 
@@ -398,9 +400,7 @@ class TestProcessBugIssue:
         """When get_issue_by_id returns None, process_bug_issue returns None."""
         engine, _ = _mock_engine()
 
-        with patch(
-            "touch_index.bug_worker.get_issue_by_id", return_value=None
-        ):
+        with patch("touch_index.bug_worker.get_issue_by_id", return_value=None):
             result = process_bug_issue(engine, "nonexistent-uuid")
 
         assert result is None
@@ -416,9 +416,7 @@ class TestProcessBugIssue:
         }
 
         with (
-            patch(
-                "touch_index.bug_worker.get_issue_by_id", return_value=issue
-            ),
+            patch("touch_index.bug_worker.get_issue_by_id", return_value=issue),
         ):
             result = process_bug_issue(engine, ISSUE_ID)
 
@@ -434,9 +432,7 @@ class TestProcessBugIssue:
         }
 
         with (
-            patch(
-                "touch_index.bug_worker.get_issue_by_id", return_value=issue
-            ),
+            patch("touch_index.bug_worker.get_issue_by_id", return_value=issue),
             patch(
                 "touch_index.bug_worker.get_files_for_issue",
                 return_value=["src/foo.py"],
@@ -461,9 +457,7 @@ class TestProcessBugIssue:
         }
 
         with (
-            patch(
-                "touch_index.bug_worker.get_issue_by_id", return_value=issue
-            ),
+            patch("touch_index.bug_worker.get_issue_by_id", return_value=issue),
             patch(
                 "touch_index.bug_worker.get_files_for_issue",
                 return_value=["src/bar.py"],
@@ -484,9 +478,7 @@ class TestProcessBugIssue:
         }
 
         with (
-            patch(
-                "touch_index.bug_worker.get_issue_by_id", return_value=issue
-            ),
+            patch("touch_index.bug_worker.get_issue_by_id", return_value=issue),
             patch(
                 "touch_index.bug_worker.get_files_for_issue",
                 return_value=["src/foo.py"],
@@ -568,9 +560,7 @@ class TestBugWorkerDryRun:
         }
 
         with (
-            patch(
-                "touch_index.bug_worker.get_issue_by_id", return_value=issue
-            ),
+            patch("touch_index.bug_worker.get_issue_by_id", return_value=issue),
             patch(
                 "touch_index.bug_worker.get_files_for_issue",
                 return_value=["src/foo.py"],
@@ -621,7 +611,9 @@ class TestMain:
             patch(
                 "touch_index.bug_worker.process_bug_issue", return_value=result
             ) as mock_process,
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
             patch(
                 "touch_index.paperclip_client.transition_issue_status"
             ) as mock_transition,
@@ -693,7 +685,11 @@ class TestMain:
 
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-100", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-100",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
 
         with (
@@ -705,7 +701,15 @@ class TestMain:
             ),
             patch(
                 "touch_index.bug_worker.run_bug_worker",
-                return_value=[BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-100", files_indexed=2, source="git", skipped_no_commits=False)],
+                return_value=[
+                    BugIngestionResult(
+                        issue_id="id-1",
+                        issue_identifier="BTCAAAAA-100",
+                        files_indexed=2,
+                        source="git",
+                        skipped_no_commits=False,
+                    )
+                ],
             ) as mock_worker,
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -729,7 +733,13 @@ class TestMain:
         from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
-        issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "completedAt": "2026-05-11T10:00:00Z"}]
+        issues = [
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-100",
+                "completedAt": "2026-05-11T10:00:00Z",
+            }
+        ]
 
         with (
             patch("touch_index.db.get_engine", return_value=engine),
@@ -766,7 +776,9 @@ class TestMain:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=False),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -788,7 +800,9 @@ class TestMain:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=False),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -837,8 +851,16 @@ class TestMain:
 
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
-            {"id": "id-2", "identifier": "BTCAAAAA-102", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
+            {
+                "id": "id-2",
+                "identifier": "BTCAAAAA-102",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
         results = [
             BugIngestionResult(
@@ -877,10 +899,12 @@ class TestMain:
             main()
 
         assert mock_transition.call_count == 2
-        mock_transition.assert_has_calls([
-            call("id-1", "done"),
-            call("id-2", "done"),
-        ])
+        mock_transition.assert_has_calls(
+            [
+                call("id-1", "done"),
+                call("id-2", "done"),
+            ]
+        )
         summary_logs = [r for r in caplog.records if "issues processed" in r.message]
         assert len(summary_logs) == 1
         msg = summary_logs[0].message
@@ -899,7 +923,11 @@ class TestMain:
 
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
 
         with (
@@ -909,7 +937,18 @@ class TestMain:
                 "touch_index.paperclip_client.get_closed_non_fdr_issues",
                 return_value=issues,
             ),
-            patch("touch_index.bug_worker.run_bug_worker", return_value=[BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False)]),
+            patch(
+                "touch_index.bug_worker.run_bug_worker",
+                return_value=[
+                    BugIngestionResult(
+                        issue_id="id-1",
+                        issue_identifier="BTCAAAAA-101",
+                        files_indexed=2,
+                        source="git",
+                        skipped_no_commits=False,
+                    )
+                ],
+            ),
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -930,7 +969,11 @@ class TestMain:
 
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
 
         with (
@@ -940,7 +983,18 @@ class TestMain:
                 "touch_index.paperclip_client.get_closed_non_fdr_issues",
                 return_value=issues,
             ),
-            patch("touch_index.bug_worker.run_bug_worker", return_value=[BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False)]),
+            patch(
+                "touch_index.bug_worker.run_bug_worker",
+                return_value=[
+                    BugIngestionResult(
+                        issue_id="id-1",
+                        issue_identifier="BTCAAAAA-101",
+                        files_indexed=2,
+                        source="git",
+                        skipped_no_commits=False,
+                    )
+                ],
+            ),
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -1004,7 +1058,9 @@ class TestMain:
         assert exc_info.value.code == 1
         mock_worker.assert_not_called()
 
-    def test_main_validate_no_issues_failed_with_json_summary(self, monkeypatch, capsys):
+    def test_main_validate_no_issues_failed_with_json_summary(
+        self, monkeypatch, capsys
+    ):
         """--json-summary --validate with no issues: emits JSON summary before exit."""
         import json
         from touch_index.__main__ import _run_bug_cli as main
@@ -1028,7 +1084,9 @@ class TestMain:
             patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
             patch("touch_index.quality.run_bug_quality_checks", return_value=report),
         ):
-            monkeypatch.setattr("sys.argv", ["touch_index", "--validate", "--json-summary"])
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--validate", "--json-summary"]
+            )
             with pytest.raises(SystemExit) as exc_info:
                 main()
 
@@ -1062,10 +1120,10 @@ class TestMain:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.bug_worker.process_bug_issue", return_value=result),
             patch(
-                "touch_index.bug_worker.process_bug_issue", return_value=result
-            ),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
             patch(
                 "touch_index.paperclip_client.transition_issue_status"
@@ -1099,9 +1157,7 @@ class TestMain:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch(
-                "touch_index.bug_worker.process_bug_issue", return_value=result
-            ),
+            patch("touch_index.bug_worker.process_bug_issue", return_value=result),
             patch("touch_index.paperclip_client.get_closed_non_fdr_issues"),
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
             patch(
@@ -1118,7 +1174,9 @@ class TestMain:
         assert exc_info.value.code == 1
         mock_transition.assert_called_once_with(ISSUE_ID, "done")
 
-    def test_main_validate_issue_id_not_found_skips_validation(self, monkeypatch, caplog):
+    def test_main_validate_issue_id_not_found_skips_validation(
+        self, monkeypatch, caplog
+    ):
         """--validate --issue-id when issue not found: validation is skipped."""
         import logging
         from touch_index.__main__ import _run_bug_cli as main
@@ -1128,9 +1186,7 @@ class TestMain:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch(
-                "touch_index.bug_worker.process_bug_issue", return_value=None
-            ),
+            patch("touch_index.bug_worker.process_bug_issue", return_value=None),
             patch("touch_index.paperclip_client.get_closed_non_fdr_issues"),
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
             caplog.at_level(logging.INFO),
@@ -1149,7 +1205,11 @@ class TestMain:
 
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
 
         with (
@@ -1159,7 +1219,18 @@ class TestMain:
                 "touch_index.paperclip_client.get_closed_non_fdr_issues",
                 return_value=issues,
             ),
-            patch("touch_index.bug_worker.run_bug_worker", return_value=[BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False)]),
+            patch(
+                "touch_index.bug_worker.run_bug_worker",
+                return_value=[
+                    BugIngestionResult(
+                        issue_id="id-1",
+                        issue_identifier="BTCAAAAA-101",
+                        files_indexed=2,
+                        source="git",
+                        skipped_no_commits=False,
+                    )
+                ],
+            ),
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -1175,22 +1246,50 @@ class TestMain:
         """All processed issues are transitioned to done regardless of current status."""
         from touch_index.__main__ import _run_bug_cli as main
         import logging
+
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "status": "done", "completedAt": "2026-05-11T10:00:00Z"},
-            {"id": "id-2", "identifier": "BTCAAAAA-102", "status": "in_progress", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "status": "done",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
+            {
+                "id": "id-2",
+                "identifier": "BTCAAAAA-102",
+                "status": "in_progress",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
         results = [
-            BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False),
-            BugIngestionResult(issue_id="id-2", issue_identifier="BTCAAAAA-102", files_indexed=1, source="git", skipped_no_commits=False),
+            BugIngestionResult(
+                issue_id="id-1",
+                issue_identifier="BTCAAAAA-101",
+                files_indexed=2,
+                source="git",
+                skipped_no_commits=False,
+            ),
+            BugIngestionResult(
+                issue_id="id-2",
+                issue_identifier="BTCAAAAA-102",
+                files_indexed=1,
+                source="git",
+                skipped_no_commits=False,
+            ),
         ]
 
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=issues),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
             patch("touch_index.bug_worker.run_bug_worker", return_value=results),
-            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
             caplog.at_level(logging.INFO),
         ):
             monkeypatch.setattr("sys.argv", ["touch_index"])
@@ -1198,27 +1297,43 @@ class TestMain:
 
         # Both issues should be transitioned (status check removed)
         assert mock_transition.call_count == 2
-        mock_transition.assert_has_calls([
-            call("id-1", "done"),
-            call("id-2", "done"),
-        ])
+        mock_transition.assert_has_calls(
+            [
+                call("id-1", "done"),
+                call("id-2", "done"),
+            ]
+        )
 
     def test_main_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
         """A failed transition is logged but does not halt the worker."""
         from touch_index.__main__ import _run_bug_cli as main
         import logging
+
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
         results = [
-            BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False),
+            BugIngestionResult(
+                issue_id="id-1",
+                issue_identifier="BTCAAAAA-101",
+                files_indexed=2,
+                source="git",
+                skipped_no_commits=False,
+            ),
         ]
 
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=issues),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
             patch("touch_index.bug_worker.run_bug_worker", return_value=results),
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -1232,10 +1347,13 @@ class TestMain:
         mock_transition.assert_called_once_with("id-1", "done")
         assert any("Failed to mark" in r.message for r in caplog.records)
 
-    def test_main_issue_id_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
+    def test_main_issue_id_transition_error_logged_does_not_crash(
+        self, monkeypatch, caplog
+    ):
         """Single-issue mode: transition failure is logged but does not crash."""
         from touch_index.__main__ import _run_bug_cli as main
         import logging
+
         engine = MagicMock()
         result = BugIngestionResult(
             issue_id="uuid-1",
@@ -1265,6 +1383,7 @@ class TestMain:
         mock_transition.assert_called_once_with("uuid-1", "done")
         assert any("Failed to mark" in r.message for r in caplog.records)
 
+
 class TestMainProcessBugIssueError:
     """Tests for process_bug_issue exception handling in single-issue CLI path."""
 
@@ -1280,8 +1399,12 @@ class TestMainProcessBugIssueError:
                 "touch_index.bug_worker.process_bug_issue",
                 side_effect=RuntimeError("API timeout"),
             ),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
-            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -1307,7 +1430,9 @@ class TestMainProcessBugIssueError:
                 side_effect=RuntimeError("API timeout"),
             ),
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -1319,8 +1444,6 @@ class TestMainProcessBugIssueError:
         assert exc_info.value.code == 1
         mock_fetch.assert_not_called()
         mock_quality.assert_not_called()
-
-
 
     def test_process_error_emits_json_summary(self, monkeypatch, capsys):
         """process_bug_issue error with --json-summary emits JSON before SystemExit."""
@@ -1336,8 +1459,12 @@ class TestMainProcessBugIssueError:
                 "touch_index.bug_worker.process_bug_issue",
                 side_effect=RuntimeError("API timeout"),
             ),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
-            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -1366,8 +1493,12 @@ class TestMainProcessBugIssueError:
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
             patch("touch_index.bug_worker.process_bug_issue", return_value=None),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
-            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
         ):
             monkeypatch.setattr(
                 "sys.argv", ["touch_index", "--issue-id", "missing", "--json-summary"]
@@ -1398,9 +1529,11 @@ class TestBugWorkerMain:
 
         mock_cli.assert_called_once()
 
+
 # -------------------------------------------------------------------
 # --json-summary flag (single-issue + polling)
 # -------------------------------------------------------------------
+
 
 class TestBugJsonSummary:
     """Tests for --json-summary in the bug worker CLI."""
@@ -1424,7 +1557,9 @@ class TestBugJsonSummary:
             patch(
                 "touch_index.bug_worker.process_bug_issue", return_value=result
             ) as mock_process,
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
             patch(
                 "touch_index.paperclip_client.transition_issue_status"
             ) as mock_transition,
@@ -1438,6 +1573,7 @@ class TestBugJsonSummary:
         mock_process.assert_called_once()
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["worker"] == "bug"
         assert data["mode"] == "single-issue"
@@ -1450,7 +1586,11 @@ class TestBugJsonSummary:
 
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
         results = [
             BugIngestionResult(
@@ -1465,7 +1605,10 @@ class TestBugJsonSummary:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=issues),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
             patch("touch_index.bug_worker.run_bug_worker", return_value=results),
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -1479,6 +1622,7 @@ class TestBugJsonSummary:
 
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["worker"] == "bug"
         assert data["mode"] == "polling"
@@ -1491,7 +1635,11 @@ class TestBugJsonSummary:
 
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
         results = [
             BugIngestionResult(
@@ -1506,7 +1654,10 @@ class TestBugJsonSummary:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=issues),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
             patch("touch_index.bug_worker.run_bug_worker", return_value=results),
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -1520,6 +1671,7 @@ class TestBugJsonSummary:
 
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["dry_run"] is True
         assert "quality" not in data
@@ -1533,7 +1685,10 @@ class TestBugJsonSummary:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=[]),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[],
+            ),
             patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
         ):
             monkeypatch.setattr(
@@ -1545,6 +1700,7 @@ class TestBugJsonSummary:
         mock_worker.assert_not_called()
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["worker"] == "bug"
         assert data["mode"] == "polling"
@@ -1557,7 +1713,11 @@ class TestBugJsonSummary:
 
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
         results = [
             BugIngestionResult(
@@ -1576,7 +1736,10 @@ class TestBugJsonSummary:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=issues),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
             patch("touch_index.bug_worker.run_bug_worker", return_value=results),
             patch("touch_index.quality.run_bug_quality_checks", return_value=qc),
             patch("touch_index.paperclip_client.transition_issue_status"),
@@ -1589,6 +1752,7 @@ class TestBugJsonSummary:
 
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["worker"] == "bug"
         assert data["mode"] == "polling"
@@ -1608,7 +1772,10 @@ class TestBugJsonSummary:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=[]),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[],
+            ),
             patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
             patch("touch_index.quality.run_bug_quality_checks", return_value=qc),
         ):
@@ -1621,6 +1788,7 @@ class TestBugJsonSummary:
         mock_worker.assert_not_called()
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["worker"] == "bug"
         assert data["mode"] == "polling"
@@ -1633,7 +1801,11 @@ class TestBugJsonSummary:
 
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
         results = [
             BugIngestionResult(
@@ -1652,7 +1824,10 @@ class TestBugJsonSummary:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=issues),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
             patch("touch_index.bug_worker.run_bug_worker", return_value=results),
             patch("touch_index.quality.run_bug_quality_checks", return_value=qc),
             patch("touch_index.paperclip_client.transition_issue_status"),
@@ -1667,6 +1842,7 @@ class TestBugJsonSummary:
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["worker"] == "bug"
         assert data["mode"] == "polling"
@@ -1694,10 +1870,16 @@ class TestBugJsonSummary:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch("touch_index.bug_worker.process_bug_issue", return_value=result) as mock_process,
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.bug_worker.process_bug_issue", return_value=result
+            ) as mock_process,
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
             patch("touch_index.quality.run_bug_quality_checks", return_value=qc),
-            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -1709,12 +1891,12 @@ class TestBugJsonSummary:
         mock_transition.assert_called_once_with("uuid-1", "done")
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["worker"] == "bug"
         assert data["mode"] == "single-issue"
         assert data["quality"]["passed"] is True
         assert data["result"]["files_indexed"] == 2
-
 
     def test_json_summary_with_validate_issue_id_failed(self, monkeypatch, capsys):
         """--json-summary --issue-id --validate emits JSON even on failure."""
@@ -1736,10 +1918,16 @@ class TestBugJsonSummary:
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
-            patch("touch_index.bug_worker.process_bug_issue", return_value=result) as mock_process,
-            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.bug_worker.process_bug_issue", return_value=result
+            ) as mock_process,
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
             patch("touch_index.quality.run_bug_quality_checks", return_value=qc),
-            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -1753,6 +1941,7 @@ class TestBugJsonSummary:
         mock_transition.assert_called_once_with("uuid-1", "done")
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["worker"] == "bug"
         assert data["mode"] == "single-issue"
