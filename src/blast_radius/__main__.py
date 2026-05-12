@@ -4,7 +4,7 @@ Subcommands
 -----------
   worker (default)  Poll for fix/bug issues transitioning to in_review and post
                     Blast Radius Reports.  Accepts --issue-id, --old-status,
-                    --loop, --dry-run, --force-reprocess.
+                    --loop, --dry-run, --force-reprocess, --json-summary.
 
   query             Query the Touch Index for a list of files.
   generate          Generate and post a Blast Radius Report for an issue.
@@ -19,6 +19,7 @@ Usage
     python -m blast_radius query --files src/a.py src/b.py
     python -m blast_radius generate --issue-id <uuid>
     python -m blast_radius serve --port 8765
+    python -m blast_radius --json-summary               # structured JSON output
 
 For backward compatibility, flat args (no subcommand) are interpreted as the
 worker subcommand:
@@ -32,6 +33,7 @@ import argparse
 import json
 import logging
 import sys
+from datetime import datetime, timezone
 
 _SUBCOMMANDS = frozenset({"worker", "query", "generate", "serve"})
 
@@ -68,6 +70,29 @@ def _setup_logging(verbose: bool = False) -> None:
     logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(message)s")
 
 
+def _emit_json_summary(
+    args: argparse.Namespace,
+    *,
+    result: dict | None = None,
+    results: list[dict] | None = None,
+) -> None:
+    """Emit a structured JSON summary of the worker run to stdout."""
+    summary: dict = {
+        "worker": "blast-radius",
+        "mode": "single-issue" if args.issue_id else "polling",
+        "dry_run": args.dry_run,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if result is not None:
+        summary["result"] = result
+    if results is not None:
+        issues_processed = len(results)
+        errors = [r for r in results if "error" in r]
+        summary["issues_processed"] = issues_processed
+        summary["issues_with_errors"] = len(errors)
+    print(json.dumps(summary, default=str))
+
+
 def _run_worker_cli(args: argparse.Namespace) -> int:
     """Worker subcommand: run once, loop, or process a single issue."""
     from blast_radius.worker import process_issue, run_once, run_loop
@@ -79,10 +104,13 @@ def _run_worker_cli(args: argparse.Namespace) -> int:
             old_status=args.old_status,
             force_reprocess=args.force_reprocess,
         )
-        if result:
-            print(json.dumps(result, indent=2))  # noqa: T201
+        if args.json_summary:
+            _emit_json_summary(args, result=result if result is not None else {"skipped": True, "issue": args.issue_id})
         else:
-            print(json.dumps({"skipped": True, "issue": args.issue_id}))  # noqa: T201
+            if result:
+                print(json.dumps(result, indent=2))  # noqa: T201
+            else:
+                print(json.dumps({"skipped": True, "issue": args.issue_id}))  # noqa: T201
         return 0
 
     if args.loop:
@@ -94,7 +122,10 @@ def _run_worker_cli(args: argparse.Namespace) -> int:
         return 0
 
     results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
-    print(json.dumps(results, indent=2))  # noqa: T201
+    if args.json_summary:
+        _emit_json_summary(args, results=results)
+    else:
+        print(json.dumps(results, indent=2))  # noqa: T201
     return 0
 
 
@@ -109,6 +140,7 @@ def _build_sub_parsers(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--loop", type=int, metavar="SECONDS", help="Run continuously, sleeping SECONDS between polls (default: run once and exit)")
     p.add_argument("--dry-run", action="store_true", help="Log reports but do not post comments")
     p.add_argument("--force-reprocess", action="store_true", help="Re-process already-seen issues (bypasses transition detection)")
+    p.add_argument("--json-summary", action="store_true", help="Output structured JSON summary to stdout")
     p.set_defaults(func=_run_worker_cli)
 
     p = sub.add_parser("query", help="Query the Touch Index for a list of files")
@@ -136,9 +168,6 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command")
     _build_sub_parsers(sub)
 
-    # Detect subcommand mode vs backward-compat flat-arg mode.
-    # If the first non-flag token is a known subcommand, use subcommand dispatch.
-    # Otherwise treat all args as flat worker args.
     argv = sys.argv[1:] if len(sys.argv) > 1 else []
     has_subcommand = any(a in _SUBCOMMANDS for a in argv if not a.startswith("-"))
 
@@ -148,8 +177,6 @@ def main() -> int:
             _setup_logging(verbose=True)
         return args.func(args)
 
-    # Backward-compat flat-arg mode.
-    # Build a minimal parser that accepts only the worker flat args.
     flat_parser = argparse.ArgumentParser(
         prog="blast-radius",
         description="Blast Radius polling worker + webhook handler",
@@ -161,6 +188,7 @@ def main() -> int:
     flat_parser.add_argument("--loop", type=int, metavar="SECONDS", help=argparse.SUPPRESS)
     flat_parser.add_argument("--dry-run", action="store_true", help=argparse.SUPPRESS)
     flat_parser.add_argument("--force-reprocess", action="store_true", help=argparse.SUPPRESS)
+    flat_parser.add_argument("--json-summary", action="store_true", help=argparse.SUPPRESS)
     flat_args = flat_parser.parse_args(argv)
 
     _setup_logging(verbose=flat_args.verbose)
