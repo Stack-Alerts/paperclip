@@ -189,6 +189,13 @@ def _run_bug_cli() -> None:
 
     results = run_bug_worker(engine, issues, dry_run=args.dry_run)
 
+    errors = len(issues) - len(results)
+    if errors:
+        logger.warning(
+            "%d issue(s) had processing errors \u2014 check logs above for details",
+            errors,
+        )
+
     total_files = sum(r.files_indexed for r in results)
     skipped = sum(1 for r in results if r.skipped_no_commits)
 
@@ -205,16 +212,17 @@ def _run_bug_cli() -> None:
                 logger.exception("Failed to mark %s as done", r.issue_identifier)
 
     logger.info(
-        "Bug worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits)",
+        "Bug worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits), %d errors",
         len(results),
         total_files,
         skipped,
+        errors,
     )
 
     if args.validate:
         report = run_bug_quality_checks(engine, stale_threshold_days=args.stale_days)
         if not report.passed:
-            logger.error("VALIDATION FAILED after ingestion — investigate")
+            logger.error("VALIDATION FAILED after ingestion \u2014 investigate")
             if args.json_summary:
                 _emit_json_summary(
                     args,
@@ -222,6 +230,7 @@ def _run_bug_cli() -> None:
                     results=results,
                     total_files=total_files,
                     skipped=skipped,
+                    errors=errors,
                     quality_report=report,
                 )
             raise SystemExit(1)
@@ -234,9 +243,9 @@ def _run_bug_cli() -> None:
             results=results,
             total_files=total_files,
             skipped=skipped,
+            errors=errors,
             quality_report=report,
         )
-
 
 def _emit_json_summary(
     args: argparse.Namespace,
