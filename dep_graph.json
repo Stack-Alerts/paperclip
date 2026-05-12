@@ -214,7 +214,8 @@
     "src/blast_radius/generator.py": [
       "src/touch_index/paperclip_client.py",
       "src/blast_radius/query.py",
-      "src/blast_radius/report.py"
+      "src/blast_radius/report.py",
+      "src/touch_index/git_extractor.py"
     ],
     "src/blast_radius/query.py": [
       "src/blast_radius/db.py"
@@ -589,7 +590,8 @@
     "src/impact_gate/worker.py": [
       "src/touch_index/paperclip_client.py",
       "src/blast_radius/report.py",
-      "src/blast_radius/query.py"
+      "src/blast_radius/query.py",
+      "src/touch_index/git_extractor.py"
     ],
     "src/indicators/pattern_detectors/detectors/__init__.py": [
       "src/indicators/pattern_detectors/detectors/zigzag_detector.py",
@@ -2457,6 +2459,8 @@
     ],
     "src/touch_index/git_extractor.py": [
       "scripts/backfill_touch_index.py",
+      "src/blast_radius/generator.py",
+      "src/impact_gate/worker.py",
       "src/touch_index/bug_worker.py",
       "src/touch_index/comment_extractor.py",
       "src/touch_index/fr_worker.py",
@@ -4731,6 +4735,6 @@
     "parsed_files": 869,
     "error_files": 1,
     "parse_rate_pct": 99.89,
-    "edge_count": 1132
+    "edge_count": 1134
   }
 }
