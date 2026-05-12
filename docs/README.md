@@ -43,3 +43,24 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 - `archive/v3-legacy/` — pre-v3 layered architecture docs
 - `archive/v3-archived/` — v3 top-level archived files
 - `archive/root-archived/` — root-level archived session and rule files
+
+## Runbooks
+
+| Runbook | Purpose |
+|---------|---------|
+| [`runbook-ci-cd.md`](runbook-ci-cd.md) | CI/CD pipeline — all 15 workflows, triggers, failure remediation |
+| [`runbook-database-migration.md`](runbook-database-migration.md) | Alembic migration lifecycle — create, apply, rollback, recovery |
+| [`runbook-incident-response.md`](runbook-incident-response.md) | Sev1–3 incident response flow, escalation matrix |
+| [`runbook-backup-restore.md`](runbook-backup-restore.md) | Database backup and restore procedures |
+| [`runbook-module-lock.md`](runbook-module-lock.md) | Lock gate operations and exception process |
+| [`runbook-blast-radius-worker.md`](runbook-blast-radius-worker.md) | Blast Radius worker operations |
+| [`runbook-touch-index-bug-worker.md`](runbook-touch-index-bug-worker.md) | Touch Index Bug worker operations |
+| [`runbook-touch-index-fr-worker.md`](runbook-touch-index-fr-worker.md) | Touch Index FR worker operations |
+| [`runbook-impact-gate-scan-done.md`](runbook-impact-gate-scan-done.md) | Impact Gate scan-done operations |
+| [`runbooks/key-rotation.md`](runbooks/key-rotation.md) | API key rotation procedure |
+
+## Planning & Audits
+
+| Document | Purpose |
+|----------|---------|
+| [`docs-audit-and-coverage-plan-BTCAAAAA-7381.md`](docs-audit-and-coverage-plan-BTCAAAAA-7381.md) | Documentation audit and gap analysis (BTCAAAAA-7381) |
