@@ -29,6 +29,7 @@ import logging
 import sys
 import json
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +177,13 @@ def _run_bug_cli() -> None:
         skipped,
     )
 
+    if args.validate:
+        report = run_bug_quality_checks(engine)
+        if not report.passed:
+            logger.error("VALIDATION FAILED after ingestion — investigate")
+            raise SystemExit(1)
+        logger.info("VALIDATION PASSED: all bug quality checks clean")
+
     if args.json_summary:
         _emit_json_summary(
             args,
@@ -183,14 +191,8 @@ def _run_bug_cli() -> None:
             results=results,
             total_files=total_files,
             skipped=skipped,
+            quality_report=locals().get("report"),
         )
-
-    if args.validate:
-        report = run_bug_quality_checks(engine)
-        if not report.passed:
-            logger.error("VALIDATION FAILED after ingestion \u2014 investigate")
-            raise SystemExit(1)
-        logger.info("VALIDATION PASSED: all bug quality checks clean")
 
 
 def _emit_json_summary(
