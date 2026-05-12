@@ -239,8 +239,8 @@ class TestBugRunnerMain:
             call("id-2", "done"),
         ])
 
-    def test_skips_transition_for_already_done_issues(self, monkeypatch, caplog):
-        """Issues already in done status are not transitioned."""
+    def test_transitions_all_processed_issues(self, monkeypatch, caplog):
+        """All processed issues are transitioned to done regardless of current status."""
         import logging
 
         monkeypatch.setattr(sys, "argv", _CLEAN_ARGV)
@@ -266,7 +266,11 @@ class TestBugRunnerMain:
         ):
             main()
 
-        mock_transition.assert_called_once_with("id-2", "done")
+        assert mock_transition.call_count == 2
+        mock_transition.assert_has_calls([
+            call("id-1", "done"),
+            call("id-2", "done"),
+        ])
 
     def test_transition_error_does_not_crash(self, monkeypatch, caplog):
         """A failure to mark an issue as done is logged but does not crash."""

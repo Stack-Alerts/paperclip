@@ -93,6 +93,14 @@ def main() -> None:
                 result.source,
                 result.skipped_no_commits,
             )
+            if not args.dry_run:
+                try:
+                    transition_issue_status(args.issue_id, "done")
+                    logger.info("Marked %s as done", result.issue_identifier)
+                except Exception:
+                    logger.exception(
+                        "Failed to mark %s as done", result.issue_identifier
+                    )
         if args.validate:
             logger.info("Running bug data quality validation after single-issue ingestion…")
             failures = _run_validation(engine)
@@ -134,7 +142,7 @@ def main() -> None:
     else:
         for issue in issues:
             issue_id = issue.get("id", "")
-            if not issue_id or issue.get("status") == "done":
+            if not issue_id:
                 continue
             try:
                 transition_issue_status(issue_id, "done")
