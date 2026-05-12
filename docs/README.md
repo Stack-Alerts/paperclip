@@ -28,7 +28,7 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 - **Database Guide**: [`architecture/DATABASE_GUIDE.md`](architecture/DATABASE_GUIDE.md)
 - **Git Workflow**: [`architecture/GIT_WORKFLOW.md`](architecture/GIT_WORKFLOW.md)
 - **Touch Index FR Worker**: [`docs/architecture/TOUCH_INDEX_FR_WORKER.md`](architecture/TOUCH_INDEX_FR_WORKER.md) — FR ingestion pipeline architecture, triggers, data quality SLAs, runbooks
-- **Touch Index Bug Worker**: [`src/touch_index/bug_worker.py`](../src/touch_index/bug_worker.py) — bug-close ingestion worker, file dependency tracking ([`DATABASE_GUIDE §9`](architecture/DATABASE_GUIDE.md#9-touch_index_bug_files), [`Bug CI`](../.github/workflows/touch-index-bug-worker.yml))
+- **Touch Index Bug Worker**: [`docs/architecture/TOUCH_INDEX_BUG_WORKER.md`](architecture/TOUCH_INDEX_BUG_WORKER.md) — bug-close ingestion worker, file dependency tracking ([`DATABASE_GUIDE §9`](architecture/DATABASE_GUIDE.md#9-touch_index_bug_files), [`Bug CI`](../.github/workflows/touch-index-bug-worker.yml))
 - **Blast Radius Worker**: [`../.github/workflows/blast-radius-worker.yml`](../.github/workflows/blast-radius-worker.yml) — detects fix→in_review transitions and posts Blast Radius Reports ([`src/blast_radius/`](../src/blast_radius/))
 - **Impact Gate Worker**: [`../.github/workflows/impact-gate-worker.yml`](../.github/workflows/impact-gate-worker.yml) — gates in_review fixes through Impact Gate validation ([`src/impact_gate/`](../src/impact_gate/))
 - **Expert Reviews**: [`building-blocks/expert-reviews/`](building-blocks/expert-reviews/) — 80 signal expert analysis docs
