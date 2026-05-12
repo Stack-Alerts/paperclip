@@ -45,6 +45,7 @@ _UPSERT_SQL = text("""
 @dataclass
 class BugIngestionResult:
     issue_identifier: str
+    issue_id: str
     files_indexed: int
     source: str  # "git" | "comments" | "none"
     skipped_no_commits: bool
@@ -71,6 +72,7 @@ def ingest_bug_issue(
             "Bug %s: no files found in git or comments — skipping", issue_identifier
         )
         return BugIngestionResult(
+            issue_id=issue_id,
             issue_identifier=issue_identifier,
             files_indexed=0,
             source="none",
@@ -104,6 +106,7 @@ def ingest_bug_issue(
             "Bug %s: indexed %d file(s) via %s", issue_identifier, len(rows), source
         )
     return BugIngestionResult(
+        issue_id=issue_id,
         issue_identifier=issue_identifier,
         files_indexed=len(rows),
         source=source,

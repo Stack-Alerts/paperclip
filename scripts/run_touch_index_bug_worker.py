@@ -140,16 +140,13 @@ def main() -> None:
     if args.dry_run:
         logger.info("DRY RUN -- skipping transition-to-done for %d issue(s)", len(issues))
     else:
-        for issue in issues:
-            issue_id = issue.get("id", "")
-            if not issue_id:
-                continue
+        for r in results:
             try:
-                transition_issue_status(issue_id, "done")
-                logger.info("Marked %s as done", issue.get("identifier", issue_id))
+                transition_issue_status(r.issue_id, "done")
+                logger.info("Marked %s as done", r.issue_identifier)
             except Exception:
                 logger.exception(
-                    "Failed to mark %s as done", issue.get("identifier", issue_id)
+                    "Failed to mark %s as done", r.issue_identifier
                 )
 
     logger.info(
