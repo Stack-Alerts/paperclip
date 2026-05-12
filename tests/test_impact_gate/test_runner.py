@@ -28,8 +28,8 @@ class TestFetchInReviewFixIssues:
     def test_filters_fix_issues(self, monkeypatch):
         monkeypatch.setattr(
             _runner,
-            "_paginate",
-            lambda path, params, page_size=100: [
+            "_fetch_in_review_issues",
+            lambda: [
                 {
                     "id": "u1",
                     "title": "Fix the thing",
@@ -44,7 +44,6 @@ class TestFetchInReviewFixIssues:
                 },
             ],
         )
-        monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
         result = _fetch_fn()
         assert len(result) == 1
         assert result[0]["id"] == "u1"
@@ -52,8 +51,8 @@ class TestFetchInReviewFixIssues:
     def test_detects_bug_in_title(self, monkeypatch):
         monkeypatch.setattr(
             _runner,
-            "_paginate",
-            lambda path, params, page_size=100: [
+            "_fetch_in_review_issues",
+            lambda: [
                 {
                     "id": "u1",
                     "title": "Bug: crash on startup",
@@ -62,15 +61,14 @@ class TestFetchInReviewFixIssues:
                 },
             ],
         )
-        monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
         result = _fetch_fn()
         assert len(result) == 1
 
     def test_detects_regression_in_title(self, monkeypatch):
         monkeypatch.setattr(
             _runner,
-            "_paginate",
-            lambda path, params, page_size=100: [
+            "_fetch_in_review_issues",
+            lambda: [
                 {
                     "id": "u1",
                     "title": "Regression in optimizer",
@@ -79,15 +77,14 @@ class TestFetchInReviewFixIssues:
                 },
             ],
         )
-        monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
         result = _fetch_fn()
         assert len(result) == 1
 
     def test_returns_empty_for_no_matches(self, monkeypatch):
         monkeypatch.setattr(
             _runner,
-            "_paginate",
-            lambda path, params, page_size=100: [
+            "_fetch_in_review_issues",
+            lambda: [
                 {
                     "id": "u1",
                     "title": "Feature request",
@@ -96,23 +93,21 @@ class TestFetchInReviewFixIssues:
                 },
             ],
         )
-        monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
         result = _fetch_fn()
         assert len(result) == 0
 
     def test_handles_empty_results(self, monkeypatch):
         monkeypatch.setattr(
-            _runner, "_paginate", lambda path, params, page_size=100: []
+            _runner, "_fetch_in_review_issues", lambda: []
         )
-        monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
         result = _fetch_fn()
         assert result == []
 
     def test_substring_fix_in_title_is_not_false_positive(self, monkeypatch):
         monkeypatch.setattr(
             _runner,
-            "_paginate",
-            lambda path, params, page_size=100: [
+            "_fetch_in_review_issues",
+            lambda: [
                 {
                     "id": "u1",
                     "title": "Impact Gate: scan for fix issues done",
@@ -127,7 +122,6 @@ class TestFetchInReviewFixIssues:
                 },
             ],
         )
-        monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
         result = _fetch_fn()
         assert result == []
 
