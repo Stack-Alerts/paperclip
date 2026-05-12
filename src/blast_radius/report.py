@@ -107,6 +107,9 @@ def extract_touched_files(description: str) -> list[str]:
     import json
     import re
 
+    if not description:
+        return []
+
     # JSON block
     json_block = re.search(
         r"```(?:json)?\s*\{[^`]*\"touchedFiles\"\s*:\s*(\[[^\]]*\])[^`]*\}\s*```",
@@ -133,14 +136,14 @@ def extract_touched_files(description: str) -> list[str]:
 
     # Markdown list under a ## Touched Files section
     section = re.search(
-        r"##\s*Touched Files\s*\n((?:\s*[-*]\s*\S+\s*\n?)+)",
+        r"##\s*Touched Files\s*\n((?:[ \t]*[-*][ \t]*\S+[ \t]*\n?)+)",
         description,
         re.IGNORECASE,
     )
     if section:
-        lines = section.group(1).strip().splitlines()
+        lines = section.group(1).splitlines()
         return [
-            re.sub(r"^[-*]\s+`?|`?$", "", line).strip()
+            re.sub(r"^[ \t]*[-*]\s+`?|`?$", "", line).strip()
             for line in lines
             if line.strip()
         ]
