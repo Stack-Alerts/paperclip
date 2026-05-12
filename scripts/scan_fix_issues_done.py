@@ -180,7 +180,7 @@ def scan(
         for entry in ungated:
             issue_id = entry["id"]
             try:
-                r = process_issue(issue_id, dry_run=False)
+                r = process_issue(issue_id, dry_run=False, force=True)
                 retro_results.append(r)
                 logger.info(
                     "Retroactive gate for %s: %s",

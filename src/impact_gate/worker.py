@@ -241,11 +241,14 @@ def _build_bypass_comment(identifier: str) -> str:
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None = None) -> dict:
+def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None = None, force: bool = False) -> dict:
     """Run the Impact Gate for a single fix issue.
 
     When called from a Paperclip ``issue_status_changed`` webhook, the caller
     may pass the previous status via *old_status* for logging and audit.
+
+    *force* bypasses the in_review status check so that already-done issues
+    can be retroactively gated (used by scan_fix_issues_done.py --retroactive).
 
     Returns a dict with keys:
       - issue: identifier
@@ -279,10 +282,12 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
             _post_comment(issue_id, _build_bypass_comment(identifier))
         return {"issue": identifier, "gate_status": "BYPASSED"}
 
-    # --- Only run for in_review issues ---
-    if status != "in_review":
+    # --- Only run for in_review issues (or force retroactive) ---
+    if status != "in_review" and not force:
         log.info("%s has status=%r (not in_review) — skipping", identifier, status)
         return {"issue": identifier, "gate_status": "SKIPPED", "reason": f"status={status}"}
+    if status != "in_review" and force:
+        log.info("%s has status=%r — force retroactive gate", identifier, status)
 
     # --- Extract touchedFiles ---
     touched_files = extract_touched_files(description)

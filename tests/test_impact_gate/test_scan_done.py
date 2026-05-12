@@ -193,7 +193,7 @@ class TestScanFunction:
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
         monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [{"body": "Other comment"}])
         process_called = []
-        monkeypatch.setattr(_scan, "process_issue", lambda iid, dry_run=False: (process_called.append(iid) or {"gate_status": "PASS"}))
+        monkeypatch.setattr(_scan, "process_issue", lambda iid, dry_run=False, **kwargs: (process_called.append(iid) or {"gate_status": "PASS"}))
         _scan.scan(dry_run=True, retroactive=True)
         assert len(process_called) == 0
 
@@ -204,7 +204,7 @@ class TestScanFunction:
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
         monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [{"body": "Other comment"}])
         process_called = []
-        monkeypatch.setattr(_scan, "process_issue", lambda iid, dry_run=False: (process_called.append(iid) or {"gate_status": "PASS"}))
+        monkeypatch.setattr(_scan, "process_issue", lambda iid, dry_run=False, **kwargs: (process_called.append(iid) or {"gate_status": "PASS"}))
         result = _scan.scan(dry_run=False, retroactive=True)
         assert len(process_called) == 1
         assert "retroactive_results" in result
