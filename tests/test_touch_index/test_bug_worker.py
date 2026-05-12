@@ -442,9 +442,9 @@ class TestProcessBugIssue:
         assert result is not None
         assert result.files_indexed == 1
 
-    def test_skips_non_done_issues(self):
-        """Issues not in done status should be skipped."""
-        engine, _ = _mock_engine()
+    def test_accepts_non_done_issues(self):
+        """Non-done issues are now accepted (caller handles transition)."""
+        engine, conn = _mock_engine()
         issue = {
             "id": ISSUE_ID,
             "identifier": ISSUE_IDENTIFIER,
@@ -455,10 +455,16 @@ class TestProcessBugIssue:
             patch(
                 "touch_index.bug_worker.get_issue_by_id", return_value=issue
             ),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/foo.py"],
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
         ):
             result = process_bug_issue(engine, ISSUE_ID)
 
-        assert result is None
+        assert result is not None
+        assert result.files_indexed == 1
 
 
 class TestBugWorkerDryRun:
@@ -1053,8 +1059,8 @@ class TestMain:
         mock_quality.assert_not_called()
         mock_transition.assert_called_once_with("id-1", "done")
 
-    def test_main_skips_transition_for_already_done_issues(self, monkeypatch, caplog):
-        """Issues already in 'done' status are not transitioned."""
+    def test_main_transitions_all_processed_issues(self, monkeypatch, caplog):
+        """All processed issues are transitioned to done regardless of current status."""
         from touch_index.__main__ import _run_bug_cli as main
         import logging
         engine = MagicMock()
@@ -1078,8 +1084,12 @@ class TestMain:
             monkeypatch.setattr("sys.argv", ["touch_index"])
             main()
 
-        # Only id-2 (in_progress) should be transitioned
-        mock_transition.assert_called_once_with("id-2", "done")
+        # Both issues should be transitioned (status check removed)
+        assert mock_transition.call_count == 2
+        mock_transition.assert_has_calls([
+            call("id-1", "done"),
+            call("id-2", "done"),
+        ])
 
     def test_main_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
         """A failed transition is logged but does not halt the worker."""
