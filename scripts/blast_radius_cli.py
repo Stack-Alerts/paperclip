@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Blast Radius CLI — query the Touch Index for a set of files.
+"""Blast Radius CLI — thin wrapper around the unified CLI (python -m blast_radius).
 
 Usage
 -----
@@ -10,20 +10,11 @@ Usage
     blast-radius worker --loop 300 [--dry-run]
     blast-radius worker --issue-id <uuid> [--old-status <status>] [--dry-run]
 
-`query` returns JSON to stdout:
-{
-  "fr_impact_set": [...],
-  "regression_set": [...],
-  "downstream_set": [],
-  "downstream_note": "Phase 2 dep graph not yet available"
-}
+All subcommands delegate to ``python -m blast_radius``.
 """
 
 from __future__ import annotations
 
-import argparse
-import json
-import logging
 import sys
 from pathlib import Path
 
@@ -33,144 +24,10 @@ if str(_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_ROOT / "src"))
 
 
-def cmd_query(args: argparse.Namespace) -> int:
-    from blast_radius.query import query_blast_radius, to_json_dict
-
-    data = query_blast_radius(args.files)
-    print(json.dumps(to_json_dict(data), indent=2))  # noqa: T201
-    return 0
-
-
-def cmd_generate(args: argparse.Namespace) -> int:
-    from blast_radius.generator import generate_and_post
-
-    result = generate_and_post(
-        issue_id=args.issue_id,
-        touched_files=args.files or None,
-        dry_run=args.dry_run,
-    )
-    print(json.dumps(result, indent=2))  # noqa: T201
-    return 0
-
-
-def cmd_serve(args: argparse.Namespace) -> int:
-    from blast_radius.api_server import serve
-
-    serve(port=args.port)
-    return 0
-
-
-def cmd_worker(args: argparse.Namespace) -> int:
-    if args.issue_id:
-        from blast_radius.worker import process_issue
-
-        result = process_issue(
-            args.issue_id,
-            dry_run=args.dry_run,
-            old_status=args.old_status,
-            force_reprocess=args.force_reprocess,
-        )
-        if result:
-            print(json.dumps(result, indent=2))  # noqa: T201
-        else:
-            print(json.dumps({"skipped": True, "issue": args.issue_id}))  # noqa: T201
-        return 0
-
-    from blast_radius.worker import run_once, run_loop
-
-    if args.loop:
-        run_loop(interval_seconds=args.loop, dry_run=args.dry_run, force_reprocess=args.force_reprocess)
-        return 0
-
-    results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
-    print(json.dumps(results, indent=2))  # noqa: T201
-    return 0
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        prog="blast-radius",
-        description="Blast Radius — Touch Index query and report generator",
-    )
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
-    sub = parser.add_subparsers(dest="command", required=True)
+    from blast_radius.__main__ import main as cli_main
 
-    # blast-radius query
-    p_query = sub.add_parser("query", help="Query the Touch Index for a list of files")
-    p_query.add_argument(
-        "--files",
-        nargs="+",
-        required=True,
-        metavar="PATH",
-        help="File paths to query (relative to repo root)",
-    )
-    p_query.set_defaults(func=cmd_query)
-
-    # blast-radius generate
-    p_gen = sub.add_parser(
-        "generate",
-        help="Generate and post a Blast Radius Report for a Paperclip issue",
-    )
-    p_gen.add_argument("--issue-id", required=True, metavar="ID", help="Paperclip issue UUID")
-    p_gen.add_argument(
-        "--files",
-        nargs="+",
-        metavar="PATH",
-        help="Override touchedFiles (parsed from issue description if omitted)",
-    )
-    p_gen.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print the report but do not post a comment",
-    )
-    p_gen.set_defaults(func=cmd_generate)
-
-    # blast-radius serve
-    p_serve = sub.add_parser("serve", help="Start the HTTP API server")
-    p_serve.add_argument("--port", type=int, default=8765, metavar="PORT")
-    p_serve.set_defaults(func=cmd_serve)
-
-    # blast-radius worker
-    p_worker = sub.add_parser(
-        "worker",
-        help="Poll for fix/bug issues transitioning to in_review and post Blast Radius Reports",
-    )
-    p_worker.add_argument(
-        "--issue-id",
-        type=str,
-        metavar="UUID",
-        help="Process a single issue by Paperclip UUID (webhook trigger)",
-    )
-    p_worker.add_argument(
-        "--old-status",
-        type=str,
-        metavar="STATUS",
-        help="Previous status when called from a status-change webhook",
-    )
-    p_worker.add_argument(
-        "--loop",
-        type=int,
-        metavar="SECONDS",
-        help="Run continuously, sleeping SECONDS between polls (default: run once and exit)",
-    )
-    p_worker.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Log reports but do not post comments",
-    )
-    p_worker.add_argument(
-        "--force-reprocess",
-        action="store_true",
-        help="Re-process already-seen issues (useful after touchedFiles update)",
-    )
-    p_worker.set_defaults(func=cmd_worker)
-
-    args = parser.parse_args()
-
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=log_level, format="%(asctime)s %(levelname)s %(message)s")
-
-    return args.func(args)
+    return cli_main()
 
 
 if __name__ == "__main__":

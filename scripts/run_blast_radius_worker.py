@@ -1,99 +1,30 @@
-"""Blast Radius polling worker runner — run by Paperclip routine every 15 minutes.
+"""Blast Radius polling worker runner — thin wrapper around the unified CLI.
 
-Polls Paperclip for fix/bug issues that have transitioned to ``in_review``,
-generates a Blast Radius Report for each, and posts it as a comment.
-
-State is persisted in ``BLAST_RADIUS_STATE_FILE`` (defaults to
-``data/blast_radius_worker_state.json``) so the worker is safe to restart.
+Sets up the environment (sys.path, .env) then delegates to the unified
+Blast Radius CLI (``python -m blast_radius worker``).
 
 Usage:
-    python scripts/run_blast_radius_worker.py [--loop SECONDS] [--dry-run]
+    python scripts/run_blast_radius_worker.py [--dry-run] [--force-reprocess]
     python scripts/run_blast_radius_worker.py --issue-id <uuid> [--old-status <status>]
 """
+
 from __future__ import annotations
 
-import argparse
-import logging
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent.parent / ".env")
 
-from blast_radius.worker import process_issue, run_once, run_loop
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
-logger = logging.getLogger("blast_radius.worker_runner")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Blast Radius worker -- detect fix->in_review and post report",
-    )
-    parser.add_argument(
-        "--issue-id",
-        type=str,
-        metavar="UUID",
-        help="Process a single issue by Paperclip UUID (webhook trigger)",
-    )
-    parser.add_argument(
-        "--old-status",
-        type=str,
-        metavar="STATUS",
-        help="Previous status when called from a status-change webhook",
-    )
-    parser.add_argument(
-        "--loop",
-        type=int,
-        metavar="SECONDS",
-        help="Run continuously, sleeping SECONDS between polls (default: run once and exit)",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Log reports but do not post comments",
-    )
-    parser.add_argument(
-        "--force-reprocess",
-        action="store_true",
-        help="Re-process already-seen issues (useful after touchedFiles update)",
-    )
-    args = parser.parse_args()
+    """Set up environment and delegate to the unified Blast Radius CLI."""
+    from blast_radius.worker import main as worker_main
 
-    if args.issue_id:
-        logger.info(
-            "Processing single issue %s (dry_run=%s, old_status=%s, force_reprocess=%s)",
-            args.issue_id, args.dry_run, args.old_status, args.force_reprocess,
-        )
-        result = process_issue(
-            args.issue_id,
-            dry_run=args.dry_run,
-            old_status=args.old_status,
-            force_reprocess=args.force_reprocess,
-        )
-        if result:
-            logger.info("Issue %s result: %s", args.issue_id, result)
-        else:
-            logger.info("Issue %s not eligible -- no report generated", args.issue_id)
-    elif args.loop:
-        logger.info(
-            "Starting Blast Radius worker loop (interval=%ds, dry_run=%s, force_reprocess=%s)",
-            args.loop, args.dry_run, args.force_reprocess,
-        )
-        run_loop(
-            interval_seconds=args.loop,
-            dry_run=args.dry_run,
-            force_reprocess=args.force_reprocess,
-        )
-    else:
-        results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
-        logger.info("Blast Radius worker run complete -- %d issue(s) processed", len(results))
-        logger.info("Results: %s", results)
+    worker_main()
 
 
 if __name__ == "__main__":

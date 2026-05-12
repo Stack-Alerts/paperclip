@@ -26,8 +26,9 @@ Blast Radius Worker ──► 1. Fetch issue touchedFiles
 | `query` | `src/blast_radius/query.py` | Touch Index DB queries (FR impact, regression risk) |
 | `db` | `src/blast_radius/db.py` | PostgreSQL engine (delegates to `touch_index.db`) |
 | `api_server` | `src/blast_radius/api_server.py` | HTTP API for queries + webhooks |
-| CLI | `scripts/blast_radius_cli.py` | Full CLI with subcommands |
-| Runner | `scripts/run_blast_radius_worker.py` | Standalone runner |
+| Unified CLI | `src/blast_radius/__main__.py` (via `python -m blast_radius`) | Primary CLI with subcommands (worker, query, generate, serve) |
+| CLI (legacy) | `scripts/blast_radius_cli.py` | Thin wrapper that delegates to the unified CLI |
+| Runner | `scripts/run_blast_radius_worker.py` | Thin wrapper that sets up env and delegates to the unified CLI |
 
 ### Database Tables
 
@@ -92,7 +93,7 @@ python -m blast_radius --loop 60
 # Using the standalone runner script
 python scripts/run_blast_radius_worker.py
 
-# Using the full CLI
+# Using the legacy CLI
 python scripts/blast_radius_cli.py worker --dry-run
 ```
 

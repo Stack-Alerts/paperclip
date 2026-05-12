@@ -740,16 +740,16 @@ class TestMain:
         _, kwargs = mock_process.call_args
         assert kwargs.get("force_reprocess") is True
 
-    def test_main_issue_id_none_result_logs(self, monkeypatch, caplog):
+    def test_main_issue_id_none_result_prints_skipped(self, monkeypatch, capsys):
         import blast_radius.worker as worker_mod
         with (
             patch("blast_radius.worker.process_issue", return_value=None),
-            caplog.at_level(logging.INFO),
         ):
             monkeypatch.setattr("sys.argv", ["blast_radius", "--issue-id", "uuid-1"])
             worker_mod.main()
 
-        assert any("No report" in r.message for r in caplog.records)
+        captured = capsys.readouterr()
+        assert "skipped" in captured.out
 
     def test_main_loop_calls_run_loop(self, monkeypatch):
         import blast_radius.worker as worker_mod
