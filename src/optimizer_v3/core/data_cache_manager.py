@@ -20,9 +20,12 @@ Date: 2026-02-12
 
 import hashlib
 import json
+import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -115,7 +118,69 @@ class DataCacheManager:
         # Generate hash
         hash_obj = hashlib.sha256(config_str.encode('utf-8'))
         return hash_obj.hexdigest()[:16]  # First 16 chars sufficient
-    
+
+    TRUNCATION_THRESHOLD = 0.5  # Refuse cache if actual bars < 50% of expected
+
+    @staticmethod
+    def _timeframe_to_minutes(timeframe: str) -> int:
+        """Parse timeframe string (e.g. '15m', '1h', '30m') to minutes."""
+        if not timeframe:
+            return 15
+        tf = str(timeframe).lower().strip()
+        if tf.endswith('h'):
+            try:
+                return int(tf[:-1]) * 60
+            except ValueError:
+                return 60
+        elif tf.endswith('m'):
+            try:
+                return int(tf[:-1])
+            except ValueError:
+                return 15
+        elif tf.endswith('min'):
+            try:
+                return int(tf[:-3])
+            except ValueError:
+                return 15
+        elif tf.endswith('d'):
+            try:
+                return int(tf[:-1]) * 1440
+            except ValueError:
+                return 1440
+        else:
+            try:
+                return int(tf)
+            except ValueError:
+                return 15
+
+    @staticmethod
+    def _is_truncated(bars: List, config: Dict[str, Any]) -> bool:
+        """
+        Check if bars appear truncated vs expected count for the date range.
+
+        Returns True when the actual bar count is below TRUNCATION_THRESHOLD
+        of the theoretical maximum for the given timeframe and date range.
+        """
+        if not bars:
+            return True
+
+        start = config.get('start_date')
+        end = config.get('end_date')
+        timeframe = config.get('timeframe', '15m')
+
+        if not start or not end:
+            return False  # Cannot determine expected count
+
+        interval_min = DataCacheManager._timeframe_to_minutes(timeframe)
+        total_seconds = (end - start).total_seconds()
+        expected = total_seconds / (interval_min * 60)
+
+        if expected <= 0:
+            return False
+
+        ratio = len(bars) / expected
+        return ratio < DataCacheManager.TRUNCATION_THRESHOLD
+
     def is_cached(self, config: Dict[str, Any]) -> bool:
         """
         Check if bars are cached for given configuration.
@@ -157,10 +222,32 @@ class DataCacheManager:
         """
         Cache bars with metadata for future use.
         
+        Cache-poisoning guard: refuses to cache truncated bars (actual count
+        significantly below expected for the date range / timeframe).
+        
         Args:
             bars: List of NautilusTrader Bar objects
             config: Backtest configuration dict
         """
+        if self._is_truncated(bars, config):
+            start = config.get('start_date')
+            end = config.get('end_date')
+            tf = config.get('timeframe', '15m')
+            if start and end:
+                interval_min = self._timeframe_to_minutes(tf)
+                expected = int((end - start).total_seconds() / (interval_min * 60))
+                ratio = 100.0 * len(bars) / max(expected, 1)
+            else:
+                expected = 0
+                ratio = 0.0
+            logger.warning(
+                "Cache-poisoning guard: refusing to cache %d bars for "
+                "timeframe=%s range=%s..%s (expected ~%d, ratio=%.1f%%). "
+                "Data appears truncated.",
+                len(bars), tf, start, end, expected, ratio,
+            )
+            return
+        
         import sys
         
         # Calculate memory size (rough estimate)
