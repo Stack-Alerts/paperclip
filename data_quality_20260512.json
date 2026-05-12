@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-12T18:06:10.146764+00:00",
+  "timestamp": "2026-05-12T18:17:19.378532+00:00",
   "touch_index_bug": {
     "pass": true,
     "coverage_pct": 16.8,
@@ -21,6 +21,6 @@
     "total_rows": 150,
     "stale_rows": 0,
     "orphans": 0,
-    "note": "FR coverage stable at 83.3% (7 FDRs without extractable files)."
+    "note": "FR coverage at 95.2% (40/42 FDR issues indexed; 2 remaining without extractable files)."
   }
 }
