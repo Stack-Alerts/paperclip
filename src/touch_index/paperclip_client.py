@@ -12,8 +12,19 @@ from datetime import datetime, timezone
 from typing import Any
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 logger = logging.getLogger(__name__)
+
+# Retry strategy for Paperclip API calls — exponential backoff, 3 attempts
+_RETRY_STRATEGY = Retry(
+    total=3,
+    backoff_factor=0.5,
+    status_forcelist=[408, 429, 500, 502, 503, 504],
+    allowed_methods=["GET", "PATCH", "POST"],
+    raise_on_status=False,
+)
 
 # FDR label identifies Feature Design Requirements (FRs)
 FDR_LABEL_ID = "d523cb2d-acd9-423d-b87a-bb79cee42c40"
@@ -40,6 +51,9 @@ def _session() -> requests.Session:
             "Content-Type": "application/json",
         }
     )
+    adapter = HTTPAdapter(max_retries=_RETRY_STRATEGY)
+    s.mount("https://", adapter)
+    s.mount("http://", adapter)
     return s
 
 
@@ -52,6 +66,9 @@ def _board_session() -> requests.Session:
             "Content-Type": "application/json",
         }
     )
+    adapter = HTTPAdapter(max_retries=_RETRY_STRATEGY)
+    s.mount("https://", adapter)
+    s.mount("http://", adapter)
     return s
 
 
