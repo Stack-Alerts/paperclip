@@ -1,30 +1,30 @@
-# BACKUP — Offsite Backup Pipeline Operator Overview
+# BACKUP — PaperClip Offsite Backup Pipeline (Operator Overview)
 
 **Owner:** PlatformEngineer
 **Last Updated:** 2026-05-12
-**Cadence:** Every 4 hours (database), continuous (sync to GDrive)
+**Cadence:** Every 4 hours (PaperClip routine)
 
-## Pipeline Architecture
+## Pipeline Overview
 
 ```
-┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
-│  Backup Routine     │ ──> │  GDrive Sync        │ ──> │  Google Drive   │
-│  (manage_backups.py)│     │  (sync_backups_to..)│     │  Paperclip-     │
-│  every 4h via cron  │     │  runs after backup  │     │  Backups/<env>/ │
-└─────────────────────┘     └─────────────────────┘     └─────────────────┘
-         │                                                        │
-         ▼                                                        ▼
-  ┌──────────────┐                                       Remote / DR site
-  │  Local disk  │
-  │  (backup dir)│
-  └──────────────┘
+PaperClip Instance                          Google Drive
++----------------------------+     +--------------------------+
+|  backup-to-drive.sh         | --> |  gdrive:Paperclip-       |
+|                             |     |  Backups/<companyId>/    |
+|  Bundles:                   |     |  YYYY/MM/DD/HHMM/        |
+|  * DB dump (paperclip-*)    |     |                          |
+|  * companies/               |     |  * paperclip-instance-   |
+|  * projects/                |     |    YYYYMMDD-HHMM.tar.gz  |
+|  * skills/                  |     |  * MANIFEST.json          |
+|  * data/storage/            |     |  * paperclip-*.sql.gz    |
+|  * config.json (sanitized)  |     |                          |
+|  * MANIFEST.json (SHA-256)  |     +--------------------------+
++----------------------------+
 ```
 
-The pipeline has three stages:
+Backups are created by `backup-to-drive.sh` at `/home/sirrus/.paperclip/scripts/`. They bundle instance data (companies, projects, skills, file storage), the latest database dump, and a sanitised config.json with a SHA-256 manifest, then upload to Google Drive under a timestamped path.
 
-1. **Backup creation** — `manage_backups.py create` produces a compressed SQL dump to local disk
-2. **Sync to GDrive** — `sync_backups_to_gdrive.py` pushes the local backup directory to Google Drive via rclone
-3. **Retention enforcement** — old backups purged locally (configurable, default 30 days)
+A dead-man's-switch within the PaperClip routine alerts if no backup has been created within the expected window.
 
 ---
 
@@ -32,110 +32,92 @@ The pipeline has three stages:
 
 | Path | Purpose |
 |------|---------|
-| `scripts/manage_backups.py` | PostgreSQL backup/restore CLI |
-| `scripts/sync_backups_to_gdrive.py` | Sync to Google Drive via rclone |
-| `scripts/rclone_bootstrap.sh` | One-time OAuth setup for GDrive |
-| `src/optimizer_v3/database/backup.py` | Backup engine (pg_dump wrapper) |
-| `logs/backup_cron.log` | Backup cron output |
-| `POSTGRES_BACKUP_PATH` (.env) | Local backup directory (e.g. `/home/sirrus/backups/optimizer_v3`) |
-| `~/.config/rclone/rclone.conf` | rclone config with GDrive token |
+| `/home/sirrus/.paperclip/scripts/backup-to-drive.sh` | Backup orchestrator script |
+| `/home/sirrus/.paperclip/scripts/restore-from-drive.sh` | Restore orchestrator script |
+| `/home/sirrus/.paperclip/scripts/rclone-bootstrap.sh` | One-time OAuth setup |
+| `/home/sirrus/.paperclip/instances/default/logs/backup.log` | Backup log output |
+| `/home/sirrus/.paperclip/instances/default/backup-state/last-success` | Timestamp of last successful backup |
+| `/home/sirrus/.paperclip/instances/default/backup-state/last-failure` | Timestamp + error of last failure |
+| `/home/sirrus/.paperclip/instances/default/data/backups/` | Local DB dump files |
+| `~/.config/rclone/rclone.conf` | rclone OAuth token (KEEP SECRET) |
 
 ---
 
 ## How to Manually Trigger a Backup
 
-```bash
-# Create a fresh backup
-python scripts/manage_backups.py create --compress
-
-# Then sync to GDrive
-python scripts/sync_backups_to_gdrive.py
-
-# Preview what would be synced (no transfer)
-python scripts/sync_backups_to_gdrive.py --dry-run
 ```
+/home/sirrus/.paperclip/scripts/backup-to-drive.sh
+```
+
+The script uses `flock` so concurrent runs (manual + scheduled) never collide.
+
+### What Gets Uploaded
+
+For a run at 2026-05-12T10:08Z, the GDrive path is:
+
+```
+gdrive:Paperclip-Backups/<companyId>/2026/05/12/1008/
+  - paperclip-instance-20260512-1008.tar.gz   # instance data bundle
+  - MANIFEST.json                              # SHA-256 + metadata
+  - paperclip-20260512_100800.sql.gz           # raw DB dump (if one exists locally)
+```
+
+The tarball contains: `companies/`, `projects/`, `skills/`, `data/storage/`, `config.json` (sanitised).
+
+---
 
 ## How to Inspect Google Drive Contents
 
-```bash
-# List backup files on GDrive
-rclone ls btc_backup:btc-trade-engine-backups/
+```
+# List backup directories (YYYY/MM/DD/HHMM tree)
+rclone tree gdrive:Paperclip-Backups/<companyId> --depth 4
+
+# Quick listing of latest backups
+rclone ls gdrive:Paperclip-Backups/<companyId> --max-depth 4
 
 # Check total usage
-rclone about btc_backup:
+rclone about gdrive:
 
-# List all remotes configured
-rclone listremotes
+# View a MANIFEST.json for a specific backup
+rclone cat gdrive:Paperclip-Backups/<companyId>/2026/05/12/1008/MANIFEST.json
 ```
 
-The remote name is `btc_backup` by default (configurable via `RCLONE_REMOTE` env var).
+Replace `<companyId>` with your actual company UUID from the PaperClip instance.
+
+---
 
 ## Retention Policy
 
-| Tier | Retention | Enforcement |
-|------|-----------|-------------|
-| Local backups | 30 days | `manage_backups.py cleanup` (manual or cron) |
-| Google Drive | Manual (no auto-delete) | Oversee via `rclone ls` |
+| Layer | Retention | Enforcement |
+|-------|-----------|-------------|
+| Google Drive | Manual | No auto-delete -- review periodically |
+| Local DB dumps | Managed by PaperClip | PaperClip's internal retention |
 
-Set retention via `.env`:
+To prune old backups on GDrive (example: delete backups older than 90 days):
 
-```ini
-POSTGRES_BACKUP_RETENTION_DAYS=30
-POSTGRES_BACKUP_COMPRESSION=true
-POSTGRES_BACKUP_PATH=/home/sirrus/backups/optimizer_v3
 ```
+# List backup directories with dates
+rclone lsl gdrive:Paperclip-Backups/<companyId> --max-depth 4
 
-GDrive does not have auto-cleanup. Periodically review and prune old backups using:
-
-```bash
-# List backups older than N days on GDrive
-rclone lsl btc_backup:btc-trade-engine-backups/ | awk '$1 < ( systime() - 90*86400 )'
-
-# Remove them (careful!)
-rclone delete btc_backup:btc-trade-engine-backups/old_backup_file.sql.gz
+# Remove a specific old backup
+rclone purge gdrive:Paperclip-Backups/<companyId>/2026/02/01/0000
 ```
 
 ---
 
-## Dead Man's Switch
+## State Files (Dead-Man's-Switch)
 
-A dead-man's-switch monitor checks whether a backup was created within the expected window. If no recent backup is found, an alert fires.
+The PaperClip routine records success/failure timestamps:
 
-### How It Works
+```
+# Last successful backup
+cat /home/sirrus/.paperclip/instances/default/backup-state/last-success
 
-- Expected to run every hour (via cron or systemd timer)
-- Checks for any backup file newer than `interval + grace_period` (default: 4h + 1h = 5h)
-- If no recent backup found: creates a Paperclip alert issue assigned to CTO (or configured alert target)
-
-### Manual Test
-
-```bash
-# Simulate a missed backup (expect alert)
-python scripts/backup_deadman_switch.py
-
-# Force alert creation even if backup is recent
-python scripts/backup_deadman_switch.py --force-alert
+# Last failure (if any)
+cat /home/sirrus/.paperclip/instances/default/backup-state/last-failure
 ```
 
----
-
-## Scheduled Cadence
-
-The intended schedule (configure via crontab):
-
-```bash
-# Backup every 4 hours
-0 */4 * * * cd /home/sirrus/projects/BTC-Trade-Engine-PaperClip && venv/bin/python scripts/manage_backups.py create --compress >> logs/backup_cron.log 2>&1
-
-# Sync to GDrive 15 min after backup
-15 */4 * * * cd /home/sirrus/projects/BTC-Trade-Engine-PaperClip && venv/bin/python scripts/sync_backups_to_gdrive.py >> logs/gdrive_sync.log 2>&1
-
-# Dead-man's-switch check every hour
-0 * * * * cd /home/sirrus/projects/BTC-Trade-Engine-PaperClip && venv/bin/python scripts/backup_deadman_switch.py >> logs/deadman.log 2>&1
-
-# Weekly local cleanup
-0 3 * * 0 cd /home/sirrus/projects/BTC-Trade-Engine-PaperClip && venv/bin/python scripts/manage_backups.py cleanup --yes >> logs/backup_cron.log 2>&1
-```
+The dead-man's-switch fires an alert if no `last-success` update is detected within the expected interval + grace period.
 
 ---
 
@@ -143,11 +125,11 @@ The intended schedule (configure via crontab):
 
 | Action | Command |
 |--------|---------|
-| Create backup | `python scripts/manage_backups.py create --compress` |
-| List local backups | `python scripts/manage_backups.py list` |
-| Verify backup | `python scripts/manage_backups.py verify <file>` |
-| Sync to GDrive | `python scripts/sync_backups_to_gdrive.py` |
-| Dry-run GDrive sync | `python scripts/sync_backups_to_gdrive.py --dry-run` |
-| List GDrive backup dir | `rclone ls btc_backup:btc-trade-engine-backups/` |
-| Stats | `python scripts/manage_backups.py stats` |
-| Cleanup old local backups | `python scripts/manage_backups.py cleanup` |
+| Run backup now | `/home/sirrus/.paperclip/scripts/backup-to-drive.sh` |
+| List GDrive backups | `rclone tree gdrive:Paperclip-Backups/<companyId> --depth 4` |
+| View manifest | `rclone cat gdrive:Paperclip-Backups/<companyId>/2026/05/12/1008/MANIFEST.json` |
+| Check last success | `cat /home/sirrus/.paperclip/instances/default/backup-state/last-success` |
+| Check last failure | `cat /home/sirrus/.paperclip/instances/default/backup-state/last-failure` |
+| Inspect live log | `tail -f /home/sirrus/.paperclip/instances/default/logs/backup.log` |
+| Verify rclone remote | `rclone listremotes` (expect `gdrive:`) |
+| Re-run OAuth | `/home/sirrus/.paperclip/scripts/rclone-bootstrap.sh` |
