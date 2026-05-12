@@ -111,6 +111,8 @@ _NOT_IN_REVIEW = {**_FIX_IN_REVIEW, "id": "not-review-uuid", "identifier": "BTCA
 
 _NO_TF = {**_FIX_IN_REVIEW, "id": "no-tf-uuid", "identifier": "BTCAAAAA-103", "description": "No file paths"}
 
+_FIX_DONE = {**_FIX_IN_REVIEW, "id": "done-uuid", "identifier": "BTCAAAAA-104", "status": "done"}
+
 
 class TestProcessIssue:
     def _mock_fetch(self, monkeypatch, issue_dict):
@@ -132,6 +134,22 @@ class TestProcessIssue:
         self._mock_fetch(monkeypatch, _NOT_IN_REVIEW)
         r = process_issue("not-review-uuid", dry_run=True)
         assert r["gate_status"] == "SKIPPED"
+
+    def test_skips_done_without_force(self, monkeypatch):
+        self._mock_fetch(monkeypatch, _FIX_DONE)
+        r = process_issue("done-uuid", dry_run=True)
+        assert r["gate_status"] == "SKIPPED"
+        assert r.get("reason") == "status=done"
+
+    def test_force_runs_on_done_issue(self, monkeypatch):
+        self._mock_fetch(monkeypatch, _FIX_DONE)
+        self._mock_br(monkeypatch)
+        monkeypatch.setattr("impact_gate.worker.run_impact_gate", lambda f, b: _PASS_RESULT)
+        posted, transitions = self._mock_actions(monkeypatch)
+        r = process_issue("done-uuid", dry_run=False, force=True)
+        assert r["gate_status"] == "PASS"
+        assert len(posted) == 1
+        assert transitions == [("done-uuid", "done")]
 
     def test_bypasses(self, monkeypatch):
         posted = []
