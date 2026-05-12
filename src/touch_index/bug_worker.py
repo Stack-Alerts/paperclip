@@ -176,3 +176,14 @@ def run_bug_worker(
             logger.exception("Bug worker error for %s", issue.get("identifier"))
     return results
 
+
+def main() -> None:
+    """CLI entry point: dispatch to __main__._run_bug_cli() (unified CLI)."""
+    from .__main__ import _run_bug_cli
+
+    _run_bug_cli()
+
+
+if __name__ == "__main__":
+    main()
+
