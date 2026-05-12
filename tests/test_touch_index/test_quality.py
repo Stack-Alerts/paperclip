@@ -378,9 +378,6 @@ class TestRunQualityChecks:
         assert report.consistency is not None
         assert report.consistency.unknown_source_rows == 3
 
-
-
-
     def test_low_coverage_fails(self):
         engine = MagicMock()
 
@@ -698,6 +695,7 @@ class TestComputeBugCoverage:
         assert report.eligible_coverage_pct == 0.0
         assert report.missing_eligible_identifiers == []
 
+
 # ---------------------------------------------------------------------------
 # compute_bug_freshness
 # ---------------------------------------------------------------------------
@@ -839,7 +837,9 @@ class TestCheckBugConsistency:
                 _make_scalar_result(0),  # null_updated_at
                 _make_scalar_result(0),  # duplicates
                 _make_scalar_result(0),  # unknown_source
-                _make_scalar_result(0, rows=[("orphan-1",), ("orphan-2",)]),  # DISTINCT bug_issue_ids
+                _make_scalar_result(
+                    0, rows=[("orphan-1",), ("orphan-2",)]
+                ),  # DISTINCT bug_issue_ids
             ]
         )
 
@@ -888,7 +888,10 @@ class TestRunBugQualityChecks:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, null_updated_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    null_closed_at_rows=0,
+                    null_updated_at_rows=0,
+                    duplicate_pairs=0,
+                    orphan_bug_issue_ids=[],
                     unknown_source_rows=0,
                 ),
             ),
@@ -973,7 +976,10 @@ class TestRunBugQualityChecks:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, null_updated_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    null_closed_at_rows=0,
+                    null_updated_at_rows=0,
+                    duplicate_pairs=0,
+                    orphan_bug_issue_ids=[],
                     unknown_source_rows=0,
                 ),
             ),
@@ -1011,7 +1017,10 @@ class TestRunBugQualityChecks:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, null_updated_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    null_closed_at_rows=0,
+                    null_updated_at_rows=0,
+                    duplicate_pairs=0,
+                    orphan_bug_issue_ids=[],
                     unknown_source_rows=0,
                 ),
             ),
@@ -1049,7 +1058,10 @@ class TestRunBugQualityChecks:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=3, null_updated_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    null_closed_at_rows=3,
+                    null_updated_at_rows=0,
+                    duplicate_pairs=0,
+                    orphan_bug_issue_ids=[],
                     unknown_source_rows=0,
                 ),
             ),
@@ -1079,7 +1091,10 @@ class TestRunBugQualityChecks:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, null_updated_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    null_closed_at_rows=0,
+                    null_updated_at_rows=0,
+                    duplicate_pairs=0,
+                    orphan_bug_issue_ids=[],
                     unknown_source_rows=0,
                 ),
             ),
@@ -1351,7 +1366,10 @@ class TestRunBugQualityChecksExtended:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, null_updated_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    null_closed_at_rows=0,
+                    null_updated_at_rows=0,
+                    duplicate_pairs=0,
+                    orphan_bug_issue_ids=[],
                     unknown_source_rows=0,
                 ),
             ),
@@ -1422,7 +1440,10 @@ class TestRunBugQualityChecksExtended:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, null_updated_at_rows=0, duplicate_pairs=3, orphan_bug_issue_ids=[],
+                    null_closed_at_rows=0,
+                    null_updated_at_rows=0,
+                    duplicate_pairs=3,
+                    orphan_bug_issue_ids=[],
                     unknown_source_rows=0,
                 ),
             ),
@@ -1587,8 +1608,11 @@ class TestReportToDict:
 
     def test_bug_consistency_report_to_dict(self):
         r = BugConsistencyReport(
-            null_closed_at_rows=0, null_updated_at_rows=0, duplicate_pairs=2, orphan_bug_issue_ids=[],
-                    unknown_source_rows=0,
+            null_closed_at_rows=0,
+            null_updated_at_rows=0,
+            duplicate_pairs=2,
+            orphan_bug_issue_ids=[],
+            unknown_source_rows=0,
         )
         d = r.to_dict()
         assert d["duplicate_pairs"] == 2
@@ -1694,8 +1718,11 @@ class TestReportToDictExtended:
 
     def test_bug_quality_report_consistency_branch(self):
         cons = BugConsistencyReport(
-            null_closed_at_rows=0, null_updated_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
-                    unknown_source_rows=0,
+            null_closed_at_rows=0,
+            null_updated_at_rows=0,
+            duplicate_pairs=0,
+            orphan_bug_issue_ids=[],
+            unknown_source_rows=0,
         )
         r = BugQualityReport(
             coverage=None, freshness=None, consistency=cons, passed=True

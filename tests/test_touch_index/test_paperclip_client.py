@@ -19,11 +19,15 @@ class TestRetryStrategy:
         from touch_index.paperclip_client import _session, _RETRY_STRATEGY
 
         # We need env vars for the session constructor
-        with patch.dict(os.environ, {
-            "PAPERCLIP_API_KEY": "test-key",
-            "PAPERCLIP_API_URL": "https://api.example.com",
-            "PAPERCLIP_COMPANY_ID": "test-company",
-        }, clear=True):
+        with patch.dict(
+            os.environ,
+            {
+                "PAPERCLIP_API_KEY": "test-key",
+                "PAPERCLIP_API_URL": "https://api.example.com",
+                "PAPERCLIP_COMPANY_ID": "test-company",
+            },
+            clear=True,
+        ):
             s = _session()
             # HTTPAdapter uses an internal Retry object; we verify via the
             # adapter's get_connection method but the simplest check is that
@@ -42,11 +46,15 @@ class TestRetryStrategy:
         """_board_session() mounts an adapter with the same retry strategy."""
         from touch_index.paperclip_client import _board_session
 
-        with patch.dict(os.environ, {
-            "PAPERCLIP_API_KEY": "test-key",
-            "PAPERCLIP_API_URL": "https://api.example.com",
-            "PAPERCLIP_COMPANY_ID": "test-company",
-        }, clear=True):
+        with patch.dict(
+            os.environ,
+            {
+                "PAPERCLIP_API_KEY": "test-key",
+                "PAPERCLIP_API_URL": "https://api.example.com",
+                "PAPERCLIP_COMPANY_ID": "test-company",
+            },
+            clear=True,
+        ):
             s = _board_session()
             https_adapter = s.get_adapter("https://api.example.com/foo")
             assert https_adapter.max_retries.total == 3

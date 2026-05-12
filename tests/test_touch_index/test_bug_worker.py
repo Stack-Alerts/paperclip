@@ -1166,7 +1166,6 @@ class TestMain:
         assert exc_info.value.code == 1
         mock_worker.assert_not_called()
 
-
     def test_main_polling_api_error_exits_nonzero(self, monkeypatch):
         """Polling mode: get_closed_non_fdr_issues error raises SystemExit(1)."""
         from touch_index.__main__ import _run_bug_cli as main
@@ -1212,9 +1211,7 @@ class TestMain:
                 "touch_index.paperclip_client.transition_issue_status"
             ) as mock_transition,
         ):
-            monkeypatch.setattr(
-                "sys.argv", ["touch_index", "--json-summary"]
-            )
+            monkeypatch.setattr("sys.argv", ["touch_index", "--json-summary"])
             with pytest.raises(SystemExit) as exc_info:
                 main()
 
@@ -1225,7 +1222,6 @@ class TestMain:
         data = json.loads(captured.out.strip())
         assert data["worker"] == "bug"
         assert data["mode"] == "polling"
-
 
     def test_main_validate_no_issues_failed_with_json_summary(
         self, monkeypatch, capsys
@@ -1907,7 +1903,6 @@ class TestBugJsonSummary:
         assert data["mode"] == "polling"
         assert data["issues_processed"] == 1
         assert data["total_files_indexed"] == 3
-
 
     def test_json_summary_polling_with_errors(self, monkeypatch, capsys):
         """--json-summary includes error count when issues fail during polling mode."""

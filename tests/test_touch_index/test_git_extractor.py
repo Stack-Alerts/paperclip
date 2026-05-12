@@ -244,9 +244,6 @@ class TestGetFilesForIssue:
         assert len(files) == 2  # 2 commits × 1 file each
 
 
-
-
-
 # ---------------------------------------------------------------------------
 # get_all_referenced_issue_ids
 # ---------------------------------------------------------------------------
@@ -263,7 +260,10 @@ class TestGetAllReferencedIssueIds:
         assert ids == {"BTCAAAAA-100", "BTCAAAAA-101"}
 
     def test_empty_when_no_refs(self):
-        with patch("touch_index.git_extractor._run", return_value="chore: cleanup\ndocs: update readme"):
+        with patch(
+            "touch_index.git_extractor._run",
+            return_value="chore: cleanup\ndocs: update readme",
+        ):
             ids = get_all_referenced_issue_ids()
         assert ids == set()
 
@@ -288,6 +288,7 @@ class TestGetAllReferencedIssueIds:
             ids = get_all_referenced_issue_ids()
         assert ids == set()
 
+
 # ---------------------------------------------------------------------------
 # _run() — error handling (uncovered error paths in subprocess wrapper)
 # ---------------------------------------------------------------------------
@@ -303,7 +304,9 @@ class TestRunErrorHandling:
         from touch_index.git_extractor import _run
 
         with (
-            patch.object(subprocess, "run", side_effect=FileNotFoundError("git not found")),
+            patch.object(
+                subprocess, "run", side_effect=FileNotFoundError("git not found")
+            ),
             caplog.at_level(logging.ERROR),
         ):
             result = _run(["git", "log"], __import__("pathlib").Path("/tmp"))
@@ -356,7 +359,9 @@ class TestRunErrorHandling:
 
         with (
             patch.object(
-                subprocess, "run", side_effect=subprocess.TimeoutExpired(cmd="git log", timeout=30)
+                subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired(cmd="git log", timeout=30),
             ),
             caplog.at_level(logging.ERROR),
         ):
