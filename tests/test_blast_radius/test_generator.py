@@ -22,7 +22,7 @@ _MOCK_ISSUE = {
 
 _MOCK_ISSUE_NO_TF = {
     "id": "issue-uuid-2",
-    "identifier": "BTCAAAAA-101",
+    "identifier": "FAKE-000",
     "title": "Fix cache bug",
     "description": "No touched files here",
 }
@@ -80,6 +80,7 @@ class TestGenerateAndPost:
 
         with (
             patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
+            patch("touch_index.git_extractor.get_files_for_issue", return_value=[]) as mock_git,
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
             result = generate_and_post("issue-uuid-2", dry_run=False)
@@ -87,17 +88,20 @@ class TestGenerateAndPost:
         assert result.get("skipped") is True
         assert result.get("reason") == "no touchedFiles"
         mock_post.assert_not_called()
+        mock_git.assert_called_once_with("FAKE-000")
 
     def test_skipped_when_touched_files_none_after_extraction(self):
         from blast_radius.generator import generate_and_post
 
         with (
             patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
+            patch("touch_index.git_extractor.get_files_for_issue", return_value=[]) as mock_git,
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
             result = generate_and_post("issue-uuid-2", dry_run=True)
 
         assert result.get("skipped") is True
+        mock_git.assert_called_once_with("FAKE-000")
 
     def test_uses_provided_touched_files(self):
         from blast_radius.generator import generate_and_post
@@ -110,7 +114,7 @@ class TestGenerateAndPost:
         ):
             result = generate_and_post("issue-uuid-2", touched_files=["src/override.py"], dry_run=False)
 
-        assert result["issue"] == "BTCAAAAA-101"
+        assert result["issue"] == "FAKE-000"
         assert result.get("skipped") is None
         mock_query.assert_called_once_with(["src/override.py"])
         mock_post.assert_called_once()
@@ -159,13 +163,50 @@ class TestGenerateAndPost:
 
         with (
             patch("blast_radius.generator.get_issue_by_id", return_value=issue),
+            patch("touch_index.git_extractor.get_files_for_issue", return_value=[]) as mock_git,
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
             result = generate_and_post("issue-uuid", dry_run=False)
 
         assert result.get("skipped") is True
         mock_post.assert_not_called()
+        mock_git.assert_called_once_with("BTCAAAAA-100")
 
+
+    def test_git_fallback_success(self):
+        """When no touchedFiles in description, git fallback should derive files from history."""
+        from blast_radius.generator import generate_and_post
+
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
+            patch("touch_index.git_extractor.get_files_for_issue", return_value=["src/git_file.py"]) as mock_git,
+            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA) as mock_query,
+            patch("blast_radius.generator._get_agent_name", return_value="Alice"),
+            patch("blast_radius.generator._post_comment") as mock_post,
+        ):
+            result = generate_and_post("issue-uuid-2", dry_run=False)
+
+        assert result.get("skipped") is None
+        assert result["issue"] == "FAKE-000"
+        mock_git.assert_called_once_with("FAKE-000")
+        mock_query.assert_called_once_with(["src/git_file.py"])
+        mock_post.assert_called_once()
+
+    def test_git_fallback_exception(self):
+        """When git fallback raises, should log warning and skip gracefully."""
+        from blast_radius.generator import generate_and_post
+
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
+            patch("touch_index.git_extractor.get_files_for_issue", side_effect=RuntimeError("git error")) as mock_git,
+            patch("blast_radius.generator._post_comment") as mock_post,
+        ):
+            result = generate_and_post("issue-uuid-2", dry_run=False)
+
+        assert result.get("skipped") is True
+        assert result.get("reason") == "no touchedFiles"
+        mock_git.assert_called_once_with("FAKE-000")
+        mock_post.assert_not_called()
     def test_no_fr_impact_set_does_not_call_get_agent_name(self):
         """When fr_impact_set is empty, _get_agent_name should not be called."""
         from blast_radius.generator import generate_and_post

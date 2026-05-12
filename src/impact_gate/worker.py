@@ -307,12 +307,23 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
 
     # --- Extract touchedFiles ---
     touched_files = extract_touched_files(description)
+
+    # Fallback: derive touched files from git history when not in description
+    if not touched_files:
+        log.info("No touchedFiles in description for %s — falling back to git history", identifier)
+        try:
+            from touch_index.git_extractor import get_files_for_issue
+            touched_files = get_files_for_issue(identifier)
+            log.info("Derived %d touched file(s) from git for %s", len(touched_files), identifier)
+        except Exception as exc:
+            log.warning("Git fallback failed for %s: %s", identifier, exc)
+
     if not touched_files:
         log.warning("No touchedFiles found for issue %s", identifier)
         if not dry_run:
             _post_comment(
                 issue_id,
-                f"## Impact Gate: SKIPPED\n\nIssue **{identifier}** has no `touchedFiles` in its description.\n\nGate cannot run without file paths.",
+                f"## Impact Gate: SKIPPED\n\nIssue **{identifier}** has no `touchedFiles` in its description and no git commits referencing it.\n\nGate cannot run without file paths.",
             )
         return {"issue": identifier, "gate_status": "SKIPPED", "reason": "no touchedFiles"}
 
