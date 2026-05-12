@@ -1241,3 +1241,156 @@ class TestBugWorkerMain:
             main()
 
         mock_cli.assert_called_once()
+
+# -------------------------------------------------------------------
+# --json-summary flag (single-issue + polling)
+# -------------------------------------------------------------------
+
+class TestBugJsonSummary:
+    """Tests for --json-summary in the bug worker CLI."""
+
+    def test_json_summary_single_issue(self, monkeypatch, capsys):
+        """--json-summary with --issue-id outputs JSON to stdout."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        result = BugIngestionResult(
+            issue_identifier="BTCAAAAA-100",
+            issue_id="uuid-1",
+            files_indexed=2,
+            source="git",
+            skipped_no_commits=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.bug_worker.process_bug_issue", return_value=result
+            ) as mock_process,
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "uuid-1", "--json-summary"],
+            )
+            main()
+
+        mock_process.assert_called_once()
+        captured = capsys.readouterr()
+        import json
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "bug"
+        assert data["mode"] == "single-issue"
+        assert data["result"]["issue_identifier"] == "BTCAAAAA-100"
+        assert data["result"]["files_indexed"] == 2
+
+    def test_json_summary_polling(self, monkeypatch, capsys):
+        """--json-summary in polling mode outputs JSON to stdout."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+        results = [
+            BugIngestionResult(
+                issue_identifier="BTCAAAAA-101",
+                issue_id="id-1",
+                files_indexed=3,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=issues),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=results),
+            patch(
+                "touch_index.paperclip_client.transition_issue_status",
+            ) as mock_transition,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--json-summary"],
+            )
+            main()
+
+        captured = capsys.readouterr()
+        import json
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "bug"
+        assert data["mode"] == "polling"
+        assert data["issues_processed"] == 1
+        assert data["total_files_indexed"] == 3
+
+    def test_json_summary_dry_run(self, monkeypatch, capsys):
+        """--json-summary with --dry-run sets dry_run field."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+        results = [
+            BugIngestionResult(
+                issue_identifier="BTCAAAAA-101",
+                issue_id="id-1",
+                files_indexed=3,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=issues),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=results),
+            patch(
+                "touch_index.paperclip_client.transition_issue_status",
+            ),
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--json-summary", "--dry-run"],
+            )
+            main()
+
+        captured = capsys.readouterr()
+        import json
+        data = json.loads(captured.out.strip())
+        assert data["dry_run"] is True
+        assert "quality" not in data
+
+    def test_json_summary_no_issues(self, monkeypatch, capsys):
+        """--json-summary with no issues outputs JSON with empty results."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=[]),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--json-summary"],
+            )
+            main()
+
+        mock_worker.assert_not_called()
+        captured = capsys.readouterr()
+        import json
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "bug"
+        assert data["mode"] == "polling"
+        assert data["issues_processed"] == 0
+        assert data["total_files_indexed"] == 0

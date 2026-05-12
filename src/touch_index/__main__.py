@@ -11,6 +11,7 @@ Common flags (both workers)
   --lookback-minutes <N>         Look back N minutes (default: 30)
   --dry-run                      Log without writing to DB or transitioning
   --validate                     Run data quality validation after ingestion
+  --json-summary                 Output structured JSON summary to stdout
 
 Usage
 -----
@@ -19,6 +20,7 @@ Usage
     python -m touch_index [fr|bug] --lookback-minutes 60    # custom lookback window
     python -m touch_index [fr|bug] --dry-run                # dry run
     python -m touch_index [fr|bug] --validate               # validate after ingestion
+    python -m touch_index [fr|bug] --json-summary           # structured JSON output
 """
 
 from __future__ import annotations
@@ -77,6 +79,11 @@ def _run_bug_cli() -> None:
         action="store_true",
         help="Run bug data quality validation after ingestion (exits non-zero on failure)",
     )
+    parser.add_argument(
+        "--json-summary",
+        action="store_true",
+        help="Output structured JSON summary to stdout after ingestion and validation",
+    )
     args = parser.parse_args()
 
     engine = get_engine()
@@ -114,6 +121,13 @@ def _run_bug_cli() -> None:
                     logger.error("VALIDATION FAILED after single-issue ingestion")
                     raise SystemExit(1)
                 logger.info("VALIDATION PASSED after single-issue ingestion")
+        if args.json_summary:
+            _emit_json_summary(
+                args,
+                worker="bug",
+                result=result,
+                quality_report=locals().get("report"),
+            )
         return
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
@@ -129,6 +143,13 @@ def _run_bug_cli() -> None:
                 logger.error("VALIDATION FAILED\u2014 investigate existing data")
                 raise SystemExit(1)
             logger.info("VALIDATION PASSED\u2014 existing data clean")
+        if args.json_summary:
+            _emit_json_summary(
+                args,
+                worker="bug",
+                results=[],
+                quality_report=locals().get("report"),
+            )
         return
 
     results = run_bug_worker(engine, issues, dry_run=args.dry_run)
@@ -155,6 +176,15 @@ def _run_bug_cli() -> None:
         skipped,
     )
 
+    if args.json_summary:
+        _emit_json_summary(
+            args,
+            worker="bug",
+            results=results,
+            total_files=total_files,
+            skipped=skipped,
+        )
+
     if args.validate:
         report = run_bug_quality_checks(engine)
         if not report.passed:
@@ -165,6 +195,7 @@ def _run_bug_cli() -> None:
 
 def _emit_json_summary(
     args: argparse.Namespace,
+    worker: str = "bug",
     results: list[Any] | None = None,
     result: Any | None = None,
     total_files: int = 0,
@@ -173,7 +204,7 @@ def _emit_json_summary(
 ) -> None:
     """Emit a structured JSON summary of the worker run to stdout."""
     summary: dict[str, Any] = {
-        "worker": "fr",
+        "worker": worker,
         "mode": "single-issue" if args.issue_id else "polling",
         "dry_run": args.dry_run,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -277,7 +308,7 @@ def _run_fr_cli() -> None:
                 raise SystemExit(1)
             logger.info("VALIDATION PASSED after single-issue ingestion")
         if args.json_summary:
-            _emit_json_summary(args, result=result, quality_report=locals().get('report'))
+            _emit_json_summary(args, worker="fr", result=result, quality_report=locals().get('report'))
         return
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
@@ -294,7 +325,7 @@ def _run_fr_cli() -> None:
                 raise SystemExit(1)
             logger.info("VALIDATION PASSED \u2014 existing data clean")
         if args.json_summary:
-            _emit_json_summary(args, results=[], quality_report=locals().get("report"))
+            _emit_json_summary(args, worker="fr", results=[], quality_report=locals().get("report"))
         return
 
     results = run_fr_worker(engine, issues, dry_run=args.dry_run)
@@ -325,6 +356,7 @@ def _run_fr_cli() -> None:
     if args.json_summary:
         _emit_json_summary(
             args,
+            worker="fr",
             results=results,
             total_files=total_files,
             skipped=skipped,
