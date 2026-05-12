@@ -1,0 +1,9 @@
+# Replacements file for git filter-repo --replace-text / --replace-message
+# Format: {literal,regex,glob}:<needle>==><replacement>
+# See: https://htmlpreview.github.io/?https://github.com/newren/git-filter-repo/blob/docs/html/git-filter-repo.html
+
+# AWS Secret Access Key (P0 — must never appear in git history)
+literal:REDACTED_AWS_SECRET_ACCESS_KEY>REDACTED_AWS_SECRET_ACCESS_KEY
+
+# AWS Access Key ID (P1 — identifying credential, must be purged)
+literal:AKIA************DBUD==>AKIA************DBUD

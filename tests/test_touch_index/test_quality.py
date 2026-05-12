@@ -307,6 +307,7 @@ class TestCheckConsistency:
                 _make_scalar_result(0),  # null_updated
                 _make_scalar_result(0),  # unknown_source
                 _make_scalar_result(0),  # duplicates
+                _make_scalar_result(0),  # unknown_source
                 _make_scalar_result(0, rows=[("orphan-1",), ("orphan-2",)]),
             ]
         )
@@ -678,6 +679,7 @@ class TestCheckBugConsistency:
             [
                 _make_scalar_result(0),  # null_closed_at
                 _make_scalar_result(0),  # duplicates
+                _make_scalar_result(0),  # unknown_source
                 _make_scalar_result(0, rows=[]),  # DISTINCT bug_issue_ids
             ]
         )
@@ -715,6 +717,7 @@ class TestCheckBugConsistency:
             [
                 _make_scalar_result(0),  # null_closed_at
                 _make_scalar_result(3),  # duplicates
+                _make_scalar_result(0),  # unknown_source
                 _make_scalar_result(0, rows=[]),
             ]
         )
@@ -730,9 +733,10 @@ class TestCheckBugConsistency:
     def test_detects_orphans(self):
         engine = _make_engine(
             [
-                _make_scalar_result(0),
-                _make_scalar_result(0),
-                _make_scalar_result(0, rows=[("orphan-1",), ("orphan-2",)]),
+                _make_scalar_result(0),  # null_closed_at
+                _make_scalar_result(0),  # duplicates
+                _make_scalar_result(0),  # unknown_source
+                _make_scalar_result(0, rows=[("orphan-1",), ("orphan-2",)]),  # DISTINCT bug_issue_ids
             ]
         )
 
@@ -778,7 +782,8 @@ class TestRunBugQualityChecks:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[]
+                    null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    unknown_source_rows=0,
                 ),
             ),
         ):
@@ -815,7 +820,8 @@ class TestRunBugQualityChecks:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[]
+                    null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    unknown_source_rows=0,
                 ),
             ),
         ):
@@ -849,7 +855,8 @@ class TestRunBugQualityChecks:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[]
+                    null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    unknown_source_rows=0,
                 ),
             ),
         ):
@@ -883,7 +890,8 @@ class TestRunBugQualityChecks:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=3, duplicate_pairs=0, orphan_bug_issue_ids=[]
+                    null_closed_at_rows=3, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    unknown_source_rows=0,
                 ),
             ),
         ):
@@ -912,7 +920,8 @@ class TestRunBugQualityChecks:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[]
+                    null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    unknown_source_rows=0,
                 ),
             ),
         ):
@@ -1179,7 +1188,8 @@ class TestRunBugQualityChecksExtended:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[]
+                    null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    unknown_source_rows=0,
                 ),
             ),
         ):
@@ -1249,7 +1259,8 @@ class TestRunBugQualityChecksExtended:
             patch(
                 "touch_index.quality.check_bug_consistency",
                 return_value=BugConsistencyReport(
-                    null_closed_at_rows=0, duplicate_pairs=3, orphan_bug_issue_ids=[]
+                    null_closed_at_rows=0, duplicate_pairs=3, orphan_bug_issue_ids=[],
+                    unknown_source_rows=0,
                 ),
             ),
         ):
@@ -1374,7 +1385,8 @@ class TestReportToDict:
 
     def test_bug_consistency_report_to_dict(self):
         r = BugConsistencyReport(
-            null_closed_at_rows=0, duplicate_pairs=2, orphan_bug_issue_ids=[]
+            null_closed_at_rows=0, duplicate_pairs=2, orphan_bug_issue_ids=[],
+                    unknown_source_rows=0,
         )
         d = r.to_dict()
         assert d["duplicate_pairs"] == 2
@@ -1480,7 +1492,8 @@ class TestReportToDictExtended:
 
     def test_bug_quality_report_consistency_branch(self):
         cons = BugConsistencyReport(
-            null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[]
+            null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[],
+                    unknown_source_rows=0,
         )
         r = BugQualityReport(
             coverage=None, freshness=None, consistency=cons, passed=True

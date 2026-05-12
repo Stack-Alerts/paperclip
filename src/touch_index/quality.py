@@ -343,6 +343,7 @@ class BugFreshnessReport:
 class BugConsistencyReport:
     null_closed_at_rows: int
     duplicate_pairs: int
+    unknown_source_rows: int
     orphan_bug_issue_ids: list[str]
 
     def to_dict(self) -> dict:
@@ -454,7 +455,7 @@ def compute_bug_freshness(
 
 
 def check_bug_consistency(engine: Engine) -> BugConsistencyReport:
-    """Check for orphan rows, null closed_at, and duplicates in touch_index_bug_files."""
+    """Check for orphan rows, null closed_at, duplicates, and unknown source in touch_index_bug_files."""
     with engine.connect() as conn:
         null_closed = (
             conn.execute(
@@ -479,6 +480,15 @@ def check_bug_consistency(engine: Engine) -> BugConsistencyReport:
             or 0
         )
 
+        unknown_source = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_bug_files WHERE source = 'unknown'"
+                )
+            ).scalar()
+            or 0
+        )
+
         orphan_rows = conn.execute(
             text("SELECT DISTINCT bug_issue_id FROM touch_index_bug_files")
         ).fetchall()
@@ -498,6 +508,7 @@ def check_bug_consistency(engine: Engine) -> BugConsistencyReport:
     return BugConsistencyReport(
         null_closed_at_rows=null_closed,
         duplicate_pairs=dups,
+        unknown_source_rows=unknown_source,
         orphan_bug_issue_ids=orphan_ids,
     )
 
