@@ -22,9 +22,9 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 def main() -> None:
     """Set up environment and delegate to the unified Blast Radius CLI."""
-    from blast_radius.worker import main as worker_main
+    from blast_radius.__main__ import main as cli_main
 
-    worker_main()
+    sys.exit(cli_main())
 
 
 if __name__ == "__main__":

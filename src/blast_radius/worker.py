@@ -373,15 +373,17 @@ def run_loop(
         time.sleep(interval_seconds)
 
 
-def main() -> None:
+def main() -> int:
     """CLI entry point: delegate to blast_radius.__main__.main() (unified CLI).
+
+    Returns the exit code from the unified CLI.
 
     .. deprecated:: Use python -m blast_radius or python -m blast_radius worker
        instead of calling this function directly.
     """
     from .__main__ import main as _main
 
-    _main()
+    return _main()
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
