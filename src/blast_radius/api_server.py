@@ -182,7 +182,21 @@ class _Handler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------
 
     def _handle_fr_webhook(self):
-        """Handle POST /api/webhook/fr-issue-event (FR issue created/updated)."""
+        """Handle POST /api/webhook/fr-issue-event (FR issue created/updated).
+
+        Expects JSON body:
+        {
+            "event": "issue_created",
+            "issue": {"id": "<uuid>", ...},
+            "dry_run": false,
+            "validate": false
+        }
+
+        Transitions the issue to done after successful ingestion
+        unless dry_run is true.  If validate is true, runs
+        FR data quality checks after ingestion and includes the result
+        in the response.
+        """
         body = self._read_body()
         if body is None:
             self._send_json(400, {"error": "invalid or empty JSON body"})
@@ -195,13 +209,17 @@ class _Handler(BaseHTTPRequestHandler):
 
         event_type = body.get("event", "unknown")
         dry_run = body.get("dry_run", False)
+        validate = body.get("validate", False)
 
         log.info(
-            "FR webhook: %s for issue %s (dry_run=%s)", event_type, issue_id, dry_run,
+            "FR webhook: %s for issue %s (dry_run=%s, validate=%s)",
+            event_type, issue_id, dry_run, validate,
         )
 
         try:
             from touch_index.fr_worker import process_fr_issue
+            from touch_index.paperclip_client import transition_issue_status
+            from touch_index.quality import run_quality_checks
 
             engine = _get_fr_engine()
             result = process_fr_issue(engine, issue_id, dry_run=bool(dry_run))
@@ -212,12 +230,39 @@ class _Handler(BaseHTTPRequestHandler):
                     "reason": "not an FDR-labelled issue or not found",
                 })
                 return
-            self._send_json(200, {
+
+            transitioned = False
+            if not dry_run:
+                try:
+                    transition_issue_status(result.issue_id, "done")
+                    transitioned = True
+                    log.info("FR webhook: marked %s as done", result.issue_identifier)
+                except Exception as exc:
+                    log.error("FR webhook: failed to mark %s as done: %s", result.issue_identifier, exc)
+
+            validation_passed: bool | None = None
+            if validate:
+                try:
+                    report = run_quality_checks(engine)
+                    validation_passed = report.passed
+                    if not report.passed:
+                        log.error("FR webhook: VALIDATION FAILED after ingestion for %s", result.issue_identifier)
+                    else:
+                        log.info("FR webhook: VALIDATION PASSED for %s", result.issue_identifier)
+                except Exception as exc:
+                    log.error("FR webhook: validation error for %s: %s", result.issue_identifier, exc)
+                    validation_passed = False
+
+            response: dict[str, Any] = {
                 "issue": result.issue_identifier,
                 "files_indexed": result.files_indexed,
                 "source": result.source,
                 "skipped_no_commits": result.skipped_no_commits,
-            })
+                "transitioned_to_done": transitioned,
+            }
+            if validation_passed is not None:
+                response["validation_passed"] = validation_passed
+            self._send_json(200, response)
         except Exception as exc:
             log.error("FR webhook processing failed for %s: %s", issue_id, exc)
             self._send_json(500, {"error": str(exc), "issue": issue_id})
