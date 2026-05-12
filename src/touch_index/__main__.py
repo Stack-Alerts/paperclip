@@ -120,6 +120,13 @@ def _run_bug_cli() -> None:
                 report = run_bug_quality_checks(engine)
                 if not report.passed:
                     logger.error("VALIDATION FAILED after single-issue ingestion")
+                    if args.json_summary:
+                        _emit_json_summary(
+                            args,
+                            worker="bug",
+                            result=result,
+                            quality_report=report,
+                        )
                     raise SystemExit(1)
                 logger.info("VALIDATION PASSED after single-issue ingestion")
         if args.json_summary:
@@ -181,6 +188,15 @@ def _run_bug_cli() -> None:
         report = run_bug_quality_checks(engine)
         if not report.passed:
             logger.error("VALIDATION FAILED after ingestion — investigate")
+            if args.json_summary:
+                _emit_json_summary(
+                    args,
+                    worker="bug",
+                    results=results,
+                    total_files=total_files,
+                    skipped=skipped,
+                    quality_report=report,
+                )
             raise SystemExit(1)
         logger.info("VALIDATION PASSED: all bug quality checks clean")
 
@@ -307,6 +323,8 @@ def _run_fr_cli() -> None:
             report = run_quality_checks(engine)
             if not report.passed:
                 logger.error("VALIDATION FAILED after single-issue ingestion")
+                if args.json_summary:
+                    _emit_json_summary(args, worker="fr", result=result, quality_report=report)
                 raise SystemExit(1)
             logger.info("VALIDATION PASSED after single-issue ingestion")
         if args.json_summary:
@@ -359,6 +377,15 @@ def _run_fr_cli() -> None:
         report = run_quality_checks(engine)
         if not report.passed:
             logger.error("VALIDATION FAILED after ingestion \u2014 investigate")
+            if args.json_summary:
+                _emit_json_summary(
+                    args,
+                    worker="fr",
+                    results=results,
+                    total_files=total_files,
+                    skipped=skipped,
+                    quality_report=report,
+                )
             raise SystemExit(1)
         logger.info("VALIDATION PASSED: all quality checks clean")
 

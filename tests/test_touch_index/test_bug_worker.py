@@ -1470,3 +1470,93 @@ class TestBugJsonSummary:
         assert data["mode"] == "polling"
         assert data["quality"]["passed"] is True
         assert data["issues_processed"] == 0
+
+    def test_json_summary_with_validate_polling_failed(self, monkeypatch, capsys):
+        """--json-summary --validate in polling mode emits JSON even on failure."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+        results = [
+            BugIngestionResult(
+                issue_identifier="BTCAAAAA-101",
+                issue_id="id-1",
+                files_indexed=2,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
+
+        qc = MagicMock()
+        qc.passed = False
+        qc.to_dict.return_value = {"passed": False}
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues", return_value=issues),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=results),
+            patch("touch_index.quality.run_bug_quality_checks", return_value=qc),
+            patch("touch_index.paperclip_client.transition_issue_status"),
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--json-summary", "--validate"],
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        import json
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "bug"
+        assert data["mode"] == "polling"
+        assert data["quality"]["passed"] is False
+        assert data["issues_processed"] == 1
+        assert data["total_files_indexed"] == 2
+
+    def test_json_summary_with_validate_issue_id_failed(self, monkeypatch, capsys):
+        """--json-summary --issue-id --validate emits JSON even on failure."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        result = BugIngestionResult(
+            issue_identifier="BTCAAAAA-100",
+            issue_id="uuid-1",
+            files_indexed=2,
+            source="git",
+            skipped_no_commits=False,
+        )
+
+        qc = MagicMock()
+        qc.passed = False
+        qc.to_dict.return_value = {"passed": False}
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.bug_worker.process_bug_issue", return_value=result) as mock_process,
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch("touch_index.quality.run_bug_quality_checks", return_value=qc),
+            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "uuid-1", "--json-summary", "--validate"],
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_fetch.assert_not_called()
+        mock_transition.assert_called_once_with("uuid-1", "done")
+        captured = capsys.readouterr()
+        import json
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "bug"
+        assert data["mode"] == "single-issue"
+        assert data["quality"]["passed"] is False
+        assert data["result"]["files_indexed"] == 2

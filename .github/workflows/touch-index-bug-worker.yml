@@ -61,14 +61,15 @@ jobs:
 
       - name: Run bug ingestion worker
         run: |
+          FLAGS="--json-summary"
           ISSUE_ID="${{ steps.resolve-issue.outputs.issue_id }}"
           if [ -n "$ISSUE_ID" ]; then
-            python scripts/run_touch_index_bug_worker.py --issue-id "$ISSUE_ID"
+            python scripts/run_touch_index_bug_worker.py --issue-id "$ISSUE_ID" $FLAGS
           elif [ -n "${{ github.event.inputs.lookback_minutes }}" ]; then
             python scripts/run_touch_index_bug_worker.py \
-              --lookback-minutes ${{ github.event.inputs.lookback_minutes }} --validate
+              --lookback-minutes ${{ github.event.inputs.lookback_minutes }} --validate $FLAGS
           else
-            python scripts/run_touch_index_bug_worker.py --validate
+            python scripts/run_touch_index_bug_worker.py --validate $FLAGS
           fi
 
       - name: Validate bug data quality
