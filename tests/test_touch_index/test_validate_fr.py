@@ -94,3 +94,11 @@ class TestValidateFR:
             from validate_touch_index_fr import main
             main()
         assert True
+
+    def test_accepts_pre_configured_engine(self):
+        """When an engine is passed directly, it is used instead of creating a new one."""
+        engine = _mock_engine()  # already configured mock engine
+        result = _run_checks(stale_hours=168, engine=engine)
+        assert result == 0
+        # The engine.connect should have been called (not get_engine)
+        engine.connect.assert_called_once()

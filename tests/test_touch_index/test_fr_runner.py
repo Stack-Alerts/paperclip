@@ -386,3 +386,123 @@ class TestFrRunnerIssueId:
         mock_fetch.assert_not_called()
         assert any("2 files indexed" in r.message for r in caplog.records)
         assert any("via git" in r.message for r in caplog.records)
+
+# ---------------------------------------------------------------------------
+# --validate flag
+# ---------------------------------------------------------------------------
+
+
+class TestFrRunnerValidate:
+    def test_validate_calls_validation_after_ingestion(self, monkeypatch, caplog):
+        """When --validate is passed, validation is called after ingestion."""
+        import logging
+
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_fr_worker.py", "--validate"]
+        )
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "description": ""},
+        ]
+        results = [_make_result(files_indexed=2, skipped=False)]
+        engine = _make_engine()
+
+        with (
+            patch("run_touch_index_fr_worker.get_engine", return_value=engine),
+            patch("run_touch_index_fr_worker.health_check", return_value=True),
+            patch("run_touch_index_fr_worker.get_fdr_issues", return_value=issues),
+            patch("run_touch_index_fr_worker.run_fr_worker", return_value=results),
+            patch("run_touch_index_fr_worker.transition_issue_status"),
+            patch("run_touch_index_fr_worker._run_validation", return_value=0) as mock_val,
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        mock_val.assert_called_once_with(engine)
+        assert any("VALIDATION PASSED" in r.message for r in caplog.records)
+
+    def test_validate_failure_exits_nonzero(self, monkeypatch):
+        """When validation fails, sys.exit(1) is called."""
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_fr_worker.py", "--validate"]
+        )
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "description": ""},
+        ]
+        results = [_make_result(files_indexed=2, skipped=False)]
+        engine = _make_engine()
+
+        with (
+            patch("run_touch_index_fr_worker.get_engine", return_value=engine),
+            patch("run_touch_index_fr_worker.health_check", return_value=True),
+            patch("run_touch_index_fr_worker.get_fdr_issues", return_value=issues),
+            patch("run_touch_index_fr_worker.run_fr_worker", return_value=results),
+            patch("run_touch_index_fr_worker.transition_issue_status"),
+            patch("run_touch_index_fr_worker._run_validation", return_value=2),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+
+    def test_validate_with_no_issues_still_runs_validation(self, monkeypatch, caplog):
+        """When no issues found, validation is still run if --validate is passed."""
+        import logging
+
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_fr_worker.py", "--validate"]
+        )
+        engine = _make_engine()
+
+        with (
+            patch("run_touch_index_fr_worker.get_engine", return_value=engine),
+            patch("run_touch_index_fr_worker.health_check", return_value=True),
+            patch("run_touch_index_fr_worker.get_fdr_issues", return_value=[]),
+            patch("run_touch_index_fr_worker.run_fr_worker") as mock_worker,
+            patch("run_touch_index_fr_worker._run_validation", return_value=0) as mock_val,
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        mock_worker.assert_not_called()
+        mock_val.assert_called_once_with(engine)
+        assert any("Running validation" in r.message for r in caplog.records)
+
+    def test_validate_with_no_issues_failure_exits(self, monkeypatch):
+        """When no issues found and validation fails, sys.exit(1) is called."""
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_fr_worker.py", "--validate"]
+        )
+        engine = _make_engine()
+
+        with (
+            patch("run_touch_index_fr_worker.get_engine", return_value=engine),
+            patch("run_touch_index_fr_worker.health_check", return_value=True),
+            patch("run_touch_index_fr_worker.get_fdr_issues", return_value=[]),
+            patch("run_touch_index_fr_worker.run_fr_worker"),
+            patch("run_touch_index_fr_worker._run_validation", return_value=3),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+
+    def test_validate_not_called_without_flag(self, monkeypatch):
+        """Without --validate, validation is not called."""
+        monkeypatch.setattr(sys, "argv", ["run_touch_index_fr_worker.py"])
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "description": ""},
+        ]
+        results = [_make_result(files_indexed=2, skipped=False)]
+        engine = _make_engine()
+
+        with (
+            patch("run_touch_index_fr_worker.get_engine", return_value=engine),
+            patch("run_touch_index_fr_worker.health_check", return_value=True),
+            patch("run_touch_index_fr_worker.get_fdr_issues", return_value=issues),
+            patch("run_touch_index_fr_worker.run_fr_worker", return_value=results),
+            patch("run_touch_index_fr_worker.transition_issue_status"),
+            patch("run_touch_index_fr_worker._run_validation") as mock_val,
+        ):
+            main()
+
+        mock_val.assert_not_called()

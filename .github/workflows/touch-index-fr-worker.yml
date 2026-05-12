@@ -66,7 +66,12 @@ jobs:
             python scripts/run_touch_index_fr_worker.py --issue-id "$ISSUE_ID"
           elif [ -n "${{ github.event.inputs.lookback_minutes }}" ]; then
             python scripts/run_touch_index_fr_worker.py \
-              --lookback-minutes ${{ github.event.inputs.lookback_minutes }}
+              --lookback-minutes ${{ github.event.inputs.lookback_minutes }} --validate
           else
-            python scripts/run_touch_index_fr_worker.py
+            python scripts/run_touch_index_fr_worker.py --validate
           fi
+
+      - name: Validate FR data quality
+        if: always()
+        run: |
+          python scripts/validate_touch_index_fr.py --stale-hours 168

@@ -15,7 +15,7 @@ Watermark strategy: the 30-minute look-back window with idempotent upsert
 means we can re-process safely without state tracking.
 
 Usage:
-    python scripts/run_touch_index_fr_worker.py [--lookback-minutes N] [--dry-run]
+    python scripts/run_touch_index_fr_worker.py [--lookback-minutes N] [--dry-run] [--validate]
     python scripts/run_touch_index_fr_worker.py --issue-id <uuid> [--dry-run]
 """
 
@@ -44,6 +44,13 @@ logging.basicConfig(
 logger = logging.getLogger("touch_index.fr_worker_runner")
 
 
+def _run_validation(engine) -> int:
+    """Run FR data quality validation. Returns number of failures (0 = clean)."""
+    from validate_touch_index_fr import _run_checks
+
+    return _run_checks(stale_hours=168, engine=engine)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="FR Touch Index polling worker")
     parser.add_argument(
@@ -62,6 +69,11 @@ def main() -> None:
         "--dry-run",
         action="store_true",
         help="Log what would be ingested without writing to DB or transitioning issues",
+    )
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run FR data quality validation after ingestion (exits non-zero on failure)",
     )
     args = parser.parse_args()
 
@@ -93,6 +105,12 @@ def main() -> None:
 
     if not issues:
         logger.info("Nothing to do")
+        if args.validate:
+            logger.info("Running validation on empty ingestion window…")
+            failures = _run_validation(engine)
+            if failures:
+                logger.error("VALIDATION FAILED: %d check(s) — investigate", failures)
+                sys.exit(1)
         return
 
     results = run_fr_worker(engine, issues, dry_run=args.dry_run)
@@ -124,6 +142,14 @@ def main() -> None:
         total_files,
         skipped,
     )
+
+    if args.validate:
+        logger.info("Running FR data quality validation after ingestion…")
+        failures = _run_validation(engine)
+        if failures:
+            logger.error("VALIDATION FAILED: %d check(s) — investigate", failures)
+            sys.exit(1)
+        logger.info("VALIDATION PASSED: all checks clean")
 
 
 if __name__ == "__main__":
