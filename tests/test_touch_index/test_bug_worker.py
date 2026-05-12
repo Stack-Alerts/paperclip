@@ -1264,6 +1264,39 @@ class TestMainProcessBugIssueError:
 
 
 
+    def test_process_error_emits_json_summary(self, monkeypatch, capsys):
+        """process_bug_issue error with --json-summary emits JSON before SystemExit."""
+        import json
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.bug_worker.process_bug_issue",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "uuid-1", "--json-summary"],
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_fetch.assert_not_called()
+        mock_transition.assert_not_called()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "bug"
+        assert data["mode"] == "single-issue"
+        assert data["dry_run"] is False
+
 class TestBugWorkerMain:
     """Tests for bug_worker.main() delegation function."""
 

@@ -1283,6 +1283,39 @@ class TestMainProcessFrIssueError:
     # --json-summary with --validate (quality_report coverage)
     # -------------------------------------------------------------------
 
+    def test_process_error_emits_json_summary(self, monkeypatch, capsys):
+        """process_fr_issue error with --json-summary emits JSON before SystemExit."""
+        import json
+        from touch_index.__main__ import _run_fr_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.fr_worker.process_fr_issue",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
+            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "uuid-1", "--json-summary"],
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_fetch.assert_not_called()
+        mock_transition.assert_not_called()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "fr"
+        assert data["mode"] == "single-issue"
+        assert data["dry_run"] is False
+
     def test_main_json_summary_with_validate_single_issue(self, monkeypatch, capsys):
         """--json-summary with --validate --issue-id includes quality in JSON."""
         import json
