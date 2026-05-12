@@ -97,34 +97,32 @@ jobs:
 
       - name: Write step summary
         if: always()
-        env:
-          PYTHONPATH: src
         run: |
           if [ -f /tmp/scan-output.json ]; then
-            python3 -c "
-              import json
-              with open('/tmp/scan-output.json') as f:
-                  data = json.load(f)
-              total = data.get('total_done_fix_issues', 0)
-              gated = data.get('gated', {})
-              ungated = data.get('ungated_count', 0)
-              retro = data.get('retroactive_results', [])
-              retro_ok = sum(1 for r in retro if r.get('gate_status') == 'PASS')
-              retro_fail = sum(1 for r in retro if r.get('gate_status') in ('FAIL', 'ERROR'))
-              print(f'## Impact Gate Scan-Done Summary')
-              print(f'')
-              print(f'| Metric | Value |')
-              print(f'|---|---|')
-              print(f'| Total done fix issues | {total} |')
-              print(f'| Gated — PASS | {gated.get(\"pass\", 0)} |')
-              print(f'| Gated — FAIL | {gated.get(\"fail\", 0)} |')
-              print(f'| Gated — BYPASSED | {gated.get(\"bypassed\", 0)} |')
-              print(f'| Gated — ERROR | {gated.get(\"error\", 0)} |')
-              print(f'| Gated — SKIPPED | {gated.get(\"skipped\", 0)} |')
-              print(f'| Retroactively gated — PASS | {retro_ok} |')
-              print(f'| Retroactively gated — FAIL | {retro_fail} |')
-              print(f'| Ungated (remaining) | {ungated} |')
-            " >> $GITHUB_STEP_SUMMARY
+            python3 >> $GITHUB_STEP_SUMMARY << 'PYEOF'
+          import json
+          with open('/tmp/scan-output.json') as f:
+              data = json.load(f)
+          total = data.get('total_done_fix_issues', 0)
+          gated = data.get('gated', {})
+          ungated = data.get('ungated_count', 0)
+          retro = data.get('retroactive_results', [])
+          retro_ok = sum(1 for r in retro if r.get('gate_status') == 'PASS')
+          retro_fail = sum(1 for r in retro if r.get('gate_status') in ('FAIL', 'ERROR'))
+          print(f'## Impact Gate Scan-Done Summary')
+          print(f'')
+          print(f'| Metric | Value |')
+          print(f'|---|---|')
+          print(f'| Total done fix issues | {total} |')
+          print(f'| Gated — PASS | {gated.get("pass", 0)} |')
+          print(f'| Gated — FAIL | {gated.get("fail", 0)} |')
+          print(f'| Gated — BYPASSED | {gated.get("bypassed", 0)} |')
+          print(f'| Gated — ERROR | {gated.get("error", 0)} |')
+          print(f'| Gated — SKIPPED | {gated.get("skipped", 0)} |')
+          print(f'| Retroactively gated — PASS | {retro_ok} |')
+          print(f'| Retroactively gated — FAIL | {retro_fail} |')
+          print(f'| Ungated (remaining) | {ungated} |')
+          PYEOF
           fi
 
       - name: Create alert on ungated issues
