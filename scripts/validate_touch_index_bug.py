@@ -1,10 +1,7 @@
 """Touch Index Bug data quality validation — run after ingestion.
 
-Checks:
-  1. No duplicate (file_path, bug_issue_id) pairs (UNIQUE constraint enforcement).
-  2. Rows with NULL closed_at (informational — acceptable if issue completedAt missing).
-  3. No stale rows: closed_at older than N days.
-  4. Total row count and distinct bug issue count.
+Delegates to ``touch_index.quality.run_bug_quality_checks`` for all checks:
+coverage, freshness, and consistency.
 
 Usage:
     python scripts/validate_touch_index_bug.py [--stale-days 30]
@@ -15,7 +12,6 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -28,8 +24,8 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from sqlalchemy import text
 from touch_index.db import get_engine, health_check
+from touch_index.quality import run_bug_quality_checks
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,117 +35,29 @@ logger = logging.getLogger("touch_index.validate_bug")
 
 
 def _run_checks(stale_days: int, engine: Engine | None = None) -> int:
-    """Run all validation checks. Returns number of failures (0 = clean).
+    """Run all validation checks via quality.run_bug_quality_checks.
+
+    Returns number of failures (0 = clean).
 
     Args:
-        stale_days: Alert if closed_at is older than this many days.
+        stale_days: Alert threshold for stale rows in days.
         engine: Optional pre-configured SQLAlchemy engine. If not provided,
                 a new engine is created from environment variables.
     """
-    failures = 0
-
     if engine is None:
         engine = get_engine()
         if not health_check(engine):
             logger.error("DB health check failed — aborting")
             sys.exit(1)
 
-    with engine.connect() as conn:
-        # 1. Duplicate check
-        dup_count = (
-            conn.execute(
-                text("""
-                SELECT COUNT(*) FROM (
-                    SELECT file_path, bug_issue_id, COUNT(*)
-                    FROM touch_index_bug_files
-                    GROUP BY file_path, bug_issue_id
-                    HAVING COUNT(*) > 1
-                ) dups
-            """)
-            ).scalar()
-            or 0
-        )
-        if dup_count:
-            logger.warning(
-                "CHECK FAILED: %d duplicate (file_path, bug_issue_id) pairs", dup_count
-            )
-            failures += 1
-        else:
-            logger.info("CHECK PASSED: no duplicate (file_path, bug_issue_id) pairs")
+    report = run_bug_quality_checks(engine, stale_threshold_days=stale_days)
 
-        # 2. Null closed_at check (warn only — closed_at is nullable per schema)
-        null_closed = (
-            conn.execute(
-                text(
-                    "SELECT COUNT(*) FROM touch_index_bug_files WHERE closed_at IS NULL"
-                )
-            ).scalar()
-            or 0
-        )
-        if null_closed:
-            logger.info(
-                "CHECK NOTE: %d rows with NULL closed_at (acceptable if issue completedAt is missing)",
-                null_closed,
-            )
+    if not report.passed:
+        logger.error("VALIDATION COMPLETE: checks FAILED — investigate")
+        return 1
 
-        # 3. Unknown source check (warn only — source should be 'git', 'comments', or 'description')
-        unknown_source = (
-            conn.execute(
-                text(
-                    "SELECT COUNT(*) FROM touch_index_bug_files WHERE source = 'unknown'"
-                )
-            ).scalar()
-            or 0
-        )
-        if unknown_source:
-            logger.warning(
-                "CHECK WARN: %d rows with source='unknown' — these may need investigation",
-                unknown_source,
-            )
-
-        # 4. Stale rows (closed_at older than N days, or NULL with old bug_identifier)
-        cutoff = datetime.now(timezone.utc) - timedelta(days=stale_days)
-        stale_count = (
-            conn.execute(
-                text(
-                    "SELECT COUNT(*) FROM touch_index_bug_files "
-                    "WHERE closed_at IS NOT NULL AND closed_at < :cutoff"
-                ),
-                {"cutoff": cutoff},
-            ).scalar()
-            or 0
-        )
-        if stale_count:
-            logger.warning(
-                "CHECK WARN: %d rows with closed_at older than %d days",
-                stale_count,
-                stale_days,
-            )
-        else:
-            logger.info("CHECK PASSED: no stale rows (>%d days)", stale_days)
-
-        # 5. Total row count
-        total = (
-            conn.execute(text("SELECT COUNT(*) FROM touch_index_bug_files")).scalar()
-            or 0
-        )
-        logger.info("Total rows in touch_index_bug_files: %d", total)
-
-        # 6. Bug issue count
-        bug_count = (
-            conn.execute(
-                text("SELECT COUNT(DISTINCT bug_issue_id) FROM touch_index_bug_files")
-            ).scalar()
-            or 0
-        )
-        logger.info("Distinct bug issues indexed: %d", bug_count)
-
-    if failures:
-        logger.error("VALIDATION COMPLETE: %d check(s) FAILED — investigate", failures)
-    else:
-        logger.info("VALIDATION COMPLETE: all checks PASSED")
-
-    return failures
+    logger.info("VALIDATION COMPLETE: all checks PASSED")
+    return 0
 
 
 def main() -> None:
