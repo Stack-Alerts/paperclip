@@ -292,29 +292,59 @@ def main():
     blocked = [(f, lp, r) for f, lp, r in unique_hits if lp not in excepted_modules]
 
     if not blocked:
-        if unique_hits:
-            print("lock-gate: all touched locked paths have exceptions. Gate passed.")
+        if "--json-summary" in sys.argv:
+            import json as _json
+            _summary = {
+                "gate": "passed",
+                "blocked": [],
+                "raw_output": (
+                    "lock-gate: all touched locked paths have exceptions. Gate passed."
+                    if unique_hits
+                    else "lock-gate: no locked paths touched. Gate passed."
+                ),
+            }
+            _json.dump(_summary, sys.stdout)
+            sys.stdout.write("\n")
         else:
-            print("lock-gate: no locked paths touched. Gate passed.")
+            if unique_hits:
+                print("lock-gate: all touched locked paths have exceptions. Gate passed.")
+            else:
+                print("lock-gate: no locked paths touched. Gate passed.")
         sys.exit(0)
 
-    print("=" * 72)
-    print("LOCK GATE BLOCKED - locked modules touched without exception")
-    print("=" * 72)
-    for file_path, locked_path, reason in blocked:
-        print(f"\n  File:    {file_path}")
-        print(f"  Locked:  {locked_path}")
-        print(f"  Reason:  {reason}")
-    print()
-    print("To proceed:")
-    print("  1. Determine the correct unlock path:")
-    print("     Path A (planned, board-approved)  — file issue, get board approval")
-    print("     Path B.1 (CEO emergency)          — CEO approval, max 4h window")
-    print("     Path B.2 (board emergency)        — board approval, max 4h window")
-    print("  2. Add an entry to lock_gate_exceptions.json")
-    print("  3. Re-run the CI pipeline")
-    print("  See docs/runbook-module-lock.md for full procedure.")
-    print("=" * 72)
+    if "--json-summary" in sys.argv:
+        import json as _json
+        _summary = {
+            "gate": "blocked",
+            "pr_number": os.environ.get("GITHUB_PR_NUMBER", os.environ.get("GH_PR_NUMBER", "")),
+            "commit_sha": os.environ.get("GITHUB_SHA", ""),
+            "pr_url": os.environ.get("GITHUB_PR_URL", ""),
+            "blocked": [
+                {"file_path": f, "locked_path": lp, "reason": r}
+                for f, lp, r in blocked
+            ],
+            "raw_output": "LOCK GATE BLOCKED - locked modules touched without exception",
+        }
+        _json.dump(_summary, sys.stdout)
+        sys.stdout.write("\n")
+    else:
+        print("=" * 72)
+        print("LOCK GATE BLOCKED - locked modules touched without exception")
+        print("=" * 72)
+        for file_path, locked_path, reason in blocked:
+            print(f"\n  File:    {file_path}")
+            print(f"  Locked:  {locked_path}")
+            print(f"  Reason:  {reason}")
+        print()
+        print("To proceed:")
+        print("  1. Determine the correct unlock path:")
+        print("     Path A (planned, board-approved)  — file issue, get board approval")
+        print("     Path B.1 (CEO emergency)          — CEO approval, max 4h window")
+        print("     Path B.2 (board emergency)        — board approval, max 4h window")
+        print("  2. Add an entry to lock_gate_exceptions.json")
+        print("  3. Re-run the CI pipeline")
+        print("  See docs/runbook-module-lock.md for full procedure.")
+        print("=" * 72)
     sys.exit(1)
 
 

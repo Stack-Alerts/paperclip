@@ -65,18 +65,15 @@ python scripts/lock_gate.py --validate-exceptions
 - `.github/ISSUE_TEMPLATE/qa-locked-module-exception.md` — Exception request template
 - `.github/CODEOWNERS` — CEO + board approval requirement for exceptions file
 
-## Automated Exception Sign-Off
+## Auto-Create CTO Sign-Off on Gate Block
 
-When the board or CEO approves an exception on a Paperclip issue, RepoSteward
-triggers the **Lock Exception Sign-Off** webhook (`.github/workflows/lock-exception-signoff.yml`),
-which automatically adds the entry to `lock_gate_exceptions.json`, commits and
-pushes the change, and transitions the issue to `done`.
+When the lock gate blocks a PR, the CI workflow (`.github/workflows/lock-gate.yml`)
+automatically creates a `high`-priority Paperclip issue requesting CTO sign-off.
+The issue includes the blocked module details, PR link, and a deduplication key
+to prevent duplicates on force-push. See `docs/runbook-module-lock.md` for details.
 
-Manual entry via `lock_gate_exceptions.json` is still supported for out-of-band
-approvals (see `docs/runbook-module-lock.md`).
+## Nightly CI Test Alert
 
-## Nightly Alert
-
-A scheduled workflow (`.github/workflows/lock-gate-nightly-alert.yml`) runs
-nightly at 03:00 UTC and creates a Paperclip alert issue if there are expired
-exceptions, upcoming expirations (within 24h), or schema validation errors.
+`.github/workflows/test.yml` runs nightly at 04:00 UTC. On failure, a
+`critical`-priority Paperclip issue is created and assigned to the CTO with
+the CI run URL and test output. On success, no issue is created.
