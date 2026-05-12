@@ -1056,6 +1056,28 @@ class TestMain:
 
         mock_quality.assert_called_once()
         assert any("VALIDATION PASSED" in r.message for r in caplog.records)
+    def test_main_json_summary_issue_id_not_found(self, monkeypatch, capsys):
+        """--json-summary --issue-id with no match outputs JSON without result field."""
+        import json
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.fr_worker.process_fr_issue", return_value=None),
+            patch("touch_index.paperclip_client.get_fdr_issues"),
+            patch("touch_index.paperclip_client.transition_issue_status"),
+        ):
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--issue-id", "missing", "--json-summary"]
+            )
+            main()
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "fr"
+        assert data["mode"] == "single-issue"
+        assert "result" not in data
     def test_main_summary_counts_files_and_skipped(self, monkeypatch, caplog):
         """Log summary reflects total files indexed and skipped count."""
         import logging

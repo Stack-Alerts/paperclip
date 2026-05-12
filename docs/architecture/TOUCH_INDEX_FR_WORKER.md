@@ -118,6 +118,10 @@ python scripts/run_touch_index_fr_worker.py --validate
 # Via the package CLI
 python -m touch_index fr
 python -m touch_index fr --issue-id <uuid> --dry-run
+
+# JSON summary output
+python -m touch_index fr --json-summary
+python -m touch_index fr --issue-id <uuid> --json-summary
 ```
 
 ### Flags
@@ -128,6 +132,7 @@ python -m touch_index fr --issue-id <uuid> --dry-run
 | `--lookback-minutes <N>` | Process FDR issues updated within N minutes (default: 30) |
 | `--dry-run` | Log what would be ingested without writing to DB or transitioning issues |
 | `--validate` | Run FR data quality validation after ingestion (exits non-zero on failure) |
+| `--json-summary` | Output structured JSON summary to stdout (includes per-issue result, quality report, and run metadata) |
 
 ## Data Quality & SLAs
 
