@@ -148,9 +148,16 @@ def _run_bug_cli() -> None:
         if args.validate:
             report = run_bug_quality_checks(engine)
             if not report.passed:
-                logger.error("VALIDATION FAILED\u2014 investigate existing data")
+                logger.error("VALIDATION FAILED— investigate existing data")
+                if args.json_summary:
+                    _emit_json_summary(
+                        args,
+                        worker="bug",
+                        results=[],
+                        quality_report=report,
+                    )
                 raise SystemExit(1)
-            logger.info("VALIDATION PASSED\u2014 existing data clean")
+            logger.info("VALIDATION PASSED— existing data clean")
         if args.json_summary:
             _emit_json_summary(
                 args,
@@ -342,6 +349,8 @@ def _run_fr_cli() -> None:
             report = run_quality_checks(engine)
             if not report.passed:
                 logger.error("VALIDATION FAILED \u2014 investigate existing data")
+                if args.json_summary:
+                    _emit_json_summary(args, worker="fr", results=[], quality_report=report)
                 raise SystemExit(1)
             logger.info("VALIDATION PASSED \u2014 existing data clean")
         if args.json_summary:
