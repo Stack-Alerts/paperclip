@@ -33,12 +33,13 @@ logger = logging.getLogger(__name__)
 
 _UPSERT_SQL = text("""
     INSERT INTO touch_index_bug_files
-        (id, file_path, bug_issue_id, bug_identifier, closed_at)
+        (id, file_path, bug_issue_id, bug_identifier, closed_at, source)
     VALUES
-        (:id, :file_path, :bug_issue_id, :bug_identifier, :closed_at)
+        (:id, :file_path, :bug_issue_id, :bug_identifier, :closed_at, :source)
     ON CONFLICT (file_path, bug_issue_id)
     DO UPDATE SET
-        closed_at = COALESCE(EXCLUDED.closed_at, touch_index_bug_files.closed_at)
+        closed_at = COALESCE(EXCLUDED.closed_at, touch_index_bug_files.closed_at),
+        source    = EXCLUDED.source
 """)
 
 
@@ -86,6 +87,7 @@ def ingest_bug_issue(
             "bug_issue_id": issue_id,
             "bug_identifier": issue_identifier,
             "closed_at": completed_at,
+            "source": source,
         }
         for f in files
     ]

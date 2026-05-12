@@ -521,6 +521,7 @@ with engine.connect() as conn:
 | bug_issue_id | UUID | NO | Paperclip issue UUID for the bug |
 | bug_identifier | TEXT | NO | Human-readable issue identifier (e.g. 'BTCAAAAA-1202') |
 | closed_at | TIMESTAMPTZ | YES | When the bug was closed (nullable — some issues lack `completedAt`) |
+| source | TEXT | NO | Origin of file reference: `git`, `comments`, or `unknown` (default) |
 
 **Indexes**:
 - PRIMARY KEY on `id`
