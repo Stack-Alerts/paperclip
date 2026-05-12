@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 Simple test to check what data is actually available on Crypto Lake.
@@ -9,19 +8,21 @@ import os
 import lakeapi
 from datetime import datetime, timedelta
 
-# Set your Crypto Lake credentials
-API_KEY = 'REDACTED_AWS_KEY'
-API_SECRET = 'REDACTED_AWS_SECRET'
+API_KEY = os.environ.get('AWS_ACCESS_KEY_ID')
+API_SECRET = os.environ.get('AWS_SECRET_ACCESS_KEY')
 
-os.environ['AWS_ACCESS_KEY_ID'] = API_KEY
-os.environ['AWS_SECRET_ACCESS_KEY'] = API_SECRET
-os.environ['AWS_DEFAULT_REGION'] = 'eu-west-1'
+if not API_KEY or not API_SECRET:
+    print("ERROR: AWS credentials not found in environment.")
+    print("Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.")
+    print("See .env.example for required configuration.")
+    exit(1)
+
+os.environ.setdefault('AWS_DEFAULT_REGION', 'eu-west-1')
 
 print("=" * 80)
 print("CRYPTO LAKE DATA AVAILABILITY - DIRECT TEST")
 print("=" * 80)
 
-# Data types to test
 DATA_TYPES = [
     'trades',
     'book',
@@ -35,14 +36,12 @@ DATA_TYPES = [
     'liquidations',
 ]
 
-# Test symbols
 TESTS = [
     ('BINANCE', 'BTC-USDT'),
     ('BINANCE_FUTURES', 'BTC-USDT-PERP'),
 ]
 
-# Time range for testing
-test_start = datetime.now() - timedelta(days=7)  # Last 7 days
+test_start = datetime.now() - timedelta(days=7)
 test_end = datetime.now()
 
 print(f"\nTest period: {test_start.strftime('%Y-%m-%d')} to {test_end.strftime('%Y-%m-%d')}")
@@ -67,12 +66,11 @@ for data_type in DATA_TYPES:
                 exchanges=[exchange]
             )
 
-            # Check if we got data
             if df is not None:
                 row_count = len(df)
                 if row_count > 0:
                     print(f"✓ SUCCESS ({row_count:,} rows)")
-                    print(f"   Columns: {list(df.columns)[:5]}...")  # Show first 5 columns
+                    print(f"   Columns: {list(df.columns)[:5]}...")
 
                     key = f"{data_type}_{exchange}"
                     results[key] = {'success': True, 'rows': row_count}
@@ -85,7 +83,6 @@ for data_type in DATA_TYPES:
 
         except Exception as e:
             error_str = str(e)
-            # Show only first 80 chars of error
             if 'SignatureDoesNotMatch' in error_str:
                 print(f"✗ SignatureDoesNotMatch (auth issue)")
             elif 'NoSuchKey' in error_str or '404' in error_str:
@@ -144,4 +141,3 @@ for key in failed:
     print(f"  • {key}: {reason}")
 
 print("\n" + "=" * 80)
-

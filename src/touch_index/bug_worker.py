@@ -25,7 +25,7 @@ from typing import Sequence
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from .comment_extractor import fetch_and_extract
+from .comment_extractor import extract_files_from_text, fetch_and_extract
 from .git_extractor import get_files_for_issue
 from .paperclip_client import FDR_LABEL_ID, get_issue_by_id
 
@@ -48,7 +48,7 @@ class BugIngestionResult:
     issue_identifier: str
     issue_id: str
     files_indexed: int
-    source: str  # "git" | "comments" | "none"
+    source: str  # "git" | "comments" | "description" | "none"
     skipped_no_commits: bool
 
 
@@ -57,6 +57,7 @@ def ingest_bug_issue(
     issue_id: str,
     issue_identifier: str,
     completed_at: datetime | None,
+    description: str = "",
     *,
     dry_run: bool = False,
 ) -> BugIngestionResult:
@@ -67,6 +68,10 @@ def ingest_bug_issue(
     if not files:
         files = fetch_and_extract(issue_id)
         source = "comments"
+
+    if not files and description:
+        files = extract_files_from_text(description)
+        source = "description"
 
     if not files:
         logger.info(
@@ -154,6 +159,7 @@ def process_bug_issue(
         issue_id=issue["id"],
         issue_identifier=issue["identifier"],
         completed_at=_parse_completed_at(issue),
+        description=issue.get("description", "") or "",
         dry_run=dry_run,
     )
 
@@ -173,6 +179,7 @@ def run_bug_worker(
                 issue_id=issue["id"],
                 issue_identifier=issue["identifier"],
                 completed_at=_parse_completed_at(issue),
+                description=issue.get("description", "") or "",
                 dry_run=dry_run,
             )
             results.append(result)
