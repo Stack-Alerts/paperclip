@@ -151,7 +151,7 @@ class TestScanFunction:
         result = _scan.scan()
         assert result["total_done_fix_issues"] == 0
         assert result["ungated_count"] == 0
-        assert result["gated"] == {"pass": 0, "fail": 0, "bypassed": 0, "error": 0}
+        assert result["gated"] == {"pass": 0, "fail": 0, "bypassed": 0, "error": 0, "skipped": 0}
 
     def test_scan_filters_fix_issues(self, monkeypatch):
         monkeypatch.setattr(

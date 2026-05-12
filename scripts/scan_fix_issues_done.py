@@ -134,7 +134,7 @@ def scan(
     fix_issues = [i for i in issues if _is_fix_issue(i)]
     logger.info("Found %d fix/bug issues in done status", len(fix_issues))
 
-    gated: dict[str, int] = {"pass": 0, "fail": 0, "bypassed": 0, "error": 0}
+    gated: dict[str, int] = {"pass": 0, "fail": 0, "bypassed": 0, "error": 0, "skipped": 0}
     ungated: list[dict] = []
     gated_issues: list[dict] = []
 
@@ -173,13 +173,14 @@ def scan(
     }
 
     logger.info(
-        "Scan complete: %d total, %d gated (PASS=%d FAIL=%d BYPASS=%d ERROR=%d), %d ungated",
+        "Scan complete: %d total, %d gated (PASS=%d FAIL=%d BYPASS=%d ERROR=%d SKIPPED=%d), %d ungated",
         len(fix_issues),
         sum(gated.values()),
         gated.get("pass", 0),
         gated.get("fail", 0),
         gated.get("bypassed", 0),
         gated.get("error", 0),
+        gated.get("skipped", 0),
         len(ungated),
     )
 
