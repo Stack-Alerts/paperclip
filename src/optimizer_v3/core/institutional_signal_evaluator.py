@@ -244,6 +244,11 @@ class InstitutionalSignalEvaluator:
             block_params[block_config.name] = params
         
         # STEP 4: Instantiate all required blocks (deduplicated)
+        if not callable(getattr(BlockRegistry, 'instantiate', None)):
+            logger.error(
+                f"BlockRegistry.instantiate is not callable "
+                f"(type={type(BlockRegistry.instantiate).__name__})"
+            )
         for block_name in blocks_to_load:
             # Extract tunable parameters for this block
             params = block_params.get(block_name, {})
@@ -257,7 +262,7 @@ class InstitutionalSignalEvaluator:
                 
                 if block_instance:
                     blocks[block_name] = block_instance
-            except ValueError as e:
+            except (ValueError, TypeError) as e:
                 logger.warning(
                     f"Skipping block '{block_name}': instantiation failed - {e}"
                 )
