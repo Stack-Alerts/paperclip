@@ -285,8 +285,14 @@ def main() -> None:
         return
 
     worker = "fr"
-    if len(sys.argv) > 1 and sys.argv[1] in ("fr", "bug"):
-        worker = sys.argv.pop(1)
+    if len(sys.argv) > 1:
+        if sys.argv[1] in ("fr", "bug"):
+            worker = sys.argv.pop(1)
+        elif not sys.argv[1].startswith("-"):
+            logger.warning(
+                "Unknown worker '%s' — defaulting to 'fr'", sys.argv[1]
+            )
+            sys.argv.pop(1)
 
     if worker == "bug":
         _run_bug_cli()

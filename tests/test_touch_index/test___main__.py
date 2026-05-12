@@ -84,7 +84,7 @@ class TestMainDispatch:
         mock_help.assert_not_called()
 
     def test_unknown_worker_falls_back_to_fr(self):
-        """When first arg is not 'fr' or 'bug', default to FR worker."""
+        """When first arg is not 'fr' or 'bug', default to FR worker and warn."""
         from touch_index.__main__ import main
 
         with (
@@ -96,11 +96,15 @@ class TestMainDispatch:
             patch("touch_index.__main__._print_help") as mock_help,
             patch("touch_index.__main__._run_fr_cli") as mock_fr,
             patch("touch_index.__main__._run_bug_cli") as mock_bug,
+            patch("touch_index.__main__.logger") as mock_logger,
         ):
             main()
         mock_fr.assert_called_once()
         mock_bug.assert_not_called()
         mock_help.assert_not_called()
+        mock_logger.warning.assert_called_once_with(
+            "Unknown worker '%s' — defaulting to 'fr'", "unknown"
+        )
 
 
 class TestHelp:
