@@ -8,19 +8,35 @@ with issue IDs in the scope token.
 
 from __future__ import annotations
 
+import logging
 import subprocess
 from pathlib import Path
-from typing import Sequence
 
+
+logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).parents[2]  # BTC-Trade-Engine-PaperClip/
 
 
 def _run(args: list[str], cwd: Path) -> str:
-    result = subprocess.run(
-        args, cwd=str(cwd), capture_output=True, text=True, timeout=30
-    )
-    return result.stdout.strip()
+    try:
+        result = subprocess.run(
+            args, cwd=str(cwd), capture_output=True, text=True, timeout=30, check=False,
+        )
+        if result.returncode != 0:
+            logger.warning(
+                "git command failed (exit %d): %s | stderr: %s",
+                result.returncode,
+                " ".join(args),
+                result.stderr.strip()[:500],
+            )
+        return result.stdout.strip()
+    except FileNotFoundError:
+        logger.error("git executable not found — cannot extract commit files")
+        return ""
+    except OSError as exc:
+        logger.error("git subprocess error: %s", exc)
+        return ""
 
 
 def get_commit_hashes(issue_identifier: str, repo: Path = _REPO_ROOT) -> list[str]:
