@@ -712,3 +712,267 @@ class TestRunBugQualityChecks:
         assert report.coverage is None
         assert report.freshness is not None
         assert report.consistency is not None
+
+# ---------------------------------------------------------------------------
+# Added coverage tests for uncovered edge cases in quality.py
+# ---------------------------------------------------------------------------
+
+
+class TestCheckConsistencyExtended:
+    """Additional edge-case tests for check_consistency."""
+
+    def test_api_error_logged_and_continues(self, caplog):
+        """When get_issue_by_id raises, the error is logged but iteration continues."""
+        import logging
+        engine = _make_engine([
+            _make_scalar_result(0),
+            _make_scalar_result(0),
+            _make_scalar_result(0),
+            _make_scalar_result(0, rows=[("id-1",), ("id-2",)]),
+        ])
+        with (
+            patch(
+                "touch_index.paperclip_client.get_issue_by_id",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            caplog.at_level(logging.WARNING),
+        ):
+            report = check_consistency(engine)
+        assert len(report.orphan_fr_issue_ids) == 0
+        assert any("API error" in r.message for r in caplog.records)
+
+    def test_detects_null_updated_at(self):
+        """Rows with NULL updated_at are counted."""
+        engine = _make_engine([
+            _make_scalar_result(0),
+            _make_scalar_result(2),
+            _make_scalar_result(0),
+            _make_scalar_result(0, rows=[]),
+        ])
+        with patch(
+            "touch_index.paperclip_client.get_issue_by_id",
+            return_value={"id": "exists"},
+        ):
+            report = check_consistency(engine)
+        assert report.null_updated_at_rows == 2
+        assert report.duplicate_pairs == 0
+
+    def test_detects_duplicates_in_fr(self):
+        """Duplicate (file_path, fr_issue_id) pairs are counted."""
+        engine = _make_engine([
+            _make_scalar_result(0),
+            _make_scalar_result(0),
+            _make_scalar_result(4),
+            _make_scalar_result(0, rows=[]),
+        ])
+        with patch(
+            "touch_index.paperclip_client.get_issue_by_id",
+            return_value={"id": "exists"},
+        ):
+            report = check_consistency(engine)
+        assert report.duplicate_pairs == 4
+
+
+class TestRunQualityChecksExtended:
+    """Additional edge-case tests for run_quality_checks."""
+
+    def test_exception_in_freshness_still_runs_others(self):
+        """When compute_freshness raises, coverage and consistency still run."""
+        engine = MagicMock()
+        with (
+            patch("touch_index.quality.compute_coverage",
+                  return_value=_make_coverage(
+                      total_fdr_issues=2, indexed_fdr_issues=2, coverage_pct=100.0)),
+            patch("touch_index.quality.compute_freshness",
+                  side_effect=RuntimeError("DB timeout")),
+            patch("touch_index.quality.check_consistency",
+                  return_value=_make_consistency()),
+        ):
+            report = run_quality_checks(engine)
+        assert report.passed is False
+        assert report.coverage is not None
+        assert report.freshness is None
+        assert report.consistency is not None
+
+    def test_exception_in_consistency_still_runs_others(self):
+        """When check_consistency raises, coverage and freshness still run."""
+        engine = MagicMock()
+        with (
+            patch("touch_index.quality.compute_coverage",
+                  return_value=_make_coverage(
+                      total_fdr_issues=2, indexed_fdr_issues=2, coverage_pct=100.0)),
+            patch("touch_index.quality.compute_freshness",
+                  return_value=_make_freshness(total_rows=5, max_age_hours=2.0)),
+            patch("touch_index.quality.check_consistency",
+                  side_effect=RuntimeError("Consistency error")),
+        ):
+            report = run_quality_checks(engine)
+        assert report.passed is False
+        assert report.coverage is not None
+        assert report.freshness is not None
+        assert report.consistency is None
+
+    def test_consistency_null_updated_at_fails(self):
+        """Null updated_at rows trigger consistency failure."""
+        engine = MagicMock()
+        with (
+            patch("touch_index.quality.compute_coverage",
+                  return_value=_make_coverage(
+                      total_fdr_issues=2, indexed_fdr_issues=2, coverage_pct=100.0)),
+            patch("touch_index.quality.compute_freshness",
+                  return_value=_make_freshness(total_rows=5, max_age_hours=2.0)),
+            patch("touch_index.quality.check_consistency",
+                  return_value=_make_consistency(null_updated_at_rows=3)),
+        ):
+            report = run_quality_checks(engine)
+        assert report.passed is False
+
+    def test_consistency_duplicates_fails(self):
+        """Duplicate pairs trigger consistency failure."""
+        engine = MagicMock()
+        with (
+            patch("touch_index.quality.compute_coverage",
+                  return_value=_make_coverage(
+                      total_fdr_issues=2, indexed_fdr_issues=2, coverage_pct=100.0)),
+            patch("touch_index.quality.compute_freshness",
+                  return_value=_make_freshness(total_rows=5, max_age_hours=2.0)),
+            patch("touch_index.quality.check_consistency",
+                  return_value=_make_consistency(duplicate_pairs=2)),
+        ):
+            report = run_quality_checks(engine)
+        assert report.passed is False
+
+    def test_consistency_orphans_fails(self):
+        """Orphan issue IDs trigger consistency failure."""
+        engine = MagicMock()
+        with (
+            patch("touch_index.quality.compute_coverage",
+                  return_value=_make_coverage(
+                      total_fdr_issues=2, indexed_fdr_issues=2, coverage_pct=100.0)),
+            patch("touch_index.quality.compute_freshness",
+                  return_value=_make_freshness(total_rows=5, max_age_hours=2.0)),
+            patch("touch_index.quality.check_consistency",
+                  return_value=_make_consistency(orphan_fr_issue_ids=["orphan-1"])),
+        ):
+            report = run_quality_checks(engine)
+        assert report.passed is False
+
+
+class TestCheckBugConsistencyExtended:
+    """Additional edge-case tests for check_bug_consistency."""
+
+    def test_api_error_logged_and_continues_bug(self, caplog):
+        """When get_issue_by_id raises in bug check, the error is logged."""
+        import logging
+        engine = _make_engine([
+            _make_scalar_result(0),
+            _make_scalar_result(0),
+            _make_scalar_result(0, rows=[("id-1",)]),
+        ])
+        with (
+            patch(
+                "touch_index.paperclip_client.get_issue_by_id",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            caplog.at_level(logging.WARNING),
+        ):
+            report = check_bug_consistency(engine)
+        assert len(report.orphan_bug_issue_ids) == 0
+        assert any("API error" in r.message for r in caplog.records)
+
+    def test_detects_duplicates_in_bug(self):
+        """Duplicate (file_path, bug_issue_id) pairs are counted."""
+        engine = _make_engine([
+            _make_scalar_result(0),
+            _make_scalar_result(2),
+            _make_scalar_result(0, rows=[]),
+        ])
+        with patch(
+            "touch_index.paperclip_client.get_issue_by_id",
+            return_value={"id": "exists"},
+        ):
+            report = check_bug_consistency(engine)
+        assert report.duplicate_pairs == 2
+
+
+class TestRunBugQualityChecksExtended:
+    """Additional edge-case tests for run_bug_quality_checks."""
+
+    def test_exception_in_freshness_still_runs_others_bug(self):
+        """When compute_bug_freshness raises, coverage and consistency still run."""
+        engine = MagicMock()
+        with (
+            patch("touch_index.quality.compute_bug_coverage",
+                  return_value=BugCoverageReport(
+                      total_bug_issues=2, indexed_bug_issues=2, coverage_pct=100.0,
+                      missing_issue_identifiers=[])),
+            patch("touch_index.quality.compute_bug_freshness",
+                  side_effect=RuntimeError("DB timeout")),
+            patch("touch_index.quality.check_bug_consistency",
+                  return_value=BugConsistencyReport(
+                      null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[])),
+        ):
+            report = run_bug_quality_checks(engine)
+        assert report.passed is False
+        assert report.coverage is not None
+        assert report.freshness is None
+        assert report.consistency is not None
+
+    def test_exception_in_consistency_still_runs_others_bug(self):
+        """When check_bug_consistency raises, coverage and freshness still run."""
+        engine = MagicMock()
+        with (
+            patch("touch_index.quality.compute_bug_coverage",
+                  return_value=BugCoverageReport(
+                      total_bug_issues=2, indexed_bug_issues=2, coverage_pct=100.0,
+                      missing_issue_identifiers=[])),
+            patch("touch_index.quality.compute_bug_freshness",
+                  return_value=BugFreshnessReport(
+                      total_rows=5, max_age_hours=2.0, min_age_hours=0.1,
+                      stale_rows=0, stale_threshold_days=30)),
+            patch("touch_index.quality.check_bug_consistency",
+                  side_effect=RuntimeError("Consistency error")),
+        ):
+            report = run_bug_quality_checks(engine)
+        assert report.passed is False
+        assert report.coverage is not None
+        assert report.freshness is not None
+        assert report.consistency is None
+
+    def test_consistency_duplicates_fails_bug(self):
+        """Duplicate pairs trigger bug consistency failure."""
+        engine = MagicMock()
+        with (
+            patch("touch_index.quality.compute_bug_coverage",
+                  return_value=BugCoverageReport(
+                      total_bug_issues=2, indexed_bug_issues=2, coverage_pct=100.0,
+                      missing_issue_identifiers=[])),
+            patch("touch_index.quality.compute_bug_freshness",
+                  return_value=BugFreshnessReport(
+                      total_rows=5, max_age_hours=2.0, min_age_hours=0.1,
+                      stale_rows=0, stale_threshold_days=30)),
+            patch("touch_index.quality.check_bug_consistency",
+                  return_value=BugConsistencyReport(
+                      null_closed_at_rows=0, duplicate_pairs=3, orphan_bug_issue_ids=[])),
+        ):
+            report = run_bug_quality_checks(engine)
+        assert report.passed is False
+
+    def test_consistency_orphans_fails_bug(self):
+        """Orphan bug issue IDs trigger consistency failure."""
+        engine = MagicMock()
+        with (
+            patch("touch_index.quality.compute_bug_coverage",
+                  return_value=BugCoverageReport(
+                      total_bug_issues=2, indexed_bug_issues=2, coverage_pct=100.0,
+                      missing_issue_identifiers=[])),
+            patch("touch_index.quality.compute_bug_freshness",
+                  return_value=BugFreshnessReport(
+                      total_rows=5, max_age_hours=2.0, min_age_hours=0.1,
+                      stale_rows=0, stale_threshold_days=30)),
+            patch("touch_index.quality.check_bug_consistency",
+                  return_value=BugConsistencyReport(
+                      null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=["orphan-1"])),
+        ):
+            report = run_bug_quality_checks(engine)
+        assert report.passed is False
