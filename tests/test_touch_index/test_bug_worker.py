@@ -1171,6 +1171,62 @@ class TestMain:
         mock_transition.assert_called_once_with("uuid-1", "done")
         assert any("Failed to mark" in r.message for r in caplog.records)
 
+class TestMainProcessBugIssueError:
+    """Tests for process_bug_issue exception handling in single-issue CLI path."""
+
+    def test_process_error_raises_system_exit(self, monkeypatch):
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.bug_worker.process_bug_issue",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "uuid-1"],
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_fetch.assert_not_called()
+        mock_transition.assert_not_called()
+
+    def test_process_error_with_validate_exits_nonzero(self, monkeypatch):
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.bug_worker.process_bug_issue",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "uuid-1", "--validate"],
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_fetch.assert_not_called()
+        mock_quality.assert_not_called()
+
+
 
 class TestBugWorkerMain:
     """Tests for bug_worker.main() delegation function."""

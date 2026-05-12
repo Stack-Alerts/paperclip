@@ -84,7 +84,11 @@ def _run_bug_cli() -> None:
         raise SystemExit(1)
 
     if args.issue_id:
-        result = process_bug_issue(engine, args.issue_id, dry_run=args.dry_run)
+        try:
+            result = process_bug_issue(engine, args.issue_id, dry_run=args.dry_run)
+        except Exception:
+            logger.exception("Failed to process bug issue %s", args.issue_id)
+            raise SystemExit(1)
         if result is None:
             logger.info("No bug issue found for %s", args.issue_id)
         else:
@@ -205,7 +209,11 @@ def _run_fr_cli() -> None:
         raise SystemExit(1)
 
     if args.issue_id:
-        result = process_fr_issue(engine, args.issue_id, dry_run=args.dry_run)
+        try:
+            result = process_fr_issue(engine, args.issue_id, dry_run=args.dry_run)
+        except Exception:
+            logger.exception("Failed to process FR issue %s", args.issue_id)
+            raise SystemExit(1)
         if result is None:
             logger.info("No FR issue found for %s", args.issue_id)
         else:
