@@ -177,16 +177,16 @@ def _run_bug_cli() -> None:
     skipped = sum(1 for r in results if r.skipped_no_commits)
 
     if args.dry_run:
-        logger.info("DRY RUN -- skipping transition-to-done for %d issue(s)", len(issues))
+        logger.info(
+            "DRY RUN -- skipping transition-to-done for %d issue(s)", len(issues)
+        )
     else:
         for r in results:
             try:
                 transition_issue_status(r.issue_id, "done")
                 logger.info("Marked %s as done", r.issue_identifier)
             except Exception:
-                logger.exception(
-                    "Failed to mark %s as done", r.issue_identifier
-                )
+                logger.exception("Failed to mark %s as done", r.issue_identifier)
 
     logger.info(
         "Bug worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits)",
@@ -339,11 +339,15 @@ def _run_fr_cli() -> None:
                 if not report.passed:
                     logger.error("VALIDATION FAILED after single-issue ingestion")
                     if args.json_summary:
-                        _emit_json_summary(args, worker="fr", result=result, quality_report=report)
+                        _emit_json_summary(
+                            args, worker="fr", result=result, quality_report=report
+                        )
                     raise SystemExit(1)
                 logger.info("VALIDATION PASSED after single-issue ingestion")
         if args.json_summary:
-            _emit_json_summary(args, worker="fr", result=result, quality_report=locals().get('report'))
+            _emit_json_summary(
+                args, worker="fr", result=result, quality_report=locals().get("report")
+            )
         return
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
@@ -358,11 +362,15 @@ def _run_fr_cli() -> None:
             if not report.passed:
                 logger.error("VALIDATION FAILED \u2014 investigate existing data")
                 if args.json_summary:
-                    _emit_json_summary(args, worker="fr", results=[], quality_report=report)
+                    _emit_json_summary(
+                        args, worker="fr", results=[], quality_report=report
+                    )
                 raise SystemExit(1)
             logger.info("VALIDATION PASSED \u2014 existing data clean")
         if args.json_summary:
-            _emit_json_summary(args, worker="fr", results=[], quality_report=locals().get("report"))
+            _emit_json_summary(
+                args, worker="fr", results=[], quality_report=locals().get("report")
+            )
         return
 
     results = run_fr_worker(engine, issues, dry_run=args.dry_run)
@@ -371,16 +379,16 @@ def _run_fr_cli() -> None:
     skipped = sum(1 for r in results if r.skipped_no_commits)
 
     if args.dry_run:
-        logger.info("DRY RUN \u2014 skipping transition-to-done for %d issue(s)", len(issues))
+        logger.info(
+            "DRY RUN \u2014 skipping transition-to-done for %d issue(s)", len(issues)
+        )
     else:
         for r in results:
             try:
                 transition_issue_status(r.issue_id, "done")
                 logger.info("Marked %s as done", r.issue_identifier)
             except Exception:
-                logger.exception(
-                    "Failed to mark %s as done", r.issue_identifier
-                )
+                logger.exception("Failed to mark %s as done", r.issue_identifier)
 
     logger.info(
         "FR worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits)",
@@ -389,7 +397,6 @@ def _run_fr_cli() -> None:
         skipped,
     )
 
-    
     if args.validate:
         report = run_quality_checks(engine)
         if not report.passed:
@@ -417,7 +424,6 @@ def _run_fr_cli() -> None:
         )
 
 
-
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
         _print_help()
@@ -428,9 +434,7 @@ def main() -> None:
         if sys.argv[1] in ("fr", "bug"):
             worker = sys.argv.pop(1)
         elif not sys.argv[1].startswith("-"):
-            logger.warning(
-                "Unknown worker '%s' — defaulting to 'fr'", sys.argv[1]
-            )
+            logger.warning("Unknown worker '%s' — defaulting to 'fr'", sys.argv[1])
             sys.argv.pop(1)
 
     if worker == "bug":

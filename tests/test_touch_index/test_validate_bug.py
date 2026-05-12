@@ -18,9 +18,7 @@ sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 import importlib
 
 runner_path = Path(__file__).parents[2] / "scripts" / "validate_touch_index_bug.py"
-_spec = importlib.util.spec_from_file_location(
-    "validate_touch_index_bug", runner_path
-)
+_spec = importlib.util.spec_from_file_location("validate_touch_index_bug", runner_path)
 _runner = importlib.util.module_from_spec(_spec)
 sys.modules["validate_touch_index_bug"] = _runner
 _spec.loader.exec_module(_runner)
@@ -58,10 +56,7 @@ class TestValidateBug:
         _run_checks(stale_days=7, engine=engine)
         conn = engine.connect.return_value.__enter__.return_value
         calls = conn.execute.call_args_list
-        has_stale = any(
-            len(c.args) >= 2 and "cutoff" in c.kwargs
-            for c in calls
-        )
+        has_stale = any(len(c.args) >= 2 and "cutoff" in c.kwargs for c in calls)
         has_stale_pos = any(
             len(c.args) >= 2 and isinstance(c.args[1], dict) and "cutoff" in c.args[1]
             for c in calls
@@ -101,6 +96,7 @@ class TestValidateBug:
         ):
             with pytest.raises(SystemExit) as exc:
                 from validate_touch_index_bug import main
+
                 main()
         assert exc.value.code == 1
 
@@ -112,5 +108,6 @@ class TestValidateBug:
             patch("validate_touch_index_bug.health_check", return_value=True),
         ):
             from validate_touch_index_bug import main
+
             main()
         assert True

@@ -2,6 +2,7 @@
 
 All DB I/O is mocked so tests run offline.
 """
+
 from __future__ import annotations
 
 import sys
@@ -16,9 +17,7 @@ sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 import importlib
 
 runner_path = Path(__file__).parents[2] / "scripts" / "validate_touch_index_fr.py"
-_spec = importlib.util.spec_from_file_location(
-    "validate_touch_index_fr", runner_path
-)
+_spec = importlib.util.spec_from_file_location("validate_touch_index_fr", runner_path)
 _runner = importlib.util.module_from_spec(_spec)
 sys.modules["validate_touch_index_fr"] = _runner
 _spec.loader.exec_module(_runner)
@@ -81,6 +80,7 @@ class TestValidateFR:
         ):
             with pytest.raises(SystemExit) as exc:
                 from validate_touch_index_fr import main
+
                 main()
         assert exc.value.code == 1
 
@@ -92,6 +92,7 @@ class TestValidateFR:
             patch("validate_touch_index_fr.health_check", return_value=True),
         ):
             from validate_touch_index_fr import main
+
             main()
         assert True
 

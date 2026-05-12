@@ -56,8 +56,9 @@ def _run_checks(stale_days: int, engine: Engine | None = None) -> int:
 
     with engine.connect() as conn:
         # 1. Duplicate check
-        dup_count = conn.execute(
-            text("""
+        dup_count = (
+            conn.execute(
+                text("""
                 SELECT COUNT(*) FROM (
                     SELECT file_path, bug_issue_id, COUNT(*)
                     FROM touch_index_bug_files
@@ -65,17 +66,26 @@ def _run_checks(stale_days: int, engine: Engine | None = None) -> int:
                     HAVING COUNT(*) > 1
                 ) dups
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
         if dup_count:
-            logger.warning("CHECK FAILED: %d duplicate (file_path, bug_issue_id) pairs", dup_count)
+            logger.warning(
+                "CHECK FAILED: %d duplicate (file_path, bug_issue_id) pairs", dup_count
+            )
             failures += 1
         else:
             logger.info("CHECK PASSED: no duplicate (file_path, bug_issue_id) pairs")
 
         # 2. Null closed_at check (warn only — closed_at is nullable per schema)
-        null_closed = conn.execute(
-            text("SELECT COUNT(*) FROM touch_index_bug_files WHERE closed_at IS NULL")
-        ).scalar() or 0
+        null_closed = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_bug_files WHERE closed_at IS NULL"
+                )
+            ).scalar()
+            or 0
+        )
         if null_closed:
             logger.info(
                 "CHECK NOTE: %d rows with NULL closed_at (acceptable if issue completedAt is missing)",
@@ -84,31 +94,39 @@ def _run_checks(stale_days: int, engine: Engine | None = None) -> int:
 
         # 3. Stale rows (closed_at older than N days, or NULL with old bug_identifier)
         cutoff = datetime.now(timezone.utc) - timedelta(days=stale_days)
-        stale_count = conn.execute(
-            text(
-                "SELECT COUNT(*) FROM touch_index_bug_files "
-                "WHERE closed_at IS NOT NULL AND closed_at < :cutoff"
-            ),
-            {"cutoff": cutoff},
-        ).scalar() or 0
+        stale_count = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_bug_files "
+                    "WHERE closed_at IS NOT NULL AND closed_at < :cutoff"
+                ),
+                {"cutoff": cutoff},
+            ).scalar()
+            or 0
+        )
         if stale_count:
             logger.warning(
                 "CHECK WARN: %d rows with closed_at older than %d days",
-                stale_count, stale_days,
+                stale_count,
+                stale_days,
             )
         else:
             logger.info("CHECK PASSED: no stale rows (>%d days)", stale_days)
 
         # 4. Total row count
-        total = conn.execute(
-            text("SELECT COUNT(*) FROM touch_index_bug_files")
-        ).scalar() or 0
+        total = (
+            conn.execute(text("SELECT COUNT(*) FROM touch_index_bug_files")).scalar()
+            or 0
+        )
         logger.info("Total rows in touch_index_bug_files: %d", total)
 
         # 5. Bug issue count
-        bug_count = conn.execute(
-            text("SELECT COUNT(DISTINCT bug_issue_id) FROM touch_index_bug_files")
-        ).scalar() or 0
+        bug_count = (
+            conn.execute(
+                text("SELECT COUNT(DISTINCT bug_issue_id) FROM touch_index_bug_files")
+            ).scalar()
+            or 0
+        )
         logger.info("Distinct bug issues indexed: %d", bug_count)
 
     if failures:
@@ -131,7 +149,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    logger.info("Touch Index Bug validation — stale threshold: %d days", args.stale_days)
+    logger.info(
+        "Touch Index Bug validation — stale threshold: %d days", args.stale_days
+    )
     failures = _run_checks(args.stale_days)
     if failures:
         sys.exit(1)

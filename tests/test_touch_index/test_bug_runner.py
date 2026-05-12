@@ -41,10 +41,17 @@ class TestBugRunnerDelegation:
     def test_delegates_args_through_sys_argv(self, monkeypatch):
         """sys.argv is left intact for the delegated main() to parse."""
         monkeypatch.setattr(
-            sys, "argv", ["run_touch_index_bug_worker.py", "--issue-id", "uuid-1", "--dry-run"]
+            sys,
+            "argv",
+            ["run_touch_index_bug_worker.py", "--issue-id", "uuid-1", "--dry-run"],
         )
         with patch("touch_index.bug_worker.main") as mock_main:
             main()
         mock_main.assert_called_once_with()
         # sys.argv should still contain the original args
-        assert sys.argv == ["run_touch_index_bug_worker.py", "--issue-id", "uuid-1", "--dry-run"]
+        assert sys.argv == [
+            "run_touch_index_bug_worker.py",
+            "--issue-id",
+            "uuid-1",
+            "--dry-run",
+        ]

@@ -57,8 +57,9 @@ def _run_checks(stale_hours: int, engine: Engine | None = None) -> int:
 
     with engine.connect() as conn:
         # 1. Duplicate check
-        dup_count = conn.execute(
-            text("""
+        dup_count = (
+            conn.execute(
+                text("""
                 SELECT COUNT(*) FROM (
                     SELECT file_path, fr_issue_id, COUNT(*)
                     FROM touch_index_fr_files
@@ -66,17 +67,26 @@ def _run_checks(stale_hours: int, engine: Engine | None = None) -> int:
                     HAVING COUNT(*) > 1
                 ) dups
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
         if dup_count:
-            logger.warning("CHECK FAILED: %d duplicate (file_path, fr_issue_id) pairs", dup_count)
+            logger.warning(
+                "CHECK FAILED: %d duplicate (file_path, fr_issue_id) pairs", dup_count
+            )
             failures += 1
         else:
             logger.info("CHECK PASSED: no duplicate (file_path, fr_issue_id) pairs")
 
         # 2. Null updated_at check
-        null_updated = conn.execute(
-            text("SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at IS NULL")
-        ).scalar() or 0
+        null_updated = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at IS NULL"
+                )
+            ).scalar()
+            or 0
+        )
         if null_updated:
             logger.warning("CHECK FAILED: %d rows with NULL updated_at", null_updated)
             failures += 1
@@ -85,28 +95,38 @@ def _run_checks(stale_hours: int, engine: Engine | None = None) -> int:
 
         # 3. Stale rows (updated_at older than N hours)
         cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_hours)
-        stale_count = conn.execute(
-            text("SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at < :cutoff"),
-            {"cutoff": cutoff},
-        ).scalar() or 0
+        stale_count = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at < :cutoff"
+                ),
+                {"cutoff": cutoff},
+            ).scalar()
+            or 0
+        )
         if stale_count:
             logger.warning(
                 "CHECK WARN: %d rows with updated_at older than %d hours",
-                stale_count, stale_hours,
+                stale_count,
+                stale_hours,
             )
         else:
             logger.info("CHECK PASSED: no stale rows (>%d hours)", stale_hours)
 
         # 4. Total row count
-        total = conn.execute(
-            text("SELECT COUNT(*) FROM touch_index_fr_files")
-        ).scalar() or 0
+        total = (
+            conn.execute(text("SELECT COUNT(*) FROM touch_index_fr_files")).scalar()
+            or 0
+        )
         logger.info("Total rows in touch_index_fr_files: %d", total)
 
         # 5. FR issue count
-        fr_count = conn.execute(
-            text("SELECT COUNT(DISTINCT fr_issue_id) FROM touch_index_fr_files")
-        ).scalar() or 0
+        fr_count = (
+            conn.execute(
+                text("SELECT COUNT(DISTINCT fr_issue_id) FROM touch_index_fr_files")
+            ).scalar()
+            or 0
+        )
         logger.info("Distinct FR issues indexed: %d", fr_count)
 
     if failures:
@@ -129,7 +149,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    logger.info("Touch Index FR validation — stale threshold: %d hours", args.stale_hours)
+    logger.info(
+        "Touch Index FR validation — stale threshold: %d hours", args.stale_hours
+    )
     failures = _run_checks(args.stale_hours)
     if failures:
         sys.exit(1)

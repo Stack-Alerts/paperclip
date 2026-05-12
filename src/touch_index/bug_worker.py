@@ -123,7 +123,9 @@ def _parse_completed_at(issue: dict) -> datetime | None:
     try:
         return datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
-        logger.warning("Bug issue %s: malformed completedAt %r", issue.get("identifier"), raw)
+        logger.warning(
+            "Bug issue %s: malformed completedAt %r", issue.get("identifier"), raw
+        )
         return None
 
 
@@ -188,4 +190,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

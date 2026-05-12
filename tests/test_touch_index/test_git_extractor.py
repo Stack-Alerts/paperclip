@@ -2,6 +2,7 @@
 
 All subprocess calls are mocked so these tests run offline.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -92,7 +93,9 @@ class TestGetCommitHashes:
         assert hashes == []
 
     def test_whitespace_lines_are_skipped(self):
-        with patch("touch_index.git_extractor._run", return_value="  \nabc123\n  \ndef456\n  "):
+        with patch(
+            "touch_index.git_extractor._run", return_value="  \nabc123\n  \ndef456\n  "
+        ):
             hashes = get_commit_hashes("BTCAAAAA-100")
         assert hashes == ["abc123", "def456"]
 
@@ -113,15 +116,23 @@ class TestGetFilesForCommit:
 
     def test_filters_non_source_files(self):
         with (
-            patch("touch_index.git_extractor._run", return_value="src/a.py\nREADME.md\nalembic/x.py"),
-            patch("touch_index.git_extractor._is_source_file", side_effect=lambda f: f == "src/a.py"),
+            patch(
+                "touch_index.git_extractor._run",
+                return_value="src/a.py\nREADME.md\nalembic/x.py",
+            ),
+            patch(
+                "touch_index.git_extractor._is_source_file",
+                side_effect=lambda f: f == "src/a.py",
+            ),
         ):
             files = get_files_for_commit("abc123")
         assert files == ["src/a.py"]
 
     def test_blank_lines_skipped(self):
         with (
-            patch("touch_index.git_extractor._run", return_value="src/a.py\n\nsrc/b.py"),
+            patch(
+                "touch_index.git_extractor._run", return_value="src/a.py\n\nsrc/b.py"
+            ),
             patch("touch_index.git_extractor._is_source_file", return_value=True),
         ):
             files = get_files_for_commit("abc123")
@@ -129,7 +140,10 @@ class TestGetFilesForCommit:
 
     def test_rename_arrow_lines_skipped(self):
         with (
-            patch("touch_index.git_extractor._run", return_value="=> src/renamed.py\nsrc/a.py"),
+            patch(
+                "touch_index.git_extractor._run",
+                return_value="=> src/renamed.py\nsrc/a.py",
+            ),
             patch("touch_index.git_extractor._is_source_file", return_value=True),
         ):
             files = get_files_for_commit("abc123")
@@ -144,7 +158,10 @@ class TestGetFilesForCommit:
 class TestGetFilesForIssue:
     def test_deduplicates_across_commits(self):
         with (
-            patch("touch_index.git_extractor.get_commit_hashes", return_value=["abc", "def"]),
+            patch(
+                "touch_index.git_extractor.get_commit_hashes",
+                return_value=["abc", "def"],
+            ),
             patch(
                 "touch_index.git_extractor.get_files_for_commit",
                 side_effect=[["src/a.py", "src/b.py"], ["src/a.py", "src/c.py"]],
@@ -160,8 +177,14 @@ class TestGetFilesForIssue:
 
     def test_respects_max_commits(self):
         with (
-            patch("touch_index.git_extractor.get_commit_hashes", return_value=["a", "b", "c"]),
-            patch("touch_index.git_extractor.get_files_for_commit", side_effect=[["src/x.py"], ["src/y.py"]]),
+            patch(
+                "touch_index.git_extractor.get_commit_hashes",
+                return_value=["a", "b", "c"],
+            ),
+            patch(
+                "touch_index.git_extractor.get_files_for_commit",
+                side_effect=[["src/x.py"], ["src/y.py"]],
+            ),
         ):
             files = get_files_for_issue("BTCAAAAA-100", max_commits=2)
         assert len(files) == 2  # 2 commits × 1 file each

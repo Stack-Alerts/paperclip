@@ -21,7 +21,12 @@ _REPO_ROOT = Path(__file__).parents[2]  # BTC-Trade-Engine-PaperClip/
 def _run(args: list[str], cwd: Path) -> str:
     try:
         result = subprocess.run(
-            args, cwd=str(cwd), capture_output=True, text=True, timeout=30, check=False,
+            args,
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
         if result.returncode != 0:
             logger.warning(
