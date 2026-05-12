@@ -1,4 +1,5 @@
 """Unit tests for scripts/scan_done_alert.py."""
+
 from __future__ import annotations
 
 import json
@@ -24,7 +25,13 @@ main = _alert.main
 class TestCreateAlert:
     def test_noop_when_no_ungated(self):
         sess = MagicMock()
-        ok = create_alert("http://base", "comp", sess, {"ungated_count": 0, "ungated_issues": []}, dry_run=False)
+        ok = create_alert(
+            "http://base",
+            "comp",
+            sess,
+            {"ungated_count": 0, "ungated_issues": []},
+            dry_run=False,
+        )
         assert ok is True
         sess.post.assert_not_called()
 
@@ -46,7 +53,10 @@ class TestCreateAlert:
 
     def test_posts_alert_with_ungated(self):
         sess = MagicMock()
-        sess.post.return_value.json.return_value = {"id": "alert-uuid", "identifier": "BTCAAAAA-200"}
+        sess.post.return_value.json.return_value = {
+            "id": "alert-uuid",
+            "identifier": "BTCAAAAA-200",
+        }
         scan_data = {
             "ungated_count": 1,
             "ungated_issues": [
@@ -92,7 +102,11 @@ class TestCreateAlert:
 
 class TestMain:
     def test_exits_on_missing_file(self):
-        test_args = ["scan_done_alert.py", "--scan-output", "/tmp/nonexistent_scan_output.json"]
+        test_args = [
+            "scan_done_alert.py",
+            "--scan-output",
+            "/tmp/nonexistent_scan_output.json",
+        ]
         old_argv, sys.argv = sys.argv, test_args
         try:
             try:
@@ -105,41 +119,70 @@ class TestMain:
     def test_calls_create_alert_with_parsed_data(self, monkeypatch, tmp_path):
         out = tmp_path / "scan-out.json"
         out.write_text(json.dumps({"ungated_count": 0, "ungated_issues": []}))
-        monkeypatch.setattr(sys, "argv", ["scan_done_alert.py", "--scan-output", str(out)])
+        monkeypatch.setattr(
+            sys, "argv", ["scan_done_alert.py", "--scan-output", str(out)]
+        )
         called = []
-        monkeypatch.setattr(_alert, "create_alert", lambda *a, **kw: (called.append(True) or True))
-        monkeypatch.setattr(_alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp"))
+        monkeypatch.setattr(
+            _alert, "create_alert", lambda *a, **kw: called.append(True) or True
+        )
+        monkeypatch.setattr(
+            _alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp")
+        )
         main()
         assert len(called) == 1
 
     def test_dry_run_flag_passed(self, monkeypatch, tmp_path):
         out = tmp_path / "scan-out.json"
-        out.write_text(json.dumps({"ungated_count": 1, "ungated_issues": [{"identifier": "X", "title": "Y"}]}))
-        monkeypatch.setattr(sys, "argv", ["scan_done_alert.py", "--scan-output", str(out), "--dry-run"])
+        out.write_text(
+            json.dumps(
+                {
+                    "ungated_count": 1,
+                    "ungated_issues": [{"identifier": "X", "title": "Y"}],
+                }
+            )
+        )
+        monkeypatch.setattr(
+            sys, "argv", ["scan_done_alert.py", "--scan-output", str(out), "--dry-run"]
+        )
         kwargs_store = {}
+
         def track(base_url, company_id, sess, scan_data, dry_run):
             kwargs_store["dry_run"] = dry_run
             return True
+
         monkeypatch.setattr(_alert, "create_alert", track)
-        monkeypatch.setattr(_alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp"))
+        monkeypatch.setattr(
+            _alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp")
+        )
         main()
         assert kwargs_store.get("dry_run") is True
 
     def test_auto_detects_dry_run_from_scan_json(self, monkeypatch, tmp_path):
         """main() should respect dry_run=true in scan JSON when --dry-run is not set."""
         out = tmp_path / "scan-out.json"
-        out.write_text(json.dumps({
-            "dry_run": True,
-            "ungated_count": 1,
-            "ungated_issues": [{"identifier": "X", "title": "Y"}],
-        }))
-        monkeypatch.setattr(sys, "argv", ["scan_done_alert.py", "--scan-output", str(out)])
+        out.write_text(
+            json.dumps(
+                {
+                    "dry_run": True,
+                    "ungated_count": 1,
+                    "ungated_issues": [{"identifier": "X", "title": "Y"}],
+                }
+            )
+        )
+        monkeypatch.setattr(
+            sys, "argv", ["scan_done_alert.py", "--scan-output", str(out)]
+        )
         kwargs_store = {}
+
         def track(base_url, company_id, sess, scan_data, dry_run):
             kwargs_store["dry_run"] = dry_run
             return True
+
         monkeypatch.setattr(_alert, "create_alert", track)
-        monkeypatch.setattr(_alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp"))
+        monkeypatch.setattr(
+            _alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp")
+        )
         main()
         assert kwargs_store.get("dry_run") is True, (
             f"Expected dry_run=True from scan JSON, got {kwargs_store.get('dry_run')}"
@@ -148,13 +191,26 @@ class TestMain:
     def test_dry_run_false_by_default(self, monkeypatch, tmp_path):
         """main() should default dry_run to False when neither CLI flag nor scan JSON specifies it."""
         out = tmp_path / "scan-out.json"
-        out.write_text(json.dumps({"ungated_count": 1, "ungated_issues": [{"identifier": "X", "title": "Y"}]}))
-        monkeypatch.setattr(sys, "argv", ["scan_done_alert.py", "--scan-output", str(out)])
+        out.write_text(
+            json.dumps(
+                {
+                    "ungated_count": 1,
+                    "ungated_issues": [{"identifier": "X", "title": "Y"}],
+                }
+            )
+        )
+        monkeypatch.setattr(
+            sys, "argv", ["scan_done_alert.py", "--scan-output", str(out)]
+        )
         kwargs_store = {}
+
         def track(base_url, company_id, sess, scan_data, dry_run):
             kwargs_store["dry_run"] = dry_run
             return True
+
         monkeypatch.setattr(_alert, "create_alert", track)
-        monkeypatch.setattr(_alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp"))
+        monkeypatch.setattr(
+            _alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp")
+        )
         main()
         assert kwargs_store.get("dry_run") is False

@@ -35,7 +35,9 @@ class TestImpactGateRunnerE2E:
     def test_runner_with_existing_fr_id(self):
         """Runner correctly resolves an existing FR ID, runs tests, and returns PASS."""
         result = run_impact_gate_runner(["FDR-850"], [])
-        assert result["status"] == "PASS", f"Expected PASS, got {result['status']}: {result}"
+        assert result["status"] == "PASS", (
+            f"Expected PASS, got {result['status']}: {result}"
+        )
         assert "FDR-850" in result["fr_results"]
         fr_entry = result["fr_results"]["FDR-850"]
         assert fr_entry["status"] == "PASS"
@@ -48,11 +50,16 @@ class TestImpactGateRunnerE2E:
     def test_runner_with_existing_bug_id(self):
         """Runner correctly resolves an existing bug ID, runs tests, and returns PASS."""
         result = run_impact_gate_runner([], ["BTCAAAAA-736"])
-        assert result["status"] == "PASS", f"Expected PASS, got {result['status']}: {result}"
+        assert result["status"] == "PASS", (
+            f"Expected PASS, got {result['status']}: {result}"
+        )
         assert "BTCAAAAA-736" in result["bug_results"]
         bug_entry = result["bug_results"]["BTCAAAAA-736"]
         assert bug_entry["status"] == "PASS"
-        assert bug_entry["test_file"] == "tests/bug_regression/test_btcaaaaa_736_regression.py"
+        assert (
+            bug_entry["test_file"]
+            == "tests/bug_regression/test_btcaaaaa_736_regression.py"
+        )
 
     def test_runner_with_both_fr_and_bug(self):
         """Runner handles both FR and bug IDs in a single invocation."""
@@ -108,7 +115,9 @@ class TestImpactGateRunnerE2E:
         assert "zero_test_files" in summary
         assert "missing_test_files" in summary
         # Result entry keys
-        for entry in list(result["fr_results"].values()) + list(result["bug_results"].values()):
+        for entry in list(result["fr_results"].values()) + list(
+            result["bug_results"].values()
+        ):
             assert "status" in entry
             assert "test_file" in entry
             assert "tests" in entry
@@ -125,18 +134,17 @@ class TestImpactGateRunnerE2E:
             assert t["outcome"] in ("passed", "failed", "error", "skipped")
             assert "test_fdr_850" in t["nodeid"]
 
-
     def test_runner_with_zero_tests_returns_error(self):
         """Runner returns ERROR when a test file exists but collects zero tests."""
         temp_file = _REPO_ROOT / "tests" / "fr_acceptance" / "test_fdr_99997.py"
         try:
             temp_file.write_text(
-                "import pytest\n"
-                "\n"
-                "# No test functions - zero tests collected\n"
+                "import pytest\n\n# No test functions - zero tests collected\n"
             )
             result = run_impact_gate_runner(["FDR-99997"], [])
-            assert result["status"] == "ERROR", f"Expected ERROR, got {result['status']}"
+            assert result["status"] == "ERROR", (
+                f"Expected ERROR, got {result['status']}"
+            )
             assert "FDR-99997" in result["fr_results"]
             fr_entry = result["fr_results"]["FDR-99997"]
             assert fr_entry["status"] == "ERROR"
@@ -155,8 +163,18 @@ class TestImpactGateRunnerCLI:
     def test_cli_with_frs(self):
         """CLI --frs flag works and outputs valid JSON."""
         proc = subprocess.run(
-            [sys.executable, str(self._runner_script), "--frs", "FDR-850", "--output", "json"],
-            capture_output=True, text=True, cwd=str(_REPO_ROOT), timeout=60,
+            [
+                sys.executable,
+                str(self._runner_script),
+                "--frs",
+                "FDR-850",
+                "--output",
+                "json",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(_REPO_ROOT),
+            timeout=60,
         )
         assert proc.returncode == 0, f"CLI exited {proc.returncode}: {proc.stderr}"
         result = json.loads(proc.stdout)
@@ -166,8 +184,18 @@ class TestImpactGateRunnerCLI:
     def test_cli_with_bugs(self):
         """CLI --bugs flag works and outputs valid JSON."""
         proc = subprocess.run(
-            [sys.executable, str(self._runner_script), "--bugs", "BTCAAAAA-736", "--output", "json"],
-            capture_output=True, text=True, cwd=str(_REPO_ROOT), timeout=60,
+            [
+                sys.executable,
+                str(self._runner_script),
+                "--bugs",
+                "BTCAAAAA-736",
+                "--output",
+                "json",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(_REPO_ROOT),
+            timeout=60,
         )
         assert proc.returncode == 0
         result = json.loads(proc.stdout)
@@ -176,16 +204,36 @@ class TestImpactGateRunnerCLI:
     def test_cli_with_missing_ids_returns_nonzero(self):
         """CLI exits non-zero when all test files are missing."""
         proc = subprocess.run(
-            [sys.executable, str(self._runner_script), "--frs", "FDR-99999", "--output", "json"],
-            capture_output=True, text=True, cwd=str(_REPO_ROOT), timeout=60,
+            [
+                sys.executable,
+                str(self._runner_script),
+                "--frs",
+                "FDR-99999",
+                "--output",
+                "json",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(_REPO_ROOT),
+            timeout=60,
         )
         assert proc.returncode == 1
 
     def test_cli_pretty_output(self):
         """CLI --output pretty produces indented JSON."""
         proc = subprocess.run(
-            [sys.executable, str(self._runner_script), "--frs", "FDR-850", "--output", "pretty"],
-            capture_output=True, text=True, cwd=str(_REPO_ROOT), timeout=60,
+            [
+                sys.executable,
+                str(self._runner_script),
+                "--frs",
+                "FDR-850",
+                "--output",
+                "pretty",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(_REPO_ROOT),
+            timeout=60,
         )
         assert proc.returncode == 0
         result = json.loads(proc.stdout)
