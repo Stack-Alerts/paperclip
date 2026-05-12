@@ -245,6 +245,7 @@ def _emit_json_summary(
     result: Any | None = None,
     total_files: int = 0,
     skipped: int = 0,
+    errors: int = 0,
     quality_report: Any | None = None,
 ) -> None:
     """Emit a structured JSON summary of the worker run to stdout."""
@@ -266,6 +267,8 @@ def _emit_json_summary(
         summary["issues_processed"] = len(results)
         summary["total_files_indexed"] = total_files
         summary["issues_skipped"] = skipped
+        if errors:
+            summary["issues_with_errors"] = errors
     if quality_report is not None:
         summary["quality"] = quality_report.to_dict()
     sys.stdout.write(json.dumps(summary, default=str) + "\n")
@@ -400,6 +403,13 @@ def _run_fr_cli() -> None:
 
     results = run_fr_worker(engine, issues, dry_run=args.dry_run)
 
+    errors = len(issues) - len(results)
+    if errors:
+        logger.warning(
+            "%d issue(s) had processing errors \u2014 check logs above for details",
+            errors,
+        )
+
     total_files = sum(r.files_indexed for r in results)
     skipped = sum(1 for r in results if r.skipped_no_commits)
 
@@ -416,10 +426,11 @@ def _run_fr_cli() -> None:
                 logger.exception("Failed to mark %s as done", r.issue_identifier)
 
     logger.info(
-        "FR worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits)",
+        "FR worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits), %d errors",
         len(results),
         total_files,
         skipped,
+        errors,
     )
 
     if args.validate:
@@ -433,6 +444,7 @@ def _run_fr_cli() -> None:
                     results=results,
                     total_files=total_files,
                     skipped=skipped,
+                    errors=errors,
                     quality_report=report,
                 )
             raise SystemExit(1)
@@ -445,6 +457,7 @@ def _run_fr_cli() -> None:
             results=results,
             total_files=total_files,
             skipped=skipped,
+            errors=errors,
             quality_report=report,
         )
 

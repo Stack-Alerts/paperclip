@@ -1648,3 +1648,60 @@ class TestMainProcessFrIssueError:
         captured = capsys.readouterr()
         data = json.loads(captured.out.strip())
         assert data["quality"]["passed"] is True
+
+
+    # -------------------------------------------------------------------
+    # Error tracking in JSON summary
+    # -------------------------------------------------------------------
+
+    def test_main_json_summary_polling_with_errors(self, monkeypatch, capsys):
+        """--json-summary includes error count when issues fail during batch processing."""
+        import json
+
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "description": ""},
+            {"id": "id-2", "identifier": "BTCAAAAA-102", "description": ""},
+            {"id": "id-3", "identifier": "BTCAAAAA-103", "description": ""},
+        ]
+        # run_fr_worker returns 2 results for 3 issues (1 failed)
+        results = [
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-101",
+                issue_id="id-1",
+                files_indexed=3,
+                source="git",
+                skipped_no_commits=False,
+            ),
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-103",
+                issue_id="id-3",
+                files_indexed=0,
+                source="none",
+                skipped_no_commits=True,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
+            patch("touch_index.fr_worker.run_fr_worker", return_value=results),
+            patch(
+                "touch_index.paperclip_client.transition_issue_status",
+            ) as mock_transition,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--json-summary"],
+            )
+            main()
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["issues_processed"] == 2
+        assert data["issues_with_errors"] == 1
+        assert data["total_files_indexed"] == 3
+        assert data["issues_skipped"] == 1
+        # Only the 2 successful issues are transitioned
+        assert mock_transition.call_count == 2
