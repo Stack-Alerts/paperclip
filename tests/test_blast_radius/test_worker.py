@@ -479,6 +479,52 @@ class TestRunOnce:
         assert results == []
         mock_gen.assert_not_called()
 
+    def test_state_issue_statuses_populated_after_run_once(self, tmp_path):
+        """After run_once, the state file's issue_statuses should contain
+        status data for ALL fetched issues (not just fix/bug ones)."""
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issues = _IN_REVIEW_ISSUES
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=issues),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}),
+        ):
+            worker_mod.run_once(dry_run=False)
+
+        state = json.loads(state_file.read_text())
+        statuses = state.get("issue_statuses", {})
+        assert statuses["uuid-fix-1"] == "in_review"
+        assert statuses["uuid-bug-1"] == "in_review"
+        assert statuses["uuid-fr-1"] == "in_review"
+        assert statuses["uuid-title-match"] == "in_review"
+
+    def test_run_once_cleans_stale_statuses(self, tmp_path):
+        """run_once should remove stale in_review entries that are no longer
+        in the fetched set, so future re-transitions are detected correctly."""
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path, {
+            "processed_issue_ids": [],
+            "issue_statuses": {
+                "uuid-stale": "in_review",
+                "uuid-fix-1": "in_progress",
+            },
+        })
+        issues = _IN_REVIEW_ISSUES
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=issues),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}),
+        ):
+            worker_mod.run_once(dry_run=False)
+
+        state = json.loads(state_file.read_text())
+        statuses = state.get("issue_statuses", {})
+        assert "uuid-stale" not in statuses, "stale entry should have been removed"
+        assert statuses["uuid-fix-1"] == "in_review"
+
 
 # ---------------------------------------------------------------------------
 # process_issue -- single-issue webhook entry point
@@ -500,6 +546,25 @@ class TestProcessIssue:
 
         assert result == {"ok": True}
         mock_gen.assert_called_once()
+
+    def test_process_issue_saves_status_to_state(self, tmp_path):
+        """After a successful process_issue, the state file's issue_statuses
+        should include the processed issue with its current status."""
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issue = _IN_REVIEW_ISSUES[0]
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}),
+        ):
+            worker_mod.process_issue("uuid-fix-1", dry_run=False)
+
+        state = json.loads(state_file.read_text())
+        statuses = state.get("issue_statuses", {})
+        assert statuses["uuid-fix-1"] == "in_review"
+        assert "uuid-fix-1" in state.get("processed_issue_ids", [])
 
     def test_dry_run_skips_state_save(self, tmp_path):
         import blast_radius.worker as worker_mod
