@@ -12,7 +12,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -31,6 +31,9 @@ class CoverageReport:
     coverage_pct: float
     missing_issue_identifiers: list[str]
 
+    def to_dict(self) -> dict:
+        return asdict(self)
+
 
 @dataclass
 class FreshnessReport:
@@ -40,6 +43,9 @@ class FreshnessReport:
     stale_rows: int
     stale_threshold_hours: int
 
+    def to_dict(self) -> dict:
+        return asdict(self)
+
 
 @dataclass
 class ConsistencyReport:
@@ -48,6 +54,9 @@ class ConsistencyReport:
     duplicate_pairs: int
     orphan_fr_issue_ids: list[str]
 
+    def to_dict(self) -> dict:
+        return asdict(self)
+
 
 @dataclass
 class QualityReport:
@@ -55,6 +64,16 @@ class QualityReport:
     freshness: FreshnessReport | None
     consistency: ConsistencyReport | None
     passed: bool
+
+    def to_dict(self) -> dict:
+        d: dict[str, Any] = {"passed": self.passed}
+        if self.coverage is not None:
+            d["coverage"] = self.coverage.to_dict()
+        if self.freshness is not None:
+            d["freshness"] = self.freshness.to_dict()
+        if self.consistency is not None:
+            d["consistency"] = self.consistency.to_dict()
+        return d
 
 
 def compute_coverage(engine: Engine) -> CoverageReport:
