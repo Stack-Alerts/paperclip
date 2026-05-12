@@ -267,8 +267,8 @@ class TestCheckConsistency:
         )
 
         with patch(
-            "touch_index.paperclip_client.get_issue_by_id",
-            return_value={"id": "exists"},
+            "touch_index.paperclip_client.get_all_issue_ids",
+            return_value=set(),
         ):
             report = check_consistency(engine)
 
@@ -290,8 +290,8 @@ class TestCheckConsistency:
         )
 
         with patch(
-            "touch_index.paperclip_client.get_issue_by_id",
-            return_value={"id": "exists"},
+            "touch_index.paperclip_client.get_all_issue_ids",
+            return_value=set(),
         ):
             report = check_consistency(engine)
 
@@ -312,8 +312,8 @@ class TestCheckConsistency:
         )
 
         with patch(
-            "touch_index.paperclip_client.get_issue_by_id",
-            return_value=None,
+            "touch_index.paperclip_client.get_all_issue_ids",
+            return_value={"existing-id"},
         ):
             report = check_consistency(engine)
 
@@ -377,6 +377,7 @@ class TestRunQualityChecks:
         assert report.passed is False
         assert report.consistency is not None
         assert report.consistency.unknown_source_rows == 3
+
 
 
 
@@ -684,8 +685,8 @@ class TestCheckBugConsistency:
         )
 
         with patch(
-            "touch_index.paperclip_client.get_issue_by_id",
-            return_value={"id": "exists"},
+            "touch_index.paperclip_client.get_all_issue_ids",
+            return_value=set(),
         ):
             report = check_bug_consistency(engine)
 
@@ -703,8 +704,8 @@ class TestCheckBugConsistency:
         )
 
         with patch(
-            "touch_index.paperclip_client.get_issue_by_id",
-            return_value={"id": "exists"},
+            "touch_index.paperclip_client.get_all_issue_ids",
+            return_value=set(),
         ):
             report = check_bug_consistency(engine)
 
@@ -722,8 +723,8 @@ class TestCheckBugConsistency:
         )
 
         with patch(
-            "touch_index.paperclip_client.get_issue_by_id",
-            return_value={"id": "exists"},
+            "touch_index.paperclip_client.get_all_issue_ids",
+            return_value=set(),
         ):
             report = check_bug_consistency(engine)
 
@@ -740,8 +741,8 @@ class TestCheckBugConsistency:
         )
 
         with patch(
-            "touch_index.paperclip_client.get_issue_by_id",
-            return_value=None,
+            "touch_index.paperclip_client.get_all_issue_ids",
+            return_value={"existing-id"},
         ):
             report = check_bug_consistency(engine)
 
@@ -792,6 +793,46 @@ class TestRunBugQualityChecks:
         assert report.coverage is not None
         assert report.freshness is not None
         assert report.consistency is not None
+
+    def test_bug_unknown_source_rows_fails(self):
+        """Unknown source rows in bug consistency trigger a failure."""
+        engine = MagicMock()
+
+        with (
+            patch(
+                "touch_index.quality.compute_bug_coverage",
+                return_value=BugCoverageReport(
+                    total_bug_issues=2,
+                    indexed_bug_issues=2,
+                    coverage_pct=100.0,
+                    missing_issue_identifiers=[],
+                ),
+            ),
+            patch(
+                "touch_index.quality.compute_bug_freshness",
+                return_value=BugFreshnessReport(
+                    total_rows=5,
+                    max_age_hours=2.0,
+                    min_age_hours=0.1,
+                    stale_rows=0,
+                    stale_threshold_days=30,
+                ),
+            ),
+            patch(
+                "touch_index.quality.check_bug_consistency",
+                return_value=BugConsistencyReport(
+                    null_closed_at_rows=0,
+                    duplicate_pairs=0,
+                    unknown_source_rows=3,
+                    orphan_bug_issue_ids=[],
+                ),
+            ),
+        ):
+            report = run_bug_quality_checks(engine)
+
+        assert report.passed is False
+        assert report.consistency is not None
+        assert report.consistency.unknown_source_rows == 3
 
     def test_low_coverage_fails(self):
         engine = MagicMock()
@@ -955,14 +996,14 @@ class TestCheckConsistencyExtended:
         )
         with (
             patch(
-                "touch_index.paperclip_client.get_issue_by_id",
+                "touch_index.paperclip_client.get_all_issue_ids",
                 side_effect=RuntimeError("API timeout"),
             ),
             caplog.at_level(logging.WARNING),
         ):
             report = check_consistency(engine)
         assert len(report.orphan_fr_issue_ids) == 0
-        assert any("API error" in r.message for r in caplog.records)
+        assert any("Paperclip issue IDs" in r.message for r in caplog.records)
 
     def test_detects_null_updated_at(self):
         """Rows with NULL updated_at are counted."""
@@ -976,8 +1017,8 @@ class TestCheckConsistencyExtended:
             ]
         )
         with patch(
-            "touch_index.paperclip_client.get_issue_by_id",
-            return_value={"id": "exists"},
+            "touch_index.paperclip_client.get_all_issue_ids",
+            return_value=set(),
         ):
             report = check_consistency(engine)
         assert report.null_updated_at_rows == 2
@@ -995,8 +1036,8 @@ class TestCheckConsistencyExtended:
             ]
         )
         with patch(
-            "touch_index.paperclip_client.get_issue_by_id",
-            return_value={"id": "exists"},
+            "touch_index.paperclip_client.get_all_issue_ids",
+            return_value=set(),
         ):
             report = check_consistency(engine)
         assert report.duplicate_pairs == 4
@@ -1140,14 +1181,14 @@ class TestCheckBugConsistencyExtended:
         )
         with (
             patch(
-                "touch_index.paperclip_client.get_issue_by_id",
+                "touch_index.paperclip_client.get_all_issue_ids",
                 side_effect=RuntimeError("API timeout"),
             ),
             caplog.at_level(logging.WARNING),
         ):
             report = check_bug_consistency(engine)
         assert len(report.orphan_bug_issue_ids) == 0
-        assert any("API error" in r.message for r in caplog.records)
+        assert any("bug orphan check" in r.message for r in caplog.records)
 
     def test_detects_duplicates_in_bug(self):
         """Duplicate (file_path, bug_issue_id) pairs are counted."""
@@ -1159,8 +1200,8 @@ class TestCheckBugConsistencyExtended:
             ]
         )
         with patch(
-            "touch_index.paperclip_client.get_issue_by_id",
-            return_value={"id": "exists"},
+            "touch_index.paperclip_client.get_all_issue_ids",
+            return_value=set(),
         ):
             report = check_bug_consistency(engine)
         assert report.duplicate_pairs == 2

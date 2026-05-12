@@ -223,6 +223,19 @@ def get_all_done_issues(completed_after: datetime | None = None) -> list[dict]:
     return issues
 
 
+def get_all_issue_ids() -> set[str]:
+    """Fetch ALL issue IDs from Paperclip (paginated) and return as a set.
+
+    Used by quality.check_consistency and check_bug_consistency to detect
+    orphan rows in a single batch instead of O(n) individual API calls.
+    """
+    all_issues = _paginate(
+        f"/api/companies/{_company()}/issues",
+        {"limit": 200},
+    )
+    return {i["id"] for i in all_issues}
+
+
 def transition_issue_status(issue_id: str, status: str) -> None:
     """Transition an issue to *status* via the Paperclip API.
 

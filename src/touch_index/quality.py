@@ -209,16 +209,15 @@ def check_consistency(engine: Engine) -> ConsistencyReport:
         ).fetchall()
 
     orphan_ids: list[str] = []
-    for row in orphan_rows:
-        issue_id = row[0]
+    if orphan_rows:
+        db_ids = {row[0] for row in orphan_rows}
         try:
-            from .paperclip_client import get_issue_by_id
+            from .paperclip_client import get_all_issue_ids
 
-            issue = get_issue_by_id(issue_id)
-            if issue is None:
-                orphan_ids.append(issue_id)
+            paperclip_ids = get_all_issue_ids()
+            orphan_ids = sorted(db_ids - paperclip_ids)
         except Exception:
-            logger.warning("Could not verify issue %s — API error", issue_id)
+            logger.warning("Could not fetch Paperclip issue IDs for orphan check")
 
     return ConsistencyReport(
         null_owner_rows=null_owner,
@@ -494,16 +493,15 @@ def check_bug_consistency(engine: Engine) -> BugConsistencyReport:
         ).fetchall()
 
     orphan_ids: list[str] = []
-    for row in orphan_rows:
-        issue_id = row[0]
+    if orphan_rows:
+        db_ids = {row[0] for row in orphan_rows}
         try:
-            from .paperclip_client import get_issue_by_id
+            from .paperclip_client import get_all_issue_ids
 
-            issue = get_issue_by_id(issue_id)
-            if issue is None:
-                orphan_ids.append(issue_id)
+            paperclip_ids = get_all_issue_ids()
+            orphan_ids = sorted(db_ids - paperclip_ids)
         except Exception:
-            logger.warning("Could not verify bug issue %s — API error", issue_id)
+            logger.warning("Could not fetch Paperclip issue IDs for bug orphan check")
 
     return BugConsistencyReport(
         null_closed_at_rows=null_closed,
