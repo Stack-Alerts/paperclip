@@ -162,7 +162,24 @@ class RecheckMetricsCalculator:
         if total_chains == 0:
             return {
                 'error': 'No data available for metrics calculation',
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'trade_impact': {
+                    'with_recheck': {
+                        **self.trade_impact['with_recheck'],
+                        'winrate': float(
+                            self.trade_impact['with_recheck']['wins'] / self.trade_impact['with_recheck']['total']
+                            if self.trade_impact['with_recheck']['total'] > 0 else 0
+                        )
+                    },
+                    'without_recheck': {
+                        **self.trade_impact['without_recheck'],
+                        'winrate': float(
+                            self.trade_impact['without_recheck']['wins'] / self.trade_impact['without_recheck']['total']
+                            if self.trade_impact['without_recheck']['total'] > 0 else 0
+                        )
+                    },
+                    'winrate_difference': 0.0
+                }
             }
         
         # Chain-level metrics

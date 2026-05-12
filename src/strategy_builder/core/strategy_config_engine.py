@@ -23,6 +23,7 @@ class RecheckConfig:
     parent_signal: Optional[str] = None  # Signal this recheck validates
     validation_mode: str = "SIGNAL"  # "SIGNAL" or "RECHECK"
     mode: str = "WITHIN"  # "AT" (exact bar) or "WITHIN" (within bar window)
+    nested_rechecks: List[Any] = field(default_factory=list)
 
 
 @dataclass
