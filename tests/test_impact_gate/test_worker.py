@@ -14,6 +14,7 @@ from impact_gate.worker import (
     _build_bypass_comment,
     _build_escalation_comment,
     process_issue,
+    MIN_TESTS_BAR,
 )
 import impact_gate.worker as worker_mod
 
@@ -21,6 +22,15 @@ _PASS_RESULT = {
     "timestamp": "2026-01-01T00:00:00",
     "status": "PASS",
     "summary": {"total": 0, "passed": 0, "failed": 0, "errors": 0},
+    "fr_results": {},
+    "bug_results": {},
+}
+
+# A pass result that meets the 10-test minimum bar
+_PASS_RESULT_BAR = {
+    "timestamp": "2026-01-01T00:00:00",
+    "status": "PASS",
+    "summary": {"total": 10, "passed": 10, "failed": 0, "errors": 0},
     "fr_results": {},
     "bug_results": {},
 }
@@ -144,7 +154,7 @@ class TestProcessIssue:
     def test_force_runs_on_done_issue(self, monkeypatch):
         self._mock_fetch(monkeypatch, _FIX_DONE)
         self._mock_br(monkeypatch)
-        monkeypatch.setattr("impact_gate.worker.run_impact_gate", lambda f, b: _PASS_RESULT)
+        monkeypatch.setattr("impact_gate.worker.run_impact_gate", lambda f, b: _PASS_RESULT_BAR)
         posted, transitions = self._mock_actions(monkeypatch)
         r = process_issue("done-uuid", dry_run=False, force=True)
         assert r["gate_status"] == "PASS"
@@ -177,7 +187,7 @@ class TestProcessIssue:
     def test_passes(self, monkeypatch):
         self._mock_fetch(monkeypatch, _FIX_IN_REVIEW)
         self._mock_br(monkeypatch)
-        monkeypatch.setattr("impact_gate.worker.run_impact_gate", lambda f, b: _PASS_RESULT)
+        monkeypatch.setattr("impact_gate.worker.run_impact_gate", lambda f, b: _PASS_RESULT_BAR)
         posted, transitions = self._mock_actions(monkeypatch)
         r = process_issue("fix-uuid", dry_run=False)
         assert r["gate_status"] == "PASS"
@@ -187,7 +197,7 @@ class TestProcessIssue:
     def test_passes_dry_run(self, monkeypatch):
         self._mock_fetch(monkeypatch, _FIX_IN_REVIEW)
         self._mock_br(monkeypatch)
-        monkeypatch.setattr("impact_gate.worker.run_impact_gate", lambda f, b: _PASS_RESULT)
+        monkeypatch.setattr("impact_gate.worker.run_impact_gate", lambda f, b: _PASS_RESULT_BAR)
         posted, transitions = self._mock_actions(monkeypatch)
         r = process_issue("fix-uuid", dry_run=True)
         assert r["gate_status"] == "PASS"
@@ -287,6 +297,53 @@ class TestSetBlockedBy:
         with caplog.at_level(logging.ERROR):
             worker_mod._set_blocked_by("uuid", ["b1"])
         assert any("Failed to set blockedByIssueIds" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Minimum test bar (10-fix bar)
+# ---------------------------------------------------------------------------
+
+
+class TestMinimumTestBar:
+    def test_below_bar_demotes_to_fail(self, monkeypatch):
+        """When total tests < MIN_TESTS_BAR, a runner PASS is demoted to FAIL."""
+        # Use _PASS_RESULT which has total=0, below the bar
+        import impact_gate.worker as wmod
+        monkeypatch.setattr(wmod, "_get_issue", lambda iid: _FIX_IN_REVIEW)
+        monkeypatch.setattr("impact_gate.worker.query_blast_radius",
+                            lambda fps: __import__("blast_radius.query",
+                                                  fromlist=["BlastRadiusData"]).BlastRadiusData())
+        monkeypatch.setattr("impact_gate.worker.run_impact_gate", lambda f, b: _PASS_RESULT)
+        posted, transitions = [], []
+        monkeypatch.setattr(wmod, "_post_comment", lambda i, b: posted.append(i))
+        monkeypatch.setattr("impact_gate.worker.transition_issue_status",
+                            lambda i, s: transitions.append((i, s)))
+        monkeypatch.setattr(wmod, "_create_blocking_issue",
+                            lambda fi, fid, d, t: {"id": f"b-{fid}"})
+        monkeypatch.setattr(wmod, "_set_blocked_by", lambda i, b: None)
+        r = process_issue("fix-uuid", dry_run=False)
+        assert r["gate_status"] == "FAIL", f"Expected FAIL, got {r['gate_status']}"
+        # Should have reverted to in_progress, not transitioned to done
+        assert transitions == [("fix-uuid", "in_progress")]
+
+    def test_at_bar_passes(self, monkeypatch):
+        """When total tests == MIN_TESTS_BAR, the gate passes."""
+        import impact_gate.worker as wmod
+        monkeypatch.setattr(wmod, "_get_issue", lambda iid: _FIX_IN_REVIEW)
+        monkeypatch.setattr("impact_gate.worker.query_blast_radius",
+                            lambda fps: __import__("blast_radius.query",
+                                                  fromlist=["BlastRadiusData"]).BlastRadiusData())
+        monkeypatch.setattr("impact_gate.worker.run_impact_gate", lambda f, b: _PASS_RESULT_BAR)
+        posted, transitions = [], []
+        monkeypatch.setattr(wmod, "_post_comment", lambda i, b: posted.append(i))
+        monkeypatch.setattr("impact_gate.worker.transition_issue_status",
+                            lambda i, s: transitions.append((i, s)))
+        r = process_issue("fix-uuid", dry_run=False)
+        assert r["gate_status"] == "PASS", f"Expected PASS, got {r['gate_status']}"
+        assert transitions == [("fix-uuid", "done")]
+
+    def test_min_bar_constant_value(self):
+        assert MIN_TESTS_BAR == 10
 
 
 # ---------------------------------------------------------------------------
