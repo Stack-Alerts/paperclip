@@ -206,6 +206,28 @@ def scan(
                 retro_results.append({"issue": entry["identifier"], "error": str(exc)})
         result["retroactive_results"] = retro_results
 
+        # Re-scan previously ungated issues to update counts after retroactive gating
+        remaining_ungated: list[dict] = []
+        for entry in ungated:
+            gate_status = _check_gate_status(entry["id"])
+            if gate_status is None:
+                remaining_ungated.append(entry)
+            else:
+                status_key = gate_status.lower()
+                gated[status_key] = gated.get(status_key, 0) + 1
+                gated_issues.append(
+                    {"identifier": entry["identifier"], "gate_status": gate_status}
+                )
+        result["ungated_count"] = len(remaining_ungated)
+        result["ungated_issues"] = remaining_ungated
+        result["gated"] = gated
+        result["gated_issues"] = gated_issues
+        logger.info(
+            "After retroactive gating: %d remaining ungated, %d total gated",
+            len(remaining_ungated),
+            sum(gated.values()),
+        )
+
     if dry_run and retroactive:
         logger.info(
             "[dry-run] Would retroactively gate %d ungated issues",
