@@ -164,7 +164,7 @@ def _fetch_issues_by_ids(identifiers: list[str]) -> list[dict]:
     seen_ids: set[str] = set()
     for identifier in identifiers:
         try:
-            issues = list_issues(status="in_progress", limit=10, offset=0)
+            issues = list_issues(status="in_progress", limit=500, offset=0)
             for issue in issues:
                 iid = issue.get("identifier") or issue.get("id", "")
                 if iid in seen_ids:
