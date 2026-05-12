@@ -256,6 +256,29 @@ class TestSyncStatuses:
         issues = [{"id": "", "status": "in_review"}]
         worker_mod._sync_statuses(state, issues)
         assert state["issue_statuses"] == {}
+    def test_removes_stale_in_review_entries(self):
+        import blast_radius.worker as worker_mod
+        state = {
+            "issue_statuses": {
+                "u1": "in_review",
+                "u2": "in_review",
+                "u3": "in_progress",
+            }
+        }
+        issues = [{"id": "u1", "status": "in_review"}]
+        worker_mod._sync_statuses(state, issues)
+        assert "u1" in state["issue_statuses"]
+        assert "u2" not in state["issue_statuses"]
+        assert state["issue_statuses"]["u3"] == "in_progress"
+
+    def test_no_cleanup_when_fetched_set_empty(self):
+        import blast_radius.worker as worker_mod
+        state = {"issue_statuses": {"u1": "in_review"}}
+        issues: list = []
+        worker_mod._sync_statuses(state, issues)
+        assert state["issue_statuses"] == {"u1": "in_review"}
+
+
 
     def test_skips_empty_status(self):
         import blast_radius.worker as worker_mod
