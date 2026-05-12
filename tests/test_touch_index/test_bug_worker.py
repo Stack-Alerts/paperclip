@@ -799,3 +799,229 @@ class TestMain:
         assert "2 issues" in msg
         assert "3 files" in msg
         assert "1 skipped" in msg
+
+    # -------------------------------------------------------------------
+    # --validate flag (polling mode)
+    # -------------------------------------------------------------------
+
+    def test_main_validate_polling_passed(self, monkeypatch, caplog):
+        """--validate with issues: validation runs and passes."""
+        import logging
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=[]),
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            caplog.at_level(logging.INFO),
+        ):
+            mock_quality.return_value.passed = True
+            monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
+            main()
+
+        mock_quality.assert_called_once()
+        assert any("VALIDATION PASSED" in r.message for r in caplog.records)
+
+    def test_main_validate_polling_failed(self, monkeypatch):
+        """--validate with issues: validation failure exits non-zero."""
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=[]),
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+        ):
+            mock_quality.return_value.passed = False
+            monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+
+    def test_main_validate_no_issues_passed(self, monkeypatch, caplog):
+        """--validate with no issues: validation runs on existing data."""
+        import logging
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[],
+            ),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            caplog.at_level(logging.INFO),
+        ):
+            mock_quality.return_value.passed = True
+            monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
+            main()
+
+        mock_worker.assert_not_called()
+        mock_quality.assert_called_once()
+        assert any("VALIDATION PASSED" in r.message for r in caplog.records)
+
+    def test_main_validate_no_issues_failed(self, monkeypatch):
+        """--validate with no issues: validation failure exits non-zero."""
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[],
+            ),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+        ):
+            mock_quality.return_value.passed = False
+            monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_worker.assert_not_called()
+
+    # -------------------------------------------------------------------
+    # --validate with --issue-id (single-issue mode)
+    # -------------------------------------------------------------------
+
+    def test_main_validate_issue_id_passed(self, monkeypatch, caplog):
+        """--validate --issue-id: validation runs after single-issue processing."""
+        import logging
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+        result = BugIngestionResult(
+            issue_identifier="BTCAAAAA-100",
+            files_indexed=2,
+            source="git",
+            skipped_no_commits=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.bug_worker.process_bug_issue", return_value=result
+            ),
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            caplog.at_level(logging.INFO),
+        ):
+            mock_quality.return_value.passed = True
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--issue-id", "uuid-1", "--validate"]
+            )
+            main()
+
+        mock_fetch.assert_not_called()
+        mock_quality.assert_called_once()
+        assert any("VALIDATION PASSED" in r.message for r in caplog.records)
+
+    def test_main_validate_issue_id_failed(self, monkeypatch):
+        """--validate --issue-id: validation failure exits non-zero."""
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+        result = BugIngestionResult(
+            issue_identifier="BTCAAAAA-100",
+            files_indexed=2,
+            source="git",
+            skipped_no_commits=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.bug_worker.process_bug_issue", return_value=result
+            ),
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues"),
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+        ):
+            mock_quality.return_value.passed = False
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--issue-id", "uuid-1", "--validate"]
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+
+    def test_main_validate_issue_id_not_found_skips_validation(self, monkeypatch, caplog):
+        """--validate --issue-id when issue not found: validation is still run."""
+        import logging
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.bug_worker.process_bug_issue", return_value=None
+            ),
+            patch("touch_index.paperclip_client.get_closed_non_fdr_issues"),
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            caplog.at_level(logging.INFO),
+        ):
+            mock_quality.return_value.passed = True
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--issue-id", "missing", "--validate"]
+            )
+            main()
+
+        mock_quality.assert_called_once()
+        assert any("VALIDATION PASSED" in r.message for r in caplog.records)
+
+    def test_main_validate_not_called_without_flag(self, monkeypatch):
+        """Without --validate, quality checks are not called."""
+        from touch_index.bug_worker import main
+
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=[]),
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        mock_quality.assert_not_called()
+
