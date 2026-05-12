@@ -86,6 +86,7 @@ def _run_bug_cli() -> None:
         help="Output structured JSON summary to stdout after ingestion and validation",
     )
     args = parser.parse_args()
+    report: Any | None = None
 
     engine = get_engine()
     if not health_check(engine):
@@ -138,7 +139,7 @@ def _run_bug_cli() -> None:
                 args,
                 worker="bug",
                 result=result,
-                quality_report=locals().get("report"),
+                quality_report=report,
             )
         return
 
@@ -167,7 +168,7 @@ def _run_bug_cli() -> None:
                 args,
                 worker="bug",
                 results=[],
-                quality_report=locals().get("report"),
+                quality_report=report,
             )
         return
 
@@ -218,7 +219,7 @@ def _run_bug_cli() -> None:
             results=results,
             total_files=total_files,
             skipped=skipped,
-            quality_report=locals().get("report"),
+            quality_report=report,
         )
 
 
@@ -300,6 +301,7 @@ def _run_fr_cli() -> None:
         help="Output structured JSON summary to stdout after ingestion and validation",
     )
     args = parser.parse_args()
+    report: Any | None = None
 
     engine = get_engine()
     if not health_check(engine):
@@ -346,7 +348,7 @@ def _run_fr_cli() -> None:
                 logger.info("VALIDATION PASSED after single-issue ingestion")
         if args.json_summary:
             _emit_json_summary(
-                args, worker="fr", result=result, quality_report=locals().get("report")
+                args, worker="fr", result=result, quality_report=report
             )
         return
 
@@ -369,7 +371,7 @@ def _run_fr_cli() -> None:
             logger.info("VALIDATION PASSED \u2014 existing data clean")
         if args.json_summary:
             _emit_json_summary(
-                args, worker="fr", results=[], quality_report=locals().get("report")
+                args, worker="fr", results=[], quality_report=report
             )
         return
 
@@ -420,7 +422,7 @@ def _run_fr_cli() -> None:
             results=results,
             total_files=total_files,
             skipped=skipped,
-            quality_report=locals().get("report"),
+            quality_report=report,
         )
 
 
