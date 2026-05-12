@@ -10,7 +10,7 @@ The scan:
 1. Fetches all `done` issues from Paperclip (optionally filtered by `days-back`).
 2. Identifies fix/bug issues (label + title heuristics).
 3. Checks each issue's comments for an Impact Gate result header
-   (`## Impact Gate: PASS|FAIL|BYPASSED|ERROR`).
+   (`## Impact Gate: PASS|FAIL|BYPASSED|ERROR|SKIPPED` at the start of a line).
 4. Reports gated vs ungated counts with a per-issue breakdown.
 5. On non-zero ungated count, creates a `medium`-priority alert issue assigned
    to the CTO listing the ungated issues.
@@ -40,20 +40,20 @@ Paperclip API          Scan-Done Runner           Impact Gate Worker
   "retroactive": false,
   "timestamp": "2026-05-12T06:00:00+00:00",
   "total_done_fix_issues": 42,
-  "gated": {"pass": 30, "fail": 5, "bypassed": 3, "error": 1},
+  "gated": {"pass": 30, "fail": 5, "bypassed": 3, "error": 1, "skipped": 0},
   "ungated_count": 3,
   "ungated_issues": [
     {"id": "<uuid>", "identifier": "BTCAAAAA-NNN", "title": "..."}
   ],
   "gated_issues": [
-    {"identifier": "BTCAAAAA-NNN", "gate_status": "PASS"}
+    {"identifier": "BTCAAAAA-NNN", "gate_status": "PASS|FAIL|BYPASSED|ERROR|SKIPPED"}
   ]
 }
 ```
 
 Gate status detection relies on a regex matching the markdown header produced
 by the Impact Gate worker's comment builders
-(`## Impact Gate: PASS|FAIL|BYPASSED|ERROR` at the start of a line).
+(`## Impact Gate: PASS|FAIL|BYPASSED|ERROR|SKIPPED` at the start of a line).
 
 ## CLI Usage
 
@@ -236,7 +236,7 @@ workers.
 The scan parses each issue's comment thread looking for the regex:
 
 ```
-^## Impact Gate:\s+(PASS|FAIL|BYPASSED|ERROR)
+^## Impact Gate:\s+(PASS|FAIL|BYPASSED|ERROR|SKIPPED)
 ```
 
 The regex uses `re.MULTILINE` so it matches at the start of any line in the
@@ -271,7 +271,7 @@ curl -X DELETE "$PAPERCLIP_API_URL/api/companies/$COMPANY_ID/issues/$ISSUE_ID" \
 | Symptom | Likely Cause | Action |
 |---|---|---|
 | Scan reports "0 total done fix issues" | No fix/bug issues in `done` status | Check Paperclip status filter; may be correct |
-| Scan reports ungated that are actually gated | Gate comment format mismatch | Verify the issue's gate comment matches `^## Impact Gate: (PASS\|FAIL\|BYPASSED\|ERROR)` |
+| Scan reports ungated that are actually gated | Gate comment format mismatch | Verify the issue's gate comment matches `^## Impact Gate: (PASS\|FAIL\|BYPASSED\|ERROR|SKIPPED)` |
 | Alert not created despite ungated > 0 | API credentials missing | Verify `PAPERCLIP_API_*` env vars |
 | | Script exited before alert step | Check step order in workflow |
 | Retroactive gating fails silently | Runner error in `process_issue` | Check logs for `Retroactive gate failed for`; may need manual gating |

@@ -13,10 +13,10 @@ Output schema (JSON)::
     {
         "timestamp": "<ISO-8601>",
         "total_done_fix_issues": <int>,
-        "gated": {"pass": <int>, "fail": <int>, "bypassed": <int>, "error": <int>},
+        "gated": {"pass": <int>, "fail": <int>, "bypassed": <int>, "error": <int>, "skipped": <int>},
         "ungated_count": <int>,
         "ungated_issues": [{"id": "<uuid>", "identifier": "BTCAAAAA-NNN", "title": "..."}, ...],
-        "gated_issues": [{"identifier": "BTCAAAAA-NNN", "gate_status": "PASS|FAIL|BYPASSED|ERROR"}, ...],
+        "gated_issues": [{"identifier": "BTCAAAAA-NNN", "gate_status": "PASS|FAIL|BYPASSED|ERROR|SKIPPED"}, ...],
     }
 
 The ``--retroactive`` flag causes the scan to run the full Impact Gate on any
