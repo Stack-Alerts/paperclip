@@ -5,7 +5,7 @@ that mentions the files they changed (e.g. ``src/optimizer_v3/database/...``).
 
 Extraction priority:
   1. Backtick-wrapped paths: `src/foo/bar.py`
-  2. Bare path strings starting with src/, tests/, scripts/, alembic/
+  2. Bare path strings starting with src/, tests/, or scripts/
   3. Paths following "Fix applied to ..." or "Commit ... touches ..." patterns
 
 Normalisation: strip leading `BTC_Engine_v3/` or `projects/*/` repo prefixes
