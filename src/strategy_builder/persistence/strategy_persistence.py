@@ -317,7 +317,10 @@ class StrategyPersistence:
             block_data = {
                 'name': block.name,
                 'logic': block.logic,
-                'signals': []
+                'signals': [],
+                'metadata': block.metadata,
+                'indented': block.indented,
+                'parameters': block.parameters,
             }
             
             # Add block-level exit conditions
@@ -401,7 +404,10 @@ class StrategyPersistence:
             block = BlockConfig(
                 name=block_data['name'],
                 logic=block_data['logic'],
-                signals=[]
+                signals=[],
+                metadata=block_data.get('metadata'),
+                indented=block_data.get('indented', False),
+                parameters=block_data.get('parameters', {}),
             )
             
             # Parse block-level exit conditions

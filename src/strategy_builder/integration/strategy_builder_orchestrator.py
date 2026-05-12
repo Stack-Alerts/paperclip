@@ -1053,7 +1053,10 @@ class StrategyBuilderOrchestrator:
                 'name': block.name,
                 'logic': block.logic,
                 'signals': [],
-                'exit_conditions': []
+                'exit_conditions': [],
+                'metadata': getattr(block, 'metadata', None),
+                'indented': getattr(block, 'indented', False),
+                'parameters': getattr(block, 'parameters', {}),
             }
             
             # Serialize signals

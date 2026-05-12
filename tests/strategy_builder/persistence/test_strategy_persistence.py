@@ -401,3 +401,180 @@ class TestStrategyPersistenceIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestParametersMetadataIndented:
+    """Round-trip tests for parameters, metadata, and indented fields"""
+
+    def test_parameters_round_trip_json(self):
+        """Test parameters field survives JSON save/load round-trip"""
+        config = StrategyConfig()
+        config.name = "ParamTest"
+        block = BlockConfig(
+            name="TestBlock",
+            logic="AND",
+            signals=[],
+            parameters={"lookback": 50, "threshold": 0.75}
+        )
+        block.signals.append(SignalConfig(name="S1", logic="AND"))
+        config.blocks.append(block)
+
+        persistence = StrategyPersistence()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = Path(tmpdir) / "test.json"
+            persistence.save(config, filepath)
+            result = persistence.load(filepath)
+
+            assert result.success
+            loaded = result.config
+            assert loaded.blocks[0].parameters == {"lookback": 50, "threshold": 0.75}
+
+    def test_parameters_round_trip_yaml(self):
+        """Test parameters field survives YAML save/load round-trip"""
+        config = StrategyConfig()
+        config.name = "ParamTestYaml"
+        block = BlockConfig(
+            name="TestBlock",
+            logic="AND",
+            signals=[],
+            parameters={"lookback": 100, "enabled": True}
+        )
+        block.signals.append(SignalConfig(name="S1", logic="AND"))
+        config.blocks.append(block)
+
+        persistence = StrategyPersistence()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = Path(tmpdir) / "test.yaml"
+            persistence.save(config, filepath)
+            result = persistence.load(filepath)
+
+            assert result.success
+            loaded = result.config
+            assert loaded.blocks[0].parameters == {"lookback": 100, "enabled": True}
+
+    def test_parameters_default_empty_dict(self):
+        """Test parameters defaults to empty dict when not in file"""
+        persistence = StrategyPersistence()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = Path(tmpdir) / "test.json"
+            import json
+            data = {
+                "name": "Test",
+                "description": "",
+                "version": "1.0.0",
+                "blocks": [{"name": "Block1", "logic": "AND", "signals": []}]
+            }
+            with open(filepath, 'w') as f:
+                json.dump(data, f)
+            result = persistence.load(filepath)
+            assert result.success
+            assert result.config.blocks[0].parameters == {}
+
+    def test_metadata_round_trip_json(self):
+        """Test metadata field survives JSON save/load round-trip"""
+        config = StrategyConfig()
+        config.name = "MetaTest"
+        block = BlockConfig(
+            name="TestBlock",
+            logic="AND",
+            signals=[],
+            metadata={"category": "PATTERN", "type": "SIGNAL"}
+        )
+        block.signals.append(SignalConfig(name="S1", logic="AND"))
+        config.blocks.append(block)
+
+        persistence = StrategyPersistence()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = Path(tmpdir) / "test.json"
+            persistence.save(config, filepath)
+            result = persistence.load(filepath)
+
+            assert result.success
+            loaded = result.config
+            assert loaded.blocks[0].metadata == {"category": "PATTERN", "type": "SIGNAL"}
+
+    def test_metadata_default_none(self):
+        """Test metadata defaults to None when not in file"""
+        persistence = StrategyPersistence()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = Path(tmpdir) / "test.json"
+            import json
+            data = {
+                "name": "Test",
+                "description": "",
+                "version": "1.0.0",
+                "blocks": [{"name": "Block1", "logic": "AND", "signals": []}]
+            }
+            with open(filepath, 'w') as f:
+                json.dump(data, f)
+            result = persistence.load(filepath)
+            assert result.success
+            assert result.config.blocks[0].metadata is None
+
+    def test_indented_round_trip_json(self):
+        """Test indented field survives JSON save/load round-trip"""
+        config = StrategyConfig()
+        config.name = "IndentTest"
+        block = BlockConfig(
+            name="TestBlock",
+            logic="AND",
+            signals=[],
+            indented=True
+        )
+        block.signals.append(SignalConfig(name="S1", logic="AND"))
+        config.blocks.append(block)
+
+        persistence = StrategyPersistence()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = Path(tmpdir) / "test.json"
+            persistence.save(config, filepath)
+            result = persistence.load(filepath)
+
+            assert result.success
+            loaded = result.config
+            assert loaded.blocks[0].indented is True
+
+    def test_indented_default_false(self):
+        """Test indented defaults to False when not in file"""
+        persistence = StrategyPersistence()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = Path(tmpdir) / "test.json"
+            import json
+            data = {
+                "name": "Test",
+                "description": "",
+                "version": "1.0.0",
+                "blocks": [{"name": "Block1", "logic": "AND", "signals": []}]
+            }
+            with open(filepath, 'w') as f:
+                json.dump(data, f)
+            result = persistence.load(filepath)
+            assert result.success
+            assert result.config.blocks[0].indented is False
+
+    def test_all_three_fields_round_trip_together(self):
+        """Test parameters, metadata, and indented all survive round-trip"""
+        config = StrategyConfig()
+        config.name = "AllFieldsTest"
+        block = BlockConfig(
+            name="TestBlock",
+            logic="AND",
+            signals=[],
+            metadata={"source": "registry"},
+            indented=True,
+            parameters={"param1": 10, "param2": "hello"}
+        )
+        block.signals.append(SignalConfig(name="S1", logic="AND"))
+        config.blocks.append(block)
+
+        persistence = StrategyPersistence()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = Path(tmpdir) / "test.json"
+            persistence.save(config, filepath)
+            result = persistence.load(filepath)
+
+            assert result.success
+            loaded = result.config
+            assert loaded.blocks[0].metadata == {"source": "registry"}
+            assert loaded.blocks[0].indented is True
+            assert loaded.blocks[0].parameters == {"param1": 10, "param2": "hello"}

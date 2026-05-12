@@ -237,12 +237,21 @@ class InstitutionalSignalEvaluator:
                     # Add first capable block (BlockRegistry returns most reliable first)
                     blocks_to_load.add(blocks_for_signal[0])
         
-        # STEP 3: Instantiate all required blocks (deduplicated)
+        # STEP 3: Build parameters map from block configs
+        block_params = {}
+        for block_config in self.strategy_config.blocks:
+            params = getattr(block_config, 'parameters', None) or {}
+            block_params[block_config.name] = params
+        
+        # STEP 4: Instantiate all required blocks (deduplicated)
         for block_name in blocks_to_load:
+            # Extract tunable parameters for this block
+            params = block_params.get(block_name, {})
             # Instantiate block from registry
             block_instance = BlockRegistry.instantiate(
                 block_name,
-                timeframe='15m'  # System designed for 15m
+                timeframe='15m',  # System designed for 15m
+                **params
             )
             
             if block_instance:
