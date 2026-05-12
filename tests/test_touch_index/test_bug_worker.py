@@ -126,7 +126,7 @@ class TestIngestBugIssue:
         conn.execute.assert_not_called()
 
     def test_upsert_rows_contain_required_fields(self):
-        """Each upserted row must carry id, file_path, bug_issue_id, bug_identifier, closed_at."""
+        """Each upserted row must carry id, file_path, bug_issue_id, bug_identifier, closed_at, source."""
         engine, conn = _mock_engine()
         files = ["src/touch_index/bug_worker.py", "src/touch_index/db.py"]
 
@@ -144,6 +144,7 @@ class TestIngestBugIssue:
             assert row["bug_issue_id"] == ISSUE_ID
             assert row["bug_identifier"] == ISSUE_IDENTIFIER
             assert row["closed_at"] == COMPLETED_AT
+            assert row["source"] == "git"
 
     def test_null_closed_at_accepted(self):
         engine, conn = _mock_engine()
@@ -212,6 +213,37 @@ class TestIngestBugIssue:
         rows = conn.execute.call_args[0][1]
         ids = [r["id"] for r in rows]
         assert len(ids) == len(set(ids)), "each row must have a unique UUID"
+
+    def test_source_persisted_in_upsert_rows(self):
+        """source column is set to 'git' or 'comments' in each upsert row."""
+        engine, conn = _mock_engine()
+
+        # git path
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/a.py"],
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
+        rows_git = conn.execute.call_args[0][1]
+        for r in rows_git:
+            assert r["source"] == "git"
+
+        # comments path
+        conn.reset_mock()
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch(
+                "touch_index.bug_worker.fetch_and_extract",
+                return_value=["src/b.py"],
+            ),
+        ):
+            ingest_bug_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT)
+        rows_comments = conn.execute.call_args[0][1]
+        for r in rows_comments:
+            assert r["source"] == "comments"
 
 
 # ---------------------------------------------------------------------------
