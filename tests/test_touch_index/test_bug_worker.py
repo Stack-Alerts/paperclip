@@ -946,6 +946,43 @@ class TestMain:
         assert exc_info.value.code == 1
         mock_worker.assert_not_called()
 
+    def test_main_validate_no_issues_failed_with_json_summary(self, monkeypatch, capsys):
+        """--json-summary --validate with no issues: emits JSON summary before exit."""
+        import json
+        from touch_index.__main__ import _run_bug_cli as main
+        from touch_index.quality import BugQualityReport
+
+        engine = MagicMock()
+        report = BugQualityReport(
+            coverage=None,
+            freshness=None,
+            consistency=None,
+            passed=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[],
+            ),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch("touch_index.quality.run_bug_quality_checks", return_value=report),
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index", "--validate", "--json-summary"])
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_worker.assert_not_called()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "bug"
+        assert data["mode"] == "polling"
+        assert data["dry_run"] is False
+        assert data["quality"] == {"passed": False}
+
     # -------------------------------------------------------------------
     # --validate with --issue-id (single-issue mode)
     # -------------------------------------------------------------------
