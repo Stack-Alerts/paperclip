@@ -1,0 +1,126 @@
+"""Unit tests for scripts/scan_done_alert.py."""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from unittest.mock import MagicMock
+
+sys.path.insert(0, str(Path(__file__).parents[2] / "scripts"))
+sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
+
+import importlib
+
+_alert_path = Path(__file__).parents[2] / "scripts" / "scan_done_alert.py"
+_spec = importlib.util.spec_from_file_location("scan_done_alert", _alert_path)
+_alert = importlib.util.module_from_spec(_spec)
+sys.modules["scan_done_alert"] = _alert
+_spec.loader.exec_module(_alert)
+
+create_alert = _alert.create_alert
+main = _alert.main
+
+
+class TestCreateAlert:
+    def test_noop_when_no_ungated(self):
+        sess = MagicMock()
+        ok = create_alert("http://base", "comp", sess, {"ungated_count": 0, "ungated_issues": []}, dry_run=False)
+        assert ok is True
+        sess.post.assert_not_called()
+
+    def test_dry_run_prints_and_returns(self, capsys):
+        sess = MagicMock()
+        scan_data = {
+            "ungated_count": 2,
+            "ungated_issues": [
+                {"identifier": "BTCAAAAA-100", "title": "Fix A"},
+                {"identifier": "BTCAAAAA-101", "title": "Fix B"},
+            ],
+        }
+        ok = create_alert("http://base", "comp", sess, scan_data, dry_run=True)
+        assert ok is True
+        sess.post.assert_not_called()
+        captured = capsys.readouterr()
+        assert "BTCAAAAA-100" in captured.out
+        assert "BTCAAAAA-101" in captured.out
+
+    def test_posts_alert_with_ungated(self):
+        sess = MagicMock()
+        sess.post.return_value.json.return_value = {"id": "alert-uuid", "identifier": "BTCAAAAA-200"}
+        scan_data = {
+            "ungated_count": 1,
+            "ungated_issues": [
+                {"identifier": "BTCAAAAA-100", "title": "Fix ungate"},
+            ],
+        }
+        ok = create_alert("http://base", "comp-id", sess, scan_data, dry_run=False)
+        assert ok is True
+        sess.post.assert_called_once()
+        args, kw = sess.post.call_args
+        assert "comp-id" in args[0]
+        payload = kw["json"]
+        assert payload["priority"] == "medium"
+        assert payload["labels"] == ["impact-gate-alert"]
+        assert "BTCAAAAA-100" in payload["body"]
+
+    def test_api_error_returns_false(self):
+        sess = MagicMock()
+        sess.post.side_effect = RuntimeError("API timeout")
+        scan_data = {
+            "ungated_count": 1,
+            "ungated_issues": [{"identifier": "BTCAAAAA-100", "title": "Fix"}],
+        }
+        ok = create_alert("http://base", "comp", sess, scan_data, dry_run=False)
+        assert ok is False
+
+    def test_table_includes_identifiers(self):
+        sess = MagicMock()
+        sess.post.return_value.json.return_value = {"id": "u"}
+        scan_data = {
+            "ungated_count": 2,
+            "ungated_issues": [
+                {"identifier": "BTCAAAAA-100", "title": "Fix A"},
+                {"identifier": "BTCAAAAA-101", "title": "Fix B"},
+            ],
+        }
+        create_alert("http://base", "comp", sess, scan_data, dry_run=False)
+        _, kw = sess.post.call_args
+        body = kw["json"]["body"]
+        assert "| BTCAAAAA-100 | Fix A |" in body
+        assert "| BTCAAAAA-101 | Fix B |" in body
+
+
+class TestMain:
+    def test_exits_on_missing_file(self):
+        test_args = ["scan_done_alert.py", "--scan-output", "/tmp/nonexistent_scan_output.json"]
+        old_argv, sys.argv = sys.argv, test_args
+        try:
+            try:
+                main()
+            except SystemExit as e:
+                assert e.code == 1
+        finally:
+            sys.argv = old_argv
+
+    def test_calls_create_alert_with_parsed_data(self, monkeypatch, tmp_path):
+        out = tmp_path / "scan-out.json"
+        out.write_text(json.dumps({"ungated_count": 0, "ungated_issues": []}))
+        monkeypatch.setattr(sys, "argv", ["scan_done_alert.py", "--scan-output", str(out)])
+        called = []
+        monkeypatch.setattr(_alert, "create_alert", lambda *a, **kw: (called.append(True) or True))
+        monkeypatch.setattr(_alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp"))
+        main()
+        assert len(called) == 1
+
+    def test_dry_run_flag_passed(self, monkeypatch, tmp_path):
+        out = tmp_path / "scan-out.json"
+        out.write_text(json.dumps({"ungated_count": 1, "ungated_issues": [{"identifier": "X", "title": "Y"}]}))
+        monkeypatch.setattr(sys, "argv", ["scan_done_alert.py", "--scan-output", str(out), "--dry-run"])
+        kwargs_store = {}
+        def track(base_url, company_id, sess, scan_data, dry_run):
+            kwargs_store["dry_run"] = dry_run
+            return True
+        monkeypatch.setattr(_alert, "create_alert", track)
+        monkeypatch.setattr(_alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp"))
+        main()
+        assert kwargs_store.get("dry_run") is True

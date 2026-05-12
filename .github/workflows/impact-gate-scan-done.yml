@@ -59,6 +59,7 @@ jobs:
         run: mkdir -p data
 
       - name: Run Impact Gate scan-done
+        id: scan
         env:
           QT_QPA_PLATFORM: offscreen
           PYTHONPATH: src
@@ -74,4 +75,16 @@ jobs:
           if [ -n "$DAYS" ]; then
             FLAGS="$FLAGS --days-back $DAYS"
           fi
-          python scripts/scan_fix_issues_done.py $FLAGS
+          python scripts/scan_fix_issues_done.py $FLAGS > /tmp/scan-output.json
+          rc=$?
+          echo "exit_code=$rc" >> $GITHUB_OUTPUT
+          cat /tmp/scan-output.json
+          exit $rc
+
+      - name: Create alert on ungated issues
+        if: failure()
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/scan_done_alert.py \
+            --scan-output /tmp/scan-output.json
