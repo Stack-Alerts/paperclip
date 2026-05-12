@@ -38,6 +38,7 @@ from src.strategy_builder.ui.strategy_info_panel import StrategyInfoPanel
 from src.strategy_builder.ui.block_search_panel import BlockSearchPanel
 from src.strategy_builder.ui.strategy_blocks_panel import StrategyBlocksPanel
 from src.strategy_builder.ui.validation_report_window import ValidationReportWindow
+from src.strategy_builder.ui.validation_dialog import ValidationDialog
 from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
 from src.optimizer_v3.validation.institutional_validator import InstitutionalValidator
 from src.strategy_builder.ui.data_update_modal import DataUpdateModal
@@ -348,6 +349,7 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         
         # Track open windows (singleton pattern)
         self.validation_window: Optional[ValidationReportWindow] = None
+        self.validation_dialog: Optional[ValidationDialog] = None
         self.browser_window: Optional[StrategyBrowserDialog] = None
         self.backtest_window: Optional[BacktestConfigDialog] = None
         self.log_viewer_window: Optional['LogViewerWindow'] = None
@@ -1579,6 +1581,16 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
                 self.validation_window.destroyed.connect(lambda: setattr(self, 'validation_window', None))
 
                 self.validation_window.show()  # QMainWindow uses .show(), not .exec_()
+                
+                # BTCAAAAA-2119: Show ValidationDialog (non-modal) so the "Generate
+                # Nautilus Code" button in ValidationPanel is reachable after validation.
+                if self.validation_dialog and self.validation_dialog.isVisible():
+                    self.validation_dialog.close()
+                self.validation_dialog = ValidationDialog(self.orchestrator, self)
+                self.validation_dialog.destroyed.connect(
+                    lambda: setattr(self, 'validation_dialog', None)
+                )
+                self.validation_dialog.show()
                 
                 # Update stepper state based on validation result
                 if report.is_valid:
