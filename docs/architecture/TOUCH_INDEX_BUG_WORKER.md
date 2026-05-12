@@ -41,7 +41,7 @@ Bug Ingestion Worker ──► 1. Git commit scan (primary — conventional comm
 
 ### File Extraction Strategy
 
-The worker tries two sources in order, stopping when files are found:
+The worker tries three sources in order, stopping when files are found:
 
 1. **Git commits (primary — highest signal):** Runs
    `git log --all --grep=<identifier>` to find commits referencing the bug
@@ -58,8 +58,14 @@ The worker tries two sources in order, stopping when files are found:
    backtick-wrapped paths and bare path patterns.  Same source-file filter
    is applied for consistency.
 
-If both sources return nothing, the issue is skipped (logged with
-`skipped_no_commits=True`).
+3. **Issue description (lowest signal):** If both git and comments return
+   no results, the worker parses the issue body text via the same
+   `extract_files_from_text()` function used for comments.  This catches
+   cases where the issue description explicitly lists touched files but no
+   agent done-comment or fix commit exists.
+
+If all three sources return nothing, the issue is skipped (logged with
+`skipped_no_commits=True` and `source='none'`).
 
 ### Idempotent Upsert
 
