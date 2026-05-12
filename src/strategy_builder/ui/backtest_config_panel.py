@@ -210,6 +210,16 @@ class DictWrapper:
             return len(self._data)
         return 0
 
+    def items(self):
+        if isinstance(self._data, dict):
+            return self._data.items()
+        return []
+
+    def values(self):
+        if isinstance(self._data, dict):
+            return self._data.values()
+        return []
+
     def __repr__(self):
         return f"DictWrapper({self._data})"
 
