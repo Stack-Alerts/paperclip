@@ -881,6 +881,80 @@ class TestMain:
     # --validate with --issue-id (single-issue mode)
     # -------------------------------------------------------------------
 
+    def test_main_validate_stale_hours_polling(self, monkeypatch):
+        """--stale-hours is passed through to run_quality_checks in polling mode."""
+        engine = MagicMock()
+        issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "description": ""}]
+        worker_results = [
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-100",
+                issue_id="id-1",
+                files_indexed=2,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
+            patch("touch_index.fr_worker.run_fr_worker", return_value=worker_results),
+            patch("touch_index.quality.run_quality_checks") as mock_quality,
+            patch("touch_index.paperclip_client.transition_issue_status"),
+        ):
+            mock_quality.return_value.passed = True
+            monkeypatch.setattr("sys.argv", ["touch_index", "--validate", "--stale-hours", "48"])
+            main()
+
+        mock_quality.assert_called_once_with(engine, stale_threshold_hours=48)
+
+    def test_main_validate_stale_hours_no_issues(self, monkeypatch):
+        """--stale-hours with no issues still passes argument to quality checks."""
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_fdr_issues", return_value=[]),
+            patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
+            patch("touch_index.quality.run_quality_checks") as mock_quality,
+        ):
+            mock_quality.return_value.passed = True
+            monkeypatch.setattr("sys.argv", ["touch_index", "--validate", "--stale-hours", "72"])
+            main()
+
+        mock_worker.assert_not_called()
+        mock_quality.assert_called_once_with(engine, stale_threshold_hours=72)
+
+    def test_main_validate_stale_hours_issue_id(self, monkeypatch):
+        """--stale-hours with --issue-id passes argument to quality checks."""
+        engine = MagicMock()
+        result = FRIngestionResult(
+            issue_identifier="BTCAAAAA-100",
+            issue_id="uuid-1",
+            files_indexed=2,
+            source="comments",
+            skipped_no_commits=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.fr_worker.process_fr_issue", return_value=result),
+            patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
+            patch("touch_index.quality.run_quality_checks") as mock_quality,
+            patch("touch_index.paperclip_client.transition_issue_status"),
+        ):
+            mock_quality.return_value.passed = True
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--issue-id", "uuid-1", "--validate", "--stale-hours", "96"]
+            )
+            main()
+
+        mock_fetch.assert_not_called()
+        mock_quality.assert_called_once_with(engine, stale_threshold_hours=96)
+
     def test_main_validate_issue_id_passed(self, monkeypatch, caplog):
         """--validate --issue-id: validation runs after single-issue processing."""
         import logging
