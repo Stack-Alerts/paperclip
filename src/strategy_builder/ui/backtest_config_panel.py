@@ -3332,8 +3332,15 @@ class BacktestConfigPanel(QWidget):
         mode = self.mode_group.checkedId()
         
         end_date = datetime.now(timezone.utc)
-        start_date = end_date - timedelta(days=lookback_days)
-        
+
+        # Mode 1: start_date is derived from training_days + testing_days
+        # so the full data window exactly covers both phases regardless of
+        # lookback_days (which is a separate UI parameter for Mode 2).
+        if mode == 1:
+            start_date = end_date - timedelta(days=training_days + testing_days)
+        else:
+            start_date = end_date - timedelta(days=lookback_days)
+
         config = {
             # Basic settings
             'lookback_days': lookback_days,
@@ -3343,7 +3350,7 @@ class BacktestConfigPanel(QWidget):
             'start_date': start_date,
             'end_date': end_date,
             'timeframe': '15m',
-            
+
             # Risk/Reward settings (CRITICAL - was missing!)
             'starting_capital': self.capital_spin.value(),
             'risk_per_trade_pct': self.risk_spin.value(),
@@ -3351,7 +3358,7 @@ class BacktestConfigPanel(QWidget):
             'max_leverage': self.leverage_spin.value(),
             'confluence_threshold': self.confluence_spin.value(),
             'max_bars_held': self.max_bars_spin.value(),
-            
+
             # Adaptive SL v2.0 settings (CRITICAL - was missing!)
             'adaptive_sl': {
                 'enabled': self.sl_combo.currentText() == 'Adaptive v2.0',
@@ -3366,12 +3373,12 @@ class BacktestConfigPanel(QWidget):
                 'structure_sources': ['swing_points', 'supply_demand', 'fibonacci']
             }
         }
-        
-        # Mode 1: Include training/testing windows
+
+        # Mode 1: Include training/testing windows with correct split dates
         if mode == 1:
             config['training_window'] = training_days
             config['testing_window'] = testing_days
-            
+
             # Calculate split dates for Mode 1
             config['training_end'] = start_date + timedelta(days=training_days)
             config['testing_start'] = config['training_end']
