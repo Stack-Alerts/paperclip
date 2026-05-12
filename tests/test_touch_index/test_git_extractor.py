@@ -79,8 +79,14 @@ class TestIsSourceFile:
     def test_skips_coveragerc(self):
         assert _is_source_file(".coveragerc") is False
 
+    def test_skips_env_example(self):
+        assert _is_source_file(".env.example") is False
+
     def test_skips_archived_prefix(self):
         assert _is_source_file("scripts/archived/foo.py") is False
+
+    def test_skips_root_archived(self):
+        assert _is_source_file("archived/utils_strategy_builder_legacy/foo.py") is False
 
     def test_skips_rst(self):
         assert _is_source_file("docs/readme.rst") is False
