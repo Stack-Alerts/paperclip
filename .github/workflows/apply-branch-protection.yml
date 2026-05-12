@@ -28,7 +28,6 @@ jobs:
           echo "current=$RESULT" >> "$GITHUB_OUTPUT"
 
       - name: Apply or update branch protection
-        if: steps.check.outputs.current == 'not_protected'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
