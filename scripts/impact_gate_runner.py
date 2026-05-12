@@ -45,6 +45,7 @@ Exit codes
   1 — one or more tests failed or errored
   2 — argument / usage error
 """
+
 from __future__ import annotations
 
 import argparse
@@ -68,6 +69,7 @@ BUG_REGRESSION_DIR = REPO_ROOT / "tests" / "bug_regression"
 # ID → file path resolution
 # ---------------------------------------------------------------------------
 
+
 def _fr_test_path(fr_id: str) -> Path:
     """Map 'FDR-850' → tests/fr_acceptance/test_fdr_850.py"""
     m = re.fullmatch(r"FDR-(\d+)", fr_id, re.IGNORECASE)
@@ -87,6 +89,7 @@ def _bug_test_path(bug_id: str) -> Path:
 # ---------------------------------------------------------------------------
 # JUnit XML parsing  (uses pytest --junitxml — no extra packages required)
 # ---------------------------------------------------------------------------
+
 
 def _parse_junit(xml_path: str, file_paths: list[Path]) -> dict[str, list[dict]]:
     """
@@ -110,7 +113,9 @@ def _parse_junit(xml_path: str, file_paths: list[Path]) -> dict[str, list[dict]]
         matched_file = None
         for p in file_paths:
             rel = str(p.relative_to(REPO_ROOT)).replace("/", ".").removesuffix(".py")
-            if classname.startswith(rel) or file_part.startswith(str(p.relative_to(REPO_ROOT)).removesuffix(".py").replace("/", ".")):
+            if classname.startswith(rel) or file_part.startswith(
+                str(p.relative_to(REPO_ROOT)).removesuffix(".py").replace("/", ".")
+            ):
                 matched_file = str(p.relative_to(REPO_ROOT))
                 break
 
@@ -142,11 +147,13 @@ def _parse_junit(xml_path: str, file_paths: list[Path]) -> dict[str, list[dict]]
 
         nodeid = f"{matched_file}::{classname.split('.')[-1]}::{name}"
 
-        results.setdefault(matched_file, []).append({
-            "nodeid": nodeid,
-            "outcome": outcome,
-            "message": message,
-        })
+        results.setdefault(matched_file, []).append(
+            {
+                "nodeid": nodeid,
+                "outcome": outcome,
+                "message": message,
+            }
+        )
 
     return results
 
@@ -154,6 +161,7 @@ def _parse_junit(xml_path: str, file_paths: list[Path]) -> dict[str, list[dict]]
 # ---------------------------------------------------------------------------
 # Main runner
 # ---------------------------------------------------------------------------
+
 
 def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
     timestamp = datetime.now(timezone.utc).isoformat()
@@ -177,21 +185,37 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
 
     # Pre-populate MISSING entries so they always appear in output
     fr_results: dict[str, dict] = {
-        fid: {"status": "MISSING", "test_file": str(fr_paths[fid].relative_to(REPO_ROOT)), "tests": []}
+        fid: {
+            "status": "MISSING",
+            "test_file": str(fr_paths[fid].relative_to(REPO_ROOT)),
+            "tests": [],
+        }
         for fid in fr_ids
     }
     bug_results: dict[str, dict] = {
-        bid: {"status": "MISSING", "test_file": str(bug_paths[bid].relative_to(REPO_ROOT)), "tests": []}
+        bid: {
+            "status": "MISSING",
+            "test_file": str(bug_paths[bid].relative_to(REPO_ROOT)),
+            "tests": [],
+        }
         for bid in bug_ids
     }
 
-    existing_paths = [p for p in list(fr_paths.values()) + list(bug_paths.values()) if p.exists()]
+    existing_paths = [
+        p for p in list(fr_paths.values()) + list(bug_paths.values()) if p.exists()
+    ]
 
     if not existing_paths:
         return {
             "timestamp": timestamp,
             "status": "ERROR",
-            "summary": {"total": 0, "passed": 0, "failed": 0, "errors": 0, "missing_test_files": len(missing)},
+            "summary": {
+                "total": 0,
+                "passed": 0,
+                "failed": 0,
+                "errors": 0,
+                "missing_test_files": len(missing),
+            },
             "fr_results": fr_results,
             "bug_results": bug_results,
             "missing_test_files": missing,
@@ -202,13 +226,16 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
 
     try:
         cmd = [
-            sys.executable, "-m", "pytest",
+            sys.executable,
+            "-m",
+            "pytest",
             f"--junitxml={junit_path}",
             "-q",
             "--tb=short",
             "--no-header",
-            "-p", "no:cacheprovider",
-            "--no-cov",   # skip coverage for speed; the gate only cares about pass/fail
+            "-p",
+            "no:cacheprovider",
+            "--no-cov",  # skip coverage for speed; the gate only cares about pass/fail
         ] + [str(p) for p in existing_paths]
 
         subprocess.run(
@@ -225,7 +252,13 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
         return {
             "timestamp": timestamp,
             "status": "ERROR",
-            "summary": {"total": 0, "passed": 0, "failed": 0, "errors": 1, "missing_test_files": len(missing)},
+            "summary": {
+                "total": 0,
+                "passed": 0,
+                "failed": 0,
+                "errors": 1,
+                "missing_test_files": len(missing),
+            },
             "fr_results": fr_results,
             "bug_results": bug_results,
             "error": "pytest timed out after 120s",
@@ -234,7 +267,13 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
         return {
             "timestamp": timestamp,
             "status": "ERROR",
-            "summary": {"total": 0, "passed": 0, "failed": 0, "errors": 1, "missing_test_files": len(missing)},
+            "summary": {
+                "total": 0,
+                "passed": 0,
+                "failed": 0,
+                "errors": 1,
+                "missing_test_files": len(missing),
+            },
             "fr_results": fr_results,
             "bug_results": bug_results,
             "error": f"Failed to parse JUnit XML: {exc}",
@@ -312,6 +351,7 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+
 def _parse_ids(raw: str) -> list[str]:
     return [x.strip() for x in raw.split(",") if x.strip()]
 
@@ -350,13 +390,13 @@ def main() -> int:
     try:
         result = run(fr_ids, bug_ids)
     except ValueError as exc:
-        print(json.dumps({"status": "ERROR", "error": str(exc)}), file=sys.stderr)
+        print(json.dumps({"status": "ERROR", "error": str(exc)}), file=sys.stderr)  # noqa: T201
         return 2
 
     if args.output == "pretty":
-        print(json.dumps(result, indent=2))
+        print(json.dumps(result, indent=2))  # noqa: T201
     else:
-        print(json.dumps(result))
+        print(json.dumps(result))  # noqa: T201
 
     return 0 if result["status"] == "PASS" else 1
 

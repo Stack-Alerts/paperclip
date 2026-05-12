@@ -33,12 +33,16 @@ ALERT_LABEL = "impact-gate-alert"
 def _setup_session():
     sys.path.insert(0, str(REPO_ROOT / "src"))
     from touch_index.paperclip_client import _session, _base, _company
+
     return _session(), _base(), _company()
 
 
 def create_alert(
-    base_url: str, company_id: str, sess,
-    scan_data: dict, dry_run: bool,
+    base_url: str,
+    company_id: str,
+    sess,
+    scan_data: dict,
+    dry_run: bool,
 ) -> bool:
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     ungated = scan_data.get("ungated_issues", [])
@@ -60,7 +64,9 @@ def create_alert(
     lines.append("")
 
     if scan_data.get("retroactive"):
-        lines.append("Retroactive gating was enabled — see `retroactive_results` above.\n")
+        lines.append(
+            "Retroactive gating was enabled — see `retroactive_results` above.\n"
+        )
 
     lines.append(
         "### Next Steps\n\n"
@@ -75,13 +81,18 @@ def create_alert(
 
     if dry_run:
         logger.info("DRY RUN: would create alert issue '%s'", title)
-        print(json.dumps({
-            "title": title,
-            "body": body,
-            "labels": [ALERT_LABEL],
-            "assigneeAgentId": CTO_AGENT_ID,
-            "priority": "medium",
-        }, indent=2))
+        print(  # noqa: T201
+            json.dumps(
+                {
+                    "title": title,
+                    "body": body,
+                    "labels": [ALERT_LABEL],
+                    "assigneeAgentId": CTO_AGENT_ID,
+                    "priority": "medium",
+                },
+                indent=2,
+            )
+        )
         return True
 
     payload = {
@@ -103,7 +114,8 @@ def create_alert(
         created = resp.json()
         logger.info(
             "Created alert issue %s: %s",
-            created.get("identifier", ""), title,
+            created.get("identifier", ""),
+            title,
         )
         return True
     except Exception as exc:
@@ -116,11 +128,14 @@ def main() -> None:
         description="Create Paperclip alert when scan-done finds ungated issues",
     )
     parser.add_argument(
-        "--scan-output", required=True,
+        "--scan-output",
+        required=True,
         help="Path to JSON file produced by scan_fix_issues_done.py --json-summary",
     )
     parser.add_argument(
-        "--dry-run", action="store_true", default=None,
+        "--dry-run",
+        action="store_true",
+        default=None,
         help="Log actions without creating issues (default: follow scan output dry_run field)",
     )
     args = parser.parse_args()
@@ -134,7 +149,9 @@ def main() -> None:
         scan_data = json.load(f)
 
     # If --dry-run was not explicitly set, respect the scan's own dry_run field
-    dry_run = args.dry_run if args.dry_run is not None else scan_data.get("dry_run", False)
+    dry_run = (
+        args.dry_run if args.dry_run is not None else scan_data.get("dry_run", False)
+    )
 
     sess, base_url, company_id = _setup_session()
 
