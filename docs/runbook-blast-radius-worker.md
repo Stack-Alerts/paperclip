@@ -132,8 +132,13 @@ rather than cancel each other.
    prefix `blast-radius-state-`)
 6. **Resolve issue ID and old_status** from event payload (supports both
    `workflow_dispatch` inputs and `repository_dispatch` client_payload)
-7. **Run worker** with appropriate flags
-8. **Save worker state cache** (always, even on failure) — saved under key
+7. **Run worker** with appropriate flags — output captured to
+   `/tmp/br-output.json` via `--json-summary`
+8. **Upload worker output artifact** (always, even on failure) — saved as
+   `blast-radius-worker-output` with 30-day retention for diagnostic access
+9. **Write step summary** — renders a structured Markdown table with mode,
+   dry-run flag, issues processed/errors, and skipped/error result when present
+10. **Save worker state cache** (always, even on failure) — saved under key
    `blast-radius-state-<run_id>` for consumption by the next scheduled run
 
 ### Environment Variables

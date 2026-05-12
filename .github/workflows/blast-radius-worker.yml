@@ -101,11 +101,49 @@ jobs:
           if [ -n "$ISSUE_ID" ]; then
             python -m blast_radius --issue-id "$ISSUE_ID" \
               ${OLD_STATUS:+--old-status "$OLD_STATUS"} \
-              $FLAGS
+              $FLAGS > /tmp/br-output.json 2>&1
           elif [ "${{ github.event.inputs.loop_seconds }}" != "0" ] && [ -n "${{ github.event.inputs.loop_seconds }}" ]; then
-            python -m blast_radius --loop ${{ github.event.inputs.loop_seconds }} $FLAGS
+            python -m blast_radius --loop ${{ github.event.inputs.loop_seconds }} $FLAGS > /tmp/br-output.json 2>&1
           else
-            python -m blast_radius $FLAGS
+            python -m blast_radius $FLAGS > /tmp/br-output.json 2>&1
+          fi
+
+      - name: Upload worker output artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blast-radius-worker-output
+          path: /tmp/br-output.json
+          retention-days: 30
+
+      - name: Write step summary
+        if: always()
+        run: |
+          if [ -f /tmp/br-output.json ]; then
+            python3 -c "
+import json
+with open('/tmp/br-output.json') as f:
+    data = json.load(f)
+mode = data.get('mode', 'unknown')
+dry_run = data.get('dry_run', False)
+issues = data.get('issues_processed', 'N/A')
+errors = data.get('issues_with_errors', 0)
+result = data.get('result', {})
+print(f'## Blast Radius Worker Summary')
+print(f'')
+print(f'| Metric | Value |')
+print(f'|---|---|')
+print(f'| Mode | {mode} |')
+print(f'| Dry run | {dry_run} |')
+print(f'| Issues processed | {issues} |')
+print(f'| Issues with errors | {errors} |')
+if result:
+    skipped = result.get('skipped', False)
+    error = result.get('error')
+    print(f'| Skipped | {skipped} |')
+    if error:
+        print(f'| Error | {error} |')
+" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Save worker state cache
