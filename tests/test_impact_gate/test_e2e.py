@@ -105,6 +105,7 @@ class TestImpactGateRunnerE2E:
         assert "passed" in summary
         assert "failed" in summary
         assert "errors" in summary
+        assert "zero_test_files" in summary
         assert "missing_test_files" in summary
         # Result entry keys
         for entry in list(result["fr_results"].values()) + list(result["bug_results"].values()):
@@ -123,6 +124,27 @@ class TestImpactGateRunnerE2E:
             assert "outcome" in t
             assert t["outcome"] in ("passed", "failed", "error", "skipped")
             assert "test_fdr_850" in t["nodeid"]
+
+
+    def test_runner_with_zero_tests_returns_error(self):
+        """Runner returns ERROR when a test file exists but collects zero tests."""
+        temp_file = _REPO_ROOT / "tests" / "fr_acceptance" / "test_fdr_99997.py"
+        try:
+            temp_file.write_text(
+                "import pytest\n"
+                "\n"
+                "# No test functions - zero tests collected\n"
+            )
+            result = run_impact_gate_runner(["FDR-99997"], [])
+            assert result["status"] == "ERROR", f"Expected ERROR, got {result['status']}"
+            assert "FDR-99997" in result["fr_results"]
+            fr_entry = result["fr_results"]["FDR-99997"]
+            assert fr_entry["status"] == "ERROR"
+            assert fr_entry["test_file"] == "tests/fr_acceptance/test_fdr_99997.py"
+            assert result["summary"]["zero_test_files"] == 1
+        finally:
+            if temp_file.exists():
+                temp_file.unlink()
 
 
 class TestImpactGateRunnerCLI:
