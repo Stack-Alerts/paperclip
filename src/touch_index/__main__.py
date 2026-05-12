@@ -353,6 +353,13 @@ def _run_fr_cli() -> None:
     )
 
     
+    if args.validate:
+        report = run_quality_checks(engine)
+        if not report.passed:
+            logger.error("VALIDATION FAILED after ingestion \u2014 investigate")
+            raise SystemExit(1)
+        logger.info("VALIDATION PASSED: all quality checks clean")
+
     if args.json_summary:
         _emit_json_summary(
             args,
@@ -360,14 +367,9 @@ def _run_fr_cli() -> None:
             results=results,
             total_files=total_files,
             skipped=skipped,
+            quality_report=locals().get("report"),
         )
 
-    if args.validate:
-        report = run_quality_checks(engine)
-        if not report.passed:
-            logger.error("VALIDATION FAILED after ingestion \u2014 investigate")
-            raise SystemExit(1)
-        logger.info("VALIDATION PASSED: all quality checks clean")
 
 
 def main() -> None:
