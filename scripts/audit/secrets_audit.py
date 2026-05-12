@@ -125,8 +125,9 @@ def main() -> None:
     for fpath in py_files:
         if "__pycache__" in str(fpath):
             continue
-        if "/archived/" in str(fpath):
-            continue
+        # Note: archived/ directories are NOT excluded.
+        # Archived scripts with hardcoded secrets are still a security risk
+        # (git history exposure, accidental un-archiving).
         all_findings.extend(scan_file(fpath))
 
     for finding in all_findings:

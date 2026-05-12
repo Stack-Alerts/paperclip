@@ -492,8 +492,8 @@ else:
    from datetime import datetime
    
    session = boto3.Session(
-       aws_access_key_id='REDACTED_AWS_KEY',
-       aws_secret_access_key='REDACTED_AWS_SECRET',
+       aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID', ''),
+       aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY', ''),
        region_name='eu-west-1'
    )
    
@@ -559,8 +559,8 @@ botocore.exceptions.NoCredentialsError
 import boto3
 
 session = boto3.Session(
-    aws_access_key_id='REDACTED_AWS_KEY',
-    aws_secret_access_key='REDACTED_AWS_SECRET',
+    aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID', ''),
+    aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY', ''),
     region_name='eu-west-1'
 )
 

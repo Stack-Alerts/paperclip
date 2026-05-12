@@ -1,12 +1,13 @@
 """
+import os
 Check what data is actually available from Crypto-lake
 """
 
 import boto3
 from datetime import datetime
 
-AWS_ACCESS_KEY = "REDACTED_AWS_KEY"
-AWS_SECRET_KEY = "REDACTED_AWS_SECRET"
+AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID", "")
+AWS_SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
 BUCKET_NAME = "crypto-lake"
 
 def check_availability():

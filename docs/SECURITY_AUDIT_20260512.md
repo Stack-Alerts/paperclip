@@ -22,8 +22,8 @@ Four categories assessed. **2 CRITICAL**, 1 HIGH, 1 MEDIUM findings.
 
 **File:** `scripts/LakeAPI/test_lakeapi_data.py:13-14`
 **Credentials exposed:**
-- `AWS_ACCESS_KEY_ID = 'REDACTED_AWS_KEY'`
-- `AWS_SECRET_ACCESS_KEY = 'REDACTED_AWS_SECRET'`
+- `AWS_ACCESS_KEY_ID = 'AKIA************DBUD'`
+- `AWS_SECRET_ACCESS_KEY = 'V7HUS********************************JOz8'`
 
 **Scope:** Hardcoded string literals in a `.py` file committed to `main` (commit `3c41f68`). Present in the current tip of `main`.
 
@@ -93,7 +93,7 @@ Four categories assessed. **2 CRITICAL**, 1 HIGH, 1 MEDIUM findings.
 
 ## Immediate Next Steps
 
-1. **Rotate AWS credentials** `REDACTED_AWS_KEY` — contact AWS admin
+1. **Rotate AWS credentials** `AKIA************DBUD` — contact AWS admin
 2. **Rotate all credentials** from the initial `.env` commit
 3. **Purge `.env` from git history** using `git filter-repo`
 4. **Enable branch protection** on `main`
