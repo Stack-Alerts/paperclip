@@ -49,10 +49,13 @@ Expected Performance:
 from nautilus_trader.trading.strategy import Strategy
 from nautilus_trader.model.data import Bar
 from nautilus_trader.model.enums import OrderSide, TimeInForce
-from nautilus_trader.model.objects import Quantity, Price
+from nautilus_trader.model.objects import Money, Price, Quantity
+from nautilus_trader.model.currencies import USD
 import pandas as pd
 from datetime import datetime
 from typing import Optional
+from nautilus_trader.model.identifiers import InstrumentId
+from src.strategies.risk_enforcer import RiskEnforcer
 
 # Import building blocks
 from src.detectors.building_blocks.moving_averages.ema_20_50_trend import EMA2050Trend
@@ -85,6 +88,12 @@ class EMATrendContinuation(Strategy):
         self.max_bars_held = 1000
         self.lookback_period = 200  # Need more history for EMA 200
         self.min_risk_reward = 1.2
+        self.max_leverage = 1.0
+        self.risk_per_trade_pct = 1.0
+        self.daily_pnl_usd = 0.0
+        self.last_pnl_reset_utc = None
+        self.instrument_id = InstrumentId.from_str("BTC/USDT.BINANCE")
+        self.risk = RiskEnforcer(self)
         
         # Trend state tracking
         self.current_trend = None  # 'BULLISH', 'BEARISH', or None
@@ -159,6 +168,11 @@ class EMATrendContinuation(Strategy):
         
         if len(df) < self.lookback_period:
             return
+        
+        # Reset daily PnL at UTC midnight
+        if RiskEnforcer.should_reset_daily_pnl(self.last_pnl_reset_utc):
+            self.daily_pnl_usd = 0.0
+            self.last_pnl_reset_utc = __import__('time').time()
         
         # Run building block analysis
         results = self._analyze_blocks(df)
@@ -304,6 +318,17 @@ class EMATrendContinuation(Strategy):
         self.log.info(f"TP1: {tp1}, TP2: {tp2}, TP3: {tp3}")
         self.log.info(f"R:R: {rr_ratio:.2f}")
         self.log.info(f"Fib Level: {fib_signal}")
+        
+        # Pre-trade risk enforcement
+        side = OrderSide.BUY if self.current_trend == 'BULLISH' else OrderSide.SELL
+        self.risk.check_and_submit(
+            side=side,
+            quantity=Quantity.from_str("0.001"),
+            price=Price(str(round(current_price, 2))),
+            entry_price=current_price,
+            instrument_id=self.instrument_id,
+            daily_pnl=Money(f"{self.daily_pnl_usd:.2f}", USD),
+        )
     
     def on_stop(self):
         """Called when strategy stops"""

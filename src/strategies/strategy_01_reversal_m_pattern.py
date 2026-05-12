@@ -46,10 +46,13 @@ Expected Performance:
 from nautilus_trader.trading.strategy import Strategy
 from nautilus_trader.model.data import Bar
 from nautilus_trader.model.enums import OrderSide, TimeInForce
-from nautilus_trader.model.objects import Quantity, Price
+from nautilus_trader.model.objects import Money, Price, Quantity
+from nautilus_trader.model.currencies import USD
 import pandas as pd
 from datetime import datetime
 from typing import Optional
+from nautilus_trader.model.identifiers import InstrumentId
+from src.strategies.risk_enforcer import RiskEnforcer
 
 # Import REAL building blocks (INSTITUTIONAL GRADE)
 from src.detectors.building_blocks.patterns.double_top import DoubleTopPattern
@@ -99,8 +102,12 @@ class MPatternReversalStandard(Strategy):
         self.capital_allocation_pct = 10.0  # Default allocation
         
         # Risk management
-        self.max_leverage = 2.0
+        self.max_leverage = 1.0
         self.risk_per_trade_pct = 1.0
+        self.daily_pnl_usd = 0.0
+        self.last_pnl_reset_utc = None
+        self.instrument_id = InstrumentId.from_str("BTC/USDT.BINANCE")
+        self.risk = RiskEnforcer(self)
         self.min_risk_reward = 2.0
         
         # Pattern detection parameters
@@ -261,6 +268,11 @@ class MPatternReversalStandard(Strategy):
         if len(df) < self.lookback_period:
             return
         
+        # Reset daily PnL at UTC midnight
+        if RiskEnforcer.should_reset_daily_pnl(self.last_pnl_reset_utc):
+            self.daily_pnl_usd = 0.0
+            self.last_pnl_reset_utc = __import__('time').time()
+        
         # Run building block analysis
         results = self._analyze_blocks(df)
         
@@ -361,9 +373,15 @@ class MPatternReversalStandard(Strategy):
         # Calculate position size (1% risk)
         quantity = self._calculate_position_size(risk)
         
-        # In production, create and submit order here
-        # order = MarketOrder(...)
-        # self.submit_order(order)
+        # Pre-trade risk enforcement
+        self.risk.check_and_submit(
+            side=OrderSide.SELL,
+            quantity=quantity,
+            price=Price(str(round(current_price, 2))),
+            entry_price=current_price,
+            instrument_id=self.instrument_id,
+            daily_pnl=Money(f"{self.daily_pnl_usd:.2f}", USD),
+        )
         
         # Log trade details
         self.log.info(f"Entry: {quantity} @ {current_price}")
@@ -437,6 +455,7 @@ class MPatternReversalStandard(Strategy):
         # Update win/loss counters
         pnl = position_data.get('pnl', 0)
         
+        self.daily_pnl_usd += pnl
         if pnl > 0:
             self.wins += 1
         else:
@@ -445,6 +464,7 @@ class MPatternReversalStandard(Strategy):
         # Log performance
         win_rate = (self.wins / self.trades_count * 100) if self.trades_count > 0 else 0
         self.log.info(f"Performance: {self.wins}W / {self.losses}L = {win_rate:.1f}% win rate")
+        self.log.info(f"Daily PnL: ${self.daily_pnl_usd:.2f}")
         
         # Calculate average confluence for winners vs losers
         if len(self.total_confluence_scores) > 0:

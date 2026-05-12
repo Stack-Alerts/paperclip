@@ -34,10 +34,13 @@ Risk Management:
 from nautilus_trader.trading.strategy import Strategy
 from nautilus_trader.model.data import Bar
 from nautilus_trader.model.enums import OrderSide, TimeInForce
-from nautilus_trader.model.objects import Quantity, Price
+from nautilus_trader.model.objects import Money, Price, Quantity
+from nautilus_trader.model.currencies import USD
 import pandas as pd
 from datetime import datetime
 from typing import Optional
+from nautilus_trader.model.identifiers import InstrumentId
+from src.strategies.risk_enforcer import RiskEnforcer
 
 # Import building blocks
 from src.detectors.building_blocks.fibonacci.fibonacci_retracements import FibonacciRetracements
@@ -81,8 +84,12 @@ class StrategyHodRejection(Strategy):
         self.capital_allocation_pct = 10.0
         
         # Risk management
-        self.max_leverage = 15.0
-        self.risk_per_trade_pct = 15.0
+        self.max_leverage = 1.0
+        self.risk_per_trade_pct = 1.0
+        self.daily_pnl_usd = 0.0
+        self.last_pnl_reset_utc = None
+        self.instrument_id = InstrumentId.from_str("BTC/USDT.BINANCE")
+        self.risk = RiskEnforcer(self)
         self.min_risk_reward = 3.0
         
         # Initialize building blocks
@@ -172,6 +179,11 @@ class StrategyHodRejection(Strategy):
         if len(df) < 100:  # Minimum warmup period
             return
         
+        # Reset daily PnL at UTC midnight
+        if RiskEnforcer.should_reset_daily_pnl(self.last_pnl_reset_utc):
+            self.daily_pnl_usd = 0.0
+            self.last_pnl_reset_utc = __import__('time').time()
+        
         # Run building block analysis
         results = self._analyze_blocks(df)
         
@@ -245,6 +257,16 @@ class StrategyHodRejection(Strategy):
         # Calculate position size
         quantity = self._calculate_position_size(risk)
         
+        # Pre-trade risk enforcement
+        self.risk.check_and_submit(
+            side=OrderSide.BUY,
+            quantity=quantity,
+            price=Price(str(round(current_price, 2))),
+            entry_price=current_price,
+            instrument_id=self.instrument_id,
+            daily_pnl=Money(f"{self.daily_pnl_usd:.2f}", USD),
+        )
+        
         # Log trade details
         self.log.info(f"Entry: {quantity} @ {current_price}")
         self.log.info(f"TP1: {tp1}, TP2: {tp2}, TP3: {tp3}")
@@ -295,6 +317,7 @@ class StrategyHodRejection(Strategy):
     def on_position_closed(self, position_data):
         """Track performance when position closes"""
         pnl = position_data.get('pnl', 0)
+        self.daily_pnl_usd += pnl
         
         if pnl > 0:
             self.wins += 1
@@ -304,6 +327,7 @@ class StrategyHodRejection(Strategy):
         # Log performance
         win_rate = (self.wins / self.trades_count * 100) if self.trades_count > 0 else 0
         self.log.info(f"Performance: {self.wins}W / {self.losses}L = {win_rate:.1f}% win rate")
+        self.log.info(f"Daily PnL: ${self.daily_pnl_usd:.2f}")
     
     def on_stop(self):
         """Called when strategy stops"""

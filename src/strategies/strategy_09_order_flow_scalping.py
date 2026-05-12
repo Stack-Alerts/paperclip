@@ -45,10 +45,13 @@ Expected Performance:
 from nautilus_trader.trading.strategy import Strategy
 from nautilus_trader.model.data import Bar
 from nautilus_trader.model.enums import OrderSide, TimeInForce
-from nautilus_trader.model.objects import Quantity, Price
+from nautilus_trader.model.objects import Money, Price, Quantity
+from nautilus_trader.model.currencies import USD
 import pandas as pd
 from datetime import datetime
 from typing import Optional
+from nautilus_trader.model.identifiers import InstrumentId
+from src.strategies.risk_enforcer import RiskEnforcer
 
 # Import building blocks
 from src.detectors.building_blocks.institutional.order_flow_imbalance import OrderFlowImbalance
@@ -78,6 +81,12 @@ class OrderFlowScalping(Strategy):
         self.max_bars_held = 24  # 6 hours max
         self.lookback_period = 100
         self.min_risk_reward = 1.0
+        self.max_leverage = 1.0
+        self.risk_per_trade_pct = 1.0
+        self.daily_pnl_usd = 0.0
+        self.last_pnl_reset_utc = None
+        self.instrument_id = InstrumentId.from_str("BTC/USDT.BINANCE")
+        self.risk = RiskEnforcer(self)
         
         # Position tracking
         self.entry_bar = None
@@ -147,6 +156,11 @@ class OrderFlowScalping(Strategy):
         
         if len(df) < self.lookback_period:
             return
+        
+        # Reset daily PnL at UTC midnight
+        if RiskEnforcer.should_reset_daily_pnl(self.last_pnl_reset_utc):
+            self.daily_pnl_usd = 0.0
+            self.last_pnl_reset_utc = __import__('time').time()
         
         # Check if we have open position
         if not self.portfolio.is_flat(self.instrument_id):
@@ -256,6 +270,17 @@ class OrderFlowScalping(Strategy):
         self.log.info(f"Entry: {current_price}, SL: {sl}")
         self.log.info(f"TP1 (FVG): {tp1}, TP2: {tp2}, TP3: {tp3}")
         self.log.info(f"R:R: {rr_ratio:.2f}")
+        
+        # Pre-trade risk enforcement
+        order_side = OrderSide.BUY if side == 'LONG' else OrderSide.SELL
+        self.risk.check_and_submit(
+            side=order_side,
+            quantity=Quantity.from_str("0.001"),
+            price=Price(str(round(current_price, 2))),
+            entry_price=current_price,
+            instrument_id=self.instrument_id,
+            daily_pnl=Money(f"{self.daily_pnl_usd:.2f}", USD),
+        )
     
     def _manage_position(self):
         """Manage open position"""
