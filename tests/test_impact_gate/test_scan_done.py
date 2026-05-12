@@ -165,7 +165,13 @@ class TestScanFunction:
         result = _scan.scan()
         assert result["total_done_fix_issues"] == 0
         assert result["ungated_count"] == 0
-        assert result["gated"] == {"pass": 0, "fail": 0, "bypassed": 0, "error": 0, "skipped": 0}
+        assert result["gated"] == {
+            "pass": 0,
+            "fail": 0,
+            "bypassed": 0,
+            "error": 0,
+            "skipped": 0,
+        }
 
     def test_scan_filters_fix_issues(self, monkeypatch):
         monkeypatch.setattr(
@@ -418,7 +424,13 @@ class TestScanFunction:
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
 
         def mock_comments(iid):
-            mapping = {"u1": "PASS", "u2": "FAIL", "u3": "BYPASSED", "u4": "ERROR", "u5": "SKIPPED"}
+            mapping = {
+                "u1": "PASS",
+                "u2": "FAIL",
+                "u3": "BYPASSED",
+                "u4": "ERROR",
+                "u5": "SKIPPED",
+            }
             status = mapping.get(iid, "PASS")
             return [{"body": f"## Impact Gate: {status}"}]
 
