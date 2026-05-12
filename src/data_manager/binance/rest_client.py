@@ -360,7 +360,7 @@ class BinanceRestClient:
         logger.info(f"   Time range: {df['timestamp'].min()} to {df['timestamp'].max()}")
         
         # INSTITUTIONAL: Check freshness and use fallback if stale
-        if len(df) > 0:
+        if len(df) > 0 and start_time is None:
             latest = pd.to_datetime(df['timestamp'].iloc[-1])
             # timestamps are now UTC-naive; strip tzinfo for comparison so the
             # delay calculation is correct regardless of machine timezone.
