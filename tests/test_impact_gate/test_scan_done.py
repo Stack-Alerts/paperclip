@@ -203,9 +203,11 @@ class TestScanFunction:
         ])
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
         monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [{"body": "Other comment"}])
-        process_called = []
-        monkeypatch.setattr(_scan, "process_issue", lambda iid, dry_run=False, **kwargs: (process_called.append(iid) or {"gate_status": "PASS"}))
+        calls = []
+        monkeypatch.setattr(_scan, "process_issue", lambda iid, dry_run=False, **kwargs: (calls.append({"iid": iid, "kwargs": kwargs}) or {"gate_status": "PASS"}))
         result = _scan.scan(dry_run=False, retroactive=True)
-        assert len(process_called) == 1
+        assert len(calls) == 1
+        assert calls[0]["iid"] == "u1"
+        assert calls[0]["kwargs"].get("force") is True
         assert "retroactive_results" in result
         assert result["retroactive_results"][0]["gate_status"] == "PASS"
