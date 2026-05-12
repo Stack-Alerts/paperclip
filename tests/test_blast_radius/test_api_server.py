@@ -128,9 +128,9 @@ class TestHandlerPost:
             method="POST",
             body=json.dumps({"event": "issue_status_changed"}).encode(),
         )
-        handler.headers.get.return_value = str(len(
-            json.dumps({"event": "issue_status_changed"})
-        ))
+        handler.headers.get.return_value = str(
+            len(json.dumps({"event": "issue_status_changed"}))
+        )
         handler._send_json = MagicMock()
         handler.do_POST()
 
@@ -211,7 +211,9 @@ class TestHandlerPost:
 
         monkeypatch.setattr(
             "blast_radius.api_server.process_issue",
-            lambda issue_id, dry_run=False, old_status=None, force_reprocess=False: None,
+            lambda issue_id, dry_run=False, old_status=None, force_reprocess=False: (
+                None
+            ),
         )
 
         handler.do_POST()
@@ -236,8 +238,8 @@ class TestHandlerPost:
         monkeypatch.setattr(
             "blast_radius.api_server.process_issue",
             lambda issue_id, dry_run=False, old_status=None, force_reprocess=False: (
-                (_ for _ in ()).throw(RuntimeError("API timeout"))
-            ),
+                _ for _ in ()
+            ).throw(RuntimeError("API timeout")),
         )
 
         handler.do_POST()
@@ -262,7 +264,9 @@ class TestHandlerPost:
 
         captured = {}
 
-        def tracking_process(issue_id, dry_run=False, old_status=None, force_reprocess=False):
+        def tracking_process(
+            issue_id, dry_run=False, old_status=None, force_reprocess=False
+        ):
             captured["dry_run"] = dry_run
             return {"issue": "BTCAAAAA-100", "dry_run": dry_run}
 
@@ -293,7 +297,9 @@ class TestHandlerPost:
 
         captured = {}
 
-        def tracking_process(issue_id, dry_run=False, old_status=None, force_reprocess=False):
+        def tracking_process(
+            issue_id, dry_run=False, old_status=None, force_reprocess=False
+        ):
             captured["force_reprocess"] = force_reprocess
             return {"issue": "BTCAAAAA-100", "dry_run": dry_run}
 
@@ -359,7 +365,14 @@ class TestServe:
 
 
 class _MockResult:
-    def __init__(self, identifier, files_indexed, source, skipped_no_commits, issue_id="00000000-0000-0000-0000-000000000000"):
+    def __init__(
+        self,
+        identifier,
+        files_indexed,
+        source,
+        skipped_no_commits,
+        issue_id="00000000-0000-0000-0000-000000000000",
+    ):
         self.issue_identifier = identifier
         self.issue_id = issue_id
         self.files_indexed = files_indexed
@@ -458,7 +471,10 @@ class TestHandlerFrWebhook:
         monkeypatch.setattr(
             "touch_index.fr_worker.process_fr_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-1200", 3, "comments", False,
+                "BTCAAAAA-1200",
+                3,
+                "comments",
+                False,
             ),
         )
         monkeypatch.setattr(
@@ -529,8 +545,8 @@ class TestHandlerFrWebhook:
         )
         monkeypatch.setattr(
             "touch_index.fr_worker.process_fr_issue",
-            lambda engine, issue_id, dry_run=False: (
-                (_ for _ in ()).throw(RuntimeError("DB connection failed"))
+            lambda engine, issue_id, dry_run=False: (_ for _ in ()).throw(
+                RuntimeError("DB connection failed")
             ),
         )
 
@@ -597,7 +613,11 @@ class TestHandlerFrWebhook:
         monkeypatch.setattr(
             "touch_index.fr_worker.process_fr_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-2000", 2, "comments", False, "fdr-uuid-42",
+                "BTCAAAAA-2000",
+                2,
+                "comments",
+                False,
+                "fdr-uuid-42",
             ),
         )
         monkeypatch.setattr(
@@ -633,7 +653,11 @@ class TestHandlerFrWebhook:
         monkeypatch.setattr(
             "touch_index.fr_worker.process_fr_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-2001", 3, "git", False, "fdr-uuid-42",
+                "BTCAAAAA-2001",
+                3,
+                "git",
+                False,
+                "fdr-uuid-42",
             ),
         )
         monkeypatch.setattr(
@@ -675,7 +699,11 @@ class TestHandlerFrWebhook:
         monkeypatch.setattr(
             "touch_index.fr_worker.process_fr_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-2002", 0, "none", True, "fdr-uuid-42",
+                "BTCAAAAA-2002",
+                0,
+                "none",
+                True,
+                "fdr-uuid-42",
             ),
         )
         monkeypatch.setattr(
@@ -717,7 +745,11 @@ class TestHandlerFrWebhook:
         monkeypatch.setattr(
             "touch_index.fr_worker.process_fr_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-2003", 1, "comments", False, "fdr-uuid-42",
+                "BTCAAAAA-2003",
+                1,
+                "comments",
+                False,
+                "fdr-uuid-42",
             ),
         )
         monkeypatch.setattr(
@@ -757,7 +789,11 @@ class TestHandlerFrWebhook:
         monkeypatch.setattr(
             "touch_index.fr_worker.process_fr_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-2004", 2, "git", False, "fdr-uuid-42",
+                "BTCAAAAA-2004",
+                2,
+                "git",
+                False,
+                "fdr-uuid-42",
             ),
         )
         monkeypatch.setattr(
@@ -798,7 +834,11 @@ class TestHandlerFrWebhook:
         monkeypatch.setattr(
             "touch_index.fr_worker.process_fr_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-2005", 3, "git", False, "fdr-uuid-42",
+                "BTCAAAAA-2005",
+                3,
+                "git",
+                False,
+                "fdr-uuid-42",
             ),
         )
         monkeypatch.setattr(
@@ -839,7 +879,11 @@ class TestHandlerFrWebhook:
         monkeypatch.setattr(
             "touch_index.fr_worker.process_fr_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-2006", 1, "comments", False, "fdr-uuid-42",
+                "BTCAAAAA-2006",
+                1,
+                "comments",
+                False,
+                "fdr-uuid-42",
             ),
         )
         monkeypatch.setattr(
@@ -875,7 +919,11 @@ class TestHandlerFrWebhook:
         monkeypatch.setattr(
             "touch_index.fr_worker.process_fr_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-2007", 0, "git", False, "fdr-uuid-42",
+                "BTCAAAAA-2007",
+                0,
+                "git",
+                False,
+                "fdr-uuid-42",
             ),
         )
         mock_transition = MagicMock()
@@ -890,6 +938,7 @@ class TestHandlerFrWebhook:
         args = handler._send_json.call_args[0]
         assert args[0] == 200
         assert args[1]["transitioned_to_done"] is False
+
 
 class TestHandlerBugWebhook:
     def test_404_on_wrong_path(self):
@@ -982,7 +1031,10 @@ class TestHandlerBugWebhook:
         monkeypatch.setattr(
             "touch_index.bug_worker.process_bug_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-1300", 2, "git", False,
+                "BTCAAAAA-1300",
+                2,
+                "git",
+                False,
             ),
         )
         monkeypatch.setattr(
@@ -1057,8 +1109,8 @@ class TestHandlerBugWebhook:
         )
         monkeypatch.setattr(
             "touch_index.bug_worker.process_bug_issue",
-            lambda engine, issue_id, dry_run=False: (
-                (_ for _ in ()).throw(RuntimeError("DB connection failed"))
+            lambda engine, issue_id, dry_run=False: (_ for _ in ()).throw(
+                RuntimeError("DB connection failed")
             ),
         )
 
@@ -1126,7 +1178,10 @@ class TestHandlerBugWebhook:
         monkeypatch.setattr(
             "touch_index.bug_worker.process_bug_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-1301", 2, "git", False,
+                "BTCAAAAA-1301",
+                2,
+                "git",
+                False,
             ),
         )
         quality_report = MagicMock()
@@ -1165,7 +1220,10 @@ class TestHandlerBugWebhook:
         monkeypatch.setattr(
             "touch_index.bug_worker.process_bug_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-1302", 0, "none", True,
+                "BTCAAAAA-1302",
+                0,
+                "none",
+                True,
             ),
         )
         quality_report = MagicMock()
@@ -1204,7 +1262,10 @@ class TestHandlerBugWebhook:
         monkeypatch.setattr(
             "touch_index.bug_worker.process_bug_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-1303", 1, "comments", False,
+                "BTCAAAAA-1303",
+                1,
+                "comments",
+                False,
             ),
         )
         monkeypatch.setattr(
@@ -1240,7 +1301,10 @@ class TestHandlerBugWebhook:
         monkeypatch.setattr(
             "touch_index.bug_worker.process_bug_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-1304", 2, "git", False,
+                "BTCAAAAA-1304",
+                2,
+                "git",
+                False,
             ),
         )
         mock_quality = MagicMock()
@@ -1277,7 +1341,10 @@ class TestHandlerBugWebhook:
         monkeypatch.setattr(
             "touch_index.bug_worker.process_bug_issue",
             lambda engine, issue_id, dry_run=False: _MockResult(
-                "BTCAAAAA-1305", 3, "git", False,
+                "BTCAAAAA-1305",
+                3,
+                "git",
+                False,
             ),
         )
         mock_quality = MagicMock()

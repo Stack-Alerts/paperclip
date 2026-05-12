@@ -15,12 +15,16 @@ class TestRenderReport:
     _BASE_DATA = BlastRadiusData()
 
     def test_contains_fix_identifier_and_title(self):
-        md = render_report("BTCAAAAA-100", "Fix null pointer", ["src/a.py"], self._BASE_DATA)
+        md = render_report(
+            "BTCAAAAA-100", "Fix null pointer", ["src/a.py"], self._BASE_DATA
+        )
         assert "BTCAAAAA-100" in md
         assert "Fix null pointer" in md
 
     def test_contains_touched_files(self):
-        md = render_report("BTCAAAAA-100", "Fix", ["src/a.py", "src/b.py"], self._BASE_DATA)
+        md = render_report(
+            "BTCAAAAA-100", "Fix", ["src/a.py", "src/b.py"], self._BASE_DATA
+        )
         assert "src/a.py" in md
         assert "src/b.py" in md
 
@@ -31,17 +35,27 @@ class TestRenderReport:
     def test_fr_impact_set_rendered(self):
         data = BlastRadiusData(
             fr_impact_set=[
-                FRImpact(fr_identifier="FDR-850", fr_owner_agent_id="agent-1", fr_issue_id="fr-uuid"),
+                FRImpact(
+                    fr_identifier="FDR-850",
+                    fr_owner_agent_id="agent-1",
+                    fr_issue_id="fr-uuid",
+                ),
             ],
         )
-        md = render_report("BTCAAAAA-100", "Fix", ["src/a.py"], data, agent_names={"agent-1": "Alice"})
+        md = render_report(
+            "BTCAAAAA-100", "Fix", ["src/a.py"], data, agent_names={"agent-1": "Alice"}
+        )
         assert "FDR-850" in md
         assert "Alice" in md
 
     def test_fr_impact_set_no_agent_names(self):
         data = BlastRadiusData(
             fr_impact_set=[
-                FRImpact(fr_identifier="FDR-850", fr_owner_agent_id="agent-1", fr_issue_id="fr-uuid"),
+                FRImpact(
+                    fr_identifier="FDR-850",
+                    fr_owner_agent_id="agent-1",
+                    fr_issue_id="fr-uuid",
+                ),
             ],
         )
         md = render_report("BTCAAAAA-100", "Fix", ["src/a.py"], data, agent_names=None)
@@ -78,7 +92,9 @@ class TestRenderReport:
         assert "Not available yet" not in md
 
     def test_sorted_file_list(self):
-        md = render_report("BTCAAAAA-100", "Fix", ["src/z.py", "src/a.py"], self._BASE_DATA)
+        md = render_report(
+            "BTCAAAAA-100", "Fix", ["src/z.py", "src/a.py"], self._BASE_DATA
+        )
         a_pos = md.index("src/a.py")
         z_pos = md.index("src/z.py")
         assert a_pos < z_pos
@@ -86,11 +102,21 @@ class TestRenderReport:
     def test_multiple_fr_issues(self):
         data = BlastRadiusData(
             fr_impact_set=[
-                FRImpact(fr_identifier="FDR-850", fr_owner_agent_id="a1", fr_issue_id="f1"),
-                FRImpact(fr_identifier="FDR-851", fr_owner_agent_id="a2", fr_issue_id="f2"),
+                FRImpact(
+                    fr_identifier="FDR-850", fr_owner_agent_id="a1", fr_issue_id="f1"
+                ),
+                FRImpact(
+                    fr_identifier="FDR-851", fr_owner_agent_id="a2", fr_issue_id="f2"
+                ),
             ],
         )
-        md = render_report("BTCAAAAA-100", "Fix", ["src/a.py"], data, agent_names={"a1": "Alice", "a2": "Bob"})
+        md = render_report(
+            "BTCAAAAA-100",
+            "Fix",
+            ["src/a.py"],
+            data,
+            agent_names={"a1": "Alice", "a2": "Bob"},
+        )
         assert "FDR-850" in md
         assert "FDR-851" in md
         assert "Alice" in md
@@ -99,10 +125,16 @@ class TestRenderReport:
     def test_agent_mention_format(self):
         data = BlastRadiusData(
             fr_impact_set=[
-                FRImpact(fr_identifier="FDR-850", fr_owner_agent_id="agent-1", fr_issue_id="fr-uuid"),
+                FRImpact(
+                    fr_identifier="FDR-850",
+                    fr_owner_agent_id="agent-1",
+                    fr_issue_id="fr-uuid",
+                ),
             ],
         )
-        md = render_report("BTCAAAAA-100", "Fix", ["src/a.py"], data, agent_names={"agent-1": "Alice"})
+        md = render_report(
+            "BTCAAAAA-100", "Fix", ["src/a.py"], data, agent_names={"agent-1": "Alice"}
+        )
         # agent mentions use the pattern [@name](agent://id)
         assert "[@Alice](agent://agent-1)" in md
 
@@ -180,7 +212,9 @@ class TestExtractTouchedFiles:
         assert extract_touched_files(None) == []
 
     def test_complex_json_block_with_extra_fields(self):
-        desc = '```json\n{"touchedFiles": ["src/complex.py"], "otherField": "value"}\n```'
+        desc = (
+            '```json\n{"touchedFiles": ["src/complex.py"], "otherField": "value"}\n```'
+        )
         assert extract_touched_files(desc) == ["src/complex.py"]
 
     def test_json_block_with_invalid_array_content(self):

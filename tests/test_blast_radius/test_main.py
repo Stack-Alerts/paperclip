@@ -48,6 +48,7 @@ class TestCmdQuery:
         def mock_query(files, engine=None):
             captured["files"] = files
             from blast_radius.query import BlastRadiusData
+
             return BlastRadiusData()
 
         def mock_to_json(data):
@@ -89,8 +90,8 @@ class TestCmdGenerate:
         monkeypatch.setattr(
             "blast_radius.generator.generate_and_post",
             lambda issue_id, touched_files=None, dry_run=False: (
-                captured.update(issue_id=issue_id, touched_files=touched_files)
-            ) or {},
+                (captured.update(issue_id=issue_id, touched_files=touched_files)) or {}
+            ),
         )
 
         args = _FakeArgs(issue_id="uuid-1", files=["src/x.py"], dry_run=False)
@@ -125,13 +126,17 @@ class TestMainDispatch:
     _CLEAN_ARGV = ["blast_radius"]
 
     def test_query_subcommand(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", self._CLEAN_ARGV + ["query", "--files", "src/a.py"])
+        monkeypatch.setattr(
+            sys, "argv", self._CLEAN_ARGV + ["query", "--files", "src/a.py"]
+        )
         with patch("blast_radius.__main__.cmd_query", return_value=0) as mock_cmd:
             assert main() == 0
             mock_cmd.assert_called_once()
 
     def test_generate_subcommand(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", self._CLEAN_ARGV + ["generate", "--issue-id", "uuid-1"])
+        monkeypatch.setattr(
+            sys, "argv", self._CLEAN_ARGV + ["generate", "--issue-id", "uuid-1"]
+        )
         with patch("blast_radius.__main__.cmd_generate", return_value=0) as mock_cmd:
             main()
             mock_cmd.assert_called_once()
@@ -149,7 +154,9 @@ class TestMainDispatch:
             mock_cmd.assert_called_once()
 
     def test_worker_with_issue_id(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", self._CLEAN_ARGV + ["worker", "--issue-id", "uuid-1"])
+        monkeypatch.setattr(
+            sys, "argv", self._CLEAN_ARGV + ["worker", "--issue-id", "uuid-1"]
+        )
         with patch("blast_radius.__main__._run_worker_cli", return_value=0) as mock_cmd:
             main()
             mock_cmd.assert_called_once()
@@ -161,7 +168,11 @@ class TestMainDispatch:
             mock_cmd.assert_called_once()
 
     def test_verbose_flag(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", self._CLEAN_ARGV + ["--verbose", "query", "--files", "src/a.py"])
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            self._CLEAN_ARGV + ["--verbose", "query", "--files", "src/a.py"],
+        )
         with patch("blast_radius.__main__.cmd_query", return_value=0):
             assert main() == 0
 
@@ -186,7 +197,9 @@ class TestMainFlatArgs:
             return 0
 
         monkeypatch.setattr(sys, "argv", ["blast_radius", "--dry-run"])
-        with patch("blast_radius.__main__._run_worker_cli", side_effect=mock_worker) as mock_cmd:
+        with patch(
+            "blast_radius.__main__._run_worker_cli", side_effect=mock_worker
+        ) as mock_cmd:
             main()
         assert captured.get("dry_run") is True
 
@@ -198,7 +211,9 @@ class TestMainFlatArgs:
             return 0
 
         monkeypatch.setattr(sys, "argv", ["blast_radius", "--issue-id", "uuid-1"])
-        with patch("blast_radius.__main__._run_worker_cli", side_effect=mock_worker) as mock_cmd:
+        with patch(
+            "blast_radius.__main__._run_worker_cli", side_effect=mock_worker
+        ) as mock_cmd:
             main()
         assert captured.get("issue_id") == "uuid-1"
 
@@ -210,7 +225,9 @@ class TestMainFlatArgs:
             return 0
 
         monkeypatch.setattr(sys, "argv", ["blast_radius", "--loop", "300"])
-        with patch("blast_radius.__main__._run_worker_cli", side_effect=mock_worker) as mock_cmd:
+        with patch(
+            "blast_radius.__main__._run_worker_cli", side_effect=mock_worker
+        ) as mock_cmd:
             main()
         assert captured.get("loop") == 300
 
@@ -222,7 +239,9 @@ class TestMainFlatArgs:
             return 0
 
         monkeypatch.setattr(sys, "argv", ["blast_radius", "--force-reprocess"])
-        with patch("blast_radius.__main__._run_worker_cli", side_effect=mock_worker) as mock_cmd:
+        with patch(
+            "blast_radius.__main__._run_worker_cli", side_effect=mock_worker
+        ) as mock_cmd:
             main()
         assert captured.get("force_reprocess") is True
 
@@ -233,8 +252,14 @@ class TestMainFlatArgs:
             captured["old_status"] = args.old_status
             return 0
 
-        monkeypatch.setattr(sys, "argv", ["blast_radius", "--issue-id", "uuid-1", "--old-status", "in_progress"])
-        with patch("blast_radius.__main__._run_worker_cli", side_effect=mock_worker) as mock_cmd:
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["blast_radius", "--issue-id", "uuid-1", "--old-status", "in_progress"],
+        )
+        with patch(
+            "blast_radius.__main__._run_worker_cli", side_effect=mock_worker
+        ) as mock_cmd:
             main()
         assert captured.get("old_status") == "in_progress"
 
@@ -246,7 +271,9 @@ class TestMainFlatArgs:
             return 0
 
         monkeypatch.setattr(sys, "argv", ["blast_radius", "--verbose", "--dry-run"])
-        with patch("blast_radius.__main__._run_worker_cli", side_effect=mock_worker) as mock_cmd:
+        with patch(
+            "blast_radius.__main__._run_worker_cli", side_effect=mock_worker
+        ) as mock_cmd:
             main()
         assert captured.get("verbose") is True
 
@@ -258,7 +285,9 @@ class TestMainFlatArgs:
             return 0
 
         monkeypatch.setattr(sys, "argv", ["blast_radius", "--json-summary"])
-        with patch("blast_radius.__main__._run_worker_cli", side_effect=mock_worker) as mock_cmd:
+        with patch(
+            "blast_radius.__main__._run_worker_cli", side_effect=mock_worker
+        ) as mock_cmd:
             main()
         assert captured.get("json_summary") is True
 
@@ -271,27 +300,57 @@ class TestMainFlatArgs:
 class TestRunWorkerCli:
     def test_run_once_default(self):
         with patch("blast_radius.worker.run_once", return_value=[]):
-            args = _FakeArgs(issue_id=None, loop=None, dry_run=False, force_reprocess=False, old_status=None)
+            args = _FakeArgs(
+                issue_id=None,
+                loop=None,
+                dry_run=False,
+                force_reprocess=False,
+                old_status=None,
+            )
             assert _main._run_worker_cli(args) == 0
 
     def test_issue_id_calls_process_issue(self):
-        with patch("blast_radius.worker.process_issue", return_value={"ok": True}) as mock_process:
-            args = _FakeArgs(issue_id="uuid-1", loop=None, dry_run=False, force_reprocess=False, old_status=None)
+        with patch(
+            "blast_radius.worker.process_issue", return_value={"ok": True}
+        ) as mock_process:
+            args = _FakeArgs(
+                issue_id="uuid-1",
+                loop=None,
+                dry_run=False,
+                force_reprocess=False,
+                old_status=None,
+            )
             assert _main._run_worker_cli(args) == 0
-            mock_process.assert_called_once_with("uuid-1", dry_run=False, old_status=None, force_reprocess=False)
+            mock_process.assert_called_once_with(
+                "uuid-1", dry_run=False, old_status=None, force_reprocess=False
+            )
 
     def test_issue_id_skipped_prints_message(self, capsys):
         with patch("blast_radius.worker.process_issue", return_value=None):
-            args = _FakeArgs(issue_id="uuid-1", loop=None, dry_run=False, force_reprocess=False, old_status=None)
+            args = _FakeArgs(
+                issue_id="uuid-1",
+                loop=None,
+                dry_run=False,
+                force_reprocess=False,
+                old_status=None,
+            )
             assert _main._run_worker_cli(args) == 0
             captured = capsys.readouterr()
             assert "skipped" in captured.out
 
     def test_loop_calls_run_loop(self):
         with patch("blast_radius.worker.run_loop") as mock_loop:
-            args = _FakeArgs(issue_id=None, loop=300, dry_run=False, force_reprocess=False, old_status=None)
+            args = _FakeArgs(
+                issue_id=None,
+                loop=300,
+                dry_run=False,
+                force_reprocess=False,
+                old_status=None,
+            )
             assert _main._run_worker_cli(args) == 0
-            mock_loop.assert_called_once_with(interval_seconds=300, dry_run=False, force_reprocess=False)
+            mock_loop.assert_called_once_with(
+                interval_seconds=300, dry_run=False, force_reprocess=False
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -302,8 +361,14 @@ class TestRunWorkerCli:
 class TestJsonSummary:
     def test_json_summary_single_issue(self, monkeypatch, capsys):
         import json
-        with patch("blast_radius.worker.process_issue", return_value={"ok": True, "issue": "BTCAAAAA-100"}):
-            monkeypatch.setattr("sys.argv", ["blast_radius", "--issue-id", "uuid-1", "--json-summary"])
+
+        with patch(
+            "blast_radius.worker.process_issue",
+            return_value={"ok": True, "issue": "BTCAAAAA-100"},
+        ):
+            monkeypatch.setattr(
+                "sys.argv", ["blast_radius", "--issue-id", "uuid-1", "--json-summary"]
+            )
             assert main() == 0
 
         captured = capsys.readouterr()
@@ -314,7 +379,10 @@ class TestJsonSummary:
 
     def test_json_summary_polling(self, monkeypatch, capsys):
         import json
-        with patch("blast_radius.worker.run_once", return_value=[{"ok": True}, {"ok": True}]):
+
+        with patch(
+            "blast_radius.worker.run_once", return_value=[{"ok": True}, {"ok": True}]
+        ):
             monkeypatch.setattr("sys.argv", ["blast_radius", "--json-summary"])
             assert main() == 0
 
@@ -327,6 +395,7 @@ class TestJsonSummary:
 
     def test_json_summary_polling_with_errors(self, monkeypatch, capsys):
         import json
+
         results = [
             {"ok": True},
             {"error": "API timeout", "issue": "BTCAAAAA-100"},
@@ -341,8 +410,13 @@ class TestJsonSummary:
 
     def test_json_summary_dry_run(self, monkeypatch, capsys):
         import json
-        with patch("blast_radius.worker.run_once", return_value=[{"ok": True, "dry_run": True}]):
-            monkeypatch.setattr("sys.argv", ["blast_radius", "--json-summary", "--dry-run"])
+
+        with patch(
+            "blast_radius.worker.run_once", return_value=[{"ok": True, "dry_run": True}]
+        ):
+            monkeypatch.setattr(
+                "sys.argv", ["blast_radius", "--json-summary", "--dry-run"]
+            )
             assert main() == 0
 
         captured = capsys.readouterr()
@@ -351,6 +425,7 @@ class TestJsonSummary:
 
     def test_json_summary_no_results(self, monkeypatch, capsys):
         import json
+
         with patch("blast_radius.worker.run_once", return_value=[]):
             monkeypatch.setattr("sys.argv", ["blast_radius", "--json-summary"])
             assert main() == 0
@@ -362,8 +437,12 @@ class TestJsonSummary:
 
     def test_json_summary_worker_subcommand(self, monkeypatch, capsys):
         import json
+
         with patch("blast_radius.worker.process_issue", return_value={"ok": True}):
-            monkeypatch.setattr("sys.argv", ["blast_radius", "worker", "--issue-id", "uuid-1", "--json-summary"])
+            monkeypatch.setattr(
+                "sys.argv",
+                ["blast_radius", "worker", "--issue-id", "uuid-1", "--json-summary"],
+            )
             assert main() == 0
 
         captured = capsys.readouterr()
@@ -373,8 +452,11 @@ class TestJsonSummary:
 
     def test_json_summary_worker_subcommand_polling(self, monkeypatch, capsys):
         import json
+
         with patch("blast_radius.worker.run_once", return_value=[{"ok": True}]):
-            monkeypatch.setattr("sys.argv", ["blast_radius", "worker", "--json-summary"])
+            monkeypatch.setattr(
+                "sys.argv", ["blast_radius", "worker", "--json-summary"]
+            )
             assert main() == 0
 
         captured = capsys.readouterr()
@@ -386,8 +468,12 @@ class TestJsonSummary:
     def test_json_summary_single_issue_not_found(self, monkeypatch, capsys):
         """--json-summary --issue-id when no match outputs skipped result."""
         import json
+
         with patch("blast_radius.worker.process_issue", return_value=None):
-            monkeypatch.setattr("sys.argv", ["blast_radius", "--issue-id", "missing-uuid", "--json-summary"])
+            monkeypatch.setattr(
+                "sys.argv",
+                ["blast_radius", "--issue-id", "missing-uuid", "--json-summary"],
+            )
             assert main() == 0
 
         captured = capsys.readouterr()
