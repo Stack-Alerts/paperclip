@@ -765,7 +765,6 @@ class TestMain:
         mock_worker.assert_not_called()
         assert any("Nothing to do" in r.message for r in caplog.records)
 
-
     def test_main_polling_api_error_exits_nonzero(self, monkeypatch):
         """Polling mode: get_fdr_issues error raises SystemExit(1)."""
         engine = MagicMock()
@@ -808,9 +807,7 @@ class TestMain:
                 "touch_index.paperclip_client.transition_issue_status"
             ) as mock_transition,
         ):
-            monkeypatch.setattr(
-                "sys.argv", ["touch_index", "--json-summary"]
-            )
+            monkeypatch.setattr("sys.argv", ["touch_index", "--json-summary"])
             with pytest.raises(SystemExit) as exc_info:
                 main()
 
@@ -821,7 +818,6 @@ class TestMain:
         data = json.loads(captured.out.strip())
         assert data["worker"] == "fr"
         assert data["mode"] == "polling"
-
 
     # -------------------------------------------------------------------
     # --validate flag (polling mode)
@@ -962,7 +958,9 @@ class TestMain:
             patch("touch_index.paperclip_client.transition_issue_status"),
         ):
             mock_quality.return_value.passed = True
-            monkeypatch.setattr("sys.argv", ["touch_index", "--validate", "--stale-hours", "48"])
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--validate", "--stale-hours", "48"]
+            )
             main()
 
         mock_quality.assert_called_once_with(engine, stale_threshold_hours=48)
@@ -979,7 +977,9 @@ class TestMain:
             patch("touch_index.quality.run_quality_checks") as mock_quality,
         ):
             mock_quality.return_value.passed = True
-            monkeypatch.setattr("sys.argv", ["touch_index", "--validate", "--stale-hours", "72"])
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--validate", "--stale-hours", "72"]
+            )
             main()
 
         mock_worker.assert_not_called()
@@ -1006,7 +1006,15 @@ class TestMain:
         ):
             mock_quality.return_value.passed = True
             monkeypatch.setattr(
-                "sys.argv", ["touch_index", "--issue-id", "uuid-1", "--validate", "--stale-hours", "96"]
+                "sys.argv",
+                [
+                    "touch_index",
+                    "--issue-id",
+                    "uuid-1",
+                    "--validate",
+                    "--stale-hours",
+                    "96",
+                ],
             )
             main()
 
@@ -1649,7 +1657,6 @@ class TestMainProcessFrIssueError:
         data = json.loads(captured.out.strip())
         assert data["quality"]["passed"] is True
 
-
     # -------------------------------------------------------------------
     # Error tracking in JSON summary
     # -------------------------------------------------------------------
@@ -1705,3 +1712,103 @@ class TestMainProcessFrIssueError:
         assert data["issues_skipped"] == 1
         # Only the 2 successful issues are transitioned
         assert mock_transition.call_count == 2
+
+    # -------------------------------------------------------------------
+    # --validate --json-summary failure paths
+    # -------------------------------------------------------------------
+
+    def test_main_json_summary_validate_single_issue_failed(self, monkeypatch, capsys):
+        """--validate --issue-id --json-summary: validation failure emits quality in JSON before exit."""
+        import json
+
+        engine = MagicMock()
+        result = FRIngestionResult(
+            issue_identifier="BTCAAAAA-100",
+            issue_id="uuid-1",
+            files_indexed=2,
+            source="comments",
+            skipped_no_commits=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.fr_worker.process_fr_issue", return_value=result),
+            patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
+            patch("touch_index.quality.run_quality_checks") as mock_quality,
+            patch("touch_index.paperclip_client.transition_issue_status"),
+        ):
+            mock_quality.return_value.passed = False
+            mock_quality.return_value.to_dict.return_value = {
+                "passed": False,
+                "coverage": {"coverage_pct": 85.0},
+            }
+            monkeypatch.setattr(
+                "sys.argv",
+                [
+                    "touch_index",
+                    "--issue-id",
+                    "uuid-1",
+                    "--validate",
+                    "--json-summary",
+                ],
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_fetch.assert_not_called()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "fr"
+        assert data["mode"] == "single-issue"
+        assert data["quality"]["passed"] is False
+        assert data["quality"]["coverage"]["coverage_pct"] == 85.0
+        assert data["result"]["issue_identifier"] == "BTCAAAAA-100"
+        assert data["result"]["files_indexed"] == 2
+
+    def test_main_json_summary_validate_polling_failed(self, monkeypatch, capsys):
+        """--validate --json-summary polling: validation failure emits quality in JSON before exit."""
+        import json
+
+        engine = MagicMock()
+        issues = [{"id": "id-1", "identifier": "BTCAAAAA-101", "description": ""}]
+        results = [
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-101",
+                issue_id="id-1",
+                files_indexed=3,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
+            patch("touch_index.fr_worker.run_fr_worker", return_value=results),
+            patch("touch_index.quality.run_quality_checks") as mock_quality,
+            patch("touch_index.paperclip_client.transition_issue_status"),
+        ):
+            mock_quality.return_value.passed = False
+            mock_quality.return_value.to_dict.return_value = {
+                "passed": False,
+                "coverage": {"coverage_pct": 80.0},
+            }
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--validate", "--json-summary"],
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "fr"
+        assert data["mode"] == "polling"
+        assert data["quality"]["passed"] is False
+        assert data["quality"]["coverage"]["coverage_pct"] == 80.0
+        assert data["issues_processed"] == 1
+        assert data["total_files_indexed"] == 3
