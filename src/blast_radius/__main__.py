@@ -105,7 +105,12 @@ def _run_worker_cli(args: argparse.Namespace) -> int:
             force_reprocess=args.force_reprocess,
         )
         if args.json_summary:
-            _emit_json_summary(args, result=result if result is not None else {"skipped": True, "issue": args.issue_id})
+            _emit_json_summary(
+                args,
+                result=result
+                if result is not None
+                else {"skipped": True, "issue": args.issue_id},
+            )
         else:
             if result:
                 print(json.dumps(result, indent=2))  # noqa: T201
@@ -135,22 +140,66 @@ def _build_sub_parsers(sub: argparse._SubParsersAction) -> None:
         help="Poll for fix/bug issues transitioning to in_review and post Blast Radius Reports",
         description="Detect fix/bug issues that transitioned TO in_review and post a Blast Radius Report.",
     )
-    p.add_argument("--issue-id", type=str, metavar="UUID", help="Process a single issue by Paperclip UUID (webhook trigger)")
-    p.add_argument("--old-status", type=str, metavar="STATUS", help="Previous status when called from a status-change webhook")
-    p.add_argument("--loop", type=int, metavar="SECONDS", help="Run continuously, sleeping SECONDS between polls (default: run once and exit)")
-    p.add_argument("--dry-run", action="store_true", help="Log reports but do not post comments")
-    p.add_argument("--force-reprocess", action="store_true", help="Re-process already-seen issues (bypasses transition detection)")
-    p.add_argument("--json-summary", action="store_true", help="Output structured JSON summary to stdout")
+    p.add_argument(
+        "--issue-id",
+        type=str,
+        metavar="UUID",
+        help="Process a single issue by Paperclip UUID (webhook trigger)",
+    )
+    p.add_argument(
+        "--old-status",
+        type=str,
+        metavar="STATUS",
+        help="Previous status when called from a status-change webhook",
+    )
+    p.add_argument(
+        "--loop",
+        type=int,
+        metavar="SECONDS",
+        help="Run continuously, sleeping SECONDS between polls (default: run once and exit)",
+    )
+    p.add_argument(
+        "--dry-run", action="store_true", help="Log reports but do not post comments"
+    )
+    p.add_argument(
+        "--force-reprocess",
+        action="store_true",
+        help="Re-process already-seen issues (bypasses transition detection)",
+    )
+    p.add_argument(
+        "--json-summary",
+        action="store_true",
+        help="Output structured JSON summary to stdout",
+    )
     p.set_defaults(func=_run_worker_cli)
 
     p = sub.add_parser("query", help="Query the Touch Index for a list of files")
-    p.add_argument("--files", nargs="+", required=True, metavar="PATH", help="File paths to query (relative to repo root)")
+    p.add_argument(
+        "--files",
+        nargs="+",
+        required=True,
+        metavar="PATH",
+        help="File paths to query (relative to repo root)",
+    )
     p.set_defaults(func=cmd_query)
 
-    p = sub.add_parser("generate", help="Generate and post a Blast Radius Report for a Paperclip issue")
-    p.add_argument("--issue-id", required=True, metavar="ID", help="Paperclip issue UUID")
-    p.add_argument("--files", nargs="+", metavar="PATH", help="Override touchedFiles (parsed from issue description if omitted)")
-    p.add_argument("--dry-run", action="store_true", help="Print the report but do not post a comment")
+    p = sub.add_parser(
+        "generate", help="Generate and post a Blast Radius Report for a Paperclip issue"
+    )
+    p.add_argument(
+        "--issue-id", required=True, metavar="ID", help="Paperclip issue UUID"
+    )
+    p.add_argument(
+        "--files",
+        nargs="+",
+        metavar="PATH",
+        help="Override touchedFiles (parsed from issue description if omitted)",
+    )
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the report but do not post a comment",
+    )
     p.set_defaults(func=cmd_generate)
 
     p = sub.add_parser("serve", help="Start the HTTP API server")
@@ -164,7 +213,9 @@ def main() -> int:
         description="Blast Radius — Touch Index query, report generator, and polling worker",
         add_help=True,
     )
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable debug logging"
+    )
     sub = parser.add_subparsers(dest="command")
     _build_sub_parsers(sub)
 
@@ -182,13 +233,25 @@ def main() -> int:
         description="Blast Radius polling worker + webhook handler",
         add_help=True,
     )
-    flat_parser.add_argument("-v", "--verbose", action="store_true", help=argparse.SUPPRESS)
-    flat_parser.add_argument("--issue-id", type=str, metavar="UUID", help=argparse.SUPPRESS)
-    flat_parser.add_argument("--old-status", type=str, metavar="STATUS", help=argparse.SUPPRESS)
-    flat_parser.add_argument("--loop", type=int, metavar="SECONDS", help=argparse.SUPPRESS)
+    flat_parser.add_argument(
+        "-v", "--verbose", action="store_true", help=argparse.SUPPRESS
+    )
+    flat_parser.add_argument(
+        "--issue-id", type=str, metavar="UUID", help=argparse.SUPPRESS
+    )
+    flat_parser.add_argument(
+        "--old-status", type=str, metavar="STATUS", help=argparse.SUPPRESS
+    )
+    flat_parser.add_argument(
+        "--loop", type=int, metavar="SECONDS", help=argparse.SUPPRESS
+    )
     flat_parser.add_argument("--dry-run", action="store_true", help=argparse.SUPPRESS)
-    flat_parser.add_argument("--force-reprocess", action="store_true", help=argparse.SUPPRESS)
-    flat_parser.add_argument("--json-summary", action="store_true", help=argparse.SUPPRESS)
+    flat_parser.add_argument(
+        "--force-reprocess", action="store_true", help=argparse.SUPPRESS
+    )
+    flat_parser.add_argument(
+        "--json-summary", action="store_true", help=argparse.SUPPRESS
+    )
     flat_args = flat_parser.parse_args(argv)
 
     _setup_logging(verbose=flat_args.verbose)

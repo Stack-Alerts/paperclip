@@ -50,10 +50,7 @@ def render_report(
 
     # Regression Risk
     if data.regression_set:
-        bug_lines = [
-            f"- {_issue_link(r.bug_identifier)}"
-            for r in data.regression_set
-        ]
+        bug_lines = [f"- {_issue_link(r.bug_identifier)}" for r in data.regression_set]
         bug_section = "\n".join(bug_lines)
     else:
         bug_section = "_None_"

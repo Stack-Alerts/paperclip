@@ -82,11 +82,19 @@ def generate_and_post(
 
     # Fallback: derive touched files from git history when not in description
     if not touched_files:
-        log.info("No touchedFiles in description for %s — falling back to git history", identifier)
+        log.info(
+            "No touchedFiles in description for %s — falling back to git history",
+            identifier,
+        )
         try:
             from touch_index.git_extractor import get_files_for_issue
+
             touched_files = get_files_for_issue(identifier)
-            log.info("Derived %d touched file(s) from git for %s", len(touched_files), identifier)
+            log.info(
+                "Derived %d touched file(s) from git for %s",
+                len(touched_files),
+                identifier,
+            )
         except Exception as exc:
             log.warning("Git fallback failed for %s: %s", identifier, exc)
 
