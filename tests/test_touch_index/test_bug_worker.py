@@ -112,6 +112,71 @@ class TestIngestBugIssue:
         mock_comments.assert_called_once_with(ISSUE_ID)
         conn.execute.assert_called_once()
 
+    def test_ingest_falls_back_to_description(self):
+        """Git and comments both empty, description has files -> source is 'description'."""
+        engine, conn = _mock_engine()
+        desc = "Fixed bug in `src/touch_index/bug_worker.py` and src/touch_index/db.py"
+
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch(
+                "touch_index.bug_worker.extract_files_from_text",
+                return_value=["src/touch_index/bug_worker.py", "src/touch_index/db.py"],
+            ) as mock_extract,
+        ):
+            result = ingest_bug_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT, description=desc
+            )
+
+        assert result.source == "description"
+        assert result.files_indexed == 2
+        assert result.skipped_no_commits is False
+        mock_extract.assert_called_once_with(desc)
+        conn.execute.assert_called_once()
+
+    def test_ingest_skips_description_when_git_has_files(self):
+        """Git has files -> description is not consulted even if provided."""
+        engine, conn = _mock_engine()
+        desc = "Some description with `src/ignored.py`"
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue", return_value=["src/git_file.py"]
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract") as mock_comments,
+            patch("touch_index.bug_worker.extract_files_from_text") as mock_extract,
+        ):
+            result = ingest_bug_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT, description=desc
+            )
+
+        assert result.source == "git"
+        assert result.files_indexed == 1
+        mock_comments.assert_not_called()
+        mock_extract.assert_not_called()
+
+    def test_ingest_skips_description_when_comments_have_files(self):
+        """Comments have files -> description is not consulted even if provided."""
+        engine, conn = _mock_engine()
+        desc = "Some description with `src/ignored.py`"
+
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch(
+                "touch_index.bug_worker.fetch_and_extract", return_value=["src/comment_file.py"]
+            ) as mock_comments,
+            patch("touch_index.bug_worker.extract_files_from_text") as mock_extract,
+        ):
+            result = ingest_bug_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT, description=desc
+            )
+
+        assert result.source == "comments"
+        assert result.files_indexed == 1
+        mock_comments.assert_called_once_with(ISSUE_ID)
+        mock_extract.assert_not_called()
+
     def test_ingest_skips_when_both_empty(self):
         """Git and comments both empty -> skipped_no_commits=True, source 'none', nothing inserted."""
         engine, conn = _mock_engine()
@@ -192,6 +257,21 @@ class TestIngestBugIssue:
         assert hasattr(r_comments, "source")
         assert r_comments.source == "comments"
 
+        # description path
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch(
+                "touch_index.bug_worker.extract_files_from_text",
+                return_value=["src/c.py"],
+            ),
+        ):
+            r_desc = ingest_bug_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT, description="Some desc"
+            )
+        assert hasattr(r_desc, "source")
+        assert r_desc.source == "description"
+
         # none path
         with (
             patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
@@ -246,6 +326,23 @@ class TestIngestBugIssue:
         rows_comments = conn.execute.call_args[0][1]
         for r in rows_comments:
             assert r["source"] == "comments"
+
+        # description path
+        conn.reset_mock()
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch(
+                "touch_index.bug_worker.extract_files_from_text",
+                return_value=["src/c.py"],
+            ),
+        ):
+            ingest_bug_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT, description="Some desc"
+            )
+        rows_desc = conn.execute.call_args[0][1]
+        for r in rows_desc:
+            assert r["source"] == "description"
 
 
 # ---------------------------------------------------------------------------
