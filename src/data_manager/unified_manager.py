@@ -501,9 +501,10 @@ class UnifiedDataManager:
         end_date: datetime
     ) -> pd.DataFrame:
         """
-        Get bars from Binance (recent/current data)
+        Get bars from Binance (recent/current data) with pagination.
         
-        Uses Binance's pre-computed klines (much faster!)
+        Uses Binance's pre-computed klines (much faster!) with startTime
+        pagination to overcome the 1,500-bar-per-request limit.
         
         Args:
             timeframe: Bar timeframe
@@ -511,24 +512,54 @@ class UnifiedDataManager:
             end_date: End date
         
         Returns:
-            DataFrame with bars
+            DataFrame with bars covering the full requested range
         """
         logger.info("   🌐 Loading from Binance...")
         
         try:
             client = self._get_binance_client()
             
-            # INSTITUTIONAL: DON'T use hours parameter!
-            # Just request maximum recent candles (limit=1500)
-            # Let Binance give us everything available, then we filter
+            # Convert tz-aware dates to millisecond epoch timestamps for Binance API
+            start_ms = int(start_date.timestamp() * 1000)
+            end_ms = int(end_date.timestamp() * 1000)
             
-            # Get klines from Binance Futures
-            bars = client.get_klines(
-                interval=timeframe,
-                symbol='BTCUSDT',
-                limit=1500,  # Maximum allowed by Binance
-                futures=True  # CRITICAL: Perpetual futures!
-            )
+            all_chunks = []
+            current_start = start_ms
+            max_limit = 1500  # Binance API maximum per request
+            
+            while current_start < end_ms:
+                chunk = client.get_klines(
+                    interval=timeframe,
+                    symbol='BTCUSDT',
+                    limit=max_limit,
+                    futures=True,
+                    start_time=current_start,
+                    end_time=end_ms,
+                )
+                
+                if len(chunk) == 0:
+                    break
+                
+                all_chunks.append(chunk)
+                
+                # If we got fewer bars than the limit, we've exhausted the range
+                if len(chunk) < max_limit:
+                    break
+                
+                # Advance startTime past the last bar's open_time for next page
+                last_ts = chunk['timestamp'].iloc[-1]
+                if last_ts.tzinfo is None:
+                    last_ts = last_ts.tz_localize('utc')
+                current_start = int(last_ts.timestamp() * 1000) + 1
+            
+            if len(all_chunks) == 0:
+                logger.warning("   ⚠️ Binance returned no data for the requested range")
+                return pd.DataFrame()
+            
+            bars = pd.concat(all_chunks, ignore_index=True)
+            
+            # Deduplicate at pagination boundaries (overlapping open_time + 1ms)
+            bars = bars.drop_duplicates(subset=['timestamp'])
             
             # Filter to exact range — parse as tz-aware UTC so comparison with
             # tz-aware start_date_floored (set by BTCAAAAA-795) doesn't raise TypeError.
