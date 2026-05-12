@@ -3265,8 +3265,8 @@ class BacktestConfigPanel(QWidget):
                         'risk_per_trade_pct': backtest_config.get('risk_per_trade_pct'),
                         'timeframe': backtest_config.get('timeframe'),
                     },
-                    'start_date': backtest_config.get('start_date', datetime.now()),
-                    'end_date': backtest_config.get('end_date', datetime.now()),
+                    'start_date': backtest_config.get('start_date', datetime.now(timezone.utc)),
+                    'end_date': backtest_config.get('end_date', datetime.now(timezone.utc)),
                     'metrics': metrics_for_db,
                     'trades': full_results.get('trades', []),
                 }
@@ -3331,7 +3331,7 @@ class BacktestConfigPanel(QWidget):
         testing_days = self.testing_spin.value()
         mode = self.mode_group.checkedId()
         
-        end_date = datetime.now()
+        end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=lookback_days)
         
         config = {
@@ -3922,7 +3922,7 @@ class BacktestConfigPanel(QWidget):
             discovery_results.append(dr)
 
         # Save enhanced CSV
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
         rows = []
         for dr in discovery_results:
             rows.append({
