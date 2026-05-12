@@ -216,8 +216,13 @@ class StateManager:
         for filepath in self.state_dir.glob(pattern):
             try:
                 # Extract session ID from filename
-                filename = filepath.stem.replace('.gz', '')
-                session_id = filename.replace('state_', '')
+                # Handle both .json and .json.gz
+                name = filepath.name
+                if name.endswith('.gz'):
+                    name = name[:-3]
+                if name.endswith('.json'):
+                    name = name[:-5]
+                session_id = name.replace('state_', '')
                 
                 # Get file stats
                 stat = filepath.stat()
@@ -370,11 +375,11 @@ class StateManager:
             type_value = value['_value']
             
             if type_name == 'Money':
-                return Money(type_value.split()[0], type_value.split()[1])
+                return Money.from_str(type_value)
             elif type_name == 'Quantity':
-                return Quantity(type_value)
+                return Quantity.from_str(type_value)
             elif type_name == 'Price':
-                return Price(type_value)
+                return Price.from_str(type_value)
             elif type_name == 'Decimal':
                 return Decimal(type_value)
             elif type_name == 'datetime':
@@ -399,10 +404,9 @@ class StateManager:
     
     def _save_compressed(self, filepath: Path, data: Dict):
         """Save as compressed JSON"""
-        gz_filepath = filepath.with_suffix('.json.gz')
         json_str = json.dumps(data, default=str)
         
-        with gzip.open(gz_filepath, 'wt', encoding='utf-8') as f:
+        with gzip.open(filepath, 'wt', encoding='utf-8') as f:
             f.write(json_str)
     
     def _load_json(self, filepath: Path) -> Dict:

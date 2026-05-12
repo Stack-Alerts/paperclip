@@ -11,6 +11,7 @@ from pathlib import Path
 from decimal import Decimal
 from datetime import datetime, timedelta
 from nautilus_trader.model.objects import Money, Quantity, Price
+from nautilus_trader.model.currencies import USD
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
@@ -40,7 +41,7 @@ def valid_state():
             {
                 'config_id': 'config_1',
                 'sharpe_ratio': Decimal('2.0'),
-                'pnl': Money('1000', 'USD')
+                'pnl': Money('1000', USD)
             }
         ],
         'config': {
@@ -58,9 +59,9 @@ def state_with_nautilus_types():
     return {
         'results': [
             {
-                'pnl': Money('500', 'USD'),
-                'quantity': Quantity('0.1'),
-                'price': Price('50000'),
+                'pnl': Money('500', USD),
+                'quantity': Quantity.from_str('0.1'),
+                'price': Price.from_str('50000'),
                 'decimal_value': Decimal('1.23456')
             }
         ],
@@ -370,7 +371,7 @@ class TestStateManager:
     
     def test_serialize_money(self, state_manager):
         """Test Money serialization"""
-        money = Money('123.45', 'USD')
+        money = Money('123.45', USD)
         serialized = state_manager._serialize_value(money)
         
         assert serialized['_type'] == 'Money'
