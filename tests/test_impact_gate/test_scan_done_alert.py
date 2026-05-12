@@ -124,3 +124,37 @@ class TestMain:
         monkeypatch.setattr(_alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp"))
         main()
         assert kwargs_store.get("dry_run") is True
+
+    def test_auto_detects_dry_run_from_scan_json(self, monkeypatch, tmp_path):
+        """main() should respect dry_run=true in scan JSON when --dry-run is not set."""
+        out = tmp_path / "scan-out.json"
+        out.write_text(json.dumps({
+            "dry_run": True,
+            "ungated_count": 1,
+            "ungated_issues": [{"identifier": "X", "title": "Y"}],
+        }))
+        monkeypatch.setattr(sys, "argv", ["scan_done_alert.py", "--scan-output", str(out)])
+        kwargs_store = {}
+        def track(base_url, company_id, sess, scan_data, dry_run):
+            kwargs_store["dry_run"] = dry_run
+            return True
+        monkeypatch.setattr(_alert, "create_alert", track)
+        monkeypatch.setattr(_alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp"))
+        main()
+        assert kwargs_store.get("dry_run") is True, (
+            f"Expected dry_run=True from scan JSON, got {kwargs_store.get('dry_run')}"
+        )
+
+    def test_dry_run_false_by_default(self, monkeypatch, tmp_path):
+        """main() should default dry_run to False when neither CLI flag nor scan JSON specifies it."""
+        out = tmp_path / "scan-out.json"
+        out.write_text(json.dumps({"ungated_count": 1, "ungated_issues": [{"identifier": "X", "title": "Y"}]}))
+        monkeypatch.setattr(sys, "argv", ["scan_done_alert.py", "--scan-output", str(out)])
+        kwargs_store = {}
+        def track(base_url, company_id, sess, scan_data, dry_run):
+            kwargs_store["dry_run"] = dry_run
+            return True
+        monkeypatch.setattr(_alert, "create_alert", track)
+        monkeypatch.setattr(_alert, "_setup_session", lambda: (MagicMock(), "http://base", "comp"))
+        main()
+        assert kwargs_store.get("dry_run") is False
