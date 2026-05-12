@@ -1,4 +1,5 @@
 """Unit tests for scripts/scan_fix_issues_done.py."""
+
 from __future__ import annotations
 
 import sys
@@ -34,7 +35,9 @@ class TestIsFixIssue:
         assert _is_fix({"labels": [], "title": "Bug: crash on startup"}) is True
 
     def test_rejects_non_fix(self):
-        assert _is_fix({"labels": [{"name": "feature"}], "title": "New feature"}) is False
+        assert (
+            _is_fix({"labels": [{"name": "feature"}], "title": "New feature"}) is False
+        )
 
     def test_case_insensitive_labels(self):
         assert _is_fix({"labels": [{"name": "FIX"}], "title": ""}) is True
@@ -89,34 +92,42 @@ One or more tests failed."""
 class TestCheckGateStatus:
     def test_detects_pass(self, monkeypatch):
         monkeypatch.setattr(
-            _scan, "fetch_issue_comments", lambda iid: [
+            _scan,
+            "fetch_issue_comments",
+            lambda iid: [
                 {"body": "## Impact Gate: PASS\n\nAll tests passed."},
-            ]
+            ],
         )
         assert _check_gate("any-id") == "PASS"
 
     def test_detects_fail(self, monkeypatch):
         monkeypatch.setattr(
-            _scan, "fetch_issue_comments", lambda iid: [
+            _scan,
+            "fetch_issue_comments",
+            lambda iid: [
                 {"body": "## Impact Gate: FAIL\n\nTests failed."},
-            ]
+            ],
         )
         assert _check_gate("any-id") == "FAIL"
 
     def test_detects_bypassed(self, monkeypatch):
         monkeypatch.setattr(
-            _scan, "fetch_issue_comments", lambda iid: [
+            _scan,
+            "fetch_issue_comments",
+            lambda iid: [
                 {"body": "## Impact Gate: BYPASSED\n\nCEO bypass."},
-            ]
+            ],
         )
         assert _check_gate("any-id") == "BYPASSED"
 
     def test_returns_none_when_no_gate_comment(self, monkeypatch):
         monkeypatch.setattr(
-            _scan, "fetch_issue_comments", lambda iid: [
+            _scan,
+            "fetch_issue_comments",
+            lambda iid: [
                 {"body": "Some other comment"},
                 {"body": "Fixed the bug"},
-            ]
+            ],
         )
         assert _check_gate("any-id") is None
 
@@ -125,7 +136,11 @@ class TestCheckGateStatus:
         assert _check_gate("any-id") is None
 
     def test_handles_api_failure_gracefully(self, monkeypatch):
-        monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: (_ for _ in ()).throw(RuntimeError("API down")))
+        monkeypatch.setattr(
+            _scan,
+            "fetch_issue_comments",
+            lambda iid: (_ for _ in ()).throw(RuntimeError("API down")),
+        )
         assert _check_gate("any-id") is None
 
 
@@ -139,23 +154,60 @@ class TestScanFunction:
         assert result["gated"] == {"pass": 0, "fail": 0, "bypassed": 0, "error": 0}
 
     def test_scan_filters_fix_issues(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix crash", "labels": [{"name": "fix"}], "status": "done"},
-            {"id": "u2", "identifier": "BTCAAAAA-101", "title": "New feature", "labels": [{"name": "feature"}], "status": "done"},
-        ])
+        monkeypatch.setattr(
+            _scan,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "identifier": "BTCAAAAA-100",
+                    "title": "Fix crash",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                },
+                {
+                    "id": "u2",
+                    "identifier": "BTCAAAAA-101",
+                    "title": "New feature",
+                    "labels": [{"name": "feature"}],
+                    "status": "done",
+                },
+            ],
+        )
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
-        monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [{"body": "## Impact Gate: PASS"}])
+        monkeypatch.setattr(
+            _scan,
+            "fetch_issue_comments",
+            lambda iid: [{"body": "## Impact Gate: PASS"}],
+        )
         result = _scan.scan()
         assert result["total_done_fix_issues"] == 1
 
     def test_scan_counts_gated_vs_ungated(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix A", "labels": [{"name": "fix"}], "status": "done"},
-            {"id": "u2", "identifier": "BTCAAAAA-101", "title": "Fix B", "labels": [{"name": "fix"}], "status": "done"},
-        ])
+        monkeypatch.setattr(
+            _scan,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "identifier": "BTCAAAAA-100",
+                    "title": "Fix A",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                },
+                {
+                    "id": "u2",
+                    "identifier": "BTCAAAAA-101",
+                    "title": "Fix B",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                },
+            ],
+        )
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
 
         call_count = 0
+
         def mock_comments(iid):
             nonlocal call_count
             call_count += 1
@@ -171,40 +223,105 @@ class TestScanFunction:
 
     def test_scan_respects_days_back(self, monkeypatch):
         from datetime import datetime, timezone, timedelta
-        recent = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
-        old = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat().replace("+00:00", "Z")
 
-        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix recent", "labels": [{"name": "fix"}],
-             "status": "done", "completedAt": recent},
-            {"id": "u2", "identifier": "BTCAAAAA-101", "title": "Fix old", "labels": [{"name": "fix"}],
-             "status": "done", "completedAt": old},
-        ])
+        recent = (
+            (datetime.now(timezone.utc) - timedelta(hours=1))
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+        old = (
+            (datetime.now(timezone.utc) - timedelta(days=30))
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+
+        monkeypatch.setattr(
+            _scan,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "identifier": "BTCAAAAA-100",
+                    "title": "Fix recent",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                    "completedAt": recent,
+                },
+                {
+                    "id": "u2",
+                    "identifier": "BTCAAAAA-101",
+                    "title": "Fix old",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                    "completedAt": old,
+                },
+            ],
+        )
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
-        monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [{"body": "## Impact Gate: PASS"}])
+        monkeypatch.setattr(
+            _scan,
+            "fetch_issue_comments",
+            lambda iid: [{"body": "## Impact Gate: PASS"}],
+        )
         result = _scan.scan(days_back=7)
         assert result["total_done_fix_issues"] == 1
         assert result["gated"]["pass"] == 1
 
     def test_dry_run_does_not_run_retroactive(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix", "labels": [{"name": "fix"}], "status": "done"},
-        ])
+        monkeypatch.setattr(
+            _scan,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "identifier": "BTCAAAAA-100",
+                    "title": "Fix",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                },
+            ],
+        )
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
-        monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [{"body": "Other comment"}])
+        monkeypatch.setattr(
+            _scan, "fetch_issue_comments", lambda iid: [{"body": "Other comment"}]
+        )
         process_called = []
-        monkeypatch.setattr(_scan, "process_issue", lambda iid, dry_run=False, **kwargs: (process_called.append(iid) or {"gate_status": "PASS"}))
+        monkeypatch.setattr(
+            _scan,
+            "process_issue",
+            lambda iid, dry_run=False, **kwargs: (
+                process_called.append(iid) or {"gate_status": "PASS"}
+            ),
+        )
         _scan.scan(dry_run=True, retroactive=True)
         assert len(process_called) == 0
 
     def test_retroactive_runs_process_on_ungated(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix", "labels": [{"name": "fix"}], "status": "done"},
-        ])
+        monkeypatch.setattr(
+            _scan,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "identifier": "BTCAAAAA-100",
+                    "title": "Fix",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                },
+            ],
+        )
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
-        monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [{"body": "Other comment"}])
+        monkeypatch.setattr(
+            _scan, "fetch_issue_comments", lambda iid: [{"body": "Other comment"}]
+        )
         calls = []
-        monkeypatch.setattr(_scan, "process_issue", lambda iid, dry_run=False, **kwargs: (calls.append({"iid": iid, "kwargs": kwargs}) or {"gate_status": "PASS"}))
+        monkeypatch.setattr(
+            _scan,
+            "process_issue",
+            lambda iid, dry_run=False, **kwargs: (
+                calls.append({"iid": iid, "kwargs": kwargs}) or {"gate_status": "PASS"}
+            ),
+        )
         result = _scan.scan(dry_run=False, retroactive=True)
         assert len(calls) == 1
         assert calls[0]["iid"] == "u1"
@@ -213,29 +330,77 @@ class TestScanFunction:
         assert result["retroactive_results"][0]["gate_status"] == "PASS"
 
     def test_retroactive_handles_process_error(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix", "labels": [{"name": "fix"}], "status": "done"},
-        ])
+        monkeypatch.setattr(
+            _scan,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "identifier": "BTCAAAAA-100",
+                    "title": "Fix",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                },
+            ],
+        )
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
-        monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [{"body": "Other comment"}])
-        monkeypatch.setattr(_scan, "process_issue", lambda iid, dry_run=False, **kwargs: (_ for _ in ()).throw(RuntimeError("runner crashed")))
+        monkeypatch.setattr(
+            _scan, "fetch_issue_comments", lambda iid: [{"body": "Other comment"}]
+        )
+        monkeypatch.setattr(
+            _scan,
+            "process_issue",
+            lambda iid, dry_run=False, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("runner crashed")
+            ),
+        )
         result = _scan.scan(dry_run=False, retroactive=True)
         assert "retroactive_results" in result
         assert "error" in result["retroactive_results"][0]
         assert "runner crashed" in result["retroactive_results"][0]["error"]
 
     def test_scan_counts_all_gate_statuses(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix A", "labels": [{"name": "fix"}], "status": "done"},
-            {"id": "u2", "identifier": "BTCAAAAA-101", "title": "Fix B", "labels": [{"name": "bug"}], "status": "done"},
-            {"id": "u3", "identifier": "BTCAAAAA-102", "title": "Fix C", "labels": [{"name": "fix"}], "status": "done"},
-            {"id": "u4", "identifier": "BTCAAAAA-103", "title": "Fix D", "labels": [{"name": "fix"}], "status": "done"},
-        ])
+        monkeypatch.setattr(
+            _scan,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "identifier": "BTCAAAAA-100",
+                    "title": "Fix A",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                },
+                {
+                    "id": "u2",
+                    "identifier": "BTCAAAAA-101",
+                    "title": "Fix B",
+                    "labels": [{"name": "bug"}],
+                    "status": "done",
+                },
+                {
+                    "id": "u3",
+                    "identifier": "BTCAAAAA-102",
+                    "title": "Fix C",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                },
+                {
+                    "id": "u4",
+                    "identifier": "BTCAAAAA-103",
+                    "title": "Fix D",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                },
+            ],
+        )
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
+
         def mock_comments(iid):
             mapping = {"u1": "PASS", "u2": "FAIL", "u3": "BYPASSED", "u4": "ERROR"}
             status = mapping.get(iid, "PASS")
             return [{"body": f"## Impact Gate: {status}"}]
+
         monkeypatch.setattr(_scan, "fetch_issue_comments", mock_comments)
         result = _scan.scan()
         assert result["total_done_fix_issues"] == 4
@@ -247,34 +412,74 @@ class TestScanFunction:
 
     def test_scan_no_completed_at_falls_back_to_updated_at(self, monkeypatch):
         from datetime import datetime, timezone, timedelta
-        recent = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
-        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix", "labels": [{"name": "fix"}],
-             "status": "done", "updatedAt": recent},
-        ])
+
+        recent = (
+            (datetime.now(timezone.utc) - timedelta(hours=1))
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+        monkeypatch.setattr(
+            _scan,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "identifier": "BTCAAAAA-100",
+                    "title": "Fix",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                    "updatedAt": recent,
+                },
+            ],
+        )
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
-        monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [{"body": "## Impact Gate: PASS"}])
+        monkeypatch.setattr(
+            _scan,
+            "fetch_issue_comments",
+            lambda iid: [{"body": "## Impact Gate: PASS"}],
+        )
         result = _scan.scan(days_back=7)
         assert result["total_done_fix_issues"] == 1
 
     def test_scan_invalid_date_falls_through(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix", "labels": [{"name": "fix"}],
-             "status": "done", "completedAt": "not-a-date"},
-        ])
+        monkeypatch.setattr(
+            _scan,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "identifier": "BTCAAAAA-100",
+                    "title": "Fix",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                    "completedAt": "not-a-date",
+                },
+            ],
+        )
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
-        monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [{"body": "## Impact Gate: PASS"}])
+        monkeypatch.setattr(
+            _scan,
+            "fetch_issue_comments",
+            lambda iid: [{"body": "## Impact Gate: PASS"}],
+        )
         result = _scan.scan(days_back=7)
         assert result["total_done_fix_issues"] == 0
 
 
 class TestMain:
     def test_exit_zero_when_all_gated(self, monkeypatch):
-        monkeypatch.setattr(_scan, "scan", lambda **kw: {
-            "timestamp": "2026-01-01T00:00:00", "total_done_fix_issues": 1,
-            "gated": {"pass": 1, "fail": 0, "bypassed": 0, "error": 0},
-            "ungated_count": 0, "ungated_issues": [], "gated_issues": [],
-        })
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: {
+                "timestamp": "2026-01-01T00:00:00",
+                "total_done_fix_issues": 1,
+                "gated": {"pass": 1, "fail": 0, "bypassed": 0, "error": 0},
+                "ungated_count": 0,
+                "ungated_issues": [],
+                "gated_issues": [],
+            },
+        )
         monkeypatch.setattr(sys, "argv", ["scan_fix_issues_done.py"])
         try:
             _scan.main()
@@ -282,13 +487,20 @@ class TestMain:
             assert e.code == 0
 
     def test_exit_one_when_ungated_exists(self, monkeypatch):
-        monkeypatch.setattr(_scan, "scan", lambda **kw: {
-            "timestamp": "2026-01-01T00:00:00", "total_done_fix_issues": 1,
-            "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
-            "ungated_count": 1,
-            "ungated_issues": [{"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix"}],
-            "gated_issues": [],
-        })
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: {
+                "timestamp": "2026-01-01T00:00:00",
+                "total_done_fix_issues": 1,
+                "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
+                "ungated_count": 1,
+                "ungated_issues": [
+                    {"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix"}
+                ],
+                "gated_issues": [],
+            },
+        )
         monkeypatch.setattr(sys, "argv", ["scan_fix_issues_done.py"])
         try:
             _scan.main()
@@ -297,11 +509,21 @@ class TestMain:
 
     def test_dry_run_flag_passed_to_scan(self, monkeypatch):
         kwargs_store = {}
-        monkeypatch.setattr(_scan, "scan", lambda **kw: (kwargs_store.update(kw) or {
-            "timestamp": "", "total_done_fix_issues": 0,
-            "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
-            "ungated_count": 0, "ungated_issues": [], "gated_issues": [],
-        }))
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: (
+                kwargs_store.update(kw)
+                or {
+                    "timestamp": "",
+                    "total_done_fix_issues": 0,
+                    "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
+                    "ungated_count": 0,
+                    "ungated_issues": [],
+                    "gated_issues": [],
+                }
+            ),
+        )
         monkeypatch.setattr(sys, "argv", ["scan_fix_issues_done.py", "--dry-run"])
         try:
             _scan.main()
@@ -311,11 +533,21 @@ class TestMain:
 
     def test_retroactive_flag_passed_to_scan(self, monkeypatch):
         kwargs_store = {}
-        monkeypatch.setattr(_scan, "scan", lambda **kw: (kwargs_store.update(kw) or {
-            "timestamp": "", "total_done_fix_issues": 0,
-            "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
-            "ungated_count": 0, "ungated_issues": [], "gated_issues": [],
-        }))
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: (
+                kwargs_store.update(kw)
+                or {
+                    "timestamp": "",
+                    "total_done_fix_issues": 0,
+                    "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
+                    "ungated_count": 0,
+                    "ungated_issues": [],
+                    "gated_issues": [],
+                }
+            ),
+        )
         monkeypatch.setattr(sys, "argv", ["scan_fix_issues_done.py", "--retroactive"])
         try:
             _scan.main()
@@ -325,12 +557,24 @@ class TestMain:
 
     def test_days_back_flag_passed_to_scan(self, monkeypatch):
         kwargs_store = {}
-        monkeypatch.setattr(_scan, "scan", lambda **kw: (kwargs_store.update(kw) or {
-            "timestamp": "", "total_done_fix_issues": 0,
-            "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
-            "ungated_count": 0, "ungated_issues": [], "gated_issues": [],
-        }))
-        monkeypatch.setattr(sys, "argv", ["scan_fix_issues_done.py", "--days-back", "7"])
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: (
+                kwargs_store.update(kw)
+                or {
+                    "timestamp": "",
+                    "total_done_fix_issues": 0,
+                    "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
+                    "ungated_count": 0,
+                    "ungated_issues": [],
+                    "gated_issues": [],
+                }
+            ),
+        )
+        monkeypatch.setattr(
+            sys, "argv", ["scan_fix_issues_done.py", "--days-back", "7"]
+        )
         try:
             _scan.main()
         except SystemExit:
@@ -338,11 +582,18 @@ class TestMain:
         assert kwargs_store.get("days_back") == 7
 
     def test_json_summary_output_format(self, monkeypatch, capsys):
-        monkeypatch.setattr(_scan, "scan", lambda **kw: {
-            "timestamp": "2026-05-12T00:00:00", "total_done_fix_issues": 0,
-            "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
-            "ungated_count": 0, "ungated_issues": [], "gated_issues": [],
-        })
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: {
+                "timestamp": "2026-05-12T00:00:00",
+                "total_done_fix_issues": 0,
+                "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
+                "ungated_count": 0,
+                "ungated_issues": [],
+                "gated_issues": [],
+            },
+        )
         monkeypatch.setattr(sys, "argv", ["scan_fix_issues_done.py", "--json-summary"])
         try:
             _scan.main()
@@ -350,20 +601,30 @@ class TestMain:
             pass
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out)
         assert data["worker"] == "impact-gate-scan-done"
         assert data["dry_run"] is False
         assert data["total_done_fix_issues"] == 0
 
     def test_json_summary_includes_retroactive_results(self, monkeypatch, capsys):
-        monkeypatch.setattr(_scan, "scan", lambda **kw: {
-            "timestamp": "2026-05-12T00:00:00", "total_done_fix_issues": 1,
-            "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
-            "ungated_count": 1,
-            "ungated_issues": [{"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix"}],
-            "gated_issues": [],
-            "retroactive_results": [{"issue": "BTCAAAAA-100", "gate_status": "PASS"}],
-        })
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: {
+                "timestamp": "2026-05-12T00:00:00",
+                "total_done_fix_issues": 1,
+                "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
+                "ungated_count": 1,
+                "ungated_issues": [
+                    {"id": "u1", "identifier": "BTCAAAAA-100", "title": "Fix"}
+                ],
+                "gated_issues": [],
+                "retroactive_results": [
+                    {"issue": "BTCAAAAA-100", "gate_status": "PASS"}
+                ],
+            },
+        )
         monkeypatch.setattr(sys, "argv", ["scan_fix_issues_done.py", "--json-summary"])
         try:
             _scan.main()
@@ -371,17 +632,27 @@ class TestMain:
             pass
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out)
         assert "retroactive_results" in data
         assert data["retroactive_results"][0]["gate_status"] == "PASS"
 
     def test_output_json_flag(self, monkeypatch, capsys):
-        monkeypatch.setattr(_scan, "scan", lambda **kw: {
-            "timestamp": "2026-05-12T00:00:00", "total_done_fix_issues": 1,
-            "gated": {"pass": 1, "fail": 0, "bypassed": 0, "error": 0},
-            "ungated_count": 0, "ungated_issues": [], "gated_issues": [],
-        })
-        monkeypatch.setattr(sys, "argv", ["scan_fix_issues_done.py", "--output", "json"])
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: {
+                "timestamp": "2026-05-12T00:00:00",
+                "total_done_fix_issues": 1,
+                "gated": {"pass": 1, "fail": 0, "bypassed": 0, "error": 0},
+                "ungated_count": 0,
+                "ungated_issues": [],
+                "gated_issues": [],
+            },
+        )
+        monkeypatch.setattr(
+            sys, "argv", ["scan_fix_issues_done.py", "--output", "json"]
+        )
         try:
             _scan.main()
         except SystemExit:
@@ -391,12 +662,21 @@ class TestMain:
         assert captured.out.count("\n") == 1
 
     def test_output_pretty_flag(self, monkeypatch, capsys):
-        monkeypatch.setattr(_scan, "scan", lambda **kw: {
-            "timestamp": "2026-05-12T00:00:00", "total_done_fix_issues": 1,
-            "gated": {"pass": 1, "fail": 0, "bypassed": 0, "error": 0},
-            "ungated_count": 0, "ungated_issues": [], "gated_issues": [],
-        })
-        monkeypatch.setattr(sys, "argv", ["scan_fix_issues_done.py", "--output", "pretty"])
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: {
+                "timestamp": "2026-05-12T00:00:00",
+                "total_done_fix_issues": 1,
+                "gated": {"pass": 1, "fail": 0, "bypassed": 0, "error": 0},
+                "ungated_count": 0,
+                "ungated_issues": [],
+                "gated_issues": [],
+            },
+        )
+        monkeypatch.setattr(
+            sys, "argv", ["scan_fix_issues_done.py", "--output", "pretty"]
+        )
         try:
             _scan.main()
         except SystemExit:
@@ -406,20 +686,35 @@ class TestMain:
         assert captured.out.count("\n") > 1
 
     def test_json_summary_takes_precedence_over_output(self, monkeypatch, capsys):
-        monkeypatch.setattr(_scan, "scan", lambda **kw: {
-            "timestamp": "2026-05-12T00:00:00", "total_done_fix_issues": 1,
-            "gated": {"pass": 1, "fail": 0, "bypassed": 0, "error": 0},
-            "ungated_count": 0, "ungated_issues": [], "gated_issues": [],
-        })
-        monkeypatch.setattr(sys, "argv", [
-            "scan_fix_issues_done.py", "--json-summary", "--output", "pretty",
-        ])
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: {
+                "timestamp": "2026-05-12T00:00:00",
+                "total_done_fix_issues": 1,
+                "gated": {"pass": 1, "fail": 0, "bypassed": 0, "error": 0},
+                "ungated_count": 0,
+                "ungated_issues": [],
+                "gated_issues": [],
+            },
+        )
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "scan_fix_issues_done.py",
+                "--json-summary",
+                "--output",
+                "pretty",
+            ],
+        )
         try:
             _scan.main()
         except SystemExit:
             pass
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out)
         assert data["worker"] == "impact-gate-scan-done"
         assert data["total_done_fix_issues"] == 1

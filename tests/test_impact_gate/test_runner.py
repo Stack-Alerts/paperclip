@@ -26,41 +26,84 @@ _CLEAN_ARGV = ["run_impact_gate_worker.py"]
 
 class TestFetchInReviewFixIssues:
     def test_filters_fix_issues(self, monkeypatch):
-        monkeypatch.setattr(_runner, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "title": "Fix the thing", "labels": [{"name": "fix"}], "status": "in_review"},
-            {"id": "u2", "title": "New feature", "labels": [{"name": "feature"}], "status": "in_review"},
-        ])
+        monkeypatch.setattr(
+            _runner,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "title": "Fix the thing",
+                    "labels": [{"name": "fix"}],
+                    "status": "in_review",
+                },
+                {
+                    "id": "u2",
+                    "title": "New feature",
+                    "labels": [{"name": "feature"}],
+                    "status": "in_review",
+                },
+            ],
+        )
         monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
         result = _fetch_fn()
         assert len(result) == 1
         assert result[0]["id"] == "u1"
 
     def test_detects_bug_in_title(self, monkeypatch):
-        monkeypatch.setattr(_runner, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "title": "Bug: crash on startup", "labels": [], "status": "in_review"},
-        ])
+        monkeypatch.setattr(
+            _runner,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "title": "Bug: crash on startup",
+                    "labels": [],
+                    "status": "in_review",
+                },
+            ],
+        )
         monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
         result = _fetch_fn()
         assert len(result) == 1
 
     def test_detects_regression_in_title(self, monkeypatch):
-        monkeypatch.setattr(_runner, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "title": "Regression in optimizer", "labels": [], "status": "in_review"},
-        ])
+        monkeypatch.setattr(
+            _runner,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "title": "Regression in optimizer",
+                    "labels": [],
+                    "status": "in_review",
+                },
+            ],
+        )
         monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
         result = _fetch_fn()
         assert len(result) == 1
 
     def test_returns_empty_for_no_matches(self, monkeypatch):
-        monkeypatch.setattr(_runner, "_paginate", lambda path, params, page_size=100: [
-            {"id": "u1", "title": "Feature request", "labels": [{"name": "enhancement"}], "status": "in_review"},
-        ])
+        monkeypatch.setattr(
+            _runner,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "title": "Feature request",
+                    "labels": [{"name": "enhancement"}],
+                    "status": "in_review",
+                },
+            ],
+        )
         monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
         result = _fetch_fn()
         assert len(result) == 0
 
     def test_handles_empty_results(self, monkeypatch):
-        monkeypatch.setattr(_runner, "_paginate", lambda path, params, page_size=100: [])
+        monkeypatch.setattr(
+            _runner, "_paginate", lambda path, params, page_size=100: []
+        )
         monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
         result = _fetch_fn()
         assert result == []
@@ -69,24 +112,48 @@ class TestFetchInReviewFixIssues:
 class TestRunnerMain:
     def test_default_calls_process_issue_on_all(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", _CLEAN_ARGV)
-        monkeypatch.setattr(_runner, "_fetch_in_review_fix_issues", lambda: [{"id": "u1"}])
+        monkeypatch.setattr(
+            _runner, "_fetch_in_review_fix_issues", lambda: [{"id": "u1"}]
+        )
         called = []
-        monkeypatch.setattr(_runner, "process_issue", lambda iid, dry_run=False, old_status=None: (called.append(iid) or {"gate_status": "PASS"}))
+        monkeypatch.setattr(
+            _runner,
+            "process_issue",
+            lambda iid, dry_run=False, old_status=None: (
+                called.append(iid) or {"gate_status": "PASS"}
+            ),
+        )
         main()
         assert called == ["u1"]
 
     def test_dry_run_flag_passed(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", [_CLEAN_ARGV[0], "--dry-run"])
-        monkeypatch.setattr(_runner, "_fetch_in_review_fix_issues", lambda: [{"id": "u1"}])
+        monkeypatch.setattr(
+            _runner, "_fetch_in_review_fix_issues", lambda: [{"id": "u1"}]
+        )
         calls = []
-        monkeypatch.setattr(_runner, "process_issue", lambda iid, dry_run=False, old_status=None: (calls.append((iid, dry_run)) or {"gate_status": "PASS"}))
+        monkeypatch.setattr(
+            _runner,
+            "process_issue",
+            lambda iid, dry_run=False, old_status=None: (
+                calls.append((iid, dry_run)) or {"gate_status": "PASS"}
+            ),
+        )
         main()
         assert calls == [("u1", True)]
 
     def test_single_issue_mode(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", [_CLEAN_ARGV[0], "--issue-id", "specific-uuid"])
+        monkeypatch.setattr(
+            sys, "argv", [_CLEAN_ARGV[0], "--issue-id", "specific-uuid"]
+        )
         called = []
-        monkeypatch.setattr(_runner, "process_issue", lambda iid, dry_run=False, old_status=None: (called.append(iid) or {"gate_status": "PASS"}))
+        monkeypatch.setattr(
+            _runner,
+            "process_issue",
+            lambda iid, dry_run=False, old_status=None: (
+                called.append(iid) or {"gate_status": "PASS"}
+            ),
+        )
         main()
         assert called == ["specific-uuid"]
 
@@ -97,14 +164,18 @@ class TestRunnerMain:
 
     def test_exception_handling(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", _CLEAN_ARGV)
-        monkeypatch.setattr(_runner, "_fetch_in_review_fix_issues", lambda: [{"id": "u1"}, {"id": "u2"}])
+        monkeypatch.setattr(
+            _runner, "_fetch_in_review_fix_issues", lambda: [{"id": "u1"}, {"id": "u2"}]
+        )
         call_count = 0
+
         def mock_process(iid, dry_run=False, old_status=None):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
                 raise RuntimeError("First failed")
             return {"gate_status": "PASS"}
+
         monkeypatch.setattr(_runner, "process_issue", mock_process)
         main()
         assert call_count == 2

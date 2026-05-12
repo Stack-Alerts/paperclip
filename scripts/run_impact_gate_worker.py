@@ -7,6 +7,7 @@ Usage:
     python scripts/run_impact_gate_worker.py --issue-id <uuid>
     python scripts/run_impact_gate_worker.py --dry-run
 """
+
 from __future__ import annotations
 
 import argparse
@@ -79,9 +80,13 @@ def main() -> None:
     if args.issue_id:
         logger.info(
             "Processing single issue %s (dry_run=%s, old_status=%s)",
-            args.issue_id, args.dry_run, args.old_status,
+            args.issue_id,
+            args.dry_run,
+            args.old_status,
         )
-        result = process_issue(args.issue_id, dry_run=args.dry_run, old_status=args.old_status)
+        result = process_issue(
+            args.issue_id, dry_run=args.dry_run, old_status=args.old_status
+        )
         logger.info("Result: %s", result)
         return
 
