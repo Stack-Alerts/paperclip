@@ -210,7 +210,7 @@ def check_consistency(engine: Engine) -> ConsistencyReport:
 
     orphan_ids: list[str] = []
     if orphan_rows:
-        db_ids = {row[0] for row in orphan_rows}
+        db_ids = {str(row[0]) for row in orphan_rows}
         try:
             from .paperclip_client import get_all_issue_ids
 
@@ -494,7 +494,7 @@ def check_bug_consistency(engine: Engine) -> BugConsistencyReport:
 
     orphan_ids: list[str] = []
     if orphan_rows:
-        db_ids = {row[0] for row in orphan_rows}
+        db_ids = {str(row[0]) for row in orphan_rows}
         try:
             from .paperclip_client import get_all_issue_ids
 
