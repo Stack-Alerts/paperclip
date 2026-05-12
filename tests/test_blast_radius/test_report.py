@@ -182,3 +182,13 @@ class TestExtractTouchedFiles:
     def test_complex_json_block_with_extra_fields(self):
         desc = '```json\n{"touchedFiles": ["src/complex.py"], "otherField": "value"}\n```'
         assert extract_touched_files(desc) == ["src/complex.py"]
+
+    def test_json_block_with_invalid_array_content(self):
+        """JSON block regex matches but json.loads fails."""
+        desc = '```json\n{"touchedFiles": [{invalid}]}\n```'
+        assert extract_touched_files(desc) == []
+
+    def test_bare_json_with_invalid_array_content(self):
+        """Bare JSON regex matches but json.loads fails."""
+        desc = '{"touchedFiles": [{invalid}]}'
+        assert extract_touched_files(desc) == []
