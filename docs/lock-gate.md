@@ -3,7 +3,8 @@
 ## Overview
 
 The lock gate is a CI gate that blocks pull requests touching any path registered in
-`.module_lock_registry.json` unless a valid exception exists in `lock_gate_exceptions.json`.
+`.module_lock_registry.json` unless a valid, non-expired exception exists in
+`lock_gate_exceptions.json`.
 
 It runs on every PR and push to `main`/`master` via `.github/workflows/lock-gate.yml`.
 
@@ -15,8 +16,8 @@ It runs on every PR and push to `main`/`master` via `.github/workflows/lock-gate
      match for files).
    - **Indirect hit**: a locked module depends on the changed file (reverse dependency
      lookup in `dep_graph.json`).
-3. If any hit is not covered by an exception in `lock_gate_exceptions.json`, the gate
-   **blocks** the pipeline with exit code 1 and prints a failure report.
+3. If any hit is not covered by a valid, non-expired exception in `lock_gate_exceptions.json`,
+   the gate **blocks** the pipeline with exit code 1 and prints a failure report.
 
 ## Reading a Gate Failure Report
 
@@ -36,30 +37,13 @@ LOCK GATE BLOCKED - locked modules touched without exception
            trade records.
 ```
 
-Each block shows:
-- **File**: the file in your PR diff that triggered the gate
-- **Locked**: the locked path from the registry that matches
-- **Reason**: why this module is locked
+## Unblocking
 
-The gate prints the remediation steps:
-1. File an exception request using `.github/ISSUE_TEMPLATE/qa-locked-module-exception.md`
-2. Get CTO approval and document the `approval_id` in `lock_gate_exceptions.json`
-3. Re-run the CI pipeline
+To unblock, follow the procedure in `docs/runbook-module-lock.md`:
 
-## Exceptions
-
-The `lock_gate_exceptions.json` file contains an `exceptions` array. Each entry:
-
-```json
-{
-  "path": "src/data_manager",
-  "reason": "Approved refactor per BTCAAAAA-XXXX",
-  "approval_id": "<CTO-approved ID>",
-  "expires_at": null
-}
-```
-
-Only the PlatformEngineer or CTO may add entries. The exceptions file itself is locked.
+- **Path A** — Board-approved planned exception (permanent)
+- **Path B.1** — CEO emergency exception (4-hour window)
+- **Path B.2** — Board emergency exception (4-hour window)
 
 ## Local Testing
 
@@ -69,4 +53,14 @@ python scripts/lock_gate.py --local
 
 # Test against a diff fixture
 python scripts/lock_gate.py --diff-file /tmp/test_diff.txt
+
+# Validate exceptions file schema
+python scripts/lock_gate.py --validate-exceptions
 ```
+
+## Related Documents
+
+- `docs/runbook-module-lock.md` — Full runbook with unlock procedures
+- `lock_gate_exceptions.schema.md` — Exception entry schema documentation
+- `.github/ISSUE_TEMPLATE/qa-locked-module-exception.md` — Exception request template
+- `.github/CODEOWNERS` — CEO + board approval requirement for exceptions file
