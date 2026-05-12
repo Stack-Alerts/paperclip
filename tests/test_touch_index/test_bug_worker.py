@@ -590,6 +590,9 @@ class TestMain:
                 "touch_index.bug_worker.process_bug_issue", return_value=result
             ) as mock_process,
             patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -599,6 +602,7 @@ class TestMain:
 
         mock_process.assert_called_once_with(engine, "uuid-1", dry_run=False)
         mock_fetch.assert_not_called()
+        mock_transition.assert_called_once_with(ISSUE_ID, "done")
 
     def test_main_issue_id_not_found_logs(self, monkeypatch, caplog):
         """When process_bug_issue returns None, a message is logged."""
@@ -968,6 +972,9 @@ class TestMain:
             ),
             patch("touch_index.paperclip_client.get_closed_non_fdr_issues") as mock_fetch,
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
             caplog.at_level(logging.INFO),
         ):
             mock_quality.return_value.passed = True
@@ -978,6 +985,7 @@ class TestMain:
 
         mock_fetch.assert_not_called()
         mock_quality.assert_called_once()
+        mock_transition.assert_called_once_with(ISSUE_ID, "done")
         assert any("VALIDATION PASSED" in r.message for r in caplog.records)
 
     def test_main_validate_issue_id_failed(self, monkeypatch):
@@ -1001,6 +1009,9 @@ class TestMain:
             ),
             patch("touch_index.paperclip_client.get_closed_non_fdr_issues"),
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
         ):
             mock_quality.return_value.passed = False
             monkeypatch.setattr(
@@ -1010,6 +1021,7 @@ class TestMain:
                 main()
 
         assert exc_info.value.code == 1
+        mock_transition.assert_called_once_with(ISSUE_ID, "done")
 
     def test_main_validate_issue_id_not_found_skips_validation(self, monkeypatch, caplog):
         """--validate --issue-id when issue not found: validation is still run."""

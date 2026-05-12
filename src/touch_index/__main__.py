@@ -97,7 +97,7 @@ def _run_bug_cli() -> None:
             )
             if not args.dry_run:
                 try:
-                    transition_issue_status(args.issue_id, "done")
+                    transition_issue_status(result.issue_id, "done")
                     logger.info("Marked %s as done", result.issue_identifier)
                 except Exception:
                     logger.exception(
@@ -218,7 +218,7 @@ def _run_fr_cli() -> None:
             )
             if not args.dry_run:
                 try:
-                    transition_issue_status(args.issue_id, "done")
+                    transition_issue_status(result.issue_id, "done")
                     logger.info("Marked %s as done", result.issue_identifier)
                 except Exception:
                     logger.exception(
