@@ -1,0 +1,77 @@
+name: Impact Gate Scan Done
+
+on:
+  schedule:
+    # Daily at 06:00 UTC — audit done fix issues for gate coverage
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      days_back:
+        description: 'Only scan issues completed within the last N days'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Dry run (log results only — no comments or transitions)'
+        required: false
+        default: 'false'
+      retroactive:
+        description: 'Run Impact Gate on ungated issues'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: impact-gate-scan-done
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    name: Scan done fix issues for Impact Gate coverage
+    runs-on: ubuntu-latest
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install requests python-dotenv SQLAlchemy psycopg2-binary
+
+      - name: Install system dependencies (Qt headless for impact gate tests)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-xkb1 \
+            xvfb libgl1-mesa-glx
+
+      - name: Ensure data directory exists
+        run: mkdir -p data
+
+      - name: Run Impact Gate scan-done
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONPATH: src
+        run: |
+          FLAGS="--json-summary"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          if [ "${{ github.event.inputs.retroactive }}" = "true" ]; then
+            FLAGS="$FLAGS --retroactive"
+          fi
+          DAYS="${{ github.event.inputs.days_back }}"
+          if [ -n "$DAYS" ]; then
+            FLAGS="$FLAGS --days-back $DAYS"
+          fi
+          python scripts/scan_fix_issues_done.py $FLAGS
