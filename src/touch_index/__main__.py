@@ -90,6 +90,8 @@ def _run_bug_cli() -> None:
     engine = get_engine()
     if not health_check(engine):
         logger.error("DB health check failed \u2014 aborting")
+        if args.json_summary:
+            _emit_json_summary(args, worker="bug")
         raise SystemExit(1)
 
     if args.issue_id:
@@ -302,6 +304,8 @@ def _run_fr_cli() -> None:
     engine = get_engine()
     if not health_check(engine):
         logger.error("DB health check failed \u2014 aborting")
+        if args.json_summary:
+            _emit_json_summary(args, worker="fr")
         raise SystemExit(1)
 
     if args.issue_id:

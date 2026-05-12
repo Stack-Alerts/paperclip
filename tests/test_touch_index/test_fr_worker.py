@@ -718,6 +718,32 @@ class TestMain:
         assert exc_info.value.code == 1
         mock_fetch.assert_not_called()
 
+    def test_main_health_check_failure_emits_json_summary(self, monkeypatch, capsys):
+        """--json-summary with health check failure emits JSON before SystemExit."""
+        import json
+        from touch_index.__main__ import _run_fr_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=False),
+            patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--json-summary"],
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_fetch.assert_not_called()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "fr"
+        assert data["mode"] == "polling"
+
     def test_main_no_issues_returns_early(self, monkeypatch, caplog):
         """When no FDR issues found, run_fr_worker is never called."""
         import logging
