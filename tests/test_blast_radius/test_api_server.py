@@ -773,3 +773,192 @@ class TestHandlerBugWebhook:
         handler._send_json.assert_called_once()
         args = handler._send_json.call_args[0]
         assert args[0] == 200
+
+    def test_validate_true_passes_validation(self, monkeypatch):
+        """validate=true: validation runs and passes, validation_passed=true in response."""
+        payload = {
+            "event": "issue_updated",
+            "issue": {"id": "bug-uuid-42"},
+            "validate": True,
+        }
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_bug_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.bug_worker.process_bug_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-1301", 2, "git", False,
+            ),
+        )
+        quality_report = MagicMock()
+        quality_report.passed = True
+        monkeypatch.setattr(
+            "touch_index.quality.run_bug_quality_checks",
+            lambda engine: quality_report,
+        )
+
+        handler.do_POST()
+
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["issue"] == "BTCAAAAA-1301"
+        assert args[1]["validation_passed"] is True
+
+    def test_validate_true_fails_validation(self, monkeypatch):
+        """validate=true: validation fails, validation_passed=false in response."""
+        payload = {
+            "event": "issue_updated",
+            "issue": {"id": "bug-uuid-42"},
+            "validate": True,
+        }
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_bug_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.bug_worker.process_bug_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-1302", 0, "none", True,
+            ),
+        )
+        quality_report = MagicMock()
+        quality_report.passed = False
+        monkeypatch.setattr(
+            "touch_index.quality.run_bug_quality_checks",
+            lambda engine: quality_report,
+        )
+
+        handler.do_POST()
+
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["issue"] == "BTCAAAAA-1302"
+        assert args[1]["validation_passed"] is False
+
+    def test_validate_true_validation_error(self, monkeypatch):
+        """validate=true: validation raises, validation_passed=false in response."""
+        payload = {
+            "event": "issue_updated",
+            "issue": {"id": "bug-uuid-42"},
+            "validate": True,
+        }
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_bug_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.bug_worker.process_bug_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-1303", 1, "comments", False,
+            ),
+        )
+        monkeypatch.setattr(
+            "touch_index.quality.run_bug_quality_checks",
+            lambda engine: (_ for _ in ()).throw(RuntimeError("DB error")),
+        )
+
+        handler.do_POST()
+
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["validation_passed"] is False
+
+    def test_validate_false_no_validation_in_response(self, monkeypatch):
+        """validate=false: validation not run, no validation_passed in response."""
+        payload = {
+            "event": "issue_created",
+            "issue": {"id": "bug-uuid-42"},
+            "validate": False,
+        }
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_bug_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.bug_worker.process_bug_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-1304", 2, "git", False,
+            ),
+        )
+        mock_quality = MagicMock()
+        monkeypatch.setattr(
+            "touch_index.quality.run_bug_quality_checks",
+            mock_quality,
+        )
+
+        handler.do_POST()
+
+        mock_quality.assert_not_called()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert "validation_passed" not in args[1]
+
+    def test_validate_not_in_body_no_validation(self, monkeypatch):
+        """validate absent from body: validation not run, no validation_passed in response."""
+        payload = {
+            "event": "issue_created",
+            "issue": {"id": "bug-uuid-42"},
+        }
+        handler = _make_handler(
+            "/api/webhook/bug-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_bug_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.bug_worker.process_bug_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-1305", 3, "git", False,
+            ),
+        )
+        mock_quality = MagicMock()
+        monkeypatch.setattr(
+            "touch_index.quality.run_bug_quality_checks",
+            mock_quality,
+        )
+
+        handler.do_POST()
+
+        mock_quality.assert_not_called()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert "validation_passed" not in args[1]
