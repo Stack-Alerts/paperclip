@@ -85,6 +85,7 @@ def _run_bug_cli() -> None:
         action="store_true",
         help="Output structured JSON summary to stdout after ingestion and validation",
     )
+    args = parser.parse_args()
     report: Any | None = None
 
     engine = get_engine()
