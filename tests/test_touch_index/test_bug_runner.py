@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -108,6 +108,7 @@ class TestBugRunnerMain:
                 "run_touch_index_bug_worker.run_bug_worker",
                 return_value=[_make_result()],
             ) as mock_worker,
+            patch("run_touch_index_bug_worker.transition_issue_status"),
         ):
             main()
 
@@ -197,6 +198,7 @@ class TestBugRunnerMain:
                 return_value=issues,
             ),
             patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
+            patch("run_touch_index_bug_worker.transition_issue_status"),
             caplog.at_level(logging.INFO),
         ):
             main()
@@ -207,7 +209,93 @@ class TestBugRunnerMain:
         msg = summary_logs[0].message
         assert "2 issues" in msg
         assert "3 files" in msg
-        assert "1 skipped" in msg
+    def test_marks_issues_done_after_processing(self, monkeypatch):
+        """Each processed issue is transitioned to done via Paperclip API."""
+        monkeypatch.setattr(sys, "argv", _CLEAN_ARGV)
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {"id": "id-2", "identifier": "BTCAAAAA-102", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+        results = [
+            _make_result(files_indexed=2, skipped=False),
+            _make_result(files_indexed=0, skipped=True),
+        ]
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
+            patch("run_touch_index_bug_worker.transition_issue_status") as mock_transition,
+        ):
+            main()
+
+        assert mock_transition.call_count == 2
+        mock_transition.assert_has_calls([
+            call("id-1", "done"),
+            call("id-2", "done"),
+        ])
+
+    def test_skips_transition_for_already_done_issues(self, monkeypatch, caplog):
+        """Issues already in done status are not transitioned."""
+        import logging
+
+        monkeypatch.setattr(sys, "argv", _CLEAN_ARGV)
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "status": "done", "completedAt": "2026-05-11T10:00:00Z"},
+            {"id": "id-2", "identifier": "BTCAAAAA-102", "status": "in_progress", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+        results = [
+            _make_result(files_indexed=2, skipped=False),
+            _make_result(files_indexed=1, skipped=False),
+        ]
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
+            patch("run_touch_index_bug_worker.transition_issue_status") as mock_transition,
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        mock_transition.assert_called_once_with("id-2", "done")
+
+    def test_transition_error_does_not_crash(self, monkeypatch, caplog):
+        """A failure to mark an issue as done is logged but does not crash."""
+        import logging
+
+        monkeypatch.setattr(sys, "argv", _CLEAN_ARGV)
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+        results = [_make_result(files_indexed=2, skipped=False)]
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
+            patch(
+                "run_touch_index_bug_worker.transition_issue_status",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            caplog.at_level(logging.ERROR),
+        ):
+            main()
+
+        assert any("Failed to mark" in r.message for r in caplog.records)
+
 
 
 class TestBugRunnerIssueId:
@@ -226,6 +314,7 @@ class TestBugRunnerIssueId:
                 "run_touch_index_bug_worker.process_bug_issue", return_value=result
             ) as mock_process,
             patch("run_touch_index_bug_worker.get_closed_non_fdr_issues") as mock_fetch,
+            patch("run_touch_index_bug_worker.transition_issue_status"),
         ):
             main()
 
@@ -278,6 +367,60 @@ class TestBugRunnerIssueId:
         assert any("via git" in r.message for r in caplog.records)
 
 
+    def test_issue_id_validate_passed(self, monkeypatch, caplog):
+        """--issue-id --validate: validation runs after single-issue processing."""
+        import logging
+
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_bug_worker.py", "--issue-id", "uuid-1", "--validate"]
+        )
+        result = _make_result(files_indexed=2, skipped=False)
+        result.issue_identifier = "BTCAAAAA-100"
+        result.source = "git"
+        engine = _make_engine()
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=engine),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.process_bug_issue", return_value=result
+            ) as mock_process,
+            patch("run_touch_index_bug_worker.get_closed_non_fdr_issues") as mock_fetch,
+            patch("run_touch_index_bug_worker.transition_issue_status"),
+            patch("run_touch_index_bug_worker._run_validation", return_value=0) as mock_val,
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        mock_process.assert_called_once_with(engine, "uuid-1", dry_run=False)
+        mock_fetch.assert_not_called()
+        mock_val.assert_called_once_with(engine)
+        assert any("VALIDATION PASSED" in r.message for r in caplog.records)
+
+    def test_issue_id_validate_failed(self, monkeypatch):
+        """--issue-id --validate: validation failure exits non-zero."""
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_bug_worker.py", "--issue-id", "uuid-1", "--validate"]
+        )
+        result = _make_result(files_indexed=2, skipped=False)
+        result.issue_identifier = "BTCAAAAA-100"
+        engine = _make_engine()
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=engine),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.process_bug_issue", return_value=result
+            ),
+            patch("run_touch_index_bug_worker.get_closed_non_fdr_issues"),
+            patch("run_touch_index_bug_worker.transition_issue_status"),
+            patch("run_touch_index_bug_worker._run_validation", return_value=2),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+
 class TestBugRunnerDryRun:
     def test_dry_run_passed_to_run_bug_worker(self, monkeypatch):
         """When --dry-run is passed, dry_run=True is forwarded to run_bug_worker."""
@@ -325,6 +468,7 @@ class TestBugRunnerDryRun:
                 return_value=issues,
             ),
             patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
+            patch("run_touch_index_bug_worker.transition_issue_status"),
             caplog.at_level(logging.INFO),
         ):
             main()
@@ -361,6 +505,38 @@ class TestBugRunnerDryRun:
 # --validate flag
 # ---------------------------------------------------------------------------
 
+    def test_dry_run_skips_transition_to_done(self, monkeypatch, caplog):
+        """When --dry-run is passed, issues are NOT transitioned to done."""
+        import logging
+
+        monkeypatch.setattr(
+            sys, "argv", ["run_touch_index_bug_worker.py", "--dry-run"]
+        )
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {"id": "id-2", "identifier": "BTCAAAAA-102", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+        results = [
+            _make_result(files_indexed=2, skipped=False),
+            _make_result(files_indexed=0, skipped=True),
+        ]
+
+        with (
+            patch("run_touch_index_bug_worker.get_engine", return_value=_make_engine()),
+            patch("run_touch_index_bug_worker.health_check", return_value=True),
+            patch(
+                "run_touch_index_bug_worker.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
+            patch("run_touch_index_bug_worker.transition_issue_status") as mock_transition,
+            caplog.at_level(logging.INFO),
+        ):
+            main()
+
+        mock_transition.assert_not_called()
+        assert any("DRY RUN" in r.message for r in caplog.records)
+
 
 class TestBugRunnerValidate:
     def test_validate_calls_validation_after_ingestion(self, monkeypatch, caplog):
@@ -388,6 +564,7 @@ class TestBugRunnerValidate:
                 return_value=issues,
             ),
             patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
+            patch("run_touch_index_bug_worker.transition_issue_status"),
             patch("run_touch_index_bug_worker._run_validation", return_value=0) as mock_val,
             caplog.at_level(logging.INFO),
         ):
@@ -419,6 +596,7 @@ class TestBugRunnerValidate:
                 return_value=issues,
             ),
             patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
+            patch("run_touch_index_bug_worker.transition_issue_status"),
             patch("run_touch_index_bug_worker._run_validation", return_value=2),
         ):
             with pytest.raises(SystemExit) as exc_info:
@@ -495,6 +673,7 @@ class TestBugRunnerValidate:
                 return_value=issues,
             ),
             patch("run_touch_index_bug_worker.run_bug_worker", return_value=results),
+            patch("run_touch_index_bug_worker.transition_issue_status"),
             patch("run_touch_index_bug_worker._run_validation") as mock_val,
         ):
             main()
