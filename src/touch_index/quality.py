@@ -310,6 +310,9 @@ class BugCoverageReport:
     coverage_pct: float
     missing_issue_identifiers: list[str]
 
+    def to_dict(self) -> dict:
+        return asdict(self)
+
 
 @dataclass
 class BugFreshnessReport:
@@ -319,12 +322,18 @@ class BugFreshnessReport:
     stale_rows: int
     stale_threshold_days: int
 
+    def to_dict(self) -> dict:
+        return asdict(self)
+
 
 @dataclass
 class BugConsistencyReport:
     null_closed_at_rows: int
     duplicate_pairs: int
     orphan_bug_issue_ids: list[str]
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
 
 @dataclass
@@ -333,6 +342,16 @@ class BugQualityReport:
     freshness: BugFreshnessReport | None
     consistency: BugConsistencyReport | None
     passed: bool
+
+    def to_dict(self) -> dict:
+        d: dict[str, Any] = {"passed": self.passed}
+        if self.coverage is not None:
+            d["coverage"] = self.coverage.to_dict()
+        if self.freshness is not None:
+            d["freshness"] = self.freshness.to_dict()
+        if self.consistency is not None:
+            d["consistency"] = self.consistency.to_dict()
+        return d
 
 
 def compute_bug_coverage(engine: Engine) -> BugCoverageReport:
