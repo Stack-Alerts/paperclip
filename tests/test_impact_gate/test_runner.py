@@ -108,6 +108,29 @@ class TestFetchInReviewFixIssues:
         result = _fetch_fn()
         assert result == []
 
+    def test_substring_fix_in_title_is_not_false_positive(self, monkeypatch):
+        monkeypatch.setattr(
+            _runner,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "title": "Impact Gate: scan for fix issues done",
+                    "labels": [],
+                    "status": "in_review",
+                },
+                {
+                    "id": "u2",
+                    "title": "Prefix bug in the title",
+                    "labels": [],
+                    "status": "in_review",
+                },
+            ],
+        )
+        monkeypatch.setattr(_runner, "_company", lambda: "comp-uuid")
+        result = _fetch_fn()
+        assert result == []
+
 
 class TestRunnerMain:
     def test_default_calls_process_issue_on_all(self, monkeypatch):
