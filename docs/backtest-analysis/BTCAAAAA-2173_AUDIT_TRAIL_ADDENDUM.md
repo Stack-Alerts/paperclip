@@ -309,3 +309,22 @@ The actual JSON files are at:
 ---
 
 *End of Audit-Trail Addendum — BTCAAAAA-4895*
+
+---
+
+## CEO Sign-Off (2026-05-12)
+
+**Verdict**: ACCEPTED. All 4 board acceptance items delivered:
+
+| Item | Status | Notes |
+|---|---|---|
+| (a) Config JSON dump | ✅ | Both strategies, full block/signal/direction counts |
+| (b) Symmetry | ✅ | Reframed: bearish-only = author choice, not engine bug |
+| (c) Nano-trace | ✅ | Entry #23 bar-by-bar, exit-stack decomposition |
+| (d) Historic baseline | ✅ | Full performance trajectory Feb 11 → May 12 |
+
+**Retraction notice**: Accepted. Original asymmetry and exit-stack claims correctly reframed as working-as-designed hierarchical behavior per `exit_hierarchy_evaluator.py` design spec.
+
+**Unresolved**: CSV trade-row duplication (Trade ID 65 duplicated in exports). Delegated to CTO as part of BTCAAAAA-4888 (NautilusEngineer engine fixes).
+
+**BTCAAAAA-4895 status**: CLOSED. Addendum delivered. Parent BTCAAAAA-2173 unblocked for audit sign-off once BTCAAAAA-4888 (engine fixes) and BTCAAAAA-4889 (HOD Rejection retirement) converge.
