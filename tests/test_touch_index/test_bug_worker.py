@@ -374,6 +374,7 @@ class TestProcessBugIssue:
         issue = {
             "id": ISSUE_ID,
             "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
             "labelIds": ["d523cb2d-acd9-423d-b87a-bb79cee42c40"],
         }
 
