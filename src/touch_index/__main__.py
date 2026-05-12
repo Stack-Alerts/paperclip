@@ -319,14 +319,14 @@ def _run_fr_cli() -> None:
                     logger.exception(
                         "Failed to mark %s as done", result.issue_identifier
                     )
-        if args.validate:
-            report = run_quality_checks(engine)
-            if not report.passed:
-                logger.error("VALIDATION FAILED after single-issue ingestion")
-                if args.json_summary:
-                    _emit_json_summary(args, worker="fr", result=result, quality_report=report)
-                raise SystemExit(1)
-            logger.info("VALIDATION PASSED after single-issue ingestion")
+            if args.validate:
+                report = run_quality_checks(engine)
+                if not report.passed:
+                    logger.error("VALIDATION FAILED after single-issue ingestion")
+                    if args.json_summary:
+                        _emit_json_summary(args, worker="fr", result=result, quality_report=report)
+                    raise SystemExit(1)
+                logger.info("VALIDATION PASSED after single-issue ingestion")
         if args.json_summary:
             _emit_json_summary(args, worker="fr", result=result, quality_report=locals().get('report'))
         return
