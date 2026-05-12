@@ -245,6 +245,7 @@ class _Handler(BaseHTTPRequestHandler):
 
         try:
             from touch_index.bug_worker import process_bug_issue
+            from touch_index.paperclip_client import transition_issue_status
 
             engine = _get_bug_engine()
             result = process_bug_issue(engine, issue_id, dry_run=bool(dry_run))
@@ -255,11 +256,22 @@ class _Handler(BaseHTTPRequestHandler):
                     "reason": "not a bug issue (FDR-labelled or not found)",
                 })
                 return
+
+            transitioned = False
+            if not dry_run:
+                try:
+                    transition_issue_status(result.issue_id, "done")
+                    transitioned = True
+                    log.info("Bug webhook: marked %s as done", result.issue_identifier)
+                except Exception as exc:
+                    log.error("Bug webhook: failed to mark %s as done: %s", result.issue_identifier, exc)
+
             self._send_json(200, {
                 "issue": result.issue_identifier,
                 "files_indexed": result.files_indexed,
                 "source": result.source,
                 "skipped_no_commits": result.skipped_no_commits,
+                "transitioned_to_done": transitioned,
             })
         except Exception as exc:
             log.error("Bug webhook processing failed for %s: %s", issue_id, exc)
