@@ -241,7 +241,7 @@ def _emit_json_summary(
         summary["issues_skipped"] = skipped
     if quality_report is not None:
         summary["quality"] = quality_report.to_dict()
-    print(json.dumps(summary, default=str))
+    sys.stdout.write(json.dumps(summary, default=str) + "\n")
 
 
 def _run_fr_cli() -> None:
