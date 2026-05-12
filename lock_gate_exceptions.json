@@ -1,32 +1,39 @@
 {
   "version": 2,
-  "description": "Lock gate exceptions — entries that bypass the module lock gate. See docs/runbook-module-lock.md for unlock procedures. Schema docs at lock_gate_exceptions.schema.md.",
+  "description": "Lock gate exceptions \u2014 entries that bypass the module lock gate. See docs/runbook-module-lock.md for unlock procedures. Schema docs at lock_gate_exceptions.schema.md.",
   "$schema": "lock_gate_exceptions.schema.md",
   "exceptions": [
     {
       "module": "scripts/lock_gate.py",
-      "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock gate itself. The gate must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 §1.",
+      "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock gate itself. The gate must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 \u00a71.",
       "expires_iso": null,
       "approval_id": "plan:BTCAAAAA-1479",
       "approved_by": "board"
     },
     {
       "module": ".module_lock_registry.json",
-      "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock registry itself. The registry must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 §1.",
+      "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock registry itself. The registry must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 \u00a71.",
       "expires_iso": null,
       "approval_id": "plan:BTCAAAAA-1479",
       "approved_by": "board"
     },
     {
       "module": "lock_gate_exceptions.json",
-      "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the exceptions file itself. The exceptions file must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 §1.",
+      "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the exceptions file itself. The exceptions file must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 \u00a71.",
       "expires_iso": null,
       "approval_id": "plan:BTCAAAAA-1479",
       "approved_by": "board"
     },
     {
       "module": ".github/workflows/lock-gate.yml",
-      "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock gate CI workflow. The workflow must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 §1.",
+      "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock gate CI workflow. The workflow must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 \u00a71.",
+      "expires_iso": null,
+      "approval_id": "plan:BTCAAAAA-1479",
+      "approved_by": "board"
+    },
+    {
+      "module": ".github/ISSUE_TEMPLATE/qa-locked-module-exception.md",
+      "scope_description": "Plan BTCAAAAA-1491: update template to include mandatory 4-item QA sign-off checklist. Approved per plan BTCAAAAA-1479 \u00a75 (Layer 5 QA template).",
       "expires_iso": null,
       "approval_id": "plan:BTCAAAAA-1479",
       "approved_by": "board"
