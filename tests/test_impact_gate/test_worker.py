@@ -14,6 +14,7 @@ from impact_gate.worker import (
     _build_bypass_comment,
     _build_escalation_comment,
     process_issue,
+    scan_done_issues,
     MIN_TESTS_BAR,
 )
 import impact_gate.worker as worker_mod
@@ -379,3 +380,48 @@ class TestGetIssue:
         mock_sess.get.return_value.raise_for_status.side_effect = RuntimeError("404")
         with pytest.raises(RuntimeError, match="404"):
             worker_mod._get_issue("bad")
+
+# ---------------------------------------------------------------------------
+# scan_done_issues
+# ---------------------------------------------------------------------------
+
+
+class TestScanDoneIssues:
+    """Tests for impact_gate.worker.scan_done_issues() wrapper."""
+
+    def test_calls_scan_and_returns_result(self, monkeypatch):
+        import scan_fix_issues_done
+        expected = {"total_done_fix_issues": 5}
+        calls = []
+        def mock_scan(**kw):
+            calls.append(kw)
+            return expected
+        monkeypatch.setattr(scan_fix_issues_done, "scan", mock_scan)
+        result = scan_done_issues()
+        assert result == expected
+        assert len(calls) == 1
+        assert calls[0] == {"days_back": None, "dry_run": False, "retroactive": False}
+
+    def test_passes_days_back(self, monkeypatch):
+        import scan_fix_issues_done
+        calls = []
+        monkeypatch.setattr(scan_fix_issues_done, "scan",
+                            lambda **kw: (calls.append(kw) or {}))
+        scan_done_issues(days_back=7)
+        assert calls[0]["days_back"] == 7
+
+    def test_passes_dry_run(self, monkeypatch):
+        import scan_fix_issues_done
+        calls = []
+        monkeypatch.setattr(scan_fix_issues_done, "scan",
+                            lambda **kw: (calls.append(kw) or {}))
+        scan_done_issues(dry_run=True)
+        assert calls[0]["dry_run"] is True
+
+    def test_passes_retroactive(self, monkeypatch):
+        import scan_fix_issues_done
+        calls = []
+        monkeypatch.setattr(scan_fix_issues_done, "scan",
+                            lambda **kw: (calls.append(kw) or {}))
+        scan_done_issues(retroactive=True)
+        assert calls[0]["retroactive"] is True
