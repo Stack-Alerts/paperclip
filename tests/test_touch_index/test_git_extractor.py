@@ -8,6 +8,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import logging
+
 import pytest
 
 from touch_index.git_extractor import (
@@ -239,3 +241,65 @@ class TestGetFilesForIssue:
         ):
             files = get_files_for_issue("BTCAAAAA-100", max_commits=2)
         assert len(files) == 2  # 2 commits × 1 file each
+
+
+
+# ---------------------------------------------------------------------------
+# _run() — error handling (uncovered error paths in subprocess wrapper)
+# ---------------------------------------------------------------------------
+
+
+class TestRunErrorHandling:
+    """Tests for _run() error handling paths that are normally mocked."""
+
+    def test_handles_file_not_found_error(self, caplog):
+        """When git executable is not found, returns empty string and logs error."""
+        import subprocess
+        from unittest.mock import patch
+        from touch_index.git_extractor import _run
+
+        with (
+            patch.object(subprocess, "run", side_effect=FileNotFoundError("git not found")),
+            caplog.at_level(logging.ERROR),
+        ):
+            result = _run(["git", "log"], __import__("pathlib").Path("/tmp"))
+
+        assert result == ""
+        assert any("git executable not found" in r.message for r in caplog.records)
+
+    def test_handles_os_error(self, caplog):
+        """When subprocess raises OSError, returns empty string and logs error."""
+        import subprocess
+        from unittest.mock import patch
+        from touch_index.git_extractor import _run
+
+        with (
+            patch.object(subprocess, "run", side_effect=OSError("Permission denied")),
+            caplog.at_level(logging.ERROR),
+        ):
+            result = _run(["git", "log"], __import__("pathlib").Path("/tmp"))
+
+        assert result == ""
+        assert any("Permission denied" in r.message for r in caplog.records)
+
+    def test_nonzero_returncode_logs_warning(self, caplog):
+        """When git exits non-zero, returns stdout and logs warning."""
+        import subprocess
+        from unittest.mock import patch, MagicMock
+        from touch_index.git_extractor import _run
+
+        mock_result = MagicMock()
+        mock_result.returncode = 128
+        mock_result.stdout = ""
+        mock_result.stderr = "fatal: not a git repository"
+
+        with (
+            patch.object(subprocess, "run", return_value=mock_result),
+            caplog.at_level(logging.WARNING),
+        ):
+            result = _run(["git", "status"], __import__("pathlib").Path("/tmp"))
+
+        assert result == ""
+        assert any("git command failed" in r.message for r in caplog.records)
+        assert any("exit 128" in r.message for r in caplog.records)
+        assert any("fatal" in r.message for r in caplog.records)
