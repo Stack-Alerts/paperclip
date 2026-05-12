@@ -1556,75 +1556,44 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         elif step == 1:
             # Validate step - CHECK PREREQUISITES
             if not self._check_validation_prerequisites():
-                return  # Prerequisites not met, error shown
-            
+                return
+
             self.stepper.set_current_step(1)
-            
-            # Run institutional validation
+
+            if self.validation_dialog and self.validation_dialog.isVisible():
+                self.validation_dialog.raise_()
+                self.validation_dialog.activateWindow()
+                return
+
+            dialog = ValidationDialog(self.orchestrator, self)
+            self.validation_dialog = dialog
+            dialog.destroyed.connect(lambda: setattr(self, 'validation_dialog', None))
+
+            dialog.validation_panel.save_requested.connect(self._on_save_strategy)
+            dialog.validation_panel.run_test_requested.connect(self._on_run_backtest)
+
+            dialog.exec_()
+
             try:
-                config = self.orchestrator.get_current_config()
-                validator = InstitutionalValidator()
-                report = validator.validate(config)
-                
-                # Check if validation window already exists and is visible
-                if self.validation_window and self.validation_window.isVisible():
-                    # Close existing window before showing new validation results
-                    self.validation_window.close()
-                
-                # Create and show validation report window (singleton pattern)
-                self.validation_window = ValidationReportWindow(report, config, self)
-
-                # Connect fix_applied signal to save changes to database
-                self.validation_window.fix_applied.connect(self._on_validation_fix_applied)
-
-                # Clear reference when window is destroyed
-                self.validation_window.destroyed.connect(lambda: setattr(self, 'validation_window', None))
-
-                self.validation_window.show()  # QMainWindow uses .show(), not .exec_()
-                
-                # BTCAAAAA-2119: Show ValidationDialog (non-modal) so the "Generate
-                # Nautilus Code" button in ValidationPanel is reachable after validation.
-                if self.validation_dialog and self.validation_dialog.isVisible():
-                    self.validation_dialog.close()
-                self.validation_dialog = ValidationDialog(self.orchestrator, self)
-                self.validation_dialog.destroyed.connect(
-                    lambda: setattr(self, 'validation_dialog', None)
-                )
-                self.validation_dialog.show()
-                
-                # Update stepper state based on validation result
-                if report.is_valid:
-                    self.validation_passed = True  # Track completion
-                    # IMMEDIATELY set status on config so it persists on save
+                panel = dialog.validation_panel
+                if panel.last_validation_result and panel.last_validation_result.success:
+                    self.validation_passed = True
                     self.orchestrator.config_engine.config.validation_status = 'passed'
                     self.stepper.mark_step_complete(1)
-                    self._update_status("Strategy validated successfully")
-                    
-                    # PERSIST VALIDATION STATUS TO DATABASE (Sprint 1.9 ORM)
-                    # Update existing version's status (don't create new version)
+                    self._update_status('Strategy validated successfully')
                     self._save_validation_status_to_db('Pass')
                 else:
                     self.validation_passed = False
-                    # Clear validation status on error
                     if hasattr(self.orchestrator.config_engine.config, 'validation_status'):
                         delattr(self.orchestrator.config_engine.config, 'validation_status')
                     self.stepper.mark_step_error(1)
-                    self._update_status(f"Strategy validation failed - {report.blocking_issues()} blocking issues")
-                    
-                    # PERSIST FAILURE STATUS TO DATABASE (Sprint 1.9 ORM)
-                    # Update existing version's status (don't create new version)
+                    self._update_status('Strategy validation failed')
                     self._save_validation_status_to_db('Fail')
-                    
             except Exception as e:
                 self.validation_passed = False
                 self.stepper.mark_step_error(1)
-                QMessageBox.critical(
-                    self,
-                    "Validation Error",
-                    f"Error running validation:\n\n{str(e)}"
-                )
-                self._update_status("Validation error occurred")
-        
+                self._update_status('Validation error occurred')
+                logger.error(f'Error updating stepper after validation dialog: {e}')
         elif step == 2:
             # Test / Optimize step - CHECK PREREQUISITES  
             if not self._check_test_prerequisites():
