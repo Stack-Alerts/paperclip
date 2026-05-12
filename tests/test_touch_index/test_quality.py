@@ -98,7 +98,7 @@ def _make_consistency(**kw):
         orphan_fr_issue_ids=[],
     )
     defaults.update(kw)
-    return ConsistencyReport(**defaults)
+    return ConsistencyReport(unknown_source_rows=0, **defaults)
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +259,7 @@ class TestCheckConsistency:
             [
                 _make_scalar_result(0),  # null_owner
                 _make_scalar_result(0),  # null_updated
+                _make_scalar_result(0),  # unknown_source
                 _make_scalar_result(0),  # duplicates
                 _make_scalar_result(0, rows=[]),  # DISTINCT fr_issue_ids
             ]
@@ -281,6 +282,7 @@ class TestCheckConsistency:
             [
                 _make_scalar_result(3),  # null_owner
                 _make_scalar_result(0),  # null_updated
+                _make_scalar_result(0),  # unknown_source
                 _make_scalar_result(0),  # duplicates
                 _make_scalar_result(0, rows=[]),  # DISTINCT
             ]
@@ -302,6 +304,7 @@ class TestCheckConsistency:
             [
                 _make_scalar_result(0),  # null_owner
                 _make_scalar_result(0),  # null_updated
+                _make_scalar_result(0),  # unknown_source
                 _make_scalar_result(0),  # duplicates
                 _make_scalar_result(0, rows=[("orphan-1",), ("orphan-2",)]),
             ]
@@ -910,6 +913,7 @@ class TestCheckConsistencyExtended:
                 _make_scalar_result(0),
                 _make_scalar_result(0),
                 _make_scalar_result(0),
+                _make_scalar_result(0),
                 _make_scalar_result(0, rows=[("id-1",), ("id-2",)]),
             ]
         )
@@ -931,6 +935,7 @@ class TestCheckConsistencyExtended:
                 _make_scalar_result(0),
                 _make_scalar_result(2),
                 _make_scalar_result(0),
+                _make_scalar_result(0),
                 _make_scalar_result(0, rows=[]),
             ]
         )
@@ -946,6 +951,7 @@ class TestCheckConsistencyExtended:
         """Duplicate (file_path, fr_issue_id) pairs are counted."""
         engine = _make_engine(
             [
+                _make_scalar_result(0),
                 _make_scalar_result(0),
                 _make_scalar_result(0),
                 _make_scalar_result(4),
@@ -1288,6 +1294,7 @@ class TestReportToDict:
             null_owner_rows=2,
             null_updated_at_rows=0,
             duplicate_pairs=0,
+            unknown_source_rows=0,
             orphan_fr_issue_ids=["orphan-1"],
         )
         d = r.to_dict()
@@ -1391,6 +1398,7 @@ class TestReportToDictExtended:
             null_owner_rows=0,
             null_updated_at_rows=0,
             duplicate_pairs=0,
+            unknown_source_rows=0,
             orphan_fr_issue_ids=[],
         )
         r = QualityReport(coverage=None, freshness=None, consistency=cons, passed=True)
@@ -1417,6 +1425,7 @@ class TestReportToDictExtended:
             null_owner_rows=0,
             null_updated_at_rows=0,
             duplicate_pairs=0,
+            unknown_source_rows=0,
             orphan_fr_issue_ids=[],
         )
         r = QualityReport(coverage=cov, freshness=fresh, consistency=cons, passed=True)

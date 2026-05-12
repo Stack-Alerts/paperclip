@@ -52,6 +52,7 @@ class ConsistencyReport:
     null_owner_rows: int
     null_updated_at_rows: int
     duplicate_pairs: int
+    unknown_source_rows: int
     orphan_fr_issue_ids: list[str]
 
     def to_dict(self) -> dict:
@@ -180,6 +181,15 @@ def check_consistency(engine: Engine) -> ConsistencyReport:
             or 0
         )
 
+        unknown_source = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_fr_files WHERE source = 'unknown'"
+                )
+            ).scalar()
+            or 0
+        )
+
         dups = (
             conn.execute(
                 text("""
@@ -214,6 +224,7 @@ def check_consistency(engine: Engine) -> ConsistencyReport:
         null_owner_rows=null_owner,
         null_updated_at_rows=null_updated,
         duplicate_pairs=dups,
+        unknown_source_rows=unknown_source,
         orphan_fr_issue_ids=orphan_ids,
     )
 
@@ -279,6 +290,8 @@ def run_quality_checks(
             issues.append(f"{consistency.null_updated_at_rows} null-updated rows")
         if consistency.duplicate_pairs:
             issues.append(f"{consistency.duplicate_pairs} duplicate pairs")
+        if consistency.unknown_source_rows:
+            issues.append(f"{consistency.unknown_source_rows} unknown-source rows")
         if consistency.orphan_fr_issue_ids:
             issues.append(f"{len(consistency.orphan_fr_issue_ids)} orphans")
         if issues:
