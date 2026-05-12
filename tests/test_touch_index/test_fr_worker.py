@@ -515,6 +515,7 @@ class TestMain:
         engine = MagicMock()
         result = FRIngestionResult(
             issue_identifier="BTCAAAAA-100",
+            issue_id="uuid-1",
             files_indexed=2,
             source="comments",
             skipped_no_commits=False,
@@ -527,6 +528,9 @@ class TestMain:
                 "touch_index.fr_worker.process_fr_issue", return_value=result
             ) as mock_process,
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -536,6 +540,7 @@ class TestMain:
 
         mock_process.assert_called_once_with(engine, "uuid-1", dry_run=False)
         mock_fetch.assert_not_called()
+        mock_transition.assert_called_once_with("uuid-1", "done")
 
     def test_main_issue_id_not_found_logs(self, monkeypatch, caplog):
         """When process_fr_issue returns None, a message is logged."""
@@ -565,6 +570,7 @@ class TestMain:
         engine = MagicMock()
         result = FRIngestionResult(
             issue_identifier="BTCAAAAA-100",
+            issue_id="uuid-1",
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
@@ -592,6 +598,15 @@ class TestMain:
         issues = [
             {"id": "id-1", "identifier": "BTCAAAAA-100", "description": ""},
         ]
+        worker_results = [
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-100",
+                issue_id="id-1",
+                files_indexed=2,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
 
         with (
             patch("touch_index.db.get_engine", return_value=engine),
@@ -601,7 +616,7 @@ class TestMain:
             ),
             patch(
                 "touch_index.fr_worker.run_fr_worker",
-                return_value=[],
+                return_value=worker_results,
             ) as mock_worker,
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -699,12 +714,21 @@ class TestMain:
         import logging
         engine = MagicMock()
         issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "description": ""}]
+        worker_results = [
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-100",
+                issue_id="id-1",
+                files_indexed=2,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
 
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
-            patch("touch_index.fr_worker.run_fr_worker", return_value=[]),
+            patch("touch_index.fr_worker.run_fr_worker", return_value=worker_results),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -723,12 +747,21 @@ class TestMain:
         """--validate with issues: validation failure exits non-zero."""
         engine = MagicMock()
         issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "description": ""}]
+        worker_results = [
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-100",
+                issue_id="id-1",
+                files_indexed=2,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
 
         with (
             patch("touch_index.db.get_engine", return_value=engine),
             patch("touch_index.db.health_check", return_value=True),
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
-            patch("touch_index.fr_worker.run_fr_worker", return_value=[]),
+            patch("touch_index.fr_worker.run_fr_worker", return_value=worker_results),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -792,6 +825,7 @@ class TestMain:
         engine = MagicMock()
         result = FRIngestionResult(
             issue_identifier="BTCAAAAA-100",
+            issue_id="uuid-1",
             files_indexed=2,
             source="comments",
             skipped_no_commits=False,
@@ -803,6 +837,9 @@ class TestMain:
             patch("touch_index.fr_worker.process_fr_issue", return_value=result),
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
             patch("touch_index.quality.run_quality_checks") as mock_quality,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ),
             caplog.at_level(logging.INFO),
         ):
             mock_quality.return_value.passed = True
@@ -820,6 +857,7 @@ class TestMain:
         engine = MagicMock()
         result = FRIngestionResult(
             issue_identifier="BTCAAAAA-100",
+            issue_id="uuid-1",
             files_indexed=2,
             source="comments",
             skipped_no_commits=False,
@@ -831,6 +869,9 @@ class TestMain:
             patch("touch_index.fr_worker.process_fr_issue", return_value=result),
             patch("touch_index.paperclip_client.get_fdr_issues"),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ),
         ):
             mock_quality.return_value.passed = False
             monkeypatch.setattr(
@@ -874,12 +915,14 @@ class TestMain:
         results = [
             FRIngestionResult(
                 issue_identifier="BTCAAAAA-101",
+                issue_id="id-1",
                 files_indexed=3,
                 source="comments",
                 skipped_no_commits=False,
             ),
             FRIngestionResult(
                 issue_identifier="BTCAAAAA-102",
+                issue_id="id-2",
                 files_indexed=0,
                 source="none",
                 skipped_no_commits=True,
@@ -914,8 +957,8 @@ class TestMain:
         assert "3 files" in msg
         assert "1 skipped" in msg
 
-    def test_main_skips_transition_for_already_done_issues(self, monkeypatch, caplog):
-        """Issues already in 'done' status are not transitioned."""
+    def test_main_transitions_all_processed_results(self, monkeypatch, caplog):
+        """All processed results are transitioned regardless of original issue status."""
         import logging
         engine = MagicMock()
         issues = [
@@ -923,8 +966,8 @@ class TestMain:
             {"id": "id-2", "identifier": "BTCAAAAA-102", "status": "in_progress", "description": ""},
         ]
         results = [
-            FRIngestionResult(issue_identifier="BTCAAAAA-101", files_indexed=2, source="comments", skipped_no_commits=False),
-            FRIngestionResult(issue_identifier="BTCAAAAA-102", files_indexed=1, source="git", skipped_no_commits=False),
+            FRIngestionResult(issue_identifier="BTCAAAAA-101", issue_id="id-1", files_indexed=2, source="comments", skipped_no_commits=False),
+            FRIngestionResult(issue_identifier="BTCAAAAA-102", issue_id="id-2", files_indexed=1, source="git", skipped_no_commits=False),
         ]
 
         with (
@@ -938,8 +981,12 @@ class TestMain:
             monkeypatch.setattr("sys.argv", ["touch_index"])
             main()
 
-        # Only id-2 (in_progress) should be transitioned
-        mock_transition.assert_called_once_with("id-2", "done")
+        # Both results are transitioned (results-based iteration, not issues)
+        assert mock_transition.call_count == 2
+        mock_transition.assert_has_calls([
+            call("id-1", "done"),
+            call("id-2", "done"),
+        ])
 
     def test_main_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
         """A failed transition is logged but does not halt the worker."""
@@ -949,7 +996,7 @@ class TestMain:
             {"id": "id-1", "identifier": "BTCAAAAA-101", "description": ""},
         ]
         results = [
-            FRIngestionResult(issue_identifier="BTCAAAAA-101", files_indexed=2, source="comments", skipped_no_commits=False),
+            FRIngestionResult(issue_identifier="BTCAAAAA-101", issue_id="id-1", files_indexed=2, source="comments", skipped_no_commits=False),
         ]
 
         with (

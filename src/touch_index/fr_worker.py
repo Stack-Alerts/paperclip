@@ -42,6 +42,7 @@ _UPSERT_SQL = text("""
 @dataclass
 class FRIngestionResult:
     issue_identifier: str
+    issue_id: str
     files_indexed: int
     source: str  # "comments" | "git" | "description" | "none"
     skipped_no_commits: bool  # True when no files found from any source
@@ -105,6 +106,7 @@ def ingest_fr_issue(
         )
         return FRIngestionResult(
             issue_identifier=issue_identifier,
+            issue_id=issue_id,
             files_indexed=0,
             source="none",
             skipped_no_commits=True,
@@ -142,6 +144,7 @@ def ingest_fr_issue(
         )
     return FRIngestionResult(
         issue_identifier=issue_identifier,
+        issue_id=issue_id,
         files_indexed=len(rows),
         source=source,
         skipped_no_commits=False,
