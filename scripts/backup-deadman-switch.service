@@ -1,0 +1,13 @@
+[Unit]
+Description=Backup dead-man's-switch monitor
+Documentation=https://github.com/anomalyco/opencode
+Wants=backup-deadman-switch.timer
+
+[Service]
+Type=oneshot
+ExecStart=%h/projects/BTC-Trade-Engine-PaperClip/scripts/backup_deadman_switch.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
