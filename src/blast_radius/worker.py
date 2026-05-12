@@ -123,13 +123,28 @@ def _detect_transitions(
 
 
 def _sync_statuses(state: dict, issues: list[dict]) -> None:
-    """Bulk-update the ``issue_statuses`` map from a list of fetched issues."""
+    """Bulk-update the ``issue_statuses`` map from a list of fetched issues.
+
+    Also removes stale entries for issues that were tracked as ``in_review``
+    but are no longer in the fetched set, so that a future re-transition to
+    ``in_review`` is correctly detected as a new transition rather than
+    suppressed by the stale status.
+    """
     statuses = state.setdefault("issue_statuses", {})
+    fetched_ids: set[str] = set()
     for issue in issues:
         issue_id = issue.get("id", "")
         status = issue.get("status", "")
         if issue_id and status:
             statuses[issue_id] = status
+            fetched_ids.add(issue_id)
+    if fetched_ids:
+        stale = [
+            iid for iid, st in statuses.items()
+            if st == "in_review" and iid not in fetched_ids
+        ]
+        for iid in stale:
+            del statuses[iid]
 
 def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]:
     """Detect fix/bug issues that transitioned TO ``in_review`` and post reports.
