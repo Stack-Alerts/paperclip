@@ -47,6 +47,7 @@ from touch_index.paperclip_client import (
     fetch_issue_comments,
 )
 from impact_gate.worker import process_issue
+from blast_radius.worker import _is_fix_issue
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,23 +60,6 @@ logger = logging.getLogger("scan_fix_issues_done")
 _GATE_HEADER_RE = re.compile(
     r"^## Impact Gate:\s+(PASS|FAIL|BYPASSED|ERROR|SKIPPED)", re.MULTILINE
 )
-
-
-def _is_fix_issue(issue: dict) -> bool:
-    """Return True if the issue looks like a fix or bug."""
-    labels = issue.get("labels") or []
-    for lbl in labels:
-        name = (lbl.get("name") or "").strip().lower()
-        if name in ("fix", "bug", "bugfix", "regression", "hotfix"):
-            return True
-    title = (issue.get("title") or "")
-    # Match only when keyword is the first word — avoids false positives
-    # from non-fix issues (e.g. "Impact Gate: scan for fix issues done").
-    return bool(
-        re.match(r"(?:fix|bug|bugfix|regression|hotfix)\b", title, re.IGNORECASE)
-    )
-
-
 def _check_gate_status(issue_id: str) -> str | None:
     """Check comments for an Impact Gate result.
 
@@ -94,8 +78,6 @@ def _check_gate_status(issue_id: str) -> str | None:
         if m:
             return m.group(1)
     return None
-
-
 def scan(
     days_back: int | None = None,
     dry_run: bool = False,
@@ -246,8 +228,6 @@ def scan(
         )
 
     return result
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Scan done fix/bug issues for Impact Gate coverage",
@@ -309,7 +289,5 @@ def main() -> int:
         print(json.dumps(result))  # noqa: T201
 
     return 0 if result["ungated_count"] == 0 else 1
-
-
 if __name__ == "__main__":
     sys.exit(main())

@@ -25,7 +25,7 @@ Usage
     python -m blast_radius.worker --force-reprocess       # re-process already-seen issues
 
 FIX_LABELS env var (comma-separated): label names that mark an issue as a fix/bug.
-Defaults to ``fix,bug,bugfix``.
+Defaults to ``fix,bug,bugfix,regression,hotfix``.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ log = logging.getLogger(__name__)
 
 FIX_LABELS = {
     lbl.strip().lower()
-    for lbl in os.environ.get("FIX_LABELS", "fix,bug,bugfix").split(",")
+    for lbl in os.environ.get("FIX_LABELS", "fix,bug,bugfix,regression,hotfix").split(",")
     if lbl.strip()
 }
 
