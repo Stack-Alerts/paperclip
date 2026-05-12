@@ -32,36 +32,45 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh api --method PUT \
-            repos/${{ github.repository }}/branches/main/protection \
-            --input - <<'JSON'
-          {
-            "required_status_checks": {
-              "strict": true,
-              "checks": [
-                {"context": "Ruff lint (no-print + datetime)"},
-                {"context": "pytest + coverage gate"},
-                {"context": "Module lock gate"},
-                {"context": "Freeze-lift evidence suite"},
-                {"context": "Real-data regression (BTCAAAAA-745)"}
-              ]
-            },
-            "enforce_admins": true,
-            "required_pull_request_reviews": {
-              "required_approving_review_count": 1,
-              "dismiss_stale_reviews": true,
-              "require_code_owner_reviews": false
-            },
-            "restrictions": null,
-            "required_linear_history": false,
-            "allow_force_pushes": false,
-            "allow_deletions": false,
-            "block_creations": false,
-            "required_conversation_resolution": true,
-            "lock_branch": false,
-            "allow_fork_syncing": true
+          python3 -c "
+          import json, subprocess
+          payload = {
+              'required_status_checks': {
+                  'strict': True,
+                  'checks': [
+                      {'context': 'Ruff lint (no-print + datetime)'},
+                      {'context': 'pytest + coverage gate'},
+                      {'context': 'Module lock gate'},
+                      {'context': 'Freeze-lift evidence suite'},
+                      {'context': 'Real-data regression (BTCAAAAA-745)'}
+                  ]
+              },
+              'enforce_admins': True,
+              'required_pull_request_reviews': {
+                  'required_approving_review_count': 1,
+                  'dismiss_stale_reviews': True,
+                  'require_code_owner_reviews': False
+              },
+              'restrictions': None,
+              'required_linear_history': False,
+              'allow_force_pushes': False,
+              'allow_deletions': False,
+              'block_creations': False,
+              'required_conversation_resolution': True,
+              'lock_branch': False,
+              'allow_fork_syncing': True
           }
-JSON
+          repo = '${{ github.repository }}'
+          p = subprocess.run(
+              ['gh', 'api', '--method', 'PUT',
+               f'repos/{repo}/branches/main/protection',
+               '--input', '-'],
+              input=json.dumps(payload).encode(), capture_output=True
+          )
+          print(p.stdout.decode())
+          if p.returncode:
+              exit(p.returncode)
+          "
 
       - name: Verify protection applied
         env:
