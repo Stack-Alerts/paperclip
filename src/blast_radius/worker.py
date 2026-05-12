@@ -131,6 +131,7 @@ def _detect_transitions(
             result.append(issue)
     return result
 
+
 def _sync_statuses(state: dict, issues: list[dict]) -> None:
     """Bulk-update the ``issue_statuses`` map from a list of fetched issues.
 
@@ -149,11 +150,13 @@ def _sync_statuses(state: dict, issues: list[dict]) -> None:
             fetched_ids.add(issue_id)
     if fetched_ids:
         stale = [
-            iid for iid, st in statuses.items()
+            iid
+            for iid, st in statuses.items()
             if st == "in_review" and iid not in fetched_ids
         ]
         for iid in stale:
             del statuses[iid]
+
 
 def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]:
     """Detect fix/bug issues that transitioned TO ``in_review`` and post reports.
@@ -284,9 +287,7 @@ def process_issue(
     status = issue.get("status", "")
 
     if status != "in_review":
-        log.info(
-            "%s has status=%r (not in_review) -- skipping", identifier, status
-        )
+        log.info("%s has status=%r (not in_review) -- skipping", identifier, status)
         # Track status change for issues leaving in_review so that
         # a future transition back to in_review is correctly detected
         # as a new transition rather than suppressed.
@@ -297,7 +298,8 @@ def process_issue(
             _save_state(state)
             log.info(
                 "Updated state for %s: status %r (was in_review)",
-                identifier, status,
+                identifier,
+                status,
             )
         return None
 
@@ -384,6 +386,7 @@ def main() -> int:
     from .__main__ import main as _main
 
     return _main()
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

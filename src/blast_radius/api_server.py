@@ -119,7 +119,9 @@ class _Handler(BaseHTTPRequestHandler):
         files = params.get("files", [])
 
         if not files:
-            self._send_json(400, {"error": "at least one `files` query param is required"})
+            self._send_json(
+                400, {"error": "at least one `files` query param is required"}
+            )
             return
 
         try:
@@ -160,7 +162,10 @@ class _Handler(BaseHTTPRequestHandler):
 
         log.info(
             "Webhook: issue_status_changed for %s (old_status=%s, dry_run=%s, force_reprocess=%s)",
-            issue_id, old_status, dry_run, force_reprocess,
+            issue_id,
+            old_status,
+            dry_run,
+            force_reprocess,
         )
 
         try:
@@ -171,7 +176,11 @@ class _Handler(BaseHTTPRequestHandler):
                 force_reprocess=bool(force_reprocess),
             )
             if result is None:
-                result = {"issue": issue_id, "status": "skipped", "reason": "not eligible"}
+                result = {
+                    "issue": issue_id,
+                    "status": "skipped",
+                    "reason": "not eligible",
+                }
             self._send_json(200, result)
         except Exception as exc:
             log.error("Webhook processing failed for %s: %s", issue_id, exc)
@@ -213,7 +222,10 @@ class _Handler(BaseHTTPRequestHandler):
 
         log.info(
             "FR webhook: %s for issue %s (dry_run=%s, validate=%s)",
-            event_type, issue_id, dry_run, validate,
+            event_type,
+            issue_id,
+            dry_run,
+            validate,
         )
 
         try:
@@ -224,11 +236,14 @@ class _Handler(BaseHTTPRequestHandler):
             engine = _get_fr_engine()
             result = process_fr_issue(engine, issue_id, dry_run=bool(dry_run))
             if result is None:
-                self._send_json(200, {
-                    "issue": issue_id,
-                    "status": "skipped",
-                    "reason": "not an FDR-labelled issue or not found",
-                })
+                self._send_json(
+                    200,
+                    {
+                        "issue": issue_id,
+                        "status": "skipped",
+                        "reason": "not an FDR-labelled issue or not found",
+                    },
+                )
                 return
 
             transitioned = False
@@ -238,7 +253,11 @@ class _Handler(BaseHTTPRequestHandler):
                     transitioned = True
                     log.info("FR webhook: marked %s as done", result.issue_identifier)
                 except Exception as exc:
-                    log.error("FR webhook: failed to mark %s as done: %s", result.issue_identifier, exc)
+                    log.error(
+                        "FR webhook: failed to mark %s as done: %s",
+                        result.issue_identifier,
+                        exc,
+                    )
 
             validation_passed: bool | None = None
             if validate:
@@ -246,11 +265,21 @@ class _Handler(BaseHTTPRequestHandler):
                     report = run_quality_checks(engine)
                     validation_passed = report.passed
                     if not report.passed:
-                        log.error("FR webhook: VALIDATION FAILED after ingestion for %s", result.issue_identifier)
+                        log.error(
+                            "FR webhook: VALIDATION FAILED after ingestion for %s",
+                            result.issue_identifier,
+                        )
                     else:
-                        log.info("FR webhook: VALIDATION PASSED for %s", result.issue_identifier)
+                        log.info(
+                            "FR webhook: VALIDATION PASSED for %s",
+                            result.issue_identifier,
+                        )
                 except Exception as exc:
-                    log.error("FR webhook: validation error for %s: %s", result.issue_identifier, exc)
+                    log.error(
+                        "FR webhook: validation error for %s: %s",
+                        result.issue_identifier,
+                        exc,
+                    )
                     validation_passed = False
 
             response: dict[str, Any] = {
@@ -302,7 +331,11 @@ class _Handler(BaseHTTPRequestHandler):
         validate = body.get("validate", False)
 
         log.info(
-            "Bug webhook: %s for issue %s (dry_run=%s, validate=%s)", event_type, issue_id, dry_run, validate,
+            "Bug webhook: %s for issue %s (dry_run=%s, validate=%s)",
+            event_type,
+            issue_id,
+            dry_run,
+            validate,
         )
 
         try:
@@ -313,11 +346,14 @@ class _Handler(BaseHTTPRequestHandler):
             engine = _get_bug_engine()
             result = process_bug_issue(engine, issue_id, dry_run=bool(dry_run))
             if result is None:
-                self._send_json(200, {
-                    "issue": issue_id,
-                    "status": "skipped",
-                    "reason": "not a bug issue (FDR-labelled or not found)",
-                })
+                self._send_json(
+                    200,
+                    {
+                        "issue": issue_id,
+                        "status": "skipped",
+                        "reason": "not a bug issue (FDR-labelled or not found)",
+                    },
+                )
                 return
 
             transitioned = False
@@ -327,7 +363,11 @@ class _Handler(BaseHTTPRequestHandler):
                     transitioned = True
                     log.info("Bug webhook: marked %s as done", result.issue_identifier)
                 except Exception as exc:
-                    log.error("Bug webhook: failed to mark %s as done: %s", result.issue_identifier, exc)
+                    log.error(
+                        "Bug webhook: failed to mark %s as done: %s",
+                        result.issue_identifier,
+                        exc,
+                    )
 
             validation_passed: bool | None = None
             if validate:
@@ -335,11 +375,21 @@ class _Handler(BaseHTTPRequestHandler):
                     report = run_bug_quality_checks(engine)
                     validation_passed = report.passed
                     if not report.passed:
-                        log.error("Bug webhook: VALIDATION FAILED after ingestion for %s", result.issue_identifier)
+                        log.error(
+                            "Bug webhook: VALIDATION FAILED after ingestion for %s",
+                            result.issue_identifier,
+                        )
                     else:
-                        log.info("Bug webhook: VALIDATION PASSED for %s", result.issue_identifier)
+                        log.info(
+                            "Bug webhook: VALIDATION PASSED for %s",
+                            result.issue_identifier,
+                        )
                 except Exception as exc:
-                    log.error("Bug webhook: validation error for %s: %s", result.issue_identifier, exc)
+                    log.error(
+                        "Bug webhook: validation error for %s: %s",
+                        result.issue_identifier,
+                        exc,
+                    )
                     validation_passed = False
 
             response: dict[str, Any] = {
@@ -366,7 +416,9 @@ def serve(port: int = DEFAULT_PORT) -> None:
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     parser = argparse.ArgumentParser(description="Blast Radius HTTP API server")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
