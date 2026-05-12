@@ -26,7 +26,7 @@ _RE_BACKTICK = re.compile(
 
 # Bare paths starting with a known root
 _RE_PATH = re.compile(
-    r"(?:^|[\s(\[])(?:BTC_Engine_v3/|projects/[^/]+/)?"
+    r"(?:^|[\s(\[])(?:BTC_Engine_v3/|BTC-Trade-Engine-PaperClip/|projects/[^/]+/)?"
     r"((?:src|tests|scripts|alembic)/[a-zA-Z0-9_/\-\.]+\.(?:" + _CODE_EXTS + r"))"
 )
 

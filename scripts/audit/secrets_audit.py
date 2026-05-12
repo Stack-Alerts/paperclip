@@ -19,6 +19,7 @@ from pathlib import Path
 THIS_FILE = Path(__file__).resolve()
 PROJECT_ROOT = THIS_FILE.parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
+DOCS_DIR = PROJECT_ROOT / "docs"
 
 # ── Patterns ──────────────────────────────────────────────────────────────────
 # AWS access key patterns
@@ -128,6 +129,10 @@ def main() -> None:
         # Note: archived/ directories are NOT excluded.
         # Archived scripts with hardcoded secrets are still a security risk
         # (git history exposure, accidental un-archiving).
+        all_findings.extend(scan_file(fpath))
+
+    md_files = sorted(DOCS_DIR.rglob("*.md"))
+    for fpath in md_files:
         all_findings.extend(scan_file(fpath))
 
     for finding in all_findings:
