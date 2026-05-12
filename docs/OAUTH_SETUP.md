@@ -1,6 +1,6 @@
-# OAUTH_SETUP — rclone Google Drive OAuth (Board One-Pager)
+# OAUTH_SETUP — rclone Google Drive OAuth for PaperClip Backups (Board One-Pager)
 
-**Audience:** Board members / administrators performing this one-time setup
+**Audience:** Board members / administrators
 **Time required:** ~10 minutes
 **What you need:** A Google account (corporate Gmail or Google Workspace)
 
@@ -8,106 +8,126 @@
 
 ## What This Does
 
-This registers Google Drive as the offsite backup target for the BTC Trade Engine's
-PostgreSQL database backups. rclone requests **least-privilege Drive access**
-(`drive.file` scope) — it can only see and modify files it creates itself.
+This authorises the PaperClip server to upload backups to a dedicated Google Drive
+folder (`Paperclip-Backups/`). It uses **least-privilege access** (`drive.file` scope):
+
+> ✅ rclone can only see and modify files it creates itself inside its folder
+> ❌ rclone cannot see your personal documents, photos, or other Drive files
+> ❌ rclone cannot access any Google services other than Drive
 
 ---
 
 ## Step-by-Step
 
-### Step 1: Install rclone (if not already installed)
+### Step 1: SSH into the PaperClip server
 
 ```bash
-sudo apt install rclone
+ssh <user>@<paperclip-server>
 ```
 
-### Step 2: Run the bootstrap script
+### Step 2: Verify rclone is installed
 
 ```bash
-bash scripts/rclone_bootstrap.sh
+rclone version
+```
+
+If not installed:
+
+```bash
+sudo apt update && sudo apt install rclone
+```
+
+### Step 3: Run the bootstrap script
+
+```bash
+/home/sirrus/.paperclip/scripts/rclone-bootstrap.sh
 ```
 
 You will see:
 
 ```
 ========================================
-  BTC Trade Engine -- rclone GDrive Bootstrap
+  Paperclip -- rclone GDrive Bootstrap
 ========================================
 
-rclone found: rclone v1.68
+Step 1: Creating rclone remote 'gdrive' (scope: drive.file)
 
-Step 1: Creating rclone remote 'btc_backup' for Google Drive
-  Scope: drive.file
-  (Least privilege -- only files created by this app)
+A browser URL will be printed. On a headless server:
+  1. Copy the URL
+  2. Open it in a browser on any machine
+  3. Authorize with your Google account
+  4. Paste the returned verification code here
 ```
 
-### Step 3: Authorize in the browser
+### Step 4: Authorize in the browser
 
-The script will print a URL like:
-
-```
-https://accounts.google.com/o/oauth2/auth?client_id=...
-```
-
-1. **Copy the URL** from the terminal
-2. **Open it** in any browser (can be a different machine than the server)
+1. **Copy the URL** from the terminal — it looks like:
+   ```
+   https://accounts.google.com/o/oauth2/auth?client_id=...
+   ```
+2. **Open it** in any browser (can be your laptop — not the server)
 3. **Log in** with your Google account
-4. The consent screen will show: **"Grant rclone access to your Google Drive"**
-   - Permission requested: *See and download files it creates*
-   - This is the `drive.file` scope — it cannot see your other Drive files
+4. **Review the consent screen:**
+   - **App name:** rclone
+   - **Permission requested:** *See and download files it creates*
+   - This is the `drive.file` scope — it cannot browse your other Drive files
 5. Click **Allow**
 6. **Copy the verification code** that appears
 
-### Step 4: Paste the code back
+### Step 5: Paste the code back
 
-Go back to the terminal where `rclone_bootstrap.sh` is running and paste the
-verification code when prompted. The script will then:
+Go back to the terminal session and paste the code when prompted.
 
-- Store the OAuth token in `~/.config/rclone/rclone.conf` (never in git)
-- Verify the connection works
-- Create the backup directory `btc-trade-engine-backups/` on Google Drive
+### Step 6: Confirm success
 
-### Step 5: Verify success
+The script will show:
+
+```
+========================================
+  Bootstrap complete!
+  Remote:  gdrive:
+  Root:    gdrive:Paperclip-Backups/
+  Config:  /home/sirrus/.config/rclone/rclone.conf
+
+To run a backup now:
+  /home/sirrus/.paperclip/scripts/backup-to-drive.sh
+```
+
+---
+
+## Verifying the Setup
 
 ```bash
-# Check the remote is configured
+# Check the remote exists
 rclone listremotes
-# Expected output: btc_backup:
+# Expected: gdrive:
 
-# List the backup directory
-rclone ls btc_backup:btc-trade-engine-backups/
+# Check the backup root directory exists
+rclone lsd gdrive:Paperclip-Backups/
+# Expected: empty or listing backup subdirectories
 
-# Check configuration file exists (contains OAuth token, keep secret)
-ls -la ~/.config/rclone/rclone.conf
+# Run a manual backup to test
+/home/sirrus/.paperclip/scripts/backup-to-drive.sh
 ```
 
 ---
 
 ## Permission Scope Reference
 
-| Scope | rclone flag | What it allows |
-|-------|-------------|----------------|
-| `drive.file` | `--drive-scope drive.file` | **Only files created by this app.** Cannot see your personal docs, photos, etc. |
-| `drive` (full) | `--drive-scope drive` | Full access to all Drive files (not used — too permissive) |
-
-We use `drive.file` exclusively. The rclone config sets `--drive-auth-owner-only` as
-an additional safety constraint.
+| Scope | What It Allows |
+|-------|----------------|
+| `drive.file` | Files created by this app only (ours) |
+| `drive` (full) | Everything (NOT used — too permissive) |
 
 ---
 
-## Security Notes
+## How to Revoke Access Later
 
-- The OAuth token is stored in `~/.config/rclone/rclone.conf`
-- **Never commit this file to git** — it is not in the repo and must not be added
-- If the token is compromised, revoke it at:
-  https://myaccount.google.com/permissions
-- To re-authorize with a different account:
+1. Go to https://myaccount.google.com/permissions
+2. Look for **"rclone"** in the list of third-party apps
+3. Click **Remove Access**
 
-  ```bash
-  rclone config delete btc_backup
-  bash scripts/rclone_bootstrap.sh
-  ```
+After revocation, re-run `rclone-bootstrap.sh` to set up fresh credentials.
 
 ---
 
@@ -115,26 +135,19 @@ an additional safety constraint.
 
 | Symptom | Fix |
 |---------|-----|
-| `rclone: not found` | Install: `sudo apt install rclone` |
-| `No verification code shown` | Make sure you click "Allow" in the browser, not just "Cancel" |
-| `Token expired` | Run `bash scripts/rclone_bootstrap.sh` again to re-authorize |
-| `Drive quota exceeded` | Free up space in the backup directory on GDrive |
-| `Remote 'btc_backup' already configured` | Script will ask if you want to reconfigure. Say `y` to redo OAuth |
+| `rclone: not found` | `sudo apt install rclone` |
+| No URL printed | Ensure terminal supports interactive prompts or use `ssh -t` |
+| `Token expired` | Re-run `rclone-bootstrap.sh` and re-authorize |
+| `Remote 'gdrive' already configured` | Say `y` to reconfigure, or run `rclone config delete gdrive` first |
+| `Failed to create file system` | Check `~/.config/rclone/rclone.conf` exists and is readable |
+| Quota exceeded | Clean up old backups or upgrade Google Drive storage |
+| Permission denied | Ensure the Google account has write access to the target Drive |
 
 ---
 
-## What Happens Next
+## What Happens After Setup
 
-Once OAuth is complete:
-
-1. Backups are created locally via `manage_backups.py` (every 4 hours)
-2. `sync_backups_to_gdrive.py` pushes them to `btc_backup:btc-trade-engine-backups/`
-3. The dead-man's-switch monitor alerts if backups stop flowing
-
-Manual sync test after setup:
-
-```bash
-python scripts/sync_backups_to_gdrive.py --dry-run
-python scripts/sync_backups_to_gdrive.py
-rclone ls btc_backup:btc-trade-engine-backups/
-```
+1. The PaperClip routine calls `backup-to-drive.sh` every 4 hours
+2. Each backup uploads to `gdrive:Paperclip-Backups/<companyId>/YYYY/MM/DD/HHMM/`
+3. A dead-man's-switch monitors that backups are flowing
+4. To restore, use `restore-from-drive.sh` (see `RESTORE.md`)
