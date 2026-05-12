@@ -408,6 +408,31 @@ class TestRunOnce:
         processed_ids = {r.get("issue") or r.get("issue_identifier", "") for r in results}
         assert mock_gen.call_count == 2
 
+    def test_skips_processed_issue_that_also_transitioned(self, tmp_path):
+        """A processed issue that transitions to in_review is skipped by the
+        continue guard (lines 179-183) rather than re-processed."""
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path, {
+            "processed_issue_ids": ["uuid-bug-1"],
+            "issue_statuses": {"uuid-bug-1": "in_progress"},
+        })
+        issues = _IN_REVIEW_ISSUES
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=issues),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}) as mock_gen,
+        ):
+            results = worker_mod.run_once(dry_run=False)
+
+        # uuid-bug-1 was in_progress -> IS a transition, but already processed -> continue
+        # uuid-fix-1 and uuid-title-match are new -> processed
+        assert len(results) == 2
+        assert mock_gen.call_count == 2
+        state = json.loads(state_file.read_text())
+        # uuid-bug-1 preserved from initial state, uuid-fix-1 and uuid-title-match added
+        assert len(state.get("processed_issue_ids", [])) == 3
+
     def test_empty_issues_list(self, tmp_path):
         import blast_radius.worker as worker_mod
         state_file = _patch_state(tmp_path)
