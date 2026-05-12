@@ -1036,7 +1036,7 @@ class TestMain:
         assert "quality" not in data
 
     def test_main_validate_issue_id_not_found_skips_validation(self, monkeypatch, caplog):
-        """--validate --issue-id when issue not found: validation is still run."""
+        """--validate --issue-id when issue not found: validation is skipped."""
         import logging
         engine = MagicMock()
 
@@ -1054,8 +1054,7 @@ class TestMain:
             )
             main()
 
-        mock_quality.assert_called_once()
-        assert any("VALIDATION PASSED" in r.message for r in caplog.records)
+        mock_quality.assert_not_called()
     def test_main_json_summary_issue_id_not_found(self, monkeypatch, capsys):
         """--json-summary --issue-id with no match outputs JSON without result field."""
         import json
