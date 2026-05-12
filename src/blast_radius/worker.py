@@ -325,63 +325,14 @@ def run_loop(
 
 
 def main() -> None:
-    """CLI entry point: parse args and dispatch to process_issue / run_loop / run_once.
+    """CLI entry point: delegate to blast_radius.__main__.main() (unified CLI).
 
-    .. deprecated:: Use python -m blast_radius (or python -m blast_radius worker)
+    .. deprecated:: Use python -m blast_radius or python -m blast_radius worker
        instead of calling this function directly.
     """
-    import argparse
+    from .__main__ import main as _main
 
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
-    )
-
-    parser = argparse.ArgumentParser(
-        description="Blast Radius polling worker + webhook handler"
-    )
-    parser.add_argument(
-        "--issue-id", type=str, metavar="UUID",
-        help="Process a single issue by Paperclip UUID (webhook trigger)",
-    )
-    parser.add_argument(
-        "--old-status", type=str, metavar="STATUS",
-        help="Previous status when called from a status-change webhook",
-    )
-    parser.add_argument(
-        "--loop", type=int, metavar="SECONDS",
-        help="Run in a loop with this interval",
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Log reports but do not post comments",
-    )
-    parser.add_argument(
-        "--force-reprocess", action="store_true",
-        help="Re-process already-seen issues (bypasses transition detection)",
-    )
-    args = parser.parse_args()
-
-    if args.issue_id:
-        result = process_issue(
-            args.issue_id,
-            dry_run=args.dry_run,
-            old_status=args.old_status,
-            force_reprocess=args.force_reprocess,
-        )
-        if result:
-            log.info("Result: %s", json.dumps(result, indent=2))
-        else:
-            log.info("No report generated (issue not eligible)")
-    elif args.loop:
-        run_loop(
-            interval_seconds=args.loop,
-            dry_run=args.dry_run,
-            force_reprocess=args.force_reprocess,
-        )
-    else:
-        results = run_once(dry_run=args.dry_run, force_reprocess=args.force_reprocess)
-        log.info("Results: %s", json.dumps(results, indent=2))
-
+    _main()
 
 if __name__ == "__main__":
     main()
