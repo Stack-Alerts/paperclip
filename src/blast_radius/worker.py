@@ -33,6 +33,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from pathlib import Path
 
@@ -104,8 +105,10 @@ def _is_fix_issue(issue: dict) -> bool:
         name = (lbl.get("name") or "").strip().lower()
         if name in FIX_LABELS:
             return True
-    title_lower = (issue.get("title") or "").lower()
-    return any(kw in title_lower for kw in ("fix", "bug", "regression", "hotfix"))
+    title = (issue.get("title") or "")
+    return bool(
+        re.match(r"(?:fix|bug|bugfix|regression|hotfix)\b", title, re.IGNORECASE)
+    )
 
 
 def _detect_transitions(

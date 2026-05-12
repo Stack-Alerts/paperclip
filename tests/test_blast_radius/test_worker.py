@@ -154,6 +154,22 @@ class TestIsFixIssue:
             worker_mod._is_fix_issue({"labels": [], "title": "  Refactor  "}) is False
         )
 
+    def test_substring_fix_in_title_is_not_false_positive(self):
+        """A title containing 'fix' not as first word should NOT match."""
+        import blast_radius.worker as worker_mod
+
+        assert (
+            worker_mod._is_fix_issue(
+                {"labels": [], "title": "Impact Gate: scan for fix issues done"}
+            )
+            is False
+        )
+        assert (
+            worker_mod._is_fix_issue(
+                {"labels": [], "title": "Prefix bug in the title"}
+            )
+            is False
+        )
 
 # ---------------------------------------------------------------------------
 # _load_state / _save_state
