@@ -976,3 +976,128 @@ class TestRunBugQualityChecksExtended:
         ):
             report = run_bug_quality_checks(engine)
         assert report.passed is False
+
+
+class TestReportToDict:
+    """Coverage for report dataclass to_dict() methods."""
+
+    def test_coverage_report_to_dict(self):
+        r = CoverageReport(total_fdr_issues=5, indexed_fdr_issues=3, coverage_pct=60.0, missing_issue_identifiers=["BTCAAAAA-100"])
+        d = r.to_dict()
+        assert d["total_fdr_issues"] == 5
+        assert d["coverage_pct"] == 60.0
+
+    def test_freshness_report_to_dict(self):
+        r = FreshnessReport(total_rows=10, max_age_hours=24.0, min_age_hours=1.0, stale_rows=0, stale_threshold_hours=168)
+        d = r.to_dict()
+        assert d["stale_threshold_hours"] == 168
+
+    def test_consistency_report_to_dict(self):
+        r = ConsistencyReport(null_owner_rows=2, null_updated_at_rows=0, duplicate_pairs=0, orphan_fr_issue_ids=["orphan-1"])
+        d = r.to_dict()
+        assert d["null_owner_rows"] == 2
+        assert d["orphan_fr_issue_ids"] == ["orphan-1"]
+
+    def test_quality_report_to_dict_all_none(self):
+        r = QualityReport(coverage=None, freshness=None, consistency=None, passed=True)
+        d = r.to_dict()
+        assert d["passed"] is True
+        assert "coverage" not in d
+        assert "freshness" not in d
+        assert "consistency" not in d
+
+    def test_quality_report_to_dict_with_subset(self):
+        cov = CoverageReport(total_fdr_issues=5, indexed_fdr_issues=3, coverage_pct=60.0, missing_issue_identifiers=[])
+        r = QualityReport(coverage=cov, freshness=None, consistency=None, passed=False)
+        d = r.to_dict()
+        assert d["passed"] is False
+        assert d["coverage"]["total_fdr_issues"] == 5
+        assert "freshness" not in d
+
+    def test_bug_coverage_report_to_dict(self):
+        r = BugCoverageReport(total_bug_issues=3, indexed_bug_issues=2, coverage_pct=66.7, missing_issue_identifiers=["BTCAAAAA-200"])
+        d = r.to_dict()
+        assert d["total_bug_issues"] == 3
+        assert d["coverage_pct"] == 66.7
+
+    def test_bug_freshness_report_to_dict(self):
+        r = BugFreshnessReport(total_rows=10, max_age_hours=48.0, min_age_hours=2.0, stale_rows=1, stale_threshold_days=30)
+        d = r.to_dict()
+        assert d["stale_threshold_days"] == 30
+
+    def test_bug_consistency_report_to_dict(self):
+        r = BugConsistencyReport(null_closed_at_rows=0, duplicate_pairs=2, orphan_bug_issue_ids=[])
+        d = r.to_dict()
+        assert d["duplicate_pairs"] == 2
+
+    def test_bug_quality_report_to_dict_all_none(self):
+        r = BugQualityReport(coverage=None, freshness=None, consistency=None, passed=True)
+        d = r.to_dict()
+        assert d["passed"] is True
+        assert "coverage" not in d
+
+    def test_bug_quality_report_to_dict_with_subset(self):
+        fresh = BugFreshnessReport(total_rows=5, max_age_hours=12.0, min_age_hours=1.0, stale_rows=0, stale_threshold_days=30)
+        r = BugQualityReport(coverage=None, freshness=fresh, consistency=None, passed=True)
+        d = r.to_dict()
+        assert d["freshness"]["total_rows"] == 5
+        assert "coverage" not in d
+        assert "consistency" not in d
+
+
+class TestReportToDictExtended:
+    """Cover remaining uncovered branches in QualityReport.to_dict and BugQualityReport.to_dict."""
+
+    def test_quality_report_freshness_branch(self):
+        fresh = FreshnessReport(total_rows=5, max_age_hours=12.0, min_age_hours=1.0, stale_rows=0, stale_threshold_hours=168)
+        r = QualityReport(coverage=None, freshness=fresh, consistency=None, passed=True)
+        d = r.to_dict()
+        assert d["freshness"]["total_rows"] == 5
+        assert "coverage" not in d
+        assert "consistency" not in d
+
+    def test_quality_report_consistency_branch(self):
+        cons = ConsistencyReport(null_owner_rows=0, null_updated_at_rows=0, duplicate_pairs=0, orphan_fr_issue_ids=[])
+        r = QualityReport(coverage=None, freshness=None, consistency=cons, passed=True)
+        d = r.to_dict()
+        assert d["consistency"]["null_owner_rows"] == 0
+        assert "coverage" not in d
+        assert "freshness" not in d
+
+    def test_quality_report_all_present(self):
+        cov = CoverageReport(total_fdr_issues=2, indexed_fdr_issues=2, coverage_pct=100.0, missing_issue_identifiers=[])
+        fresh = FreshnessReport(total_rows=5, max_age_hours=12.0, min_age_hours=1.0, stale_rows=0, stale_threshold_hours=168)
+        cons = ConsistencyReport(null_owner_rows=0, null_updated_at_rows=0, duplicate_pairs=0, orphan_fr_issue_ids=[])
+        r = QualityReport(coverage=cov, freshness=fresh, consistency=cons, passed=True)
+        d = r.to_dict()
+        assert d["coverage"]["coverage_pct"] == 100.0
+        assert d["freshness"]["total_rows"] == 5
+        assert d["consistency"]["null_owner_rows"] == 0
+
+    def test_bug_quality_report_freshness_branch(self):
+        fresh = BugFreshnessReport(total_rows=5, max_age_hours=12.0, min_age_hours=1.0, stale_rows=0, stale_threshold_days=30)
+        r = BugQualityReport(coverage=None, freshness=fresh, consistency=None, passed=True)
+        d = r.to_dict()
+        assert d["freshness"]["total_rows"] == 5
+        assert "coverage" not in d
+        assert "consistency" not in d
+
+    def test_bug_quality_report_consistency_branch(self):
+        cons = BugConsistencyReport(null_closed_at_rows=0, duplicate_pairs=0, orphan_bug_issue_ids=[])
+        r = BugQualityReport(coverage=None, freshness=None, consistency=cons, passed=True)
+        d = r.to_dict()
+        assert d["consistency"]["null_closed_at_rows"] == 0
+        assert "coverage" not in d
+        assert "freshness" not in d
+
+
+class TestBugQualityReportToDictExtended:
+    """Cover remaining uncovered branch in BugQualityReport.to_dict coverage."""
+
+    def test_bug_quality_report_coverage_branch(self):
+        cov = BugCoverageReport(total_bug_issues=5, indexed_bug_issues=3, coverage_pct=60.0, missing_issue_identifiers=[])
+        r = BugQualityReport(coverage=cov, freshness=None, consistency=None, passed=True)
+        d = r.to_dict()
+        assert d["coverage"]["coverage_pct"] == 60.0
+        assert "freshness" not in d
+        assert "consistency" not in d
