@@ -101,7 +101,7 @@ def _is_fix_issue(issue: dict) -> bool:
     """Return True if the issue looks like a fix or bug."""
     labels = issue.get("labels") or []
     for lbl in labels:
-        name = (lbl.get("name") or "").lower()
+        name = (lbl.get("name") or "").strip().lower()
         if name in FIX_LABELS:
             return True
     title_lower = (issue.get("title") or "").lower()

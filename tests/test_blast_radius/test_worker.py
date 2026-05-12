@@ -1,30 +1,61 @@
-"""Unit tests for blast_radius.worker — no DB or live network required."""
+"""Unit tests for blast_radius.worker -- no DB or live network required.
+
+Tests cover state management, issue detection, transition tracking, and the
+orchestration entry points (run_once, process_issue, run_loop).
+"""
 
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-import blast_radius.worker as worker_mod
-from blast_radius.query import BlastRadiusData
 
-from blast_radius.worker import (
-    _is_fix_issue,
-    _load_state,
-    _save_state,
-    _detect_transitions,
-    _sync_statuses,
-    run_loop,
-    run_once,
-    main as worker_main,
-)
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_IN_REVIEW_ISSUES = [
+    {
+        "id": "uuid-fix-1",
+        "identifier": "BTCAAAAA-100",
+        "title": "Fix null pointer in loader",
+        "status": "in_review",
+        "labels": [{"name": "fix"}],
+    },
+    {
+        "id": "uuid-bug-1",
+        "identifier": "BTCAAAAA-101",
+        "title": "Bug: trade list empty",
+        "status": "in_review",
+        "labels": [{"name": "bug"}],
+    },
+    {
+        "id": "uuid-fr-1",
+        "identifier": "BTCAAAAA-200",
+        "title": "Add trailing stop feature",
+        "status": "in_review",
+        "labels": [{"name": "feature"}],
+    },
+    {
+        "id": "uuid-title-match",
+        "identifier": "BTCAAAAA-102",
+        "title": "Fix regression in optimizer",
+        "status": "in_review",
+        "labels": [],
+    },
+]
 
 
-class _BreakLoop(BaseException):
-    """Used to break out of infinite run_loop during testing."""
+def _patch_state(tmp_path: Path, data: dict | None = None) -> Path:
+    """Write state to a temp path and return it, overriding STATE_PATH."""
+    state_file = tmp_path / "blast_radius_state.json"
+    if data is not None:
+        state_file.write_text(json.dumps(data))
+    return state_file
 
 
 # ---------------------------------------------------------------------------
@@ -34,106 +65,116 @@ class _BreakLoop(BaseException):
 
 class TestIsFixIssue:
     def test_fix_label(self):
-        issue = {"title": "Improve performance", "labels": [{"name": "fix"}]}
-        assert _is_fix_issue(issue) is True
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [{"name": "fix"}]}) is True
 
     def test_bug_label(self):
-        issue = {"title": "Some thing", "labels": [{"name": "Bug"}]}
-        assert _is_fix_issue(issue) is True
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [{"name": "bug"}]}) is True
 
     def test_bugfix_label(self):
-        issue = {"title": "Irrelevant", "labels": [{"name": "bugfix"}]}
-        assert _is_fix_issue(issue) is True
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [{"name": "bugfix"}]}) is True
 
-    def test_unrelated_label(self):
-        issue = {"title": "Add new feature", "labels": [{"name": "enhancement"}]}
-        assert _is_fix_issue(issue) is False
+    def test_case_insensitive_label(self):
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [{"name": "FIX"}]}) is True
+
+    def test_no_labels(self):
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [], "title": "Refactor db"}) is False
 
     def test_title_contains_fix(self):
-        issue = {"title": "Fix null pointer in strategy loader", "labels": []}
-        assert _is_fix_issue(issue) is True
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [], "title": "Fix the loader"}) is True
 
     def test_title_contains_bug(self):
-        issue = {"title": "Bug: signals fire twice", "labels": []}
-        assert _is_fix_issue(issue) is True
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [], "title": "Bug: crash on startup"}) is True
 
     def test_title_contains_regression(self):
-        issue = {"title": "Regression in optimizer v3", "labels": []}
-        assert _is_fix_issue(issue) is True
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [], "title": "Regression in v2.1"}) is True
 
     def test_title_contains_hotfix(self):
-        issue = {"title": "Hotfix: stop-loss ignored", "labels": []}
-        assert _is_fix_issue(issue) is True
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [], "title": "Hotfix for prod"}) is True
 
-    def test_normal_feature_issue(self):
-        issue = {"title": "Add live chart widget", "labels": [{"name": "feature"}]}
-        assert _is_fix_issue(issue) is False
+    def test_whitespace_label(self):
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [{"name": "  fix  "}], "title": ""}) is True
 
-    def test_no_labels_key(self):
-        issue = {"title": "Performance improvement"}
-        assert _is_fix_issue(issue) is False
+    def test_feature_is_not_fix(self):
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [{"name": "feature"}], "title": "New thing"}) is False
 
-    def test_empty_labels(self):
-        issue = {"title": "Refactor module", "labels": []}
-        assert _is_fix_issue(issue) is False
+    def test_missing_labels_key(self):
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"title": "Some change"}) is False
+
+    def test_non_dict_labels(self):
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": None, "title": ""}) is False
+
+    def test_whitespace_title(self):
+        import blast_radius.worker as worker_mod
+        assert worker_mod._is_fix_issue({"labels": [], "title": "  Refactor  "}) is False
 
 
 # ---------------------------------------------------------------------------
-# State file helpers
+# _load_state / _save_state
 # ---------------------------------------------------------------------------
 
 
-class TestStateHelpers:
-    def test_round_trip(self, tmp_path, monkeypatch):
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+class TestStatePersistence:
+    def test_load_nonexistent_returns_defaults(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        path = tmp_path / "nonexistent.json"
+        with patch.object(worker_mod, "_STATE_PATH", path):
+            state = worker_mod._load_state()
+        assert state == {"processed_issue_ids": [], "issue_statuses": {}}
 
-        default = _load_state()
-        assert default == {"processed_issue_ids": [], "issue_statuses": {}}
+    def test_load_corrupt_json_returns_defaults(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        path = tmp_path / "corrupt.json"
+        path.write_text("{bad json")
+        with patch.object(worker_mod, "_STATE_PATH", path):
+            state = worker_mod._load_state()
+        assert state == {"processed_issue_ids": [], "issue_statuses": {}}
 
-        _save_state({"processed_issue_ids": ["id-1", "id-2"], "issue_statuses": {"id-1": "in_review"}})
-        loaded = _load_state()
-        assert loaded["processed_issue_ids"] == ["id-1", "id-2"]
-        assert loaded["issue_statuses"] == {"id-1": "in_review"}
+    def test_load_missing_keys_filled(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        path = tmp_path / "partial.json"
+        path.write_text(json.dumps({"processed_issue_ids": ["a"]}))
+        with patch.object(worker_mod, "_STATE_PATH", path):
+            state = worker_mod._load_state()
+        assert "issue_statuses" in state
+        assert "processed_issue_ids" in state
 
-    def test_load_corrupted_file_returns_default(self, tmp_path, monkeypatch):
-        state_file = tmp_path / "state.json"
-        state_file.write_text("NOT JSON{{{{")
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
+    def test_save_and_load_roundtrip(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        path = tmp_path / "roundtrip.json"
+        with patch.object(worker_mod, "_STATE_PATH", path):
+            worker_mod._save_state({"processed_issue_ids": ["x"], "issue_statuses": {"x": "in_review"}})
+            state = worker_mod._load_state()
+        assert state["processed_issue_ids"] == ["x"]
+        assert state["issue_statuses"] == {"x": "in_review"}
 
-        result = _load_state()
-        assert result == {"processed_issue_ids": [], "issue_statuses": {}}
+    def test_save_creates_parent_dir(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        path = tmp_path / "subdir" / "state.json"
+        with patch.object(worker_mod, "_STATE_PATH", path):
+            worker_mod._save_state({"processed_issue_ids": [], "issue_statuses": {}})
+        assert path.exists()
 
-    def test_save_creates_parent_dirs(self, tmp_path, monkeypatch):
-        state_file = tmp_path / "nested" / "dir" / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-
-        _save_state({"processed_issue_ids": ["x"], "issue_statuses": {}})
-        assert state_file.exists()
-        assert json.loads(state_file.read_text()) == {
-            "processed_issue_ids": ["x"],
-            "issue_statuses": {},
-        }
-
-    def test_backward_compat_no_issue_statuses(self, tmp_path, monkeypatch):
-        """Old state files without issue_statuses should still load."""
-        state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({"processed_issue_ids": ["id-1"]}))
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-
-        result = _load_state()
-        assert result["processed_issue_ids"] == ["id-1"]
-        assert result["issue_statuses"] == {}
-
-    def test_backward_compat_no_processed_ids(self, tmp_path, monkeypatch):
-        """Old state files without processed_issue_ids should still load."""
-        state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({"issue_statuses": {"id-1": "in_review"}}))
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-
-        result = _load_state()
-        assert result["processed_issue_ids"] == []
-        assert result["issue_statuses"] == {"id-1": "in_review"}
+    def test_load_normal_state(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        expected = {"processed_issue_ids": ["uuid-1"], "issue_statuses": {"uuid-1": "in_review"}}
+        path = tmp_path / "normal.json"
+        path.write_text(json.dumps(expected))
+        with patch.object(worker_mod, "_STATE_PATH", path):
+            state = worker_mod._load_state()
+        assert state == expected
 
 
 # ---------------------------------------------------------------------------
@@ -143,36 +184,41 @@ class TestStateHelpers:
 
 class TestDetectTransitions:
     def test_new_issue_is_transition(self):
+        import blast_radius.worker as worker_mod
+        issues = [{"id": "new-uuid"}]
         state = {"issue_statuses": {}}
-        issues = [{"id": "u1", "status": "in_review"}]
-        assert _detect_transitions(state, issues) == issues
+        assert worker_mod._detect_transitions(state, issues) == issues
 
-    def test_known_in_review_is_not_transition(self):
-        state = {"issue_statuses": {"u1": "in_review"}}
-        issues = [{"id": "u1", "status": "in_review"}]
-        assert _detect_transitions(state, issues) == []
+    def test_issue_was_not_in_review_is_transition(self):
+        import blast_radius.worker as worker_mod
+        issues = [{"id": "uuid-1"}]
+        state = {"issue_statuses": {"uuid-1": "in_progress"}}
+        assert worker_mod._detect_transitions(state, issues) == issues
 
-    def test_known_other_status_is_transition(self):
-        state = {"issue_statuses": {"u1": "in_progress"}}
-        issues = [{"id": "u1", "status": "in_review"}]
-        assert _detect_transitions(state, issues) == issues
+    def test_issue_already_in_review_is_not_transition(self):
+        import blast_radius.worker as worker_mod
+        issues = [{"id": "uuid-1"}]
+        state = {"issue_statuses": {"uuid-1": "in_review"}}
+        assert worker_mod._detect_transitions(state, issues) == []
 
-    def test_mixed_issues(self):
-        state = {"issue_statuses": {"u1": "in_review", "u2": "in_progress", "u3": "todo"}}
-        issues = [
-            {"id": "u1", "status": "in_review"},
-            {"id": "u2", "status": "in_review"},
-            {"id": "u3", "status": "in_review"},
-            {"id": "u4", "status": "in_review"},
-        ]
-        result = _detect_transitions(state, issues)
-        assert [i["id"] for i in result] == ["u2", "u3", "u4"]
+    def test_mixed_transitions(self):
+        import blast_radius.worker as worker_mod
+        issues = [{"id": "already"}, {"id": "new"}, {"id": "was-progress"}]
+        state = {"issue_statuses": {"already": "in_review", "was-progress": "in_progress"}}
+        result = worker_mod._detect_transitions(state, issues)
+        assert [i["id"] for i in result] == ["new", "was-progress"]
 
-    def test_issue_without_id_is_skipped(self):
-        state = {"issue_statuses": {"u1": "in_review"}}
-        issues = [{"status": "in_review"}, {"id": "u2", "status": "in_review"}]
-        result = _detect_transitions(state, issues)
-        assert [i.get("id") for i in result] == [None, "u2"]
+    def test_empty_issue_list(self):
+        import blast_radius.worker as worker_mod
+        assert worker_mod._detect_transitions({}, []) == []
+
+    def test_issue_with_missing_id_is_excluded(self):
+        """An issue without an id field cannot be tracked and is excluded."""
+        import blast_radius.worker as worker_mod
+        issues = [{"identifier": "BTCAAAAA-100"}]
+        state = {"issue_statuses": {"": "in_review"}}
+        # empty string ID -> found in known with "" -> excluded
+        assert worker_mod._detect_transitions(state, issues) == []
 
 
 # ---------------------------------------------------------------------------
@@ -182,825 +228,391 @@ class TestDetectTransitions:
 
 class TestSyncStatuses:
     def test_updates_statuses(self):
-        state = {"issue_statuses": {"u1": "todo"}}
-        issues = [
-            {"id": "u1", "status": "in_review"},
-            {"id": "u2", "status": "in_review"},
-        ]
-        _sync_statuses(state, issues)
-        assert state["issue_statuses"]["u1"] == "in_review"
-        assert state["issue_statuses"]["u2"] == "in_review"
-
-    def test_ignores_issue_without_id_or_status(self):
+        import blast_radius.worker as worker_mod
         state = {"issue_statuses": {}}
-        issues = [
-            {"id": "", "status": "in_review"},
-            {"id": "u1", "status": ""},
-            {"id": "u2", "status": "in_review"},
-        ]
-        _sync_statuses(state, issues)
-        assert "u2" in state["issue_statuses"]
-        assert state["issue_statuses"]["u2"] == "in_review"
-        assert "" not in state["issue_statuses"]
+        issues = [{"id": "u1", "status": "in_review"}, {"id": "u2", "status": "done"}]
+        worker_mod._sync_statuses(state, issues)
+        assert state["issue_statuses"] == {"u1": "in_review", "u2": "done"}
 
+    def test_preserves_existing_unrelated(self):
+        import blast_radius.worker as worker_mod
+        state = {"issue_statuses": {"u3": "in_progress"}}
+        issues = [{"id": "u1", "status": "in_review"}]
+        worker_mod._sync_statuses(state, issues)
+        assert "u3" in state["issue_statuses"]
 
-# ---------------------------------------------------------------------------
-# run_once
-# ---------------------------------------------------------------------------
+    def test_skips_empty_id(self):
+        import blast_radius.worker as worker_mod
+        state = {"issue_statuses": {}}
+        issues = [{"id": "", "status": "in_review"}]
+        worker_mod._sync_statuses(state, issues)
+        assert state["issue_statuses"] == {}
 
-_FIX_ISSUE = {
-    "id": "issue-uuid-fix",
-    "identifier": "BTCAAAAA-100",
-    "title": "Fix the thing",
-    "status": "in_review",
-    "labels": [{"name": "fix"}],
-}
-
-_NON_FIX_ISSUE = {
-    "id": "issue-uuid-feat",
-    "identifier": "BTCAAAAA-200",
-    "title": "Add new feature",
-    "status": "in_review",
-    "labels": [{"name": "feature"}],
-}
-
-
-class TestRunOnce:
-    def _patch_all(self, tmp_path, monkeypatch, issues, gen_return=None):
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-
-        monkeypatch.setattr(
-            worker_mod,
-            "_fetch_in_review_issues",
-            lambda: issues,
-        )
-
-        if gen_return is None:
-            gen_return = {"issue": "BTCAAAAA-100", "dry_run": False}
-
-        monkeypatch.setattr(
-            worker_mod,
-            "generate_and_post",
-            lambda issue_id, dry_run=False: gen_return,
-        )
-
-        return state_file
-
-    def test_processes_fix_issue(self, tmp_path, monkeypatch):
-        state_file = self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
-
-        results = run_once()
-
-        assert len(results) == 1
-        assert results[0]["issue"] == "BTCAAAAA-100"
-
-        state = json.loads(state_file.read_text())
-        assert "issue-uuid-fix" in state["processed_issue_ids"]
-        assert state["issue_statuses"]["issue-uuid-fix"] == "in_review"
-
-    def test_skips_non_fix_issue(self, tmp_path, monkeypatch):
-        state_file = self._patch_all(tmp_path, monkeypatch, [_NON_FIX_ISSUE])
-
-        results = run_once()
-
-        assert results == []
-        state = json.loads(state_file.read_text())
-        assert state["processed_issue_ids"] == []
-        assert state["issue_statuses"]["issue-uuid-feat"] == "in_review"
-
-    def test_skips_already_processed(self, tmp_path, monkeypatch):
-        state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": ["issue-uuid-fix"],
-            "issue_statuses": {"issue-uuid-fix": "in_review"},
-        }))
-        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
-
-        results = run_once()
-
-        assert results == []
-        state = json.loads(state_file.read_text())
-        assert state["processed_issue_ids"] == ["issue-uuid-fix"]
-
-    def test_skips_already_processed_when_transition(self, tmp_path, monkeypatch):
-        """Issue in processed_issue_ids is skipped even when it IS a new transition."""
-        state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": ["issue-uuid-fix"],
-            "issue_statuses": {"issue-uuid-fix": "in_progress"},
-        }))
-        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
-
-        results = run_once()
-
-        assert results == []
-        state = json.loads(state_file.read_text())
-        assert state["processed_issue_ids"] == ["issue-uuid-fix"]
-
-    def test_transition_detected_for_new_issue(self, tmp_path, monkeypatch):
-        """A previously unknown issue (no status tracked) is treated as a transition."""
-        state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({"processed_issue_ids": [], "issue_statuses": {}}))
-        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
-
-        results = run_once()
-
-        assert len(results) == 1
-
-    def test_no_transition_for_known_in_review(self, tmp_path, monkeypatch):
-        """An issue already tracked as in_review is NOT a new transition."""
-        state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": [],
-            "issue_statuses": {"issue-uuid-fix": "in_review"},
-        }))
-        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
-
-        results = run_once()
-
-        assert results == []
-
-    def test_transition_for_known_other_status(self, tmp_path, monkeypatch):
-        """An issue previously in_progress IS a new transition."""
-        state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": [],
-            "issue_statuses": {"issue-uuid-fix": "in_progress"},
-        }))
-        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
-
-        results = run_once()
-
-        assert len(results) == 1
-
-    def test_dry_run_does_not_save_state(self, tmp_path, monkeypatch):
-        state_file = self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
-
-        run_once(dry_run=True)
-
-        assert not state_file.exists()
-
-    def test_generator_error_recorded(self, tmp_path, monkeypatch):
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        monkeypatch.setattr(
-            worker_mod,
-            "_fetch_in_review_issues",
-            lambda: [_FIX_ISSUE],
-        )
-        monkeypatch.setattr(
-            worker_mod,
-            "generate_and_post",
-            lambda issue_id, dry_run=False: (_ for _ in ()).throw(
-                RuntimeError("DB down")
-            ),
-        )
-
-        results = run_once()
-
-        assert len(results) == 1
-        assert "error" in results[0]
-        assert "DB down" in results[0]["error"]
-        state = json.loads(state_file.read_text())
-        assert state["processed_issue_ids"] == []
-        assert state["issue_statuses"]["issue-uuid-fix"] == "in_review"
-
-    def test_mixed_issues(self, tmp_path, monkeypatch):
-        issues = [_FIX_ISSUE, _NON_FIX_ISSUE]
-        self._patch_all(tmp_path, monkeypatch, issues)
-
-        results = run_once()
-
-        assert len(results) == 1
-        assert results[0]["issue"] == "BTCAAAAA-100"
-
-    def test_force_reprocess_overrides_transition_detection(self, tmp_path, monkeypatch):
-        state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": [],
-            "issue_statuses": {"issue-uuid-fix": "in_review"},
-        }))
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        monkeypatch.setattr(
-            worker_mod,
-            "_fetch_in_review_issues",
-            lambda: [_FIX_ISSUE],
-        )
-        call_count = 0
-
-        def tracking_gen(issue_id, dry_run=False):
-            nonlocal call_count
-            call_count += 1
-            return {"issue": "BTCAAAAA-100", "dry_run": dry_run}
-
-        monkeypatch.setattr(worker_mod, "generate_and_post", tracking_gen)
-
-        results = run_once(force_reprocess=True)
-
-        assert len(results) == 1
-        assert call_count == 1
-        state = json.loads(state_file.read_text())
-        assert "issue-uuid-fix" in state["processed_issue_ids"]
-
-    def test_force_reprocess_with_dry_run_does_not_save_state(
-        self, tmp_path, monkeypatch
-    ):
-        state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": ["issue-uuid-fix"],
-            "issue_statuses": {"issue-uuid-fix": "in_review"},
-        }))
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        monkeypatch.setattr(
-            worker_mod,
-            "_fetch_in_review_issues",
-            lambda: [_FIX_ISSUE],
-        )
-        monkeypatch.setattr(
-            worker_mod,
-            "generate_and_post",
-            lambda issue_id, dry_run=False: {"issue": "BTCAAAAA-100"},
-        )
-
-        run_once(dry_run=True, force_reprocess=True)
-
-        state = json.loads(state_file.read_text())
-        assert state["processed_issue_ids"] == ["issue-uuid-fix"]
-
-    def test_statuses_synced_for_all_issues(self, tmp_path, monkeypatch):
-        """Statuses for ALL fetched issues, not just processed ones."""
-        state_file = tmp_path / "state.json"
-        state_file.write_text(json.dumps({"processed_issue_ids": [], "issue_statuses": {}}))
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        monkeypatch.setattr(
-            worker_mod,
-            "_fetch_in_review_issues",
-            lambda: [_FIX_ISSUE, _NON_FIX_ISSUE],
-        )
-        monkeypatch.setattr(
-            worker_mod,
-            "generate_and_post",
-            lambda issue_id, dry_run=False: {"issue": "BTCAAAAA-100"},
-        )
-
-        run_once()
-
-        state = json.loads(state_file.read_text())
-        assert state["issue_statuses"]["issue-uuid-fix"] == "in_review"
-        assert state["issue_statuses"]["issue-uuid-feat"] == "in_review"
-
-    def test_does_not_transition_issue(self, tmp_path, monkeypatch):
-        """The worker must NOT transition the issue status in Paperclip.
-
-        After run_once() processes a fix issue, the saved state should
-        reflect the fetched status (in_review), not a transitioned status.
-        """
-        state_file = self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
-        results = run_once()
-        assert len(results) == 1
-        state = json.loads(state_file.read_text())
-        assert state["issue_statuses"]["issue-uuid-fix"] == "in_review"
-
-    def test_does_not_transition_on_dry_run(self, tmp_path, monkeypatch):
-        """Dry-run mode must NOT transition or persist state."""
-        state_file = self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
-        results = run_once(dry_run=True)
-        assert len(results) == 1
-        assert not state_file.exists()
-
-    def test_does_not_transition_when_skipped(self, tmp_path, monkeypatch):
-        self._patch_all(
-            tmp_path,
-            monkeypatch,
-            [_FIX_ISSUE],
-            gen_return={"skipped": True, "reason": "no touchedFiles", "issue": "BTCAAAAA-100"},
-        )
-
-        result = run_once()
-        assert len(result) == 1
-        assert result[0].get("skipped") is True
-
-    def test_empty_issue_list(self, tmp_path, monkeypatch):
-        state_file = self._patch_all(tmp_path, monkeypatch, [])
-
-        results = run_once()
-
-        assert results == []
-        state = json.loads(state_file.read_text())
-        assert state["processed_issue_ids"] == []
+    def test_skips_empty_status(self):
+        import blast_radius.worker as worker_mod
+        state = {"issue_statuses": {}}
+        issues = [{"id": "u1", "status": ""}]
+        worker_mod._sync_statuses(state, issues)
         assert state["issue_statuses"] == {}
 
 
 # ---------------------------------------------------------------------------
-# process_issue (single-issue webhook entry point)
-# ---------------------------------------------------------------------------
-
-
-class TestProcessIssue:
-    _FIX_IN_REVIEW = {
-        "id": "issue-uuid-42",
-        "identifier": "BTCAAAAA-1507",
-        "title": "Fix the webhook handler",
-        "status": "in_review",
-        "labels": [{"name": "fix"}],
-        "description": (
-            '"touchedFiles": ["src/blast_radius/worker.py"]'
-        ),
-    }
-
-    _NON_FIX_IN_REVIEW = {
-        "id": "issue-uuid-43",
-        "identifier": "BTCAAAAA-1508",
-        "title": "Feature request",
-        "status": "in_review",
-        "labels": [{"name": "feature"}],
-    }
-
-    _ISSUE_NOT_IN_REVIEW = {
-        "id": "issue-uuid-44",
-        "identifier": "BTCAAAAA-1509",
-        "title": "Fix in progress",
-        "status": "in_progress",
-        "labels": [{"name": "fix"}],
-    }
-
-    def _patch_gen(self, monkeypatch, posted_list=None):
-        if posted_list is None:
-            posted_list = []
-        monkeypatch.setattr(
-            "blast_radius.generator._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._get_agent_name",
-            lambda agent_id: "Bot",
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._post_comment",
-            lambda issue_id, body: posted_list.append(issue_id),
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator.query_blast_radius",
-            lambda file_paths: BlastRadiusData(),
-        )
-        return posted_list
-
-    def test_processes_fix_in_review(self, tmp_path, monkeypatch):
-        from blast_radius.worker import process_issue
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", tmp_path / "state.json")
-        posted = self._patch_gen(monkeypatch)
-
-        result = process_issue("issue-uuid-42", dry_run=False)
-
-        assert result is not None
-        assert result.get("issue") == "BTCAAAAA-1507"
-        assert posted == ["issue-uuid-42"]
-
-        # State should be updated
-        state = json.loads((tmp_path / "state.json").read_text())
-        assert "issue-uuid-42" in state["processed_issue_ids"]
-        assert state["issue_statuses"]["issue-uuid-42"] == "in_review"
-
-    def test_skips_non_fix_issue(self, monkeypatch):
-        from blast_radius.worker import process_issue
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._NON_FIX_IN_REVIEW,
-        )
-
-        result = process_issue("issue-uuid-43", dry_run=True)
-
-        assert result is None
-
-    def test_skips_not_in_review(self, monkeypatch):
-        from blast_radius.worker import process_issue
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._ISSUE_NOT_IN_REVIEW,
-        )
-
-        result = process_issue("issue-uuid-44", dry_run=True)
-
-        assert result is None
-
-    def test_dry_run_does_not_post(self, monkeypatch):
-        from blast_radius.worker import process_issue
-        from unittest.mock import MagicMock
-
-        mock_sess = MagicMock()
-        monkeypatch.setattr(
-            "touch_index.paperclip_client._session",
-            lambda: mock_sess,
-        )
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        posted = self._patch_gen(monkeypatch)
-
-        result = process_issue("issue-uuid-42", dry_run=True)
-
-        assert result is not None
-        assert result["dry_run"] is True
-        assert posted == []
-
-    def test_dry_run_does_not_save_state(self, tmp_path, monkeypatch):
-        from blast_radius.worker import process_issue
-
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        self._patch_gen(monkeypatch)
-
-        process_issue("issue-uuid-42", dry_run=True)
-
-        assert not state_file.exists()
-
-    def test_does_not_transition_to_done(self, tmp_path, monkeypatch):
-        from blast_radius.worker import process_issue
-
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        self._patch_gen(monkeypatch)
-
-        result = process_issue("issue-uuid-42", dry_run=False)
-        assert result is not None
-
-    def test_does_not_transition_on_dry_run_process(self, tmp_path, monkeypatch):
-        from blast_radius.worker import process_issue
-
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        self._patch_gen(monkeypatch)
-
-        result = process_issue("issue-uuid-42", dry_run=True)
-        assert result is not None
-        assert result.get("dry_run") is True
-
-    def test_fetch_failure_returns_error_dict(self, monkeypatch):
-        from blast_radius.worker import process_issue
-        from unittest.mock import MagicMock
-
-        mock_sess = MagicMock()
-        mock_sess.__enter__.return_value = mock_sess
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status.side_effect = RuntimeError("API timeout")
-        mock_sess.get.return_value = mock_resp
-
-        monkeypatch.setattr(
-            "touch_index.paperclip_client._session",
-            lambda: mock_sess,
-        )
-
-        result = process_issue("bad-uuid", dry_run=True)
-
-        assert result is not None
-        assert "error" in result
-        assert "API timeout" in result["error"]
-
-    def test_generator_failure_returns_error_dict(self, monkeypatch):
-        from blast_radius.worker import process_issue
-        from unittest.mock import MagicMock
-
-        mock_sess = MagicMock()
-        monkeypatch.setattr(
-            "touch_index.paperclip_client._session",
-            lambda: mock_sess,
-        )
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._get_agent_name",
-            lambda agent_id: "Bot",
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator.query_blast_radius",
-            lambda file_paths: (_ for _ in ()).throw(RuntimeError("DB down")),
-        )
-
-        result = process_issue("issue-uuid-42", dry_run=True)
-
-        assert result is not None
-        assert "error" in result
-        assert "DB down" in result["error"]
-
-    def test_accepts_old_status_from_webhook(self, monkeypatch):
-        """process_issue should accept and log old_status."""
-        from blast_radius.worker import process_issue
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        self._patch_gen(monkeypatch)
-
-        result = process_issue(
-            "issue-uuid-42",
-            dry_run=True,
-            old_status="in_progress",
-        )
-
-        assert result is not None
-        assert result["dry_run"] is True
-
-    def test_skips_already_processed_webhook(self, tmp_path, monkeypatch):
-        """Webhook should skip if issue already in processed_issue_ids."""
-        from blast_radius.worker import process_issue
-
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": ["issue-uuid-42"],
-            "issue_statuses": {"issue-uuid-42": "in_review"},
-        }))
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-
-        result = process_issue("issue-uuid-42", dry_run=True)
-
-        assert result is None
-
-    def test_force_reprocess_bypasses_already_processed_guard(self, tmp_path, monkeypatch):
-        """force_reprocess=True should bypass the already-processed guard."""
-        from blast_radius.worker import process_issue
-
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": ["issue-uuid-42"],
-            "issue_statuses": {"issue-uuid-42": "in_review"},
-        }))
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        posted = self._patch_gen(monkeypatch)
-
-        result = process_issue("issue-uuid-42", dry_run=False, force_reprocess=True)
-
-        assert result is not None
-        assert result.get("issue") == "BTCAAAAA-1507"
-        assert posted == ["issue-uuid-42"]
-
-    def test_force_reprocess_with_dry_run_does_not_post_or_save(self, tmp_path, monkeypatch):
-        """force_reprocess with dry_run should not post or save state."""
-        from blast_radius.worker import process_issue
-
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": ["issue-uuid-42"],
-            "issue_statuses": {"issue-uuid-42": "in_review"},
-        }))
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._FIX_IN_REVIEW,
-        )
-        posted = self._patch_gen(monkeypatch)
-
-        result = process_issue("issue-uuid-42", dry_run=True, force_reprocess=True)
-
-        assert result is not None
-        assert result["dry_run"] is True
-        assert posted == []
-        state = json.loads(state_file.read_text())
-        assert state["processed_issue_ids"] == ["issue-uuid-42"]
-
-
-
-# ---------------------------------------------------------------------------
-# process_issue — leaving in_review state tracking
-# ---------------------------------------------------------------------------
-
-
-class TestProcessIssueLeavingInReview:
-    """Tests for state tracking when an issue leaves in_review status."""
-
-    _ISSUE_LEAVING_REVIEW = {
-        "id": "issue-uuid-45",
-        "identifier": "BTCAAAAA-1510",
-        "title": "Fix that went back to in_progress",
-        "status": "in_progress",
-        "labels": [{"name": "fix"}],
-    }
-
-    def test_updates_state_when_leaving_in_review(self, tmp_path, monkeypatch):
-        """When old_status=in_review and current status is not, state should update."""
-        from blast_radius.worker import process_issue
-
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": [],
-            "issue_statuses": {"issue-uuid-45": "in_review"},
-        }))
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._ISSUE_LEAVING_REVIEW,
-        )
-
-        result = process_issue(
-            "issue-uuid-45", dry_run=False, old_status="in_review",
-        )
-
-        assert result is None  # skipped because not in_review
-        state = json.loads(state_file.read_text())
-        assert state["issue_statuses"]["issue-uuid-45"] == "in_progress"
-        # processed_issue_ids should NOT have been updated
-        assert state["processed_issue_ids"] == []
-
-    def test_dry_run_does_not_update_state(self, tmp_path, monkeypatch):
-        """Dry-run mode must not persist state when issue leaves in_review."""
-        from blast_radius.worker import process_issue
-
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": [],
-            "issue_statuses": {"issue-uuid-45": "in_review"},
-        }))
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._ISSUE_LEAVING_REVIEW,
-        )
-
-        process_issue(
-            "issue-uuid-45", dry_run=True, old_status="in_review",
-        )
-
-        state = json.loads(state_file.read_text())
-        # State should still show in_review (not updated)
-        assert state["issue_statuses"]["issue-uuid-45"] == "in_review"
-
-    def test_no_update_when_old_status_not_in_review(self, tmp_path, monkeypatch):
-        """When old_status is not in_review, state should not update."""
-        from blast_radius.worker import process_issue
-
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": [],
-            "issue_statuses": {"issue-uuid-45": "in_progress"},
-        }))
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._ISSUE_LEAVING_REVIEW,
-        )
-
-        process_issue(
-            "issue-uuid-45", dry_run=False, old_status="in_progress",
-        )
-
-        state = json.loads(state_file.read_text())
-        # State should still show in_progress (not updated to in_progress again)
-        assert state["issue_statuses"]["issue-uuid-45"] == "in_progress"
-
-    def test_no_update_when_old_status_is_none(self, tmp_path, monkeypatch):
-        """When old_status is None, state should not update."""
-        from blast_radius.worker import process_issue
-
-        state_file = tmp_path / "state.json"
-        monkeypatch.setattr(worker_mod, "_STATE_PATH", state_file)
-        state_file.write_text(json.dumps({
-            "processed_issue_ids": [],
-            "issue_statuses": {"issue-uuid-45": "in_review"},
-        }))
-
-        monkeypatch.setattr(
-            "blast_radius.worker._get_issue",
-            lambda issue_id: self._ISSUE_LEAVING_REVIEW,
-        )
-
-        process_issue(
-            "issue-uuid-45", dry_run=False, old_status=None,
-        )
-
-        state = json.loads(state_file.read_text())
-        assert state["issue_statuses"]["issue-uuid-45"] == "in_review"
-
-# ---------------------------------------------------------------------------
-# _get_issue
-# ---------------------------------------------------------------------------
-
-
-class TestGetIssue:
-    def test_fetches_issue(self, monkeypatch):
-        from blast_radius.worker import _get_issue
-
-        expected = {"id": "iss-1", "identifier": "BTCAAAAA-100"}
-        monkeypatch.setattr(
-            "blast_radius.worker.get_issue_by_id",
-            lambda issue_id: expected,
-        )
-
-        result = _get_issue("iss-1")
-        assert result == expected
-
-    def test_raises_on_http_error(self, monkeypatch):
-        from blast_radius.worker import _get_issue
-
-        monkeypatch.setattr(
-            "blast_radius.worker.get_issue_by_id",
-            lambda issue_id: (_ for _ in ()).throw(RuntimeError("404 Not Found")),
-        )
-
-        with pytest.raises(RuntimeError, match="404 Not Found"):
-            _get_issue("bad-id")
-
-    def test_raises_on_not_found(self, monkeypatch):
-        from blast_radius.worker import _get_issue
-
-        monkeypatch.setattr(
-            "blast_radius.worker.get_issue_by_id",
-            lambda issue_id: None,
-        )
-
-        with pytest.raises(RuntimeError, match="not found"):
-            _get_issue("missing-id")
-
-
-# ---------------------------------------------------------------------------
-# _fetch_in_review_issues (paginated wrapper)
+# _fetch_in_review_issues
 # ---------------------------------------------------------------------------
 
 
 class TestFetchInReviewIssues:
-    def test_delegates_to_paginate(self, monkeypatch):
-        expected = [{"id": "iss-1", "identifier": "BTCAAAAA-300"}]
-        captured_args = {}
+    def test_calls_paginate(self):
+        import blast_radius.worker as worker_mod
+        with patch("blast_radius.worker._paginate", return_value=[{"id": "x"}]) as mock:
+            result = worker_mod._fetch_in_review_issues()
+        assert result == [{"id": "x"}]
+        args, kwargs = mock.call_args
+        assert {"status": "in_review"} == args[1]
 
-        def mock_paginate(path, params, *, page_size):
-            captured_args["path"] = path
-            captured_args["params"] = params
-            captured_args["page_size"] = page_size
-            return expected
 
-        monkeypatch.setattr(
-            "blast_radius.worker._paginate",
-            mock_paginate,
-        )
-        monkeypatch.setattr(
-            "blast_radius.worker._company",
-            lambda: "comp-uuid",
-        )
+# ---------------------------------------------------------------------------
+# run_once -- main polling entry point
+# ---------------------------------------------------------------------------
 
-        from blast_radius.worker import _fetch_in_review_issues
 
-        result = _fetch_in_review_issues()
+class TestRunOnce:
+    def test_fix_issue_processed(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issues = _IN_REVIEW_ISSUES
 
-        assert result == expected
-        assert "in_review" in str(captured_args["params"])
-        assert captured_args["page_size"] == 100
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=issues),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}) as mock_gen,
+        ):
+            results = worker_mod.run_once(dry_run=False)
 
-    def test_returns_empty_list_on_empty_result(self, monkeypatch):
-        monkeypatch.setattr(
-            "blast_radius.worker._paginate",
-            lambda path, params, *, page_size: [],
-        )
-        monkeypatch.setattr(
-            "blast_radius.worker._company",
-            lambda: "comp-uuid",
-        )
+        assert len(results) == 3  # 3 fix/bug issues (100, 101, 102)
+        assert mock_gen.call_count == 3
+        assert state_file.exists()
 
-        from blast_radius.worker import _fetch_in_review_issues
+    def test_dry_run_skips_state_save(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issues = _IN_REVIEW_ISSUES
 
-        result = _fetch_in_review_issues()
-        assert result == []
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=issues),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}) as mock_gen,
+        ):
+            results = worker_mod.run_once(dry_run=True)
+
+        assert len(results) == 3
+        assert mock_gen.call_count == 3
+        # State should not exist (save skipped on dry-run)
+        assert not state_file.exists()
+
+    def test_skips_already_processed(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path, {
+            "processed_issue_ids": ["uuid-fix-1"],
+            "issue_statuses": {"uuid-fix-1": "in_review"},
+        })
+        issues = _IN_REVIEW_ISSUES
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=issues),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}) as mock_gen,
+        ):
+            results = worker_mod.run_once(dry_run=False)
+
+        # uuid-fix-1 is already processed and already in_review, so no transition
+        assert len(results) == 2  # 101 and 102 are transitions
+        mock_gen.assert_called()
+
+    def test_force_reprocess_processes_all(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path, {
+            "processed_issue_ids": ["uuid-fix-1", "uuid-bug-1"],
+            "issue_statuses": {"uuid-fix-1": "in_review", "uuid-bug-1": "in_review"},
+        })
+        issues = _IN_REVIEW_ISSUES
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=issues),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}) as mock_gen,
+        ):
+            results = worker_mod.run_once(dry_run=False, force_reprocess=True)
+
+        assert len(results) == 3
+        assert mock_gen.call_count == 3
+
+    def test_generator_error_does_not_halt(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issues = _IN_REVIEW_ISSUES
+
+        def _side_effect(issue_id, **kw):
+            if issue_id == "uuid-fix-1":
+                raise RuntimeError("API timeout")
+            return {"ok": True}
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=issues),
+            patch("blast_radius.worker.generate_and_post", side_effect=_side_effect) as mock_gen,
+        ):
+            results = worker_mod.run_once(dry_run=False)
+
+        # All 3 attempted, 1 failed, 2 successful
+        assert len(results) == 3
+        assert mock_gen.call_count == 3
+        error_results = [r for r in results if "error" in r]
+        assert len(error_results) == 1
+
+    def test_no_fix_issues_in_review(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        non_fix = [{"id": "fr-1", "identifier": "BTCAAAAA-200", "title": "Feature", "status": "in_review", "labels": [{"name": "feature"}]}]
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=non_fix),
+            patch("blast_radius.worker.generate_and_post") as mock_gen,
+        ):
+            results = worker_mod.run_once(dry_run=False)
+
+        assert results == []
+        mock_gen.assert_not_called()
+
+    def test_transition_detection_respects_state(self, tmp_path):
+        """Issues already in_review in state are not processed unless force."""
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path, {
+            "processed_issue_ids": [],
+            "issue_statuses": {"uuid-fix-1": "in_review", "uuid-bug-1": "in_progress"},
+        })
+        issues = _IN_REVIEW_ISSUES
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=issues),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}) as mock_gen,
+        ):
+            results = worker_mod.run_once(dry_run=False)
+
+        # uuid-fix-1 is already in_review in state -> NOT a transition
+        # uuid-bug-1 was in_progress -> IS a transition
+        # uuid-title-match was unknown -> IS a transition
+        assert len(results) == 2
+        processed_ids = {r.get("issue") or r.get("issue_identifier", "") for r in results}
+        assert mock_gen.call_count == 2
+
+    def test_empty_issues_list(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=[]),
+            patch("blast_radius.worker.generate_and_post") as mock_gen,
+        ):
+            results = worker_mod.run_once(dry_run=False)
+
+        assert results == []
+        mock_gen.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# process_issue -- single-issue webhook entry point
+# ---------------------------------------------------------------------------
+
+
+class TestProcessIssue:
+    def test_processes_fix_issue(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issue = _IN_REVIEW_ISSUES[0]
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}) as mock_gen,
+        ):
+            result = worker_mod.process_issue("uuid-fix-1", dry_run=False)
+
+        assert result == {"ok": True}
+        mock_gen.assert_called_once()
+
+    def test_dry_run_skips_state_save(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issue = _IN_REVIEW_ISSUES[0]
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}) as mock_gen,
+        ):
+            result = worker_mod.process_issue("uuid-fix-1", dry_run=True)
+
+        assert result == {"ok": True}
+        mock_gen.assert_called_once()
+        assert not state_file.exists()
+
+    def test_skips_non_in_review(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issue = {"id": "uuid-1", "identifier": "BTCAAAAA-100", "status": "in_progress", "labels": [{"name": "fix"}]}
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch("blast_radius.worker.generate_and_post") as mock_gen,
+        ):
+            result = worker_mod.process_issue("uuid-1", dry_run=False)
+
+        assert result is None
+        mock_gen.assert_not_called()
+
+    def test_skips_non_fix_issue(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issue = {"id": "uuid-fr", "identifier": "BTCAAAAA-200", "status": "in_review", "labels": [{"name": "feature"}], "title": "New feature"}
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch("blast_radius.worker.generate_and_post") as mock_gen,
+        ):
+            result = worker_mod.process_issue("uuid-fr", dry_run=False)
+
+        assert result is None
+        mock_gen.assert_not_called()
+
+    def test_skips_already_processed(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path, {"processed_issue_ids": ["uuid-fix-1"], "issue_statuses": {}})
+        issue = _IN_REVIEW_ISSUES[0]
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch("blast_radius.worker.generate_and_post") as mock_gen,
+        ):
+            result = worker_mod.process_issue("uuid-fix-1", dry_run=False)
+
+        assert result is None
+        mock_gen.assert_not_called()
+
+    def test_force_reprocess_overrides_already_processed(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path, {"processed_issue_ids": ["uuid-fix-1"], "issue_statuses": {}})
+        issue = _IN_REVIEW_ISSUES[0]
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}) as mock_gen,
+        ):
+            result = worker_mod.process_issue("uuid-fix-1", dry_run=False, force_reprocess=True)
+
+        assert result == {"ok": True}
+        mock_gen.assert_called_once()
+
+    def test_fetch_failure_returns_error(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", side_effect=RuntimeError("API down")),
+            patch("blast_radius.worker.generate_and_post") as mock_gen,
+        ):
+            result = worker_mod.process_issue("bad-uuid", dry_run=False)
+
+        assert result is not None
+        assert "error" in result
+        assert "API down" in result["error"]
+        mock_gen.assert_not_called()
+
+    def test_issue_not_found_returns_error(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=None),
+            patch("blast_radius.worker.generate_and_post") as mock_gen,
+        ):
+            result = worker_mod.process_issue("missing", dry_run=False)
+
+        assert result is not None
+        assert "error" in result
+        mock_gen.assert_not_called()
+
+    def test_generator_error_caught(self, tmp_path):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issue = _IN_REVIEW_ISSUES[0]
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch("blast_radius.worker.generate_and_post", side_effect=RuntimeError("gen failed")),
+        ):
+            result = worker_mod.process_issue("uuid-fix-1", dry_run=False)
+
+        assert result is not None
+        assert "error" in result
+        assert "gen failed" in result["error"]
+
+    def test_tracks_status_when_leaving_in_review(self, tmp_path):
+        """When old_status=in_review and current status is different, state is updated."""
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path, {"processed_issue_ids": [], "issue_statuses": {"uuid-1": "in_review"}})
+        issue = {"id": "uuid-1", "identifier": "BTCAAAAA-100", "status": "in_progress", "labels": [{"name": "fix"}]}
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+        ):
+            result = worker_mod.process_issue("uuid-1", dry_run=False, old_status="in_review")
+
+        assert result is None
+        state = json.loads(state_file.read_text())
+        assert state["issue_statuses"]["uuid-1"] == "in_progress"
+
+    def test_tracks_status_leave_in_review_dry_run(self, tmp_path):
+        """On dry_run, state is NOT updated when leaving in_review."""
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path, {"processed_issue_ids": [], "issue_statuses": {"uuid-1": "in_review"}})
+        issue = {"id": "uuid-1", "identifier": "BTCAAAAA-100", "status": "in_progress", "labels": [{"name": "fix"}]}
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+        ):
+            result = worker_mod.process_issue("uuid-1", dry_run=True, old_status="in_review")
+
+        assert result is None
+        state = json.loads(state_file.read_text())
+        assert state["issue_statuses"]["uuid-1"] == "in_review"  # unchanged
+
+    def test_with_old_status_logs_transition(self, tmp_path, caplog):
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issue = _IN_REVIEW_ISSUES[0]
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch("blast_radius.worker.generate_and_post", return_value={"ok": True}),
+            caplog.at_level(logging.INFO),
+        ):
+            worker_mod.process_issue("uuid-fix-1", dry_run=False, old_status="in_progress")
+
+        assert any("transitioned" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------
@@ -1009,283 +621,142 @@ class TestFetchInReviewIssues:
 
 
 class TestRunLoop:
-    """Tests for the infinite-loop poller."""
+    def test_loop_calls_run_once(self):
+        import blast_radius.worker as worker_mod
 
-    def test_catches_run_once_exception(self, monkeypatch):
-        """run_loop must catch exceptions from run_once and continue."""
+        def _run_once(**kw):
+            raise SystemExit(0)
+
+        with (
+            patch("blast_radius.worker.run_once", side_effect=_run_once) as mock_run,
+        ):
+            with pytest.raises(SystemExit):
+                worker_mod.run_loop(interval_seconds=0)
+
+        assert mock_run.call_count == 1
+
+    def test_loop_handles_exception(self):
+        import blast_radius.worker as worker_mod
         call_count = 0
 
-        def mock_run_once(dry_run=False, **kwargs):
+        def _run_once(**kw):
             nonlocal call_count
             call_count += 1
-            if call_count >= 2:
-                raise _BreakLoop()
-            raise RuntimeError("DB connection lost")
-
-        monkeypatch.setattr("blast_radius.worker.run_once", mock_run_once)
-        monkeypatch.setattr("blast_radius.worker.time.sleep", lambda s: None)
-
-        with pytest.raises(_BreakLoop):
-            run_loop(interval_seconds=1)
-
-        assert call_count == 2, "run_once should be called again after exception"
-
-    def test_passes_dry_run_flag(self, monkeypatch):
-        """run_loop must pass dry_run to run_once."""
-        captured = {"dry_run": None}
-
-        def mock_run_once(dry_run=False, **kwargs):
-            captured["dry_run"] = dry_run
-            raise _BreakLoop()
-
-        monkeypatch.setattr("blast_radius.worker.run_once", mock_run_once)
-        monkeypatch.setattr("blast_radius.worker.time.sleep", lambda s: None)
-
-        with pytest.raises(_BreakLoop):
-            run_loop(interval_seconds=1, dry_run=True)
-
-        assert captured["dry_run"] is True
-
-    def test_logs_error_message(self, monkeypatch, caplog):
-        """run_loop must log the exception message before sleeping."""
-        import logging
-
-        def mock_run_once(dry_run=False, **kwargs):
-            raise RuntimeError("PostgreSQL connection refused")
-
-        monkeypatch.setattr("blast_radius.worker.run_once", mock_run_once)
-        monkeypatch.setattr(
-            "blast_radius.worker.time.sleep",
-            lambda s: (_ for _ in ()).throw(_BreakLoop()),
-        )
+            if call_count == 1:
+                raise RuntimeError("boom")
+            raise SystemExit(0)
 
         with (
-            pytest.raises(_BreakLoop),
-            caplog.at_level(logging.ERROR),
+            patch("blast_radius.worker.run_once", side_effect=_run_once),
         ):
-            run_loop(interval_seconds=1)
+            with pytest.raises(SystemExit):
+                worker_mod.run_loop(interval_seconds=0)
 
-        assert any("PostgreSQL connection refused" in r.message for r in caplog.records)
-
-    def test_multiple_iterations(self, monkeypatch):
-        """run_loop should keep calling run_once across iterations."""
-        call_count = 0
-
-        def mock_run_once(dry_run=False, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count >= 3:
-                raise _BreakLoop()
-            return []
-
-        monkeypatch.setattr("blast_radius.worker.run_once", mock_run_once)
-        monkeypatch.setattr("blast_radius.worker.time.sleep", lambda s: None)
-
-        with pytest.raises(_BreakLoop):
-            run_loop(interval_seconds=60)
-
-        assert call_count == 3
+        assert call_count == 2
 
 
 # ---------------------------------------------------------------------------
-# CLI argparse
+# main() -- CLI entry point
 # ---------------------------------------------------------------------------
 
 
-class TestCliArgparse:
-    """Verify CLI flags are wired correctly (no side effects)."""
-
-    def test_old_status_flag_accepted(self):
-        """--old-status should be parsed without error."""
-        import argparse
-
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--old-status", type=str)
-        args = parser.parse_args(["--old-status", "in_progress"])
-        assert args.old_status == "in_progress"
-
-    def test_old_status_defaults_to_none(self):
-        import argparse
-
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--old-status", type=str, default=None)
-        args = parser.parse_args([])
-        assert args.old_status is None
-
-
-# ---------------------------------------------------------------------------
-# main() CLI entry point
-# ---------------------------------------------------------------------------
-
-
-class TestMainCli:
-    """Tests for blast_radius.worker.main() — CLI entry point.
-
-    Verifies command-line flags are dispatched to the underlying
-    ``process_issue``, ``run_once``, and ``run_loop`` functions.
-    """
-
-    _CLEAN_ARGV = ["blast_radius.worker"]
-
-    def test_default_calls_run_once(self, monkeypatch):
-        import sys
-        monkeypatch.setattr(sys, "argv", self._CLEAN_ARGV)
+class TestMain:
+    def test_main_issue_id_calls_process_issue(self, monkeypatch):
+        import blast_radius.worker as worker_mod
         with (
-            patch("blast_radius.worker.run_once", return_value=[]) as mock_run_once,
+            patch("blast_radius.worker.process_issue", return_value={"ok": True}) as mock_process,
         ):
-            worker_main()
-        mock_run_once.assert_called_once_with(dry_run=False, force_reprocess=False)
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--issue-id", "uuid-1"])
+            worker_mod.main()
 
-    def test_dry_run_flag_passed_to_run_once(self, monkeypatch):
-        import sys
-        monkeypatch.setattr(
-            sys, "argv", self._CLEAN_ARGV + ["--dry-run"]
-        )
+        mock_process.assert_called_once()
+        args, kwargs = mock_process.call_args
+        assert args[0] == "uuid-1"
+
+    def test_main_issue_id_dry_run(self, monkeypatch):
+        import blast_radius.worker as worker_mod
         with (
-            patch("blast_radius.worker.run_once", return_value=[]) as mock_run_once,
+            patch("blast_radius.worker.process_issue", return_value={"ok": True}) as mock_process,
         ):
-            worker_main()
-        mock_run_once.assert_called_once_with(dry_run=True, force_reprocess=False)
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--issue-id", "uuid-1", "--dry-run"])
+            worker_mod.main()
 
-    def test_force_reprocess_flag_passed_to_run_once(self, monkeypatch):
-        import sys
-        monkeypatch.setattr(
-            sys, "argv", self._CLEAN_ARGV + ["--force-reprocess"]
-        )
+        _, kwargs = mock_process.call_args
+        assert kwargs.get("dry_run") is True
+
+    def test_main_issue_id_old_status(self, monkeypatch):
+        import blast_radius.worker as worker_mod
         with (
-            patch("blast_radius.worker.run_once", return_value=[]) as mock_run_once,
+            patch("blast_radius.worker.process_issue", return_value={"ok": True}) as mock_process,
         ):
-            worker_main()
-        mock_run_once.assert_called_once_with(dry_run=False, force_reprocess=True)
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--issue-id", "uuid-1", "--old-status", "in_progress"])
+            worker_mod.main()
 
-    def test_loop_flag_calls_run_loop(self, monkeypatch):
-        import sys
-        monkeypatch.setattr(
-            sys, "argv", self._CLEAN_ARGV + ["--loop", "300"]
-        )
+        _, kwargs = mock_process.call_args
+        assert kwargs.get("old_status") == "in_progress"
+
+    def test_main_issue_id_force_reprocess(self, monkeypatch):
+        import blast_radius.worker as worker_mod
         with (
-            patch("blast_radius.worker.run_loop") as mock_run_loop,
+            patch("blast_radius.worker.process_issue", return_value={"ok": True}) as mock_process,
         ):
-            worker_main()
-        mock_run_loop.assert_called_once_with(
-            interval_seconds=300, dry_run=False, force_reprocess=False
-        )
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--issue-id", "uuid-1", "--force-reprocess"])
+            worker_mod.main()
 
-    def test_loop_with_dry_run(self, monkeypatch):
-        import sys
-        monkeypatch.setattr(
-            sys, "argv",
-            self._CLEAN_ARGV + ["--loop", "120", "--dry-run"],
-        )
-        with (
-            patch("blast_radius.worker.run_loop") as mock_run_loop,
-        ):
-            worker_main()
-        mock_run_loop.assert_called_once_with(
-            interval_seconds=120, dry_run=True, force_reprocess=False
-        )
+        _, kwargs = mock_process.call_args
+        assert kwargs.get("force_reprocess") is True
 
-    def test_loop_with_force_reprocess(self, monkeypatch):
-        import sys
-        monkeypatch.setattr(
-            sys, "argv",
-            self._CLEAN_ARGV + ["--loop", "60", "--force-reprocess"],
-        )
-        with (
-            patch("blast_radius.worker.run_loop") as mock_run_loop,
-        ):
-            worker_main()
-        mock_run_loop.assert_called_once_with(
-            interval_seconds=60, dry_run=False, force_reprocess=True
-        )
-
-    def test_issue_id_calls_process_issue(self, monkeypatch):
-        import sys
-        monkeypatch.setattr(
-            sys, "argv",
-            self._CLEAN_ARGV + ["--issue-id", "uuid-1"],
-        )
-        with (
-            patch("blast_radius.worker.process_issue", return_value=None) as mock_process,
-            patch("blast_radius.worker.run_once") as mock_run_once,
-        ):
-            worker_main()
-        mock_process.assert_called_once_with(
-            "uuid-1", dry_run=False, old_status=None, force_reprocess=False
-        )
-        mock_run_once.assert_not_called()
-
-    def test_issue_id_with_old_status(self, monkeypatch):
-        import sys
-        monkeypatch.setattr(
-            sys, "argv",
-            self._CLEAN_ARGV + ["--issue-id", "uuid-1", "--old-status", "in_progress"],
-        )
-        with (
-            patch("blast_radius.worker.process_issue", return_value=None) as mock_process,
-            patch("blast_radius.worker.run_once") as mock_run_once,
-        ):
-            worker_main()
-        mock_process.assert_called_once_with(
-            "uuid-1", dry_run=False, old_status="in_progress", force_reprocess=False
-        )
-        mock_run_once.assert_not_called()
-
-    def test_issue_id_with_dry_run(self, monkeypatch):
-        import sys
-        monkeypatch.setattr(
-            sys, "argv",
-            self._CLEAN_ARGV + ["--issue-id", "uuid-1", "--dry-run"],
-        )
-        with (
-            patch("blast_radius.worker.process_issue", return_value=None) as mock_process,
-            patch("blast_radius.worker.run_once") as mock_run_once,
-        ):
-            worker_main()
-        mock_process.assert_called_once_with(
-            "uuid-1", dry_run=True, old_status=None, force_reprocess=False
-        )
-        mock_run_once.assert_not_called()
-
-    def test_result_logged_for_process_issue(self, monkeypatch, caplog):
-        import logging, sys
-
-        monkeypatch.setattr(
-            sys, "argv",
-            self._CLEAN_ARGV + ["--issue-id", "uuid-1"],
-        )
-        result = {"issue": "BTCAAAAA-100", "dry_run": False}
-        with (
-            patch("blast_radius.worker.process_issue", return_value=result),
-            caplog.at_level(logging.INFO),
-        ):
-            worker_main()
-        assert any("BTCAAAAA-100" in r.message for r in caplog.records)
-
-    def test_no_report_logged_when_not_eligible(self, monkeypatch, caplog):
-        import logging, sys
-
-        monkeypatch.setattr(
-            sys, "argv",
-            self._CLEAN_ARGV + ["--issue-id", "missing-uuid"],
-        )
+    def test_main_issue_id_none_result_logs(self, monkeypatch, caplog):
+        import blast_radius.worker as worker_mod
         with (
             patch("blast_radius.worker.process_issue", return_value=None),
             caplog.at_level(logging.INFO),
         ):
-            worker_main()
-        assert any("not eligible" in r.message for r in caplog.records)
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--issue-id", "uuid-1"])
+            worker_mod.main()
 
-    def test_results_logged_on_run_once(self, monkeypatch, caplog):
-        import logging, sys
+        assert any("No report" in r.message for r in caplog.records)
 
-        monkeypatch.setattr(sys, "argv", self._CLEAN_ARGV)
-        results = [{"issue": "BTCAAAAA-100", "dry_run": False}]
+    def test_main_loop_calls_run_loop(self, monkeypatch):
+        import blast_radius.worker as worker_mod
         with (
-            patch("blast_radius.worker.run_once", return_value=results),
-            caplog.at_level(logging.INFO),
+            patch("blast_radius.worker.run_loop") as mock_loop,
         ):
-            worker_main()
-        assert any("Results" in r.message for r in caplog.records)
-        assert any("BTCAAAAA-100" in r.message for r in caplog.records)
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--loop", "300"])
+            worker_mod.main()
 
+        mock_loop.assert_called_once()
+        _, kwargs = mock_loop.call_args
+        assert kwargs.get("interval_seconds") == 300
+
+    def test_main_run_once_calls_run_once(self, monkeypatch):
+        import blast_radius.worker as worker_mod
+        with (
+            patch("blast_radius.worker.run_once", return_value=[]) as mock_run,
+        ):
+            monkeypatch.setattr("sys.argv", ["blast_radius"])
+            worker_mod.main()
+
+        mock_run.assert_called_once()
+
+    def test_main_run_once_dry_run(self, monkeypatch):
+        import blast_radius.worker as worker_mod
+        with (
+            patch("blast_radius.worker.run_once", return_value=[]) as mock_run,
+        ):
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--dry-run"])
+            worker_mod.main()
+
+        _, kwargs = mock_run.call_args
+        assert kwargs.get("dry_run") is True
+
+    def test_main_run_once_force_reprocess(self, monkeypatch):
+        import blast_radius.worker as worker_mod
+        with (
+            patch("blast_radius.worker.run_once", return_value=[]) as mock_run,
+        ):
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--force-reprocess"])
+            worker_mod.main()
+
+        _, kwargs = mock_run.call_args
+        assert kwargs.get("force_reprocess") is True

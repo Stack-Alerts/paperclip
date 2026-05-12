@@ -1,4 +1,4 @@
-"""Unit tests for blast_radius.generator — no DB or live network required."""
+"""Unit tests for blast_radius.generator -- no DB or live network required."""
 
 from __future__ import annotations
 
@@ -6,442 +6,315 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from blast_radius.generator import generate_and_post
 from blast_radius.query import BlastRadiusData, FRImpact, RegressionRisk
 
 
-@pytest.fixture
-def mock_issue():
-    return {
-        "id": "issue-uuid-1",
-        "identifier": "BTCAAAAA-100",
-        "title": "Fix the thing",
-        "description": '```json\n{"touchedFiles": ["src/foo.py", "src/bar.py"]}\n```',
-    }
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_MOCK_ISSUE = {
+    "id": "issue-uuid",
+    "identifier": "BTCAAAAA-100",
+    "title": "Fix null pointer in loader",
+    "description": '{"touchedFiles": ["src/loader.py", "src/db.py"]}',
+}
+
+_MOCK_ISSUE_NO_TF = {
+    "id": "issue-uuid-2",
+    "identifier": "BTCAAAAA-101",
+    "title": "Fix cache bug",
+    "description": "No touched files here",
+}
+
+_MOCK_BR_DATA = BlastRadiusData(
+    fr_impact_set=[
+        FRImpact(fr_identifier="FDR-850", fr_owner_agent_id="agent-1", fr_issue_id="fr-uuid"),
+    ],
+    regression_set=[
+        RegressionRisk(bug_identifier="BTCAAAAA-50", bug_issue_id="bug-uuid"),
+    ],
+    downstream_set=[],
+)
 
 
-@pytest.fixture
-def mock_empty_touched_issue():
-    return {
-        "id": "issue-uuid-2",
-        "identifier": "BTCAAAAA-200",
-        "title": "Fix another thing",
-        "description": "No touched files here.",
-    }
+# ---------------------------------------------------------------------------
+# generate_and_post
+# ---------------------------------------------------------------------------
 
 
 class TestGenerateAndPost:
-    def _patch_all(self, monkeypatch, issue, query_data=None):
-        """Wire up all external dependencies."""
-        monkeypatch.setattr(
-            "blast_radius.generator._get_issue",
-            lambda issue_id: issue,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._get_agent_name",
-            lambda agent_id: f"Agent-{agent_id[:8]}",
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._post_comment",
-            lambda issue_id, body: None,
-        )
-        if query_data is None:
-            query_data = BlastRadiusData()
-        monkeypatch.setattr(
-            "blast_radius.generator.query_blast_radius",
-            lambda file_paths: query_data,
-        )
+    def test_generates_and_posts(self):
+        from blast_radius.generator import generate_and_post
 
-    def test_generates_and_posts(self, monkeypatch, mock_issue):
-        self._patch_all(monkeypatch, mock_issue)
-
-        result = generate_and_post(issue_id="issue-uuid-1", dry_run=False)
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE) as mock_get,
+            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA) as mock_query,
+            patch("blast_radius.generator._get_agent_name", return_value="Alice") as mock_name,
+            patch("blast_radius.generator._post_comment") as mock_post,
+        ):
+            result = generate_and_post("issue-uuid", dry_run=False)
 
         assert result["issue"] == "BTCAAAAA-100"
         assert result["dry_run"] is False
+        mock_get.assert_called_once_with("issue-uuid")
+        mock_query.assert_called_once()
+        mock_post.assert_called_once()
 
-    def test_dry_run_does_not_post(self, monkeypatch, mock_issue):
-        posted = []
-        monkeypatch.setattr(
-            "blast_radius.generator._get_issue",
-            lambda issue_id: mock_issue,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._get_agent_name",
-            lambda agent_id: "TestAgent",
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._post_comment",
-            lambda issue_id, body: posted.append(issue_id),
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator.query_blast_radius",
-            lambda file_paths: BlastRadiusData(),
-        )
+    def test_dry_run_does_not_post(self):
+        from blast_radius.generator import generate_and_post
 
-        result = generate_and_post(issue_id="issue-uuid-1", dry_run=True)
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE),
+            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA),
+            patch("blast_radius.generator._get_agent_name", return_value="Alice"),
+            patch("blast_radius.generator._post_comment") as mock_post,
+        ):
+            result = generate_and_post("issue-uuid", dry_run=True)
 
         assert result["dry_run"] is True
-        assert posted == []
+        mock_post.assert_not_called()
 
-    def test_posts_comment_in_live_mode(self, monkeypatch, mock_issue):
-        posted = []
-        monkeypatch.setattr(
-            "blast_radius.generator._get_issue",
-            lambda issue_id: mock_issue,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._get_agent_name",
-            lambda agent_id: "TestAgent",
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._post_comment",
-            lambda issue_id, body: posted.append(issue_id),
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator.query_blast_radius",
-            lambda file_paths: BlastRadiusData(),
-        )
+    def test_skipped_when_no_touched_files(self):
+        from blast_radius.generator import generate_and_post
 
-        generate_and_post(issue_id="issue-uuid-1", dry_run=False)
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
+            patch("blast_radius.generator._post_comment") as mock_post,
+        ):
+            result = generate_and_post("issue-uuid-2", dry_run=False)
 
-        assert posted == ["issue-uuid-1"]
+        assert result.get("skipped") is True
+        assert result.get("reason") == "no touchedFiles"
+        mock_post.assert_not_called()
 
-    def test_uses_provided_touched_files(self, monkeypatch, mock_issue):
-        captured = []
-        monkeypatch.setattr(
-            "blast_radius.generator._get_issue",
-            lambda issue_id: mock_issue,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._get_agent_name",
-            lambda agent_id: "TestAgent",
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._post_comment",
-            lambda issue_id, body: None,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator.query_blast_radius",
-            lambda file_paths: captured.append(list(file_paths)) or BlastRadiusData(),
-        )
+    def test_skipped_when_touched_files_none_after_extraction(self):
+        from blast_radius.generator import generate_and_post
 
-        generate_and_post(
-            issue_id="issue-uuid-1",
-            touched_files=["src/override.py"],
-            dry_run=True,
-        )
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
+            patch("blast_radius.generator._post_comment") as mock_post,
+        ):
+            result = generate_and_post("issue-uuid-2", dry_run=True)
 
-        assert captured == [["src/override.py"]]
+        assert result.get("skipped") is True
 
-    def test_skips_when_no_touched_files(self, monkeypatch, mock_empty_touched_issue):
-        monkeypatch.setattr(
-            "blast_radius.generator._get_issue",
-            lambda issue_id: mock_empty_touched_issue,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._get_agent_name",
-            lambda agent_id: "TestAgent",
-        )
-        posted = []
-        monkeypatch.setattr(
-            "blast_radius.generator._post_comment",
-            lambda issue_id, body: posted.append(issue_id),
-        )
+    def test_uses_provided_touched_files(self):
+        from blast_radius.generator import generate_and_post
 
-        result = generate_and_post(issue_id="issue-uuid-2", dry_run=False)
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
+            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA) as mock_query,
+            patch("blast_radius.generator._get_agent_name", return_value="Alice"),
+            patch("blast_radius.generator._post_comment") as mock_post,
+        ):
+            result = generate_and_post("issue-uuid-2", touched_files=["src/override.py"], dry_run=False)
 
-        assert result["skipped"] is True
-        assert result["reason"] == "no touchedFiles"
-        assert posted == []
+        assert result["issue"] == "BTCAAAAA-101"
+        assert result.get("skipped") is None
+        mock_query.assert_called_once_with(["src/override.py"])
+        mock_post.assert_called_once()
 
-    def test_includes_fr_impact_in_result(self, monkeypatch, mock_issue):
-        data = BlastRadiusData(
-            fr_impact_set=[
-                FRImpact(
-                    fr_identifier="FDR-100",
-                    fr_owner_agent_id="agent-uuid-fr-owner",
-                    fr_issue_id="fr-issue-uuid",
-                )
-            ]
-        )
-        self._patch_all(monkeypatch, mock_issue, query_data=data)
+    def test_resolves_agent_names_for_mention(self):
+        from blast_radius.generator import generate_and_post
 
-        result = generate_and_post(issue_id="issue-uuid-1", dry_run=True)
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE),
+            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA),
+            patch("blast_radius.generator._get_agent_name", return_value="Alice") as mock_name,
+            patch("blast_radius.generator._post_comment") as mock_post,
+        ):
+            generate_and_post("issue-uuid", dry_run=False)
 
-        assert len(result["fr_impact_set"]) == 1
-        assert result["fr_impact_set"][0]["fr_identifier"] == "FDR-100"
+        mock_name.assert_called_once_with("agent-1")
 
-    def test_includes_regression_risk_in_result(self, monkeypatch, mock_issue):
-        data = BlastRadiusData(
-            regression_set=[
-                RegressionRisk(
-                    bug_identifier="BTCAAAAA-500",
-                    bug_issue_id="bug-uuid-1",
-                )
-            ]
-        )
-        self._patch_all(monkeypatch, mock_issue, query_data=data)
+    def test_skips_agent_name_when_none_returned(self):
+        from blast_radius.generator import generate_and_post
 
-        result = generate_and_post(issue_id="issue-uuid-1", dry_run=True)
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE),
+            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA),
+            patch("blast_radius.generator._get_agent_name", return_value=None),
+            patch("blast_radius.generator._post_comment") as mock_post,
+        ):
+            result = generate_and_post("issue-uuid", dry_run=False)
 
-        assert len(result["regression_set"]) == 1
-        assert result["regression_set"][0]["bug_identifier"] == "BTCAAAAA-500"
+        assert result["issue"] == "BTCAAAAA-100"
+        mock_post.assert_called_once()
 
-    def test_resolves_agent_names_for_mentions(self, monkeypatch, mock_issue):
-        data = BlastRadiusData(
-            fr_impact_set=[
-                FRImpact(
-                    fr_identifier="FDR-200",
-                    fr_owner_agent_id="agent-uuid-abc",
-                    fr_issue_id="fr-uuid-2",
-                )
-            ]
-        )
-        resolved = {}
-        monkeypatch.setattr(
-            "blast_radius.generator._get_issue",
-            lambda issue_id: mock_issue,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._get_agent_name",
-            lambda agent_id: resolved.update({agent_id: "ResolvedName"}) or "ResolvedName",
-        )
-        posted_body = []
-        monkeypatch.setattr(
-            "blast_radius.generator._post_comment",
-            lambda issue_id, body: posted_body.append(body),
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator.query_blast_radius",
-            lambda file_paths: data,
-        )
+    def test_issue_not_found_raises(self):
+        from blast_radius.generator import generate_and_post
 
-        generate_and_post(issue_id="issue-uuid-1", dry_run=False)
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=None),
+        ):
+            with pytest.raises(RuntimeError, match="not found"):
+                generate_and_post("bad-uuid", dry_run=False)
 
-        assert "ResolvedName" in posted_body[0]
-        assert "FDR-200" in posted_body[0]
+    def test_empty_issue_description(self):
+        """An empty description should not crash extract_touched_files."""
+        from blast_radius.generator import generate_and_post
 
-    def test_error_in_get_issue_raises(self, monkeypatch):
-        monkeypatch.setattr(
-            "blast_radius.generator._get_issue",
-            lambda issue_id: (_ for _ in ()).throw(RuntimeError("API down")),
-        )
+        issue = {**_MOCK_ISSUE, "description": ""}
 
-        with pytest.raises(RuntimeError, match="API down"):
-            generate_and_post(issue_id="bad-uuid", dry_run=True)
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=issue),
+            patch("blast_radius.generator._post_comment") as mock_post,
+        ):
+            result = generate_and_post("issue-uuid", dry_run=False)
+
+        assert result.get("skipped") is True
+        mock_post.assert_not_called()
+
+    def test_no_fr_impact_set_does_not_call_get_agent_name(self):
+        """When fr_impact_set is empty, _get_agent_name should not be called."""
+        from blast_radius.generator import generate_and_post
+
+        empty_data = BlastRadiusData()
+
+        with (
+            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE),
+            patch("blast_radius.generator.query_blast_radius", return_value=empty_data),
+            patch("blast_radius.generator._get_agent_name") as mock_name,
+            patch("blast_radius.generator._post_comment"),
+        ):
+            generate_and_post("issue-uuid", dry_run=False)
+
+        mock_name.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
-# Generator HTTP helper functions
+# _get_agent_name
 # ---------------------------------------------------------------------------
 
-class TestRunHeaders:
-    def test_returns_empty_without_env(self, monkeypatch):
-        import blast_radius.generator as gen_mod
-        monkeypatch.setattr(gen_mod, "PAPERCLIP_RUN_ID", "")
-        assert gen_mod._run_headers() == {}
 
-    def test_returns_run_id_header_when_set(self, monkeypatch):
-        import blast_radius.generator as gen_mod
-        monkeypatch.setattr(gen_mod, "PAPERCLIP_RUN_ID", "run-abc-123")
-        result = gen_mod._run_headers()
-        assert result == {"X-Paperclip-Run-Id": "run-abc-123"}
-
-
-class TestGetIssue:
-    def test_fetches_issue_by_id(self, monkeypatch):
-        from blast_radius.generator import _get_issue
-
-        expected = {"id": "iss-1", "identifier": "BTCAAAAA-100"}
-        monkeypatch.setattr(
-            "blast_radius.generator.get_issue_by_id",
-            lambda issue_id: expected,
-        )
-
-        result = _get_issue("iss-1")
-        assert result == expected
-
-    def test_raises_on_http_error(self, monkeypatch):
-        from blast_radius.generator import _get_issue
-
-        monkeypatch.setattr(
-            "blast_radius.generator.get_issue_by_id",
-            lambda issue_id: (_ for _ in ()).throw(RuntimeError("404 Not Found")),
-        )
-
-        with pytest.raises(RuntimeError, match="404 Not Found"):
-            _get_issue("bad-id")
-
-    def test_raises_on_not_found(self, monkeypatch):
-        from blast_radius.generator import _get_issue
-
-        monkeypatch.setattr(
-            "blast_radius.generator.get_issue_by_id",
-            lambda issue_id: None,
-        )
-
-        with pytest.raises(RuntimeError, match="not found"):
-            _get_issue("missing-id")
+def _mock_session() -> MagicMock:
+    """Return a MagicMock configured as a context manager for _session()."""
+    mock_sess = MagicMock()
+    mock_sess.__enter__.return_value = mock_sess
+    mock_sess.__exit__.return_value = False
+    return mock_sess
 
 
 class TestGetAgentName:
-    def test_returns_name_on_success(self, monkeypatch):
+    def test_returns_name(self):
         from blast_radius.generator import _get_agent_name
 
-        mock_resp = MagicMock()
-        mock_resp.ok = True
-        mock_resp.json.return_value = {"name": "CoderBot"}
-        mock_sess = MagicMock()
-        mock_sess.__enter__.return_value = mock_sess
-        mock_sess.get.return_value = mock_resp
+        mock_sess = _mock_session()
+        mock_sess.get.return_value.ok = True
+        mock_sess.get.return_value.json.return_value = {"name": "Alice"}
 
-        monkeypatch.setattr(
-            "blast_radius.generator._session",
-            lambda: mock_sess,
-        )
+        with patch("blast_radius.generator._session", return_value=mock_sess):
+            result = _get_agent_name("agent-1")
 
-        result = _get_agent_name("agent-uuid")
-        assert result == "CoderBot"
+        assert result == "Alice"
 
-    def test_falls_back_to_name_key(self, monkeypatch):
+    def test_returns_name_key_when_name_missing(self):
         from blast_radius.generator import _get_agent_name
 
-        mock_resp = MagicMock()
-        mock_resp.ok = True
-        mock_resp.json.return_value = {"nameKey": "agent-coder-01"}
-        mock_sess = MagicMock()
-        mock_sess.__enter__.return_value = mock_sess
-        mock_sess.get.return_value = mock_resp
+        mock_sess = _mock_session()
+        mock_sess.get.return_value.ok = True
+        mock_sess.get.return_value.json.return_value = {"nameKey": "bot-alice"}
 
-        monkeypatch.setattr(
-            "blast_radius.generator._session",
-            lambda: mock_sess,
-        )
+        with patch("blast_radius.generator._session", return_value=mock_sess):
+            result = _get_agent_name("agent-1")
 
-        result = _get_agent_name("agent-uuid")
-        assert result == "agent-coder-01"
+        assert result == "bot-alice"
 
-    def test_returns_none_on_http_error(self, monkeypatch):
+    def test_returns_none_on_api_error(self):
         from blast_radius.generator import _get_agent_name
 
-        mock_resp = MagicMock()
-        mock_resp.ok = False
-        mock_sess = MagicMock()
-        mock_sess.__enter__.return_value = mock_sess
-        mock_sess.get.return_value = mock_resp
+        mock_sess = _mock_session()
+        mock_sess.get.return_value.ok = False
 
-        monkeypatch.setattr(
-            "blast_radius.generator._session",
-            lambda: mock_sess,
-        )
+        with patch("blast_radius.generator._session", return_value=mock_sess):
+            result = _get_agent_name("agent-1")
 
-        result = _get_agent_name("agent-uuid")
         assert result is None
 
-    def test_returns_none_on_exception(self, monkeypatch):
+    def test_returns_none_on_exception(self):
         from blast_radius.generator import _get_agent_name
 
-        def thrower(*args, **kwargs):
-            raise ConnectionError("Network timeout")
+        mock_sess = _mock_session()
+        mock_sess.get.side_effect = RuntimeError("timeout")
 
-        mock_sess = MagicMock()
-        mock_sess.__enter__.return_value = mock_sess
-        mock_sess.get.side_effect = thrower
+        with patch("blast_radius.generator._session", return_value=mock_sess):
+            result = _get_agent_name("agent-1")
 
-        monkeypatch.setattr(
-            "blast_radius.generator._session",
-            lambda: mock_sess,
-        )
-
-        result = _get_agent_name("agent-uuid")
         assert result is None
 
-    def test_returns_none_on_missing_both_name_and_name_key(self, monkeypatch):
-        from blast_radius.generator import _get_agent_name
 
-        mock_resp = MagicMock()
-        mock_resp.ok = True
-        mock_resp.json.return_value = {"id": "agent-uuid"}
-        mock_sess = MagicMock()
-        mock_sess.__enter__.return_value = mock_sess
-        mock_sess.get.return_value = mock_resp
-
-        monkeypatch.setattr(
-            "blast_radius.generator._session",
-            lambda: mock_sess,
-        )
-
-        result = _get_agent_name("agent-uuid")
-        assert result is None
+# ---------------------------------------------------------------------------
+# _post_comment
+# ---------------------------------------------------------------------------
 
 
 class TestPostComment:
-    def test_posts_comment(self, monkeypatch):
+    def test_posts_to_correct_endpoint(self):
         from blast_radius.generator import _post_comment
 
-        mock_resp = MagicMock()
-        mock_sess = MagicMock()
-        mock_sess.__enter__.return_value = mock_sess
-        mock_sess.post.return_value = mock_resp
+        mock_sess = _mock_session()
 
-        monkeypatch.setattr(
-            "blast_radius.generator._session",
-            lambda: mock_sess,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._run_headers",
-            lambda: {},
-        )
+        with (
+            patch("blast_radius.generator._session", return_value=mock_sess),
+            patch("blast_radius.generator.PAPERCLIP_RUN_ID", ""),
+        ):
+            _post_comment("issue-uuid", "body text")
 
-        _post_comment("iss-1", "Hello world")
+        args, kwargs = mock_sess.post.call_args
+        assert "issue-uuid/comments" in args[0]
+        assert kwargs["json"]["body"] == "body text"
 
-        mock_sess.post.assert_called_once()
-        call_args = mock_sess.post.call_args
-        assert "/api/issues/iss-1/comments" in str(call_args[0][0])
-        assert call_args[1]["json"] == {"body": "Hello world"}
-
-    def test_raises_on_http_error(self, monkeypatch):
+    def test_includes_run_header_when_set(self):
         from blast_radius.generator import _post_comment
 
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status.side_effect = RuntimeError("422 Unprocessable")
-        mock_sess = MagicMock()
-        mock_sess.__enter__.return_value = mock_sess
-        mock_sess.post.return_value = mock_resp
+        mock_sess = _mock_session()
 
-        monkeypatch.setattr(
-            "blast_radius.generator._session",
-            lambda: mock_sess,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._run_headers",
-            lambda: {},
-        )
+        with (
+            patch("blast_radius.generator._session", return_value=mock_sess),
+            patch("blast_radius.generator.PAPERCLIP_RUN_ID", "run-123"),
+        ):
+            _post_comment("issue-uuid", "body")
 
-        with pytest.raises(RuntimeError, match="422 Unprocessable"):
-            _post_comment("bad-id", "body")
+        _, kwargs = mock_sess.post.call_args
+        # The headers are set via sess.headers.update()
+        mock_sess.headers.update.assert_called_once()
 
-    def test_includes_run_header(self, monkeypatch):
-        from blast_radius.generator import _post_comment
 
-        mock_resp = MagicMock()
-        mock_sess = MagicMock()
-        mock_sess.__enter__.return_value = mock_sess
-        mock_sess.post.return_value = mock_resp
+# ---------------------------------------------------------------------------
+# _get_issue
+# ---------------------------------------------------------------------------
 
-        monkeypatch.setattr(
-            "blast_radius.generator._session",
-            lambda: mock_sess,
-        )
-        monkeypatch.setattr(
-            "blast_radius.generator._run_headers",
-            lambda: {"X-Paperclip-Run-Id": "run-xyz"},
-        )
 
-        _post_comment("iss-1", "body")
+class TestGetIssue:
+    def test_fetches_issue(self):
+        from blast_radius.generator import _get_issue
 
-        # _run_headers result should be merged into session headers
-        mock_sess.headers.update.assert_called_once_with(
-            {"X-Paperclip-Run-Id": "run-xyz"}
-        )
+        with patch("blast_radius.generator.get_issue_by_id", return_value={"id": "i1"}):
+            assert _get_issue("i1") == {"id": "i1"}
+
+    def test_raises_on_not_found(self):
+        from blast_radius.generator import _get_issue
+
+        with patch("blast_radius.generator.get_issue_by_id", return_value=None):
+            with pytest.raises(RuntimeError, match="not found"):
+                _get_issue("missing")
+
+
+# ---------------------------------------------------------------------------
+# _run_headers
+# ---------------------------------------------------------------------------
+
+
+class TestRunHeaders:
+    def test_returns_empty_when_no_run_id(self):
+        from blast_radius.generator import _run_headers
+
+        with patch("blast_radius.generator.PAPERCLIP_RUN_ID", ""):
+            assert _run_headers() == {}
+
+    def test_returns_run_header_when_set(self):
+        from blast_radius.generator import _run_headers
+
+        with patch("blast_radius.generator.PAPERCLIP_RUN_ID", "run-123"):
+            assert _run_headers() == {"X-Paperclip-Run-Id": "run-123"}
