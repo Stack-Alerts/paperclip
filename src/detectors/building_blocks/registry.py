@@ -325,14 +325,25 @@ class BlockRegistry:
         try:
             # Import module
             module = importlib.import_module(module_name)
-            
+
             # Get class
             block_class = getattr(module, class_name)
-            
+
+            # Guard: class resolution returned None or is not callable
+            if block_class is None:
+                raise TypeError(
+                    f"Block registry class_name '{class_name}' resolved to None in {module_name}"
+                )
+            if not callable(block_class):
+                raise TypeError(
+                    f"Block registry class_name '{class_name}' in {module_name} "
+                    f"is not callable (got {type(block_class).__name__})"
+                )
+
             # Instantiate
             return block_class(**kwargs)
-            
-        except (ImportError, AttributeError) as e:
+
+        except (ImportError, AttributeError, TypeError) as e:
             raise ValueError(
                 f"Failed to instantiate block '{name}': {e}\n"
                 f"Module: {module_name}\n"

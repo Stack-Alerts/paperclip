@@ -247,15 +247,20 @@ class InstitutionalSignalEvaluator:
         for block_name in blocks_to_load:
             # Extract tunable parameters for this block
             params = block_params.get(block_name, {})
-            # Instantiate block from registry
-            block_instance = BlockRegistry.instantiate(
-                block_name,
-                timeframe='15m',  # System designed for 15m
-                **params
-            )
-            
-            if block_instance:
-                blocks[block_name] = block_instance
+            try:
+                # Instantiate block from registry
+                block_instance = BlockRegistry.instantiate(
+                    block_name,
+                    timeframe='15m',  # System designed for 15m
+                    **params
+                )
+                
+                if block_instance:
+                    blocks[block_name] = block_instance
+            except ValueError as e:
+                logger.warning(
+                    f"Skipping block '{block_name}': instantiation failed - {e}"
+                )
         
         return blocks
     
