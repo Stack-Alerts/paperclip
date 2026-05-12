@@ -1,224 +1,202 @@
-# RESTORE — Operator Restore Runbook
+# RESTORE — PaperClip Restore from Google Drive (Operator Runbook)
 
 **Owner:** PlatformEngineer / DBA
-**Audience:** On-call engineers (read this at 3am during a real incident)
+**Audience:** On-call engineers
 **Last Updated:** 2026-05-12
-**Drill reference:** `scripts/postgres_restore_drill.py` (BTCAAAAA-2080)
 
-## Contents
+## Restore Tool
 
-1. [DB-Only Restore](#1-db-only-restore) — quickest path to recovery
-2. [Full Restore from Scratch](#2-full-restore-from-scratch) — new machine or total loss
-3. [Choosing a Backup](#3-choosing-a-backup)
-4. [Post-Restore Verification](#4-post-restore-verification)
-5. [Rollback a Migration](#5-rollback-a-migration)
-6. [Emergency Commands Cheat Sheet](#6-emergency-commands-cheat-sheet)
+The restore script lives at `/home/sirrus/.paperclip/scripts/restore-from-drive.sh`.
+
+```
+Usage: restore-from-drive.sh <command> [args]
+
+Commands:
+  list                          List available backups
+  latest  [dest-dir]            Restore most recent backup
+  <path>  [dest-dir]            Restore specific backup (e.g. 2026/05/12/1008)
+```
 
 ---
 
 ## 1. DB-Only Restore
 
-Use when: the database is corrupted or lost, but the application code is intact.
+Use when: the PostgreSQL database is corrupted but instance files are intact.
 
-### Step 1: Pull the latest backup from GDrive
+### Step 1: List available backups
 
-```bash
-# List available backups on GDrive
-rclone ls btc_backup:btc-trade-engine-backups/
-
-# Pull the newest one
-rclone copy btc_backup:btc-trade-engine-backups/optimizer_v3_20260512_020002.sql.gz /tmp/
+```
+/home/sirrus/.paperclip/scripts/restore-from-drive.sh list
 ```
 
-### Step 2: Restore via CLI tool
+This shows the available backup timestamps from GDrive.
 
-```bash
-# Check what you're about to restore
-python scripts/manage_backups.py list
+### Step 2: Download the latest backup
 
-# Standard restore (requires confirmation)
-python scripts/manage_backups.py restore /tmp/optimizer_v3_20260512_020002.sql.gz
-
-# Emergency restore (skip confirmation, drop existing DB first)
-python scripts/manage_backups.py restore /tmp/optimizer_v3_20260512_020002.sql.gz --drop --yes
+```
+/home/sirrus/.paperclip/scripts/restore-from-drive.sh latest /tmp/restore
 ```
 
-### Step 3: Re-apply AI grants
+Or a specific backup:
 
-Backups taken before migration `20260509_add_ai_readonly_role` may not include the correct grants:
+```
+/home/sirrus/.paperclip/scripts/restore-from-drive.sh 2026/05/12/1008 /tmp/restore
+```
 
-```bash
-python -c "
-from src.optimizer_v3.database.backup import get_backup_manager
-get_backup_manager().reapply_ai_grants()
-"
+### Step 3: Restore the database
+
+```
+# Find the SQL dump in the download directory
+ls /tmp/restore/paperclip-*.sql.gz
+
+# Restore it
+gunzip -c /tmp/restore/paperclip-20260512_100800.sql.gz | psql -h localhost paperclip
 ```
 
 ### Step 4: Verify
 
-```bash
-python scripts/manage_migrations.py current
-python -c "
-from src.optimizer_v3.database.config import get_db_url
-from sqlalchemy import create_engine, text
-e = create_engine(get_db_url())
-c = e.connect()
-print('Strategies:', c.execute(text('SELECT count(*) FROM strategies')).scalar())
-print('Alembic version:', c.execute(text('SELECT version_num FROM alembic_version')).scalar())
-c.close()
-"
+```
+# Check alembic version matches expected
+psql -h localhost paperclip -c "SELECT version_num FROM alembic_version"
+
+# Spot-check key tables
+psql -h localhost paperclip -c "SELECT count(*) FROM companies"
+psql -h localhost paperclip -c "SELECT count(*) FROM projects"
 ```
 
 ---
 
 ## 2. Full Restore from Scratch
 
-Use when: you have a brand-new machine or total environment loss.
+Use when: you have a new machine or total instance loss.
 
-### Prerequisites
+### Step 1: Reinstall PaperClip
 
-- Python 3.11+, Poetry, PostgreSQL 12+
-- Project cloned from git
-- `.env` restored from secure backup (see Section 2.2)
-- rclone configured with GDrive access
+Follow the standard PaperClip installation procedure to get a base instance running.
 
-### Step 1: Restore .env
+### Step 2: Restore .env and config
 
-```bash
-# Copy from secure backup (NOT from git — .env is in .gitignore)
-cp /home/sirrus/backups/env/optimizer_v3.env.20260512 .env
-chmod 600 .env
+```
+# Restore from secure backup (NOT from git)
+cp /path/to/backup/.env /home/sirrus/.paperclip/instances/default/.env
+chmod 600 /home/sirrus/.paperclip/instances/default/.env
 ```
 
-### Step 2: Restore PostgreSQL database
+### Step 3: Download the latest backup
 
-```bash
-# List backups on GDrive
-rclone ls btc_backup:btc-trade-engine-backups/
-
-# Download the latest
-rclone copy btc_backup:btc-trade-engine-backups/optimizer_v3_latest.sql.gz /tmp/
-
-# Restore (drop + create + restore)
-python scripts/manage_backups.py restore /tmp/optimizer_v3_latest.sql.gz --drop --yes
-
-# Re-apply AI grants
-python -c "
-from src.optimizer_v3.database.backup import get_backup_manager
-get_backup_manager().reapply_ai_grants()
-"
+```
+/home/sirrus/.paperclip/scripts/restore-from-drive.sh latest /tmp/restore
 ```
 
-### Step 3: Apply pending migrations
+### Step 4: Examine the manifest
 
-```bash
-python scripts/manage_migrations.py upgrade
+```
+cat /tmp/restore/MANIFEST.json
 ```
 
-### Step 4: Verify
-
-```bash
-python scripts/manage_migrations.py current
-python scripts/manage_backups.py list
+Expected output:
+```json
+{
+  "timestamp": "2026-05-12T10:08:00Z",
+  "hostname": "paperclip-server",
+  "paperclipVersion": "x.y.z",
+  "companyId": "<uuid>",
+  "sourceDump": "paperclip-20260512_100800.sql.gz",
+  "payloadSha256": "abc123...",
+  "payloadSizeBytes": 12345678
+}
 ```
+
+### Step 5: Restore the database
+
+```
+gunzip -c /tmp/restore/paperclip-*.sql.gz | psql -h localhost paperclip
+```
+
+### Step 6: Copy instance files
+
+The payload tarball was already extracted by `restore-from-drive.sh`:
+
+```
+/tmp/restore/
+  - MANIFEST.json
+  - paperclip-instance-20260512-1008.tar.gz
+  - paperclip-20260512_100800.sql.gz
+  - config.json
+  - companies/
+  - projects/
+  - skills/
+  - storage/
+```
+
+Copy these into the PaperClip instance directory:
+
+```
+INSTANCE_DIR=/home/sirrus/.paperclip/instances/default
+
+cp /tmp/restore/config.json "$INSTANCE_DIR/config.json"
+cp -r /tmp/restore/companies/* "$INSTANCE_DIR/companies/"
+cp -r /tmp/restore/projects/* "$INSTANCE_DIR/projects/"
+cp -r /tmp/restore/skills/* "$INSTANCE_DIR/skills/"
+cp -r /tmp/restore/storage/* "$INSTANCE_DIR/data/storage/"
+```
+
+### Step 7: Restart PaperClip
+
+```
+# Restart the PaperClip service
+systemctl restart paperclip
+```
+
+### Step 8: Verify
+
+1. Log in to the PaperClip UI
+2. Confirm all companies, projects, and skills are present
+3. Check the alembic migration version:
+   ```
+   psql -h localhost paperclip -c "SELECT version_num FROM alembic_version"
+   ```
 
 ---
 
-## 3. Choosing a Backup
+## 3. Backup Selection Guide
 
-| Criterion | Pick |
-|-----------|------|
-| Latest data | Newest file by timestamp |
-| Before a bad migration | Backup file dated before the migration was applied |
-| Verify this DB | Drill or staging — use a copy of latest |
-
-**Naming convention:** `optimizer_v3_YYYYMMDD_HHMMSS.sql.gz`
-
----
-
-## 4. Post-Restore Verification
-
-Always run this checklist after any restore:
-
-```bash
-# 1. Migration version
-python scripts/manage_migrations.py current
-
-# 2. Row counts match expected
-python scripts/postgres_restore_drill.py
-```
-The drill script creates a throwaway database, restores, and compares row counts on
-`strategies`, `strategy_versions`, and `strategy_test_results` tables plus the
-`alembic_version`. Expected output:
-
-```
-OK  1. Create backup
-OK  2. Verify backup integrity
-OK  3. Validate SQL content
-OK  4. Create drill database
-OK  5. Restore backup
-OK  6. Row count match: strategies         src=42 dst=42
-OK  6. Row count match: strategy_versions  src=156 dst=156
-OK  6. Row count match: strategy_test_results src=890 dst=890
-OK  6. Verify data integrity
-OK  7. Alembic version match               src=20260512_add_bug_files_source_col dst=20260512_add_bug_files_source_col
-```
-
-### 4.1 Manual Verification (if drill script unavailable)
-
-```bash
-for tbl in strategies strategy_versions strategy_test_results; do
-  echo "$tbl: $(psql -h localhost -U optimizer_admin -d optimizer_v3 -tAc "SELECT count(*) FROM $tbl")"
-done
-echo "alembic: $(psql -h localhost -U optimizer_admin -d optimizer_v3 -tAc "SELECT version_num FROM alembic_version")"
-```
+| Criterion | Command |
+|-----------|---------|
+| Latest backup | `restore-from-drive.sh latest /tmp/restore` |
+| Specific date/time | `restore-from-drive.sh 2026/05/12/1008 /tmp/restore` |
+| Before a bad migration | Pick a backup timestamped before the migration was applied |
+| Preview manifest (no download) | `rclone cat gdrive:Paperclip-Backups/<companyId>/<path>/MANIFEST.json` |
+| List all backups | `rclone tree gdrive:Paperclip-Backups/<companyId> --depth 4` |
 
 ---
 
-## 5. Rollback a Migration
+## 4. Emergency Commands Cheat Sheet
 
-If a recent migration introduced a problem:
-
-```bash
-# Check current version
-python scripts/manage_migrations.py current
-
-# Rollback 1 step
-python scripts/manage_migrations.py downgrade
-
-# Rollback N steps
-python scripts/manage_migrations.py downgrade 3
 ```
+# -- List backups --------------------------------------------------
+/home/sirrus/.paperclip/scripts/restore-from-drive.sh list
+rclone tree gdrive:Paperclip-Backups/<companyId> --depth 4
 
-After rollback, verify the schema matches the backup you intend to restore.
+# -- Download + restore latest -------------------------------------
+/home/sirrus/.paperclip/scripts/restore-from-drive.sh latest /tmp/restore
 
----
+# -- DB restore ----------------------------------------------------
+gunzip -c /tmp/restore/paperclip-*.sql.gz | psql -h localhost paperclip
 
-## 6. Emergency Commands Cheat Sheet
+# -- Full file restore ---------------------------------------------
+INSTANCE_DIR=/home/sirrus/.paperclip/instances/default
+cp /tmp/restore/config.json "$INSTANCE_DIR/config.json"
+cp -r /tmp/restore/companies/* "$INSTANCE_DIR/companies/" 2>/dev/null || true
+cp -r /tmp/restore/projects/* "$INSTANCE_DIR/projects/" 2>/dev/null || true
+cp -r /tmp/restore/skills/* "$INSTANCE_DIR/skills/" 2>/dev/null || true
+cp -r /tmp/restore/storage/* "$INSTANCE_DIR/data/storage/" 2>/dev/null || true
 
-```bash
-# ── DB Restore ──────────────────────────────────────────────
-# Restore with drop-create (DESTRUCTIVE — last resort)
-python scripts/manage_backups.py restore <file> --drop --yes
+# -- Verify --------------------------------------------------------
+psql -h localhost paperclip -c "SELECT count(*) FROM companies"
+psql -h localhost paperclip -c "SELECT version_num FROM alembic_version"
+systemctl status paperclip
 
-# Manual restore via psql
-gunzip -c <file> | psql -h localhost -U optimizer_admin -d optimizer_v3
-
-# Manual restore with drop-create via psql
-psql -h localhost -U optimizer_admin -d postgres -c "DROP DATABASE IF EXISTS optimizer_v3"
-psql -h localhost -U optimizer_admin -d postgres -c "CREATE DATABASE optimizer_v3"
-gunzip -c <file> | psql -h localhost -U optimizer_admin -d optimizer_v3
-
-# ── GDrive ──────────────────────────────────────────────────
-rclone ls btc_backup:btc-trade-engine-backups/
-rclone copy btc_backup:btc-trade-engine-backups/<file> /tmp/
-
-# ── Post-restore ────────────────────────────────────────────
-python scripts/manage_migrations.py upgrade
-python -c "from src.optimizer_v3.database.backup import get_backup_manager; get_backup_manager().reapply_ai_grants()"
-python scripts/manage_migrations.py current
-
-# ── Migration rollback ──────────────────────────────────────
-python scripts/manage_migrations.py downgrade
-python scripts/manage_migrations.py current
+# -- Manual GDrive download ----------------------------------------
+rclone copy gdrive:Paperclip-Backups/<companyId>/2026/05/12/1008 /tmp/restore --progress
 ```
