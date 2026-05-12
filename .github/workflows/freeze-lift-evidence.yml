@@ -1,0 +1,67 @@
+name: Freeze-Lift Evidence
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+  schedule:
+    # Nightly at 05:00 UTC — after test suite (04:00) so full context is available
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  evidence:
+    name: Freeze-lift evidence suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pytest
+
+      - name: Run freeze-lift evidence tests
+        id: evidence
+        run: |
+          python -m pytest tests/freeze_lift/ \
+            -v \
+            --tb=short \
+            --no-header \
+            -q \
+            --override-ini="addopts=" \
+            2>&1 | tee /tmp/freeze-lift-output.txt
+
+      - name: Check canary on main
+        run: |
+          echo "## Freeze-Lift Evidence Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Categories" >> $GITHUB_STEP_SUMMARY
+          echo "- **Canary on main**: Verifies lock gate passes on clean branches, exceptions file is valid" >> $GITHUB_STEP_SUMMARY
+          echo "- **Broken-branch block**: Verifies locked module changes are blocked without exception" >> $GITHUB_STEP_SUMMARY
+          echo "- **Escape hatch Path A+B**: Verifies board and emergency exceptions unblock correctly" >> $GITHUB_STEP_SUMMARY
+          echo "- **Locked-itself**: Verifies gate infrastructure files are locked" >> $GITHUB_STEP_SUMMARY
+          echo "- **Schema contracts**: Verifies exceptions/registry schema integrity" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Evidence Status" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.evidence.outcome }}" = "success" ]; then
+            echo ":white_check_mark: All freeze-lift evidence tests passed." >> $GITHUB_STEP_SUMMARY
+          else
+            echo ":x: Freeze-lift evidence tests failed. Review output above." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload evidence output artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: freeze-lift-evidence
+          path: /tmp/freeze-lift-output.txt

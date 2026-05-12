@@ -27,7 +27,7 @@ jobs:
             2>/dev/null || echo "not_protected")
           echo "current=$RESULT" >> "$GITHUB_OUTPUT"
 
-      - name: Apply branch protection
+      - name: Apply or update branch protection
         if: steps.check.outputs.current == 'not_protected'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,6 +42,7 @@ jobs:
                 {"context": "Ruff lint (no-print + datetime)"},
                 {"context": "pytest + coverage gate"},
                 {"context": "Module lock gate"},
+                {"context": "Freeze-lift evidence suite"},
                 {"context": "Real-data regression (BTCAAAAA-745)"}
               ]
             },
