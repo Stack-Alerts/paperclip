@@ -13,7 +13,7 @@ Output schema (JSON)::
     {
         "timestamp": "<ISO-8601>",
         "total_done_fix_issues": <int>,
-        "gated": {"pass": <int>, "fail": <int>, "bypassed": <int>, "errored": <int>},
+        "gated": {"pass": <int>, "fail": <int>, "bypassed": <int>, "error": <int>},
         "ungated_count": <int>,
         "ungated_issues": [{"id": "<uuid>", "identifier": "BTCAAAAA-NNN", "title": "..."}, ...],
         "gated_issues": [{"identifier": "BTCAAAAA-NNN", "gate_status": "PASS|FAIL|BYPASSED|ERROR"}, ...],
@@ -128,7 +128,7 @@ def scan(
     fix_issues = [i for i in issues if _is_fix_issue(i)]
     logger.info("Found %d fix/bug issues in done status", len(fix_issues))
 
-    gated: dict[str, int] = {"pass": 0, "fail": 0, "bypassed": 0, "errored": 0}
+    gated: dict[str, int] = {"pass": 0, "fail": 0, "bypassed": 0, "error": 0}
     ungated: list[dict] = []
     gated_issues: list[dict] = []
 
@@ -169,7 +169,7 @@ def scan(
         gated.get("pass", 0),
         gated.get("fail", 0),
         gated.get("bypassed", 0),
-        gated.get("errored", 0),
+        gated.get("error", 0),
         len(ungated),
     )
 
