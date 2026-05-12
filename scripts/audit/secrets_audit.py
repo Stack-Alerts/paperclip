@@ -19,6 +19,7 @@ from pathlib import Path
 THIS_FILE = Path(__file__).resolve()
 PROJECT_ROOT = THIS_FILE.parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
+SRC_DIR = PROJECT_ROOT / "src"
 DOCS_DIR = PROJECT_ROOT / "docs"
 
 # ── Patterns ──────────────────────────────────────────────────────────────────
@@ -108,6 +109,8 @@ def scan_file(path: Path) -> list[str]:
             if val in BINANCE_LITERALS:
                 if "==" in line or "!=" in line:
                     continue
+                if re.search(r'\.(?:get|pop|setdefault)\s*\(\s*["'"'"']' + re.escape(val) + r'["'"'"']', line):
+                    continue
                 snippet = line.strip()[:80]
                 findings.append(f"{file_str}:{lineno}: binance_literal_string: {snippet}")
                 break
@@ -123,6 +126,7 @@ def main() -> None:
         all_findings.append(f"{env_path}:1: env_file_present: .env file exists at repo root")
 
     py_files = sorted(SCRIPTS_DIR.rglob("*.py"))
+    py_files.extend(sorted(SRC_DIR.rglob("*.py")))
     for fpath in py_files:
         if "__pycache__" in str(fpath):
             continue

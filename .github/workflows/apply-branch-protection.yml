@@ -42,7 +42,8 @@ jobs:
                       {'context': 'pytest + coverage gate'},
                       {'context': 'Module lock gate'},
                       {'context': 'Freeze-lift evidence suite'},
-                      {'context': 'Real-data regression (BTCAAAAA-745)'}
+                      {'context': 'Real-data regression (BTCAAAAA-745)'},
+                      {'context': 'Secrets audit (DIAG-2)'},
                   ]
               },
               'enforce_admins': True,
