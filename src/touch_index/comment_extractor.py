@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from typing import Sequence
 
-_CODE_EXTS = r"(?:py|js|ts|sql)"
+_CODE_EXTS = r"(?:py|js|ts)"
 
 # Backtick-wrapped paths
 _RE_BACKTICK = re.compile(r"`([a-zA-Z0-9_/\-\.]+\.(?:" + _CODE_EXTS + r"))`")
@@ -82,10 +82,6 @@ def extract_files_from_comments(comments: Sequence[dict]) -> list[str]:
 
 def fetch_and_extract(issue_id: str) -> list[str]:
     """Fetch comments for an issue via Paperclip API and extract file paths."""
-    from .paperclip_client import _base, _session
+    from .paperclip_client import fetch_issue_comments
 
-    url = f"{_base()}/api/issues/{issue_id}/comments"
-    with _session() as sess:
-        resp = sess.get(url, timeout=30)
-        resp.raise_for_status()
-        return extract_files_from_comments(resp.json())
+    return extract_files_from_comments(fetch_issue_comments(issue_id))

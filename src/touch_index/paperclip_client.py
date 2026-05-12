@@ -309,3 +309,15 @@ def force_release_issue(
             return None
         resp.raise_for_status()
         return resp.json()
+
+
+def fetch_issue_comments(issue_id: str) -> list[dict]:
+    """Fetch all comments for an issue via the Paperclip API.
+
+    Returns a list of comment dicts sorted by creation time (oldest first).
+    Each comment dict includes at least ``id``, ``body``, ``createdAt``.
+    """
+    with _session() as sess:
+        resp = sess.get(f"{_base()}/api/issues/{issue_id}/comments", timeout=30)
+        resp.raise_for_status()
+        return resp.json()
