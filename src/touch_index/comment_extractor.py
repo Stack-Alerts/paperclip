@@ -19,8 +19,8 @@ from typing import Sequence
 
 _CODE_EXTS = r"(?:py|js|ts)"
 
-# Backtick-wrapped paths
-_RE_BACKTICK = re.compile(r"`([a-zA-Z0-9_/\-\.]+\.(?:" + _CODE_EXTS + r"))`")
+# Backtick-wrapped paths (optional :line or :line-end suffix, e.g. file.py:229-332)
+_RE_BACKTICK = re.compile(r"`([a-zA-Z0-9_/\-\.]+\.(?:" + _CODE_EXTS + r"))(?::\d+(?:-\d+)?)?`")
 
 # Bare paths starting with a known root
 _RE_PATH = re.compile(

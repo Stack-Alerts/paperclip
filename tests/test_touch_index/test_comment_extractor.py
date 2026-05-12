@@ -91,6 +91,21 @@ class TestExtractFilesFromText:
         files = extract_files_from_text("Fix in `BTC_Engine_v3/src/worker.py`")
         assert files == ["src/worker.py"]
 
+    def test_backtick_path_with_line_range(self):
+        """Backtick-wrapped path with line-number suffix (e.g. file.py:229-332)."""
+        files = extract_files_from_text("See `src/foo.py:229-332` for details")
+        assert files == ["src/foo.py"]
+
+    def test_backtick_path_with_single_line(self):
+        files = extract_files_from_text("Fixed in `src/bar.py:42`")
+        assert files == ["src/bar.py"]
+
+    def test_backtick_path_with_line_number_and_prefix(self):
+        """Line-number suffix combined with repo prefix inside backticks."""
+        files = extract_files_from_text("Changed `BTC_Engine_v3/src/foo.py:10-20`")
+        assert files == ["src/foo.py"]
+
+
 
 # ---------------------------------------------------------------------------
 # extract_files_from_comments
