@@ -77,3 +77,41 @@ to prevent duplicates on force-push. See `docs/runbook-module-lock.md` for detai
 `.github/workflows/test.yml` runs nightly at 04:00 UTC. On failure, a
 `critical`-priority Paperclip issue is created and assigned to the CTO with
 the CI run URL and test output. On success, no issue is created.
+
+## Freeze-Lift CI Evidence Package (BTCAAAAA-1879)
+
+The freeze-lift evidence package is a comprehensive test suite at `tests/freeze_lift/` that
+proves the module lock freeze-lift mechanism works correctly. It runs as a separate CI
+workflow (`.github/workflows/freeze-lift-evidence.yml`) on every push and nightly.
+
+### Evidence Pillars
+
+| # | Pillar | What It Proves | Tests |
+|---|--------|----------------|-------|
+| 1 | **Canary on main** | Gate passes on clean branches, exceptions file is valid | `TestCanaryOnMain` |
+| 2 | **Broken-branch block** | Branches touching locked modules without exceptions are blocked (exit 1) | `TestBrokenBranchBlock` |
+| 3a | **Escape hatch Path A** | Board-approved permanent exceptions correctly unblock | `TestEscapeHatchPathA` |
+| 3b | **Escape hatch Path B** | Emergency exceptions (CEO/board) with 4h windows work; expired/over-4h are rejected | `TestEscapeHatchPathB` |
+| 4 | **Locked-itself** | Gate's own files (gate script, registry, exceptions, workflow) are registered and block without exception | `TestLockedItself` |
+| 5 | **Freeze-lift cycle** | End-to-end: freeze -> detect block -> apply exception -> lift | `TestFreezeLiftCycle` |
+| 6 | **Schema contracts** | Exceptions file (v2), registry (v1), approved_by validation, module-path consistency | `TestSchemaAndContracts` |
+
+### Running Locally
+
+```bash
+pytest tests/freeze_lift/ -v
+```
+
+### CI Evidence Workflow
+
+`.github/workflows/freeze-lift-evidence.yml`:
+- Runs on every push to `main`/`master` and every PR
+- Runs nightly at 05:00 UTC
+- Uploads test output as a build artifact
+- Fails the pipeline if any evidence test fails
+
+### Adding New Evidence
+
+When adding a new locked module or exception path, add a corresponding test to
+`tests/freeze_lift/test_freeze_lift_evidence.py` that proves the new mechanism
+works. The evidence package must always pass before marking a lock-gate issue as done.
