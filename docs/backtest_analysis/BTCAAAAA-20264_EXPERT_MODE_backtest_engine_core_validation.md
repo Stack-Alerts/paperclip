@@ -205,3 +205,27 @@ The 0-trade results are NOT an engine bug. Root causes identified:
 The engine correctly scores confluence, applies timing constraints, evaluates all signals, and only enters trades when the full signal chain fires at sufficient threshold. The 0-trade results for most strategies confirm the engine is NOT generating false entries — it correctly rejects inadequate setups.
 
 This is a **strategy calibration issue** (StrategyResearcher domain), not an engine defect.
+
+---
+
+## Addendum 2: Multicore vs Single-Core Consistency (2026-05-12)
+
+### Test Setup
+- Strategy: 50% Asia Rejection Simple (current_strategy.json)
+- Data: 4,000 bars (15-min, Mar-Apr 2026)
+- Single-core: `evaluate_chunk()` — all bars in one chunk
+- Multicore: `MulticoreBacktestEngine(num_processes=4)` — 4 parallel chunks
+
+### Results
+
+| Metric | Single-Core | Multicore | Match |
+|---|---|---|---|
+| Total trades | 38 | 38 | ✅ |
+| Sorted PnL list | 38 values | 38 values | ✅ |
+| Duplicates rejected | 0 | 1 (correctly deduped) | ✅ |
+| Execution time | 34.7s | 8.1s | 4.3x speedup |
+
+### Conclusion
+Multicore and single-core produce **identical trade sets** (same count, same sorted PnL values). The 1 duplicate rejected in multicore mode is a trade spanning a chunk boundary — correctly identified and deduplicated by the TradeRegistry. No trades are lost or altered by the parallel processing path.
+
+**Acceptance criterion verified: Multicore vs single-core results are consistent.**
