@@ -266,7 +266,9 @@ class BinanceRestClient:
         symbol: str = 'BTCUSDT',
         limit: int = 1000,
         hours: Optional[int] = None,
-        futures: bool = False
+        futures: bool = False,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
     ) -> pd.DataFrame:
         """
         Get candlestick/kline data with AUTOMATIC FALLBACK to direct method
@@ -280,6 +282,8 @@ class BinanceRestClient:
             limit: Number of candles (max 1500)
             hours: Alternative: specify hours of history
             futures: Use futures API (default: False for spot)
+            start_time: Start time in milliseconds since epoch (overrides hours)
+            end_time: End time in milliseconds since epoch (overrides hours)
         
         Returns:
             DataFrame with OHLCV data (guaranteed fresh < 20 min)
@@ -288,6 +292,9 @@ class BinanceRestClient:
             >>> # Automatically gets fresh data
             >>> candles = client.get_klines('15m', limit=1000, futures=True)
             >>> # If stale, uses direct fallback automatically
+            >>> # Pagination with explicit start/end time (millisecond epoch)
+            >>> candles = client.get_klines('15m', limit=1500, futures=True,
+            ...     start_time=1735689600000, end_time=1735776000000)
         
         Note:
             For futures trading, fresh data is CRITICAL!
@@ -295,11 +302,15 @@ class BinanceRestClient:
         """
         params = {'symbol': symbol, 'interval': interval, 'limit': min(limit, 1500)}
         
-        if hours:
-            end_time = datetime.now()
-            start_time = end_time - timedelta(hours=hours)
-            params['startTime'] = int(start_time.timestamp() * 1000)
-            params['endTime'] = int(end_time.timestamp() * 1000)
+        if start_time is not None:
+            params['startTime'] = start_time
+            if end_time is not None:
+                params['endTime'] = end_time
+        elif hours:
+            end_time_calc = datetime.now()
+            start_time_calc = end_time_calc - timedelta(hours=hours)
+            params['startTime'] = int(start_time_calc.timestamp() * 1000)
+            params['endTime'] = int(end_time_calc.timestamp() * 1000)
         
         endpoint = '/fapi/v1/klines' if futures else '/api/v3/klines'
         source = 'Binance Futures' if futures else 'Binance Spot'

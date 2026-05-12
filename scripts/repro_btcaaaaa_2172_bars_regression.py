@@ -180,6 +180,6 @@ if __name__ == '__main__':
     demonstrate_cache_poisoning(start_date, end_date)
 
     logger.info("=" * 70)
-    logger.info("Root cause: unified_manager.py:529 — limit=1500 with no startTime")
-    logger.info("Cache amplifier: data_cache_manager.py:99-103 — day-boundary rounding")
+    logger.info("Root cause (FIXED by BTCAAAAA-2185): unified_manager.py:529 — limit=1500 with no startTime; now paginates via startTime")
+    logger.info("Cache amplifier (unfixed): data_cache_manager.py:99-103 — day-boundary rounding")
     logger.info("=" * 70)
