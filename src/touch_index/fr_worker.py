@@ -210,7 +210,7 @@ def main() -> None:
     args = parser.parse_args()
 
     from .db import get_engine, health_check
-    from .paperclip_client import get_fdr_issues
+    from .paperclip_client import get_fdr_issues, transition_issue_status
 
     engine = get_engine()
     if not health_check(engine):
@@ -255,8 +255,28 @@ def main() -> None:
         return
 
     results = run_fr_worker(engine, issues, dry_run=args.dry_run)
+
     total_files = sum(r.files_indexed for r in results)
     skipped = sum(1 for r in results if r.skipped_no_commits)
+
+    # Mark each processed issue as done in Paperclip.
+    # Skip issues already in done status to avoid 403 on redundant transition.
+    # Skip in dry-run mode — no side effects.
+    if args.dry_run:
+        logger.info("DRY RUN — skipping transition-to-done for %d issue(s)", len(issues))
+    else:
+        for issue in issues:
+            issue_id = issue.get("id", "")
+            if not issue_id or issue.get("status") == "done":
+                continue
+            try:
+                transition_issue_status(issue_id, "done")
+                logger.info("Marked %s as done", issue.get("identifier", issue_id))
+            except Exception:
+                logger.exception(
+                    "Failed to mark %s as done", issue.get("identifier", issue_id)
+                )
+
     logger.info(
         "FR worker done — %d issues processed, %d files indexed, %d skipped (no commits)",
         len(results),

@@ -5,14 +5,20 @@ Workers
   fr   (default)  FR ingestion worker — upserts touch_index_fr_files
   bug              Bug-close ingestion worker — upserts touch_index_bug_files
 
+Common flags (both workers)
+----------------------------
+  --issue-id <uuid>              Process a single issue by Paperclip UUID
+  --lookback-minutes <N>         Look back N minutes (default: 30)
+  --dry-run                      Log without writing to DB or transitioning
+  --validate                     Run data quality validation after ingestion
+
 Usage
 -----
-    python -m touch_index fr                          # run FR polling mode
-    python -m touch_index bug                         # run bug polling mode
-    python -m touch_index fr --issue-id <uuid>        # process a single FR issue
-    python -m touch_index bug --issue-id <uuid>       # process a single bug issue
-    python -m touch_index bug --lookback-minutes 60   # custom lookback window
-    python -m touch_index fr --dry-run                # dry run (no DB writes)
+    python -m touch_index [fr|bug]                          # run polling mode
+    python -m touch_index [fr|bug] --issue-id <uuid>        # process single issue
+    python -m touch_index [fr|bug] --lookback-minutes 60    # custom lookback window
+    python -m touch_index [fr|bug] --dry-run                # dry run
+    python -m touch_index [fr|bug] --validate               # validate after ingestion
 """
 
 import sys

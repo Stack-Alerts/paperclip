@@ -603,6 +603,9 @@ class TestMain:
                 "touch_index.fr_worker.run_fr_worker",
                 return_value=[],
             ) as mock_worker,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status",
+            ) as mock_transition,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -615,6 +618,7 @@ class TestMain:
         assert args[0] is engine
         assert args[1] == issues
         assert kwargs.get("dry_run") is False
+        mock_transition.assert_called_once_with("id-1", "done")
 
     def test_main_polling_dry_run(self, monkeypatch):
         """--dry-run is passed through to run_fr_worker."""
@@ -629,6 +633,9 @@ class TestMain:
                 "touch_index.fr_worker.run_fr_worker",
                 return_value=[],
             ) as mock_worker,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status",
+            ) as mock_transition,
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -639,6 +646,7 @@ class TestMain:
         mock_worker.assert_called_once()
         _, kwargs = mock_worker.call_args
         assert kwargs.get("dry_run") is True
+        mock_transition.assert_not_called()
 
     def test_main_health_check_failure_exits(self, monkeypatch):
         """When health_check returns False, SystemExit is raised."""
@@ -698,6 +706,9 @@ class TestMain:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=[]),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status",
+            ) as mock_transition,
             caplog.at_level(logging.INFO),
         ):
             mock_quality.return_value.passed = True
@@ -705,6 +716,7 @@ class TestMain:
             main()
 
         mock_quality.assert_called_once()
+        mock_transition.assert_called_once_with("id-1", "done")
         assert any("VALIDATION PASSED" in r.message for r in caplog.records)
 
     def test_main_validate_polling_failed(self, monkeypatch):
@@ -718,6 +730,9 @@ class TestMain:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=[]),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status",
+            ) as mock_transition,
         ):
             mock_quality.return_value.passed = False
             monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
@@ -725,6 +740,7 @@ class TestMain:
                 main()
 
         assert exc_info.value.code == 1
+        mock_transition.assert_called_once_with("id-1", "done")
 
     def test_main_validate_no_issues_passed(self, monkeypatch, caplog):
         """--validate with no issues: validation runs on existing data."""
@@ -875,6 +891,9 @@ class TestMain:
             patch("touch_index.db.health_check", return_value=True),
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=results),
+            patch(
+                "touch_index.paperclip_client.transition_issue_status",
+            ) as mock_transition,
             caplog.at_level(logging.INFO),
         ):
             monkeypatch.setattr(
@@ -883,9 +902,70 @@ class TestMain:
             )
             main()
 
+        assert mock_transition.call_count == 2
+        mock_transition.assert_has_calls([
+            call("id-1", "done"),
+            call("id-2", "done"),
+        ])
         summary_logs = [r for r in caplog.records if "issues processed" in r.message]
         assert len(summary_logs) == 1
         msg = summary_logs[0].message
         assert "2 issues" in msg
         assert "3 files" in msg
         assert "1 skipped" in msg
+
+    def test_main_skips_transition_for_already_done_issues(self, monkeypatch, caplog):
+        """Issues already in 'done' status are not transitioned."""
+        import logging
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "status": "done", "description": ""},
+            {"id": "id-2", "identifier": "BTCAAAAA-102", "status": "in_progress", "description": ""},
+        ]
+        results = [
+            FRIngestionResult(issue_identifier="BTCAAAAA-101", files_indexed=2, source="comments", skipped_no_commits=False),
+            FRIngestionResult(issue_identifier="BTCAAAAA-102", files_indexed=1, source="git", skipped_no_commits=False),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
+            patch("touch_index.fr_worker.run_fr_worker", return_value=results),
+            patch("touch_index.paperclip_client.transition_issue_status") as mock_transition,
+            caplog.at_level(logging.INFO),
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        # Only id-2 (in_progress) should be transitioned
+        mock_transition.assert_called_once_with("id-2", "done")
+
+    def test_main_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
+        """A failed transition is logged but does not halt the worker."""
+        import logging
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "description": ""},
+        ]
+        results = [
+            FRIngestionResult(issue_identifier="BTCAAAAA-101", files_indexed=2, source="comments", skipped_no_commits=False),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
+            patch("touch_index.fr_worker.run_fr_worker", return_value=results),
+            patch(
+                "touch_index.paperclip_client.transition_issue_status",
+                side_effect=RuntimeError("API timeout"),
+            ) as mock_transition,
+            caplog.at_level(logging.ERROR),
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        mock_transition.assert_called_once_with("id-1", "done")
+        assert any("Failed to mark" in r.message for r in caplog.records)
+
