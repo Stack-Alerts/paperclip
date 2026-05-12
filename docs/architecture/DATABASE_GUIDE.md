@@ -483,6 +483,7 @@ result = {
 | fr_issue_id | UUID | NO | Paperclip issue UUID for the FR |
 | fr_identifier | TEXT | NO | Human-readable issue identifier (e.g. 'BTCAAAAA-1085') |
 | fr_owner_agent_id | UUID | NO | Agent UUID of the FR owner/assignee |
+| source | TEXT | NO | Origin of the file reference: `comments`, `git`, or `description` |
 | updated_at | TIMESTAMPTZ | NO | Last upsert timestamp (server default `now()`) |
 
 **Indexes**:
