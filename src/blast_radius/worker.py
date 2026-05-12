@@ -38,8 +38,8 @@ from pathlib import Path
 
 from touch_index.paperclip_client import (
     _paginate,
-    _base,
     _company,
+    get_issue_by_id,
 )
 
 from .generator import generate_and_post
@@ -283,12 +283,10 @@ def process_issue(
 
 
 def _get_issue(issue_id: str) -> dict:
-    from touch_index.paperclip_client import _session
-
-    with _session() as sess:
-        resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=15)
-        resp.raise_for_status()
-        return resp.json()
+    issue = get_issue_by_id(issue_id)
+    if issue is None:
+        raise RuntimeError(f"Issue {issue_id} not found")
+    return issue
 
 
 def run_loop(

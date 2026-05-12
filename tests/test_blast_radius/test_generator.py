@@ -253,38 +253,36 @@ class TestGetIssue:
     def test_fetches_issue_by_id(self, monkeypatch):
         from blast_radius.generator import _get_issue
 
-        mock_resp = MagicMock()
-        mock_resp.json.return_value = {"id": "iss-1", "identifier": "BTCAAAAA-100"}
-        mock_sess = MagicMock()
-        mock_sess.__enter__.return_value = mock_sess
-        mock_sess.get.return_value = mock_resp
-
+        expected = {"id": "iss-1", "identifier": "BTCAAAAA-100"}
         monkeypatch.setattr(
-            "blast_radius.generator._session",
-            lambda: mock_sess,
+            "blast_radius.generator.get_issue_by_id",
+            lambda issue_id: expected,
         )
 
         result = _get_issue("iss-1")
-        assert result == {"id": "iss-1", "identifier": "BTCAAAAA-100"}
-        mock_sess.get.assert_called_once()
-        assert "/api/issues/iss-1" in str(mock_sess.get.call_args[0][0])
+        assert result == expected
 
     def test_raises_on_http_error(self, monkeypatch):
         from blast_radius.generator import _get_issue
 
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status.side_effect = RuntimeError("404 Not Found")
-        mock_sess = MagicMock()
-        mock_sess.__enter__.return_value = mock_sess
-        mock_sess.get.return_value = mock_resp
-
         monkeypatch.setattr(
-            "blast_radius.generator._session",
-            lambda: mock_sess,
+            "blast_radius.generator.get_issue_by_id",
+            lambda issue_id: (_ for _ in ()).throw(RuntimeError("404 Not Found")),
         )
 
         with pytest.raises(RuntimeError, match="404 Not Found"):
             _get_issue("bad-id")
+
+    def test_raises_on_not_found(self, monkeypatch):
+        from blast_radius.generator import _get_issue
+
+        monkeypatch.setattr(
+            "blast_radius.generator.get_issue_by_id",
+            lambda issue_id: None,
+        )
+
+        with pytest.raises(RuntimeError, match="not found"):
+            _get_issue("missing-id")
 
 
 class TestGetAgentName:
