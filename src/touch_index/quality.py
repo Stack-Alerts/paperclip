@@ -344,6 +344,7 @@ class BugFreshnessReport:
 @dataclass
 class BugConsistencyReport:
     null_closed_at_rows: int
+    null_updated_at_rows: int
     duplicate_pairs: int
     unknown_source_rows: int
     orphan_bug_issue_ids: list[str]
@@ -499,6 +500,15 @@ def check_bug_consistency(engine: Engine) -> BugConsistencyReport:
             or 0
         )
 
+        null_updated = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_bug_files WHERE updated_at IS NULL"
+                )
+            ).scalar()
+            or 0
+        )
+
         dups = (
             conn.execute(
                 text("""
@@ -539,6 +549,7 @@ def check_bug_consistency(engine: Engine) -> BugConsistencyReport:
 
     return BugConsistencyReport(
         null_closed_at_rows=null_closed,
+        null_updated_at_rows=null_updated,
         duplicate_pairs=dups,
         unknown_source_rows=unknown_source,
         orphan_bug_issue_ids=orphan_ids,
@@ -615,6 +626,8 @@ def run_bug_quality_checks(
         issues = []
         if consistency.null_closed_at_rows:
             issues.append(f"{consistency.null_closed_at_rows} null-closed_at rows")
+        if consistency.null_updated_at_rows:
+            issues.append(f"{consistency.null_updated_at_rows} null-updated_at rows")
         if consistency.duplicate_pairs:
             issues.append(f"{consistency.duplicate_pairs} duplicate pairs")
         if consistency.unknown_source_rows:
