@@ -98,8 +98,10 @@ def _is_source_file(path: str) -> bool:
     skip_prefixes = (
         "alembic/",
         "scripts/LakeAPI/",
+        "scripts/archived/",
         ".github/",
         "docs/",
+        ".coveragerc",
     )
     skip_suffixes = (
         ".sql",
@@ -114,6 +116,19 @@ def _is_source_file(path: str) -> bool:
         ".yaml",
         ".sh",
         ".csv",
+        ".rst",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".svg",
+        ".ico",
+        ".pdf",
+        ".pyc",
+        ".so",
+        ".o",
+        ".parquet",
+        ".pkl",
     )
     if any(path.startswith(p) for p in skip_prefixes):
         return False
