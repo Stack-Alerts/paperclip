@@ -6,11 +6,14 @@ All methods return plain dicts (no schema binding).
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Any
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 # FDR label identifies Feature Design Requirements (FRs)
 FDR_LABEL_ID = "d523cb2d-acd9-423d-b87a-bb79cee42c40"
@@ -114,11 +117,18 @@ def get_fdr_issues(updated_after: datetime | None = None) -> list[dict]:
     issues = _paginate(f"/api/companies/{_company()}/issues", params)
     if updated_after:
         cutoff = updated_after.astimezone(timezone.utc)
-        issues = [
-            i
-            for i in issues
-            if (ts := _parse_iso_ts(i.get("updatedAt"))) is not None and ts >= cutoff
-        ]
+        filtered: list[dict] = []
+        for i in issues:
+            ts = _parse_iso_ts(i.get("updatedAt"))
+            if ts is None:
+                logger.warning(
+                    "FDR issue %s has missing/malformed updatedAt — skipping",
+                    i.get("identifier", "unknown"),
+                )
+                continue
+            if ts >= cutoff:
+                filtered.append(i)
+        issues = filtered
     return issues
 
 
@@ -129,11 +139,18 @@ def get_closed_bug_issues(closed_after: datetime | None = None) -> list[dict]:
     bugs = [i for i in issues if _is_bug(i["title"])]
     if closed_after:
         cutoff = closed_after.astimezone(timezone.utc)
-        bugs = [
-            b
-            for b in bugs
-            if (ts := _parse_iso_ts(b.get("completedAt"))) is not None and ts >= cutoff
-        ]
+        filtered: list[dict] = []
+        for b in bugs:
+            ts = _parse_iso_ts(b.get("completedAt"))
+            if ts is None:
+                logger.warning(
+                    "Bug issue %s has missing/malformed completedAt — skipping",
+                    b.get("identifier", "unknown"),
+                )
+                continue
+            if ts >= cutoff:
+                filtered.append(b)
+        bugs = filtered
     return bugs
 
 
@@ -149,11 +166,18 @@ def get_closed_non_fdr_issues(closed_after: datetime | None = None) -> list[dict
     issues = [i for i in issues if FDR_LABEL_ID not in (i.get("labelIds") or [])]
     if closed_after:
         cutoff = closed_after.astimezone(timezone.utc)
-        issues = [
-            i
-            for i in issues
-            if (ts := _parse_iso_ts(i.get("completedAt"))) is not None and ts >= cutoff
-        ]
+        filtered: list[dict] = []
+        for i in issues:
+            ts = _parse_iso_ts(i.get("completedAt"))
+            if ts is None:
+                logger.warning(
+                    "Non-FDR issue %s has missing/malformed completedAt — skipping",
+                    i.get("identifier", "unknown"),
+                )
+                continue
+            if ts >= cutoff:
+                filtered.append(i)
+        issues = filtered
     return issues
 
 
@@ -167,11 +191,18 @@ def get_all_done_issues(completed_after: datetime | None = None) -> list[dict]:
     issues = _paginate(f"/api/companies/{_company()}/issues", params)
     if completed_after:
         cutoff = completed_after.astimezone(timezone.utc)
-        issues = [
-            i
-            for i in issues
-            if (ts := _parse_iso_ts(i.get("completedAt"))) is not None and ts >= cutoff
-        ]
+        filtered: list[dict] = []
+        for i in issues:
+            ts = _parse_iso_ts(i.get("completedAt"))
+            if ts is None:
+                logger.warning(
+                    "Done issue %s has missing/malformed completedAt — skipping",
+                    i.get("identifier", "unknown"),
+                )
+                continue
+            if ts >= cutoff:
+                filtered.append(i)
+        issues = filtered
     return issues
 
 

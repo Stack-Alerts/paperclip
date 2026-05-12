@@ -85,7 +85,6 @@ def _run_bug_cli() -> None:
         action="store_true",
         help="Output structured JSON summary to stdout after ingestion and validation",
     )
-    args = parser.parse_args()
     report: Any | None = None
 
     engine = get_engine()
@@ -300,6 +299,12 @@ def _run_fr_cli() -> None:
         action="store_true",
         help="Output structured JSON summary to stdout after ingestion and validation",
     )
+    parser.add_argument(
+        "--stale-hours",
+        type=int,
+        default=168,
+        help="Validation alert threshold in hours for stale rows (default: 168 = 7d)",
+    )
     args = parser.parse_args()
     report: Any | None = None
 
@@ -337,7 +342,7 @@ def _run_fr_cli() -> None:
                         "Failed to mark %s as done", result.issue_identifier
                     )
             if args.validate:
-                report = run_quality_checks(engine)
+                report = run_quality_checks(engine, stale_threshold_hours=args.stale_hours)
                 if not report.passed:
                     logger.error("VALIDATION FAILED after single-issue ingestion")
                     if args.json_summary:
@@ -358,7 +363,7 @@ def _run_fr_cli() -> None:
     if not issues:
         logger.info("Nothing to do")
         if args.validate:
-            report = run_quality_checks(engine)
+            report = run_quality_checks(engine, stale_threshold_hours=args.stale_hours)
             if not report.passed:
                 logger.error("VALIDATION FAILED \u2014 investigate existing data")
                 if args.json_summary:
@@ -396,7 +401,7 @@ def _run_fr_cli() -> None:
     )
 
     if args.validate:
-        report = run_quality_checks(engine)
+        report = run_quality_checks(engine, stale_threshold_hours=args.stale_hours)
         if not report.passed:
             logger.error("VALIDATION FAILED after ingestion \u2014 investigate")
             if args.json_summary:
