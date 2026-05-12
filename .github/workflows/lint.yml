@@ -25,3 +25,17 @@ jobs:
         # T201: prevents print() regression after structured-logging migration (BTCAAAAA-198)
         # DTZ003: enforces timezone-aware datetimes
         run: ruff check src/ --select T201,DTZ003
+
+  secrets-audit:
+    name: Secrets audit (DIAG-2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run secrets audit
+        run: python scripts/audit/secrets_audit.py
