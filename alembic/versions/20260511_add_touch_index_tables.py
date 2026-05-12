@@ -47,6 +47,7 @@ def upgrade() -> None:
             fr_issue_id       UUID        NOT NULL,
             fr_identifier     TEXT        NOT NULL,
             fr_owner_agent_id UUID        NOT NULL,
+            source            TEXT        NOT NULL DEFAULT 'unknown',
             updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
             PRIMARY KEY (id)
         );
@@ -72,6 +73,7 @@ def upgrade() -> None:
             file_path      TEXT        NOT NULL,
             bug_issue_id   UUID        NOT NULL,
             bug_identifier TEXT        NOT NULL,
+            source         TEXT        NOT NULL DEFAULT 'unknown',
             closed_at      TIMESTAMPTZ,
             PRIMARY KEY (id)
         );
