@@ -36,6 +36,19 @@ _STRIP_PREFIXES = (
     "projects/",
 )
 
+# Comment/description extracted paths must start with a known source root
+# to reject bare filenames like `backtest_config_panel.py` from agent comments.
+# Git-extracted paths are NOT filtered by this (they come from actual commits).
+_ALLOW_PREFIXES = (
+    "src/",
+    "tests/",
+    "scripts/",
+)
+
+
+def _has_allowed_prefix(path: str) -> bool:
+    return any(path.startswith(p) for p in _ALLOW_PREFIXES)
+
 
 def _normalise(path: str) -> str:
     for prefix in _STRIP_PREFIXES:
@@ -62,12 +75,12 @@ def extract_files_from_text(text: str) -> list[str]:
 
     for m in _RE_BACKTICK.finditer(text):
         path = _normalise(m.group(1))
-        if _is_source_file(path):
+        if _is_source_file(path) and _has_allowed_prefix(path):
             found.add(path)
 
     for m in _RE_PATH.finditer(text):
         path = _normalise(m.group(1))
-        if _is_source_file(path):
+        if _is_source_file(path) and _has_allowed_prefix(path):
             found.add(path)
 
     return sorted(found)
