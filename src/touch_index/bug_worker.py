@@ -209,6 +209,11 @@ def main() -> None:
         action="store_true",
         help="Log what would be ingested without writing to DB",
     )
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run bug data quality validation after ingestion (exits non-zero on failure)",
+    )
     args = parser.parse_args()
 
     from .db import get_engine, health_check
@@ -231,6 +236,13 @@ def main() -> None:
                 result.source,
                 result.skipped_no_commits,
             )
+        if args.validate:
+            from .quality import run_bug_quality_checks
+            report = run_bug_quality_checks(engine)
+            if not report.passed:
+                logger.error("VALIDATION FAILED after single-issue ingestion")
+                raise SystemExit(1)
+            logger.info("VALIDATION PASSED after single-issue ingestion")
         return
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
@@ -240,6 +252,13 @@ def main() -> None:
 
     if not issues:
         logger.info("Nothing to do")
+        if args.validate:
+            from .quality import run_bug_quality_checks
+            report = run_bug_quality_checks(engine)
+            if not report.passed:
+                logger.error("VALIDATION FAILED\u2014 investigate existing data")
+                raise SystemExit(1)
+            logger.info("VALIDATION PASSED\u2014 existing data clean")
         return
 
     results = run_bug_worker(engine, issues, dry_run=args.dry_run)
@@ -251,6 +270,14 @@ def main() -> None:
         total_files,
         skipped,
     )
+
+    if args.validate:
+        from .quality import run_bug_quality_checks
+        report = run_bug_quality_checks(engine)
+        if not report.passed:
+            logger.error("VALIDATION FAILED after ingestion \u2014 investigate")
+            raise SystemExit(1)
+        logger.info("VALIDATION PASSED: all bug quality checks clean")
 
 
 if __name__ == "__main__":
