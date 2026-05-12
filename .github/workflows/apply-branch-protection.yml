@@ -1,0 +1,74 @@
+name: Apply Branch Protection
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  administration: write
+
+jobs:
+  protect:
+    name: Apply branch protection rules to main
+    if: ${{ github.ref_name == 'main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if protection already applied
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RESULT=$(gh api \
+            repos/${{ github.repository }}/branches/main/protection \
+            --jq '.required_pull_request_reviews.required_approving_review_count' \
+            2>/dev/null || echo "not_protected")
+          echo "current=$RESULT" >> "$GITHUB_OUTPUT"
+
+      - name: Apply branch protection
+        if: steps.check.outputs.current == 'not_protected'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api --method PUT \
+            repos/${{ github.repository }}/branches/main/protection \
+            --input - <<'JSON'
+          {
+            "required_status_checks": {
+              "strict": true,
+              "checks": [
+                {"context": "Ruff lint (no-print + datetime)"},
+                {"context": "pytest + coverage gate"},
+                {"context": "Module lock gate"},
+                {"context": "Real-data regression (BTCAAAAA-745)"}
+              ]
+            },
+            "enforce_admins": true,
+            "required_pull_request_reviews": {
+              "required_approving_review_count": 1,
+              "dismiss_stale_reviews": true,
+              "require_code_owner_reviews": false
+            },
+            "restrictions": null,
+            "required_linear_history": false,
+            "allow_force_pushes": false,
+            "allow_deletions": false,
+            "block_creations": false,
+            "required_conversation_resolution": true,
+            "lock_branch": false,
+            "allow_fork_syncing": true
+          }
+JSON
+
+      - name: Verify protection applied
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "## Branch Protection Status" >> "$GITHUB_STEP_SUMMARY"
+          gh api repos/${{ github.repository }}/branches/main/protection \
+            --jq '{enabled: true, reviews: .required_pull_request_reviews.required_approving_review_count, strict: .required_status_checks.strict, admins: .enforce_admins.enabled}' \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Protection applied successfully to \`main\`." >> "$GITHUB_STEP_SUMMARY"
