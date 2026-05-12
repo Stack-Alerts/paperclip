@@ -1042,6 +1042,7 @@ class StrategyBuilderOrchestrator:
             'name': config.name,
             'description': getattr(config, 'description', ''),
             'strategy_type': getattr(config, 'strategy_type', 'Bearish'),
+            'version_id': self.current_version_id,
             'blocks': [],
             'exit_conditions': [],
             'parameters': {},
