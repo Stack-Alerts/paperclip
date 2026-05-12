@@ -576,6 +576,7 @@ class TestMain:
 
         engine = MagicMock()
         result = BugIngestionResult(
+            issue_id=ISSUE_ID,
             issue_identifier="BTCAAAAA-100",
             files_indexed=2,
             source="git",
@@ -627,6 +628,7 @@ class TestMain:
 
         engine = MagicMock()
         result = BugIngestionResult(
+            issue_id=ISSUE_ID,
             issue_identifier="BTCAAAAA-100",
             files_indexed=2,
             source="git",
@@ -667,7 +669,7 @@ class TestMain:
             ),
             patch(
                 "touch_index.bug_worker.run_bug_worker",
-                return_value=[],
+                return_value=[BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-100", files_indexed=2, source="git", skipped_no_commits=False)],
             ) as mock_worker,
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -778,12 +780,14 @@ class TestMain:
         ]
         results = [
             BugIngestionResult(
+                issue_id="id-1",
                 issue_identifier="BTCAAAAA-101",
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
             ),
             BugIngestionResult(
+                issue_id="id-2",
                 issue_identifier="BTCAAAAA-102",
                 files_indexed=0,
                 source="none",
@@ -843,7 +847,7 @@ class TestMain:
                 "touch_index.paperclip_client.get_closed_non_fdr_issues",
                 return_value=issues,
             ),
-            patch("touch_index.bug_worker.run_bug_worker", return_value=[]),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=[BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False)]),
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -874,7 +878,7 @@ class TestMain:
                 "touch_index.paperclip_client.get_closed_non_fdr_issues",
                 return_value=issues,
             ),
-            patch("touch_index.bug_worker.run_bug_worker", return_value=[]),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=[BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False)]),
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -949,6 +953,7 @@ class TestMain:
 
         engine = MagicMock()
         result = BugIngestionResult(
+            issue_id=ISSUE_ID,
             issue_identifier="BTCAAAAA-100",
             files_indexed=2,
             source="git",
@@ -981,6 +986,7 @@ class TestMain:
 
         engine = MagicMock()
         result = BugIngestionResult(
+            issue_id=ISSUE_ID,
             issue_identifier="BTCAAAAA-100",
             files_indexed=2,
             source="git",
@@ -1047,7 +1053,7 @@ class TestMain:
                 "touch_index.paperclip_client.get_closed_non_fdr_issues",
                 return_value=issues,
             ),
-            patch("touch_index.bug_worker.run_bug_worker", return_value=[]),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=[BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False)]),
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
             patch(
                 "touch_index.paperclip_client.transition_issue_status",
@@ -1069,8 +1075,8 @@ class TestMain:
             {"id": "id-2", "identifier": "BTCAAAAA-102", "status": "in_progress", "completedAt": "2026-05-11T10:00:00Z"},
         ]
         results = [
-            BugIngestionResult(issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False),
-            BugIngestionResult(issue_identifier="BTCAAAAA-102", files_indexed=1, source="git", skipped_no_commits=False),
+            BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False),
+            BugIngestionResult(issue_id="id-2", issue_identifier="BTCAAAAA-102", files_indexed=1, source="git", skipped_no_commits=False),
         ]
 
         with (
@@ -1100,7 +1106,7 @@ class TestMain:
             {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
         ]
         results = [
-            BugIngestionResult(issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False),
+            BugIngestionResult(issue_id="id-1", issue_identifier="BTCAAAAA-101", files_indexed=2, source="git", skipped_no_commits=False),
         ]
 
         with (

@@ -40,10 +40,11 @@ def _make_engine():
     return MagicMock()
 
 
-def _make_result(files_indexed: int = 2, skipped: bool = False):
+def _make_result(files_indexed: int = 2, skipped: bool = False, issue_id: str = ""):
     r = MagicMock()
     r.files_indexed = files_indexed
     r.skipped_no_commits = skipped
+    r.issue_id = issue_id
     return r
 
 
@@ -217,8 +218,8 @@ class TestBugRunnerMain:
             {"id": "id-2", "identifier": "BTCAAAAA-102", "completedAt": "2026-05-11T10:00:00Z"},
         ]
         results = [
-            _make_result(files_indexed=2, skipped=False),
-            _make_result(files_indexed=0, skipped=True),
+            _make_result(files_indexed=2, skipped=False, issue_id="id-1"),
+            _make_result(files_indexed=0, skipped=True, issue_id="id-2"),
         ]
 
         with (
@@ -249,8 +250,8 @@ class TestBugRunnerMain:
             {"id": "id-2", "identifier": "BTCAAAAA-102", "status": "in_progress", "completedAt": "2026-05-11T10:00:00Z"},
         ]
         results = [
-            _make_result(files_indexed=2, skipped=False),
-            _make_result(files_indexed=1, skipped=False),
+            _make_result(files_indexed=2, skipped=False, issue_id="id-1"),
+            _make_result(files_indexed=1, skipped=False, issue_id="id-2"),
         ]
 
         with (
