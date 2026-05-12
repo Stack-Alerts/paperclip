@@ -303,3 +303,20 @@ class TestRunErrorHandling:
         assert any("git command failed" in r.message for r in caplog.records)
         assert any("exit 128" in r.message for r in caplog.records)
         assert any("fatal" in r.message for r in caplog.records)
+
+    def test_handles_timeout_expired(self, caplog):
+        """When git subprocess times out, returns empty string and logs error."""
+        import subprocess
+        from unittest.mock import patch
+        from touch_index.git_extractor import _run
+
+        with (
+            patch.object(
+                subprocess, "run", side_effect=subprocess.TimeoutExpired(cmd="git log", timeout=30)
+            ),
+            caplog.at_level(logging.ERROR),
+        ):
+            result = _run(["git", "log"], __import__("pathlib").Path("/tmp"))
+
+        assert result == ""
+        assert any("timed out" in r.message for r in caplog.records)
