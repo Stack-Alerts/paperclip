@@ -39,19 +39,23 @@ class TestQueryBlastRadius:
         conn = engine.connect.return_value.__enter__.return_value
         # Call order: fr_impact -> regression -> downstream (count)
         conn.execute.side_effect = [
-            _mock_result([
-                MagicMock(
-                    fr_identifier="FDR-100",
-                    fr_owner_agent_id="agent-a",
-                    fr_issue_id="issue-a",
-                )
-            ]),
-            _mock_result([
-                MagicMock(
-                    bug_identifier="BTCAAAAA-500",
-                    bug_issue_id="bug-uuid",
-                )
-            ]),
+            _mock_result(
+                [
+                    MagicMock(
+                        fr_identifier="FDR-100",
+                        fr_owner_agent_id="agent-a",
+                        fr_issue_id="issue-a",
+                    )
+                ]
+            ),
+            _mock_result(
+                [
+                    MagicMock(
+                        bug_identifier="BTCAAAAA-500",
+                        bug_issue_id="bug-uuid",
+                    )
+                ]
+            ),
             _mock_result([], scalar_return=0),  # downstream count = 0 -> skip query
         ]
 
@@ -69,13 +73,15 @@ class TestQueryBlastRadius:
         conn = engine.connect.return_value.__enter__.return_value
         # Call order: fr_impact -> regression -> downstream (count, then query)
         conn.execute.side_effect = [
-            _mock_result([]),                      # fr: no results
-            _mock_result([]),                      # regression: no results
-            _mock_result([], scalar_return=5),     # downstream count = 5 > 0
-            _mock_result([                         # downstream query
-                MagicMock(dep_file="src/dep.py"),
-                MagicMock(dep_file="src/dep2.py"),
-            ]),
+            _mock_result([]),  # fr: no results
+            _mock_result([]),  # regression: no results
+            _mock_result([], scalar_return=5),  # downstream count = 5 > 0
+            _mock_result(
+                [  # downstream query
+                    MagicMock(dep_file="src/dep.py"),
+                    MagicMock(dep_file="src/dep2.py"),
+                ]
+            ),
         ]
 
         data = query_blast_radius(["src/foo.py"], engine=engine)
@@ -89,9 +95,9 @@ class TestQueryBlastRadius:
         conn = engine.connect.return_value.__enter__.return_value
 
         conn.execute.side_effect = [
-            _mock_result([]),                      # fr
-            _mock_result([]),                      # regression
-            _mock_result([], scalar_return=0),     # downstream count = 0
+            _mock_result([]),  # fr
+            _mock_result([]),  # regression
+            _mock_result([], scalar_return=0),  # downstream count = 0
         ]
 
         query_blast_radius(["src/a.py", "src/b.py"], engine=engine)
@@ -116,9 +122,9 @@ class TestQueryBlastRadius:
         engine = MagicMock()
         conn = engine.connect.return_value.__enter__.return_value
         conn.execute.side_effect = [
-            _mock_result([]),                      # fr
-            _mock_result([]),                      # regression
-            _mock_result([], scalar_return=0),     # downstream count = 0
+            _mock_result([]),  # fr
+            _mock_result([]),  # regression
+            _mock_result([], scalar_return=0),  # downstream count = 0
         ]
 
         with patch("blast_radius.query.get_engine", return_value=engine) as mock_get:
@@ -200,4 +206,3 @@ class TestRegressionRisk:
         )
         assert r.bug_identifier == "BTCAAAAA-500"
         assert r.bug_issue_id == "bug-uuid"
-

@@ -1,4 +1,5 @@
 """Ensure src/ is on sys.path before any blast_radius test module is imported."""
+
 import sys
 from pathlib import Path
 

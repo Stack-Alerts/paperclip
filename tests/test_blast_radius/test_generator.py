@@ -29,7 +29,9 @@ _MOCK_ISSUE_NO_TF = {
 
 _MOCK_BR_DATA = BlastRadiusData(
     fr_impact_set=[
-        FRImpact(fr_identifier="FDR-850", fr_owner_agent_id="agent-1", fr_issue_id="fr-uuid"),
+        FRImpact(
+            fr_identifier="FDR-850", fr_owner_agent_id="agent-1", fr_issue_id="fr-uuid"
+        ),
     ],
     regression_set=[
         RegressionRisk(bug_identifier="BTCAAAAA-50", bug_issue_id="bug-uuid"),
@@ -48,9 +50,15 @@ class TestGenerateAndPost:
         from blast_radius.generator import generate_and_post
 
         with (
-            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE) as mock_get,
-            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA) as mock_query,
-            patch("blast_radius.generator._get_agent_name", return_value="Alice") as mock_name,
+            patch(
+                "blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE
+            ) as mock_get,
+            patch(
+                "blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA
+            ) as mock_query,
+            patch(
+                "blast_radius.generator._get_agent_name", return_value="Alice"
+            ) as mock_name,
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
             result = generate_and_post("issue-uuid", dry_run=False)
@@ -66,7 +74,9 @@ class TestGenerateAndPost:
 
         with (
             patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE),
-            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA),
+            patch(
+                "blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA
+            ),
             patch("blast_radius.generator._get_agent_name", return_value="Alice"),
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
@@ -79,8 +89,12 @@ class TestGenerateAndPost:
         from blast_radius.generator import generate_and_post
 
         with (
-            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
-            patch("touch_index.git_extractor.get_files_for_issue", return_value=[]) as mock_git,
+            patch(
+                "blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF
+            ),
+            patch(
+                "touch_index.git_extractor.get_files_for_issue", return_value=[]
+            ) as mock_git,
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
             result = generate_and_post("issue-uuid-2", dry_run=False)
@@ -94,8 +108,12 @@ class TestGenerateAndPost:
         from blast_radius.generator import generate_and_post
 
         with (
-            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
-            patch("touch_index.git_extractor.get_files_for_issue", return_value=[]) as mock_git,
+            patch(
+                "blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF
+            ),
+            patch(
+                "touch_index.git_extractor.get_files_for_issue", return_value=[]
+            ) as mock_git,
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
             result = generate_and_post("issue-uuid-2", dry_run=True)
@@ -107,12 +125,18 @@ class TestGenerateAndPost:
         from blast_radius.generator import generate_and_post
 
         with (
-            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
-            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA) as mock_query,
+            patch(
+                "blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF
+            ),
+            patch(
+                "blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA
+            ) as mock_query,
             patch("blast_radius.generator._get_agent_name", return_value="Alice"),
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
-            result = generate_and_post("issue-uuid-2", touched_files=["src/override.py"], dry_run=False)
+            result = generate_and_post(
+                "issue-uuid-2", touched_files=["src/override.py"], dry_run=False
+            )
 
         assert result["issue"] == "FAKE-000"
         assert result.get("skipped") is None
@@ -124,8 +148,12 @@ class TestGenerateAndPost:
 
         with (
             patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE),
-            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA),
-            patch("blast_radius.generator._get_agent_name", return_value="Alice") as mock_name,
+            patch(
+                "blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA
+            ),
+            patch(
+                "blast_radius.generator._get_agent_name", return_value="Alice"
+            ) as mock_name,
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
             generate_and_post("issue-uuid", dry_run=False)
@@ -137,7 +165,9 @@ class TestGenerateAndPost:
 
         with (
             patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE),
-            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA),
+            patch(
+                "blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA
+            ),
             patch("blast_radius.generator._get_agent_name", return_value=None),
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
@@ -163,7 +193,9 @@ class TestGenerateAndPost:
 
         with (
             patch("blast_radius.generator.get_issue_by_id", return_value=issue),
-            patch("touch_index.git_extractor.get_files_for_issue", return_value=[]) as mock_git,
+            patch(
+                "touch_index.git_extractor.get_files_for_issue", return_value=[]
+            ) as mock_git,
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
             result = generate_and_post("issue-uuid", dry_run=False)
@@ -172,15 +204,21 @@ class TestGenerateAndPost:
         mock_post.assert_not_called()
         mock_git.assert_called_once_with("BTCAAAAA-100")
 
-
     def test_git_fallback_success(self):
         """When no touchedFiles in description, git fallback should derive files from history."""
         from blast_radius.generator import generate_and_post
 
         with (
-            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
-            patch("touch_index.git_extractor.get_files_for_issue", return_value=["src/git_file.py"]) as mock_git,
-            patch("blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA) as mock_query,
+            patch(
+                "blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF
+            ),
+            patch(
+                "touch_index.git_extractor.get_files_for_issue",
+                return_value=["src/git_file.py"],
+            ) as mock_git,
+            patch(
+                "blast_radius.generator.query_blast_radius", return_value=_MOCK_BR_DATA
+            ) as mock_query,
             patch("blast_radius.generator._get_agent_name", return_value="Alice"),
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
@@ -197,8 +235,13 @@ class TestGenerateAndPost:
         from blast_radius.generator import generate_and_post
 
         with (
-            patch("blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF),
-            patch("touch_index.git_extractor.get_files_for_issue", side_effect=RuntimeError("git error")) as mock_git,
+            patch(
+                "blast_radius.generator.get_issue_by_id", return_value=_MOCK_ISSUE_NO_TF
+            ),
+            patch(
+                "touch_index.git_extractor.get_files_for_issue",
+                side_effect=RuntimeError("git error"),
+            ) as mock_git,
             patch("blast_radius.generator._post_comment") as mock_post,
         ):
             result = generate_and_post("issue-uuid-2", dry_run=False)
@@ -207,6 +250,7 @@ class TestGenerateAndPost:
         assert result.get("reason") == "no touchedFiles"
         mock_git.assert_called_once_with("FAKE-000")
         mock_post.assert_not_called()
+
     def test_no_fr_impact_set_does_not_call_get_agent_name(self):
         """When fr_impact_set is empty, _get_agent_name should not be called."""
         from blast_radius.generator import generate_and_post
