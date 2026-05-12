@@ -561,7 +561,9 @@ def run_bug_quality_checks(
         # fix commits can never be indexed by the bug worker, so using the
         # raw total denominator would always fail (~16% coverage).
         # When there are zero eligible issues, the gate passes automatically.
-        eligible_indexed = max(0, coverage.eligible_bug_issues - len(coverage.missing_eligible_identifiers))
+        eligible_indexed = max(
+            0, coverage.eligible_bug_issues - len(coverage.missing_eligible_identifiers)
+        )
         if coverage.eligible_bug_issues > 0 and coverage.eligible_coverage_pct < 90:
             logger.warning(
                 "BUG COVERAGE: %.1f%% (%d/%d) overall / %.1f%% (%d/%d) eligible — %d missing eligible",
