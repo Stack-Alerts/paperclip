@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from touch_index.db import get_engine, health_check
-from touch_index.paperclip_client import get_closed_non_fdr_issues
+from touch_index.paperclip_client import get_closed_non_fdr_issues, transition_issue_status
 from touch_index.bug_worker import run_bug_worker, process_bug_issue
 
 logging.basicConfig(
@@ -93,6 +93,13 @@ def main() -> None:
                 result.source,
                 result.skipped_no_commits,
             )
+        if args.validate:
+            logger.info("Running bug data quality validation after single-issue ingestion…")
+            failures = _run_validation(engine)
+            if failures:
+                logger.error("VALIDATION FAILED: %d check(s) — investigate", failures)
+                sys.exit(1)
+            logger.info("VALIDATION PASSED: all checks clean")
         return
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
@@ -118,6 +125,24 @@ def main() -> None:
 
     if args.dry_run:
         logger.info("DRY RUN — would have processed %d issue(s)", len(results))
+
+    # Mark each processed issue as done in Paperclip.
+    # Skip issues already in done status to avoid 403 on redundant transition.
+    # Skip in dry-run mode -- no side effects.
+    if args.dry_run:
+        logger.info("DRY RUN -- skipping transition-to-done for %d issue(s)", len(issues))
+    else:
+        for issue in issues:
+            issue_id = issue.get("id", "")
+            if not issue_id or issue.get("status") == "done":
+                continue
+            try:
+                transition_issue_status(issue_id, "done")
+                logger.info("Marked %s as done", issue.get("identifier", issue_id))
+            except Exception:
+                logger.exception(
+                    "Failed to mark %s as done", issue.get("identifier", issue_id)
+                )
 
     logger.info(
         "Bug worker done — %d issues processed, %d files indexed, %d skipped (no commits)",
