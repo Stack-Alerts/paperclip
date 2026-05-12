@@ -240,7 +240,7 @@ def _run_bug_cli() -> None:
 
 def _emit_json_summary(
     args: argparse.Namespace,
-    worker: str = "bug",
+    worker: str,
     results: list[Any] | None = None,
     result: Any | None = None,
     total_files: int = 0,
