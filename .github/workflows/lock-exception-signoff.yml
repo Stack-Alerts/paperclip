@@ -1,0 +1,122 @@
+name: Lock Exception Sign-Off
+
+on:
+  repository_dispatch:
+    types: [lock_exception_signed_off]
+  workflow_dispatch:
+    inputs:
+      issue_id:
+        description: 'Paperclip issue UUID'
+        required: true
+      module:
+        description: 'Locked module path'
+        required: true
+      scope:
+        description: 'Scope description of the change'
+        required: true
+      approved_by:
+        description: 'Who approved (board or ceo-emergency)'
+        required: true
+        default: 'board'
+      approval_id:
+        description: 'Approval ID'
+        required: true
+      expires_iso:
+        description: 'ISO 8601 expiry (or empty for permanent)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Dry run (log only, do not commit or push)'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: lock-exception-signoff
+  cancel-in-progress: false
+
+jobs:
+  signoff:
+    name: Process lock exception sign-off
+    runs-on: ubuntu-latest
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests python-dotenv
+
+      - name: Configure git for push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Resolve payload
+        id: resolve
+        run: |
+          ISSUE_ID="${{ github.event.inputs.issue_id || '' }}"
+          MODULE="${{ github.event.inputs.module || '' }}"
+          SCOPE="${{ github.event.inputs.scope || '' }}"
+          APPROVED_BY="${{ github.event.inputs.approved_by || '' }}"
+          APPROVAL_ID="${{ github.event.inputs.approval_id || '' }}"
+          EXPIRES_ISO="${{ github.event.inputs.expires_iso || '' }}"
+          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+
+          if [ -z "$ISSUE_ID" ] && [ -n "${{ github.event.client_payload.issue_id || '' }}" ]; then
+            ISSUE_ID="${{ github.event.client_payload.issue_id }}"
+            MODULE="${{ github.event.client_payload.module }}"
+            SCOPE="${{ github.event.client_payload.scope }}"
+            APPROVED_BY="${{ github.event.client_payload.approved_by }}"
+            APPROVAL_ID="${{ github.event.client_payload.approval_id }}"
+            EXPIRES_ISO="${{ github.event.client_payload.expires_iso }}"
+            DRY_RUN="${{ github.event.client_payload.dry_run || 'false' }}"
+          fi
+
+          echo "issue_id=$ISSUE_ID" >> $GITHUB_OUTPUT
+          echo "module=$MODULE" >> $GITHUB_OUTPUT
+          echo "scope=$SCOPE" >> $GITHUB_OUTPUT
+          echo "approved_by=$APPROVED_BY" >> $GITHUB_OUTPUT
+          echo "approval_id=$APPROVAL_ID" >> $GITHUB_OUTPUT
+          echo "expires_iso=$EXPIRES_ISO" >> $GITHUB_OUTPUT
+          echo "dry_run=$DRY_RUN" >> $GITHUB_OUTPUT
+
+      - name: Run lock exception sign-off
+        env:
+          PYTHONPATH: src
+        run: |
+          FLAGS=""
+          if [ "${{ steps.resolve.outputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          EXPIRES="${{ steps.resolve.outputs.expires_iso }}"
+          if [ -n "$EXPIRES" ]; then
+            python scripts/lock_exception_signoff.py \
+              --issue-id "${{ steps.resolve.outputs.issue_id }}" \
+              --module "${{ steps.resolve.outputs.module }}" \
+              --scope "${{ steps.resolve.outputs.scope }}" \
+              --approved-by "${{ steps.resolve.outputs.approved_by }}" \
+              --approval-id "${{ steps.resolve.outputs.approval_id }}" \
+              --expires-iso "$EXPIRES" \
+              $FLAGS
+          else
+            python scripts/lock_exception_signoff.py \
+              --issue-id "${{ steps.resolve.outputs.issue_id }}" \
+              --module "${{ steps.resolve.outputs.module }}" \
+              --scope "${{ steps.resolve.outputs.scope }}" \
+              --approved-by "${{ steps.resolve.outputs.approved_by }}" \
+              --approval-id "${{ steps.resolve.outputs.approval_id }}" \
+              $FLAGS
+          fi

@@ -64,3 +64,19 @@ python scripts/lock_gate.py --validate-exceptions
 - `lock_gate_exceptions.schema.md` — Exception entry schema documentation
 - `.github/ISSUE_TEMPLATE/qa-locked-module-exception.md` — Exception request template
 - `.github/CODEOWNERS` — CEO + board approval requirement for exceptions file
+
+## Automated Exception Sign-Off
+
+When the board or CEO approves an exception on a Paperclip issue, RepoSteward
+triggers the **Lock Exception Sign-Off** webhook (`.github/workflows/lock-exception-signoff.yml`),
+which automatically adds the entry to `lock_gate_exceptions.json`, commits and
+pushes the change, and transitions the issue to `done`.
+
+Manual entry via `lock_gate_exceptions.json` is still supported for out-of-band
+approvals (see `docs/runbook-module-lock.md`).
+
+## Nightly Alert
+
+A scheduled workflow (`.github/workflows/lock-gate-nightly-alert.yml`) runs
+nightly at 03:00 UTC and creates a Paperclip alert issue if there are expired
+exceptions, upcoming expirations (within 24h), or schema validation errors.
