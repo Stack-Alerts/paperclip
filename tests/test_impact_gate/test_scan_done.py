@@ -48,6 +48,18 @@ class TestIsFixIssue:
     def test_no_labels_or_keywords(self):
         assert _is_fix({"labels": [], "title": "Refactor logging"}) is False
 
+    def test_substring_fix_in_title_is_not_false_positive(self):
+        assert (
+            _is_fix(
+                {"labels": [], "title": "Impact Gate: scan for fix issues done"}
+            )
+            is False
+        )
+        assert (
+            _is_fix({"labels": [], "title": "Prefix bug in the title"})
+            is False
+        )
+
 
 class TestGateHeaderRegex:
     def test_matches_pass(self):
