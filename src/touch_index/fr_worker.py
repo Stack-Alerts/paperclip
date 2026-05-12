@@ -34,6 +34,7 @@ _UPSERT_SQL = text("""
         (:id, :file_path, :fr_issue_id, :fr_identifier, :fr_owner_agent_id, :source, :updated_at)
     ON CONFLICT (file_path, fr_issue_id)
     DO UPDATE SET
+        fr_identifier     = EXCLUDED.fr_identifier,
         fr_owner_agent_id = EXCLUDED.fr_owner_agent_id,
         source            = EXCLUDED.source,
         updated_at        = EXCLUDED.updated_at
