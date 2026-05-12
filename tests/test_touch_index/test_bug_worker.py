@@ -562,11 +562,11 @@ def _issues(count: int = 2) -> list[dict]:
 
 
 class TestMain:
-    """Tests for bug_worker.main() CLI entry point."""
+    """Tests for _run_bug_cli() CLI entry point (formerly bug_worker.main())."""
 
     def test_main_issue_id_calls_process_bug_issue(self, monkeypatch):
         """When --issue-id is provided, process_bug_issue is called."""
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
         result = BugIngestionResult(
@@ -596,7 +596,7 @@ class TestMain:
     def test_main_issue_id_not_found_logs(self, monkeypatch, caplog):
         """When process_bug_issue returns None, a message is logged."""
         import logging
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
 
@@ -617,7 +617,7 @@ class TestMain:
 
     def test_main_issue_id_dry_run(self, monkeypatch):
         """--dry-run is passed through to process_bug_issue."""
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
         result = BugIngestionResult(
@@ -645,7 +645,7 @@ class TestMain:
 
     def test_main_polling_calls_run_bug_worker(self, monkeypatch):
         """When no --issue-id, run_bug_worker is called with non-FDR issues."""
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
         issues = [
@@ -682,7 +682,7 @@ class TestMain:
 
     def test_main_polling_dry_run(self, monkeypatch):
         """--dry-run is passed through to run_bug_worker."""
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
         issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "completedAt": "2026-05-11T10:00:00Z"}]
@@ -715,7 +715,7 @@ class TestMain:
 
     def test_main_health_check_failure_exits(self, monkeypatch):
         """When health_check returns False, SystemExit is raised."""
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
 
@@ -737,7 +737,7 @@ class TestMain:
     def test_main_no_issues_returns_early(self, monkeypatch, caplog):
         """When no closed non-FDR issues found, run_bug_worker is never called."""
         import logging
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
 
@@ -763,7 +763,7 @@ class TestMain:
     def test_main_summary_counts_files_and_skipped(self, monkeypatch, caplog):
         """Log summary reflects total files indexed and skipped count."""
         import logging
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
         issues = [
@@ -823,7 +823,7 @@ class TestMain:
     def test_main_validate_polling_passed(self, monkeypatch, caplog):
         """--validate with issues: validation runs and passes."""
         import logging
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
         issues = [
@@ -854,7 +854,7 @@ class TestMain:
 
     def test_main_validate_polling_failed(self, monkeypatch):
         """--validate with issues: validation failure exits non-zero."""
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
         issues = [
@@ -885,7 +885,7 @@ class TestMain:
     def test_main_validate_no_issues_passed(self, monkeypatch, caplog):
         """--validate with no issues: validation runs on existing data."""
         import logging
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
 
@@ -910,7 +910,7 @@ class TestMain:
 
     def test_main_validate_no_issues_failed(self, monkeypatch):
         """--validate with no issues: validation failure exits non-zero."""
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
 
@@ -939,7 +939,7 @@ class TestMain:
     def test_main_validate_issue_id_passed(self, monkeypatch, caplog):
         """--validate --issue-id: validation runs after single-issue processing."""
         import logging
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
         result = BugIngestionResult(
@@ -971,7 +971,7 @@ class TestMain:
 
     def test_main_validate_issue_id_failed(self, monkeypatch):
         """--validate --issue-id: validation failure exits non-zero."""
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
         result = BugIngestionResult(
@@ -1002,7 +1002,7 @@ class TestMain:
     def test_main_validate_issue_id_not_found_skips_validation(self, monkeypatch, caplog):
         """--validate --issue-id when issue not found: validation is still run."""
         import logging
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
 
@@ -1027,7 +1027,7 @@ class TestMain:
 
     def test_main_validate_not_called_without_flag(self, monkeypatch):
         """Without --validate, quality checks are not called."""
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
 
         engine = MagicMock()
         issues = [
@@ -1055,7 +1055,7 @@ class TestMain:
 
     def test_main_skips_transition_for_already_done_issues(self, monkeypatch, caplog):
         """Issues already in 'done' status are not transitioned."""
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
         import logging
         engine = MagicMock()
         issues = [
@@ -1083,7 +1083,7 @@ class TestMain:
 
     def test_main_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
         """A failed transition is logged but does not halt the worker."""
-        from touch_index.bug_worker import main
+        from touch_index.__main__ import _run_bug_cli as main
         import logging
         engine = MagicMock()
         issues = [

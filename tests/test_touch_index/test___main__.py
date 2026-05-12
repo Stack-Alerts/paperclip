@@ -27,7 +27,7 @@ class TestMainDispatch:
             patch.object(sys, "argv", ["touch_index"]),
             patch("touch_index.__main__._print_help") as mock_help,
             patch("touch_index.fr_worker.main") as mock_fr,
-            patch("touch_index.bug_worker.main") as mock_bug,
+            patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
         mock_fr.assert_called_once()
@@ -35,14 +35,14 @@ class TestMainDispatch:
         mock_help.assert_not_called()
 
     def test_bug_dispatches_to_bug_worker(self):
-        """When first arg is 'bug', bug_worker.main() is called."""
+        """When first arg is 'bug', _run_bug_cli() is called."""
         from touch_index.__main__ import main
 
         with (
             patch.object(sys, "argv", ["touch_index", "bug"]),
             patch("touch_index.__main__._print_help") as mock_help,
             patch("touch_index.fr_worker.main") as mock_fr,
-            patch("touch_index.bug_worker.main") as mock_bug,
+            patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
         mock_bug.assert_called_once()
@@ -57,7 +57,7 @@ class TestMainDispatch:
             patch.object(sys, "argv", ["touch_index", "fr"]),
             patch("touch_index.__main__._print_help") as mock_help,
             patch("touch_index.fr_worker.main") as mock_fr,
-            patch("touch_index.bug_worker.main") as mock_bug,
+            patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
         mock_fr.assert_called_once()
@@ -76,7 +76,7 @@ class TestMainDispatch:
             ),
             patch("touch_index.__main__._print_help") as mock_help,
             patch("touch_index.fr_worker.main") as mock_fr,
-            patch("touch_index.bug_worker.main") as mock_bug,
+            patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
         mock_bug.assert_called_once()
@@ -95,7 +95,7 @@ class TestMainDispatch:
             ),
             patch("touch_index.__main__._print_help") as mock_help,
             patch("touch_index.fr_worker.main") as mock_fr,
-            patch("touch_index.bug_worker.main") as mock_bug,
+            patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
         mock_fr.assert_called_once()
@@ -111,7 +111,7 @@ class TestHelp:
         with (
             patch.object(sys, "argv", ["touch_index", "--help"]),
             patch("touch_index.fr_worker.main") as mock_fr,
-            patch("touch_index.bug_worker.main") as mock_bug,
+            patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
         captured = capsys.readouterr()
@@ -128,7 +128,7 @@ class TestHelp:
         with (
             patch.object(sys, "argv", ["touch_index", "-h"]),
             patch("touch_index.fr_worker.main") as mock_fr,
-            patch("touch_index.bug_worker.main") as mock_bug,
+            patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
         captured = capsys.readouterr()
@@ -137,26 +137,26 @@ class TestHelp:
         mock_bug.assert_not_called()
 
     def test_bug_help_passes_through_to_bug_worker(self):
-        """When 'bug --help' is used, --help is passed to bug_worker.main() directly."""
+        """When 'bug --help' is used, --help is passed to _run_bug_cli() directly."""
         from touch_index.__main__ import main
 
         with (
             patch.object(sys, "argv", ["touch_index", "bug", "--help"]),
             patch("touch_index.__main__._print_help") as mock_help,
-            patch("touch_index.bug_worker.main") as mock_bug,
+            patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
         mock_bug.assert_called_once()
         mock_help.assert_not_called()
 
     def test_bug_dash_h_passes_through(self):
-        """When 'bug -h' is used, -h is passed to bug_worker.main() directly."""
+        """When 'bug -h' is used, -h is passed to _run_bug_cli() directly."""
         from touch_index.__main__ import main
 
         with (
             patch.object(sys, "argv", ["touch_index", "bug", "-h"]),
             patch("touch_index.__main__._print_help") as mock_help,
-            patch("touch_index.bug_worker.main") as mock_bug,
+            patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
         mock_bug.assert_called_once()
