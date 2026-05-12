@@ -115,7 +115,11 @@ def _parse_completed_at(issue: dict) -> datetime | None:
     raw = issue.get("completedAt")
     if not raw:
         return None
-    return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        logger.warning("Bug issue %s: malformed completedAt %r", issue.get("identifier"), raw)
+        return None
 
 
 def process_bug_issue(

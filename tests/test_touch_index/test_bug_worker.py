@@ -39,6 +39,11 @@ class TestParseCompletedAt:
     def test_empty_string(self):
         assert _parse_completed_at({"completedAt": ""}) is None
 
+    def test_malformed_timestamp(self):
+        """Malformed completedAt returns None instead of crashing."""
+        result = _parse_completed_at({"completedAt": "not-a-date", "identifier": "BTCAAAAA-999"})
+        assert result is None
+
 
 # ---------------------------------------------------------------------------
 # Helpers

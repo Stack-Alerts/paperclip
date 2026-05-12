@@ -19,6 +19,17 @@ FDR_LABEL_ID = "d523cb2d-acd9-423d-b87a-bb79cee42c40"
 _BUG_TITLE_PREFIXES = ("bug:", "bug ")
 
 
+
+def _parse_iso_ts(raw: str | None) -> datetime | None:
+    """Parse an ISO timestamp string, returning None on malformed input."""
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
 def _session() -> requests.Session:
     s = requests.Session()
     s.headers.update(
@@ -107,7 +118,8 @@ def get_fdr_issues(updated_after: datetime | None = None) -> list[dict]:
         issues = [
             i
             for i in issues
-            if datetime.fromisoformat(i["updatedAt"].replace("Z", "+00:00")) >= cutoff
+            if (ts := _parse_iso_ts(i.get("updatedAt"))) is not None
+            and ts >= cutoff
         ]
     return issues
 
@@ -122,8 +134,8 @@ def get_closed_bug_issues(closed_after: datetime | None = None) -> list[dict]:
         bugs = [
             b
             for b in bugs
-            if b.get("completedAt")
-            and datetime.fromisoformat(b["completedAt"].replace("Z", "+00:00"))
+            if (ts := _parse_iso_ts(b.get("completedAt"))) is not None
+            and ts
             >= cutoff
         ]
     return bugs
@@ -144,8 +156,8 @@ def get_closed_non_fdr_issues(closed_after: datetime | None = None) -> list[dict
         issues = [
             i
             for i in issues
-            if i.get("completedAt")
-            and datetime.fromisoformat(i["completedAt"].replace("Z", "+00:00"))
+            if (ts := _parse_iso_ts(i.get("completedAt"))) is not None
+            and ts
             >= cutoff
         ]
     return issues
@@ -164,8 +176,8 @@ def get_all_done_issues(completed_after: datetime | None = None) -> list[dict]:
         issues = [
             i
             for i in issues
-            if i.get("completedAt")
-            and datetime.fromisoformat(i["completedAt"].replace("Z", "+00:00"))
+            if (ts := _parse_iso_ts(i.get("completedAt"))) is not None
+            and ts
             >= cutoff
         ]
     return issues
