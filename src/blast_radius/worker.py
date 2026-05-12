@@ -117,10 +117,19 @@ def _detect_transitions(
     An issue is considered a new transition when its *previous known status*
     (from the state file) was *not* ``in_review``.  Never-seen-before issues
     are included as transitions.
+
+    Issues without a valid ``id`` field (``None``, missing, or empty) are
+    excluded since they cannot be tracked in state.
     """
     known: dict[str, str] = state.get("issue_statuses", {})
-    return [i for i in issues if known.get(i.get("id", "")) != "in_review"]
-
+    result = []
+    for issue in issues:
+        issue_id = issue.get("id") or ""
+        if not issue_id:
+            continue
+        if known.get(issue_id) != "in_review":
+            result.append(issue)
+    return result
 
 def _sync_statuses(state: dict, issues: list[dict]) -> None:
     """Bulk-update the ``issue_statuses`` map from a list of fetched issues.

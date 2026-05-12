@@ -229,6 +229,13 @@ class TestDetectTransitions:
         # empty string ID -> found in known with "" -> excluded
         assert worker_mod._detect_transitions(state, issues) == []
 
+    def test_issue_with_none_id_is_excluded(self):
+        """An issue with id=None cannot be tracked and is excluded."""
+        import blast_radius.worker as worker_mod
+        issues = [{"id": None, "identifier": "BTCAAAAA-100"}]
+        state = {"issue_statuses": {}}
+        assert worker_mod._detect_transitions(state, issues) == []
+
 
 # ---------------------------------------------------------------------------
 # _sync_statuses
