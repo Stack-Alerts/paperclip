@@ -598,6 +598,105 @@ class TestComputeBugCoverage:
         assert report.indexed_bug_issues == 1
         assert report.coverage_pct == 100.0
 
+    def test_eligible_coverage_full(self):
+        """All eligible (git-referenced) issues are indexed."""
+        engine = _make_engine(
+            [
+                _make_scalar_result(2),  # COUNT(DISTINCT bug_identifier)
+                _make_scalar_result(
+                    0,
+                    rows=[
+                        ("BTCAAAAA-100",),
+                        ("BTCAAAAA-101",),
+                    ],
+                ),
+            ]
+        )
+
+        with (
+            patch(
+                "touch_index.quality._paginate",
+                return_value=[
+                    {"identifier": "BTCAAAAA-100"},
+                    {"identifier": "BTCAAAAA-101"},
+                    {"identifier": "BTCAAAAA-102"},
+                ],
+            ),
+            patch(
+                "touch_index.git_extractor.get_all_referenced_issue_ids",
+                return_value={"BTCAAAAA-100", "BTCAAAAA-101"},
+            ),
+        ):
+            report = compute_bug_coverage(engine)
+
+        assert report.total_bug_issues == 3
+        assert report.indexed_bug_issues == 2
+        assert report.coverage_pct == pytest.approx(66.7, rel=0.1)
+        assert report.eligible_bug_issues == 2
+        assert report.eligible_coverage_pct == 100.0
+        assert report.missing_eligible_identifiers == []
+
+    def test_eligible_coverage_partial(self):
+        """Some eligible issues are missing from the index."""
+        engine = _make_engine(
+            [
+                _make_scalar_result(1),  # COUNT(DISTINCT bug_identifier)
+                _make_scalar_result(
+                    0,
+                    rows=[("BTCAAAAA-101",)],
+                ),
+            ]
+        )
+
+        with (
+            patch(
+                "touch_index.quality._paginate",
+                return_value=[
+                    {"identifier": "BTCAAAAA-100"},
+                    {"identifier": "BTCAAAAA-101"},
+                    {"identifier": "BTCAAAAA-102"},
+                ],
+            ),
+            patch(
+                "touch_index.git_extractor.get_all_referenced_issue_ids",
+                return_value={"BTCAAAAA-100", "BTCAAAAA-101"},
+            ),
+        ):
+            report = compute_bug_coverage(engine)
+
+        assert report.eligible_bug_issues == 2
+        assert report.eligible_coverage_pct == 50.0
+        assert report.missing_eligible_identifiers == ["BTCAAAAA-100"]
+
+    def test_eligible_coverage_none_eligible(self):
+        """When no issues have git references, eligible coverage is 0 and gate passes automatically."""
+        engine = _make_engine(
+            [
+                _make_scalar_result(0),  # COUNT(DISTINCT bug_identifier)
+                _make_scalar_result(0, rows=[]),
+            ]
+        )
+
+        with (
+            patch(
+                "touch_index.quality._paginate",
+                return_value=[
+                    {"identifier": "BTCAAAAA-100"},
+                ],
+            ),
+            patch(
+                "touch_index.git_extractor.get_all_referenced_issue_ids",
+                return_value=set(),
+            ),
+        ):
+            report = compute_bug_coverage(engine)
+
+        assert report.total_bug_issues == 1
+        assert report.indexed_bug_issues == 0
+        assert report.coverage_pct == 0.0
+        assert report.eligible_bug_issues == 0
+        assert report.eligible_coverage_pct == 0.0
+        assert report.missing_eligible_identifiers == []
 
 # ---------------------------------------------------------------------------
 # compute_bug_freshness

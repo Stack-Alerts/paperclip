@@ -14,6 +14,7 @@ import pytest
 
 from touch_index.git_extractor import (
     _is_source_file,
+    get_all_referenced_issue_ids,
     get_commit_hashes,
     get_files_for_commit,
     get_files_for_issue,
@@ -243,6 +244,49 @@ class TestGetFilesForIssue:
         assert len(files) == 2  # 2 commits × 1 file each
 
 
+
+
+
+# ---------------------------------------------------------------------------
+# get_all_referenced_issue_ids
+# ---------------------------------------------------------------------------
+
+
+class TestGetAllReferencedIssueIds:
+    def test_returns_set_of_issue_ids(self):
+        """Parses BTCAAAAA-NNN from commit subjects."""
+        with patch(
+            "touch_index.git_extractor._run",
+            return_value="fix(BTCAAAAA-100): fix foo\nfeat(BTCAAAAA-101): add bar\nfix(BTCAAAAA-100): second fix for 100",
+        ):
+            ids = get_all_referenced_issue_ids()
+        assert ids == {"BTCAAAAA-100", "BTCAAAAA-101"}
+
+    def test_empty_when_no_refs(self):
+        with patch("touch_index.git_extractor._run", return_value="chore: cleanup\ndocs: update readme"):
+            ids = get_all_referenced_issue_ids()
+        assert ids == set()
+
+    def test_empty_when_no_commits(self):
+        with patch("touch_index.git_extractor._run", return_value=""):
+            ids = get_all_referenced_issue_ids()
+        assert ids == set()
+
+    def test_extracts_multiple_ids_from_single_message(self):
+        """A commit subject referencing multiple issues extracts all."""
+        with patch(
+            "touch_index.git_extractor._run",
+            return_value="fix(BTCAAAAA-100,BTCAAAAA-101): fix two issues",
+        ):
+            ids = get_all_referenced_issue_ids()
+        assert "BTCAAAAA-100" in ids
+        assert "BTCAAAAA-101" in ids
+
+    def test_handles_git_error_returns_empty(self):
+        """When _run returns empty (error), the result is an empty set."""
+        with patch("touch_index.git_extractor._run", return_value=""):
+            ids = get_all_referenced_issue_ids()
+        assert ids == set()
 
 # ---------------------------------------------------------------------------
 # _run() — error handling (uncovered error paths in subprocess wrapper)
