@@ -81,6 +81,7 @@ jobs:
           # live network — they mock all external dependencies.
           python -m pytest \
             tests/test_blast_radius/ \
+            tests/test_impact_gate/ \
             tests/test_touch_index/ \
             tests/strategy_builder/validation/ \
             tests/strategy_builder/persistence/ \
