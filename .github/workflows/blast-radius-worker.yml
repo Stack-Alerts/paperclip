@@ -120,30 +120,30 @@ jobs:
         if: always()
         run: |
           if [ -f /tmp/br-output.json ]; then
-            python3 -c "
-import json
-with open('/tmp/br-output.json') as f:
-    data = json.load(f)
-mode = data.get('mode', 'unknown')
-dry_run = data.get('dry_run', False)
-issues = data.get('issues_processed', 'N/A')
-errors = data.get('issues_with_errors', 0)
-result = data.get('result', {})
-print(f'## Blast Radius Worker Summary')
-print(f'')
-print(f'| Metric | Value |')
-print(f'|---|---|')
-print(f'| Mode | {mode} |')
-print(f'| Dry run | {dry_run} |')
-print(f'| Issues processed | {issues} |')
-print(f'| Issues with errors | {errors} |')
-if result:
-    skipped = result.get('skipped', False)
-    error = result.get('error')
-    print(f'| Skipped | {skipped} |')
-    if error:
-        print(f'| Error | {error} |')
-" >> $GITHUB_STEP_SUMMARY
+            python3 >> $GITHUB_STEP_SUMMARY << 'PYEOF'
+          import json
+          with open('/tmp/br-output.json') as f:
+              data = json.load(f)
+          mode = data.get('mode', 'unknown')
+          dry_run = data.get('dry_run', False)
+          issues = data.get('issues_processed', 'N/A')
+          errors = data.get('issues_with_errors', 0)
+          result = data.get('result', {})
+          print('## Blast Radius Worker Summary')
+          print('')
+          print('| Metric | Value |')
+          print('|---|---|')
+          print('| Mode |' + ' ' + str(mode) + ' |')
+          print('| Dry run |' + ' ' + str(dry_run) + ' |')
+          print('| Issues processed |' + ' ' + str(issues) + ' |')
+          print('| Issues with errors |' + ' ' + str(errors) + ' |')
+          if result:
+              skipped = result.get('skipped', False)
+              error = result.get('error')
+              print('| Skipped |' + ' ' + str(skipped) + ' |')
+              if error:
+                  print('| Error |' + ' ' + str(error) + ' |')
+          PYEOF
           fi
 
       - name: Save worker state cache
