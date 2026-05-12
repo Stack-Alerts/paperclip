@@ -9,6 +9,7 @@ with issue IDs in the scope token.
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from pathlib import Path
 
@@ -16,6 +17,9 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).parents[2]  # BTC-Trade-Engine-PaperClip/
+
+# Broad pattern to find any BTCAAAAA-NNN reference in commit messages.
+_RE_ISSUE_ID = re.compile(r"BTCAAAAA-\d+")
 
 
 def _run(args: list[str], cwd: Path) -> str:
@@ -54,6 +58,23 @@ def get_commit_hashes(issue_identifier: str, repo: Path = _REPO_ROOT) -> list[st
         repo,
     )
     return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def get_all_referenced_issue_ids(repo: Path = _REPO_ROOT) -> set[str]:
+    """Return all BTCAAAAA-NNN issue identifiers referenced in commit messages.
+
+    Used by ``quality.compute_bug_coverage`` to determine which done issues
+    are *eligible* for bug-file indexing (i.e. have at least one fix commit
+    referencing the issue identifier).  Issues without any git reference
+    cannot be indexed by the bug worker and should be excluded from the
+    coverage denominator.
+    """
+    out = _run(["git", "log", "--all", "--format=%s"], repo)
+    ids: set[str] = set()
+    for line in out.splitlines():
+        for match in _RE_ISSUE_ID.finditer(line):
+            ids.add(match.group(0))
+    return ids
 
 
 def get_files_for_commit(sha: str, repo: Path = _REPO_ROOT) -> list[str]:

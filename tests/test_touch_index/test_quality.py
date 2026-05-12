@@ -767,6 +767,9 @@ class TestRunBugQualityChecks:
                     indexed_bug_issues=2,
                     coverage_pct=100.0,
                     missing_issue_identifiers=[],
+                    eligible_bug_issues=2,
+                    eligible_coverage_pct=100.0,
+                    missing_eligible_identifiers=[],
                 ),
             ),
             patch(
@@ -806,6 +809,9 @@ class TestRunBugQualityChecks:
                     indexed_bug_issues=2,
                     coverage_pct=100.0,
                     missing_issue_identifiers=[],
+                    eligible_bug_issues=2,
+                    eligible_coverage_pct=100.0,
+                    missing_eligible_identifiers=[],
                 ),
             ),
             patch(
@@ -845,6 +851,9 @@ class TestRunBugQualityChecks:
                     indexed_bug_issues=5,
                     coverage_pct=50.0,
                     missing_issue_identifiers=["BTCAAAAA-101"],
+                    eligible_bug_issues=8,
+                    eligible_coverage_pct=62.5,
+                    missing_eligible_identifiers=["BTCAAAAA-101"],
                 ),
             ),
             patch(
@@ -880,6 +889,9 @@ class TestRunBugQualityChecks:
                     indexed_bug_issues=2,
                     coverage_pct=100.0,
                     missing_issue_identifiers=[],
+                    eligible_bug_issues=2,
+                    eligible_coverage_pct=100.0,
+                    missing_eligible_identifiers=[],
                 ),
             ),
             patch(
@@ -915,6 +927,9 @@ class TestRunBugQualityChecks:
                     indexed_bug_issues=2,
                     coverage_pct=100.0,
                     missing_issue_identifiers=[],
+                    eligible_bug_issues=2,
+                    eligible_coverage_pct=100.0,
+                    missing_eligible_identifiers=[],
                 ),
             ),
             patch(

@@ -12,7 +12,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -321,6 +321,9 @@ class BugCoverageReport:
     indexed_bug_issues: int
     coverage_pct: float
     missing_issue_identifiers: list[str]
+    eligible_bug_issues: int = 0
+    eligible_coverage_pct: float = 0.0
+    missing_eligible_identifiers: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -368,7 +371,20 @@ class BugQualityReport:
 
 
 def compute_bug_coverage(engine: Engine) -> BugCoverageReport:
-    """Compare done non-FDR issues in Paperclip vs touch_index_bug_files."""
+    """Compare done non-FDR issues in Paperclip vs touch_index_bug_files.
+
+    Reports two coverage metrics:
+      - ``coverage_pct``: indexed / ALL done non-FDR issues (low because many
+        org-level issues have no code changes).
+      - ``eligible_coverage_pct``: indexed / issues that appear in git commit
+        messages (the set of issues that *can* be indexed by the bug worker).
+
+    The pass/fail gate in ``run_bug_quality_checks`` uses the eligible
+    coverage so the CI pipeline doesn't fail on issues that can never be
+    indexed.
+    """
+    from .git_extractor import get_all_referenced_issue_ids
+
     params: dict[str, Any] = {
         "status": "done",
     }
@@ -400,11 +416,29 @@ def compute_bug_coverage(engine: Engine) -> BugCoverageReport:
         i["identifier"] for i in non_fdr_done if i["identifier"] not in indexed_set
     )
 
+    # Determine eligible issues — those referenced in git commit messages.
+    # Issues without git references can never be indexed by the bug
+    # worker, so they are excluded from the eligibility-based coverage.
+    git_ids = get_all_referenced_issue_ids()
+    eligible = [i for i in non_fdr_done if i["identifier"] in git_ids]
+    eligible_total = len(eligible)
+    eligible_indexed = sum(1 for i in eligible if i["identifier"] in indexed_set)
+    eligible_pct = (
+        (eligible_indexed / eligible_total * 100) if eligible_total > 0 else 0.0
+    )
+
+    missing_eligible = sorted(
+        i["identifier"] for i in eligible if i["identifier"] not in indexed_set
+    )
+
     return BugCoverageReport(
         total_bug_issues=total,
         indexed_bug_issues=indexed,
         coverage_pct=round(pct, 1),
         missing_issue_identifiers=missing,
+        eligible_bug_issues=eligible_total,
+        eligible_coverage_pct=round(eligible_pct, 1),
+        missing_eligible_identifiers=missing_eligible,
     )
 
 
@@ -523,21 +557,32 @@ def run_bug_quality_checks(
 
     try:
         coverage = compute_bug_coverage(engine)
-        if coverage.coverage_pct < 90:
+        # Use eligible coverage for the pass/fail gate — issues without git
+        # fix commits can never be indexed by the bug worker, so using the
+        # raw total denominator would always fail (~16% coverage).
+        # When there are zero eligible issues, the gate passes automatically.
+        eligible_indexed = max(0, coverage.eligible_bug_issues - len(coverage.missing_eligible_identifiers))
+        if coverage.eligible_bug_issues > 0 and coverage.eligible_coverage_pct < 90:
             logger.warning(
-                "BUG COVERAGE: %.1f%% (%d/%d) — %d missing issues",
+                "BUG COVERAGE: %.1f%% (%d/%d) overall / %.1f%% (%d/%d) eligible — %d missing eligible",
                 coverage.coverage_pct,
                 coverage.indexed_bug_issues,
                 coverage.total_bug_issues,
-                len(coverage.missing_issue_identifiers),
+                coverage.eligible_coverage_pct,
+                eligible_indexed,
+                coverage.eligible_bug_issues,
+                len(coverage.missing_eligible_identifiers),
             )
             failures += 1
         else:
             logger.info(
-                "BUG COVERAGE: %.1f%% (%d/%d)",
+                "BUG COVERAGE: %.1f%% (%d/%d) overall / %.1f%% (%d/%d) eligible",
                 coverage.coverage_pct,
                 coverage.indexed_bug_issues,
                 coverage.total_bug_issues,
+                coverage.eligible_coverage_pct,
+                eligible_indexed,
+                coverage.eligible_bug_issues,
             )
     except Exception:
         logger.exception("Bug coverage check failed")
