@@ -503,7 +503,14 @@ class InstitutionalSignalEvaluator:
                 )
         
         # STEP 7: Check entry decision
-        should_enter = confluence >= min_confluence
+        # BTCAAAAA-7364: Verify all required (AND) signals are present before allowing entry
+        required_ok = True
+        if self.confluence_calc:
+            required_ok = self.confluence_calc.check_required_signals(
+                self.strategy_config,
+                all_signals
+            )
+        should_enter = required_ok and confluence >= min_confluence
 
         # BTCAAAAA-736 diagnostic: log totals at last bar so the user can see in UI output
         if total_bars > 0 and bar_index == total_bars - 1:
@@ -521,7 +528,9 @@ class InstitutionalSignalEvaluator:
         # Don't pollute logs with "NO ENTRY (Confluence: 0)" spam
         if total_bars > 0 and all_signals:  # Only log when signals actually fired
             reason = ""
-            if confluence < min_confluence:
+            if not required_ok:
+                reason = "Required (AND) signals missing"
+            elif confluence < min_confluence:
                 reason = f"Confluence too low ({confluence} < {min_confluence})"
 
             self.logger.log_entry_decision(should_enter, confluence, reason)
