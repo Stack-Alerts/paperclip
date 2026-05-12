@@ -9,6 +9,9 @@ blast-radius = "blast_radius.__main__:main"
 touch-index = "touch_index.__main__:main"
 touch-index-fr = "touch_index.fr_worker:main"
 touch-index-bug = "touch_index.bug_worker:main"
+impact-gate-worker = "impact_gate_worker:main"
+scan-fix-issues-done = "scan_fix_issues_done:main"
+scan-done-alert = "scan_done_alert:main"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
