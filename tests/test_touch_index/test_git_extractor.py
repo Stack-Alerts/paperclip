@@ -75,7 +75,6 @@ class TestIsSourceFile:
     def test_skips_ini(self):
         assert _is_source_file("setup.cfg") is False
 
-
     def test_skips_coveragerc(self):
         assert _is_source_file(".coveragerc") is False
 

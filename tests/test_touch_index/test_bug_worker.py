@@ -142,7 +142,8 @@ class TestIngestBugIssue:
 
         with (
             patch(
-                "touch_index.bug_worker.get_files_for_issue", return_value=["src/git_file.py"]
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/git_file.py"],
             ),
             patch("touch_index.bug_worker.fetch_and_extract") as mock_comments,
             patch("touch_index.bug_worker.extract_files_from_text") as mock_extract,
@@ -164,7 +165,8 @@ class TestIngestBugIssue:
         with (
             patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
             patch(
-                "touch_index.bug_worker.fetch_and_extract", return_value=["src/comment_file.py"]
+                "touch_index.bug_worker.fetch_and_extract",
+                return_value=["src/comment_file.py"],
             ) as mock_comments,
             patch("touch_index.bug_worker.extract_files_from_text") as mock_extract,
         ):
@@ -267,7 +269,11 @@ class TestIngestBugIssue:
             ),
         ):
             r_desc = ingest_bug_issue(
-                engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT, description="Some desc"
+                engine,
+                ISSUE_ID,
+                ISSUE_IDENTIFIER,
+                COMPLETED_AT,
+                description="Some desc",
             )
         assert hasattr(r_desc, "source")
         assert r_desc.source == "description"
@@ -338,7 +344,11 @@ class TestIngestBugIssue:
             ),
         ):
             ingest_bug_issue(
-                engine, ISSUE_ID, ISSUE_IDENTIFIER, COMPLETED_AT, description="Some desc"
+                engine,
+                ISSUE_ID,
+                ISSUE_IDENTIFIER,
+                COMPLETED_AT,
+                description="Some desc",
             )
         rows_desc = conn.execute.call_args[0][1]
         for r in rows_desc:
