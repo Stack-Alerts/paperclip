@@ -90,7 +90,7 @@ def _emit_json_summary(
         errors = [r for r in results if "error" in r]
         summary["issues_processed"] = issues_processed
         summary["issues_with_errors"] = len(errors)
-    print(json.dumps(summary, default=str))
+    sys.stdout.write(json.dumps(summary, default=str) + "\n")
 
 
 def _run_worker_cli(args: argparse.Namespace) -> int:
