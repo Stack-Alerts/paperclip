@@ -23,6 +23,7 @@ Exit codes
   0 — gate passed or bypassed
   1 — gate failed (tests failed or runner error)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -35,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).parent / ".." / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent / ".." / ".env")
 
 from impact_gate.worker import process_issue
@@ -73,11 +75,15 @@ def main() -> int:
 
     logger.info(
         "Starting Impact Gate for issue %s (dry_run=%s, old_status=%s)",
-        args.issue_id, args.dry_run, args.old_status,
+        args.issue_id,
+        args.dry_run,
+        args.old_status,
     )
 
-    result = process_issue(args.issue_id, dry_run=args.dry_run, old_status=args.old_status)
-    print(json.dumps(result, indent=2))
+    result = process_issue(
+        args.issue_id, dry_run=args.dry_run, old_status=args.old_status
+    )
+    print(json.dumps(result, indent=2))  # noqa: T201
 
     gate_status = result.get("gate_status", "ERROR")
     logger.info("Gate result for %s: %s", args.issue_id, gate_status)

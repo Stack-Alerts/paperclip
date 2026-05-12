@@ -51,6 +51,7 @@ MIN_TESTS_BAR = 10
 # Paperclip API helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_issue(issue_id: str) -> dict:
     sess = _session()
     resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=15)
@@ -108,7 +109,11 @@ def _create_blocking_issue(
         )
         resp.raise_for_status()
         created = resp.json()
-        log.info("Created blocking issue %s for %s", created.get("identifier", ""), failing_item_id)
+        log.info(
+            "Created blocking issue %s for %s",
+            created.get("identifier", ""),
+            failing_item_id,
+        )
         return created
     except Exception as exc:
         log.error("Failed to create blocking issue for %s: %s", failing_item_id, exc)
@@ -134,6 +139,7 @@ def _set_blocked_by(issue_id: str, blocking_ids: list[str]) -> None:
 # Bypass check
 # ---------------------------------------------------------------------------
 
+
 def _has_bypass_label(issue: dict) -> bool:
     """Check if the issue carries the CEO bypass label."""
     labels = issue.get("labels") or []
@@ -147,6 +153,7 @@ def _has_bypass_label(issue: dict) -> bool:
 # ---------------------------------------------------------------------------
 # Results comment builder
 # ---------------------------------------------------------------------------
+
 
 def _build_pass_comment(identifier: str, result: dict) -> str:
     summary = result.get("summary", {})
@@ -257,7 +264,13 @@ def _build_bypass_comment(identifier: str) -> str:
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None = None, force: bool = False) -> dict:
+
+def process_issue(
+    issue_id: str,
+    dry_run: bool = False,
+    old_status: str | None = None,
+    force: bool = False,
+) -> dict:
     """Run the Impact Gate for a single fix issue.
 
     When called from a Paperclip ``issue_status_changed`` webhook, the caller
@@ -276,7 +289,11 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
         issue = _get_issue(issue_id)
     except Exception as exc:
         log.error("Failed to fetch issue %s: %s", issue_id, exc)
-        return {"issue": issue_id, "gate_status": "ERROR", "error": f"fetch failed: {exc}"}
+        return {
+            "issue": issue_id,
+            "gate_status": "ERROR",
+            "error": f"fetch failed: {exc}",
+        }
 
     identifier = issue.get("identifier", issue_id)
     status = issue.get("status", "")
@@ -286,7 +303,10 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
     if old_status:
         log.info(
             "Processing issue %s (status=%s, old_status=%s, title=%s)",
-            identifier, status, old_status, title,
+            identifier,
+            status,
+            old_status,
+            title,
         )
     else:
         log.info("Processing issue %s (status=%s, title=%s)", identifier, status, title)
@@ -301,7 +321,11 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
     # --- Only run for in_review issues (or force retroactive) ---
     if status != "in_review" and not force:
         log.info("%s has status=%r (not in_review) — skipping", identifier, status)
-        return {"issue": identifier, "gate_status": "SKIPPED", "reason": f"status={status}"}
+        return {
+            "issue": identifier,
+            "gate_status": "SKIPPED",
+            "reason": f"status={status}",
+        }
     if status != "in_review" and force:
         log.info("%s has status=%r — force retroactive gate", identifier, status)
 
@@ -310,11 +334,19 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
 
     # Fallback: derive touched files from git history when not in description
     if not touched_files:
-        log.info("No touchedFiles in description for %s — falling back to git history", identifier)
+        log.info(
+            "No touchedFiles in description for %s — falling back to git history",
+            identifier,
+        )
         try:
             from touch_index.git_extractor import get_files_for_issue
+
             touched_files = get_files_for_issue(identifier)
-            log.info("Derived %d touched file(s) from git for %s", len(touched_files), identifier)
+            log.info(
+                "Derived %d touched file(s) from git for %s",
+                len(touched_files),
+                identifier,
+            )
         except Exception as exc:
             log.warning("Git fallback failed for %s: %s", identifier, exc)
 
@@ -325,7 +357,11 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
                 issue_id,
                 f"## Impact Gate: SKIPPED\n\nIssue **{identifier}** has no `touchedFiles` in its description and no git commits referencing it.\n\nGate cannot run without file paths.",
             )
-        return {"issue": identifier, "gate_status": "SKIPPED", "reason": "no touchedFiles"}
+        return {
+            "issue": identifier,
+            "gate_status": "SKIPPED",
+            "reason": "no touchedFiles",
+        }
 
     log.info("Touched files for %s: %s", identifier, touched_files)
 
@@ -351,7 +387,9 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
 
     log.info(
         "Impact Gate for %s: fr_ids=%s, bug_ids=%s",
-        identifier, fr_ids, bug_ids,
+        identifier,
+        fr_ids,
+        bug_ids,
     )
 
     if not fr_ids and not bug_ids:
@@ -379,7 +417,9 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
     if total_tests < MIN_TESTS_BAR and result.get("status") == "PASS":
         log.warning(
             "Impact Gate for %s: %d tests collected but bar requires %d — demoting PASS to FAIL",
-            identifier, total_tests, MIN_TESTS_BAR,
+            identifier,
+            total_tests,
+            MIN_TESTS_BAR,
         )
         result["status"] = "FAIL"
         bar_parts = [
@@ -428,7 +468,11 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
             for t in fr_entry.get("tests", []):
                 if t.get("outcome") in ("failed", "error"):
                     detail_lines.append(f"{t['nodeid']}: {t.get('message', '')}")
-            detail = "\n".join(detail_lines) if detail_lines else f"Status: {fr_entry.get('status')}"
+            detail = (
+                "\n".join(detail_lines)
+                if detail_lines
+                else f"Status: {fr_entry.get('status')}"
+            )
             bi = _create_blocking_issue(identifier, fid, detail, "fr")
             if bi:
                 blocking_issues.append(bi)
@@ -442,13 +486,19 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
             for t in bug_entry.get("tests", []):
                 if t.get("outcome") in ("failed", "error"):
                     detail_lines.append(f"{t['nodeid']}: {t.get('message', '')}")
-            detail = "\n".join(detail_lines) if detail_lines else f"Status: {bug_entry.get('status')}"
+            detail = (
+                "\n".join(detail_lines)
+                if detail_lines
+                else f"Status: {bug_entry.get('status')}"
+            )
             bi = _create_blocking_issue(identifier, bid, detail, "bug")
             if bi:
                 blocking_issues.append(bi)
 
     # Post failure comment
-    fail_comment = _build_fail_comment(identifier, result, fr_ids, bug_ids, blocking_issues)
+    fail_comment = _build_fail_comment(
+        identifier, result, fr_ids, bug_ids, blocking_issues
+    )
     _post_comment(issue_id, fail_comment)
 
     # Revert to in_progress
@@ -469,7 +519,9 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
         "issue": identifier,
         "gate_status": gate_status,
         "summary": result.get("summary"),
-        "blocking_issues": [bi.get("identifier", bi.get("id", "")) for bi in blocking_issues],
+        "blocking_issues": [
+            bi.get("identifier", bi.get("id", "")) for bi in blocking_issues
+        ],
     }
 
 
@@ -484,6 +536,7 @@ def scan_done_issues(
     retroactive: bool = False,
 ) -> dict:
     from scan_fix_issues_done import scan as _scan_impl
+
     return _scan_impl(days_back=days_back, dry_run=dry_run, retroactive=retroactive)
 
 
@@ -513,4 +566,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     result = process_issue(args.issue_id, dry_run=args.dry_run)
-    print(json.dumps(result, indent=2))
+    print(json.dumps(result, indent=2))  # noqa: T201

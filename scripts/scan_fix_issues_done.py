@@ -23,6 +23,7 @@ The ``--retroactive`` flag causes the scan to run the full Impact Gate on any
 ungated issue, posting results and transitioning the issue to its current
 state (the gate runner handles PASS -> done, FAIL -> in_progress).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -37,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from touch_index.paperclip_client import (
@@ -54,7 +56,9 @@ logger = logging.getLogger("scan_fix_issues_done")
 
 # Regex to detect an Impact Gate comment in an issue's comment thread.
 # Matches the markdown headers produced by worker._build_*_comment().
-_GATE_HEADER_RE = re.compile(r"^## Impact Gate:\s+(PASS|FAIL|BYPASSED|ERROR)", re.MULTILINE)
+_GATE_HEADER_RE = re.compile(
+    r"^## Impact Gate:\s+(PASS|FAIL|BYPASSED|ERROR)", re.MULTILINE
+)
 
 
 def _is_fix_issue(issue: dict) -> bool:
@@ -123,7 +127,9 @@ def scan(
                 except ValueError:
                     pass
         issues = filtered
-        logger.info("Filtered to %d done issues within last %d days", len(issues), days_back)
+        logger.info(
+            "Filtered to %d done issues within last %d days", len(issues), days_back
+        )
 
     fix_issues = [i for i in issues if _is_fix_issue(i)]
     logger.info("Found %d fix/bug issues in done status", len(fix_issues))
@@ -140,18 +146,22 @@ def scan(
         gate_status = _check_gate_status(issue_id)
 
         if gate_status is None:
-            ungated.append({
-                "id": issue_id,
-                "identifier": identifier,
-                "title": title,
-            })
+            ungated.append(
+                {
+                    "id": issue_id,
+                    "identifier": identifier,
+                    "title": title,
+                }
+            )
         else:
             status_key = gate_status.lower()
             gated[status_key] = gated.get(status_key, 0) + 1
-            gated_issues.append({
-                "identifier": identifier,
-                "gate_status": gate_status,
-            })
+            gated_issues.append(
+                {
+                    "identifier": identifier,
+                    "gate_status": gate_status,
+                }
+            )
 
     result = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -175,7 +185,9 @@ def scan(
 
     # --- Retroactive gating ---
     if retroactive and ungated and not dry_run:
-        logger.info("Running retroactive Impact Gate on %d ungated issues", len(ungated))
+        logger.info(
+            "Running retroactive Impact Gate on %d ungated issues", len(ungated)
+        )
         retro_results: list[dict] = []
         for entry in ungated:
             issue_id = entry["id"]
@@ -188,7 +200,9 @@ def scan(
                     r.get("gate_status"),
                 )
             except Exception as exc:
-                logger.error("Retroactive gate failed for %s: %s", entry["identifier"], exc)
+                logger.error(
+                    "Retroactive gate failed for %s: %s", entry["identifier"], exc
+                )
                 retro_results.append({"issue": entry["identifier"], "error": str(exc)})
         result["retroactive_results"] = retro_results
 
@@ -255,11 +269,11 @@ def main() -> int:
         }
         if "retroactive_results" in result:
             summary["retroactive_results"] = result["retroactive_results"]
-        print(json.dumps(summary, default=str))
+        print(json.dumps(summary, default=str))  # noqa: T201
     elif args.output == "pretty":
-        print(json.dumps(result, indent=2))
+        print(json.dumps(result, indent=2))  # noqa: T201
     else:
-        print(json.dumps(result))
+        print(json.dumps(result))  # noqa: T201
 
     return 0 if result["ungated_count"] == 0 else 1
 
