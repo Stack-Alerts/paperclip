@@ -76,6 +76,52 @@ class TestIsSourceFile:
         assert _is_source_file("setup.cfg") is False
 
 
+    def test_skips_coveragerc(self):
+        assert _is_source_file(".coveragerc") is False
+
+    def test_skips_archived_prefix(self):
+        assert _is_source_file("scripts/archived/foo.py") is False
+
+    def test_skips_rst(self):
+        assert _is_source_file("docs/readme.rst") is False
+
+    def test_skips_png(self):
+        assert _is_source_file("assets/icon.png") is False
+
+    def test_skips_jpg(self):
+        assert _is_source_file("assets/photo.jpg") is False
+
+    def test_skips_jpeg(self):
+        assert _is_source_file("assets/photo.jpeg") is False
+
+    def test_skips_gif(self):
+        assert _is_source_file("assets/animation.gif") is False
+
+    def test_skips_svg(self):
+        assert _is_source_file("assets/diagram.svg") is False
+
+    def test_skips_ico(self):
+        assert _is_source_file("favicon.ico") is False
+
+    def test_skips_pdf(self):
+        assert _is_source_file("docs/report.pdf") is False
+
+    def test_skips_pyc(self):
+        assert _is_source_file("src/module.pyc") is False
+
+    def test_skips_so(self):
+        assert _is_source_file("src/lib.so") is False
+
+    def test_skips_o(self):
+        assert _is_source_file("src/object.o") is False
+
+    def test_skips_parquet(self):
+        assert _is_source_file("data/prices.parquet") is False
+
+    def test_skips_pkl(self):
+        assert _is_source_file("data/model.pkl") is False
+
+
 # ---------------------------------------------------------------------------
 # get_commit_hashes
 # ---------------------------------------------------------------------------
