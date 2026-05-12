@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from blast_radius.query import (
     BlastRadiusData,
@@ -109,6 +109,27 @@ class TestQueryBlastRadius:
             assert "src/a.py" in paths
             assert "src/b.py" in paths
 
+    def test_no_engine_creates_and_disposes(self):
+        """When no engine is passed, get_engine is called and disposed."""
+        from blast_radius.query import query_blast_radius
+
+        engine = MagicMock()
+        conn = engine.connect.return_value.__enter__.return_value
+        conn.execute.side_effect = [
+            _mock_result([]),                      # fr
+            _mock_result([]),                      # regression
+            _mock_result([], scalar_return=0),     # downstream count = 0
+        ]
+
+        with patch("blast_radius.query.get_engine", return_value=engine) as mock_get:
+            data = query_blast_radius(["src/foo.py"])
+
+        assert data.fr_impact_set == []
+        assert data.regression_set == []
+        assert data.downstream_set == []
+        mock_get.assert_called_once()
+        engine.dispose.assert_called_once()
+
 
 class TestToJsonDict:
     def test_serializes_empty_data(self):
@@ -179,3 +200,4 @@ class TestRegressionRisk:
         )
         assert r.bug_identifier == "BTCAAAAA-500"
         assert r.bug_issue_id == "bug-uuid"
+
