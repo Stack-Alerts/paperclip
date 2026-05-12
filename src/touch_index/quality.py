@@ -572,6 +572,8 @@ def run_bug_quality_checks(
             issues.append(f"{consistency.null_closed_at_rows} null-closed_at rows")
         if consistency.duplicate_pairs:
             issues.append(f"{consistency.duplicate_pairs} duplicate pairs")
+        if consistency.unknown_source_rows:
+            issues.append(f"{consistency.unknown_source_rows} unknown-source rows")
         if consistency.orphan_bug_issue_ids:
             issues.append(f"{len(consistency.orphan_bug_issue_ids)} orphans")
         if issues:
