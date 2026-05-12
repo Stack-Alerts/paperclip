@@ -68,6 +68,7 @@ yarn-error.log*
 .coverage
 htmlcov/
 *.cover
+*,cover
 
 # MyPy
 .mypy_cache/

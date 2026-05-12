@@ -4,6 +4,11 @@ version = "0.1.0"
 description = "Institutional-grade trading strategy optimizer"
 authors = ["Stack Alerts <info@stackalerts.com>"]
 
+[tool.poetry.scripts]
+touch-index = "touch_index.__main__:main"
+touch-index-fr = "touch_index.fr_worker:main"
+touch-index-bug = "touch_index.bug_worker:main"
+
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
 nautilus-trader = "^1.0.0"
