@@ -38,9 +38,10 @@ _UPSERT_SQL = text("""
         (:id, :file_path, :bug_issue_id, :bug_identifier, :closed_at, :source, :updated_at)
     ON CONFLICT (file_path, bug_issue_id)
     DO UPDATE SET
-        closed_at  = COALESCE(EXCLUDED.closed_at, touch_index_bug_files.closed_at),
-        source     = EXCLUDED.source,
-        updated_at = EXCLUDED.updated_at
+        bug_identifier = EXCLUDED.bug_identifier,
+        closed_at      = COALESCE(EXCLUDED.closed_at, touch_index_bug_files.closed_at),
+        source         = EXCLUDED.source,
+        updated_at     = EXCLUDED.updated_at
 """)
 
 
