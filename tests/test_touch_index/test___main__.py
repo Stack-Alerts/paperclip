@@ -20,13 +20,13 @@ def _preserve_argv():
 
 class TestMainDispatch:
     def test_default_worker_is_fr(self):
-        """When no args are given, fr_worker.main() is called."""
+        """When no args are given, _run_fr_cli() is called."""
         from touch_index.__main__ import main
 
         with (
             patch.object(sys, "argv", ["touch_index"]),
             patch("touch_index.__main__._print_help") as mock_help,
-            patch("touch_index.fr_worker.main") as mock_fr,
+            patch("touch_index.__main__._run_fr_cli") as mock_fr,
             patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
@@ -41,7 +41,7 @@ class TestMainDispatch:
         with (
             patch.object(sys, "argv", ["touch_index", "bug"]),
             patch("touch_index.__main__._print_help") as mock_help,
-            patch("touch_index.fr_worker.main") as mock_fr,
+            patch("touch_index.__main__._run_fr_cli") as mock_fr,
             patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
@@ -50,13 +50,13 @@ class TestMainDispatch:
         mock_help.assert_not_called()
 
     def test_fr_dispatches_to_fr_worker(self):
-        """When first arg is 'fr', fr_worker.main() is called."""
+        """When first arg is 'fr', _run_fr_cli() is called."""
         from touch_index.__main__ import main
 
         with (
             patch.object(sys, "argv", ["touch_index", "fr"]),
             patch("touch_index.__main__._print_help") as mock_help,
-            patch("touch_index.fr_worker.main") as mock_fr,
+            patch("touch_index.__main__._run_fr_cli") as mock_fr,
             patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
@@ -75,7 +75,7 @@ class TestMainDispatch:
                 ["touch_index", "bug", "--issue-id", "uuid-1", "--dry-run"],
             ),
             patch("touch_index.__main__._print_help") as mock_help,
-            patch("touch_index.fr_worker.main") as mock_fr,
+            patch("touch_index.__main__._run_fr_cli") as mock_fr,
             patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
@@ -94,7 +94,7 @@ class TestMainDispatch:
                 ["touch_index", "unknown", "--issue-id", "uuid-1"],
             ),
             patch("touch_index.__main__._print_help") as mock_help,
-            patch("touch_index.fr_worker.main") as mock_fr,
+            patch("touch_index.__main__._run_fr_cli") as mock_fr,
             patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
@@ -110,7 +110,7 @@ class TestHelp:
 
         with (
             patch.object(sys, "argv", ["touch_index", "--help"]),
-            patch("touch_index.fr_worker.main") as mock_fr,
+            patch("touch_index.__main__._run_fr_cli") as mock_fr,
             patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
@@ -127,7 +127,7 @@ class TestHelp:
 
         with (
             patch.object(sys, "argv", ["touch_index", "-h"]),
-            patch("touch_index.fr_worker.main") as mock_fr,
+            patch("touch_index.__main__._run_fr_cli") as mock_fr,
             patch("touch_index.__main__._run_bug_cli") as mock_bug,
         ):
             main()
