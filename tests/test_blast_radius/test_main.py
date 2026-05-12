@@ -31,6 +31,8 @@ class _FakeArgs:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
+        if not hasattr(self, "json_summary"):
+            self.json_summary = False
 
 
 # ---------------------------------------------------------------------------
@@ -248,6 +250,18 @@ class TestMainFlatArgs:
             main()
         assert captured.get("verbose") is True
 
+    def test_json_summary_passes_through(self, monkeypatch):
+        captured = {}
+
+        def mock_worker(args):
+            captured["json_summary"] = args.json_summary
+            return 0
+
+        monkeypatch.setattr(sys, "argv", ["blast_radius", "--json-summary"])
+        with patch("blast_radius.__main__._run_worker_cli", side_effect=mock_worker) as mock_cmd:
+            main()
+        assert captured.get("json_summary") is True
+
 
 # ---------------------------------------------------------------------------
 # _run_worker_cli — worker subcommand dispatch
@@ -278,3 +292,93 @@ class TestRunWorkerCli:
             args = _FakeArgs(issue_id=None, loop=300, dry_run=False, force_reprocess=False, old_status=None)
             assert _main._run_worker_cli(args) == 0
             mock_loop.assert_called_once_with(interval_seconds=300, dry_run=False, force_reprocess=False)
+
+
+# ---------------------------------------------------------------------------
+# --json-summary
+# ---------------------------------------------------------------------------
+
+
+class TestJsonSummary:
+    def test_json_summary_single_issue(self, monkeypatch, capsys):
+        import json
+        with patch("blast_radius.worker.process_issue", return_value={"ok": True, "issue": "BTCAAAAA-100"}):
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--issue-id", "uuid-1", "--json-summary"])
+            assert main() == 0
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "blast-radius"
+        assert data["mode"] == "single-issue"
+        assert data["result"]["ok"] is True
+
+    def test_json_summary_polling(self, monkeypatch, capsys):
+        import json
+        with patch("blast_radius.worker.run_once", return_value=[{"ok": True}, {"ok": True}]):
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--json-summary"])
+            assert main() == 0
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "blast-radius"
+        assert data["mode"] == "polling"
+        assert data["issues_processed"] == 2
+        assert data["issues_with_errors"] == 0
+
+    def test_json_summary_polling_with_errors(self, monkeypatch, capsys):
+        import json
+        results = [
+            {"ok": True},
+            {"error": "API timeout", "issue": "BTCAAAAA-100"},
+        ]
+        with patch("blast_radius.worker.run_once", return_value=results):
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--json-summary"])
+            assert main() == 0
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["issues_with_errors"] == 1
+
+    def test_json_summary_dry_run(self, monkeypatch, capsys):
+        import json
+        with patch("blast_radius.worker.run_once", return_value=[{"ok": True, "dry_run": True}]):
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--json-summary", "--dry-run"])
+            assert main() == 0
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["dry_run"] is True
+
+    def test_json_summary_no_results(self, monkeypatch, capsys):
+        import json
+        with patch("blast_radius.worker.run_once", return_value=[]):
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--json-summary"])
+            assert main() == 0
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["issues_processed"] == 0
+        assert data["issues_with_errors"] == 0
+
+    def test_json_summary_worker_subcommand(self, monkeypatch, capsys):
+        import json
+        with patch("blast_radius.worker.process_issue", return_value={"ok": True}):
+            monkeypatch.setattr("sys.argv", ["blast_radius", "worker", "--issue-id", "uuid-1", "--json-summary"])
+            assert main() == 0
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "blast-radius"
+        assert data["mode"] == "single-issue"
+
+    def test_json_summary_worker_subcommand_polling(self, monkeypatch, capsys):
+        import json
+        with patch("blast_radius.worker.run_once", return_value=[{"ok": True}]):
+            monkeypatch.setattr("sys.argv", ["blast_radius", "worker", "--json-summary"])
+            assert main() == 0
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "blast-radius"
+        assert data["mode"] == "polling"
+        assert data["issues_processed"] == 1
