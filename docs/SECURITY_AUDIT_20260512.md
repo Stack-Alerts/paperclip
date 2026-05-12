@@ -66,15 +66,17 @@ Four categories assessed. **2 CRITICAL**, 1 HIGH, 1 MEDIUM findings.
 
 ---
 
-## Finding 4: No Automated Secret Scanning Gate — MEDIUM
+## Finding 4: No Automated Secret Scanning Gate — MEDIUM (RESOLVED)
 
-**Current State:** `scripts/audit/secrets_audit.py` exists but is not wired into CI or pre-commit hooks.
+**Current State:** `scripts/audit/secrets_audit.py` is wired into CI as a blocking gate:
+- CI job `Secrets audit (DIAG-2)` in `.github/workflows/lint.yml` — runs on every push/PR to main
+- Required status check in branch protection (`apply-branch-protection.yml`)
+- Fixed `.env` false-positive: only flagged if tracked by git (gitignored `.env` passes cleanly)
+- Verified: `python scripts/audit/secrets_audit.py` exits 0 with "No secrets found."
 
-**Risk:** Future credential leaks will not be caught before reaching GitHub.
+**Risk:** Mitigated. All future credential leaks are caught before merge.
 
-**Action Required:**
-- Add secret scan step to `.github/workflows/lint.yml`
-- Consider pre-commit hook for local detection
+**Resolution:** BTCAAAAA-20273 — script fixed and CI gate confirmed operational.
 
 ---
 

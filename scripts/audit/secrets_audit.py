@@ -6,13 +6,14 @@ Required patterns (case-insensitive where noted):
   2. secret / aws_secret_access_key / AWS_SECRET_KEY = '...' (8+ chars)
   3. Binance literal strings (BNBBTC, api_key, secret_key) not via os.environ
   4. BINANCE_API_KEY / BINANCE_SECRET as string literals
-  5. .env file present at repo root
+  5. .env file tracked by git at repo root (ignored if gitignored)
 
 Output format: {file_path}:{line_number}: {pattern_matched}: {snippet}
 """
 
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -123,7 +124,19 @@ def main() -> None:
 
     env_path = PROJECT_ROOT / ".env"
     if env_path.exists():
-        all_findings.append(f"{env_path}:1: env_file_present: .env file exists at repo root")
+        # Only flag .env if it is tracked by git (would be committed).
+        # A gitignored .env is the intended safe state.
+        try:
+            result = subprocess.run(
+                ["git", "ls-files", "--error-unmatch", str(env_path)],
+                capture_output=True,
+                cwd=str(PROJECT_ROOT),
+            )
+            tracked = result.returncode == 0
+        except (subprocess.SubprocessError, FileNotFoundError):
+            tracked = False
+        if tracked:
+            all_findings.append(f"{env_path}:1: env_file_present: .env file is tracked by git")
 
     py_files = sorted(SCRIPTS_DIR.rglob("*.py"))
     py_files.extend(sorted(SRC_DIR.rglob("*.py")))
