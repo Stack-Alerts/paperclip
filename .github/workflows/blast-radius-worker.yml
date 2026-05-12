@@ -89,7 +89,7 @@ jobs:
 
       - name: Run Blast Radius worker
         run: |
-          FLAGS=""
+          FLAGS="--json-summary"
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             FLAGS="$FLAGS --dry-run"
           fi
