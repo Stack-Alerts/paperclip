@@ -495,12 +495,11 @@ class AsiaSession50Percent:
             confirmed_bounce, confirmed_rejection, breached_50, crossed_50_up, crossed_50_down
         )
         
-        # Positional signals (ABOVE_ASIA_50, AT_ASIA_50, BELOW_ASIA_50) fire on every bar
-        # where the position condition is met. They represent continuous state, not events,
-        # and are used by strategy timing-constrained confluence chains (e.g. AT_ASIA_50 →
-        # BELOW_ASIA_50 within N bars). The event-driven simple_signal (BULLISH/BEARISH)
-        # retains its own is_new_event logic for consumers needing event-only signals.
-        signal = granular_signal
+        # Gate granular signal on is_new_event so AT_ASIA_50 only fires on new entry events,
+        # not on every bar where price is within 0.3% of the Asia mid.
+        # Without this gate the block fired on ~32% of all bars (positional noise).
+        signal = granular_signal if is_new_event else 'NEUTRAL'
+        # simple_signal retains its own event-driven logic (used for simple mode compatibility)
         
         metadata = {
             'asia_50': round(asia_50, 2),
@@ -525,7 +524,7 @@ class AsiaSession50Percent:
         }
         
         return {
-            'signal': signal,  # Granular positional signal (primary — fires continuously)
+            'signal': signal,  # Granular signal gated on is_new_event (primary)
             'signal_simple': simple_signal,  # Simple signal (for strategy builder)
             'confidence': round(confidence, 2),
             'metadata': metadata,
