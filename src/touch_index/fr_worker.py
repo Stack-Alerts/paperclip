@@ -29,12 +29,13 @@ logger = logging.getLogger(__name__)
 
 _UPSERT_SQL = text("""
     INSERT INTO touch_index_fr_files
-        (id, file_path, fr_issue_id, fr_identifier, fr_owner_agent_id, updated_at)
+        (id, file_path, fr_issue_id, fr_identifier, fr_owner_agent_id, source, updated_at)
     VALUES
-        (:id, :file_path, :fr_issue_id, :fr_identifier, :fr_owner_agent_id, :updated_at)
+        (:id, :file_path, :fr_issue_id, :fr_identifier, :fr_owner_agent_id, :source, :updated_at)
     ON CONFLICT (file_path, fr_issue_id)
     DO UPDATE SET
         fr_owner_agent_id = EXCLUDED.fr_owner_agent_id,
+        source            = EXCLUDED.source,
         updated_at        = EXCLUDED.updated_at
 """)
 
@@ -122,6 +123,7 @@ def ingest_fr_issue(
             "fr_issue_id": issue_id,
             "fr_identifier": issue_identifier,
             "fr_owner_agent_id": owner,
+            "source": source,
             "updated_at": now,
         }
         for f in files

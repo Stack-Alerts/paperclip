@@ -150,8 +150,6 @@ class TestIngestFrIssue:
         ):
             ingest_fr_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID)
 
-        _, rows_arg = conn.execute.call_args
-        # conn.execute(sql, rows) — rows is the second positional arg
         rows = conn.execute.call_args[0][1]
         assert len(rows) == 2
         for row in rows:
@@ -160,6 +158,7 @@ class TestIngestFrIssue:
             assert row["fr_issue_id"] == ISSUE_ID
             assert row["fr_identifier"] == ISSUE_IDENTIFIER
             assert row["fr_owner_agent_id"] == OWNER_AGENT_ID
+            assert row["source"] == "comments"
             assert isinstance(row["updated_at"], datetime)
 
     def test_null_owner_replaced_with_sentinel(self):
@@ -244,6 +243,43 @@ class TestIngestFrIssue:
 
         mock_desc.assert_not_called()
         assert result.source == "comments"
+
+    def test_source_field_persisted_in_upsert_rows(self):
+        """source column is populated correctly for each extraction path."""
+        engine, conn = _mock_engine()
+
+        # comments path
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=["src/comments.py"]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            ingest_fr_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID)
+        rows = conn.execute.call_args[0][1]
+        assert rows[0]["source"] == "comments"
+        conn.reset_mock()
+
+        # git path
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=["src/git.py"]),
+        ):
+            ingest_fr_issue(engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID)
+        rows = conn.execute.call_args[0][1]
+        assert rows[0]["source"] == "git"
+        conn.reset_mock()
+
+        # description path
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.fr_worker.extract_files_from_text", return_value=["src/desc.py"]),
+        ):
+            ingest_fr_issue(
+                engine, ISSUE_ID, ISSUE_IDENTIFIER, OWNER_AGENT_ID,
+                description="Changed src/desc.py",
+            )
+        rows = conn.execute.call_args[0][1]
+        assert rows[0]["source"] == "description"
 
 
 # ---------------------------------------------------------------------------
