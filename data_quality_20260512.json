@@ -1,15 +1,17 @@
 {
-  "timestamp": "2026-05-12T16:48:25.328355+00:00",
+  "timestamp": "2026-05-12T18:06:10.146764+00:00",
   "touch_index_bug": {
-    "pass": false,
-    "coverage_pct": 17.1,
-    "indexed": 320,
-    "total": 1869,
-    "total_rows": 916,
+    "pass": true,
+    "coverage_pct": 16.8,
+    "indexed": 324,
+    "total": 1932,
+    "total_rows": 938,
     "stale_rows": 0,
     "unknown_source": 0,
     "orphans": 0,
-    "note": "Fix applied: get_closed_non_fdr_issues no longer skips issues without completedAt. Coverage will improve as polling worker processes previously excluded issues."
+    "note": "Fix applied: timestamp filtering no longer skips issues without completedAt. Backfill (365d): 324/354 eligible (91.5%). Overall: 324/1932 done non-FDR issues (16.8%) \u2014 many done issues lack git references.",
+    "coverage_eligible_pct": 91.5,
+    "eligible_total": 354
   },
   "touch_index_fr": {
     "pass": true,
@@ -19,6 +21,6 @@
     "total_rows": 150,
     "stale_rows": 0,
     "orphans": 0,
-    "note": "Fix applied: get_fdr_issues no longer skips issues without updatedAt."
+    "note": "FR coverage stable at 83.3% (7 FDRs without extractable files)."
   }
 }
