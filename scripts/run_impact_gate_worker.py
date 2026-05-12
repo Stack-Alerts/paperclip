@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -45,9 +46,13 @@ def _fetch_in_review_fix_issues() -> list[dict]:
         title = issue.get("title", "")
         label_names = [lbl.get("name", "").lower() for lbl in labels]
         is_fix = any(
-            kw in label_names or kw in title.lower()
+            kw in label_names
             for kw in ("fix", "bug", "bugfix", "regression", "hotfix")
         )
+        if not is_fix:
+            is_fix = bool(
+                re.match(r"(?:fix|bug|bugfix|regression|hotfix)\b", title, re.IGNORECASE)
+            )
         if is_fix:
             fix_issues.append(issue)
     return fix_issues

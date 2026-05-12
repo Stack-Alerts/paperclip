@@ -68,8 +68,12 @@ def _is_fix_issue(issue: dict) -> bool:
         name = (lbl.get("name") or "").strip().lower()
         if name in ("fix", "bug", "bugfix", "regression", "hotfix"):
             return True
-    title_lower = (issue.get("title") or "").lower()
-    return any(kw in title_lower for kw in ("fix", "bug", "regression", "hotfix"))
+    title = (issue.get("title") or "")
+    # Match only when keyword is the first word — avoids false positives
+    # from non-fix issues (e.g. "Impact Gate: scan for fix issues done").
+    return bool(
+        re.match(r"(?:fix|bug|bugfix|regression|hotfix)\b", title, re.IGNORECASE)
+    )
 
 
 def _check_gate_status(issue_id: str) -> str | None:

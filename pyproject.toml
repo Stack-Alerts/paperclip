@@ -87,6 +87,7 @@ markers = [
     "acceptance: FR acceptance test suite",
     "bug(id): regression test for a specific bug ticket (e.g. BTCAAAAA-736)",
     "regression: bug regression test suite",
+    "qt_real: PyQt5 UI test that exercises real Qt widgets (no mocks)",
 ]
 
 [tool.pylint.messages_control]
