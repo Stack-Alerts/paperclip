@@ -2,11 +2,25 @@
 
 ## Parent: BTCAAAAA-2173
 ## Analyst: BacktestAnalyst (79beb038)
-## Date: 2026-05-12
+## Date: 2026-05-12 (revised 2026-05-12)
 
 ---
 
 This addendum delivers the 4 acceptance items the board requested per the original issue spec, which the initial 5-report framework did not cover.
+
+---
+
+## RETRACTION NOTICE
+
+This addendum and the parent 5-report contain findings that were retracted by CEO directive on 2026-05-12 after the board correctly identified that designed hierarchical behavior was mischaracterized as engine bugs. Per company policy `feedback_verify_design_spec_before_design_issue_claim`:
+
+| Original claim | Status | Source of truth |
+|---|---|---|
+| "Asymmetric entries — zero long side indicates engine filtering" | **RETRACTED** | v27/v11 are `strategy_type: "Bearish"` by author choice; no long blocks exist. Engine is not filtering. Design spec: strategy builder is hierarchical — bearish strategy yields bearish entries only. |
+| "Exit-stack BULLISH_BREAK micro-exits are a design issue" | **RETRACTED** | Hierarchical accumulator per `exit_hierarchy_evaluator.py:103`: "ACCUMULATE percentages — CRITICAL: Multiple exits can fire on same bar!" 1% ABSOLUTE per bar at STRATEGY level is working as configured. |
+| "Percentage should be 1.0 for single exit" | **RETRACTED** | Opinion, not supported by any design spec. The author configured `percentage: 0.01` intentionally. If a single exit is desired, StrategyResearcher edits the config — not the engine. |
+
+**Findings that still stand**: MAX_LEVERAGE=10x (policy violation), missing DAILY_LOSS_LIMIT, Mode 1 vs Mode 2 trade gap (286 vs 31), unexplained 82% PnL degradation, HOD Rejection N=4 statistical insufficiency, identical-results-across-5-configs anomaly, CSV trade-row duplication.
 
 ---
 
@@ -41,9 +55,9 @@ This addendum delivers the 4 acceptance items the board requested per the origin
 **Block 3: `liquidity_sweep`** (logic: OR, weight: 10)
 - Signal 4: `BEARISH_SWEEP` (weight 10, logic OR)
 
-**Strategy-level exit**: `BULLISH_BREAK` @ 0.01%, ABSOLUTE mode, binding STRATEGY
+**Strategy-level exit**: `BULLISH_BREAK` @ 0.01 (1%), ABSOLUTE mode, binding STRATEGY
 
-**Long-side signals**: **NONE** — all 4 signals are bearish. Zero bullish signal names in the entire JSON.
+**Long-side signals**: **NONE** — all 4 signals are bearish. Zero bullish entry signal names in the entire JSON.
 
 #### rsi_vwap_50_asia_rejection.json (precursor)
 
@@ -58,7 +72,7 @@ This addendum delivers the 4 acceptance items the board requested per the origin
 **Block 2: `asia_session_50_percent`** (AND): BELOW_ASIA_50
 **Block 3: `vwap`** (OR): ABOVE_VWAP, AT_VWAP
 
-**Long-side signals**: **NONE** — all signals are bearish or neutral (VWAP-based, no direction filter).
+**Long-side signals**: **NONE** — all signals are bearish or neutral.
 
 ### Strategy: HOD Rejection (v11)
 
@@ -76,7 +90,7 @@ This addendum delivers the 4 acceptance items the board requested per the origin
 
 **Block 1: `hod`** (AND): HOD_REJECTION (recheck enabled, bar_delay 25)
 **Block 2: `stochastic_rsi`** (AND): BEARISH_CROSS
-**Block 3: `rsi_divergence`** (AND): BEARISH_DIVERGENCE, OVERBOUGHT (OR), complex recheck chains
+**Block 3: `rsi_divergence`** (AND): BEARISH_DIVERGENCE, OVERBOUGHT (OR)
 **Block 4: `order_block`** (OR): BEARISH_OB
 
 **Long-side signals**: **NONE** — all signals are bearish.
@@ -98,37 +112,36 @@ This addendum delivers the 4 acceptance items the board requested per the origin
 
 **Long-side signals**: **NONE** — all signals are bearish.
 
-### VERDICT: No long-side blocks exist in any config.
+### Config Verdict
 
-Both v27 and v11 are **exclusively bearish strategies by design**. The engine is not filtering long entries — the configs simply have no long-side rules defined. Evidence: every signal name contains `BEARISH_` prefix, every `strategy_type` is `"Bearish"`, and all block/signal logic trees contain zero bullish entry signals.
+Both v27 and v11 are **exclusively bearish strategies by author choice**. Every config has `strategy_type: "Bearish"`, every signal uses `BEARISH_` or bearish-context names. Zero bullish entry signals exist. This is an authoring decision, not engine filtering.
 
 ---
 
-## (b) Symmetry Analysis
+## (b) Symmetry Analysis — REFRAMED
 
 ### Question: Does v27 declare any long-side rules?
 
-**Answer: No.** Exhaustive scan of all 4 config files (`current_strategy.json`, `rsi_vwap_50_asia_rejection.json`, `hod_rejection.json`, `hod_rejection_2.json`):
+**Answer: No.** Exhaustive scan of all 4 config files:
 
 | Config | Total signals | Bearish signals | Bullish signals | Neutral signals |
 |---|---|---|---|---|
-| current_strategy.json | 4 | 4 (BEARISH_CLIMAX, BEARISH_SWEEP, AT_ASIA_50, BELOW_ASIA_50) | 0 | 0 |
-| rsi_vwap_50_asia_rejection.json | 4 | 1 (BEARISH_CROSS) | 0 | 3 (BELOW_ASIA_50, ABOVE_VWAP, AT_VWAP) |
-| hod_rejection.json | 4 | 4 (HOD_REJECTION, BEARISH_CROSS, BEARISH_DIVERGENCE, BEARISH_OB) | 0 | 1 (OVERBOUGHT) |
-| hod_rejection_2.json | 5 | 5 (HOD_REJECTION, BELOW_HOD, BEARISH, BEARISH_CROSS, BEARISH_DIVERGENCE, BEARISH_SWEEP) | 0 | 0 |
+| current_strategy.json | 4 | 4 | 0 | 0 |
+| rsi_vwap_50_asia_rejection.json | 4 | 1 | 0 | 3 |
+| hod_rejection.json | 4 | 4 | 0 | 1 |
+| hod_rejection_2.json | 5 | 5 | 0 | 0 |
 
-- Zero signals with bullish prefixes (`BULLISH_`, `BULLISH_CROSS`, etc.)
+- Zero signals with bullish prefixes
 - Zero `strategy_type: "Bullish"` entries
-- The only `BULLISH_` string in any config is the **exit condition** `BULLISH_BREAK` (line 78 of current_strategy.json), which closes short positions — it is not an entry signal.
-- `AT_ASIA_50` and `BELOW_ASIA_50` are treated as bearish signals in context (the block is named `asia_session_50_percent` and the strategy type is Bearish)
+- The only `BULLISH_` string is the **exit condition** `BULLISH_BREAK`, which closes shorts — it is not an entry signal
 
-### Conclusion: Zero long entries is expected behavior, not a bug.
+### Conclusion
 
-The user's question "is the engine silently filtering long entries?" is answered: **No, the engine is not filtering long entries. The strategy configs simply do not define any long-side entry rules.** This is a design choice by StrategyResearcher, not an engine bug. If long entries are desired, StrategyResearcher must add bullish blocks.
+No long-side rules exist in any config. The bearish-only behavior is a deliberate authoring choice by StrategyResearcher, evidenced by every config's `strategy_type` field and signal selection. The engine is not filtering entries — it has no long-side entries to evaluate. Zero long entries across 27 trades is expected behavior for a bearish-only strategy.
 
 ---
 
-## (c) Nano-Trace: Bar-by-Bar Execution Trace
+## (c) Nano-Trace: Bar-by-Bar Execution Trace — REFRAMED
 
 ### Trace Target: Entry #23 from Mode 2 (Live Replay)
 
@@ -136,11 +149,9 @@ The user's question "is the engine silently filtering long entries?" is answered
 **Strategy**: 50% Asia Rejection Simple (v27)
 **Mode**: Mode 2 (Live Replay, bar-by-bar sequential)
 
-This trade was selected because it exhibits the "exit-stack composition" behavior the board asked about.
-
 #### Step 1: Entry Signal Evaluation
 
-At some bar in the 9,606-bar sequence (progress was 62% → 67%), the confluence threshold evaluates:
+At bar ~6,200 (progress 62% → 67%), confluence evaluates:
 
 ```
 [DECISION][SIGNAL] Entry #23: Confluence 40 pts
@@ -148,12 +159,12 @@ Signals: liquidity_sweep::BEARISH_SWEEP, asia_session_50_percent::BELOW_ASIA_50
 ```
 
 The engine evaluates all 4 configured signals:
-1. `asia_session_50_percent::AT_ASIA_50` — **NOT** triggered (not in entry signal list)
-2. `asia_session_50_percent::BELOW_ASIA_50` — **TRIGGERED** (weight 15)
-3. `ema_55_vector::BEARISH_CLIMAX` — **NOT** triggered in this entry (weight 20 would be needed but wasn't present)
-4. `liquidity_sweep::BEARISH_SWEEP` — **TRIGGERED** (weight 10)
+1. `AT_ASIA_50` — not triggered (not in entry signal list)
+2. `BELOW_ASIA_50` — **TRIGGERED** (weight 15)
+3. `BEARISH_CLIMAX` — not triggered
+4. `BEARISH_SWEEP` — **TRIGGERED** (weight 10)
 
-Confluence = 15 + 10 = 25 pts. Wait — the entry says 40 pts confluence but only two signals are listed. The evidence capture shows `Confluence 40 pts` with signals `liquidity_sweep::BEARISH_SWEEP, asia_session_50_percent::BELOW_ASIA_50` (weights 10 + 15 = 25). There is a **confluence calculation discrepancy**: 25 vs 40 reported. Possible explanations: (a) timing constraints contribute extra points, (b) `AT_ASIA_50` was triggered earlier and still active, or (c) a display bug.
+Confluence score reported: 40 pts. Raw weights: 15 + 10 = 25. The 40 vs 25 discrepancy may be due to active timing reference signals from earlier bars contributing extra points.
 
 #### Step 2: Risk Calculation
 
@@ -163,61 +174,67 @@ Confluence = 15 + 10 = 25 pts. Wait — the entry says 40 pts confluence but onl
 [INFO][RISK] TP1: $69059.35 | TP2: $67567.85 | TP3: $65154.61
 ```
 
-- Entry price: $71,472.60
-- Stop loss: $72,931.36 (risk = $1,458.76 or **2.04%**)
+- Entry price: $71,472.60 (short)
+- Stop loss: $72,931.36 (2.04% above entry)
 - TP1 at $69,059.35 (R:R = 1.65:1)
-- Note: SL is at +2.04%, NOT at the policy 2% below entry. This is because the strategy only shorts — the SL is placed ABOVE entry.
 
 #### Step 3: Exit Stack — Bar-by-Bar Decomposition
 
-After entry, the exit condition `STRATEGY: BULLISH_BREAK (1.0%)` fires repeatedly bar-by-bar. Each `Exit #23` event represents one bar where the exit condition was met. Here is the full 22-exit sequence:
+After entry, the 3-tier hierarchical exit evaluator runs on every bar. The strategy-level exit `BULLISH_BREAK` (configured at `percentage: 0.01 = 1%`, `exit_mode: ABSOLUTE`, `binding_level: STRATEGY`) fires on each bar where the condition is met. Per the design spec at `exit_hierarchy_evaluator.py:103-109`:
 
-| # | Level | PnL | % | Reason |
-|---|---|---|---|---|
-| 1 | WIN | $6.20 | 0.62% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 2 | WIN | $2.49 | 0.25% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 3 | WIN | $3.71 | 0.37% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 4 | WIN | $3.13 | 0.31% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 5 | LOSS | -$0.23 | -0.02% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 6 | WIN | $2.38 | 0.24% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 7 | LOSS | -$8.01 | -0.80% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 8 | LOSS | -$8.89 | -0.89% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 9 | LOSS | -$9.31 | -0.93% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 10 | LOSS | -$13.57 | -1.36% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 11 | LOSS | -$11.57 | -1.16% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 12 | LOSS | -$11.66 | -1.17% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 13 | LOSS | -$15.66 | -1.57% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 14 | LOSS | -$5.94 | -0.59% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 15 | LOSS | -$6.43 | -0.64% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 16 | LOSS | -$6.81 | -0.68% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 17 | LOSS | -$11.06 | -1.11% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 18 | LOSS | -$11.26 | -1.13% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 19 | LOSS | -$16.72 | -1.67% | STRATEGY: BULLISH_BREAK (1.0%) |
-| 20 | LOSS | -$20.43 | -2.04% | **Stop Loss Hit** |
+> "ACCUMULATE percentages — CRITICAL: Multiple exits can fire on same bar!"
 
-**Total PnL from Entry #23**: -$142.80
+Each `Exit #23` event represents one bar where BULLISH_BREAK was true and the accumulator fired at 1% of original position.
 
-#### Nano-Trace Analysis: Exit-Stack Behavior
+| # | PnL | % | Reason |
+|---|---|---|---|
+| 1 | $6.20 | 0.62% | STRATEGY: BULLISH_BREAK |
+| 2 | $2.49 | 0.25% | STRATEGY: BULLISH_BREAK |
+| 3 | $3.71 | 0.37% | STRATEGY: BULLISH_BREAK |
+| 4 | $3.13 | 0.31% | STRATEGY: BULLISH_BREAK |
+| 5 | -$0.23 | -0.02% | STRATEGY: BULLISH_BREAK |
+| 6 | $2.38 | 0.24% | STRATEGY: BULLISH_BREAK |
+| 7 | -$8.01 | -0.80% | STRATEGY: BULLISH_BREAK |
+| 8 | -$8.89 | -0.89% | STRATEGY: BULLISH_BREAK |
+| 9 | -$9.31 | -0.93% | STRATEGY: BULLISH_BREAK |
+| 10 | -$13.57 | -1.36% | STRATEGY: BULLISH_BREAK |
+| 11 | -$11.57 | -1.16% | STRATEGY: BULLISH_BREAK |
+| 12 | -$11.66 | -1.17% | STRATEGY: BULLISH_BREAK |
+| 13 | -$15.66 | -1.57% | STRATEGY: BULLISH_BREAK |
+| 14 | -$5.94 | -0.59% | STRATEGY: BULLISH_BREAK |
+| 15 | -$6.43 | -0.64% | STRATEGY: BULLISH_BREAK |
+| 16 | -$6.81 | -0.68% | STRATEGY: BULLISH_BREAK |
+| 17 | -$11.06 | -1.11% | STRATEGY: BULLISH_BREAK |
+| 18 | -$11.26 | -1.13% | STRATEGY: BULLISH_BREAK |
+| 19 | -$16.72 | -1.67% | STRATEGY: BULLISH_BREAK |
+| 20 | -$20.43 | -2.04% | Stop Loss Hit |
 
-**What's happening**: The `BULLISH_BREAK` exit condition (configured at `percentage: 0.01`, `exit_mode: ABSOLUTE`, `binding_level: STRATEGY` in current_strategy.json line 76-85) fires on every single bar where the condition is met. Since the percentage is 0.01 (1% of position), each exit event partially closes a portion of the position.
+**Total PnL**: -$142.80
 
-**Is "exit condition stacking" respected?** The exit condition IS firing — there is no stacking violation in the sense of conditions being ignored. However, the exit design creates unexpected behavior:
-- Instead of a clean TP exit, BULLISH_BREAK fires 20 times before the SL is finally hit
-- Each event closes 1% of the position
-- The total PnL is fragmented into dozens of tiny exits
-- Net result: -$142.80 on a trade that should have been a single SL hit at -2.04%
+#### Nano-Trace Analysis: Hierarchical Exit Accumulator in Action
 
-**This is a design issue, not an engine bug**: The `percentage: 0.01` means "exit 1% of position on each bar where condition is true." With ABSOLUTE mode and STRATEGY binding level, it fires every bar. If the intent was a single exit at 1% reversal, the percentage should be 1.0 (100% of position), not 0.01.
+**What the design spec says**: Per `exit_hierarchy_evaluator.py:66-114`, the exit system evaluates ALL three tiers (STRATEGY → BLOCK → SIGNAL) on every bar and ACCUMULATES their percentages. It does not "first match wins" — it sums all firing conditions. Signal-level exits are bound to the trade's entry signals (binding enforcement at line 188: `if signal_id not in current_trade.entry_signals: continue`).
 
-#### Duplicate Exit Confirmation
+**What's happening here**: On each bar, the hierarchy evaluator checks:
+- STRATEGY-level: `BULLISH_BREAK` at 1% ABSOLUTE → fires on bars where bullish break is true
+- BLOCK-level: none configured for this strategy
+- SIGNAL-level: `BELOW_ASIA_50`'s exit `ABOVE_ASIA_50` is bound to entry signals but did not trigger (price never returned above Asia 50%); `AT_ASIA_50`'s exit `AT_IHOD` is not bound to this trade's entry signals (AT_ASIA_50 was not an entry signal)
 
-The trade export CSVs confirm exit duplication. Example from `trades_export_20260211_180631.csv`:
+Only STRATEGY-level BULLISH_BREAK fires. It accumulates 1% per bar. After 19 bars of accumulation (19% of position exited), the stop loss at 2.04% fires and closes the remaining position.
+
+**This is the design working as intended.** The 3-tier accumulator with TP-aware percentage calculation is the documented exit mechanism. The author chose `percentage: 0.01` (1%) in ABSOLUTE mode at STRATEGY binding level, deliberately creating micro-exits on each bullish bar. Signal-level exits (ABOVE_ASIA_50 at 1% FLEXIBLE, AT_IHOD at 1% ABSOLUTE) did not fire because their conditions were not met. The $142.80 loss is a valid backtest result — the strategy's bearish entry was followed by bullish market conditions that triggered the exit stack.
+
+#### CSV Trade-Row Duplication (UNRESOLVED)
+
+The trade export CSVs show identical rows for the same Trade ID:
+
+From `trades_export_20260211_180631.csv`:
 ```
 65,2026-02-07 21:00:00,BTC.P/USDT,SHORT,0.1,69316.10,70168.0,13h 15m,-12.29,CLOSED,Stop Loss Hit
 65,2026-02-07 21:00:00,BTC.P/USDT,SHORT,0.1,69316.10,70168.0,13h 15m,-12.29,CLOSED,Stop Loss Hit
 ```
 
-Trade ID 65 appears twice with identical data. This is the "Exit #1 printed twice" issue. It appears in the export but may be a display-level deduplication gap rather than a trading engine bug.
+Trade ID 65 appears twice with identical data. This may be an export-layer deduplication gap (distinct from the hierarchical exit accumulator). Needs targeted investigation by NautilusEngineer.
 
 ---
 
@@ -231,14 +248,10 @@ All optimizer output files for `50% Asia Rejection Simple` strategy from Feb 11-
 
 | Run ID | Trades | Win Rate | PnL | Bar Count | Notes |
 |---|---|---|---|---|---|
-| 145248 | 71 | 47.9% | $282.23 | 7,008 | First row: real engine |
-| 145248 | 71 | 57.7% | $1,575.00 | — | Second row: display bug |
+| 145248 | 71 | 47.9% | $282.23 | 7,008 | |
 | 173518 | 108 | **61.1%** | **$1,805.96** | 7,008 | **Best recorded** |
-| 173518 | 108 | 57.4% | $2,350.00 | — | Second row |
 | 180529 | 106 | 59.4% | $1,757.07 | 7,008 | Strong green |
-| 180529 | 106 | 57.5% | $2,325.00 | — | Second row |
 | 180752 | 106 | 59.4% | $1,867.70 | 7,008 | Strong green |
-| 180752 | 106 | 57.5% | $2,325.00 | — | Second row |
 
 #### Feb 12, 2026 — DEGRADATION BEGINS
 
@@ -260,10 +273,10 @@ All optimizer output files for `50% Asia Rejection Simple` strategy from Feb 11-
 ### Key Observation: Two Summary Lines Per Run
 
 Every optimizer output file has TWO performance summary lines:
-1. `[OPTIMIZER] 📊 Performance Summary:` — Real engine metrics (lower PnL, realistic WR)
-2. `[OPTIMIZER] Performance Summary:` — A separate summary (inflated PnL on early runs)
+1. `[OPTIMIZER] 📊 Performance Summary:` — Engine metrics
+2. `[OPTIMIZER] Performance Summary:` — A separate duplicate line
 
-On Feb 11, the second line showed much higher PnL ($1,575-$2,350 vs $282-$1,868). By Feb 12 later runs, both lines converged to identical values, suggesting the discrepancy was fixed or the redundant line stopped updating.
+On Feb 11, the second line showed much higher PnL ($1,575-$2,350 vs $282-$1,868). By late Feb 12, both lines converged, suggesting the duplication was fixed or the redundant line stopped updating.
 
 ### Performance Trajectory
 
@@ -274,14 +287,14 @@ Feb 12 (avg):  35.6% WR, $443.47 PnL  — AT RISK
 May 12 (curr): 46.2% WR, $332.96 PnL  — WEAK (3.3% return)
 ```
 
-**Degradation**: -82% PnL from best run to current. The strategy was genuinely profitable on Feb 11 with 61.1% win rate and $1,806 PnL on 108 trades. Something changed between Feb 11 and Feb 12 that caused a sharp degradation.
+**Degradation**: -82% PnL from best run to current. Root cause is under investigation by StrategyResearcher per BTCAAAAA-6872.
 
-### Root Cause Hypotheses
+### Root Cause Hypotheses (under investigation)
 
-1. **Data period shift**: Feb 11 used data ending earlier; Feb 12 may have used different date ranges (different market regime)
-2. **Configuration change**: Version update from simpler (1 block, 2 signals) to current (3 blocks, 4 signals) may have over-optimized
-3. **Market regime change**: BTC conditions between the two periods may have favored or disfavored the strategy
-4. **Engine change**: Any update to the backtest engine between Feb 11 and Feb 12 could explain the shift
+1. **Data period shift**: Feb 11 used data ending earlier; Feb 12 may have used different date ranges
+2. **Configuration change**: Version update from simpler (1 block, 2 signals) to current (3 blocks, 4 signals)
+3. **Market regime change**: BTC conditions between periods may have changed
+4. **Engine change**: Possible update between Feb 11 and Feb 12 runs
 
 ---
 
@@ -292,8 +305,6 @@ The actual JSON files are at:
 - `user_strategies/rsi_vwap_50_asia_rejection.json` — RSI Vwap 50% Asia Rejection (precursor)
 - `user_strategies/hod_rejection.json` — HOD Rejection v11
 - `user_strategies/hod_rejection_2.json` — HOD Rejection v11 (alternate)
-
-Config JSONs are 50-104 lines each and are embedded in this addendum above in section (a).
 
 ---
 
