@@ -451,14 +451,23 @@ class TestRunOnce:
         assert state["issue_statuses"]["issue-uuid-feat"] == "in_review"
 
     def test_does_not_transition_issue(self, tmp_path, monkeypatch):
-        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
-        run_once()
-        assert True
+        """The worker must NOT transition the issue status in Paperclip.
+
+        After run_once() processes a fix issue, the saved state should
+        reflect the fetched status (in_review), not a transitioned status.
+        """
+        state_file = self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
+        results = run_once()
+        assert len(results) == 1
+        state = json.loads(state_file.read_text())
+        assert state["issue_statuses"]["issue-uuid-fix"] == "in_review"
 
     def test_does_not_transition_on_dry_run(self, tmp_path, monkeypatch):
-        self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
-        run_once(dry_run=True)
-        assert True
+        """Dry-run mode must NOT transition or persist state."""
+        state_file = self._patch_all(tmp_path, monkeypatch, [_FIX_ISSUE])
+        results = run_once(dry_run=True)
+        assert len(results) == 1
+        assert not state_file.exists()
 
     def test_does_not_transition_when_skipped(self, tmp_path, monkeypatch):
         self._patch_all(
