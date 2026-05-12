@@ -100,6 +100,11 @@ def get_files_for_issue(
 
 
 def _is_source_file(path: str) -> bool:
+    allow_prefixes = (
+        "src/",
+        "tests/",
+        "scripts/",
+    )
     skip_prefixes = (
         "alembic/",
         "scripts/LakeAPI/",
@@ -140,5 +145,7 @@ def _is_source_file(path: str) -> bool:
     if any(path.startswith(p) for p in skip_prefixes):
         return False
     if any(path.endswith(s) for s in skip_suffixes):
+        return False
+    if not any(path.startswith(p) for p in allow_prefixes):
         return False
     return True
