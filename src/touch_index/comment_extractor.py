@@ -48,14 +48,25 @@ def _normalise(path: str) -> str:
 
 
 def extract_files_from_text(text: str) -> list[str]:
-    """Return deduplicated, normalised source file paths found in `text`."""
+    """Return deduplicated, normalised source file paths found in `text`.
+
+    Applies the same source-file filter as ``git_extractor._is_source_file``
+    so extraction is consistent regardless of whether files come from
+    comments, description text, or git history.
+    """
+    from .git_extractor import _is_source_file
+
     found: set[str] = set()
 
     for m in _RE_BACKTICK.finditer(text):
-        found.add(_normalise(m.group(1)))
+        path = _normalise(m.group(1))
+        if _is_source_file(path):
+            found.add(path)
 
     for m in _RE_PATH.finditer(text):
-        found.add(_normalise(m.group(1)))
+        path = _normalise(m.group(1))
+        if _is_source_file(path):
+            found.add(path)
 
     return sorted(found)
 
