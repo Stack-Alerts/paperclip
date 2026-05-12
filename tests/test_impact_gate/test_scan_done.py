@@ -374,3 +374,52 @@ class TestMain:
         data = json.loads(captured.out)
         assert "retroactive_results" in data
         assert data["retroactive_results"][0]["gate_status"] == "PASS"
+
+    def test_output_json_flag(self, monkeypatch, capsys):
+        monkeypatch.setattr(_scan, "scan", lambda **kw: {
+            "timestamp": "2026-05-12T00:00:00", "total_done_fix_issues": 1,
+            "gated": {"pass": 1, "fail": 0, "bypassed": 0, "error": 0},
+            "ungated_count": 0, "ungated_issues": [], "gated_issues": [],
+        })
+        monkeypatch.setattr(sys, "argv", ["scan_fix_issues_done.py", "--output", "json"])
+        try:
+            _scan.main()
+        except SystemExit:
+            pass
+        captured = capsys.readouterr()
+        assert '"total_done_fix_issues": 1' in captured.out
+        assert captured.out.count("\n") == 1
+
+    def test_output_pretty_flag(self, monkeypatch, capsys):
+        monkeypatch.setattr(_scan, "scan", lambda **kw: {
+            "timestamp": "2026-05-12T00:00:00", "total_done_fix_issues": 1,
+            "gated": {"pass": 1, "fail": 0, "bypassed": 0, "error": 0},
+            "ungated_count": 0, "ungated_issues": [], "gated_issues": [],
+        })
+        monkeypatch.setattr(sys, "argv", ["scan_fix_issues_done.py", "--output", "pretty"])
+        try:
+            _scan.main()
+        except SystemExit:
+            pass
+        captured = capsys.readouterr()
+        assert '"total_done_fix_issues": 1' in captured.out
+        assert captured.out.count("\n") > 1
+
+    def test_json_summary_takes_precedence_over_output(self, monkeypatch, capsys):
+        monkeypatch.setattr(_scan, "scan", lambda **kw: {
+            "timestamp": "2026-05-12T00:00:00", "total_done_fix_issues": 1,
+            "gated": {"pass": 1, "fail": 0, "bypassed": 0, "error": 0},
+            "ungated_count": 0, "ungated_issues": [], "gated_issues": [],
+        })
+        monkeypatch.setattr(sys, "argv", [
+            "scan_fix_issues_done.py", "--json-summary", "--output", "pretty",
+        ])
+        try:
+            _scan.main()
+        except SystemExit:
+            pass
+        captured = capsys.readouterr()
+        import json
+        data = json.loads(captured.out)
+        assert data["worker"] == "impact-gate-scan-done"
+        assert data["total_done_fix_issues"] == 1
