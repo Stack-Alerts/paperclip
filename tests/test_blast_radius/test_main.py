@@ -382,3 +382,16 @@ class TestJsonSummary:
         assert data["worker"] == "blast-radius"
         assert data["mode"] == "polling"
         assert data["issues_processed"] == 1
+
+    def test_json_summary_single_issue_not_found(self, monkeypatch, capsys):
+        """--json-summary --issue-id when no match outputs skipped result."""
+        import json
+        with patch("blast_radius.worker.process_issue", return_value=None):
+            monkeypatch.setattr("sys.argv", ["blast_radius", "--issue-id", "missing-uuid", "--json-summary"])
+            assert main() == 0
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "blast-radius"
+        assert data["mode"] == "single-issue"
+        assert data["result"] == {"skipped": True, "issue": "missing-uuid"}
