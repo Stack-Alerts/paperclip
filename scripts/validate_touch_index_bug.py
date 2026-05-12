@@ -92,7 +92,22 @@ def _run_checks(stale_days: int, engine: Engine | None = None) -> int:
                 null_closed,
             )
 
-        # 3. Stale rows (closed_at older than N days, or NULL with old bug_identifier)
+        # 3. Unknown source check (warn only — source should be 'git', 'comments', or 'description')
+        unknown_source = (
+            conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM touch_index_bug_files WHERE source = 'unknown'"
+                )
+            ).scalar()
+            or 0
+        )
+        if unknown_source:
+            logger.warning(
+                "CHECK WARN: %d rows with source='unknown' — these may need investigation",
+                unknown_source,
+            )
+
+        # 4. Stale rows (closed_at older than N days, or NULL with old bug_identifier)
         cutoff = datetime.now(timezone.utc) - timedelta(days=stale_days)
         stale_count = (
             conn.execute(
@@ -113,14 +128,14 @@ def _run_checks(stale_days: int, engine: Engine | None = None) -> int:
         else:
             logger.info("CHECK PASSED: no stale rows (>%d days)", stale_days)
 
-        # 4. Total row count
+        # 5. Total row count
         total = (
             conn.execute(text("SELECT COUNT(*) FROM touch_index_bug_files")).scalar()
             or 0
         )
         logger.info("Total rows in touch_index_bug_files: %d", total)
 
-        # 5. Bug issue count
+        # 6. Bug issue count
         bug_count = (
             conn.execute(
                 text("SELECT COUNT(DISTINCT bug_issue_id) FROM touch_index_bug_files")

@@ -307,7 +307,6 @@ class TestCheckConsistency:
                 _make_scalar_result(0),  # null_updated
                 _make_scalar_result(0),  # unknown_source
                 _make_scalar_result(0),  # duplicates
-                _make_scalar_result(0),  # unknown_source
                 _make_scalar_result(0, rows=[("orphan-1",), ("orphan-2",)]),
             ]
         )
@@ -1134,6 +1133,8 @@ class TestCheckBugConsistencyExtended:
             [
                 _make_scalar_result(0),
                 _make_scalar_result(0),
+                _make_scalar_result(0),  # unknown_source
+
                 _make_scalar_result(0, rows=[("id-1",)]),
             ]
         )
@@ -1296,6 +1297,8 @@ class TestRunBugQualityChecksExtended:
                     null_closed_at_rows=0,
                     duplicate_pairs=0,
                     orphan_bug_issue_ids=["orphan-1"],
+                    unknown_source_rows=0,
+
                 ),
             ),
         ):

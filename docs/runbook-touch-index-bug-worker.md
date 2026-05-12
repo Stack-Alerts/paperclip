@@ -184,6 +184,7 @@ older than the threshold, default 30 days).
 Detects:
 - Null `closed_at` values
 - Duplicate `(file_path, bug_issue_id)` pairs
+- Unknown `source` values (rows where source has not been set)
 - Orphan `bug_issue_id` values (issue no longer exists in Paperclip)
 
 ### Quality report structure (JSON)
@@ -207,6 +208,7 @@ Detects:
   "consistency": {
     "null_closed_at_rows": 0,
     "duplicate_pairs": 0,
+    "unknown_source_rows": 0,
     "orphan_bug_issue_ids": []
   }
 }
