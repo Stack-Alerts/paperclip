@@ -1024,7 +1024,7 @@ class TestMain:
         mock_transition.assert_called_once_with(ISSUE_ID, "done")
 
     def test_main_validate_issue_id_not_found_skips_validation(self, monkeypatch, caplog):
-        """--validate --issue-id when issue not found: validation is still run."""
+        """--validate --issue-id when issue not found: validation is skipped."""
         import logging
         from touch_index.__main__ import _run_bug_cli as main
 
@@ -1046,8 +1046,7 @@ class TestMain:
             )
             main()
 
-        mock_quality.assert_called_once()
-        assert any("VALIDATION PASSED" in r.message for r in caplog.records)
+        mock_quality.assert_not_called()
 
     def test_main_validate_not_called_without_flag(self, monkeypatch):
         """Without --validate, quality checks are not called."""

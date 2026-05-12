@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import json
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
@@ -107,12 +108,12 @@ def _run_bug_cli() -> None:
                     logger.exception(
                         "Failed to mark %s as done", result.issue_identifier
                     )
-        if args.validate:
-            report = run_bug_quality_checks(engine)
-            if not report.passed:
-                logger.error("VALIDATION FAILED after single-issue ingestion")
-                raise SystemExit(1)
-            logger.info("VALIDATION PASSED after single-issue ingestion")
+            if args.validate:
+                report = run_bug_quality_checks(engine)
+                if not report.passed:
+                    logger.error("VALIDATION FAILED after single-issue ingestion")
+                    raise SystemExit(1)
+                logger.info("VALIDATION PASSED after single-issue ingestion")
         return
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
@@ -162,6 +163,38 @@ def _run_bug_cli() -> None:
         logger.info("VALIDATION PASSED: all bug quality checks clean")
 
 
+def _emit_json_summary(
+    args: argparse.Namespace,
+    results: list[Any] | None = None,
+    result: Any | None = None,
+    total_files: int = 0,
+    skipped: int = 0,
+    quality_report: Any | None = None,
+) -> None:
+    """Emit a structured JSON summary of the worker run to stdout."""
+    summary: dict[str, Any] = {
+        "worker": "fr",
+        "mode": "single-issue" if args.issue_id else "polling",
+        "dry_run": args.dry_run,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if result is not None:
+        summary["result"] = {
+            "issue_identifier": result.issue_identifier,
+            "issue_id": result.issue_id,
+            "files_indexed": result.files_indexed,
+            "source": result.source,
+            "skipped_no_commits": result.skipped_no_commits,
+        }
+    if results is not None:
+        summary["issues_processed"] = len(results)
+        summary["total_files_indexed"] = total_files
+        summary["issues_skipped"] = skipped
+    if quality_report is not None:
+        summary["quality"] = quality_report.to_dict()
+    print(json.dumps(summary, default=str))
+
+
 def _run_fr_cli() -> None:
     """FR worker CLI entry point (from python -m touch_index fr ...)."""
     import argparse
@@ -201,6 +234,11 @@ def _run_fr_cli() -> None:
         action="store_true",
         help="Run FR data quality validation after ingestion (exits non-zero on failure)",
     )
+    parser.add_argument(
+        "--json-summary",
+        action="store_true",
+        help="Output structured JSON summary to stdout after ingestion and validation",
+    )
     args = parser.parse_args()
 
     engine = get_engine()
@@ -238,6 +276,8 @@ def _run_fr_cli() -> None:
                 logger.error("VALIDATION FAILED after single-issue ingestion")
                 raise SystemExit(1)
             logger.info("VALIDATION PASSED after single-issue ingestion")
+        if args.json_summary:
+            _emit_json_summary(args, result=result, quality_report=locals().get('report'))
         return
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
@@ -253,6 +293,8 @@ def _run_fr_cli() -> None:
                 logger.error("VALIDATION FAILED \u2014 investigate existing data")
                 raise SystemExit(1)
             logger.info("VALIDATION PASSED \u2014 existing data clean")
+        if args.json_summary:
+            _emit_json_summary(args, results=[], quality_report=locals().get("report"))
         return
 
     results = run_fr_worker(engine, issues, dry_run=args.dry_run)
@@ -278,6 +320,15 @@ def _run_fr_cli() -> None:
         total_files,
         skipped,
     )
+
+    
+    if args.json_summary:
+        _emit_json_summary(
+            args,
+            results=results,
+            total_files=total_files,
+            skipped=skipped,
+        )
 
     if args.validate:
         report = run_quality_checks(engine)
