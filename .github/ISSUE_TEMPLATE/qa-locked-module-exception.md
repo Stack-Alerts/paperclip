@@ -1,41 +1,72 @@
 ---
-name: Locked Module Exception Request
-about: Request an exception to modify a locked module path
-title: "[LOCK EXCEPTION] <brief description>"
-labels: lock-exception
-assignees: PlatformEngineer
+name: Locked Module Exception — QA Sign-Off Checklist
+about: Mandatory QA checklist for approved locked-module exceptions (auto-created post-approval)
+title: "[QA SIGN-OFF] Locked module exception — <module path>"
+labels: lock-exception, qa-signoff
+assignees: QAEngineer
 
 ---
 
-## Locked Module
+## Exception Reference
 
-<!-- Path of the locked module you need to modify -->
-**Module path:**
+- **Module path:** <!-- populated by automation -->
+- **PR:** <!-- populated by automation -->
+- **Approval ID:** <!-- populated by automation -->
+- **Approved by:** <!-- populated by automation -->
 
-## Change Description
+---
 
-<!-- What do you need to change and why? -->
+## QA Checklist — Locked Module Exception
 
-## Justification
+> All four checks **must** pass before this issue can close. If any check fails,
+> comment with failure details and assign back to the CTO for resolution.
 
-<!-- Why is this change urgent/necessary and why can't it wait for the normal
-     unblocking process? -->
+### 1. pytest passed (all tests, not just smoke)
 
-## Impact Assessment
+- [ ] Paste CI run URL here
+- [ ] CI run must include the full test suite, not a subset
+- [ ] All tests green — no skipped-as-failure, no tolerated failures
 
-<!-- What is the blast radius of this change? Which downstream consumers will be
-     affected? -->
+**Evidence:**
+```
+<CI run URL>
+```
 
-## CTO Approval
+### 2. UI path verified end-to-end
 
-<!-- Leave blank -- CTO will sign off here -->
+- [ ] Attach screenshot or log artifact
+- [ ] Each modified UI component renders correctly
+- [ ] No new console errors from changed modules
 
-- [ ] Approved
-- [ ] Denied
-- Approval ID:
+**Evidence:**
+```
+<screenshot filename or log artifact link>
+```
 
-## Exception Record
+### 3. Trade execution confirmed in dry-run (≥1 trade in known 24h window)
 
-<!-- After approval, the PlatformEngineer will add this to lock_gate_exceptions.json
-     with the approval_id. No PR modifying a locked path may merge without a valid,
-     approved exception entry. -->
+- [ ] Paste dry-run evidence
+- [ ] At least 1 trade placed within the last 24 hours for a known strategy
+- [ ] Trade appears in the optimizer trade ledger with expected parameters
+
+**Evidence:**
+```
+<dry-run log excerpt or trade ledger entry>
+```
+
+### 4. Canary smoke test passed
+
+- [ ] Paste canary test CI run URL
+- [ ] `tests/bug_regression/test_canary_trade_execution.py` green
+- [ ] Zero-trades regression confirmed — no masked replication of the original bug
+
+**Evidence:**
+```
+<canary test CI run URL>
+```
+
+---
+
+## Sign-Off
+
+- [ ] **QAEngineer:** All four checklist items verified and passing. Exception approved for merge.
