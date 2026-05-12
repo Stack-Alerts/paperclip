@@ -99,9 +99,9 @@ def _is_source_file(path: str) -> bool:
         "alembic/",
         "scripts/LakeAPI/",
         "scripts/archived/",
+        "archived/",
         ".github/",
         "docs/",
-        ".coveragerc",
     )
     skip_suffixes = (
         ".sql",
@@ -130,6 +130,8 @@ def _is_source_file(path: str) -> bool:
         ".parquet",
         ".pkl",
     )
+    if path.startswith("."):
+        return False
     if any(path.startswith(p) for p in skip_prefixes):
         return False
     if any(path.endswith(s) for s in skip_suffixes):
