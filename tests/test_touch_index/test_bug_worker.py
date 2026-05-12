@@ -1207,6 +1207,116 @@ class TestMain:
         assert data["quality"] == {"passed": False}
 
     # -------------------------------------------------------------------
+    # --stale-days CLI arg
+    # -------------------------------------------------------------------
+
+    def test_main_validate_stale_days_polling(self, monkeypatch):
+        """--stale-days is passed through to run_bug_quality_checks in polling mode."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        issues = [
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
+        ]
+        results = [
+            BugIngestionResult(
+                issue_identifier="BTCAAAAA-101",
+                issue_id="id-1",
+                files_indexed=2,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=results),
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            patch("touch_index.paperclip_client.transition_issue_status"),
+        ):
+            mock_quality.return_value.passed = True
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--validate", "--stale-days", "60"]
+            )
+            main()
+
+        mock_quality.assert_called_once_with(engine, stale_threshold_days=60)
+
+    def test_main_validate_stale_days_no_issues(self, monkeypatch):
+        """--stale-days with no issues still passes argument to quality checks."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[],
+            ),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+        ):
+            mock_quality.return_value.passed = True
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--validate", "--stale-days", "90"]
+            )
+            main()
+
+        mock_worker.assert_not_called()
+        mock_quality.assert_called_once_with(engine, stale_threshold_days=90)
+
+    def test_main_validate_stale_days_issue_id(self, monkeypatch):
+        """--stale-days with --issue-id passes argument to quality checks."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        result = BugIngestionResult(
+            issue_identifier="BTCAAAAA-100",
+            issue_id="uuid-1",
+            files_indexed=2,
+            source="git",
+            skipped_no_commits=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.bug_worker.process_bug_issue", return_value=result),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            patch("touch_index.paperclip_client.transition_issue_status"),
+        ):
+            mock_quality.return_value.passed = True
+            monkeypatch.setattr(
+                "sys.argv",
+                [
+                    "touch_index",
+                    "--issue-id",
+                    "uuid-1",
+                    "--validate",
+                    "--stale-days",
+                    "120",
+                ],
+            )
+            main()
+
+        mock_fetch.assert_not_called()
+        mock_quality.assert_called_once_with(engine, stale_threshold_days=120)
+
+    # -------------------------------------------------------------------
     # --validate with --issue-id (single-issue mode)
     # -------------------------------------------------------------------
 
