@@ -142,7 +142,11 @@ Group: `impact-gate-scan-done` — `cancel-in-progress: false` ensures runs queu
    and optional `--dry-run` / `--retroactive` / `--days-back` flags.
    Output is written to `/tmp/scan-output.json` and the step exits with the
    scan's exit code (0 = no ungated, 1 = ungated found).
-7. **Create alert on ungated issues** — runs only on failure (ungated found).
+7. **Upload scan output artifact** — preserves `/tmp/scan-output.json` as a
+   workflow artifact (retention: 30 days) for post-hoc analysis.
+8. **Write step summary** — renders a markdown table with gated/ungated counts
+   to the workflow run page (`$GITHUB_STEP_SUMMARY`) for at-a-glance results.
+9. **Create alert on ungated issues** — runs only on failure (ungated found).
    Calls `scripts/scan_done_alert.py --scan-output /tmp/scan-output.json` to
    create a `medium`-priority issue assigned to the CTO.
 
