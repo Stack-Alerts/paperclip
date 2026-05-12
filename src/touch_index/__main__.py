@@ -154,7 +154,13 @@ def _run_bug_cli() -> None:
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
     logger.info("Fetching closed non-FDR issues completed after %s", cutoff.isoformat())
-    issues = get_closed_non_fdr_issues(closed_after=cutoff)
+    try:
+        issues = get_closed_non_fdr_issues(closed_after=cutoff)
+    except Exception:
+        logger.exception("Failed to fetch closed non-FDR issues from Paperclip API")
+        if args.json_summary:
+            _emit_json_summary(args, worker="bug")
+        raise SystemExit(1)
     logger.info("Found %d closed non-FDR issue(s) to process", len(issues))
 
     if not issues:
@@ -367,7 +373,13 @@ def _run_fr_cli() -> None:
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
     logger.info("Fetching FDR issues updated after %s", cutoff.isoformat())
-    issues = get_fdr_issues(updated_after=cutoff)
+    try:
+        issues = get_fdr_issues(updated_after=cutoff)
+    except Exception:
+        logger.exception("Failed to fetch FDR issues from Paperclip API")
+        if args.json_summary:
+            _emit_json_summary(args, worker="fr")
+        raise SystemExit(1)
     logger.info("Found %d FDR issue(s) to process", len(issues))
 
     if not issues:

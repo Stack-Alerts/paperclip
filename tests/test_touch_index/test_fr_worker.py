@@ -765,6 +765,64 @@ class TestMain:
         mock_worker.assert_not_called()
         assert any("Nothing to do" in r.message for r in caplog.records)
 
+
+    def test_main_polling_api_error_exits_nonzero(self, monkeypatch):
+        """Polling mode: get_fdr_issues error raises SystemExit(1)."""
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_fdr_issues",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_worker.assert_not_called()
+        mock_transition.assert_not_called()
+
+    def test_main_polling_api_error_emits_json_summary(self, monkeypatch, capsys):
+        """Polling mode: API error with --json-summary emits JSON before exit."""
+        import json
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_fdr_issues",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
+        ):
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--json-summary"]
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_worker.assert_not_called()
+        mock_transition.assert_not_called()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "fr"
+        assert data["mode"] == "polling"
+
+
     # -------------------------------------------------------------------
     # --validate flag (polling mode)
     # -------------------------------------------------------------------
