@@ -1,0 +1,66 @@
+name: dep-graph-refresh
+
+on:
+  schedule:
+    # Nightly at 02:00 UTC: regenerate dependency graph for lock gate reverse lookups
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    # Allow manual trigger for testing
+
+jobs:
+  refresh:
+    name: Regenerate dep_graph.json
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pydantic pyyaml
+
+      - name: Regenerate dep_graph.json
+        id: regen
+        run: |
+          if [ -f scripts/regenerate_dep_graph.py ]; then
+            python scripts/regenerate_dep_graph.py
+            echo "status=generated" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=no-regeneration-script" >> "$GITHUB_OUTPUT"
+            echo "notice: scripts/regenerate_dep_graph.py not found — dep_graph.json not regenerated"
+          fi
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if ! git diff --quiet dep_graph.json; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit updated dep_graph.json
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dep_graph.json
+          git commit -m "chore(dep-graph): nightly regeneration [skip ci]"
+          git push
+
+      - name: Summary
+        run: |
+          echo "## dep-graph-refresh results" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Regeneration status: ${{ steps.regen.outputs.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Changes committed: ${{ steps.diff.outputs.changed }}" >> "$GITHUB_STEP_SUMMARY"

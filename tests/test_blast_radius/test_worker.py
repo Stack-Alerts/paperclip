@@ -441,6 +441,37 @@ class TestRunOnce:
         # The failed issue should NOT be in processed_issue_ids
         assert "uuid-fix-1" not in state.get("processed_issue_ids", [])
 
+    def test_skipped_issue_not_marked_processed(self, tmp_path):
+        """A skipped issue (no touchedFiles) should NOT be marked as
+        processed or have its status persisted as in_review, so it can be
+        re-detected as a transition on the next poll."""
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issues = _IN_REVIEW_ISSUES
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker._fetch_in_review_issues", return_value=issues),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"skipped": True, "reason": "no touchedFiles", "issue": "BTCAAAAA-100"},
+            ),
+        ):
+            results = worker_mod.run_once(dry_run=False)
+
+        assert len(results) == 3  # All 3 fix issues attempted
+        assert all(r.get("skipped") for r in results)
+        state = json.loads(state_file.read_text())
+        # None of the skipped issues should be in processed_issue_ids
+        assert state.get("processed_issue_ids", []) == []
+        statuses = state.get("issue_statuses", {})
+        # Skipped issues should NOT have persisted statuses (removed by skipped_ids cleanup)
+        for issue in _IN_REVIEW_ISSUES:
+            if issue.get("id") in ("uuid-fr-1",):
+                continue
+            assert issue["id"] not in statuses or statuses[issue["id"]] != "in_review", (
+                f"Skipped issue {issue['id']} should not persist as in_review"
+            )
 
     def test_no_fix_issues_in_review(self, tmp_path):
         import blast_radius.worker as worker_mod
@@ -775,6 +806,47 @@ class TestProcessIssue:
             worker_mod.process_issue("uuid-fix-1", dry_run=False, old_status="in_progress")
 
         assert any("transitioned" in r.message for r in caplog.records)
+
+    def test_skipped_issue_not_persisted_on_process(self, tmp_path):
+        """When process_issue's generate_and_post returns a skipped result,
+        the issue should NOT be added to processed_issue_ids or have its
+        status persisted, so a future re-trigger can detect it."""
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issue = _IN_REVIEW_ISSUES[0]
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"skipped": True, "reason": "no touchedFiles", "issue": "BTCAAAAA-100"},
+            ),
+        ):
+            result = worker_mod.process_issue("uuid-fix-1", dry_run=False)
+
+        assert result == {"skipped": True, "reason": "no touchedFiles", "issue": "BTCAAAAA-100"}
+        # State should not exist (skipped result should not trigger save)
+        assert not state_file.exists()
+
+    def test_skipped_issue_dry_run_no_persist(self, tmp_path):
+        """On dry_run, a skipped result does nothing to state (no save)."""
+        import blast_radius.worker as worker_mod
+        state_file = _patch_state(tmp_path)
+        issue = _IN_REVIEW_ISSUES[0]
+
+        with (
+            patch.object(worker_mod, "_STATE_PATH", state_file),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"skipped": True, "reason": "no touchedFiles", "issue": "BTCAAAAA-100"},
+            ),
+        ):
+            result = worker_mod.process_issue("uuid-fix-1", dry_run=True)
+
+        assert result.get("skipped") is True
+        assert not state_file.exists()
 
 
 # ---------------------------------------------------------------------------

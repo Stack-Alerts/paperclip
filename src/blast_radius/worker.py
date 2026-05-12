@@ -195,6 +195,7 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
     results = []
     newly_processed: list[str] = []
     failed_ids: set[str] = set()
+    skipped_ids: set[str] = set()
 
     for issue in candidates:
         issue_id = issue.get("id", "")
@@ -214,7 +215,15 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
         try:
             result = generate_and_post(issue_id, dry_run=dry_run)
             results.append(result)
-            newly_processed.append(issue_id)
+            if result.get("skipped"):
+                skipped_ids.add(issue_id)
+                log.info(
+                    "Skipped report for %s (%s) -- will re-detect on next poll",
+                    identifier,
+                    result.get("reason", "unknown"),
+                )
+            else:
+                newly_processed.append(issue_id)
 
         except Exception as exc:
             log.error("Failed to generate report for %s: %s", identifier, exc)
@@ -223,9 +232,11 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
 
     _sync_statuses(state, issues)
 
-    # Remove status entries for failed candidates so they are re-detected
-    # as transitions on the next poll rather than silently dropped.
-    for iid in failed_ids:
+    # Remove status entries for failed and skipped candidates so they are
+    # re-detected as transitions on the next poll rather than silently
+    # dropped.  Skipped issues (e.g. no touchedFiles) should be re-checked
+    # in case touchedFiles are added later.
+    for iid in failed_ids | skipped_ids:
         state["issue_statuses"].pop(iid, None)
 
     if dry_run:
@@ -318,11 +329,18 @@ def process_issue(
         result = generate_and_post(issue_id, dry_run=dry_run)
 
         if not dry_run:
-            if issue_id not in processed:
-                state["processed_issue_ids"] = list(processed | {issue_id})
-            statuses = state.setdefault("issue_statuses", {})
-            statuses[issue_id] = status
-            _save_state(state)
+            if not result.get("skipped"):
+                if issue_id not in processed:
+                    state["processed_issue_ids"] = list(processed | {issue_id})
+                statuses = state.setdefault("issue_statuses", {})
+                statuses[issue_id] = status
+                _save_state(state)
+            else:
+                log.info(
+                    "Skipped report for %s (%s) -- not persisting state",
+                    identifier,
+                    result.get("reason", "unknown"),
+                )
 
         return result
     except Exception as exc:

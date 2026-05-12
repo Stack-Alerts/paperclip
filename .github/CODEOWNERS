@@ -1,0 +1,10 @@
+# CODEOWNERS — PR approval requirements
+#
+# For lock_gate_exceptions.json, both a CEO-designated owner and a board-designated
+# owner must approve any PR touching this file. This enforces the board directive
+# 2026-05-11 that the CTO cannot unilaterally add exceptions.
+#
+# The @org/ceo and @org/board teams are defined in GitHub org settings.
+# Replace these placeholders with actual team handles during onboarding.
+
+lock_gate_exceptions.json  @org/ceo @org/board
