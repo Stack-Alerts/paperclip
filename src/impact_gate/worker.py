@@ -473,6 +473,20 @@ def process_issue(issue_id: str, dry_run: bool = False, old_status: str | None =
     }
 
 
+# ---------------------------------------------------------------------------
+# Scan-done: audit done fix/bug issues for Impact Gate coverage
+# ---------------------------------------------------------------------------
+
+
+def scan_done_issues(
+    days_back: int | None = None,
+    dry_run: bool = False,
+    retroactive: bool = False,
+) -> dict:
+    from scan_fix_issues_done import scan as _scan_impl
+    return _scan_impl(days_back=days_back, dry_run=dry_run, retroactive=retroactive)
+
+
 if __name__ == "__main__":
     import argparse
 
