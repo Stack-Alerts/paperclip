@@ -347,9 +347,7 @@ def _run_fr_cli() -> None:
                     raise SystemExit(1)
                 logger.info("VALIDATION PASSED after single-issue ingestion")
         if args.json_summary:
-            _emit_json_summary(
-                args, worker="fr", result=result, quality_report=report
-            )
+            _emit_json_summary(args, worker="fr", result=result, quality_report=report)
         return
 
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.lookback_minutes)
@@ -370,9 +368,7 @@ def _run_fr_cli() -> None:
                 raise SystemExit(1)
             logger.info("VALIDATION PASSED \u2014 existing data clean")
         if args.json_summary:
-            _emit_json_summary(
-                args, worker="fr", results=[], quality_report=report
-            )
+            _emit_json_summary(args, worker="fr", results=[], quality_report=report)
         return
 
     results = run_fr_worker(engine, issues, dry_run=args.dry_run)
