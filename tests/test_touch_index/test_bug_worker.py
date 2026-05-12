@@ -1165,6 +1165,67 @@ class TestMain:
         assert exc_info.value.code == 1
         mock_worker.assert_not_called()
 
+
+    def test_main_polling_api_error_exits_nonzero(self, monkeypatch):
+        """Polling mode: get_closed_non_fdr_issues error raises SystemExit(1)."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_worker.assert_not_called()
+        mock_transition.assert_not_called()
+
+    def test_main_polling_api_error_emits_json_summary(self, monkeypatch, capsys):
+        """Polling mode: API error with --json-summary emits JSON before exit."""
+        import json
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status"
+            ) as mock_transition,
+        ):
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--json-summary"]
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_worker.assert_not_called()
+        mock_transition.assert_not_called()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "bug"
+        assert data["mode"] == "polling"
+
+
     def test_main_validate_no_issues_failed_with_json_summary(
         self, monkeypatch, capsys
     ):
