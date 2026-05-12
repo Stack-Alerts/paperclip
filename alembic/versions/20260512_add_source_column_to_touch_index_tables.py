@@ -1,53 +1,25 @@
-"""add_source_column_to_touch_index_tables
+"""add_source_column_to_touch_index_tables (no-op)
 
-Revision ID: 20260512_add_source_column_to_touch_index_tables
-Revises: 20260511_phase2_touch_index_deps
-Create Date: 2026-05-12
+This migration was superseded by the chain:
+  20260512_add_fr_files_source_col -> 20260512_add_bug_files_source_col
+which added source to each table individually.
 
-Fixes a schema bug in the original 20260511_add_touch_index_tables
-migration: both touch_index_fr_files and touch_index_bug_files were
-created without a `source` TEXT column, but the ingestion workers
-(and the documented schema) expect it.
-
-Changes:
-  - touch_index_fr_files  → ADD COLUMN source TEXT NOT NULL DEFAULT 'unknown'
-  - touch_index_bug_files → ADD COLUMN source TEXT NOT NULL DEFAULT 'unknown'
-
-The default 'unknown' ensures existing rows (if any) are backfilled
-correctly.  After this migration, the application always sets source
-explicitly on INSERT/upsert, so the default is only a safety net.
+This revision is preserved as a no-op so that databases which already
+applied it (via the stale sibling chain) remain compatible.  New
+databases will never reach this revision -- they follow the main chain.
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "20260512_add_source_column_to_touch_index_tables"
-down_revision = "20260511_phase2_touch_index_deps"
+down_revision = "20260512_add_bug_files_source_col"
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    conn = op.get_bind()
-
-    conn.execute(sa.text("""
-        ALTER TABLE touch_index_fr_files
-            ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'unknown';
-    """))
-
-    conn.execute(sa.text("""
-        ALTER TABLE touch_index_bug_files
-            ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'unknown';
-    """))
+    pass
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
-
-    conn.execute(sa.text("""
-        ALTER TABLE touch_index_fr_files DROP COLUMN IF EXISTS source;
-    """))
-
-    conn.execute(sa.text("""
-        ALTER TABLE touch_index_bug_files DROP COLUMN IF EXISTS source;
-    """))
-
+    pass

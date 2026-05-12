@@ -11,7 +11,8 @@ Common flags (both workers)
   --lookback-minutes <N>         Look back N minutes (default: 30)
   --dry-run                      Log without writing to DB or transitioning
   --validate                     Run data quality validation after ingestion
-  --stale-days <N>               Validation alert threshold in days for stale rows (default: 30)
+  --stale-days <N>               Bug worker: stale alert threshold in days (default: 30)
+  --stale-hours <N>              FR worker: stale alert threshold in hours (default: 168 = 7d)
   --json-summary                 Output structured JSON summary to stdout
 
 Usage
