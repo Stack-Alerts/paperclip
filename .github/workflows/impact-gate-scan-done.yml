@@ -96,23 +96,23 @@ jobs:
         run: |
           if [ -f /tmp/scan-output.json ]; then
             python3 -c "
-import json
-with open('/tmp/scan-output.json') as f:
-    data = json.load(f)
-total = data.get('total_done_fix_issues', 0)
-gated = data.get('gated', {})
-ungated = data.get('ungated_count', 0)
-print(f'## Impact Gate Scan-Done Summary')
-print(f'')
-print(f'| Metric | Value |')
-print(f'|---|---|')
-print(f'| Total done fix issues | {total} |')
-print(f'| Gated — PASS | {gated.get(\"pass\", 0)} |')
-print(f'| Gated — FAIL | {gated.get(\"fail\", 0)} |')
-print(f'| Gated — BYPASSED | {gated.get(\"bypassed\", 0)} |')
-print(f'| Gated — ERROR | {gated.get(\"error\", 0)} |')
-print(f'| Ungated | {ungated} |')
-" >> $GITHUB_STEP_SUMMARY
+              import json
+              with open('/tmp/scan-output.json') as f:
+                  data = json.load(f)
+              total = data.get('total_done_fix_issues', 0)
+              gated = data.get('gated', {})
+              ungated = data.get('ungated_count', 0)
+              print(f'## Impact Gate Scan-Done Summary')
+              print(f'')
+              print(f'| Metric | Value |')
+              print(f'|---|---|')
+              print(f'| Total done fix issues | {total} |')
+              print(f'| Gated — PASS | {gated.get(\"pass\", 0)} |')
+              print(f'| Gated — FAIL | {gated.get(\"fail\", 0)} |')
+              print(f'| Gated — BYPASSED | {gated.get(\"bypassed\", 0)} |')
+              print(f'| Gated — ERROR | {gated.get(\"error\", 0)} |')
+              print(f'| Ungated | {ungated} |')
+            " >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Create alert on ungated issues
