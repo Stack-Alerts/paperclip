@@ -359,8 +359,9 @@ class TestServe:
 
 
 class _MockResult:
-    def __init__(self, identifier, files_indexed, source, skipped_no_commits):
+    def __init__(self, identifier, files_indexed, source, skipped_no_commits, issue_id="00000000-0000-0000-0000-000000000000"):
         self.issue_identifier = identifier
+        self.issue_id = issue_id
         self.files_indexed = files_indexed
         self.source = source
         self.skipped_no_commits = skipped_no_commits
@@ -569,6 +570,321 @@ class TestHandlerFrWebhook:
         handler._send_json.assert_called_once()
         args = handler._send_json.call_args[0]
         assert args[0] == 200
+
+    def test_200_transitions_to_done(self, monkeypatch):
+        """When dry_run=false, issue is transitioned to done."""
+        payload = {
+            "event": "issue_updated",
+            "issue": {"id": "fdr-uuid-42"},
+        }
+        handler = _make_handler(
+            "/api/webhook/fr-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_fr_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.fr_worker.process_fr_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-2000", 2, "comments", False, "fdr-uuid-42",
+            ),
+        )
+        monkeypatch.setattr(
+            "touch_index.paperclip_client.transition_issue_status",
+            lambda issue_id, status: None,
+        )
+
+        handler.do_POST()
+
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["transitioned_to_done"] is True
+
+    def test_validate_true_passes_validation(self, monkeypatch):
+        """validate=true: FR quality checks pass, validation_passed=true."""
+        payload = {
+            "event": "issue_updated",
+            "issue": {"id": "fdr-uuid-42"},
+            "validate": True,
+        }
+        handler = _make_handler(
+            "/api/webhook/fr-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_fr_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.fr_worker.process_fr_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-2001", 3, "git", False, "fdr-uuid-42",
+            ),
+        )
+        monkeypatch.setattr(
+            "touch_index.paperclip_client.transition_issue_status",
+            lambda issue_id, status: None,
+        )
+        quality_report = MagicMock()
+        quality_report.passed = True
+        monkeypatch.setattr(
+            "touch_index.quality.run_quality_checks",
+            lambda engine: quality_report,
+        )
+
+        handler.do_POST()
+
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["validation_passed"] is True
+
+    def test_validate_true_fails_validation(self, monkeypatch):
+        """validate=true: FR quality checks fail, validation_passed=false."""
+        payload = {
+            "event": "issue_updated",
+            "issue": {"id": "fdr-uuid-42"},
+            "validate": True,
+        }
+        handler = _make_handler(
+            "/api/webhook/fr-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_fr_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.fr_worker.process_fr_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-2002", 0, "none", True, "fdr-uuid-42",
+            ),
+        )
+        monkeypatch.setattr(
+            "touch_index.paperclip_client.transition_issue_status",
+            lambda issue_id, status: None,
+        )
+        quality_report = MagicMock()
+        quality_report.passed = False
+        monkeypatch.setattr(
+            "touch_index.quality.run_quality_checks",
+            lambda engine: quality_report,
+        )
+
+        handler.do_POST()
+
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["validation_passed"] is False
+
+    def test_validate_true_validation_error(self, monkeypatch):
+        """validate=true: FR quality checks raise, validation_passed=false."""
+        payload = {
+            "event": "issue_updated",
+            "issue": {"id": "fdr-uuid-42"},
+            "validate": True,
+        }
+        handler = _make_handler(
+            "/api/webhook/fr-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_fr_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.fr_worker.process_fr_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-2003", 1, "comments", False, "fdr-uuid-42",
+            ),
+        )
+        monkeypatch.setattr(
+            "touch_index.paperclip_client.transition_issue_status",
+            lambda issue_id, status: None,
+        )
+        monkeypatch.setattr(
+            "touch_index.quality.run_quality_checks",
+            lambda engine: (_ for _ in ()).throw(RuntimeError("DB error")),
+        )
+
+        handler.do_POST()
+
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["validation_passed"] is False
+
+    def test_validate_false_no_validation(self, monkeypatch):
+        """validate=false: FR quality checks not run, no validation_passed."""
+        payload = {
+            "event": "issue_created",
+            "issue": {"id": "fdr-uuid-42"},
+            "validate": False,
+        }
+        handler = _make_handler(
+            "/api/webhook/fr-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_fr_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.fr_worker.process_fr_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-2004", 2, "git", False, "fdr-uuid-42",
+            ),
+        )
+        monkeypatch.setattr(
+            "touch_index.paperclip_client.transition_issue_status",
+            lambda issue_id, status: None,
+        )
+        mock_quality = MagicMock()
+        monkeypatch.setattr(
+            "touch_index.quality.run_quality_checks",
+            mock_quality,
+        )
+
+        handler.do_POST()
+
+        mock_quality.assert_not_called()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert "validation_passed" not in args[1]
+
+    def test_validate_not_in_body_no_validation(self, monkeypatch):
+        """validate absent: FR quality checks not run, no validation_passed."""
+        payload = {
+            "event": "issue_created",
+            "issue": {"id": "fdr-uuid-42"},
+        }
+        handler = _make_handler(
+            "/api/webhook/fr-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_fr_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.fr_worker.process_fr_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-2005", 3, "git", False, "fdr-uuid-42",
+            ),
+        )
+        monkeypatch.setattr(
+            "touch_index.paperclip_client.transition_issue_status",
+            lambda issue_id, status: None,
+        )
+        mock_quality = MagicMock()
+        monkeypatch.setattr(
+            "touch_index.quality.run_quality_checks",
+            mock_quality,
+        )
+
+        handler.do_POST()
+
+        mock_quality.assert_not_called()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert "validation_passed" not in args[1]
+
+    def test_transition_failure_logged(self, monkeypatch):
+        """When transition_issue_status raises, transitioned_to_done is false."""
+        payload = {
+            "event": "issue_updated",
+            "issue": {"id": "fdr-uuid-42"},
+        }
+        handler = _make_handler(
+            "/api/webhook/fr-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_fr_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.fr_worker.process_fr_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-2006", 1, "comments", False, "fdr-uuid-42",
+            ),
+        )
+        monkeypatch.setattr(
+            "touch_index.paperclip_client.transition_issue_status",
+            lambda issue_id, status: (_ for _ in ()).throw(RuntimeError("API error")),
+        )
+
+        handler.do_POST()
+
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["transitioned_to_done"] is False
+
+    def test_dry_run_skips_transition(self, monkeypatch):
+        """When dry_run=true, transition_issue_status is not called."""
+        payload = {
+            "event": "issue_created",
+            "issue": {"id": "fdr-uuid-42"},
+            "dry_run": True,
+        }
+        handler = _make_handler(
+            "/api/webhook/fr-issue-event",
+            method="POST",
+            body=json.dumps(payload).encode(),
+        )
+        handler.headers.get.return_value = str(len(json.dumps(payload)))
+        handler._send_json = MagicMock()
+
+        monkeypatch.setattr(
+            "blast_radius.api_server._get_fr_engine",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "touch_index.fr_worker.process_fr_issue",
+            lambda engine, issue_id, dry_run=False: _MockResult(
+                "BTCAAAAA-2007", 0, "git", False, "fdr-uuid-42",
+            ),
+        )
+        mock_transition = MagicMock()
+        monkeypatch.setattr(
+            "touch_index.paperclip_client.transition_issue_status",
+            mock_transition,
+        )
+
+        handler.do_POST()
+
+        mock_transition.assert_not_called()
+        args = handler._send_json.call_args[0]
+        assert args[0] == 200
+        assert args[1]["transitioned_to_done"] is False
 
 class TestHandlerBugWebhook:
     def test_404_on_wrong_path(self):
