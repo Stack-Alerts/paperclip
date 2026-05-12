@@ -461,6 +461,10 @@ class TestHandlerFrWebhook:
                 "BTCAAAAA-1200", 3, "comments", False,
             ),
         )
+        monkeypatch.setattr(
+            "touch_index.paperclip_client.transition_issue_status",
+            lambda issue_id, status: None,
+        )
 
         handler.do_POST()
 
@@ -471,6 +475,7 @@ class TestHandlerFrWebhook:
         assert args[1]["files_indexed"] == 3
         assert args[1]["source"] == "comments"
         assert args[1]["skipped_no_commits"] is False
+        assert args[1]["transitioned_to_done"] is True
 
     def test_passes_dry_run_flag(self, monkeypatch):
         payload = {
@@ -980,6 +985,10 @@ class TestHandlerBugWebhook:
                 "BTCAAAAA-1300", 2, "git", False,
             ),
         )
+        monkeypatch.setattr(
+            "touch_index.paperclip_client.transition_issue_status",
+            lambda issue_id, status: None,
+        )
 
         handler.do_POST()
 
@@ -990,6 +999,7 @@ class TestHandlerBugWebhook:
         assert args[1]["files_indexed"] == 2
         assert args[1]["source"] == "git"
         assert args[1]["skipped_no_commits"] is False
+        assert args[1]["transitioned_to_done"] is True
 
     def test_passes_dry_run_flag(self, monkeypatch):
         payload = {
@@ -1018,6 +1028,10 @@ class TestHandlerBugWebhook:
         monkeypatch.setattr(
             "touch_index.bug_worker.process_bug_issue",
             tracking_process,
+        )
+        monkeypatch.setattr(
+            "touch_index.paperclip_client.transition_issue_status",
+            lambda issue_id, status: None,
         )
 
         handler.do_POST()

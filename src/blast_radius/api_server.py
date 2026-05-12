@@ -272,7 +272,21 @@ class _Handler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------
 
     def _handle_bug_webhook(self):
-        """Handle POST /api/webhook/bug-issue-event (bug issue created/updated)."""
+        """Handle POST /api/webhook/bug-issue-event (bug issue created/updated).
+
+        Expects JSON body:
+        {
+            "event": "issue_created",
+            "issue": {"id": "<uuid>", ...},
+            "dry_run": false,
+            "validate": false
+        }
+
+        Transitions the issue to done after successful ingestion
+        unless dry_run is true.  If validate is true, runs
+        bug data quality checks after ingestion and includes the result
+        in the response.
+        """
         body = self._read_body()
         if body is None:
             self._send_json(400, {"error": "invalid or empty JSON body"})
