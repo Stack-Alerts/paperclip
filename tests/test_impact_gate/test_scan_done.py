@@ -66,6 +66,10 @@ class TestGateHeaderRegex:
         m = _GATE_HEADER_RE.search("## Impact Gate: ERROR")
         assert m is not None and m.group(1) == "ERROR"
 
+    def test_matches_skipped(self):
+        m = _GATE_HEADER_RE.search("## Impact Gate: SKIPPED")
+        assert m is not None and m.group(1) == "SKIPPED"
+
     def test_no_match_for_non_gate_header(self):
         m = _GATE_HEADER_RE.search("## Some other header")
         assert m is None
@@ -134,6 +138,16 @@ class TestCheckGateStatus:
     def test_returns_none_on_empty_comments(self, monkeypatch):
         monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [])
         assert _check_gate("any-id") is None
+
+    def test_detects_skipped(self, monkeypatch):
+        monkeypatch.setattr(
+            _scan,
+            "fetch_issue_comments",
+            lambda iid: [
+                {"body": "## Impact Gate: SKIPPED\n\nNo touched files found."},
+            ],
+        )
+        assert _check_gate("any-id") == "SKIPPED"
 
     def test_handles_api_failure_gracefully(self, monkeypatch):
         monkeypatch.setattr(
@@ -392,22 +406,30 @@ class TestScanFunction:
                     "labels": [{"name": "fix"}],
                     "status": "done",
                 },
+                {
+                    "id": "u5",
+                    "identifier": "BTCAAAAA-104",
+                    "title": "Fix E",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                },
             ],
         )
         monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
 
         def mock_comments(iid):
-            mapping = {"u1": "PASS", "u2": "FAIL", "u3": "BYPASSED", "u4": "ERROR"}
+            mapping = {"u1": "PASS", "u2": "FAIL", "u3": "BYPASSED", "u4": "ERROR", "u5": "SKIPPED"}
             status = mapping.get(iid, "PASS")
             return [{"body": f"## Impact Gate: {status}"}]
 
         monkeypatch.setattr(_scan, "fetch_issue_comments", mock_comments)
         result = _scan.scan()
-        assert result["total_done_fix_issues"] == 4
+        assert result["total_done_fix_issues"] == 5
         assert result["gated"]["pass"] == 1
         assert result["gated"]["fail"] == 1
         assert result["gated"]["bypassed"] == 1
         assert result["gated"]["error"] == 1
+        assert result["gated"]["skipped"] == 1
         assert result["ungated_count"] == 0
 
     def test_scan_no_completed_at_falls_back_to_updated_at(self, monkeypatch):

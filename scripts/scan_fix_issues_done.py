@@ -57,7 +57,7 @@ logger = logging.getLogger("scan_fix_issues_done")
 # Regex to detect an Impact Gate comment in an issue's comment thread.
 # Matches the markdown headers produced by worker._build_*_comment().
 _GATE_HEADER_RE = re.compile(
-    r"^## Impact Gate:\s+(PASS|FAIL|BYPASSED|ERROR)", re.MULTILINE
+    r"^## Impact Gate:\s+(PASS|FAIL|BYPASSED|ERROR|SKIPPED)", re.MULTILINE
 )
 
 
