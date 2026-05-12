@@ -1907,6 +1907,75 @@ class TestBugJsonSummary:
         assert data["issues_processed"] == 1
         assert data["total_files_indexed"] == 3
 
+
+    def test_json_summary_polling_with_errors(self, monkeypatch, capsys):
+        """--json-summary includes error count when issues fail during polling mode."""
+        import json
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        issues = [
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
+            {
+                "id": "id-2",
+                "identifier": "BTCAAAAA-102",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
+            {
+                "id": "id-3",
+                "identifier": "BTCAAAAA-103",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
+        ]
+        # run_bug_worker returns 2 results for 3 issues (1 failed)
+        results = [
+            BugIngestionResult(
+                issue_identifier="BTCAAAAA-101",
+                issue_id="id-1",
+                files_indexed=3,
+                source="git",
+                skipped_no_commits=False,
+            ),
+            BugIngestionResult(
+                issue_identifier="BTCAAAAA-103",
+                issue_id="id-3",
+                files_indexed=0,
+                source="none",
+                skipped_no_commits=True,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=results),
+            patch(
+                "touch_index.paperclip_client.transition_issue_status",
+            ) as mock_transition,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--json-summary"],
+            )
+            main()
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["issues_processed"] == 2
+        assert data["issues_with_errors"] == 1
+        assert data["total_files_indexed"] == 3
+        assert data["issues_skipped"] == 1
+        # Only the 2 successful issues are transitioned
+        assert mock_transition.call_count == 2
+
     def test_json_summary_dry_run(self, monkeypatch, capsys):
         """--json-summary with --dry-run sets dry_run field."""
         from touch_index.__main__ import _run_bug_cli as main
