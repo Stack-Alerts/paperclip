@@ -1,11 +1,7 @@
 """Touch Index FR data quality validation — run after ingestion.
 
-Checks:
-  1. touch_index_fr_files has no orphan rows (fr_issue_id must resolve in Paperclip).
-  2. No duplicate (file_path, fr_issue_id) pairs (UNIQUE constraint enforcement).
-  3. All rows have a non-null updated_at within the last N hours.
-  4. Each fr_issue_id has at least one file_path (no empty FR issues in the table).
-  5. No stale rows: updated_at older than 7 days (configurable).
+Delegates to ``touch_index.quality.run_quality_checks`` for all checks:
+coverage, freshness, and consistency.
 
 Usage:
     python scripts/validate_touch_index_fr.py [--stale-hours 168]
@@ -16,7 +12,6 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -29,8 +24,8 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from sqlalchemy import text
 from touch_index.db import get_engine, health_check
+from touch_index.quality import run_quality_checks
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,101 +35,28 @@ logger = logging.getLogger("touch_index.validate_fr")
 
 
 def _run_checks(stale_hours: int, engine: Engine | None = None) -> int:
-    """Run all validation checks. Returns number of failures (0 = clean).
+    """Run all validation checks via quality.run_quality_checks.
+
+    Returns number of failures (0 = clean).
 
     Args:
-        stale_hours: Alert if updated_at is older than this many hours.
-        engine: Optional pre-configured SQLAlchemy engine. If not provided,
-                a new engine is created from environment variables.
+        stale_hours: Alert threshold for stale rows in hours.
+        engine: Optional pre-configured SQLAlchemy engine.
     """
-    failures = 0
-
     if engine is None:
         engine = get_engine()
         if not health_check(engine):
             logger.error("DB health check failed — aborting")
             sys.exit(1)
 
-    with engine.connect() as conn:
-        # 1. Duplicate check
-        dup_count = (
-            conn.execute(
-                text("""
-                SELECT COUNT(*) FROM (
-                    SELECT file_path, fr_issue_id, COUNT(*)
-                    FROM touch_index_fr_files
-                    GROUP BY file_path, fr_issue_id
-                    HAVING COUNT(*) > 1
-                ) dups
-            """)
-            ).scalar()
-            or 0
-        )
-        if dup_count:
-            logger.warning(
-                "CHECK FAILED: %d duplicate (file_path, fr_issue_id) pairs", dup_count
-            )
-            failures += 1
-        else:
-            logger.info("CHECK PASSED: no duplicate (file_path, fr_issue_id) pairs")
+    report = run_quality_checks(engine, stale_threshold_hours=stale_hours)
 
-        # 2. Null updated_at check
-        null_updated = (
-            conn.execute(
-                text(
-                    "SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at IS NULL"
-                )
-            ).scalar()
-            or 0
-        )
-        if null_updated:
-            logger.warning("CHECK FAILED: %d rows with NULL updated_at", null_updated)
-            failures += 1
-        else:
-            logger.info("CHECK PASSED: no NULL updated_at values")
+    if not report.passed:
+        logger.error("VALIDATION COMPLETE: checks FAILED — investigate")
+        return 1
 
-        # 3. Stale rows (updated_at older than N hours)
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_hours)
-        stale_count = (
-            conn.execute(
-                text(
-                    "SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at < :cutoff"
-                ),
-                {"cutoff": cutoff},
-            ).scalar()
-            or 0
-        )
-        if stale_count:
-            logger.warning(
-                "CHECK WARN: %d rows with updated_at older than %d hours",
-                stale_count,
-                stale_hours,
-            )
-        else:
-            logger.info("CHECK PASSED: no stale rows (>%d hours)", stale_hours)
-
-        # 4. Total row count
-        total = (
-            conn.execute(text("SELECT COUNT(*) FROM touch_index_fr_files")).scalar()
-            or 0
-        )
-        logger.info("Total rows in touch_index_fr_files: %d", total)
-
-        # 5. FR issue count
-        fr_count = (
-            conn.execute(
-                text("SELECT COUNT(DISTINCT fr_issue_id) FROM touch_index_fr_files")
-            ).scalar()
-            or 0
-        )
-        logger.info("Distinct FR issues indexed: %d", fr_count)
-
-    if failures:
-        logger.error("VALIDATION COMPLETE: %d check(s) FAILED — investigate", failures)
-    else:
-        logger.info("VALIDATION COMPLETE: all checks PASSED")
-
-    return failures
+    logger.info("VALIDATION COMPLETE: all checks PASSED")
+    return 0
 
 
 def main() -> None:
