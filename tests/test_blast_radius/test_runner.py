@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parents[2] / "scripts"))
 sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 
@@ -29,29 +31,34 @@ class TestRunnerMain:
     def test_delegates_to_worker_main(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", _CLEAN_ARGV)
         with patch("blast_radius.__main__.main", return_value=0) as mock_main:
-            main()
+            with pytest.raises(SystemExit):
+                main()
             mock_main.assert_called_once()
 
     def test_passes_dry_run(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", _CLEAN_ARGV + ["--dry-run"])
         with patch("blast_radius.__main__.main", return_value=0) as mock_main:
-            main()
+            with pytest.raises(SystemExit):
+                main()
             mock_main.assert_called_once()
 
     def test_passes_issue_id(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", _CLEAN_ARGV + ["--issue-id", "uuid-1"])
         with patch("blast_radius.__main__.main", return_value=0) as mock_main:
-            main()
+            with pytest.raises(SystemExit):
+                main()
             mock_main.assert_called_once()
 
     def test_passes_loop(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", _CLEAN_ARGV + ["--loop", "300"])
         with patch("blast_radius.__main__.main", return_value=0) as mock_main:
-            main()
+            with pytest.raises(SystemExit):
+                main()
             mock_main.assert_called_once()
 
     def test_passes_force_reprocess(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", _CLEAN_ARGV + ["--force-reprocess"])
         with patch("blast_radius.__main__.main", return_value=0) as mock_main:
-            main()
+            with pytest.raises(SystemExit):
+                main()
             mock_main.assert_called_once()
