@@ -3,7 +3,7 @@
 ## Overview
 
 The Impact Gate Scan-Done workflow audits fix/bug issues in `done` status for
-Impact Gate coverage. It runs daily at 06:00 UTC and can also be triggered
+Impact Gate coverage. It runs every 5 minutes and can also be triggered
 manually.
 
 The scan:
@@ -124,7 +124,7 @@ Workflow: `.github/workflows/impact-gate-scan-done.yml`
 
 | Trigger | Schedule / Event |
 |---|---|
-| `schedule` | Daily at 06:00 UTC (`0 6 * * *`) |
+| `schedule` | Every 5 minutes (`*/5 * * * *`) |
 | `workflow_dispatch` | Manual trigger with optional `days_back`, `dry_run`, `retroactive` |
 
 ### Concurrency
