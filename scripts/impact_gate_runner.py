@@ -70,19 +70,27 @@ BUG_REGRESSION_DIR = REPO_ROOT / "tests" / "bug_regression"
 # ---------------------------------------------------------------------------
 
 
-def _fr_test_path(fr_id: str) -> Path:
-    """Map 'FDR-850' → tests/fr_acceptance/test_fdr_850.py"""
-    m = re.fullmatch(r"FDR-(\d+)", fr_id, re.IGNORECASE)
+def _fr_test_path(fr_id: str) -> Path | None:
+    """Map 'FDR-850' → tests/fr_acceptance/test_fdr_850.py
+
+    Also accepts BTCAAAAA-NNN format and tries both naming conventions.
+    Returns None when the FR ID format is not recognized.
+    """
+    m = re.fullmatch(r"(?:FDR|BTCAAAAA)-(\d+)", fr_id, re.IGNORECASE)
     if not m:
-        raise ValueError(f"Invalid FR ID format: {fr_id!r} (expected FDR-NNN)")
-    return FR_ACCEPTANCE_DIR / f"test_fdr_{m.group(1)}.py"
+        return None
+    num = m.group(1)
+    path = FR_ACCEPTANCE_DIR / f"test_fdr_{num}.py"
+    if path.exists():
+        return path
+    return FR_ACCEPTANCE_DIR / f"test_btcaaaaa_{num}.py"
 
 
-def _bug_test_path(bug_id: str) -> Path:
+def _bug_test_path(bug_id: str) -> Path | None:
     """Map 'BTCAAAAA-736' → tests/bug_regression/test_btcaaaaa_736_regression.py"""
     m = re.fullmatch(r"BTCAAAAA-(\d+)", bug_id, re.IGNORECASE)
     if not m:
-        raise ValueError(f"Invalid bug ID format: {bug_id!r} (expected BTCAAAAA-NNN)")
+        return None
     return BUG_REGRESSION_DIR / f"test_btcaaaaa_{m.group(1)}_regression.py"
 
 
@@ -174,20 +182,24 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
     for fid in fr_ids:
         path = _fr_test_path(fid)
         fr_paths[fid] = path
-        if not path.exists():
+        if path is None:
+            missing.append(f"unrecognized_fr_id:{fid}")
+        elif not path.exists():
             missing.append(str(path.relative_to(REPO_ROOT)))
 
     for bid in bug_ids:
         path = _bug_test_path(bid)
         bug_paths[bid] = path
-        if not path.exists():
+        if path is None:
+            missing.append(f"unrecognized_bug_id:{bid}")
+        elif not path.exists():
             missing.append(str(path.relative_to(REPO_ROOT)))
 
     # Pre-populate MISSING entries so they always appear in output
     fr_results: dict[str, dict] = {
         fid: {
             "status": "MISSING",
-            "test_file": str(fr_paths[fid].relative_to(REPO_ROOT)),
+            "test_file": str(fr_paths[fid].relative_to(REPO_ROOT)) if fr_paths[fid] else f"unresolved:{fid}",
             "tests": [],
         }
         for fid in fr_ids
@@ -195,14 +207,14 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
     bug_results: dict[str, dict] = {
         bid: {
             "status": "MISSING",
-            "test_file": str(bug_paths[bid].relative_to(REPO_ROOT)),
+            "test_file": str(bug_paths[bid].relative_to(REPO_ROOT)) if bug_paths[bid] else f"unresolved:{bid}",
             "tests": [],
         }
         for bid in bug_ids
     }
 
     existing_paths = [
-        p for p in list(fr_paths.values()) + list(bug_paths.values()) if p.exists()
+        p for p in list(fr_paths.values()) + list(bug_paths.values()) if p is not None and p.exists()
     ]
 
     if not existing_paths:
@@ -286,10 +298,10 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
 
     total = passed_total = failed_total = error_total = zero_test_files = 0
 
-    def _populate(id_path_map: dict[str, Path], results_dict: dict[str, dict]) -> None:
+    def _populate(id_path_map: dict[str, Path | None], results_dict: dict[str, dict]) -> None:
         nonlocal total, passed_total, failed_total, error_total, zero_test_files
         for tid, path in id_path_map.items():
-            if not path.exists():
+            if path is None or not path.exists():
                 continue
             rel = str(path.relative_to(REPO_ROOT))
             file_tests = file_results.get(rel, [])

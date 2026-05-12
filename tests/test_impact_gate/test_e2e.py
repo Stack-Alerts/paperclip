@@ -81,7 +81,7 @@ class TestImpactGateRunnerE2E:
         assert "FDR-99999" in result["fr_results"]
         fr_entry = result["fr_results"]["FDR-99999"]
         assert fr_entry["status"] == "MISSING"
-        assert "test_fdr_99999.py" in fr_entry["test_file"]
+        assert "test_fdr_99999.py" in fr_entry["test_file"] or "test_btcaaaaa_99999.py" in fr_entry["test_file"]
 
     def test_runner_with_missing_bug_id(self):
         """Runner reports MISSING status for a non-existent bug ID."""
