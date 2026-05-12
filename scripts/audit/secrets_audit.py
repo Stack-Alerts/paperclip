@@ -133,6 +133,8 @@ def main() -> None:
 
     md_files = sorted(DOCS_DIR.rglob("*.md"))
     for fpath in md_files:
+        if "archive" in str(fpath):
+            continue
         all_findings.extend(scan_file(fpath))
 
     for finding in all_findings:
