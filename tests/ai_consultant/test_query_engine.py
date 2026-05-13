@@ -183,6 +183,11 @@ def seed_database(admin_session: Session, seed_ids: dict):
     """))
     admin_session.commit()
 
+    # ── Grant SELECT to ai_readonly on all tables in the schema ────────────
+    admin_session.execute(text("GRANT SELECT ON ALL TABLES IN SCHEMA public TO ai_readonly"))
+    admin_session.execute(text("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO ai_readonly"))
+    admin_session.commit()
+
     # ── Strategies ────────────────────────────────────────────────────────
     admin_session.execute(text("""
         INSERT INTO strategies (strategy_id, name, created_at, updated_at)
