@@ -78,6 +78,13 @@ from .models import (
     StrategyBlockVersion,
     AIRecommendation,
     StrategyTestResult,
+    # ADR-0002 Traceability Models
+    TraceRequirement,
+    TraceTestCase,
+    TraceIssue,
+    TraceLink,
+    ValidationReportDB,
+    AiConsultantAudit,
 )
 
 __all__ = [
@@ -107,6 +114,14 @@ __all__ = [
     'StrategyBlockVersion',
     'AIRecommendation',
     'StrategyTestResult',
+    
+    # ADR-0002 Traceability Models
+    'TraceRequirement',
+    'TraceTestCase',
+    'TraceIssue',
+    'TraceLink',
+    'ValidationReportDB',
+    'AiConsultantAudit',
 ]
 
 __version__ = '1.0.0'

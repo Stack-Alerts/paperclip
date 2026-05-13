@@ -11,7 +11,7 @@ All models use NautilusTrader types stored as strings for precision:
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, Index, Numeric
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, Index, Numeric, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -788,3 +788,121 @@ class AiConsultantAudit(Base):
 
     def __repr__(self):
         return f"<AiConsultantAudit(id='{self.id}', event_type='{self.event_type}')>"
+
+# ==============================================================================
+# ADR-0002 TRACEABILITY SCHEMA
+# Requirement → TestCase → Issue traceability layer
+# ==============================================================================
+
+
+class TraceRequirement(Base):
+    __tablename__ = "trace_requirements"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    identifier = Column(String(50), nullable=False, unique=True)
+    title = Column(String(500), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(30), nullable=False)
+    priority = Column(String(20), nullable=True)
+    labels = Column(JSONB, nullable=True)
+    source = Column(String(30), nullable=False)
+    paperclip_id = Column(UUID(as_uuid=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    metadata_ = Column("metadata", JSONB, nullable=True)
+
+    __table_args__ = (
+        Index("idx_trace_requirements_status", "status"),
+        Index("idx_trace_requirements_paperclip_id", "paperclip_id"),
+    )
+
+    def __repr__(self):
+        return f"<TraceRequirement(identifier='{self.identifier}', status='{self.status}')>"
+
+
+class TraceTestCase(Base):
+    __tablename__ = "trace_test_cases"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    identifier = Column(String(300), nullable=False, unique=True)
+    test_file = Column(String(500), nullable=False)
+    test_function = Column(String(300), nullable=False)
+    test_class = Column(String(300), nullable=True)
+    markers = Column(JSONB, nullable=True)
+    source = Column(String(30), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    tags = Column(JSONB, nullable=True)
+    language = Column(String(20), nullable=False, server_default=text("'python'"))
+    component = Column(String(200), nullable=True)
+
+    __table_args__ = (
+        Index("idx_trace_test_cases_test_file", "test_file"),
+        Index("idx_trace_test_cases_component", "component"),
+    )
+
+    def __repr__(self):
+        return f"<TraceTestCase(identifier='{self.identifier}', file='{self.test_file}')>"
+
+
+class TraceIssue(Base):
+    __tablename__ = "trace_issues"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    identifier = Column(String(50), nullable=False, unique=True)
+    title = Column(String(500), nullable=False)
+    issue_type = Column(String(30), nullable=False)
+    status = Column(String(30), nullable=False)
+    paperclip_id = Column(UUID(as_uuid=True), nullable=True)
+    labels = Column(JSONB, nullable=True)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("trace_issues.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_trace_issues_paperclip_id", "paperclip_id"),
+        Index("idx_trace_issues_issue_type", "issue_type"),
+        Index("idx_trace_issues_status", "status"),
+    )
+
+    parent = relationship("TraceIssue", remote_side="TraceIssue.id", backref="children")
+
+    def __repr__(self):
+        return f"<TraceIssue(identifier='{self.identifier}', type='{self.issue_type}')>"
+
+
+class TraceLink(Base):
+    __tablename__ = "trace_links"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    requirement_id = Column(UUID(as_uuid=True), ForeignKey("trace_requirements.id"), nullable=True)
+    test_case_id = Column(UUID(as_uuid=True), ForeignKey("trace_test_cases.id"), nullable=True)
+    issue_id = Column(UUID(as_uuid=True), ForeignKey("trace_issues.id"), nullable=True)
+    link_type = Column(String(30), nullable=False)
+    direction = Column(String(10), nullable=False)
+    confidence = Column(Float, nullable=False)
+    metadata_ = Column("metadata", JSONB, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_by = Column(String(100), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("requirement_id", "test_case_id", "issue_id", "link_type",
+                         name="uq_trace_link_edge"),
+        Index("idx_trace_links_requirement_id", "requirement_id"),
+        Index("idx_trace_links_test_case_id", "test_case_id"),
+        Index("idx_trace_links_issue_id", "issue_id"),
+        Index("idx_trace_links_link_type", "link_type"),
+    )
+
+    requirement = relationship("TraceRequirement", backref="links")
+    test_case = relationship("TraceTestCase", backref="links")
+    issue = relationship("TraceIssue", backref="links")
+
+    def __repr__(self):
+        return (
+            f"<TraceLink(type='{self.link_type}', "
+            f"confidence={self.confidence}, "
+            f"active={self.is_active})>"
+        )
+
