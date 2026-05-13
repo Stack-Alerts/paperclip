@@ -1598,6 +1598,42 @@ class TestMain:
             ]
         )
 
+
+    def test_main_polling_skips_transition_for_non_done_result(self, monkeypatch, caplog):
+        """Polling mode: result with issue_status='in_progress' skips transition and logs."""
+        import logging
+
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "description": ""},
+        ]
+        results = [
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-101",
+                issue_id="id-1",
+                files_indexed=2,
+                source="comments",
+                skipped_no_commits=False,
+                issue_status="in_progress",
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
+            patch("touch_index.fr_worker.run_fr_worker", return_value=results),
+            patch(
+                "touch_index.paperclip_client.transition_issue_status_board"
+            ) as mock_transition,
+            caplog.at_level(logging.INFO),
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        mock_transition.assert_not_called()
+        assert any("skipping transition to done" in r.message for r in caplog.records)
+
     def test_main_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
         """A failed transition is logged but does not halt the worker."""
         import logging
