@@ -1,0 +1,109 @@
+name: Blast Radius Monitor
+
+on:
+  schedule:
+    # Every 30 minutes — health-check the BR worker and alert on errors/staleness
+    - cron: '*/30 * * * *'
+  workflow_run:
+    workflows: ["Blast Radius Worker"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        description: 'Run ID of the blast-radius-worker to monitor (leave empty to poll latest)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Dry run (log only, do not create alert issues)'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: blast-radius-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: Health-check Blast Radius worker output
+    runs-on: ubuntu-latest
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Resolve worker output artifact
+        id: resolve-artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ARTIFACT="blast-radius-worker-output"
+          if [ -n "${{ github.event.inputs.artifact_run_id }}" ]; then
+            RUN_ID="${{ github.event.inputs.artifact_run_id }}"
+          else
+            # Download latest artifact from the most recent Blast Radius Worker run
+            RUN_ID=$(gh run list -w "Blast Radius Worker" --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || echo "")
+          fi
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+          echo "artifact_name=$ARTIFACT" >> $GITHUB_OUTPUT
+
+      - name: Download worker output artifact
+        id: download-artifact
+        if: steps.resolve-artifact.outputs.run_id != ''
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: blast-radius-worker.yml
+          run_id: ${{ steps.resolve-artifact.outputs.run_id }}
+          name: blast-radius-worker-output
+          path: /tmp/br-artifact
+          if_no_artifact_found: warn
+          allow_forks: false
+
+      - name: Generate synthetic output (fallback when no artifact)
+        id: fallback
+        if: steps.download-artifact.outcome == 'failure' || steps.resolve-artifact.outputs.run_id == ''
+        run: |
+          cat > /tmp/br-artifact/br-output.json << 'JSONEOF'
+          {"worker": "blast-radius", "mode": "polling", "dry_run": false, "timestamp": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')", "issues_processed": 0, "issues_with_errors": 0, "result": {"error": "Staleness: could not retrieve worker artifact — worker may not have run recently"}}
+          JSONEOF
+
+      - name: Run monitor
+        env:
+          PYTHONPATH: src
+        run: |
+          FLAGS="--worker-output /tmp/br-artifact/br-output.json"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          python scripts/blast_radius_monitor.py $FLAGS --run-url "$RUN_URL" 2>&1 | tee /tmp/br-monitor.log
+
+      - name: Upload monitor log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blast-radius-monitor-log
+          path: /tmp/br-monitor.log
+          retention-days: 7
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Blast Radius Monitor Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Worker run ID:** ${{ steps.resolve-artifact.outputs.run_id }}" >> $GITHUB_STEP_SUMMARY

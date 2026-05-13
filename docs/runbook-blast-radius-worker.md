@@ -248,6 +248,8 @@ curl -X DELETE "$PAPERCLIP_API_URL/api/issues/$ISSUE_ID/comments/$COMMENT_ID" \
 
 ## Monitoring & Alerting
 
+### Log Patterns
+
 The worker logs at `INFO` level by default. Key log lines:
 
 | Log pattern | Meaning |
@@ -261,6 +263,44 @@ The worker logs at `INFO` level by default. Key log lines:
 | `Worker iteration failed` | Unhandled exception in loop |
 
 The `--json-summary` flag outputs structured JSON for downstream automation.
+
+### Automated Alerting
+
+The **Blast Radius Monitor** (`scripts/blast_radius_monitor.py`) parses the
+worker's JSON output and creates Paperclip alert issues when errors are
+detected.  It runs in two contexts:
+
+1. **Inline (every worker run):** The `blast-radius-worker.yml` workflow runs the
+   monitor as a post-processing step after each poll cycle.  If the worker
+   encountered errors processing any issues, a ``medium``- or ``critical``-priority
+   Paperclip issue is created and assigned to the CTO.
+
+2. **Scheduled health check (every 30 min):** The `blast-radius-monitor.yml`
+   workflow downloads the latest worker output artifact and runs the monitor.  If
+   no artifact is available (worker stale), it generates a staleness alert.
+
+#### Alert severity rules
+
+| Condition | Priority |
+|---|---|
+| Error rate > 50% of processed issues | `critical` |
+| Any errors in a poll run | `medium` |
+| Single-issue processing error | `medium` |
+| Staleness (no recent artifact) | `medium` |
+| Dry-run worker execution | _no alert_ |
+
+#### Silencing alerts
+
+To suppress alerts during maintenance:
+1. Use `workflow_dispatch` on the worker with `dry_run: true`.
+2. Or disable the monitor workflow: GitHub → Actions → Blast Radius Monitor → ⋮ → Disable workflow.
+
+#### Deduplication
+
+One alert issue is created per day.  Subsequent errors within the same day
+append an update comment to the existing alert issue rather than creating
+duplicates.  Alert issues carry the ``blast-radius-alert`` label for easy
+filtering.
 
 ## Troubleshooting
 
@@ -285,4 +325,6 @@ The `--json-summary` flag outputs structured JSON for downstream automation.
 - `src/blast_radius/query.py` — Touch Index query helpers
 - `src/blast_radius/api_server.py` — Optional HTTP API server
 - `.github/workflows/blast-radius-worker.yml` — CI/CD workflow
+- `.github/workflows/blast-radius-monitor.yml` — Monitoring & alerting workflow
+- `scripts/blast_radius_monitor.py` — Worker health monitoring script
 - `data/blast_radius_worker_state.json` — Persisted worker state
