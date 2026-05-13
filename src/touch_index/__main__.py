@@ -223,6 +223,7 @@ def _run_bug_cli() -> None:
 
     results = run_bug_worker(engine, issues, dry_run=args.dry_run)
     worker_count = len(results)
+    worker_results = list(results)
 
     catchup_results = catch_up_eligible_bug_issues(engine, dry_run=args.dry_run)
     if catchup_results:
@@ -265,7 +266,7 @@ def _run_bug_cli() -> None:
             "DRY RUN — skipping transition-to-done for %d issue(s)", len(issues)
         )
     else:
-        for r in results:
+        for r in worker_results:
             try:
                 if r.issue_status == "done" or r.issue_status is None:
                     transition_issue_status_board(r.issue_id, "done")

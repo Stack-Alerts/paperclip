@@ -1157,6 +1157,56 @@ class TestMain:
         assert "4 files" in msg
         assert "1 skipped" in msg
 
+    def test_main_catch_up_results_not_transitioned(self, monkeypatch):
+        """Catch-up results must not be transitioned to done (already done issues)."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        issues = [
+            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+        ]
+        results = [
+            BugIngestionResult(
+                issue_id="id-1",
+                issue_identifier="BTCAAAAA-101",
+                files_indexed=2,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
+        catchup_results = [
+            BugIngestionResult(
+                issue_id="catchup-uuid",
+                issue_identifier="BTCAAAAA-201",
+                files_indexed=1,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=results),
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=catchup_results,
+            ),
+            patch(
+                "touch_index.paperclip_client.transition_issue_status_board",
+            ) as mock_transition,
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        # Only the worker result should be transitioned, not the catch-up result
+        mock_transition.assert_called_once_with("id-1", "done")
+
+
     def test_main_catch_up_dry_run(self, monkeypatch):
         """--dry-run is passed through to catch_up_eligible_bug_issues."""
         from touch_index.__main__ import _run_bug_cli as main
