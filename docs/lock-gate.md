@@ -61,7 +61,7 @@ python scripts/lock_gate.py --validate-exceptions
 ## Related Documents
 
 - `docs/runbook-module-lock.md` — Full runbook with unlock procedures
-- `lock_gate_exceptions.schema.md` — Exception entry schema documentation
+- `docs/architecture/lock_gate_exceptions.schema.md` — Exception entry schema documentation
 - `.github/ISSUE_TEMPLATE/qa-locked-module-exception.md` — Exception request template
 - `.github/CODEOWNERS` — CEO + board approval requirement for exceptions file
 

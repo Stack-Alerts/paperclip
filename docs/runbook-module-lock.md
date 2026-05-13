@@ -336,7 +336,7 @@ must be scheduled:
 ## Related Documents
 
 - `docs/lock-gate.md` — Lock gate usage guide
-- `lock_gate_exceptions.schema.md` — Exception entry schema documentation
+- `docs/architecture/lock_gate_exceptions.schema.md` — Exception entry schema documentation
 - `.github/ISSUE_TEMPLATE/qa-locked-module-exception.md` — QA sign-off checklist template
 - `.github/CODEOWNERS` — CEO + board approval requirement for exceptions file
 

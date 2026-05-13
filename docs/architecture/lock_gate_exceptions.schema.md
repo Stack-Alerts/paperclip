@@ -8,7 +8,7 @@
 {
   "version": 2,
   "description": "Human-readable description of the file purpose.",
-  "$schema": "lock_gate_exceptions.schema.md",
+  "$schema": "docs/architecture/lock_gate_exceptions.schema.md",
   "exceptions": [
     { /* ExceptionEntry */ }
   ]
