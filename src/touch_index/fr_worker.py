@@ -21,7 +21,7 @@ from typing import Sequence
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from .comment_extractor import fetch_and_extract, extract_files_from_text
+from .comment_extractor import extract_files_from_text, fetch_and_extract
 from .git_extractor import get_files_for_issue
 from .paperclip_client import FDR_LABEL_ID, get_issue_by_id
 

@@ -13,7 +13,6 @@ import re
 import subprocess
 from pathlib import Path
 
-
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).parents[2]  # BTC-Trade-Engine-PaperClip/
