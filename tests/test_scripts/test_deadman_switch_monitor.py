@@ -54,6 +54,31 @@ class TestGhRunList:
         runs = _gh_run_list("backup-deadman-switch.yml")
         assert runs == []
 
+    def test_returns_none_on_auth_error(self, monkeypatch):
+        from scripts.deadman_switch_monitor import _gh_run_list
+
+        monkeypatch.setattr(
+            "subprocess.run",
+            lambda *a, **kw: MagicMock(
+                returncode=1, stdout="", stderr="To get started with GitHub CLI, please run:  gh auth login",
+            ),
+        )
+        runs = _gh_run_list("backup-deadman-switch.yml")
+        assert runs is None
+
+    def test_returns_none_on_missing_token(self, monkeypatch):
+        from scripts.deadman_switch_monitor import _gh_run_list
+
+        monkeypatch.setattr(
+            "subprocess.run",
+            lambda *a, **kw: MagicMock(
+                returncode=1, stdout="",
+                stderr="no oauth token found",
+            ),
+        )
+        runs = _gh_run_list("backup-deadman-switch.yml")
+        assert runs is None
+
     def test_returns_empty_on_invalid_json(self, monkeypatch):
         from scripts.deadman_switch_monitor import _gh_run_list
 
@@ -396,6 +421,21 @@ class TestRun:
         result = run(threshold_minutes=15)
         assert result["status"] == "alert"
         assert mock_sess.post.call_count == 1
+
+    def test_auth_error_returns_auth_error_status(self, monkeypatch):
+        from scripts.deadman_switch_monitor import run
+
+        self._setup_env(monkeypatch)
+        self._patch_state_and_rotate(monkeypatch)
+        monkeypatch.setattr(
+            "scripts.deadman_switch_monitor._gh_run_list",
+            lambda *a, **kw: None,
+        )
+        result = run(threshold_minutes=45)
+        assert result["status"] == "auth_error"
+        assert result["alert_fired"] is False
+        assert result["last_success_age_minutes"] is None
+        assert result["total_runs_checked"] == 0
 
     def test_summary_includes_metadata(self, monkeypatch):
         from scripts.deadman_switch_monitor import run
