@@ -627,6 +627,80 @@ class TestProcessIssue:
         assert "error" in result
 
 
+    def test_self_close_called_after_successful_post(self, tmp_path):
+        state_path = str(tmp_path / "state.json")
+        issue = _make_issue(issue_id=ISSUE_111, status="in_review")
+        with (
+            patch("blast_radius.worker._STATE_PATH", Path(state_path)),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"issue": "BTCAAAAA-9999", "skipped": False},
+            ),
+            patch("blast_radius.worker.transition_issue_status_board") as mock_close,
+        ):
+            result = process_issue(ISSUE_111, dry_run=False)
+
+        assert result is not None
+        mock_close.assert_called_once_with(ISSUE_111, "done")
+
+    def test_self_close_not_called_on_dry_run(self, tmp_path):
+        state_path = str(tmp_path / "state.json")
+        issue = _make_issue(issue_id=ISSUE_111, status="in_review")
+        with (
+            patch("blast_radius.worker._STATE_PATH", Path(state_path)),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"issue": "BTCAAAAA-9999", "skipped": False},
+            ),
+            patch("blast_radius.worker.transition_issue_status_board") as mock_close,
+        ):
+            result = process_issue(ISSUE_111, dry_run=True)
+
+        assert result is not None
+        mock_close.assert_not_called()
+
+    def test_self_close_not_called_when_skipped(self, tmp_path):
+        state_path = str(tmp_path / "state.json")
+        issue = _make_issue(issue_id=ISSUE_111, status="in_review")
+        with (
+            patch("blast_radius.worker._STATE_PATH", Path(state_path)),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"issue": "BTCAAAAA-9999", "skipped": True, "reason": "no touchedFiles"},
+            ),
+            patch("blast_radius.worker.transition_issue_status_board") as mock_close,
+        ):
+            result = process_issue(ISSUE_111, dry_run=False)
+
+        assert result is not None
+        assert result.get("skipped") is True
+        mock_close.assert_not_called()
+
+    def test_self_close_failure_does_not_block_return(self, tmp_path):
+        state_path = str(tmp_path / "state.json")
+        issue = _make_issue(issue_id=ISSUE_111, status="in_review")
+        with (
+            patch("blast_radius.worker._STATE_PATH", Path(state_path)),
+            patch("blast_radius.worker.get_issue_by_id", return_value=issue),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"issue": "BTCAAAAA-9999", "skipped": False},
+            ),
+            patch(
+                "blast_radius.worker.transition_issue_status_board",
+                side_effect=RuntimeError("API error"),
+            ),
+        ):
+            result = process_issue(ISSUE_111, dry_run=False)
+
+        assert result is not None
+        # Even though self-close failed, the result should still be returned
+        assert "error" not in result
+
+
 # ---------------------------------------------------------------------------
 # TestRunLoop
 # ---------------------------------------------------------------------------

@@ -57,6 +57,15 @@ returned by the API, its entry is removed so a future re-transition to
 touchedFiles) have their status entries removed so they are re-detected on the
 next poll.
 
+**Self-close on single-issue processing**: when the worker processes an issue
+via ``--issue-id`` (webhook or manual trigger), after successfully posting the
+Blast Radius Report, it transitions the issue to **done** via
+``transition_issue_status_board()``.  This prevents routine execution issues
+from accumulating in ``in_review``.  The self-close is skipped when:
+- ``--dry-run`` is set (no API calls are made)
+- The report is skipped (e.g. no ``touchedFiles``)
+- The issue was already processed (normal dedup)
+
 ## CLI Usage
 
 ### Poll once (default)

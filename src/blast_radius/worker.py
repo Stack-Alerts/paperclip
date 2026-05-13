@@ -41,6 +41,7 @@ from touch_index.paperclip_client import (
     _paginate,
     _company,
     get_issue_by_id,
+    transition_issue_status_board,
 )
 
 from .generator import generate_and_post
@@ -342,6 +343,15 @@ def process_issue(
                 statuses = state.setdefault("issue_statuses", {})
                 statuses[issue_id] = status
                 _save_state(state)
+                # Self-close: transition to done so routine issues don't
+                # accumulate in in_review after the BR report is posted.
+                try:
+                    transition_issue_status_board(issue_id, "done")
+                    log.info("Self-closed %s -> done", identifier)
+                except Exception as exc:
+                    log.warning(
+                        "Failed to self-close %s: %s", identifier, exc
+                    )
             else:
                 log.info(
                     "Skipped report for %s (%s) -- not persisting state",
