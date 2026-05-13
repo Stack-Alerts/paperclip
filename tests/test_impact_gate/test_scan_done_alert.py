@@ -19,7 +19,75 @@ sys.modules["scan_done_alert"] = _alert
 _spec.loader.exec_module(_alert)
 
 create_alert = _alert.create_alert
+_find_todays_alert = _alert._find_todays_alert
 main = _alert.main
+ALERT_LABEL = _alert.ALERT_LABEL
+
+
+class TestFindTodaysAlert:
+    def test_returns_alert_when_found(self, monkeypatch):
+        import touch_index.paperclip_client as pc
+        candidates = [
+            {"title": "Other issue", "labels": [], "identifier": "BTCAAAAA-1"},
+            {
+                "title": "Impact Gate Scan-Done Alert -- 2026-05-13 (5 ungated)",
+                "labels": [{"name": ALERT_LABEL}],
+                "identifier": "BTCAAAAA-2",
+            },
+        ]
+        monkeypatch.setattr(
+            pc, "_paginate", lambda path, params, page_size=50: candidates
+        )
+        result = _find_todays_alert("http://base", "comp", None, "2026-05-13")
+        assert result is not None
+        assert result["identifier"] == "BTCAAAAA-2"
+
+    def test_returns_none_when_no_match(self, monkeypatch):
+        import touch_index.paperclip_client as pc
+        monkeypatch.setattr(
+            pc, "_paginate", lambda path, params, page_size=50: []
+        )
+        result = _find_todays_alert("http://base", "comp", None, "2026-05-13")
+        assert result is None
+
+    def test_returns_none_when_date_mismatch(self, monkeypatch):
+        import touch_index.paperclip_client as pc
+        candidates = [
+            {
+                "title": "Impact Gate Scan-Done Alert -- 2026-05-12 (3 ungated)",
+                "labels": [{"name": ALERT_LABEL}],
+                "identifier": "BTCAAAAA-2",
+            },
+        ]
+        monkeypatch.setattr(
+            pc, "_paginate", lambda path, params, page_size=50: candidates
+        )
+        result = _find_todays_alert("http://base", "comp", None, "2026-05-13")
+        assert result is None
+
+    def test_returns_none_when_label_mismatch(self, monkeypatch):
+        import touch_index.paperclip_client as pc
+        candidates = [
+            {
+                "title": "Impact Gate Scan-Done Alert -- 2026-05-13 (5 ungated)",
+                "labels": [{"name": "other-label"}],
+                "identifier": "BTCAAAAA-2",
+            },
+        ]
+        monkeypatch.setattr(
+            pc, "_paginate", lambda path, params, page_size=50: candidates
+        )
+        result = _find_todays_alert("http://base", "comp", None, "2026-05-13")
+        assert result is None
+
+    def test_handles_api_error_gracefully(self, monkeypatch):
+        import touch_index.paperclip_client as pc
+        def raise_error(*a, **kw):
+            raise RuntimeError("API error")
+
+        monkeypatch.setattr(pc, "_paginate", raise_error)
+        result = _find_todays_alert("http://base", "comp", None, "2026-05-13")
+        assert result is None
 
 
 class TestCreateAlert:
@@ -98,6 +166,26 @@ class TestCreateAlert:
         body = kw["json"]["body"]
         assert "| BTCAAAAA-100 | Fix A |" in body
         assert "| BTCAAAAA-101 | Fix B |" in body
+
+    def test_skips_duplicate_when_alert_exists(self, monkeypatch):
+        monkeypatch.setattr(
+            _alert,
+            "_find_todays_alert",
+            lambda *a, **kw: {
+                "identifier": "BTCAAAAA-200",
+                "title": "Impact Gate Scan-Done Alert -- 2026-05-13 (5 ungated)",
+            },
+        )
+        sess = MagicMock()
+        scan_data = {
+            "ungated_count": 5,
+            "ungated_issues": [
+                {"identifier": "BTCAAAAA-100", "title": "Fix"},
+            ],
+        }
+        ok = create_alert("http://base", "comp", sess, scan_data, dry_run=False)
+        assert ok is True
+        sess.post.assert_not_called()
 
 
 class TestMain:
