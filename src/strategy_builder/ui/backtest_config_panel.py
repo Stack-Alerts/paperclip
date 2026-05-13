@@ -3362,7 +3362,7 @@ class BacktestConfigPanel(QWidget):
         testing_days = self.testing_spin.value()
         mode = self.mode_group.checkedId()
         
-        end_date = datetime.now(timezone.utc)
+        end_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
         # Mode 1: start_date is derived from training_days + testing_days
         # so the full data window exactly covers both phases regardless of
