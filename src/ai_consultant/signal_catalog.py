@@ -18,7 +18,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -117,7 +117,7 @@ class SignalCatalogService:
                 logger.warning("Live stats unavailable (%s); catalog loaded without stats.", exc)
                 self._stats_source = "none"
         self._loaded = True
-        self._loaded_at = datetime.utcnow()
+        self._loaded_at = datetime.now(timezone.utc)
         logger.info(
             "SignalCatalogService loaded: %d blocks, %d unique signals, stats=%s",
             len(self._entries), len(self._signal_index), self._stats_source,
