@@ -91,6 +91,51 @@ def seed_database(admin_session: Session, seed_ids: dict):
     now = datetime.now(timezone.utc)
     past_30 = now - timedelta(days=30)
     past_60 = now - timedelta(days=60)
+    # ── Ensure ORM-managed tables exist (not managed by Alembic) ───────────
+    admin_session.execute(text("""
+        CREATE TABLE IF NOT EXISTS signal_metrics (
+            metric_id UUID PRIMARY KEY,
+            signal_name VARCHAR(255) NOT NULL,
+            start_date TIMESTAMP NOT NULL,
+            end_date TIMESTAMP NOT NULL,
+            total_occurrences INTEGER NOT NULL DEFAULT 0,
+            trades_triggered INTEGER NOT NULL DEFAULT 0,
+            trigger_rate DOUBLE PRECISION,
+            winning_trades INTEGER DEFAULT 0,
+            losing_trades INTEGER DEFAULT 0,
+            win_rate DOUBLE PRECISION,
+            avg_pnl VARCHAR(50),
+            total_pnl VARCHAR(50),
+            profit_factor DOUBLE PRECISION,
+            best_market_condition VARCHAR(100),
+            worst_market_condition VARCHAR(100),
+            best_timeframe VARCHAR(50),
+            calculated_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+    admin_session.execute(text("""
+        CREATE TABLE IF NOT EXISTS signal_events (
+            event_id UUID PRIMARY KEY,
+            run_id UUID NOT NULL,
+            variation_id UUID NOT NULL,
+            timestamp TIMESTAMP NOT NULL,
+            signal_name VARCHAR(255) NOT NULL,
+            signal_type VARCHAR(50) NOT NULL,
+            signal_direction VARCHAR(20),
+            instrument_id VARCHAR(100) NOT NULL,
+            price VARCHAR(50) NOT NULL,
+            bar_number INTEGER,
+            signal_strength DOUBLE PRECISION,
+            confidence DOUBLE PRECISION,
+            signal_metadata JSONB,
+            led_to_trade BOOLEAN DEFAULT FALSE,
+            trade_result VARCHAR(20),
+            trade_pnl VARCHAR(50),
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+    admin_session.commit()
 
     # ── Strategies ────────────────────────────────────────────────────────
     admin_session.execute(text("""
