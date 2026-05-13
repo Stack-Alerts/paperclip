@@ -216,6 +216,7 @@ def _run_bug_cli() -> None:
             sum(r.files_indexed for r in catchup_results),
             len(catchup_results),
         )
+    worker_count = len(results)
     results.extend(catchup_results)
 
     errors = len(issues) - worker_count
@@ -456,6 +457,7 @@ def _run_fr_cli() -> None:
         return
 
     results = run_fr_worker(engine, issues, dry_run=args.dry_run)
+    worker_count = len(results)
 
     catchup_results = catch_up_eligible_fr_issues(
         engine, dry_run=args.dry_run
