@@ -78,3 +78,29 @@ class TestPopulateTableSignature:
         assert "def _populate_table(self, report" in SOURCE_TEXT, (
             "_populate_table must accept report parameter"
         )
+
+
+class TestVerificationReset:
+    """Verify _start_verification clears the table before re-population."""
+
+    def test_start_verification_clears_table(self):
+        assert "self._table.setRowCount(0)" in SOURCE_TEXT, (
+            "_start_verification must call setRowCount(0) to clear "
+            "the table before a fresh verification run"
+        )
+
+    def test_on_verify_finished_calls_populate_table(self):
+        assert "_populate_table(report)" in SOURCE_TEXT, (
+            "_on_verify_finished must delegate to _populate_table "
+            "when verification succeeds"
+        )
+
+
+class TestTableInit:
+    """Verify the table starts with the right number of columns."""
+
+    def test_table_has_six_columns(self):
+        assert "QTableWidget(0, 6)" in SOURCE_TEXT, (
+            "The results table must be initialized with 6 columns "
+            "(Timeframe, Status, Gaps Found, Missing Bars, Last Candle, Notes)"
+        )
