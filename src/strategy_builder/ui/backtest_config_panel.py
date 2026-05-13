@@ -805,8 +805,8 @@ class BacktestWorker(QThread):
                             "OPTIMIZER"
                         )
                 
-                # CRITICAL FIX: Check TP/SL price hits BEFORE signal-based exits (Issue #5)
-                # TP/SL exits are MANDATORY and take priority over signal-based exits
+                # CHECK TP/SL HITS - but ONLY if no exit signal from evaluate_bar!
+                # Exit conditions have PRIORITY over TP/SL (institutional hierarchy)
                 if not result.should_exit and evaluator.current_trade and hasattr(evaluator.current_trade, 'tpsl_levels'):
                     current_price = float(current_bar.close)
                     tpsl = evaluator.current_trade.tpsl_levels

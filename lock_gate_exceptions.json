@@ -8,35 +8,40 @@
       "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock gate itself. The gate must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 \u00a71.",
       "expires_iso": null,
       "approval_id": "plan:BTCAAAAA-1479",
-      "approved_by": "board"
+      "approved_by": "board",
+      "state": "active"
     },
     {
       "module": ".module_lock_registry.json",
       "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock registry itself. The registry must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 \u00a71.",
       "expires_iso": null,
       "approval_id": "plan:BTCAAAAA-1479",
-      "approved_by": "board"
+      "approved_by": "board",
+      "state": "active"
     },
     {
       "module": "lock_gate_exceptions.json",
       "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the exceptions file itself. The exceptions file must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 \u00a71.",
       "expires_iso": null,
       "approval_id": "plan:BTCAAAAA-1479",
-      "approved_by": "board"
+      "approved_by": "board",
+      "state": "active"
     },
     {
       "module": ".github/workflows/lock-gate.yml",
       "scope_description": "Bootstrap exception BTCAAAAA-1486: initial creation of the lock gate CI workflow. The workflow must be created before it can enforce itself. Approved per plan BTCAAAAA-1479 \u00a71.",
       "expires_iso": null,
       "approval_id": "plan:BTCAAAAA-1479",
-      "approved_by": "board"
+      "approved_by": "board",
+      "state": "active"
     },
     {
       "module": ".github/ISSUE_TEMPLATE/qa-locked-module-exception.md",
       "scope_description": "Plan BTCAAAAA-1491: update template to include mandatory 4-item QA sign-off checklist. Approved per plan BTCAAAAA-1479 \u00a75 (Layer 5 QA template).",
       "expires_iso": null,
       "approval_id": "plan:BTCAAAAA-1479",
-      "approved_by": "board"
+      "approved_by": "board",
+      "state": "active"
     },
     {
       "module": "src/data_manager",
@@ -44,7 +49,18 @@
       "expires_iso": "2026-05-26",
       "approval_id": "434fe69a-ebac-4beb-8698-d94a7134d31f",
       "approved_by": "board",
-      "cto_agent_id": "41b5ede6-e209-40ba-b923-dc969c722e6d"
+      "cto_agent_id": "41b5ede6-e209-40ba-b923-dc969c722e6d",
+      "files": [
+        {
+          "path": "src/data_manager/unified_manager.py",
+          "lines": "526-531"
+        },
+        {
+          "path": "src/data_manager/binance/rest_client.py",
+          "lines": "296-310"
+        }
+      ],
+      "state": "active"
     }
   ]
 }
