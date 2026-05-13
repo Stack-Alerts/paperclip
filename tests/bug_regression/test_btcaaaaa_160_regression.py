@@ -231,3 +231,96 @@ class TestScanAnchorClipping:
         assert fixed_result["15m"]["gaps_found"] >= 1
         assert fixed_result["15m"]["gaps_repaired"] >= 1
         assert fixed_result["15m"]["bars_fetched"] >= 1
+
+    def test_get_last_bar_timestamp_skips_corrupt_month_file(self, manager):
+        """
+        If one monthly parquet file is corrupt,
+        get_last_bar_timestamp should skip it and try older files.
+        """
+        healthy_ts = datetime(2026, 5, 4, 19, 0, 0)
+        start = healthy_ts - timedelta(minutes=15 * 7)
+        df = _make_ohlcv(start, n=8, freq_minutes=15, timeframe="15m")
+        _write_month_file(manager.binance_dir, "2026-05", df, "15m")
+
+        corrupt_dir = manager.binance_dir / "2026-04"
+        corrupt_dir.mkdir(parents=True, exist_ok=True)
+        corrupt_file = corrupt_dir / "BTCUSDT_PERP_15m_2026-04.parquet"
+        corrupt_file.write_bytes(b"not a valid parquet file")
+
+        ts = manager.get_last_bar_timestamp("15m")
+        assert ts is not None
+        assert ts == healthy_ts.replace(tzinfo=None)
+
+    def test_get_last_bar_timestamp_only_1h_data(self, manager):
+        """
+        When only 1h bars exist on disk,
+        get_last_bar_timestamp returns the correct 1h timestamp.
+        """
+        last_bar_ts = datetime(2026, 5, 4, 19, 0, 0)
+        start = last_bar_ts - timedelta(hours=7)
+        df = _make_ohlcv(start, n=8, freq_minutes=60, timeframe="1h")
+        _write_month_file(manager.binance_dir, "2026-05", df, "1h")
+
+        ts_15m = manager.get_last_bar_timestamp("15m")
+        ts_1h = manager.get_last_bar_timestamp("1h")
+
+        assert ts_15m is None
+        assert ts_1h is not None
+        if ts_1h.tzinfo is not None:
+            ts_1h = ts_1h.replace(tzinfo=None)
+        assert ts_1h == last_bar_ts.replace(tzinfo=None)
+
+    def test_detect_gaps_multiple_gaps_all_reported(self, manager):
+        """
+        When the data has multiple discontinuities, all gaps are reported.
+        The anchor-based start_date includes all bars so no gap is clipped.
+        """
+        bar_a_end = datetime(2026, 5, 4, 19, 0, 0)
+        bar_b_start = datetime(2026, 5, 4, 20, 0, 0)
+        bar_b_end = datetime(2026, 5, 4, 20, 30, 0)
+
+
+        import pandas as pd
+        df_a = _make_ohlcv(bar_a_end - timedelta(minutes=15 * 7), n=8, freq_minutes=15, timeframe="15m")
+        df_b = _make_ohlcv(bar_b_start, n=3, freq_minutes=15, timeframe="15m")
+        combined = pd.concat([df_a, df_b], ignore_index=True)
+        _write_month_file(manager.binance_dir, "2026-05", combined, "15m")
+
+        scan_start = bar_a_end - timedelta(minutes=15)
+        gaps = manager.detect_gaps_in_binance_files(
+            "15m", start_date=scan_start, end_date=bar_b_end
+        )
+
+        assert len(gaps) >= 1
+        found_internal_gap = any(
+            g["gap_start"] == df_a.iloc[-1]["timestamp"]
+            for g in gaps
+        )
+        assert found_internal_gap, (
+            f"Expected an internal gap starting at last bar of block A "
+            f"({df_a.iloc[-1]['timestamp']}), gaps: {gaps}"
+        )
+
+    def test_verify_and_repair_dry_run_does_not_mutate(self, manager):
+        """
+        verify_and_repair(dry_run=True) detects gaps but does not
+        fetch or save any data — the on-disk state remains unchanged.
+        """
+        last_bar_ts = datetime(2026, 5, 4, 19, 0, 0)
+        end_date = datetime(2026, 5, 4, 19, 45, 0)
+
+        start = last_bar_ts - timedelta(minutes=15 * 7)
+        df = _make_ohlcv(start, n=8, freq_minutes=15, timeframe="15m")
+        _write_month_file(manager.binance_dir, "2026-05", df, "15m")
+
+        scan_start = last_bar_ts - timedelta(minutes=15)
+        result = manager.verify_and_repair(
+            timeframes=["15m"],
+            start_date=scan_start,
+            end_date=end_date,
+            dry_run=True,
+        )
+
+        assert result["15m"]["gaps_found"] >= 1
+        assert result["15m"]["gaps_repaired"] == 0
+        assert result["15m"]["bars_fetched"] == 0
