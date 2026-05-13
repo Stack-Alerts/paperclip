@@ -318,7 +318,23 @@ class BinanceRestClient:
         logger.info(f"📊 Fetching {interval} candles from {source}...")
         
         response = self._request(endpoint, params, futures=futures)
-        
+
+        # BTCAAAAA-25416: validate response is a list before DataFrame construction.
+        # Binance may return a dict error payload on 200 for some error scenarios
+        # (e.g. invalid symbol).  Treating a dict as a row would produce NaT/NaN.
+        if not isinstance(response, list):
+            if isinstance(response, dict) and "code" in response:
+                logger.error(
+                    "Binance klines API error: code=%s msg=%s",
+                    response.get("code"), response.get("msg"),
+                )
+            else:
+                logger.error(
+                    "Binance klines returned unexpected type=%s: %s",
+                    type(response).__name__, str(response)[:200],
+                )
+            return pd.DataFrame()
+
         # Convert to DataFrame
         df = pd.DataFrame(response, columns=[
             'open_time', 'open', 'high', 'low', 'close', 'volume',

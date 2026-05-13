@@ -528,15 +528,22 @@ class UnifiedDataManager:
             max_limit = 1500  # Binance API maximum per request
             
             while current_start < end_ms:
-                chunk = client.get_klines(
-                    interval=timeframe,
-                    symbol='BTCUSDT',
-                    limit=max_limit,
-                    futures=True,
-                    start_time=current_start,
-                    end_time=end_ms,
-                )
-                
+                try:
+                    chunk = client.get_klines(
+                        interval=timeframe,
+                        symbol='BTCUSDT',
+                        limit=max_limit,
+                        futures=True,
+                        start_time=current_start,
+                        end_time=end_ms,
+                    )
+                except Exception as api_exc:
+                    logger.error(
+                        "Binance API error at page boundary current_start=%d: %s",
+                        current_start, api_exc,
+                    )
+                    break
+
                 if len(chunk) == 0:
                     break
                 
@@ -548,6 +555,13 @@ class UnifiedDataManager:
                 
                 # Advance startTime past the last bar's open_time for next page
                 last_ts = chunk['timestamp'].iloc[-1]
+                if pd.isna(last_ts):
+                    logger.warning(
+                        "NaT timestamp detected in Binance response at cursor=%d -- "
+                        "terminating pagination to avoid infinite loop",
+                        current_start,
+                    )
+                    break
                 if last_ts.tzinfo is None:
                     last_ts = last_ts.tz_localize('utc')
                 current_start = int(last_ts.timestamp() * 1000) + 1
@@ -1333,7 +1347,17 @@ class UnifiedDataManager:
                              timeframe, cursor, end_ts, exc)
                 break
 
-            if not raw:
+            if not raw or not isinstance(raw, list):
+                if isinstance(raw, dict) and "code" in raw:
+                    logger.error(
+                        "Binance API error response: code=%s msg=%s",
+                        raw.get("code"), raw.get("msg"),
+                    )
+                elif not isinstance(raw, list):
+                    logger.warning(
+                        "Binance returned non-list response type=%s -- aborting page",
+                        type(raw).__name__,
+                    )
                 break
 
             batch = pd.DataFrame(raw, columns=[
@@ -1360,6 +1384,13 @@ class UnifiedDataManager:
 
             # Advance cursor past the last returned candle
             last_ts = batch['timestamp'].iloc[-1]
+            if pd.isna(last_ts):
+                logger.warning(
+                    "NaT timestamp in Binance kline response at cursor=%s -- "
+                    "terminating pagination loop",
+                    cursor,
+                )
+                break
             cursor = last_ts + bar_td
 
             # If the batch is smaller than requested we've reached the end
