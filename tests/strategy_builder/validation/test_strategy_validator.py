@@ -239,6 +239,112 @@ class TestStrategyValidator:
         assert result.is_valid is False
         assert any("duplicate" in error.lower() for error in result.errors)
         
+    def test_validate_direction_consistency_bullish_aligned(self):
+        """Bullish strategy with bullish signals passes"""
+        config = StrategyConfig()
+        config.name = 'BullishStrategy'
+        config.strategy_type = 'Bullish'
+        block = BlockConfig(name='Block1', logic='AND', signals=[])
+        signal = SignalConfig(name='BULLISH_BREAKOUT', logic='AND')
+        signal2 = SignalConfig(name='SUPPORT_BOUNCE', logic='AND')
+        block.signals.extend([signal, signal2])
+        config.blocks.append(block)
+
+        validator = StrategyValidator()
+        result = validator.validate(config)
+
+        direction_errors = [e for e in result.errors if 'directional' in e.lower() or 'bearish' in e.lower() or 'bullish' in e.lower()]
+        assert len(direction_errors) == 0, f'Unexpected direction errors: {direction_errors}'
+
+    def test_validate_direction_consistency_bearish_aligned(self):
+        """Bearish strategy with bearish signals passes"""
+        config = StrategyConfig()
+        config.name = 'BearishStrategy'
+        config.strategy_type = 'Bearish'
+        block = BlockConfig(name='Block1', logic='AND', signals=[])
+        signal = SignalConfig(name='BEARISH_BREAKDOWN', logic='AND')
+        signal2 = SignalConfig(name='RESISTANCE_REJECTION', logic='AND')
+        block.signals.extend([signal, signal2])
+        config.blocks.append(block)
+
+        validator = StrategyValidator()
+        result = validator.validate(config)
+
+        direction_errors = [e for e in result.errors if 'directional' in e.lower() or 'bearish' in e.lower() or 'bullish' in e.lower()]
+        assert len(direction_errors) == 0, f'Unexpected direction errors: {direction_errors}'
+
+    def test_validate_direction_consistency_bullish_mismatch_critical(self):
+        """Bullish strategy with >70% bearish signals fails critical"""
+        config = StrategyConfig()
+        config.name = 'WrongDirectionStrategy'
+        config.strategy_type = 'Bullish'
+        block = BlockConfig(name='Block1', logic='AND', signals=[])
+        # 4 bearish, 1 bullish = 80% bearish → CRITICAL
+        for name in ['BEARISH_BREAKDOWN', 'SHORT_SELL', 'DOWN_TREND', 'RESISTANCE', 'BULLISH_BREAKOUT']:
+            block.signals.append(SignalConfig(name=name, logic='AND'))
+        config.blocks.append(block)
+
+        validator = StrategyValidator()
+        result = validator.validate(config)
+
+        direction_errors = [e for e in result.errors if 'directional' in e.lower() or 'bearish' in e.lower() or 'bullish' in e.lower()]
+        assert len(direction_errors) > 0
+        assert any('CRITICAL' in e for e in direction_errors)
+
+    def test_validate_direction_consistency_bearish_mismatch_critical(self):
+        """Bearish strategy with >70% bullish signals fails critical"""
+        config = StrategyConfig()
+        config.name = 'WrongDirectionStrategy'
+        config.strategy_type = 'Bearish'
+        block = BlockConfig(name='Block1', logic='AND', signals=[])
+        # 4 bullish, 1 bearish = 80% bullish → CRITICAL
+        for name in ['BULLISH_BREAKOUT', 'SUPPORT_BOUNCE', 'UP_TREND', 'BUY_SIGNAL', 'BEARISH_BREAKDOWN']:
+            block.signals.append(SignalConfig(name=name, logic='AND'))
+        config.blocks.append(block)
+
+        validator = StrategyValidator()
+        result = validator.validate(config)
+
+        direction_errors = [e for e in result.errors if 'directional' in e.lower() or 'bearish' in e.lower() or 'bullish' in e.lower()]
+        assert len(direction_errors) > 0
+        assert any('CRITICAL' in e for e in direction_errors)
+
+    def test_validate_direction_consistency_bullish_mismatch_warning(self):
+        """Bullish strategy with slightly more bearish signals warns"""
+        config = StrategyConfig()
+        config.name = 'MixedStrategy'
+        config.strategy_type = 'Bullish'
+        block = BlockConfig(name='Block1', logic='AND', signals=[])
+        # 2 bearish, 1 bullish = 66% bearish → WARNING (not CRITICAL)
+        block.signals.append(SignalConfig(name='BULLISH_BREAKOUT', logic='AND'))
+        block.signals.append(SignalConfig(name='BEARISH_BREAKDOWN', logic='AND'))
+        block.signals.append(SignalConfig(name='SHORT_SELL', logic='AND'))
+        config.blocks.append(block)
+
+        validator = StrategyValidator()
+        result = validator.validate(config)
+
+        direction_errors = [e for e in result.errors if 'directional' in e.lower() or 'bearish' in e.lower() or 'bullish' in e.lower()]
+        assert len(direction_errors) > 0
+        assert any('WARNING' in e for e in direction_errors)
+        assert not any('CRITICAL' in e for e in direction_errors)
+
+    def test_validate_direction_consistency_no_directional_signals(self):
+        """Strategy with no directional signals passes"""
+        config = StrategyConfig()
+        config.name = 'NeutralStrategy'
+        config.strategy_type = 'Bullish'
+        block = BlockConfig(name='Block1', logic='AND', signals=[])
+        block.signals.append(SignalConfig(name='SIGNAL_A', logic='AND'))
+        block.signals.append(SignalConfig(name='SIGNAL_B', logic='AND'))
+        config.blocks.append(block)
+
+        validator = StrategyValidator()
+        result = validator.validate(config)
+
+        direction_errors = [e for e in result.errors if 'directional' in e.lower() or 'bearish' in e.lower() or 'bullish' in e.lower()]
+        assert len(direction_errors) == 0
+
     # Helper methods
     def _create_valid_strategy(self):
         """Create a valid strategy for testing"""

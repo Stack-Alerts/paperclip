@@ -165,6 +165,29 @@ class ConfigValidators:
         return False
 
     @staticmethod
+    def validate_direction_consistency(config: StrategyConfig) -> List[str]:
+        warnings = []
+        strategy_type = config.strategy_type.lower()
+        bullish_keywords = ["bullish", "long", "buy"]
+        bearish_keywords = ["bearish", "short", "sell"]
+        for block in config.blocks:
+            for signal in block.signals:
+                signal_lower = signal.name.lower()
+                has_bullish = any(kw in signal_lower for kw in bullish_keywords)
+                has_bearish = any(kw in signal_lower for kw in bearish_keywords)
+                if strategy_type == "bullish" and has_bearish and not has_bullish:
+                    warnings.append(
+                        f"Signal '{block.name}.{signal.name}' contains bearish keywords "
+                        f"but strategy_type is '{config.strategy_type}'"
+                    )
+                elif strategy_type == "bearish" and has_bullish and not has_bearish:
+                    warnings.append(
+                        f"Signal '{block.name}.{signal.name}' contains bullish keywords "
+                        f"but strategy_type is '{config.strategy_type}'"
+                    )
+        return warnings
+
+    @staticmethod
     def validate_recheck_config(signal: SignalConfig) -> List[str]:
         """
         Validate RECHECK configuration for a signal.
@@ -511,6 +534,10 @@ class StrategyConfigEngine:
         if self.validators.has_circular_dependencies(self.config):
             errors.append("Circular dependencies detected in block structure")
         
+        # Direction consistency warnings
+        direction_warnings = self.validators.validate_direction_consistency(self.config)
+        warnings.extend(direction_warnings)
+
         # Warnings for best practices
         if self.config.required_signals == 0:
             warnings.append("Strategy has no required (AND) signals")

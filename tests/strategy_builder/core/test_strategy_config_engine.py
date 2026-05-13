@@ -331,3 +331,84 @@ class TestStrategyConfigEngineIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestDirectionConsistency:
+    """Test direction consistency validation"""
+
+    def test_bullish_strategy_with_bearish_signal_warns(self):
+        """Bullish strategy with bearish signal produces warning"""
+        engine = StrategyConfigEngine(registry=None)
+        engine.config.strategy_type = "Bullish"
+        engine.add_block("Block1", logic="AND")
+        engine.add_signal("Block1", "BEARISH_BREAKDOWN", logic="AND")
+
+        result = engine.validate()
+        assert result.valid is True
+        assert any("bearish" in w.lower() and "BEARISH_BREAKDOWN" in w for w in result.warnings)
+
+    def test_bearish_strategy_with_bullish_signal_warns(self):
+        """Bearish strategy with bullish signal produces warning"""
+        engine = StrategyConfigEngine(registry=None)
+        engine.config.strategy_type = "Bearish"
+        engine.add_block("Block1", logic="AND")
+        engine.add_signal("Block1", "BULLISH_BREAKOUT", logic="AND")
+
+        result = engine.validate()
+        assert result.valid is True
+        assert any("bullish" in w.lower() and "BULLISH_BREAKOUT" in w for w in result.warnings)
+
+    def test_bullish_strategy_with_bullish_signal_clean(self):
+        """Bullish strategy with bullish signal produces no warning"""
+        engine = StrategyConfigEngine(registry=None)
+        engine.config.strategy_type = "Bullish"
+        engine.add_block("Block1", logic="AND")
+        engine.add_signal("Block1", "BULLISH_BREAKOUT", logic="AND")
+
+        result = engine.validate()
+        assert result.valid is True
+        assert not any("direction" in w.lower() for w in result.warnings)
+
+    def test_bearish_strategy_with_bearish_signal_clean(self):
+        """Bearish strategy with bearish signal produces no warning"""
+        engine = StrategyConfigEngine(registry=None)
+        engine.config.strategy_type = "Bearish"
+        engine.add_block("Block1", logic="AND")
+        engine.add_signal("Block1", "BEARISH_BREAKDOWN", logic="AND")
+
+        result = engine.validate()
+        assert result.valid is True
+        assert not any("direction" in w.lower() for w in result.warnings)
+
+    def test_neutral_signal_no_warning(self):
+        """Neutral signal (no direction keywords) produces no warning"""
+        engine = StrategyConfigEngine(registry=None)
+        engine.config.strategy_type = "Bullish"
+        engine.add_block("Block1", logic="AND")
+        engine.add_signal("Block1", "HIGH_VOLUME", logic="AND")
+
+        result = engine.validate()
+        assert result.valid is True
+        assert not any("direction" in w.lower() for w in result.warnings)
+
+    def test_long_keyword_triggers_bullish_detection(self):
+        """"long" in signal name is treated as bullish"""
+        engine = StrategyConfigEngine(registry=None)
+        engine.config.strategy_type = "Bearish"
+        engine.add_block("Block1", logic="AND")
+        engine.add_signal("Block1", "LONG_ENTRY", logic="AND")
+
+        result = engine.validate()
+        assert result.valid is True
+        assert any("bullish" in w.lower() for w in result.warnings)
+
+    def test_short_keyword_triggers_bearish_detection(self):
+        """"short" in signal name is treated as bearish"""
+        engine = StrategyConfigEngine(registry=None)
+        engine.config.strategy_type = "Bullish"
+        engine.add_block("Block1", logic="AND")
+        engine.add_signal("Block1", "SHORT_EXIT", logic="AND")
+
+        result = engine.validate()
+        assert result.valid is True
+        assert any("bearish" in w.lower() for w in result.warnings)

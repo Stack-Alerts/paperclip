@@ -168,6 +168,18 @@ class StrategyValidator:
     VALID_LOGICS = ["AND", "OR"]
     MAX_RECOMMENDED_BLOCKS = 15
     MAX_RECOMMENDED_SIGNALS_PER_BLOCK = 10
+
+    BULLISH_KEYWORDS = [
+        'BULLISH', 'LONG', 'BUY', 'ABOVE', 'OVER', 'UP', 'HIGHER',
+        'BREAKOUT', 'SUPPORT', 'BOUNCE', 'REVERSAL_UP', 'UPTREND',
+        'ACCUMULATION', 'REACCUMULATION', 'SPRING', 'SOS', 'LPS'
+    ]
+
+    BEARISH_KEYWORDS = [
+        'BEARISH', 'SHORT', 'SELL', 'BELOW', 'UNDER', 'DOWN', 'LOWER',
+        'BREAKDOWN', 'RESISTANCE', 'REJECTION', 'REVERSAL_DOWN', 'DOWNTREND',
+        'DISTRIBUTION', 'REDISTRIBUTION', 'UPTHRUST', 'SOW', 'LPSY'
+    ]
     
     def __init__(self):
         """Initialize validator with rules"""
@@ -206,6 +218,11 @@ class StrategyValidator:
             ValidationRule(
                 name="no_duplicates",
                 description="No duplicate block or signal names",
+                level=ValidationLevel.STANDARD
+            ),
+            ValidationRule(
+                name="direction_consistency",
+                description="Signal directions must be consistent with strategy_type (Bullish/Bearish)",
                 level=ValidationLevel.STANDARD
             ),
             ValidationRule(
@@ -291,6 +308,9 @@ class StrategyValidator:
         # Validate timing constraints
         errors.extend(self._validate_timing_constraints(config))
         
+        # Validate direction consistency (BTCAAAAA-25552)
+        errors.extend(self._validate_direction_consistency(config))
+        
         # Check for duplicates
         errors.extend(self._check_duplicates(config))
         
@@ -343,6 +363,63 @@ class StrategyValidator:
                         
         return errors
         
+    def _validate_direction_consistency(self, config: StrategyConfig) -> List[str]:
+        """Validate signal directions are consistent with declared strategy_type.
+        
+        Counts bullish vs bearish keywords in signal names and compares
+        against strategy_type (Bullish/Bearish).
+        
+        Critical mismatch: >70% signals opposite to strategy_type
+        Warning mismatch: >50% signals opposite to strategy_type
+        """
+        errors = []
+        
+        if not config.strategy_type:
+            return errors
+        
+        if config.strategy_type not in ("Bullish", "Bearish"):
+            return errors
+        
+        bullish_count = 0
+        bearish_count = 0
+        
+        for block in config.blocks:
+            for signal in block.signals:
+                signal_upper = signal.name.upper()
+                is_bullish = any(k in signal_upper for k in self.BULLISH_KEYWORDS)
+                is_bearish = any(k in signal_upper for k in self.BEARISH_KEYWORDS)
+                if is_bullish:
+                    bullish_count += 1
+                if is_bearish:
+                    bearish_count += 1
+        
+        total_directional = bullish_count + bearish_count
+        if total_directional == 0:
+            return errors
+        
+        if config.strategy_type == "Bullish":
+            bearish_pct = bearish_count / total_directional * 100
+            if bearish_pct > 70:
+                errors.append(
+                    f"Strategy type is 'Bullish' but {bearish_pct:.0f}% of directional signals are bearish (CRITICAL)"
+                )
+            elif bearish_count > bullish_count:
+                errors.append(
+                    "Strategy type is 'Bullish' but has more bearish signals than bullish (WARNING)"
+                )
+        elif config.strategy_type == "Bearish":
+            bullish_pct = bullish_count / total_directional * 100
+            if bullish_pct > 70:
+                errors.append(
+                    f"Strategy type is 'Bearish' but {bullish_pct:.0f}% of directional signals are bullish (CRITICAL)"
+                )
+            elif bullish_count > bearish_count:
+                errors.append(
+                    "Strategy type is 'Bearish' but has more bullish signals than bearish (WARNING)"
+                )
+        
+        return errors
+
     def _check_duplicates(self, config: StrategyConfig) -> List[str]:
         """Check for duplicate block and signal names"""
         errors = []
