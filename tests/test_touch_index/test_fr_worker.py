@@ -858,8 +858,11 @@ class TestMain:
         mock_transition.assert_called_once_with("id-1", "done")
         assert any("VALIDATION PASSED" in r.message for r in caplog.records)
 
-    def test_main_validate_polling_failed(self, monkeypatch):
-        """--validate with issues: validation failure exits non-zero, no transition."""
+    def test_main_validate_polling_failed(self, monkeypatch, caplog):
+        """--validate with issues: validation failure exits non-zero, no transition,
+        and 'FR worker done' log is not emitted (regression: BTCAAAAA-25413)."""
+        import logging
+
         engine = MagicMock()
         issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "description": ""}]
         worker_results = [
@@ -881,6 +884,7 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
+            caplog.at_level(logging.INFO),
         ):
             mock_quality.return_value.passed = False
             monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
@@ -889,6 +893,8 @@ class TestMain:
 
         assert exc_info.value.code == 1
         mock_transition.assert_not_called()
+        done_logs = [r for r in caplog.records if "FR worker done" in r.message]
+        assert len(done_logs) == 0
 
     def test_main_validate_no_issues_passed(self, monkeypatch, caplog):
         """--validate with no issues: validation runs on existing data."""
