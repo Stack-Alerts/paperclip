@@ -1380,7 +1380,7 @@ class TestMain:
     # -------------------------------------------------------------------
 
     def test_main_json_summary_single_issue(self, monkeypatch, capsys):
-        """--json-summary with --issue-id outputs JSON to stdout."""
+        """--json-summary with --issue-id outputs JSON including issue_status."""
         engine = MagicMock()
         result = FRIngestionResult(
             issue_identifier="BTCAAAAA-100",
@@ -1388,6 +1388,7 @@ class TestMain:
             files_indexed=2,
             source="comments",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -1416,6 +1417,40 @@ class TestMain:
         assert data["mode"] == "single-issue"
         assert data["result"]["issue_identifier"] == "BTCAAAAA-100"
         assert data["result"]["files_indexed"] == 2
+        assert data["result"]["issue_status"] == "done"
+
+    def test_main_json_summary_single_issue_none_status(self, monkeypatch, capsys):
+        """--json-summary with --issue-id emits issue_status=None when unset."""
+        engine = MagicMock()
+        result = FRIngestionResult(
+            issue_identifier="BTCAAAAA-101",
+            issue_id="uuid-2",
+            files_indexed=1,
+            source="git",
+            skipped_no_commits=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.fr_worker.process_fr_issue", return_value=result
+            ) as mock_process,
+            patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status_board"
+            ) as mock_transition,
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "uuid-2", "--json-summary"],
+            )
+            main()
+
+        captured = capsys.readouterr()
+        import json
+        data = json.loads(captured.out.strip())
+        assert data["result"]["issue_status"] is None
 
     def test_main_json_summary_polling(self, monkeypatch, capsys):
         """--json-summary in polling mode outputs JSON to stdout."""
