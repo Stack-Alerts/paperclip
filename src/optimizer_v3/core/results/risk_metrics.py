@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 import numpy as np
 from scipy import stats
 from nautilus_trader.model.objects import Money, Quantity, Price
+from nautilus_trader.model.currencies import USD
 from dotenv import load_dotenv
 import os
 
@@ -102,7 +103,7 @@ class RiskMetrics:
         Uses actual historical returns distribution
         """
         if not returns or len(returns) < 10:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         returns_array = np.array([float(r) for r in returns])
         
@@ -110,7 +111,7 @@ class RiskMetrics:
         percentile = (1 - confidence) * 100
         var = np.percentile(returns_array, percentile)
         
-        return Money(str(abs(var)), 'USD')
+        return Money(str(abs(var)), USD)
     
     def _calculate_parametric_var(self,
                                   returns: List[Decimal],
@@ -121,7 +122,7 @@ class RiskMetrics:
         Assumes normal distribution of returns
         """
         if not returns or len(returns) < 10:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         returns_array = np.array([float(r) for r in returns])
         
@@ -135,7 +136,7 @@ class RiskMetrics:
         # VaR = mean + z_score * std_dev
         var = mean_return + z_score * std_dev
         
-        return Money(str(abs(var)), 'USD')
+        return Money(str(abs(var)), USD)
     
     def _calculate_monte_carlo_var(self,
                                    returns: List[Decimal],
@@ -146,7 +147,7 @@ class RiskMetrics:
         Uses Monte Carlo simulation with historical parameters
         """
         if not returns or len(returns) < 10:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         returns_array = np.array([float(r) for r in returns])
         
@@ -166,7 +167,7 @@ class RiskMetrics:
         percentile = (1 - confidence) * 100
         var = np.percentile(simulated_returns, percentile)
         
-        return Money(str(abs(var)), 'USD')
+        return Money(str(abs(var)), USD)
     
     # ==================== Expected Shortfall ====================
     
@@ -179,7 +180,7 @@ class RiskMetrics:
         Average of losses beyond VaR threshold
         """
         if not returns or len(returns) < 10:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         returns_array = np.array([float(r) for r in returns])
         
@@ -191,11 +192,11 @@ class RiskMetrics:
         tail_losses = returns_array[returns_array <= var_threshold]
         
         if len(tail_losses) == 0:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         es = np.mean(tail_losses)
         
-        return Money(str(abs(es)), 'USD')
+        return Money(str(abs(es)), USD)
     
     def _calculate_parametric_es(self,
                                  returns: List[Decimal],
@@ -206,7 +207,7 @@ class RiskMetrics:
         Uses normal distribution assumption
         """
         if not returns or len(returns) < 10:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         returns_array = np.array([float(r) for r in returns])
         
@@ -221,7 +222,7 @@ class RiskMetrics:
         pdf_z = stats.norm.pdf(z_score)
         es = mean_return - std_dev * pdf_z / (1 - confidence)
         
-        return Money(str(abs(es)), 'USD')
+        return Money(str(abs(es)), USD)
     
     # ==================== Drawdown Analysis ====================
     
@@ -260,10 +261,10 @@ class RiskMetrics:
         dd_distribution = self._calculate_drawdown_distribution(drawdown_periods)
         
         return {
-            'max_drawdown_money': Money(str(max_dd['amount']), 'USD'),
+            'max_drawdown_money': Money(str(max_dd['amount']), USD),
             'max_drawdown_percent': Decimal(str(max_dd['percent'])),
             'max_drawdown_duration': max_dd['duration'],
-            'average_drawdown_money': Money(str(avg_dd['amount']), 'USD'),
+            'average_drawdown_money': Money(str(avg_dd['amount']), USD),
             'average_drawdown_percent': Decimal(str(avg_dd['percent'])),
             'average_drawdown_duration': avg_dd_duration,
             'total_drawdown_periods': len(drawdown_periods),
@@ -633,17 +634,17 @@ class RiskMetrics:
     
     def _get_trade_pnl(self, trade: Dict) -> Money:
         """Get trade PnL"""
-        pnl = trade.get('pnl', Money('0', 'USD'))
+        pnl = trade.get('pnl', Money('0', USD))
         if isinstance(pnl, Money):
             return pnl
-        return Money(str(pnl), 'USD')
+        return Money(str(pnl), USD)
     
     def _get_trade_capital_start(self, trade: Dict) -> Money:
         """Get trade starting capital"""
-        capital = trade.get('capital_start', Money('10000', 'USD'))
+        capital = trade.get('capital_start', Money('10000', USD))
         if isinstance(capital, Money):
             return capital
-        return Money(str(capital), 'USD')
+        return Money(str(capital), USD)
     
     def _empty_risk_metrics(self) -> Dict:
         """Return empty risk metrics"""

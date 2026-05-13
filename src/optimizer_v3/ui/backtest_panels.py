@@ -17,6 +17,7 @@ import multiprocessing as mp
 import psutil
 
 from nautilus_trader.model.objects import Price, Quantity, Money
+from nautilus_trader.model.currencies import USD
 
 # Import all styles from centralized stylesheet
 from src.strategy_builder.ui.styles import (
@@ -331,16 +332,16 @@ class BacktestConfigurationPanel(QWidget):
     def __init__(self):
         super().__init__()
         # Initialize with default values
-        self.starting_capital = Money('1000', 'USD')
+        self.starting_capital = Money('1000', USD)
         self.capital_range = (
-            Money('500', 'USD'),
-            Money('5000000', 'USD')
+            Money('500', USD),
+            Money('5000000', USD)
         )
         self.capital_step = {
-            'micro': Money('100', 'USD'),
-            'small': Money('500', 'USD'),
-            'medium': Money('1000', 'USD'),
-            'large': Money('5000', 'USD')
+            'micro': Money('100', USD),
+            'small': Money('500', USD),
+            'medium': Money('1000', USD),
+            'large': Money('5000', USD)
         }
         self.risk_params = {
             'min_risk_reward': Decimal('2.0'),
@@ -392,7 +393,7 @@ class BacktestConfigurationPanel(QWidget):
     def set_starting_capital(self, amount: str):
         """Set starting capital amount"""
         try:
-            self.starting_capital = Money(amount, 'USD')
+            self.starting_capital = Money(amount, USD)
         except ValueError as e:
             raise ValueError(f"Invalid starting capital: {str(e)}")
     

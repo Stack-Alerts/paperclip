@@ -9,6 +9,7 @@ from pathlib import Path
 from decimal import Decimal
 from datetime import datetime, timedelta
 from nautilus_trader.model.objects import Money, Quantity, Price
+from nautilus_trader.model.currencies import USD
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
@@ -27,7 +28,7 @@ def sample_trades():
     """Create sample trades for testing"""
     trades = []
     base_time = datetime(2024, 1, 1, 9, 0)
-    capital = Money('10000', 'USD')
+    capital = Money('10000', USD)
     
     # Create 50 trades with varying outcomes
     for i in range(50):
@@ -39,15 +40,15 @@ def sample_trades():
             'trade_id': f'TRADE_{i}',
             'entry_time': base_time + timedelta(hours=i),
             'exit_time': base_time + timedelta(hours=i, minutes=30),
-            'pnl': Money(pnl_amount, 'USD'),
+            'pnl': Money(pnl_amount, USD),
             'capital_start': capital,
-            'capital_end': Money(str(capital.as_decimal() + Decimal(pnl_amount)), 'USD'),
-            'quantity': Quantity('0.1'),
-            'entry_price': Price('50000'),
+            'capital_end': Money(str(capital.as_decimal() + Decimal(pnl_amount)), USD),
+            'quantity': Quantity.from_str('0.1'),
+            'entry_price': Price.from_str('50000'),
             'exit_price': Price('50100' if is_winner else '49950'),
             'side': 'BUY',
-            'commission': Money('2.5', 'USD'),
-            'slippage': Money('0.5', 'USD')
+            'commission': Money('2.5', USD),
+            'slippage': Money('0.5', USD)
         }
         
         trades.append(trade)
@@ -61,8 +62,8 @@ def minimal_trades():
     """Create minimal set of trades (below threshold)"""
     return [
         {
-            'pnl': Money('100', 'USD'),
-            'capital_start': Money('10000', 'USD'),
+            'pnl': Money('100', USD),
+            'capital_start': Money('10000', USD),
             'entry_time': datetime.now(),
             'exit_time': datetime.now() + timedelta(hours=1)
         }
@@ -179,14 +180,14 @@ class TestInstitutionalMetrics:
         """Test with all winning trades"""
         trades = [
             {
-                'pnl': Money('100', 'USD'),
-                'capital_start': Money('10000', 'USD'),
-                'capital_end': Money('10100', 'USD'),
+                'pnl': Money('100', USD),
+                'capital_start': Money('10000', USD),
+                'capital_end': Money('10100', USD),
                 'entry_time': datetime.now() + timedelta(hours=i),
                 'exit_time': datetime.now() + timedelta(hours=i, minutes=30),
-                'quantity': Quantity('0.1'),
-                'entry_price': Price('50000'),
-                'exit_price': Price('50100')
+                'quantity': Quantity.from_str('0.1'),
+                'entry_price': Price.from_str('50000'),
+                'exit_price': Price.from_str('50100')
             }
             for i in range(50)
         ]
@@ -200,14 +201,14 @@ class TestInstitutionalMetrics:
         """Test with all losing trades"""
         trades = [
             {
-                'pnl': Money('-50', 'USD'),
-                'capital_start': Money('10000', 'USD'),
-                'capital_end': Money('9950', 'USD'),
+                'pnl': Money('-50', USD),
+                'capital_start': Money('10000', USD),
+                'capital_end': Money('9950', USD),
                 'entry_time': datetime.now() + timedelta(hours=i),
                 'exit_time': datetime.now() + timedelta(hours=i, minutes=30),
-                'quantity': Quantity('0.1'),
-                'entry_price': Price('50000'),
-                'exit_price': Price('49950')
+                'quantity': Quantity.from_str('0.1'),
+                'entry_price': Price.from_str('50000'),
+                'exit_price': Price.from_str('49950')
             }
             for i in range(50)
         ]
@@ -221,14 +222,14 @@ class TestInstitutionalMetrics:
         """Test with exactly minimum trades"""
         trades = [
             {
-                'pnl': Money('100', 'USD'),
-                'capital_start': Money('10000', 'USD'),
-                'capital_end': Money('10100', 'USD'),
+                'pnl': Money('100', USD),
+                'capital_start': Money('10000', USD),
+                'capital_end': Money('10100', USD),
                 'entry_time': datetime.now() + timedelta(hours=i),
                 'exit_time': datetime.now() + timedelta(hours=i, minutes=30),
-                'quantity': Quantity('0.1'),
-                'entry_price': Price('50000'),
-                'exit_price': Price('50100')
+                'quantity': Quantity.from_str('0.1'),
+                'entry_price': Price.from_str('50000'),
+                'exit_price': Price.from_str('50100')
             }
             for i in range(30)  # Minimum threshold
         ]
@@ -242,14 +243,14 @@ class TestInstitutionalMetrics:
         """Test handling of zero capital"""
         trades = [
             {
-                'pnl': Money('0', 'USD'),
-                'capital_start': Money('0', 'USD'),
-                'capital_end': Money('0', 'USD'),
+                'pnl': Money('0', USD),
+                'capital_start': Money('0', USD),
+                'capital_end': Money('0', USD),
                 'entry_time': datetime.now(),
                 'exit_time': datetime.now() + timedelta(hours=1),
-                'quantity': Quantity('0'),
-                'entry_price': Price('50000'),
-                'exit_price': Price('50000')
+                'quantity': Quantity.from_str('0'),
+                'entry_price': Price.from_str('50000'),
+                'exit_price': Price.from_str('50000')
             }
         ]
         
@@ -285,7 +286,7 @@ class TestInstitutionalMetrics:
     
     def test_money_to_decimal_conversion(self, metrics_calculator):
         """Test Money to Decimal conversion"""
-        money = Money('123.456', 'USD')
+        money = Money('123.456', USD)
         result = metrics_calculator._money_to_decimal(money)
         
         assert isinstance(result, Decimal)
@@ -294,10 +295,10 @@ class TestInstitutionalMetrics:
     def test_is_winning_trade(self, metrics_calculator):
         """Test winning trade identification"""
         winning_trade = {
-            'pnl': Money('100', 'USD')
+            'pnl': Money('100', USD)
         }
         losing_trade = {
-            'pnl': Money('-50', 'USD')
+            'pnl': Money('-50', USD)
         }
         
         assert metrics_calculator._is_winning_trade(winning_trade) is True
@@ -312,14 +313,14 @@ class TestInstitutionalMetrics:
         # Create 1000 trades
         trades = [
             {
-                'pnl': Money('100', 'USD') if i % 2 == 0 else Money('-50', 'USD'),
-                'capital_start': Money('10000', 'USD'),
-                'capital_end': Money('10050', 'USD'),
+                'pnl': Money('100', USD) if i % 2 == 0 else Money('-50', USD),
+                'capital_start': Money('10000', USD),
+                'capital_end': Money('10050', USD),
                 'entry_time': datetime.now() + timedelta(hours=i),
                 'exit_time': datetime.now() + timedelta(hours=i, minutes=30),
-                'quantity': Quantity('0.1'),
-                'entry_price': Price('50000'),
-                'exit_price': Price('50100')
+                'quantity': Quantity.from_str('0.1'),
+                'entry_price': Price.from_str('50000'),
+                'exit_price': Price.from_str('50100')
             }
             for i in range(1000)
         ]

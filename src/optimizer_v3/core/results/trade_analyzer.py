@@ -16,6 +16,7 @@ from collections import defaultdict
 import numpy as np
 from scipy import stats
 from nautilus_trader.model.objects import Money, Quantity, Price
+from nautilus_trader.model.currencies import USD
 from dotenv import load_dotenv
 import os
 
@@ -111,8 +112,8 @@ class TradeAnalyzer:
                     'hour': hour_data['hour'],
                     'trade_count': 0,
                     'win_rate': Decimal('0'),
-                    'avg_pnl': Money('0', 'USD'),
-                    'total_pnl': Money('0', 'USD'),
+                    'avg_pnl': Money('0', USD),
+                    'total_pnl': Money('0', USD),
                     'avg_duration': timedelta(),
                     'statistical_significance': False
                 })
@@ -139,8 +140,8 @@ class TradeAnalyzer:
                 'hour': hour_data['hour'],
                 'trade_count': len(hour_trades),
                 'win_rate': win_rate,
-                'avg_pnl': Money(str(total_pnl / Decimal(len(hour_trades))), 'USD'),
-                'total_pnl': Money(str(total_pnl), 'USD'),
+                'avg_pnl': Money(str(total_pnl / Decimal(len(hour_trades))), USD),
+                'total_pnl': Money(str(total_pnl), USD),
                 'avg_duration': avg_duration,
                 'statistical_significance': significant
             })
@@ -180,8 +181,8 @@ class TradeAnalyzer:
                     'day_num': day_data['day_num'],
                     'trade_count': 0,
                     'win_rate': Decimal('0'),
-                    'avg_pnl': Money('0', 'USD'),
-                    'total_pnl': Money('0', 'USD'),
+                    'avg_pnl': Money('0', USD),
+                    'total_pnl': Money('0', USD),
                     'statistical_significance': False
                 })
                 continue
@@ -202,8 +203,8 @@ class TradeAnalyzer:
                 'day_num': day_data['day_num'],
                 'trade_count': len(day_trades),
                 'win_rate': win_rate,
-                'avg_pnl': Money(str(total_pnl / Decimal(len(day_trades))), 'USD'),
-                'total_pnl': Money(str(total_pnl), 'USD'),
+                'avg_pnl': Money(str(total_pnl / Decimal(len(day_trades))), USD),
+                'total_pnl': Money(str(total_pnl), USD),
                 'statistical_significance': significant
             })
         
@@ -248,8 +249,8 @@ class TradeAnalyzer:
                 'condition': condition,
                 'trade_count': 0,
                 'win_rate': Decimal('0'),
-                'avg_pnl': Money('0', 'USD'),
-                'total_pnl': Money('0', 'USD')
+                'avg_pnl': Money('0', USD),
+                'total_pnl': Money('0', USD)
             }
         
         wins = sum(1 for t in trades if self._is_winning_trade(t))
@@ -261,8 +262,8 @@ class TradeAnalyzer:
             'condition': condition,
             'trade_count': len(trades),
             'win_rate': Decimal(wins) / Decimal(len(trades)),
-            'avg_pnl': Money(str(total_pnl / Decimal(len(trades))), 'USD'),
-            'total_pnl': Money(str(total_pnl), 'USD')
+            'avg_pnl': Money(str(total_pnl / Decimal(len(trades))), USD),
+            'total_pnl': Money(str(total_pnl), USD)
         }
     
     # ==================== Quality Analysis ====================
@@ -340,15 +341,15 @@ class TradeAnalyzer:
         slippages = []
         
         for trade in trades:
-            slippage = trade.get('slippage', Money('0', 'USD'))
+            slippage = trade.get('slippage', Money('0', USD))
             slippage_value = self._money_to_decimal(slippage)
             slippages.append(slippage_value)
         
         if not slippages:
             return {
-                'avg_slippage': Money('0', 'USD'),
-                'max_slippage': Money('0', 'USD'),
-                'total_slippage': Money('0', 'USD'),
+                'avg_slippage': Money('0', USD),
+                'max_slippage': Money('0', USD),
+                'total_slippage': Money('0', USD),
                 'problematic_trades': 0
             }
         
@@ -358,9 +359,9 @@ class TradeAnalyzer:
         problematic = np.sum(np.abs(slippages_array) > threshold)
         
         return {
-            'avg_slippage': Money(str(Decimal(str(np.mean(slippages_array)))), 'USD'),
-            'max_slippage': Money(str(max(slippages, key=abs)), 'USD'),
-            'total_slippage': Money(str(sum(slippages)), 'USD'),
+            'avg_slippage': Money(str(Decimal(str(np.mean(slippages_array)))), USD),
+            'max_slippage': Money(str(max(slippages, key=abs)), USD),
+            'total_slippage': Money(str(sum(slippages)), USD),
             'problematic_trades': int(problematic)
         }
     
@@ -370,7 +371,7 @@ class TradeAnalyzer:
         total_pnl = Decimal('0')
         
         for trade in trades:
-            commission = trade.get('commission', Money('0', 'USD'))
+            commission = trade.get('commission', Money('0', USD))
             pnl = self._get_trade_pnl(trade)
             
             total_commission += self._money_to_decimal(commission)
@@ -382,8 +383,8 @@ class TradeAnalyzer:
             impact_pct = abs(total_commission) / abs(total_pnl)
         
         return {
-            'total_commission': Money(str(total_commission), 'USD'),
-            'avg_commission_per_trade': Money(str(total_commission / Decimal(len(trades))), 'USD') if trades else Money('0', 'USD'),
+            'total_commission': Money(str(total_commission), USD),
+            'avg_commission_per_trade': Money(str(total_commission / Decimal(len(trades))), USD) if trades else Money('0', USD),
             'commission_as_pct_of_pnl': impact_pct,
             'excessive_impact': impact_pct > Decimal(str(self.config['commission_impact']))
         }
@@ -440,8 +441,8 @@ class TradeAnalyzer:
             results[setup] = {
                 'trade_count': total_trades,
                 'win_rate': win_rate,
-                'total_pnl': Money(str(stats['total_pnl']), 'USD'),
-                'avg_pnl': Money(str(stats['total_pnl'] / Decimal(total_trades)), 'USD') if total_trades > 0 else Money('0', 'USD')
+                'total_pnl': Money(str(stats['total_pnl']), USD),
+                'avg_pnl': Money(str(stats['total_pnl'] / Decimal(total_trades)), USD) if total_trades > 0 else Money('0', USD)
             }
         
         return results
@@ -554,7 +555,7 @@ class TradeAnalyzer:
         volumes = []
         
         for trade in trades:
-            quantity = trade.get('quantity', Quantity('0'))
+            quantity = trade.get('quantity', Quantity.from_str('0'))
             if isinstance(quantity, Quantity):
                 volumes.append(float(quantity.as_decimal()))
             else:
@@ -738,7 +739,7 @@ class TradeAnalyzer:
                 # Get exit condition details
                 exit_condition_name = trade.get('exit_condition_name', 'Unknown')
                 exit_percentage = trade.get('partial_exit_percentage', Decimal('0'))
-                exit_price = trade.get('exit_price', Price('0'))
+                exit_price = trade.get('exit_price', Price.from_str('0'))
                 
                 # Track by condition name
                 exits_by_condition[exit_condition_name]['count'] += 1
@@ -783,7 +784,7 @@ class TradeAnalyzer:
                     'USD'
                 )
                 condition_stats['avg_percentage'] /= Decimal(condition_stats['count'])
-                condition_stats['total_pnl'] = Money(str(condition_stats['total_pnl']), 'USD')
+                condition_stats['total_pnl'] = Money(str(condition_stats['total_pnl']), USD)
         
         # Find best and worst performing exit conditions
         best_exit = None
@@ -792,21 +793,21 @@ class TradeAnalyzer:
         if exits_by_condition:
             sorted_exits = sorted(
                 exits_by_condition.items(),
-                key=lambda x: self._money_to_decimal(x[1].get('avg_pnl', Money('0', 'USD'))),
+                key=lambda x: self._money_to_decimal(x[1].get('avg_pnl', Money('0', USD))),
                 reverse=True
             )
             
             if sorted_exits:
                 best_exit = {
                     'name': sorted_exits[0][0],
-                    'avg_pnl': sorted_exits[0][1].get('avg_pnl', Money('0', 'USD')),
+                    'avg_pnl': sorted_exits[0][1].get('avg_pnl', Money('0', USD)),
                     'count': sorted_exits[0][1]['count']
                 }
                 
             if len(sorted_exits) > 1:
                 worst_exit = {
                     'name': sorted_exits[-1][0],
-                    'avg_pnl': sorted_exits[-1][1].get('avg_pnl', Money('0', 'USD')),
+                    'avg_pnl': sorted_exits[-1][1].get('avg_pnl', Money('0', USD)),
                     'count': sorted_exits[-1][1]['count']
                 }
         
@@ -840,7 +841,7 @@ class TradeAnalyzer:
         
         return {
             'total_exit_condition_triggers': len(exit_condition_trades),
-            'exit_condition_pnl': Money(str(total_exit_pnl), 'USD'),
+            'exit_condition_pnl': Money(str(total_exit_pnl), USD),
             'exit_condition_vs_tp_comparison': {
                 'better_than_tp': exit_vs_tp_better,
                 'worse_than_tp': exit_vs_tp_worse,
@@ -868,10 +869,10 @@ class TradeAnalyzer:
     
     def _get_trade_pnl(self, trade: Dict) -> Money:
         """Get trade PnL"""
-        pnl = trade.get('pnl', Money('0', 'USD'))
+        pnl = trade.get('pnl', Money('0', USD))
         if isinstance(pnl, Money):
             return pnl
-        return Money(str(pnl), 'USD')
+        return Money(str(pnl), USD)
     
     def _is_winning_trade(self, trade: Dict) -> bool:
         """Check if trade is a winner"""

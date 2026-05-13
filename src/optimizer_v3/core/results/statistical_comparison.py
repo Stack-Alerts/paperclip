@@ -14,6 +14,7 @@ from typing import List, Dict, Tuple, Optional
 import numpy as np
 from scipy import stats
 from nautilus_trader.model.objects import Money
+from nautilus_trader.model.currencies import USD
 from dotenv import load_dotenv
 import os
 
@@ -481,14 +482,14 @@ class StatisticalComparison:
     
     def _get_trade_pnl(self, trade: Dict) -> Money:
         """Get trade PnL"""
-        pnl = trade.get('pnl', Money('0', 'USD'))
+        pnl = trade.get('pnl', Money('0', USD))
         if isinstance(pnl, Money):
             return pnl
-        return Money(str(pnl), 'USD')
+        return Money(str(pnl), USD)
     
     def _get_trade_capital(self, trade: Dict) -> Money:
         """Get trade capital"""
-        capital = trade.get('capital_start', Money('10000', 'USD'))
+        capital = trade.get('capital_start', Money('10000', USD))
         if isinstance(capital, Money):
             return capital
-        return Money(str(capital), 'USD')
+        return Money(str(capital), USD)

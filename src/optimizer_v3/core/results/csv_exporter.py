@@ -17,6 +17,7 @@ import csv
 import io
 from pathlib import Path
 from nautilus_trader.model.objects import Money, Quantity, Price
+from nautilus_trader.model.currencies import USD
 from dotenv import load_dotenv
 import os
 
@@ -277,7 +278,7 @@ class CSVExporter:
             elif col == 'total_trades':
                 row[col] = inst_metrics.get('total_trades', 0)
             elif col == 'total_pnl':
-                total_pnl = inst_metrics.get('total_pnl', Money('0', 'USD'))
+                total_pnl = inst_metrics.get('total_pnl', Money('0', USD))
                 row[col] = self._format_money(total_pnl)
             elif col == 'annualized_return':
                 row[col] = self._format_value(inst_metrics.get('annualized_return', Decimal('0')))
@@ -306,21 +307,21 @@ class CSVExporter:
             elif col == 'side':
                 row[col] = trade.get('side', '')
             elif col == 'quantity':
-                quantity = trade.get('quantity', Quantity('0'))
+                quantity = trade.get('quantity', Quantity.from_str('0'))
                 row[col] = self._format_nautilus_type(quantity)
             elif col == 'entry_price':
-                entry_price = trade.get('entry_price', Price('0'))
+                entry_price = trade.get('entry_price', Price.from_str('0'))
                 row[col] = self._format_nautilus_type(entry_price)
             elif col == 'exit_price':
-                exit_price = trade.get('exit_price', Price('0'))
+                exit_price = trade.get('exit_price', Price.from_str('0'))
                 row[col] = self._format_nautilus_type(exit_price)
             elif col == 'pnl':
-                pnl = trade.get('pnl', Money('0', 'USD'))
+                pnl = trade.get('pnl', Money('0', USD))
                 row[col] = self._format_money(pnl)
             elif col == 'return_pct':
                 # Calculate return percentage
-                pnl = trade.get('pnl', Money('0', 'USD'))
-                capital = trade.get('capital_start', Money('10000', 'USD'))
+                pnl = trade.get('pnl', Money('0', USD))
+                capital = trade.get('capital_start', Money('10000', USD))
                 pnl_val = self._money_to_decimal(pnl)
                 cap_val = self._money_to_decimal(capital)
                 return_pct = (pnl_val / cap_val * Decimal('100')) if cap_val > 0 else Decimal('0')
@@ -334,7 +335,7 @@ class CSVExporter:
                 else:
                     row[col] = ''
             elif col == 'win_loss':
-                pnl = trade.get('pnl', Money('0', 'USD'))
+                pnl = trade.get('pnl', Money('0', USD))
                 pnl_val = self._money_to_decimal(pnl)
                 row[col] = 'WIN' if pnl_val > 0 else 'LOSS'
             elif col == 'entry_timestamp':

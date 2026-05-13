@@ -7,8 +7,9 @@ from typing import Any, Dict, List, Optional, Union
 from decimal import Decimal
 from datetime import datetime
 
-from nautilus_trader.model.objects import Price, Quantity, Money
+from nautilus_trader.model.objects import Price, Quantity, Money, Currency
 from nautilus_trader.model.enums import OrderSide, OrderType, TimeInForce
+from nautilus_trader.model.currencies import USD
 from nautilus_trader.model.identifiers import InstrumentId, Symbol, Venue
 
 from src.optimizer_v3.core.logger import OptimizerLogger
@@ -129,8 +130,10 @@ class DataValidator:
         try:
             if isinstance(value, Price):
                 return value
-            elif isinstance(value, (int, float, Decimal, str)):
-                return Price(str(value), precision=2)
+            elif isinstance(value, str):
+                return Price.from_str(value)
+            elif isinstance(value, (int, float, Decimal)):
+                return Price(float(value), 2)
             else:
                 raise ValidationError(
                     f"Cannot convert {type(value).__name__} to Price"
@@ -154,8 +157,10 @@ class DataValidator:
         try:
             if isinstance(value, Quantity):
                 return value
-            elif isinstance(value, (int, float, Decimal, str)):
-                return Quantity(str(value), precision=8)
+            elif isinstance(value, str):
+                return Quantity.from_str(value)
+            elif isinstance(value, (int, float, Decimal)):
+                return Quantity(float(value), 8)
             else:
                 raise ValidationError(
                     f"Cannot convert {type(value).__name__} to Quantity"
@@ -163,13 +168,13 @@ class DataValidator:
         except Exception as e:
             raise ValidationError(f"Invalid quantity value: {str(e)}")
     
-    def validate_money(self, value: Any, currency: str = 'USD') -> Money:
+    def validate_money(self, value: Any, currency: Currency = USD) -> Money:
         """
         Validate and convert to Money type.
         
         Args:
             value: Value to validate
-            currency: Currency code (default: USD)
+            currency: Currency instance (default: USD)
             
         Returns:
             Valid Money object

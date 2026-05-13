@@ -43,7 +43,7 @@ class NautilusTypeConverter:
         Example:
             >>> qty = NautilusTypeConverter.to_quantity("1.5")
             >>> qty
-            Quantity('1.5')
+            Quantity.from_str('1.5')
         """
         return Quantity.from_str(value)
     
@@ -84,7 +84,7 @@ class NautilusTypeConverter:
         Example:
             >>> price = NautilusTypeConverter.to_price("50000.50")
             >>> price
-            Price('50000.50')
+            Price.from_str('50000.50')
         """
         return Price.from_str(value)
     
@@ -164,7 +164,7 @@ class NautilusTypeConverter:
         Example:
             >>> inst_id = NautilusTypeConverter.to_instrument_id("BTC/USDT.BINANCE")
             >>> inst_id
-            InstrumentId('BTC/USDT.BINANCE')
+            InstrumentId.from_str('BTC/USDT.BINANCE')
         """
         return InstrumentId.from_str(value)
     

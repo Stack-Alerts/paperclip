@@ -14,6 +14,7 @@ from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 import numpy as np
 from nautilus_trader.model.objects import Money, Quantity, Price
+from nautilus_trader.model.currencies import USD
 from nautilus_trader.model.identifiers import TradeId
 from dotenv import load_dotenv
 import os
@@ -329,8 +330,8 @@ class InstitutionalMetrics:
         winning_trades = [t for t in trades if self._is_winning_trade(t)]
         losing_trades = [t for t in trades if not self._is_winning_trade(t)]
         
-        avg_winner = self._calculate_average_winner(winning_trades) if winning_trades else Money('0', 'USD')
-        avg_loser = self._calculate_average_loser(losing_trades) if losing_trades else Money('0', 'USD')
+        avg_winner = self._calculate_average_winner(winning_trades) if winning_trades else Money('0', USD)
+        avg_loser = self._calculate_average_loser(losing_trades) if losing_trades else Money('0', USD)
         
         return {
             'average_trade_pnl': self._calculate_average_trade_pnl(trades),
@@ -372,7 +373,7 @@ class InstitutionalMetrics:
     def _calculate_max_drawdown_money(self, trades: List[Dict]) -> Money:
         """Calculate maximum drawdown in money terms"""
         if not trades:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         # Build equity curve
         equity = [self._money_to_decimal(self._get_trade_capital_start(trades[0]))]
@@ -392,7 +393,7 @@ class InstitutionalMetrics:
             if drawdown > max_dd:
                 max_dd = drawdown
         
-        return Money(str(max_dd), 'USD')
+        return Money(str(max_dd), USD)
     
     def _calculate_max_drawdown_percent(self, trades: List[Dict]) -> Decimal:
         """Calculate maximum drawdown as percentage"""
@@ -424,7 +425,7 @@ class InstitutionalMetrics:
     def _calculate_average_drawdown(self, trades: List[Dict]) -> Money:
         """Calculate average drawdown"""
         if not trades:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         # Build equity curve
         equity = [self._money_to_decimal(self._get_trade_capital_start(trades[0]))]
@@ -445,10 +446,10 @@ class InstitutionalMetrics:
                 drawdowns.append(drawdown)
         
         if not drawdowns:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         avg_dd = sum(drawdowns, Decimal('0')) / Decimal(len(drawdowns))
-        return Money(str(avg_dd), 'USD')
+        return Money(str(avg_dd), USD)
     
     def _calculate_max_drawdown_duration(self, trades: List[Dict]) -> timedelta:
         """Calculate maximum drawdown duration"""
@@ -518,60 +519,60 @@ class InstitutionalMetrics:
     def _calculate_average_trade_pnl(self, trades: List[Dict]) -> Money:
         """Calculate average trade PnL"""
         if not trades:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         total_pnl = sum(
             self._money_to_decimal(self._get_trade_pnl(t)) for t in trades
         )
         avg = total_pnl / Decimal(len(trades))
         
-        return Money(str(avg), 'USD')
+        return Money(str(avg), USD)
     
     def _calculate_average_winner(self, winning_trades: List[Dict]) -> Money:
         """Calculate average winning trade"""
         if not winning_trades:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         total = sum(
             self._money_to_decimal(self._get_trade_pnl(t)) for t in winning_trades
         )
         avg = total / Decimal(len(winning_trades))
         
-        return Money(str(avg), 'USD')
+        return Money(str(avg), USD)
     
     def _calculate_average_loser(self, losing_trades: List[Dict]) -> Money:
         """Calculate average losing trade"""
         if not losing_trades:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         total = sum(
             self._money_to_decimal(self._get_trade_pnl(t)) for t in losing_trades
         )
         avg = total / Decimal(len(losing_trades))
         
-        return Money(str(avg), 'USD')
+        return Money(str(avg), USD)
     
     def _calculate_largest_winner(self, trades: List[Dict]) -> Money:
         """Calculate largest winning trade"""
         if not trades:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         max_pnl = max(
             self._money_to_decimal(self._get_trade_pnl(t)) for t in trades
         )
         
-        return Money(str(max_pnl), 'USD')
+        return Money(str(max_pnl), USD)
     
     def _calculate_largest_loser(self, trades: List[Dict]) -> Money:
         """Calculate largest losing trade"""
         if not trades:
-            return Money('0', 'USD')
+            return Money('0', USD)
         
         min_pnl = min(
             self._money_to_decimal(self._get_trade_pnl(t)) for t in trades
         )
         
-        return Money(str(min_pnl), 'USD')
+        return Money(str(min_pnl), USD)
     
     def _calculate_average_trade_duration(self, trades: List[Dict]) -> timedelta:
         """Calculate average trade duration"""
@@ -666,35 +667,35 @@ class InstitutionalMetrics:
     
     def _get_trade_pnl(self, trade: Dict) -> Money:
         """Get trade PnL (NautilusTrader Money type)"""
-        pnl = trade.get('pnl', Money('0', 'USD'))
+        pnl = trade.get('pnl', Money('0', USD))
         if isinstance(pnl, Money):
             return pnl
-        return Money(str(pnl), 'USD')
+        return Money(str(pnl), USD)
     
     def _get_trade_capital_start(self, trade: Dict) -> Money:
         """Get trade starting capital"""
-        capital = trade.get('capital_start', Money('10000', 'USD'))
+        capital = trade.get('capital_start', Money('10000', USD))
         if isinstance(capital, Money):
             return capital
-        return Money(str(capital), 'USD')
+        return Money(str(capital), USD)
     
     def _get_trade_capital_end(self, trade: Dict) -> Money:
         """Get trade ending capital"""
-        capital = trade.get('capital_end', Money('10000', 'USD'))
+        capital = trade.get('capital_end', Money('10000', USD))
         if isinstance(capital, Money):
             return capital
-        return Money(str(capital), 'USD')
+        return Money(str(capital), USD)
     
     def _get_trade_position_size(self, trade: Dict) -> Money:
         """Calculate position size in money terms"""
-        quantity = trade.get('quantity', Quantity('0'))
-        entry_price = trade.get('entry_price', Price('0'))
+        quantity = trade.get('quantity', Quantity.from_str('0'))
+        entry_price = trade.get('entry_price', Price.from_str('0'))
         
         if isinstance(quantity, Quantity) and isinstance(entry_price, Price):
             size_decimal = quantity.as_decimal() * entry_price.as_decimal()
-            return Money(str(size_decimal), 'USD')
+            return Money(str(size_decimal), USD)
         
-        return Money('0', 'USD')
+        return Money('0', USD)
     
     def _is_winning_trade(self, trade: Dict) -> bool:
         """Check if trade is a winner"""
