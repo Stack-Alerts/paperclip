@@ -101,9 +101,9 @@ class StrategyHodRejection(Strategy):
         
         # Initialize detector instances
         self.detectors = {
-            'hod': Hod(timeframe='15min'),
-            'hod': Hod(timeframe='15min'),
-            'hod': Hod(timeframe='15min'),
+            'hod': HOD(timeframe='15min'),
+            'hod': HOD(timeframe='15min'),
+            'hod': HOD(timeframe='15min'),
             'stochastic_rsi': StochasticRSI(timeframe='15min'),
         }
         
