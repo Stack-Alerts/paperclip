@@ -150,6 +150,18 @@ class TestCheckGateStatus:
     def test_returns_none_on_empty_comments(self, monkeypatch):
         monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [])
         assert _check_gate("any-id") is None
+    def test_returns_most_recent_gate_result(self, monkeypatch):
+        """When an issue has multiple gate comments (re-run), return the newest."""
+        monkeypatch.setattr(
+            _scan,
+            "fetch_issue_comments",
+            lambda iid: [
+                {"body": "## Impact Gate: FAIL\n\nTests failed."},
+                {"body": "## Impact Gate: PASS \u2705\n\nAll tests passed after fix."},
+            ],
+        )
+        assert _check_gate("any-id") == "PASS"
+
 
     def test_detects_skipped(self, monkeypatch):
         monkeypatch.setattr(

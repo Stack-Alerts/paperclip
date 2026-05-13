@@ -63,10 +63,14 @@ _GATE_HEADER_RE = re.compile(
 
 
 def _check_gate_status(issue_id: str) -> str | None:
-    """Check comments for an Impact Gate result.
+    """Check comments for the most recent Impact Gate result.
 
-    Returns the gate status string (PASS, FAIL, BYPASSED, ERROR) or None
-    if no Impact Gate comment was found.
+    Comments are returned oldest-first by the API, so we iterate in
+    reverse to find the newest gate outcome (handles re-run scenarios
+    where an earlier FAIL is superseded by a later PASS).
+
+    Returns the gate status string (PASS, FAIL, BYPASSED, ERROR, SKIPPED)
+    or None if no Impact Gate comment was found.
     """
     try:
         comments = fetch_issue_comments(issue_id)
@@ -74,7 +78,7 @@ def _check_gate_status(issue_id: str) -> str | None:
         logger.warning("Failed to fetch comments for issue %s: %s", issue_id, exc)
         return None
 
-    for comment in comments:
+    for comment in reversed(comments):
         body = comment.get("body", "")
         m = _GATE_HEADER_RE.search(body)
         if m:
