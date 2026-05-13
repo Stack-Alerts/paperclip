@@ -71,3 +71,12 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 | Document | Purpose |
 |----------|---------|
 | [`docs-audit-and-coverage-plan-BTCAAAAA-7381.md`](docs-audit-and-coverage-plan-BTCAAAAA-7381.md) | Documentation audit and gap analysis (BTCAAAAA-7381) |
+
+## QA / Fact-Check Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [`qa/FACT_CHECK_PIPELINE.md`](qa/FACT_CHECK_PIPELINE.md) | TestManager-owned fact-check pipeline — architecture, routing, commands, workflow, config |
+| [`qa/QAENGINEER_FACT_CHECK_INTEGRATION.md`](qa/QAENGINEER_FACT_CHECK_INTEGRATION.md) | QAEngineer integration — trigger conditions, recording results, release gate checklist |
+| [`qa/BTCAAAAA-22893-factual-accuracy-audit.md`](qa/BTCAAAAA-22893-factual-accuracy-audit.md) | Example audit: README + training-manual fact-check results (15 FAIL) |
+| [`../scripts/qa_fact_check_pipeline.py`](../scripts/qa_fact_check_pipeline.py) | Pipeline script — `scan`, `verify`, `route` commands |
