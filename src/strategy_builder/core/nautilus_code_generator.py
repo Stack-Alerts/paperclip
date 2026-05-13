@@ -141,6 +141,7 @@ from decimal import Decimal'''
 {self.indent * 2}self.signal_state: Dict[str, int] = {{}}  # signal_name -> bar_index
 {self.indent * 2}self.required_signals = {config.required_signals}
 {self.indent * 2}self.current_bar_index = 0
+{self.indent * 2}self.strategy_type = config.get("strategy_type", "Bullish")
 {self.indent * 2}
 {self.indent * 2}# Building block configuration'''
         
@@ -162,7 +163,6 @@ from decimal import Decimal'''
 {self.indent * 2}# Initialize signal tracking
 {self.indent * 2}self.signal_state = {{}}
 {self.indent * 2}self.current_bar_index = 0
-{self.indent * 2}
 {self.indent * 2}self.log.info("Strategy initialization complete")'''
         
         return code
@@ -235,7 +235,7 @@ from decimal import Decimal'''
 {self.indent * 2}self.log.info(f"Strategy conditions met at bar {{self.current_bar_index}}")
 {self.indent * 2}
 {self.indent * 2}# Determine order side based on strategy type
-{self.indent * 2}order_side = OrderSide.BUY  # TODO: Determine from signals
+{self.indent * 2}order_side = OrderSide.BUY if self.strategy_type == "Bullish" else OrderSide.SELL  # Inferred from strategy_type
 {self.indent * 2}
 {self.indent * 2}# Create order with proper types
 {self.indent * 2}from nautilus_trader.model.objects import Quantity, Price
@@ -261,6 +261,7 @@ from decimal import Decimal'''
             "strategy_name": config.name or "GeneratedStrategy",
             "instrument_id": "BTC/USDT.BINANCE",
             "bar_type": "15-MINUTE",
+            "strategy_type": config.strategy_type,
             "required_signals": config.required_signals,
             "blocks": []
         }

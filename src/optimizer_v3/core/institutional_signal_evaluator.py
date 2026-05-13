@@ -183,6 +183,10 @@ class InstitutionalSignalEvaluator:
         # BTCAAAAA-736 signal diagnostic counter
         self._diag_signals_fired_total: int = 0
         self._diag_signals_filtered_total: int = 0
+
+        # Direction consistency check: when enabled, signals that fire for entry
+        # must be directionally consistent with the strategy_type (Bullish/Bearish).
+        self.direction_check_enabled = True
         
         # Exit conditions (organized by level)
         self.exit_conditions = self._organize_exit_conditions()
@@ -525,6 +529,16 @@ class InstitutionalSignalEvaluator:
                 all_signals
             )
         should_enter = required_ok and confluence >= min_confluence
+
+        # Direction consistency check: reject entry if signals conflict with strategy_type
+        if should_enter and self.direction_check_enabled:
+            direction_ok, direction_reason = self._check_direction_consistency(all_signals)
+            if not direction_ok:
+                should_enter = False
+                logger.warning("DIRECTION CHECK: %s", direction_reason)
+            elif total_bars > 0 and all_signals:
+                logger.info("DIRECTION CHECK: passed (signals consistent with %s)",
+                            getattr(self.strategy_config, "strategy_type", "Bullish"))
 
         # BTCAAAAA-736 diagnostic: log totals at last bar so the user can see in UI output
         if total_bars > 0 and bar_index == total_bars - 1:
@@ -1056,3 +1070,88 @@ class InstitutionalSignalEvaluator:
         self.timing_constraints.clear()
         self.fired_signals.clear()
         self.current_trade = None
+
+    @staticmethod
+    def _get_signal_direction(signal_id: str) -> str:
+        """
+        Determine directional bias of a signal from its signal ID.
+
+        Args:
+            signal_id: Signal ID in format 'block_name::SIGNAL_NAME'
+
+        Returns:
+            'BULLISH', 'BEARISH', or 'NEUTRAL'
+        """
+        if '::' not in signal_id:
+            return 'NEUTRAL'
+
+        block_name, signal_name = signal_id.split('::', 1)
+        signal_upper = signal_name.upper()
+
+        # Check signal name for explicit directional markers
+        if 'BULLISH' in signal_upper or '_BOUNCE' in signal_upper or 'ABOVE_' in signal_upper:
+            return 'BULLISH'
+        if 'BEARISH' in signal_upper or '_BREAK' in signal_upper or 'BELOW_' in signal_upper or 'REJECTION' in signal_upper:
+            return 'BEARISH'
+
+        # Fall back to block-level direction from registry
+        try:
+            from src.detectors.building_blocks.registry import BlockRegistry
+            meta = BlockRegistry.get_block(block_name)
+            if meta and meta.direction in ('BULLISH', 'BEARISH'):
+                return meta.direction
+        except Exception:
+            pass
+
+        return 'NEUTRAL'
+
+    def _check_direction_consistency(self, signal_ids: list) -> tuple:
+        """
+        Check accumulated signals are directionally consistent with strategy_type.
+
+        Args:
+            signal_ids: List of signal IDs in 'block_name::SIGNAL_NAME' format
+
+        Returns:
+            Tuple of (is_consistent: bool, reason: str or None)
+        """
+        strategy_type = getattr(self.strategy_config, 'strategy_type', 'Bullish')
+        expected_direction = 'BULLISH' if strategy_type == 'Bullish' else 'BEARISH'
+
+        if not signal_ids:
+            return True, None
+
+        bullish_count = 0
+        bearish_count = 0
+        neutral_count = 0
+
+        for sid in signal_ids:
+            direction = self._get_signal_direction(sid)
+            if direction == 'BULLISH':
+                bullish_count += 1
+            elif direction == 'BEARISH':
+                bearish_count += 1
+            else:
+                neutral_count += 1
+
+        total_directional = bullish_count + bearish_count
+
+        # If no directional signals at all, allow entry (no information to judge)
+        if total_directional == 0:
+            return True, None
+
+        # If expected BULLISH but dominant signals are BEARISH → reject
+        if expected_direction == 'BULLISH' and bearish_count > bullish_count:
+            return False, (
+                f"Direction mismatch: strategy_type={strategy_type} but "
+                f"signals are {bearish_count}B / {bullish_count}L / {neutral_count}N"
+            )
+
+        # If expected BEARISH but dominant signals are BULLISH → reject
+        if expected_direction == 'BEARISH' and bullish_count > bearish_count:
+            return False, (
+                f"Direction mismatch: strategy_type={strategy_type} but "
+                f"signals are {bullish_count}L / {bearish_count}B / {neutral_count}N"
+            )
+
+        return True, None
