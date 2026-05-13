@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-05-13T02:18:23.306987+00:00",
+  "touch_index_fr": {
+    "pass": true,
+    "coverage_pct": 95.2,
+    "indexed": 40,
+    "total": 42,
+    "total_rows": 150,
+    "stale_rows": 0,
+    "orphans": 0
+  },
+  "touch_index_bug": {
+    "pass": false,
+    "coverage_pct": 13.9,
+    "indexed": 324,
+    "total": 2326,
+    "total_rows": null,
+    "stale_rows": null,
+    "orphans": null,
+    "coverage_eligible_pct": 74.0,
+    "eligible_total": 438
+  }
+}
