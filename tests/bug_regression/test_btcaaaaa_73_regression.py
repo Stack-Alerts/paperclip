@@ -28,6 +28,7 @@ _HERE = Path(__file__).resolve().parent
 _REPO_ROOT = _HERE.parents[1]
 _HOOK_PATH = _REPO_ROOT / "scripts" / "hooks" / "post-commit"
 _FAKE_URL = "git@github.com:btc-aaaaa-73-test/repo.git"
+_DEFAULT_URL = "git@github.com:Stack-Alerts/BTC-Trade-Engine-PaperClip.git"
 
 
 def _init_repo(tmp: Path) -> Path:
@@ -96,8 +97,6 @@ class TestPostCommitHookAutoRecover:
         print(f"stdout: {proc.stdout}")
         print(f"stderr: {proc.stderr}")
         assert proc.returncode == 0, "Commit should succeed even with NO_AUTO_PUSH"
-        # The hook exits before remote recovery when NO_AUTO_PUSH=1,
-        # so origin should remain absent
         assert "origin" not in _remotes(repo), (
             "With NO_AUTO_PUSH=1 the hook exits early and should NOT recover the remote"
         )
@@ -124,11 +123,10 @@ class TestPostCommitHookAutoRecover:
         )
         print(f"detached stdout: {proc.stdout}")
         print(f"detached stderr: {proc.stderr}")
-        # Should not crash — hook exits 0 for detached HEAD
         assert proc.returncode == 0
 
     def test_hook_preserves_existing_remote(self, tmp_path):
-        """When origin remote already exists with the default URL, the hook does not overwrite it."""
+        """When origin remote already exists, the hook does not overwrite it."""
         repo = _init_repo(tmp_path)
         existing_url = "git@github.com:existing/repo.git"
         sp.run(["git", "remote", "add", "origin", existing_url], cwd=str(repo), capture_output=True, check=True)
@@ -152,6 +150,142 @@ class TestPostCommitHookAutoRecover:
         assert remotes["origin"] == existing_url, (
             f"Expected existing remote URL to be preserved: {existing_url}, got {remotes['origin']}"
         )
+
+    def test_hook_default_url_fallback(self, tmp_path):
+        """When GIT_REMOTE_URL is not set, the hook falls back to the hardcoded default URL."""
+        repo = _init_repo(tmp_path)
+        assert "origin" not in _remotes(repo)
+
+        env = {**os.environ}
+        if "GIT_REMOTE_URL" in env:
+            del env["GIT_REMOTE_URL"]
+        (repo / "file4.md").write_text("change 4")
+        sp.run(["git", "add", "file4.md"], cwd=str(repo), capture_output=True, check=True)
+        proc = sp.run(
+            ["git", "commit", "-m", "test default url fallback"],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        print(f"default url stdout: {proc.stdout}")
+        print(f"default url stderr: {proc.stderr}")
+
+        remotes = _remotes(repo)
+        assert "origin" in remotes, f"Expected origin to be added with default URL. Remotes: {remotes}"
+        assert remotes["origin"] == _DEFAULT_URL, (
+            f"Expected default URL {_DEFAULT_URL}, got {remotes['origin']}"
+        )
+
+    def test_hook_idempotent_recovery(self, tmp_path):
+        """Running the hook on two sequential commits is safe and idempotent."""
+        repo = _init_repo(tmp_path)
+        assert "origin" not in _remotes(repo)
+
+        env = {**os.environ, "GIT_REMOTE_URL": _FAKE_URL}
+
+        (repo / "file5a.md").write_text("change 5a")
+        sp.run(["git", "add", "file5a.md"], cwd=str(repo), capture_output=True, check=True)
+        proc1 = sp.run(
+            ["git", "commit", "-m", "first commit"],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        print(f"first commit stdout: {proc1.stdout}")
+        print(f"first commit stderr: {proc1.stderr}")
+
+        remotes1 = _remotes(repo)
+        assert "origin" in remotes1, "First commit should have added origin"
+        assert remotes1["origin"] == _FAKE_URL
+
+        (repo / "file5b.md").write_text("change 5b")
+        sp.run(["git", "add", "file5b.md"], cwd=str(repo), capture_output=True, check=True)
+        proc2 = sp.run(
+            ["git", "commit", "-m", "second commit"],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        print(f"second commit stdout: {proc2.stdout}")
+        print(f"second commit stderr: {proc2.stderr}")
+
+        remotes2 = _remotes(repo)
+        assert "origin" in remotes2, "Second commit should preserve origin"
+        assert remotes2["origin"] == _FAKE_URL, (
+            f"Second commit should preserve same URL. Expected {_FAKE_URL}, got {remotes2['origin']}"
+        )
+
+    def test_hook_feature_branch(self, tmp_path):
+        """A feature branch with a slash in the name works correctly with the hook."""
+        repo = _init_repo(tmp_path)
+        env = {**os.environ, "GIT_REMOTE_URL": _FAKE_URL}
+
+        sp.run(["git", "checkout", "-b", "feature/test-branch"], cwd=str(repo), capture_output=True, check=True)
+        (repo / "feat.md").write_text("feature change")
+        sp.run(["git", "add", "feat.md"], cwd=str(repo), capture_output=True, check=True)
+        proc = sp.run(
+            ["git", "commit", "-m", "feature branch commit"],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        print(f"feature branch stdout: {proc.stdout}")
+        print(f"feature branch stderr: {proc.stderr}")
+
+        assert proc.returncode == 0, "Commit on feature branch should succeed"
+        branch = sp.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=str(repo), capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        assert branch == "feature/test-branch"
+
+        remotes = _remotes(repo)
+        assert "origin" in remotes, "Origin should be recovered on feature branch"
+        assert remotes["origin"] == _FAKE_URL
+
+    def test_hook_exits_zero_on_push_failure(self, tmp_path):
+        """Even when git push fails (no real remote), the hook exits 0 and does not crash."""
+        repo = _init_repo(tmp_path)
+        env = {**os.environ, "GIT_REMOTE_URL": "git@github.com:nonexistent/never-gonna-push.git"}
+
+        (repo / "file6.md").write_text("change 6")
+        sp.run(["git", "add", "file6.md"], cwd=str(repo), capture_output=True, check=True)
+        proc = sp.run(
+            ["git", "commit", "-m", "push failure test"],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        print(f"push fail stdout: {proc.stdout}")
+        print(f"push fail stderr: {proc.stderr}")
+        assert proc.returncode == 0, "Hook must exit 0 even when push fails"
+
+    def test_hook_handles_empty_commit(self, tmp_path):
+        """An --allow-empty commit does not crash the hook."""
+        repo = _init_repo(tmp_path)
+        env = {**os.environ, "GIT_REMOTE_URL": _FAKE_URL}
+
+        proc = sp.run(
+            ["git", "commit", "--allow-empty", "-m", "empty commit"],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        print(f"empty commit stdout: {proc.stdout}")
+        print(f"empty commit stderr: {proc.stderr}")
+        assert proc.returncode == 0, "Empty commit should not crash the hook"
 
 
 def _remotes(repo: Path) -> dict[str, str]:
