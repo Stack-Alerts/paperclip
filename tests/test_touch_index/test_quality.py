@@ -887,6 +887,41 @@ class TestCheckBugConsistency:
         assert len(report.orphan_bug_issue_ids) == 2
         assert "orphan-1" in report.orphan_bug_issue_ids
 
+    def test_bug_source_distribution_query_failure_logs_warning(self, caplog):
+        """When bug source distribution query fails, a warning is logged and source_distribution is empty."""
+        import logging
+
+        call_count = [0]
+
+        def _execute(*a, **kw):
+            call_count[0] += 1
+            if call_count[0] == 6:
+                raise RuntimeError("Bug source distribution query failed")
+            r = MagicMock()
+            r.scalar = MagicMock(return_value=0)
+            r.fetchall = MagicMock(return_value=[])
+            return r
+
+        conn = MagicMock()
+        conn.execute = _execute
+        ctx = MagicMock()
+        ctx.__enter__ = MagicMock(return_value=conn)
+        ctx.__exit__ = MagicMock(return_value=False)
+        engine = MagicMock()
+        engine.connect = MagicMock(return_value=ctx)
+
+        with (
+            patch(
+                "touch_index.paperclip_client.get_all_issue_ids",
+                return_value=set(),
+            ),
+            caplog.at_level(logging.WARNING),
+        ):
+            report = check_bug_consistency(engine)
+
+        assert report.source_distribution == {}
+        assert any("Could not query bug source distribution" in r.message for r in caplog.records)
+
 
 # ---------------------------------------------------------------------------
 # run_bug_quality_checks
