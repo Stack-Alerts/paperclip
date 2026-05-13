@@ -35,6 +35,7 @@ def _dict_to_obj(d: Any) -> Any:
 
 def _and_block_config() -> Any:
     return _dict_to_obj({
+        "strategy_type": "Bearish",
         "blocks": [
             {
                 "name": "hod",
