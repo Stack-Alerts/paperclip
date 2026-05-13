@@ -256,6 +256,16 @@ def run_once(dry_run: bool = False, force_reprocess: bool = False) -> list[dict]
         log.info("Marked %d issues as processed", len(newly_processed))
 
     _save_state(state)
+
+    # Self-close: transition successfully processed issues to done so
+    # routine issues don't accumulate in in_review after the BR report is posted.
+    for issue_id in newly_processed:
+        try:
+            transition_issue_status_board(issue_id, "done")
+            log.info("Self-closed %s -> done", issue_id)
+        except Exception as exc:
+            log.warning("Failed to self-close %s: %s", issue_id, exc)
+
     return results
 
 

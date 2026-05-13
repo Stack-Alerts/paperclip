@@ -482,6 +482,137 @@ class TestRunOnce:
         assert len(results) == 2
         assert mock_gen.call_count == 2
 
+    def test_self_close_called_after_successful_run(self, tmp_path):
+        state_path = str(tmp_path / "state.json")
+        with (
+            patch("blast_radius.worker._STATE_PATH", Path(state_path)),
+            patch(
+                "blast_radius.worker._fetch_in_review_issues",
+                return_value=[_make_issue(issue_id=ISSUE_111)],
+            ),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"issue": "BTCAAAAA-9999", "skipped": False},
+            ),
+            patch("blast_radius.worker.transition_issue_status_board") as mock_close,
+        ):
+            results = run_once(dry_run=False)
+
+        assert len(results) == 1
+        mock_close.assert_called_once_with(ISSUE_111, "done")
+
+    def test_self_close_not_called_on_dry_run(self, tmp_path):
+        state_path = str(tmp_path / "state.json")
+        Path(state_path).write_text(json.dumps({"processed_issue_ids": [], "issue_statuses": {}}))
+        with (
+            patch("blast_radius.worker._STATE_PATH", Path(state_path)),
+            patch(
+                "blast_radius.worker._fetch_in_review_issues",
+                return_value=[_make_issue(issue_id=ISSUE_111)],
+            ),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"issue": "BTCAAAAA-9999", "skipped": False},
+            ),
+            patch("blast_radius.worker.transition_issue_status_board") as mock_close,
+        ):
+            results = run_once(dry_run=True)
+
+        assert len(results) == 1
+        mock_close.assert_not_called()
+
+    def test_self_close_not_called_when_skipped(self, tmp_path):
+        state_path = str(tmp_path / "state.json")
+        with (
+            patch("blast_radius.worker._STATE_PATH", Path(state_path)),
+            patch(
+                "blast_radius.worker._fetch_in_review_issues",
+                return_value=[_make_issue(issue_id=ISSUE_111)],
+            ),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"issue": "BTCAAAAA-9999", "skipped": True, "reason": "no touchedFiles"},
+            ),
+            patch("blast_radius.worker.transition_issue_status_board") as mock_close,
+        ):
+            results = run_once(dry_run=False)
+
+        assert results[0]["skipped"] is True
+        mock_close.assert_not_called()
+
+    def test_self_close_failure_does_not_block_return(self, tmp_path):
+        state_path = str(tmp_path / "state.json")
+        with (
+            patch("blast_radius.worker._STATE_PATH", Path(state_path)),
+            patch(
+                "blast_radius.worker._fetch_in_review_issues",
+                return_value=[_make_issue(issue_id=ISSUE_111)],
+            ),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"issue": "BTCAAAAA-9999", "skipped": False},
+            ),
+            patch(
+                "blast_radius.worker.transition_issue_status_board",
+                side_effect=RuntimeError("API error"),
+            ),
+        ):
+            results = run_once(dry_run=False)
+
+        assert len(results) == 1
+        assert "error" not in results[0]
+
+    def test_self_close_called_for_multiple_issues(self, tmp_path):
+        state_path = str(tmp_path / "state.json")
+        with (
+            patch("blast_radius.worker._STATE_PATH", Path(state_path)),
+            patch(
+                "blast_radius.worker._fetch_in_review_issues",
+                return_value=[
+                    _make_issue(issue_id=ISSUE_111),
+                    _make_issue(issue_id=ISSUE_222, identifier="BTCAAAAA-8888"),
+                ],
+            ),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                return_value={"issue": "test", "skipped": False},
+            ),
+            patch("blast_radius.worker.transition_issue_status_board") as mock_close,
+        ):
+            results = run_once(dry_run=False)
+
+        assert len(results) == 2
+        assert mock_close.call_count == 2
+        mock_close.assert_any_call(ISSUE_111, "done")
+        mock_close.assert_any_call(ISSUE_222, "done")
+
+    def test_self_close_mixed_skipped_and_processed(self, tmp_path):
+        state_path = str(tmp_path / "state.json")
+        with (
+            patch("blast_radius.worker._STATE_PATH", Path(state_path)),
+            patch(
+                "blast_radius.worker._fetch_in_review_issues",
+                return_value=[
+                    _make_issue(issue_id=ISSUE_111),
+                    _make_issue(issue_id=ISSUE_222, identifier="BTCAAAAA-8888"),
+                ],
+            ),
+            patch(
+                "blast_radius.worker.generate_and_post",
+                side_effect=lambda i, **kw: (
+                    {"issue": "BTCAAAAA-9999", "skipped": True, "reason": "no touchedFiles"}
+                    if i == ISSUE_111
+                    else {"issue": "BTCAAAAA-8888", "skipped": False}
+                ),
+            ),
+            patch("blast_radius.worker.transition_issue_status_board") as mock_close,
+        ):
+            results = run_once(dry_run=False)
+
+        assert len(results) == 2
+        # Only ISSUE_222 should be closed (ISSUE_111 was skipped)
+        mock_close.assert_called_once_with(ISSUE_222, "done")
+
 
 # ---------------------------------------------------------------------------
 # TestProcessIssue
