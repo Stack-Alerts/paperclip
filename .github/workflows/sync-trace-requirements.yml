@@ -1,0 +1,86 @@
+name: Sync Trace Requirements
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  repository_dispatch:
+    types: [issue_created, issue_updated, issue_status_changed]
+  workflow_dispatch:
+    inputs:
+      issue_id:
+        description: 'Paperclip issue UUID (single-issue trigger)'
+        required: false
+        default: ''
+      lookback_minutes:
+        description: 'Lookback window in minutes'
+        required: false
+        default: '30'
+      dry_run:
+        description: 'Dry run (log only, no DB writes)'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: sync-trace-requirements
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync FDR requirements → trace_requirements
+    runs-on: ubuntu-latest
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+      POSTGRES_HOST: ${{ secrets.POSTGRES_HOST || 'localhost' }}
+      POSTGRES_PORT: ${{ secrets.POSTGRES_PORT || '5432' }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'optimizer_v3' }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'optimizer_admin' }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install requests python-dotenv SQLAlchemy psycopg2-binary
+
+      - name: Resolve issue ID from event payload
+        id: resolve
+        run: |
+          ISSUE_ID="${{ github.event.inputs.issue_id || '' }}"
+          if [ -z "$ISSUE_ID" ] && [ -n "${{ github.event.client_payload.issue_id || '' }}" ]; then
+            ISSUE_ID="${{ github.event.client_payload.issue_id }}"
+          fi
+          echo "issue_id=$ISSUE_ID" >> $GITHUB_OUTPUT
+
+      - name: Run requirement sync
+        env:
+          PYTHONPATH: src
+        run: |
+          FLAGS="--json-summary"
+          ISSUE_ID="${{ steps.resolve.outputs.issue_id }}"
+          LOOKBACK="${{ github.event.inputs.lookback_minutes || '30' }}"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          if [ -n "$ISSUE_ID" ]; then
+            python scripts/sync_trace_requirements.py --issue-id "$ISSUE_ID" $FLAGS
+          else
+            python scripts/sync_trace_requirements.py --lookback-minutes "$LOOKBACK" $FLAGS
+          fi
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Sync Trace Requirements" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,102 @@
+name: Traceability Monitor
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_run:
+    workflows:
+      - Sync Trace Requirements
+      - Sync Trace Issues
+      - Sync Trace Test Cases
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      no_alert:
+        description: 'Skip alert posting'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: traceability-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: Health check traceability schema
+    runs-on: ubuntu-latest
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+      POSTGRES_HOST: ${{ secrets.POSTGRES_HOST || 'localhost' }}
+      POSTGRES_PORT: ${{ secrets.POSTGRES_PORT || '5432' }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'optimizer_v3' }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'optimizer_admin' }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install requests python-dotenv SQLAlchemy psycopg2-binary
+
+      - name: Run traceability monitor
+        id: monitor
+        env:
+          PYTHONPATH: src
+        run: |
+          FLAGS="--json-summary"
+          if [ "${{ github.event.inputs.no_alert }}" = "true" ]; then
+            FLAGS="$FLAGS --no-alert"
+          fi
+          python scripts/traceability_monitor.py $FLAGS | tee /tmp/monitor-summary.json
+
+      - name: Write step summary
+        if: always()
+        run: |
+          python -c "
+          import json
+          d = json.load(open('/tmp/monitor-summary.json'))
+          tables = d.get('table_health', {})
+          cov = d.get('coverage', {})
+          orphans = d.get('orphans', {})
+          links = d.get('links', {})
+          lines = []
+          lines.append('## Traceability Monitor')
+          lines.append('')
+          lines.append('**Status:** ' + d.get('status', 'unknown'))
+          lines.append('**Severity:** ' + d.get('severity', 'low'))
+          lines.append('')
+          lines.append('### Table Health')
+          for t, h in tables.items():
+              lines.append('- ' + t + ': ' + str(h.get('row_count', h)) + ' rows')
+          lines.append('')
+          lines.append('### Coverage')
+          lines.append('- Gap: ' + str(cov.get('gap_pct', '?')) + ' %')
+          lines.append('- Active requirements: ' + str(cov.get('total_active', '?')))
+          lines.append('- Untested: ' + str(cov.get('untested', '?')))
+          lines.append('')
+          lines.append('### Orphans')
+          lines.append('- Count: ' + str(orphans.get('orphan_count', '?')))
+          lines.append('')
+          lines.append('### Links')
+          lines.append('- Total active links: ' + str(links.get('total_links', '?')))
+          print('\n'.join(lines))
+          " > $GITHUB_STEP_SUMMARY
+
+      - name: Upload monitor report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: traceability-monitor-report
+          path: /tmp/monitor-summary.json
+          retention-days: 7

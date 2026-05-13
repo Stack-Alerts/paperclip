@@ -1,0 +1,106 @@
+name: Sync Trace Test Cases
+
+on:
+  push:
+    branches: ["main", "master"]
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      test_dir:
+        description: 'Test directory to scan'
+        required: false
+        default: 'tests/'
+      regenerate_links:
+        description: 'Drop and recreate all test links'
+        required: false
+        default: 'false'
+      dry_run:
+        description: 'Dry run (log only, no DB writes)'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: sync-trace-test-cases
+  cancel-in-progress: true
+
+jobs:
+  collect:
+    name: Collect tests → trace_test_cases
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: optimizer_v3
+          POSTGRES_USER: optimizer_admin
+          POSTGRES_PASSWORD: secure_password_change_me
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: optimizer_v3
+      POSTGRES_USER: optimizer_admin
+      POSTGRES_PASSWORD: secure_password_change_me
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install requests python-dotenv SQLAlchemy psycopg2-binary
+
+      - name: Run test case collection
+        env:
+          PYTHONPATH: src
+        run: |
+          FLAGS="--json-summary"
+          TEST_DIR="${{ github.event.inputs.test_dir || 'tests/' }}"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          if [ "${{ github.event.inputs.regenerate_links }}" = "true" ]; then
+            FLAGS="$FLAGS --regenerate-links"
+          fi
+          python scripts/sync_trace_test_cases.py --test-dir "$TEST_DIR" $FLAGS
+
+      - name: Run gap analysis
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/sync_trace_test_cases.py \
+            --test-dir "${{ github.event.inputs.test_dir || 'tests/' }}" \
+            --json-summary > /tmp/collect-summary.json 2>/dev/null || true
+          UNTESTED=$(python -c "import json; d=json.load(open('/tmp/collect-summary.json')); print(len(d.get('untested_requirements',[])))" 2>/dev/null || echo "0")
+          echo "Untested requirements: $UNTESTED"
+
+      - name: Upload gap report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trace-gap-report
+          path: /tmp/collect-summary.json
+          retention-days: 7
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Sync Trace Test Cases" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
