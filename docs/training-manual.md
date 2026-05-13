@@ -714,7 +714,7 @@ The Optimiser automatically tests many parameter combinations and ranks them by 
 **Optimisation best practices:**
 
 - Optimise 2–3 parameters at a time. Optimising 6+ parameters simultaneously almost always leads to curve-fitting.
-- Enable `EARLY_STOP_PATIENCE=10` in `.env` — this stops the optimisation when 10 consecutive configurations show no improvement, saving time.
+- Configure `EARLY_STOP_PATIENCE` in `.env` (e.g. `EARLY_STOP_PATIENCE=10`) — this stops the optimisation when N consecutive configurations show no improvement. This setting is not pre-configured; add it to `.env` if needed.
 - After optimisation, re-run a clean walk-forward test with the best parameters on **out-of-sample data** to confirm they generalise.
 
 ---
@@ -775,14 +775,16 @@ Caching stores loaded historical data in memory across test runs, eliminating re
 **Reduce history length:**
 ```
 # In .env:
-PERF_HISTORY_LENGTH=100   # Default: 1000. Reduce if memory is limited.
+# Default: 300. Reduce if memory is limited.
+PERF_HISTORY_LENGTH=300
 ```
 
 **Use early stopping for optimisation:**
 ```
 # In .env:
-EARLY_STOP_PATIENCE=10
-EARLY_STOP_MIN_DELTA=0.001
+# Add both to .env:
+# EARLY_STOP_PATIENCE=10
+# EARLY_STOP_MIN_DELTA=0.001
 ```
 
 ---
