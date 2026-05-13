@@ -51,10 +51,8 @@ def sample_ohlcv_data():
 @pytest.fixture
 def strategy_config():
     """Create strategy configuration"""
-    return {
-        'instrument_id': 'BTC-PERP',
-        'timeframe': '15m'
-    }
+    from nautilus_trader.trading.config import StrategyConfig
+    return StrategyConfig(strategy_id='001_STRATEGY_01_01_HOD_REJECTION')
 
 
 @pytest.fixture
