@@ -47,7 +47,7 @@ from nautilus_trader.model.identifiers import InstrumentId
 from src.strategies.risk_enforcer import RiskEnforcer
 
 # Import building blocks
-from src.detectors.building_blocks.oscillators.stochastic_rsi import StrategyStochasticRsi
+from src.detectors.building_blocks.oscillators.stochastic_rsi import StochasticRSI
 from src.detectors.building_blocks.price_levels.hod import HOD
 
 # Import centralized confluence calculator
@@ -104,7 +104,7 @@ class StrategyHodRejection(Strategy):
             'hod': Hod(timeframe='15min'),
             'hod': Hod(timeframe='15min'),
             'hod': Hod(timeframe='15min'),
-            'stochastic_rsi': Stochasticrsi(timeframe='15min'),
+            'stochastic_rsi': StochasticRSI(timeframe='15min'),
         }
         
         # Block weights configuration

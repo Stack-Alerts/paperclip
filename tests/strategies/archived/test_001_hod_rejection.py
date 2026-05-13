@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Import strategy
-from src.strategies.strategy_001_hod_rejection import StrategyHodRejection
+from src.strategies.archived.strategy_001_hod_rejection import StrategyHodRejection
 
 
 @pytest.fixture
