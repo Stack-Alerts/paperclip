@@ -18,10 +18,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# Ensure src/ is on the path when running the script directly.
 _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_ROOT / "src"))
+
+from dotenv import load_dotenv
+
+load_dotenv(_ROOT / ".env")
 
 
 def main() -> int:
