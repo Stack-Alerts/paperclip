@@ -7,6 +7,9 @@ from typing import List, Dict, Optional, Callable
 from dataclasses import dataclass
 from datetime import datetime
 
+from dotenv import load_dotenv
+import os
+
 from src.optimizer_v3.core.logger import OptimizerLogger
 from src.optimizer_v3.core.parallel_executor import ParallelExecutor
 from src.optimizer_v3.core.progress_tracker import ProgressTracker
@@ -17,6 +20,7 @@ from src.optimizer_v3.core.early_stopping import EarlyStopping, StoppingReason
 import logging
 logger = logging.getLogger(__name__)
 
+load_dotenv()
 
 
 @dataclass
@@ -25,8 +29,8 @@ class OptimizationConfig:
     strategy_id: str
     configs: List[Dict]
     metric_name: str = "sharpe_ratio"
-    early_stop_patience: int = 10
-    early_stop_min_delta: float = 0.001
+    early_stop_patience: int = int(os.getenv('EARLY_STOP_PATIENCE', '10'))
+    early_stop_min_delta: float = float(os.getenv('EARLY_STOP_MIN_DELTA', '0.001'))
     max_workers: Optional[int] = None
     enable_checkpoints: bool = True
     checkpoint_interval: int = 5
