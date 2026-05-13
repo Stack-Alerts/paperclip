@@ -532,7 +532,7 @@ class TestMain:
         except SystemExit as e:
             assert e.code == 0
 
-    def test_exit_one_when_ungated_exists(self, monkeypatch):
+    def test_exit_zero_when_ungated_exists(self, monkeypatch):
         monkeypatch.setattr(
             _scan,
             "scan",
@@ -551,7 +551,7 @@ class TestMain:
         try:
             _scan.main()
         except SystemExit as e:
-            assert e.code == 1
+            assert e.code == 0
 
     def test_dry_run_flag_passed_to_scan(self, monkeypatch):
         kwargs_store = {}

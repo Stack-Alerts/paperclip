@@ -82,10 +82,15 @@ jobs:
             fi
           fi
           python scripts/scan_fix_issues_done.py $FLAGS > /tmp/scan-output.json
-          rc=$?
-          echo "exit_code=$rc" >> $GITHUB_OUTPUT
+          echo "scan_exit_code=$?" >> $GITHUB_OUTPUT
+          UNGATED=$(python3 -c "import json; d=json.load(open('/tmp/scan-output.json')); print(d.get('ungated_count', 0))")
+          echo "ungated_count=$UNGATED" >> $GITHUB_OUTPUT
+          if [ "$UNGATED" -gt 0 ]; then
+            echo "alert_needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "alert_needed=false" >> $GITHUB_OUTPUT
+          fi
           cat /tmp/scan-output.json
-          exit $rc
 
       - name: Upload scan output artifact
         if: always()
@@ -126,7 +131,7 @@ jobs:
           fi
 
       - name: Create alert on ungated issues
-        if: failure()
+        if: steps.scan.outputs.alert_needed == 'true'
         env:
           PYTHONPATH: src
         run: |

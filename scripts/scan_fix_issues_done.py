@@ -294,7 +294,7 @@ def main() -> int:
     else:
         print(json.dumps(result))  # noqa: T201
 
-    return 0 if result["ungated_count"] == 0 else 1
+    return 0
 
 
 if __name__ == "__main__":

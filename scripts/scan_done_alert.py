@@ -37,6 +37,36 @@ def _setup_session():
     return _session(), _base(), _company()
 
 
+def _find_todays_alert(
+    base_url: str,
+    company_id: str,
+    sess,
+    date_str: str,
+) -> dict | None:
+    from touch_index.paperclip_client import _paginate
+
+    try:
+        candidates = _paginate(
+            f"/api/companies/{company_id}/issues",
+            {"q": "Impact Gate Scan-Done Alert", "limit": 50},
+            page_size=50,
+        )
+        for issue in candidates:
+            title = issue.get("title", "")
+            labels = [l.get("name", "") for l in (issue.get("labels") or [])]
+            if date_str in title and ALERT_LABEL in labels:
+                logger.info(
+                    "Found existing alert issue %s: %s",
+                    issue.get("identifier", ""),
+                    title,
+                )
+                return issue
+        return None
+    except Exception as exc:
+        logger.warning("Failed to search for existing alerts: %s", exc)
+        return None
+
+
 def create_alert(
     base_url: str,
     company_id: str,
@@ -50,6 +80,15 @@ def create_alert(
 
     if ungated_count == 0:
         logger.info("No ungated issues — no alert needed")
+        return True
+
+    existing = _find_todays_alert(base_url, company_id, sess, date_str)
+    if existing is not None:
+        logger.info(
+            "Alert already exists for %s (%s) — skipping duplicate",
+            date_str,
+            existing.get("identifier", ""),
+        )
         return True
 
     title = f"Impact Gate Scan-Done Alert — {date_str} ({ungated_count} ungated)"
