@@ -37,6 +37,7 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 - **Impact Gate Worker**: [`../.github/workflows/impact-gate-worker.yml`](../.github/workflows/impact-gate-worker.yml) — gates in_review fixes through Impact Gate validation ([`src/impact_gate/`](../src/impact_gate/))
 - **Expert Reviews**: [`building-blocks/expert-reviews/`](building-blocks/expert-reviews/) — 80 signal expert analysis docs
 - **LakeAPI Integration**: [`integrations/`](integrations/)
+- **Requirements Traceability**: [`architecture/REQUIREMENTS_TRACEABILITY.md`](architecture/REQUIREMENTS_TRACEABILITY.md) — end-to-end traceability from CEO goals through implementation, QA, and deployment; status lifecycle, field requirements, auditing procedures
 
 ## Archive Structure
 
