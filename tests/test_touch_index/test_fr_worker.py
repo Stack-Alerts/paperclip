@@ -1175,10 +1175,7 @@ class TestMain:
             summary = [r for r in caplog.records if "FR worker done" in r.message][0]
             assert "2 issues processed" in summary.message
             assert "5 files indexed" in summary.message
-        mock_transition.assert_has_calls(
-            [call("id-1", "done"), call("catchup-uuid-1", "done")],
-            any_order=True,
-        )
+        mock_transition.assert_called_once_with("id-1", "done")
 
     def test_main_validate_no_issues_passed(self, monkeypatch, caplog):
         """--validate with no issues: validation runs on existing data."""
