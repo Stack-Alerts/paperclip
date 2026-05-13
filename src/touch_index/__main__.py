@@ -203,6 +203,23 @@ def _run_bug_cli() -> None:
     total_files = sum(r.files_indexed for r in results)
     skipped = sum(1 for r in results if r.skipped_no_commits)
 
+    if args.validate:
+        report = run_bug_quality_checks(engine, stale_threshold_days=args.stale_days)
+        if not report.passed:
+            logger.error("VALIDATION FAILED after ingestion \u2014 investigate")
+            if args.json_summary:
+                _emit_json_summary(
+                    args,
+                    worker="bug",
+                    results=results,
+                    total_files=total_files,
+                    skipped=skipped,
+                    errors=errors,
+                    quality_report=report,
+                )
+            raise SystemExit(1)
+        logger.info("VALIDATION PASSED: all bug quality checks clean")
+
     if args.dry_run:
         logger.info(
             "DRY RUN — skipping transition-to-done for %d issue(s)", len(issues)
@@ -222,23 +239,6 @@ def _run_bug_cli() -> None:
         skipped,
         errors,
     )
-
-    if args.validate:
-        report = run_bug_quality_checks(engine, stale_threshold_days=args.stale_days)
-        if not report.passed:
-            logger.error("VALIDATION FAILED after ingestion \u2014 investigate")
-            if args.json_summary:
-                _emit_json_summary(
-                    args,
-                    worker="bug",
-                    results=results,
-                    total_files=total_files,
-                    skipped=skipped,
-                    errors=errors,
-                    quality_report=report,
-                )
-            raise SystemExit(1)
-        logger.info("VALIDATION PASSED: all bug quality checks clean")
 
     if args.json_summary:
         _emit_json_summary(
