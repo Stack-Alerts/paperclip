@@ -93,9 +93,9 @@ class TestCalibrationGateStructuralRequirements:
         import src.strategy_builder.ui.backtest_config_panel as mod
 
         src_lines = inspect.getsource(mod).split("\n")
-        assert any(
-            "calibration_cache" in line for line in src_lines[:100]
-        ), "'calibration_cache' import must appear in the first 100 lines of the module"
+        assert any("calibration_cache" in line for line in src_lines[:100]), (
+            "'calibration_cache' import must appear in the first 100 lines of the module"
+        )
 
     def test_run_auto_calibration_has_graceful_degradation(self):
         """_run_auto_calibration() must have exception handling."""
