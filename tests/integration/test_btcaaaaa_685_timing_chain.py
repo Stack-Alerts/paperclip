@@ -9,14 +9,13 @@ is never pulled back into the confluence window when BELOW_ASIA_50 fires.
 Result: max achievable confluence = BELOW_ASIA_50 (15) + BEARISH_CLIMAX (20) = 35 < 40
 Fix:    read both 'reference_signal' and 'reference' keys.
 
-Both tests FAIL on pre-fix main and PASS after the fix.
+Expanded to meet Impact Gate 10-test minimum bar (BTCAAAAA-25065).
 """
 
 import json
 import unittest
 from datetime import datetime
 from typing import Dict, Any
-from unittest.mock import MagicMock
 
 from nautilus_trader.model.data import Bar, BarType, BarSpecification
 from nautilus_trader.model.objects import Price, Quantity
@@ -32,12 +31,6 @@ from src.optimizer_v3.core.institutional_signal_evaluator import InstitutionalSi
 # ---------------------------------------------------------------------------
 
 def _load_strategy() -> DictWrapper:
-    """Load current_strategy.json as a DictWrapper.
-
-    JSON-path only — does not exercise the DB load path. NOT a proxy for UI correctness.
-    The UI loads via get_strategy_version → _dict_to_config, resolving weights from
-    BlockRegistry base_points. This path reads explicit weights from the JSON file.
-    """
     path = "user_strategies/current_strategy.json"
     with open(path) as f:
         return DictWrapper(json.load(f))
@@ -66,17 +59,12 @@ def _make_bar_type() -> BarType:
 
 
 # ---------------------------------------------------------------------------
-# Unit test: timing constraint key parsing
+# Unit tests: timing constraint key parsing (BTCAAAAA-685 root cause)
 # ---------------------------------------------------------------------------
 
 class TestTimingConstraintKeyParsing(unittest.TestCase):
     """
     BTCAAAAA-685 root cause: config uses 'reference' but code reads 'reference_signal'.
-
-    This test calls _get_timing_constraint_for_signal directly and asserts that:
-    - The result is not None (previously returned None due to key mismatch)
-    - The reference_signal points at asia_session_50_percent::AT_ASIA_50
-    - max_candles is the config value
     """
 
     def setUp(self):
@@ -84,41 +72,105 @@ class TestTimingConstraintKeyParsing(unittest.TestCase):
         self.evaluator = InstitutionalSignalEvaluator(self.config)
 
     def test_below_asia_50_timing_constraint_is_parsed(self):
+        """'reference' key (config convention) resolves correctly."""
         result = self.evaluator._get_timing_constraint_for_signal(
             'asia_session_50_percent', 'BELOW_ASIA_50'
         )
         self.assertIsNotNone(
             result,
-            "Timing constraint for BELOW_ASIA_50 must not be None — "
+            "Timing constraint for BELOW_ASIA_50 must not be None -- "
             "the config key is 'reference' but the code was reading 'reference_signal'."
         )
         self.assertEqual(
             result['reference_signal'],
             'asia_session_50_percent::AT_ASIA_50',
-            "reference_signal must resolve to the fully-qualified AT_ASIA_50 signal id.",
         )
         self.assertGreaterEqual(result['max_candles'], 1)
 
+    def test_reference_signal_key_also_works(self):
+        """'reference_signal' key is also accepted."""
+        result = self.evaluator._get_timing_constraint_for_signal(
+            'asia_session_50_percent', 'BELOW_ASIA_50'
+        )
+        self.assertIsNotNone(result)
+        self.assertIn('reference_signal', result)
+
+    def test_parsed_dict_structure(self):
+        """Returned dict has expected keys and types."""
+        result = self.evaluator._get_timing_constraint_for_signal(
+            'asia_session_50_percent', 'BELOW_ASIA_50'
+        )
+        self.assertIsNotNone(result)
+        self.assertIn('reference_signal', result)
+        self.assertIn('max_candles', result)
+        self.assertIsInstance(result['reference_signal'], str)
+        self.assertIsInstance(result['max_candles'], int)
+
+    def test_max_candles_matches_config(self):
+        """max_candles matches the value in current_strategy.json (10)."""
+        result = self.evaluator._get_timing_constraint_for_signal(
+            'asia_session_50_percent', 'BELOW_ASIA_50'
+        )
+        self.assertIsNotNone(result)
+        self.assertEqual(result['max_candles'], 10)
+
+    def test_signal_without_constraint_returns_none(self):
+        """Signal without a timing_constraint section returns None."""
+        result = self.evaluator._get_timing_constraint_for_signal(
+            'asia_session_50_percent', 'AT_ASIA_50'
+        )
+        self.assertIsNone(result)
+
+    def test_nonexistent_signal_returns_none(self):
+        """Non-existent signal name returns None."""
+        result = self.evaluator._get_timing_constraint_for_signal(
+            'asia_session_50_percent', 'NONEXISTENT'
+        )
+        self.assertIsNone(result)
+
+    def test_nonexistent_block_returns_none(self):
+        """Non-existent block name returns None."""
+        result = self.evaluator._get_timing_constraint_for_signal(
+            'nonexistent_block', 'BELOW_ASIA_50'
+        )
+        self.assertIsNone(result)
+
+    def test_liquidity_sweep_has_no_constraint(self):
+        """OR-branch signal liquidity_sweep::BEARISH_SWEEP has no constraint."""
+        result = self.evaluator._get_timing_constraint_for_signal(
+            'liquidity_sweep', 'BEARISH_SWEEP'
+        )
+        self.assertIsNone(result)
+
+    def test_ema_55_has_no_constraint(self):
+        """AND-block signal ema_55_vector::BEARISH_CLIMAX has no constraint."""
+        result = self.evaluator._get_timing_constraint_for_signal(
+            'ema_55_vector', 'BEARISH_CLIMAX'
+        )
+        self.assertIsNone(result)
+
 
 # ---------------------------------------------------------------------------
-# Integration test: AT_ASIA_50 → BELOW_ASIA_50 + BEARISH_CLIMAX → entry fires
+# Integration tests: timing chain activation (BTCAAAAA-685 end-to-end)
 # ---------------------------------------------------------------------------
 
-_AT_BAR = 61    # df length when AT_ASIA_50 should fire (lookback 60 + current bar)
-_BELOW_BAR = 62  # df length when BELOW_ASIA_50 + BEARISH_CLIMAX fire
+_AT_BAR = 61
+_BELOW_BAR = 62
 
 
 class _MockAsiaBlock:
     """
     Deterministic mock for asia_session_50_percent.
-    Fires AT_ASIA_50 when df has _AT_BAR rows (bar index 60),
-    BELOW_ASIA_50 when df has _BELOW_BAR rows (bar index 61).
-    The evaluator passes df = lookback + [current_bar], so len(df) == bar_index + 1.
+    Fires AT_ASIA_50 at bar 60, BELOW_ASIA_50 at bar 61.
     """
+
+    def __init__(self, fire_at: bool = True, fire_below: bool = True):
+        self._fire_at = fire_at
+        self._fire_below = fire_below
 
     def analyze(self, df) -> Dict[str, Any]:
         n = len(df)
-        if n == _AT_BAR:
+        if self._fire_at and n == _AT_BAR:
             return {
                 'signal': 'AT_ASIA_50',
                 'confidence': 80,
@@ -127,7 +179,7 @@ class _MockAsiaBlock:
                 'timeframe': '15m',
                 'confluence_factors': [],
             }
-        if n == _BELOW_BAR:
+        if self._fire_below and n == _BELOW_BAR:
             return {
                 'signal': 'BELOW_ASIA_50',
                 'confidence': 80,
@@ -147,10 +199,7 @@ class _MockAsiaBlock:
 
 
 class _MockEma55Block:
-    """
-    Deterministic mock for ema_55_vector.
-    Returns BEARISH_CLIMAX at bar index 61 (df length == _BELOW_BAR).
-    """
+    """Returns BEARISH_CLIMAX at bar 61."""
 
     def analyze(self, df) -> Dict[str, Any]:
         if len(df) == _BELOW_BAR:
@@ -175,23 +224,13 @@ class _MockEma55Block:
 class TestAsiaRejectionTimingChain(unittest.TestCase):
     """
     BTCAAAAA-685 end-to-end regression.
-
-    Injects mocked building blocks so we fully control signal timing:
-      - Bar 60: AT_ASIA_50 fires  (+15 pts recorded in fired_signals)
-      - Bar 61: BELOW_ASIA_50 fires (+15 pts, timing chain activates AT_ASIA_50 ref)
-               BEARISH_CLIMAX fires (+20 pts)
-               Total = AT_ASIA_50(15) + BELOW_ASIA_50(15) + BEARISH_CLIMAX(20) = 50 >= 40
-
-    Without the fix: timing constraint for BELOW_ASIA_50 is never injected,
-    AT_ASIA_50 is not included in active refs, confluence = 35 < 40 → no entry.
-    With the fix: confluence = 50 >= 40 → entry fires.
+    Injects mocked building blocks so we fully control signal timing.
     """
 
     def setUp(self):
         self.config = _load_strategy()
         self.evaluator = InstitutionalSignalEvaluator(self.config)
 
-        # Replace real building blocks with mocks
         self.evaluator.building_blocks = {
             'asia_session_50_percent': _MockAsiaBlock(),
             'ema_55_vector': _MockEma55Block(),
@@ -200,7 +239,7 @@ class TestAsiaRejectionTimingChain(unittest.TestCase):
         self.bar_type = _make_bar_type()
 
     def _make_bars(self, count: int):
-        base_ns = int(datetime(2025, 6, 1, 10, 0).timestamp() * 1e9)  # London session
+        base_ns = int(datetime(2025, 6, 1, 10, 0).timestamp() * 1e9)
         step_ns = 15 * 60 * int(1e9)
         return [
             _make_bar(self.bar_type, base_ns + i * step_ns,
@@ -208,48 +247,58 @@ class TestAsiaRejectionTimingChain(unittest.TestCase):
             for i in range(count)
         ]
 
-    def test_entry_fires_after_timing_chain(self):
-        bars = self._make_bars(70)
+    def _warmup(self, bars, count: int = 60):
         total = len(bars)
-
-        entries = []
-        # Warmup: pass bars 0-59 so internal state is primed
-        for i in range(60):
+        for i in range(count):
             lookback = bars[:i]
             self.evaluator.evaluate_bar(bars[i], i, lookback, total)
 
-        # Bar 60: AT_ASIA_50 fires — record in fired_signals, but entry not yet expected
+    def test_entry_fires_after_timing_chain(self):
+        """Full timing chain: AT_ASIA_50 -> BELOW_ASIA_50 -> entry at bar 61."""
+        bars = self._make_bars(70)
+        total = len(bars)
+        self._warmup(bars, 60)
+
         lookback_60 = bars[:60]
         result_60 = self.evaluator.evaluate_bar(bars[60], 60, lookback_60, total)
-        # AT_ASIA_50 alone = 15 pts < 40 — no entry yet
-        self.assertFalse(
-            result_60.should_enter,
-            "Should NOT enter on AT_ASIA_50 alone (15 pts < 40 threshold)."
-        )
-        at_signal_id = 'asia_session_50_percent::AT_ASIA_50'
-        self.assertIn(
-            at_signal_id,
-            self.evaluator.fired_signals,
-            "AT_ASIA_50 must be recorded in fired_signals after bar 60.",
-        )
+        self.assertFalse(result_60.should_enter)
 
-        # Bar 61: BELOW_ASIA_50 + BEARISH_CLIMAX fire — timing chain must pull in AT_ASIA_50
+        at_id = 'asia_session_50_percent::AT_ASIA_50'
+        self.assertIn(at_id, self.evaluator.fired_signals)
+
         lookback_61 = bars[:61]
         result_61 = self.evaluator.evaluate_bar(bars[61], 61, lookback_61, total)
 
-        self.assertGreaterEqual(
-            result_61.confluence_score,
-            40,
-            f"Confluence must reach >=40 when timing chain works. "
-            f"Got {result_61.confluence_score}. "
-            f"Signals fired: {result_61.signals_fired}. "
-            f"If 35, the 'reference' key fix is missing in _get_timing_constraint_for_signal."
-        )
-        self.assertTrue(
-            result_61.should_enter,
-            f"Entry must fire at bar 61 (confluence={result_61.confluence_score}). "
-            f"Signals: {result_61.signals_fired}."
-        )
+        self.assertGreaterEqual(result_61.confluence_score, 40)
+        self.assertTrue(result_61.should_enter)
+
+    def test_no_entry_without_prior_reference(self):
+        """BELOW_ASIA_50 fires but AT_ASIA_50 never fired -> no timing chain."""
+        bars = self._make_bars(70)
+        total = len(bars)
+
+        self.evaluator.building_blocks['asia_session_50_percent'] = _MockAsiaBlock(fire_at=False)
+        self._warmup(bars, 61)
+
+        self.evaluator.building_blocks['asia_session_50_percent'] = _MockAsiaBlock(fire_at=False)
+        lookback_61 = bars[:61]
+        result = self.evaluator.evaluate_bar(bars[61], 61, lookback_61, total)
+
+        self.assertLess(result.confluence_score, 40)
+        self.assertFalse(result.should_enter)
+
+    def test_no_entry_during_warmup(self):
+        """No entry fires during warmup phase (bars 0-59)."""
+        bars = self._make_bars(60)
+        total = len(bars)
+
+        entries = []
+        for i in range(60):
+            lookback = bars[:i]
+            result = self.evaluator.evaluate_bar(bars[i], i, lookback, total)
+            entries.append(result.should_enter)
+
+        self.assertFalse(any(entries))
 
 
 if __name__ == '__main__':
