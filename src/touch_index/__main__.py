@@ -429,14 +429,6 @@ def _run_fr_cli() -> None:
     total_files = sum(r.files_indexed for r in results)
     skipped = sum(1 for r in results if r.skipped_no_commits)
 
-    logger.info(
-        "FR worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits), %d errors",
-        len(results),
-        total_files,
-        skipped,
-        errors,
-    )
-
     if args.validate:
         report = run_quality_checks(engine, stale_threshold_hours=args.stale_hours)
         if not report.passed:
@@ -465,6 +457,13 @@ def _run_fr_cli() -> None:
                 logger.info("Marked %s as done", r.issue_identifier)
             except Exception:
                 logger.exception("Failed to mark %s as done", r.issue_identifier)
+    logger.info(
+        "FR worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits), %d errors",
+        len(results),
+        total_files,
+        skipped,
+        errors,
+    )
 
     if args.json_summary:
         _emit_json_summary(
