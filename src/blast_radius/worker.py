@@ -359,9 +359,7 @@ def process_issue(
                     transition_issue_status_board(issue_id, "done")
                     log.info("Self-closed %s -> done", identifier)
                 except Exception as exc:
-                    log.warning(
-                        "Failed to self-close %s: %s", identifier, exc
-                    )
+                    log.warning("Failed to self-close %s: %s", identifier, exc)
             else:
                 log.info(
                     "Skipped report for %s (%s) -- not persisting state",
