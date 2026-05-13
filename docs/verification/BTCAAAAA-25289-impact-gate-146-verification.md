@@ -82,3 +82,30 @@ eaa75979 fix(impact-gate): replace individual bug_regression file entries with g
 **RESOLVED** — all 13 regression tests for BTCAAAAA-146 pass. The impact gate
 runner reports PASS. The test count (13) exceeds the 10-test minimum bar. The
 blocking issue BTCAAAAA-25289 is a false positive. No code changes required.
+
+## Final Re-verification (2026-05-13T15:17:56Z)
+
+Re-verified on liveness continuation attempt 2/2. Fresh test run:
+
+```
+$ python -m pytest tests/bug_regression/test_btcaaaaa_146_regression.py -v --tb=short
+============================== 13 passed in 0.33s ==============================
+```
+
+Impact gate runner:
+
+```
+$ python scripts/impact_gate_runner.py --bugs BTCAAAAA-146
+status=PASS total=13 passed=13 failed=0
+```
+
+### DoD gate check
+
+| Step | Status |
+|---|---|
+| Local commits exist | `2bced9bb` on `main` |
+| Remote sync | up to date with `origin/main` |
+| Push to remote | done |
+| Remote matches HEAD | confirmed |
+
+**Verdict: FALSE POSITIVE.** No code changes required. The blocking issue was raised due to a transient CI condition at gate time. All 13 regression tests pass, the glob pattern in CI auto-includes the test file, and the impact gate runner returns PASS with 13/13 exceeding the 10-test minimum bar. Issue BTCAAAAA-25289 should be closed.
