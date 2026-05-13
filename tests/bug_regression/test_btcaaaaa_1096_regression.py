@@ -79,7 +79,9 @@ def _make_training_stub():
     stub._pending_fingerprint = None
 
     stub._execute_training = types.MethodType(TrainingPanelUI._execute_training, stub)
-    stub._on_training_complete = types.MethodType(TrainingPanelUI._on_training_complete, stub)
+    stub._on_training_complete = types.MethodType(
+        TrainingPanelUI._on_training_complete, stub
+    )
     stub._reset_ui_state = types.MethodType(TrainingPanelUI._reset_ui_state, stub)
 
     return stub
@@ -95,6 +97,7 @@ def _make_mock_thread():
 # ---------------------------------------------------------------------------
 # AC1 — Cache hit -> dialog appears
 # ---------------------------------------------------------------------------
+
 
 class TestAc1DialogOnCacheHit:
     """AC1: Cache hit -> 'Cached calibration results available' dialog shown."""
@@ -166,16 +169,24 @@ class TestAc1DialogOnCacheHit:
         }
 
         mock_thread = _make_mock_thread()
-        with patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb), \
-             patch("src.optimizer_v3.core.training_thread.TrainingThread", return_value=mock_thread):
+        with (
+            patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb),
+            patch(
+                "src.optimizer_v3.core.training_thread.TrainingThread",
+                return_value=mock_thread,
+            ),
+        ):
             stub._execute_training(config)
 
-        assert not dialog_created, "AC1: Dialog appeared on cache miss - should NOT have"
+        assert not dialog_created, (
+            "AC1: Dialog appeared on cache miss - should NOT have"
+        )
 
 
 # ---------------------------------------------------------------------------
 # AC2 -- "Use cached" -> delay_map applied, TrainingThread NOT spawned
 # ---------------------------------------------------------------------------
+
 
 class TestAc2UseCachedPath:
     """AC2: 'Use cached' must skip TrainingThread and display cached delay_map."""
@@ -190,7 +201,9 @@ class TestAc2UseCachedPath:
 
         use_btn = object()
         mock_msg_box = MagicMock()
-        mock_msg_box.addButton.side_effect = lambda label, role: use_btn if "Use Cached" in str(label) else object()
+        mock_msg_box.addButton.side_effect = lambda label, role: (
+            use_btn if "Use Cached" in str(label) else object()
+        )
         mock_msg_box.exec_.return_value = None
         mock_msg_box.clickedButton.return_value = use_btn
         mock_qmb = MagicMock(return_value=mock_msg_box)
@@ -206,8 +219,13 @@ class TestAc2UseCachedPath:
         }
 
         mock_thread = _make_mock_thread()
-        with patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb), \
-             patch("src.optimizer_v3.core.training_thread.TrainingThread", return_value=mock_thread):
+        with (
+            patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb),
+            patch(
+                "src.optimizer_v3.core.training_thread.TrainingThread",
+                return_value=mock_thread,
+            ),
+        ):
             stub._execute_training(config)
 
         mock_thread.start.assert_not_called()
@@ -222,7 +240,9 @@ class TestAc2UseCachedPath:
 
         use_btn = object()
         mock_msg_box = MagicMock()
-        mock_msg_box.addButton.side_effect = lambda label, role: use_btn if "Use Cached" in str(label) else object()
+        mock_msg_box.addButton.side_effect = lambda label, role: (
+            use_btn if "Use Cached" in str(label) else object()
+        )
         mock_msg_box.exec_.return_value = None
         mock_msg_box.clickedButton.return_value = use_btn
         mock_qmb = MagicMock(return_value=mock_msg_box)
@@ -241,13 +261,15 @@ class TestAc2UseCachedPath:
             stub._execute_training(config)
 
         call_text = stub.results_text.setPlainText.call_args[0][0]
-        assert "Cached calibration results applied" in call_text, \
+        assert "Cached calibration results applied" in call_text, (
             f"Expected cached result message, got: {call_text!r}"
+        )
 
 
 # ---------------------------------------------------------------------------
 # AC3 -- "Re-calibrate" -> TrainingThread spawned, cache updated
 # ---------------------------------------------------------------------------
+
 
 class TestAc3RecalibratePath:
     """AC3: 'Re-calibrate' must spawn TrainingThread and update cache on completion."""
@@ -262,7 +284,9 @@ class TestAc3RecalibratePath:
 
         recal_btn = object()
         mock_msg_box = MagicMock()
-        mock_msg_box.addButton.side_effect = lambda label, role: object() if "Use Cached" in str(label) else recal_btn
+        mock_msg_box.addButton.side_effect = lambda label, role: (
+            object() if "Use Cached" in str(label) else recal_btn
+        )
         mock_msg_box.exec_.return_value = None
         mock_msg_box.clickedButton.return_value = recal_btn
         mock_qmb = MagicMock(return_value=mock_msg_box)
@@ -278,8 +302,13 @@ class TestAc3RecalibratePath:
         }
 
         mock_thread = _make_mock_thread()
-        with patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb), \
-             patch("src.optimizer_v3.core.training_thread.TrainingThread", return_value=mock_thread):
+        with (
+            patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb),
+            patch(
+                "src.optimizer_v3.core.training_thread.TrainingThread",
+                return_value=mock_thread,
+            ),
+        ):
             stub._execute_training(config)
 
         mock_thread.start.assert_called_once()
@@ -293,7 +322,9 @@ class TestAc3RecalibratePath:
 
         recal_btn = object()
         mock_msg_box = MagicMock()
-        mock_msg_box.addButton.side_effect = lambda label, role: object() if "Use Cached" in str(label) else recal_btn
+        mock_msg_box.addButton.side_effect = lambda label, role: (
+            object() if "Use Cached" in str(label) else recal_btn
+        )
         mock_msg_box.exec_.return_value = None
         mock_msg_box.clickedButton.return_value = recal_btn
         mock_qmb = MagicMock(return_value=mock_msg_box)
@@ -309,8 +340,13 @@ class TestAc3RecalibratePath:
         }
 
         mock_thread = _make_mock_thread()
-        with patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb), \
-             patch("src.optimizer_v3.core.training_thread.TrainingThread", return_value=mock_thread):
+        with (
+            patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb),
+            patch(
+                "src.optimizer_v3.core.training_thread.TrainingThread",
+                return_value=mock_thread,
+            ),
+        ):
             stub._execute_training(config)
 
         assert stub._pending_fingerprint is not None
@@ -319,6 +355,7 @@ class TestAc3RecalibratePath:
 # ---------------------------------------------------------------------------
 # AC5 -- Different block-set -> no dialog, TrainingThread runs
 # ---------------------------------------------------------------------------
+
 
 class TestAc5CacheMissRunsTraining:
     """AC5: Different block-set must NOT show dialog and must run TrainingThread."""
@@ -351,8 +388,13 @@ class TestAc5CacheMissRunsTraining:
         }
 
         mock_thread = _make_mock_thread()
-        with patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb), \
-             patch("src.optimizer_v3.core.training_thread.TrainingThread", return_value=mock_thread):
+        with (
+            patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb),
+            patch(
+                "src.optimizer_v3.core.training_thread.TrainingThread",
+                return_value=mock_thread,
+            ),
+        ):
             stub._execute_training(config)
 
         assert not dialog_created, "AC5: Dialog appeared for different block-set"
@@ -381,8 +423,13 @@ class TestAc5CacheMissRunsTraining:
         }
 
         mock_thread = _make_mock_thread()
-        with patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb), \
-             patch("src.optimizer_v3.core.training_thread.TrainingThread", return_value=mock_thread):
+        with (
+            patch("src.optimizer_v3.ui.training_panel.QMessageBox", mock_qmb),
+            patch(
+                "src.optimizer_v3.core.training_thread.TrainingThread",
+                return_value=mock_thread,
+            ),
+        ):
             stub._execute_training(config)
 
         assert not dialog_created, "No dialog should appear when no cache exists"
@@ -392,6 +439,7 @@ class TestAc5CacheMissRunsTraining:
 # ---------------------------------------------------------------------------
 # Cache write on _on_training_complete
 # ---------------------------------------------------------------------------
+
 
 class TestCacheWriteOnTrainingComplete:
     """_on_training_complete must write cache when _pending_fingerprint is set."""
@@ -404,7 +452,9 @@ class TestCacheWriteOnTrainingComplete:
 
         results = [{"signal_name": "Alpha", "optimal_delay": 5}]
 
-        with patch("src.optimizer_v3.ui.training_panel.calibration_cache.save_cache") as mock_save:
+        with patch(
+            "src.optimizer_v3.ui.training_panel.calibration_cache.save_cache"
+        ) as mock_save:
             stub._on_training_complete(results)
 
         assert stub._calibration_fingerprint == fp
@@ -430,7 +480,9 @@ class TestCacheWriteOnTrainingComplete:
 
         results = [{"signal_name": "Alpha", "optimal_delay": 5}]
 
-        with patch("src.optimizer_v3.ui.training_panel.calibration_cache.save_cache") as mock_save:
+        with patch(
+            "src.optimizer_v3.ui.training_panel.calibration_cache.save_cache"
+        ) as mock_save:
             stub._on_training_complete(results)
 
         assert stub._calibration_fingerprint is None
@@ -444,7 +496,9 @@ class TestCacheWriteOnTrainingComplete:
 
         results = [{"foo": "bar"}]
 
-        with patch("src.optimizer_v3.ui.training_panel.calibration_cache.save_cache") as mock_save:
+        with patch(
+            "src.optimizer_v3.ui.training_panel.calibration_cache.save_cache"
+        ) as mock_save:
             stub._on_training_complete(results)
 
         assert stub._calibration_fingerprint is None
