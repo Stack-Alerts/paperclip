@@ -94,7 +94,8 @@ jobs:
             tests/bug_regression/test_btcaaaaa_778_regression.py \
             tests/bug_regression/test_btcaaaaa_893_regression.py \
             tests/bug_regression/test_btcaaaaa_995_regression.py \
-            tests/bug_regression/test_btcaaaaa_25378_regression.py \n            --cov=src \
+            tests/bug_regression/test_btcaaaaa_25378_regression.py \
+            --cov=src \
             --cov-config=.coveragerc \
             --cov-report=term-missing \
             --cov-fail-under=20 \
