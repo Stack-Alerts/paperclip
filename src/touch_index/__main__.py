@@ -328,6 +328,7 @@ def _emit_json_summary(
             "files_indexed": result.files_indexed,
             "source": result.source,
             "skipped_no_commits": result.skipped_no_commits,
+            "issue_status": result.issue_status,
         }
     if results is not None:
         summary["issues_processed"] = len(results)
