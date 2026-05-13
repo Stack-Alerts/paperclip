@@ -48,6 +48,7 @@ class FRIngestionResult:
     files_indexed: int
     source: str  # "comments" | "git" | "description" | "none"
     skipped_no_commits: bool  # True when no files found from any source
+    issue_status: str | None = None  # Paperclip status at time of ingestion
 
 
 def process_fr_issue(
@@ -68,7 +69,7 @@ def process_fr_issue(
     if FDR_LABEL_ID not in (issue.get("labelIds") or []):
         logger.info("Issue %s is not FDR-labelled — skipping", issue.get("identifier"))
         return None
-    return ingest_fr_issue(
+    result = ingest_fr_issue(
         engine,
         issue_id=issue["id"],
         issue_identifier=issue["identifier"],
@@ -76,6 +77,9 @@ def process_fr_issue(
         description=issue.get("description", "") or "",
         dry_run=dry_run,
     )
+    if result is not None:
+        result.issue_status = issue.get("status")
+    return result
 
 
 def ingest_fr_issue(

@@ -674,6 +674,43 @@ class TestMain:
         mock_fetch.assert_not_called()
         mock_transition.assert_called_once_with("uuid-1", "done")
 
+    def test_main_issue_id_non_done_skips_transition(self, monkeypatch, caplog):
+        """When --issue-id resolves to a non-done issue, transition is skipped."""
+        import logging
+
+        engine = MagicMock()
+        result = FRIngestionResult(
+            issue_identifier="BTCAAAAA-100",
+            issue_id="uuid-1",
+            files_indexed=2,
+            source="git",
+            skipped_no_commits=False,
+            issue_status="in_progress",
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.fr_worker.process_fr_issue", return_value=result
+            ) as mock_process,
+            patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status_board"
+            ) as mock_transition,
+            caplog.at_level(logging.INFO),
+        ):
+            monkeypatch.setattr(
+                "sys.argv",
+                ["touch_index", "--issue-id", "uuid-1"],
+            )
+            main()
+
+        mock_process.assert_called_once_with(engine, "uuid-1", dry_run=False)
+        mock_fetch.assert_not_called()
+        mock_transition.assert_not_called()
+        assert any("skipping transition to done" in r.message for r in caplog.records)
+
     def test_main_issue_id_not_found_logs(self, monkeypatch, caplog):
         """When process_fr_issue returns None, a message is logged."""
         import logging
