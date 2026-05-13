@@ -1,0 +1,16 @@
+[Unit]
+Description=Paperclip Offsite Backup to Google Drive
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/sirrus/.paperclip/scripts/backup-to-drive.sh
+StandardOutput=append:/home/sirrus/.paperclip/instances/default/logs/backup-to-drive.log
+StandardError=append:/home/sirrus/.paperclip/instances/default/logs/backup-to-drive.log
+Environment=HOME=/home/sirrus
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/home/sirrus/.local/bin
+Environment=PAPERCLIP_COMPANY_ID=73419cf3-bd37-4a7c-8782-311ccb47fced
+
+[Install]
+WantedBy=default.target
