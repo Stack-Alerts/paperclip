@@ -166,7 +166,7 @@ def issue_to_record(issue: dict) -> dict[str, Any]:
 
 
 def upsert_issues(engine, issues: list[dict], dry_run: bool = False) -> int:
-    """Upsert issue records into trace_issues. Returns count."""
+    """Upsert issue records into trace_issues (two-pass: insert then resolve parent FKs)."""
     if not issues:
         return 0
     if dry_run:
@@ -175,7 +175,9 @@ def upsert_issues(engine, issues: list[dict], dry_run: bool = False) -> int:
         return len(issues)
 
     with Session(engine) as session:
+        # Pass 1: insert all issues without parent_id (avoids FK violations)
         upserted = 0
+        paperclip_parent_map: dict[str, str] = {}  # paperclip_id -> paperclip_parent_id
         for r in issues:
             fields = {
                 "identifier": r["identifier"],
@@ -184,7 +186,6 @@ def upsert_issues(engine, issues: list[dict], dry_run: bool = False) -> int:
                 "status": r["status"],
                 "paperclip_id": r["paperclip_id"],
                 "labels": r.get("labels"),
-                "parent_id": r.get("parent_id"),
             }
             stmt = pg_insert(TraceIssue).values(**fields)
             stmt = stmt.on_conflict_do_update(
@@ -195,13 +196,43 @@ def upsert_issues(engine, issues: list[dict], dry_run: bool = False) -> int:
                     "status": stmt.excluded.status,
                     "paperclip_id": stmt.excluded.paperclip_id,
                     "labels": stmt.excluded.labels,
-                    "parent_id": stmt.excluded.parent_id,
                     "updated_at": datetime.now(timezone.utc),
                 },
             )
             session.execute(stmt)
             upserted += 1
+            if r.get("parent_id"):
+                paperclip_parent_map[r["paperclip_id"]] = r["parent_id"]
         session.commit()
+
+        # Pass 2: resolve parent FKs (paperclip parentId -> trace_issues.id)
+        if paperclip_parent_map:
+            # Build lookup: paperclip_id -> internal id
+            from uuid import UUID as PyUUID
+            pc_ids = list({v for v in paperclip_parent_map.values()})
+            parent_rows = session.execute(
+                select(TraceIssue.id, TraceIssue.paperclip_id).where(
+                    TraceIssue.paperclip_id.in_([PyUUID(pid) for pid in pc_ids])
+                )
+            ).fetchall()
+            pc_to_internal: dict[str, PyUUID] = {
+                str(row.paperclip_id): row.id for row in parent_rows
+            }
+
+            for child_pc_id, parent_pc_id in paperclip_parent_map.items():
+                parent_internal = pc_to_internal.get(parent_pc_id)
+                if parent_internal is None:
+                    continue
+                session.execute(
+                    text(
+                        "UPDATE trace_issues SET parent_id = :parent_id, "
+                        "updated_at = :now WHERE paperclip_id = CAST(:child_pc_id AS uuid)"
+                    ),
+                    {"parent_id": parent_internal, "now": datetime.now(timezone.utc),
+                     "child_pc_id": child_pc_id},
+                )
+            session.commit()
+
     return upserted
 
 
