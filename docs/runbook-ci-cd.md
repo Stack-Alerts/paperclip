@@ -1,217 +1,210 @@
-# Runbook: CI/CD Pipeline
+# Runbook: CI/CD Pipeline Reference
 
-**Last updated:** 2026-05-12
+**Last updated:** 2026-05-13
 **Owner:** RepoSteward / DocWriter
-**Monitoring:** `.github/workflows/*.yml` (15 workflows)
+**Audience:** All developers, agents, and on-call responders
 
 ---
 
-## 1. Overview
+## 1. Pipeline Overview
 
-The CI/CD pipeline consists of 15 GitHub Actions workflows that handle linting, testing, security gating, documentation indexing, impact analysis, and scheduled maintenance tasks.
+The system runs **17 GitHub Actions workflows** organized into three tiers:
 
-### Workflow Summary
-
-| # | Workflow | Trigger | Cadence | Run Time |
-|---|---|---|---|---|
-| 1 | Lint | push/PR → main | Per commit | <1m |
-| 2 | Test & Coverage | push/PR → main, nightly 04:00 UTC | Per commit + daily | ~5m |
-| 3 | Lock Gate | push/PR → main | Per commit | <1m |
-| 4 | Apply Branch Protection | push → main | Per commit to main | <30s |
-| 5 | Freeze-Lift Evidence | push/PR → main, nightly 05:00 UTC | Per commit + daily | ~2m |
-| 6 | Blast Radius Worker | Every 5 min + webhook | 5 min cycle | ~1m |
-| 7 | Impact Gate Worker | Every 5 min + webhook | 5 min cycle | ~1m |
-| 8 | Impact Gate Scan Done | Every 5 min | 5 min cycle | ~1m |
-| 9 | Touch Index Bug Worker | Every 15 min + webhook | 15 min cycle | ~2m |
-| 10 | Touch Index FR Worker | Every 15 min + webhook | 15 min cycle | ~2m |
-| 11 | Backfill — Close Stale Runs | Hourly | 60 min cycle | ~30s |
-| 12 | Dep Graph Refresh | Nightly 02:00 UTC | Daily | ~1m |
-| 13 | Lock Gate Nightly Alert | Nightly 03:00 UTC | Daily | ~30s |
-| 14 | Lock Exception Sign-Off | repository_dispatch | On demand | ~30s |
-| 15 | OpenCode Watchdog | Every 15 min | 15 min cycle | ~30s |
+| Tier | Trigger | Workflows |
+|------|---------|-----------|
+| **Gate** | Every PR/push to main | `lint.yml`, `test.yml`, `lock-gate.yml`, `freeze-lift-evidence.yml` |
+| **Worker** | Scheduled + webhook | `blast-radius-worker.yml`, `touch-index-bug-worker.yml`, `touch-index-fr-worker.yml`, `impact-gate-worker.yml`, `impact-gate-scan-done.yml` |
+| **Infrastructure** | Scheduled | `dep-graph-refresh.yml`, `lock-gate-nightly-alert.yml`, `backfill-close-stale-runs.yml`, `opencode-watchdog.yml`, `apply-branch-protection.yml`, `lock-exception-signoff.yml` |
 
 ---
 
-## 2. Quality Gates (Push/PR to main)
-
-These workflows run on every push or PR to `main`. All must pass for merge.
+## 2. Gate Workflows (PR/Push)
 
 ### 2.1 Lint (`lint.yml`)
 
-**Purpose:** Enforce code quality rules.
+- **Trigger:** Push/PR to `main` or `master`
+- **Jobs:**
+  - `ruff` — ruff check on `src/` for `T201` (no print statements) and `DTZ003` (no naive datetimes)
+  - `secrets-audit` — runs `scripts/audit/secrets_audit.py`
+- **Failure action:** Block PR merge. Fix and push.
 
-- **Ruff lint:** Checks `src/` for `T201` (no print()) and `DTZ003` (timezone-aware datetimes)
-- **Secrets audit:** Runs `scripts/audit/secrets_audit.py` to detect hardcoded credentials
+### 2.2 Test and Coverage (`test.yml`)
 
-**Failure remediation:**
-```
-ruff check src/ --select T201,DTZ003
-# Fix violations, re-push
-```
-
-### 2.2 Test & Coverage (`test.yml`)
-
-**Purpose:** Run unit tests, integration tests, and enforce coverage minimum.
-
-- **pytest + coverage gate:** Runs tests under `tests/test_blast_radius/`, `tests/test_impact_gate/`, `tests/test_touch_index/`, `tests/strategy_builder/`, `tests/optimizer_v3/test_error_recovery.py`, `tests/itm/state/`. Coverage threshold: **20%** (fail-under).
-- **Real-data regression:** `tests/integration/test_btcaaaaa_745_multicore_real_data_regression.py`
-- **Canary smoke:** `tests/bug_regression/test_canary_trade_execution.py`
-- Requires PostgreSQL 17 service container.
-- Nightly failures post alert to Paperclip via `scripts/nightly_test_alert.py`.
-
-**Failure remediation:**
-```bash
-# Reproduce locally
-source venv/bin/activate
-python -m pytest <test_path> -v --tb=long
-```
+- **Trigger:** Push/PR to `main`/`master` + nightly at 04:00 UTC
+- **Services:** PostgreSQL 17 (ephemeral CI container)
+- **Jobs:**
+  - `test` — pytest with coverage gate (≥20%). Runs strategy builder, optimizer, ITM state, and gate tests.
+  - `integration-real-data` — multicore real-data regression (BTCAAAAA-745)
+  - `canary-smoke` — canary trade execution smoke test (BTCAAAAA-1476)
+- **Failure action (nightly):** Auto-creates `critical` Paperclip issue via `scripts/nightly_test_alert.py`
 
 ### 2.3 Lock Gate (`lock-gate.yml`)
 
-**Purpose:** Prevent unauthorized changes to locked modules. See [lock-gate.md](lock-gate.md) for full documentation.
+- **Trigger:** Push/PR to `main`/`master`
+- **Script:** `scripts/lock_gate.py --json-summary`
+- **On block:** Auto-creates CTO sign-off Paperclip issue via `scripts/lock_gate_create_signoff.py`
+- **Reference:** [runbook-module-lock.md](runbook-module-lock.md)
 
-- Runs `scripts/lock_gate.py` with JSON summary
-- If blocked, creates CTO sign-off issue via `scripts/lock_gate_create_signoff.py`
+### 2.4 Freeze-Lift Evidence (`freeze-lift-evidence.yml`)
 
-**Failure remediation:** Follow lock exception process in [lock-gate.md](lock-gate.md).
-
-### 2.4 Apply Branch Protection (`apply-branch-protection.yml`)
-
-**Purpose:** Ensure `main` branch has required settings (1 approval review, enforce admins, conversation resolution).
-
-- Runs on every push to main
-- Idempotent — skips if protection already applied
-
-**Failure remediation:** Check `GH_TOKEN` permissions. Manual: `gh api repos/{owner}/{repo}/branches/main/protection`.
-
-### 2.5 Freeze-Lift Evidence (`freeze-lift-evidence.yml`)
-
-**Purpose:** Verify lock-gate integrity through evidence tests.
-
-- **Canary on main:** Lock gate passes on clean branches
-- **Broken-branch block:** Locked module changes blocked without exception
-- **Escape hatch:** Board and emergency exceptions unblock correctly
-- **Locked-itself:** Gate infrastructure files are locked
-- **Schema contracts:** Exceptions/registry schema integrity
-
-**Failure remediation:** Investigate `tests/freeze_lift/` output. Usually indicates lock-gate config drift.
+- **Trigger:** Push/PR to `main`/`master` + nightly at 05:00 UTC
+- **Tests:** `tests/freeze_lift/` — validates lock gate behavior:
+  - Canary on main (clean branches pass)
+  - Broken-branch block (locked module changes blocked without exception)
+  - Escape hatch Path A+B (board/emergency exceptions unblock)
+  - Locked-itself (gate infrastructure files are locked)
+  - Schema contracts (exceptions/registry schema integrity)
 
 ---
 
-## 3. Worker Pipelines (Polling/Webhook)
+## 3. Worker Workflows (Scheduled + Webhook)
 
 ### 3.1 Blast Radius Worker (`blast-radius-worker.yml`)
 
-**Every 5 min + webhook.** Detects fix→in_review issue transitions and posts Blast Radius Reports.
+- **Schedule:** Every 5 minutes
+- **Trigger:** `repository_dispatch` (issue status changed)
+- **Purpose:** Detect `fix → in_review` transitions, post Blast Radius report comments
+- **Script:** `scripts/run_blast_radius_worker.py`
+- **State caching:** Uses GitHub Actions cache for `data/blast_radius_worker_state.json`
 
-- Scheduled: polls for transitions every 5 min
-- `repository_dispatch` — immediate trigger on status change
-- `workflow_dispatch` — manual: pass `issue_id`, `old_status`, `dry_run`, `loop_seconds`, `force_reprocess`
+### 3.2 Touch Index Bug Worker (`touch-index-bug-worker.yml`)
 
-See [architecture/BLAST_RADIUS_WORKER.md](../architecture/BLAST_RADIUS_WORKER.md) and [runbook-blast-radius-worker.md](runbook-blast-radius-worker.md).
+- **Schedule:** Every 15 minutes
+- **Trigger:** `repository_dispatch` (issue created/updated/status changed)
+- **Purpose:** Ingest file references from newly-closed bug issues into touch index
+- **Validation:** `scripts/validate_touch_index_bug.py --stale-days 30`
 
-### 3.2 Impact Gate Worker (`impact-gate-worker.yml`)
+### 3.3 Touch Index FR Worker (`touch-index-fr-worker.yml`)
 
-**Every 5 min + webhook.** Runs Impact Gate on in_review fix issues.
+- **Schedule:** Every 15 minutes
+- **Trigger:** `repository_dispatch` (issue created/updated/status changed)
+- **Purpose:** Ingest file references from updated FDR (Feature/Defect Report) issues
+- **Validation:** `scripts/validate_touch_index_fr.py --stale-hours 168`
 
-- Scheduled: polls every 5 min
-- `repository_dispatch` — immediate trigger
-- `workflow_dispatch` — manual: `issue_id`, `old_status`, `dry_run`
+### 3.4 Impact Gate Worker (`impact-gate-worker.yml`)
 
-### 3.3 Impact Gate Scan Done (`impact-gate-scan-done.yml`)
+- **Schedule:** Every 5 minutes
+- **Trigger:** `repository_dispatch` (issue status changed)
+- **Purpose:** Run Impact Gate validation on `in_review` fix issues
+- **Scripts:** `scripts/impact_gate_worker.py` / `scripts/run_impact_gate_worker.py`
+- **Dependencies:** Qt headless system packages for UI smoke tests
 
-**Every 5 min.** Retroactively gates recently-completed fix/bug issues.
+### 3.5 Impact Gate Scan-Done (`impact-gate-scan-done.yml`)
 
-- Runs `scripts/scan_fix_issues_done.py` with retroactive mode
-- Default lookback: 7 days (scheduled) or `days_back` input (manual)
-- Alerts on ungated issues via `scripts/scan_done_alert.py`
-
-### 3.4 Touch Index Bug Worker (`touch-index-bug-worker.yml`)
-
-**Every 15 min + webhook.** Ingests file references from closed bug issues into the touch index.
-
-- Runs `scripts/run_touch_index_bug_worker.py`
-- Validates data quality via `scripts/validate_touch_index_bug.py --stale-days 30`
-- See [architecture/TOUCH_INDEX_BUG_WORKER.md](../architecture/TOUCH_INDEX_BUG_WORKER.md)
-
-### 3.5 Touch Index FR Worker (`touch-index-fr-worker.yml`)
-
-**Every 15 min + webhook.** Ingests file references from updated FDR (Feature/Defect Request) issues.
-
-- Runs `scripts/run_touch_index_fr_worker.py`
-- Validates data quality via `scripts/validate_touch_index_fr.py --stale-hours 168`
-- See [architecture/TOUCH_INDEX_FR_WORKER.md](../architecture/TOUCH_INDEX_FR_WORKER.md)
+- **Schedule:** Every 5 minutes
+- **Purpose:** Retroactively gate recently-done fix/bug issues
+- **Script:** `scripts/scan_fix_issues_done.py`
+- **Output:** Writes `data_quality_impact_gate_{date}.json` snapshot
+- **Alerting:** Creates alert Paperclip issue for ungated issues via `scripts/scan_done_alert.py`
 
 ---
 
-## 4. Scheduled Maintenance
+## 4. Infrastructure Workflows (Scheduled)
 
-### 4.1 Backfill — Close Stale Runs (`backfill-close-stale-runs.yml`)
+### 4.1 Dependency Graph Refresh (`dep-graph-refresh.yml`)
 
-**Hourly.** Closes Paperclip issues stuck `in_progress` past the staleness threshold (default: 60 min).
+- **Schedule:** Nightly at 02:00 UTC
+- **Purpose:** Regenerate `dep_graph.json` for lock gate reverse-dependency lookups
+- **Script:** `scripts/regenerate_dep_graph.py`
+- **Output:** Auto-commits updated `dep_graph.json` with `[skip ci]`
 
-- Runs `scripts/backfill_close_stale_runs.py`
-- Dry-run by default on manual trigger
+### 4.2 Lock Gate Nightly Alert (`lock-gate-nightly-alert.yml`)
 
-### 4.2 Dependency Graph Refresh (`dep-graph-refresh.yml`)
+- **Schedule:** Nightly at 03:00 UTC (after dep-graph refresh)
+- **Purpose:** Generate nightly lock gate alert report
+- **Script:** `scripts/lock_gate_nightly_alert.py`
 
-**Nightly 02:00 UTC.** Regenerates `dep_graph.json` for lock gate reverse lookups.
+### 4.3 Backfill — Close Stale Runs (`backfill-close-stale-runs.yml`)
 
-- Runs `scripts/regenerate_dep_graph.py`
-- Auto-commits changes to `dep_graph.json` with `[skip ci]`
+- **Schedule:** Hourly
+- **Purpose:** Auto-close stale `in_progress` Paperclip issues
+- **Script:** `scripts/backfill_close_stale_runs.py`
+- **Config:** `--stale-minutes 60`, dry-run mode supported via `workflow_dispatch`
 
-### 4.3 Lock Gate Nightly Alert (`lock-gate-nightly-alert.yml`)
+### 4.4 OpenCode Watchdog (`opencode-watchdog.yml`)
 
-**Nightly 03:00 UTC.** Posts a summary of lock gate status.
+- **Schedule:** Every 15 minutes
+- **Purpose:** Kill hanging opencode processes on the runner
+- **Script:** `scripts/opencode_watchdog.py --verbose`
+- **Artifacts:** Uploads watchdog logs (7-day retention)
 
-- Runs `scripts/lock_gate_nightly_alert.py`
-- Runs after dep-graph-refresh (02:00) so `dep_graph.json` is fresh
+### 4.5 Apply Branch Protection (`apply-branch-protection.yml`)
 
----
+- **Trigger:** Push to `main`
+- **Purpose:** Ensures branch protection is applied to `main`:
+  - 1 required approving review
+  - Dismiss stale reviews
+  - Require conversation resolution
+  - Enforce for admins
+  - No force pushes, no deletions
 
-## 5. Event-Driven Workflows
+### 4.6 Lock Exception Sign-Off (`lock-exception-signoff.yml`)
 
-### 5.1 Lock Exception Sign-Off (`lock-exception-signoff.yml`)
-
-**Trigger:** `repository_dispatch` with `lock_exception_signed_off` type.
-
-Processes approved lock exceptions — adds entry to `lock_gate_exceptions.json` and pushes.
-
-Parameters: `issue_id`, `module`, `scope`, `approved_by`, `approval_id`, `expires_iso`, `dry_run`
-
----
-
-## 6. Runbook Workflows
-
-### 6.1 OpenCode Watchdog (`opencode-watchdog.yml`)
-
-**Every 15 min.** Kills hanging opencode processes (silent >30 min).
-
-- Runs `scripts/opencode_watchdog.py`
-- Dry-run by default on manual trigger
-- Uploads watchdog logs as artifact
+- **Trigger:** `repository_dispatch` (type: `lock_exception_signed_off`)
+- **Purpose:** Process lock exception sign-off and add entry to `lock_gate_exceptions.json`
+- **Script:** `scripts/lock_exception_signoff.py`
 
 ---
 
-## 7. Alerting
+## 5. Secrets Reference
 
-| Workflow | Alert Method |
-|---|---|
-| Nightly test failure | `scripts/nightly_test_alert.py` → Paperclip issue |
-| Lock gate block | `scripts/lock_gate_create_signoff.py` → CTO sign-off issue |
-| Impact Gate ungated issues | `scripts/scan_done_alert.py` → alert issue |
-| Stale in_progress runs | Hourly auto-close (Paperclip API) |
-| OpenCode hang | Auto-kill + logs artifact |
+Workflows use these GitHub secrets:
+
+| Secret | Used By |
+|--------|---------|
+| `PAPERCLIP_API_URL` | All workers, lock gate, test alert |
+| `PAPERCLIP_API_KEY` | All workers, lock gate, test alert |
+| `PAPERCLIP_COMPANY_ID` | All workers, lock gate, test alert |
+| `PAPERCLIP_BOARD_API_KEY` | Backfill close stale runs |
+| `POSTGRES_HOST` | Workers (DB-connected) |
+| `POSTGRES_PORT` | Workers (DB-connected) |
+| `POSTGRES_DB` | Workers (DB-connected) |
+| `POSTGRES_USER` | Workers (DB-connected) |
+| `POSTGRES_PASSWORD` | Workers (DB-connected) |
 
 ---
 
-## 8. Failure Quick Reference
+## 6. Common Failure Modes
 
-| Symptom | Likely Cause | Action |
-|---|---|---|
-| Lint fails | Print statement / naive datetime | Fix violation, re-push |
-| Tests fail | Code regression / DB unavail | Check test output, reproduce locally |
-| Lock gate blocks | Locked module changed | Get CTO sign-off |
-| Worker not running | Rate limit / API key expired | Check secrets, check concurrency |
-| stale runner stuck | Stale >60 min | Will be auto-closed on next hourly run |
-| Branch protection missing | First push on new repo | Push again, workflow auto-applies |
+| Symptom | Likely Cause | Fix |
+|---------|-------------|-----|
+| Lint fails | `print()` statement or `datetime.utcnow()` | Use `structlog` and `datetime.now(timezone.utc)` |
+| Test coverage < 20% | Missing or low-coverage tests | Add tests for uncovered code |
+| Lock gate blocks PR | Locked module changed without exception | Request exception via CTO sign-off (see [runbook-module-lock.md](runbook-module-lock.md)) |
+| Worker timeout | Large batch, slow DB, or resource contention | Bump timeout or reduce batch size in workflow config |
+| Secrets missing | `.env` not configured or secrets not set in repo | Check GitHub repo settings → Secrets and variables |
+| DB connection refused | PostgreSQL service not started or credentials wrong | Verify `POSTGRES_*` secrets and service configuration |
+| Nightly test alert fired | Scheduled test suite failed | Check CI run logs, fix regression, verify next nightly pass |
+
+---
+
+## 7. Manual Intervention
+
+### 7.1 Rerun a Failed Workflow
+
+```bash
+gh run list --limit 5 --json databaseId,conclusion,status,name
+gh run rerun <run-id>
+```
+
+### 7.2 Trigger a Workflow Manually
+
+```bash
+gh workflow run "Blast Radius Worker" -f dry_run=true -f issue_id="<uuid>"
+```
+
+### 7.3 Check All Workflow Status
+
+```bash
+gh run list --limit 20 --json name,conclusion,status,displayTitle
+```
+
+---
+
+## 8. Related Documents
+
+- [runbook-deployment.md](runbook-deployment.md) — deployment procedures
+- [runbook-incident-response.md](runbook-incident-response.md) — incident handling
+- [runbook-module-lock.md](runbook-module-lock.md) — lock gate procedures
+- [runbook-database-migration.md](runbook-database-migration.md) — DB migration procedures
+- [architecture/GIT_WORKFLOW.md](architecture/GIT_WORKFLOW.md) — git workflow guide
