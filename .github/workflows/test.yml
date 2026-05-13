@@ -98,9 +98,11 @@ jobs:
             tests/bug_regression/test_btcaaaaa_1085_regression.py \
             tests/bug_regression/test_btcaaaaa_1096_regression.py \
             tests/bug_regression/test_btcaaaaa_1092_regression.py \
+            tests/bug_regression/test_btcaaaaa_1195_regression.py \
             tests/bug_regression/test_btcaaaaa_119_regression.py \
             tests/bug_regression/test_btcaaaaa_25378_regression.py \
             tests/bug_regression/test_btcaaaaa_25379_regression.py \
+            tests/bug_regression/test_btcaaaaa_25385_regression.py \
             tests/bug_regression/test_btcaaaaa_25380_regression.py \
             --cov=src \
             --cov-config=.coveragerc \
