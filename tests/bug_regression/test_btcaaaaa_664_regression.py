@@ -171,3 +171,37 @@ class TestNoApplyCallInRunAutoCalibration:
         assert "self._apply_calibration_results" not in run_method_lines, (
             "_run_auto_calibration must not call self._apply_calibration_results"
         )
+
+
+class TestRepairIfUnreachable:
+    """_repair_if_unreachable must return config when confluence is already reachable."""
+
+    def test_returns_config_when_confluence_reachable(self):
+        from src.strategy_builder.ui.backtest_config_panel import (
+            BacktestConfigPanel,
+        )
+        panel = MagicMock(spec=BacktestConfigPanel)
+        config = {
+            'blocks': [
+                {'name': 'a', 'signals': [{'weight': 30}]},
+                {'name': 'b', 'signals': [{'weight': 25}]},
+            ],
+            'confluence_threshold': 40,
+        }
+        result = BacktestConfigPanel._repair_if_unreachable(panel, config)
+        assert result is config
+
+    def test_returns_none_when_confluence_unreachable_no_fallback(self):
+        from src.strategy_builder.ui.backtest_config_panel import (
+            BacktestConfigPanel,
+        )
+        panel = MagicMock()
+        config = {
+            'name': 'test_strat',
+            'blocks': [
+                {'name': 'x', 'signals': [{'weight': 10}]},
+            ],
+            'confluence_threshold': 50,
+        }
+        result = BacktestConfigPanel._repair_if_unreachable(panel, config)
+        assert result is None
