@@ -588,13 +588,17 @@ class DataUpdateModal(QDialog):
             logger.info(f"[DataUpdateModal] no anchor available; "
                         f"fetching last 2h from {start_date.strftime('%H:%M:%S')} UTC")
 
-        # BUG B FIX: For 1h timeframe the query window must be ≥ 1 hour so that
-        # at least one complete candle falls within the range.
+        # SUB-1D GAP GUARD: The DataUpdateThread downloads 15m, 1h AND 1d bars
+        # using the same start_date.  1d bars need a ≥24h window to return at
+        # least one closed daily candle.  Without this guard, a sub-24h gap
+        # (which is normal for incremental "last bar on disk" updates) causes
+        # the 1d download to return 0 bars because today's candle is still
+        # forming and no closed daily candle fits in the range.
         gap_seconds = (end_date - start_date).total_seconds()
-        if gap_seconds < 3600:
-            start_date = end_date - timedelta(hours=2)
-            logger.info(f"[DataUpdateModal] BUG-B: sub-1h gap ({gap_seconds:.0f}s) — "
-                f"widening query start to {start_date.strftime('%H:%M:%S')} UTC to ensure ≥1 closed candle")
+        if gap_seconds < 86400:
+            start_date = end_date - timedelta(hours=24)
+            logger.info(f"[DataUpdateModal] sub-1d gap ({gap_seconds:.0f}s) — "
+                f"widening query start to {start_date.strftime('%H:%M:%S')} UTC to ensure ≥1 closed daily candle")
 
         # Create and start update thread (with retry logic!)
         self.update_thread = DataUpdateThread(
