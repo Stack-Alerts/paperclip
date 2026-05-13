@@ -166,6 +166,7 @@ def scan(
         "ungated_count": len(ungated),
         "ungated_issues": ungated,
         "gated_issues": gated_issues,
+        "days_back": days_back,
     }
 
     logger.info(
@@ -279,6 +280,7 @@ def main() -> int:
             "worker": "impact-gate-scan-done",
             "dry_run": args.dry_run,
             "retroactive": args.retroactive,
+            "days_back": args.days_back,
             "timestamp": result["timestamp"],
             "total_done_fix_issues": result["total_done_fix_issues"],
             "gated": result["gated"],

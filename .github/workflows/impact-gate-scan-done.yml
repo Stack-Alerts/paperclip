@@ -137,3 +137,59 @@ jobs:
         run: |
           python scripts/scan_done_alert.py \
             --scan-output /tmp/scan-output.json
+      - name: Write data quality snapshot
+        id: snapshot
+        run: |
+          python3 << 'SNAPSHOT_EOF'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          with open("/tmp/scan-output.json") as f:
+              data = json.load(f)
+
+          total = data.get("total_done_fix_issues", 0)
+          gated = data.get("gated", {})
+          ungated = data.get("ungated_count", 0)
+          coverage_pct = round((1 - ungated / total) * 100, 1) if total > 0 else 0.0
+
+          snapshot = {
+              "timestamp": data.get("timestamp", datetime.now(timezone.utc).isoformat()),
+              "impact_gate_scan": {
+                  "total_done_fix_issues": total,
+                  "gated": gated,
+                  "ungated_count": ungated,
+                  "coverage_pct": coverage_pct,
+                  "window_days": data.get("days_back"),
+              },
+          }
+
+          date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+          out = Path(f"data_quality_impact_gate_{date_str}.json")
+          out.write_text(json.dumps(snapshot, indent=2) + "\n")
+          print(f"Wrote {out}")
+          SNAPSHOT_EOF
+          echo "snapshot_written=true" >> "$GITHUB_OUTPUT"
+
+      - name: Check for changes
+        id: diff
+        run: |
+          SNAPSHOT=$(ls data_quality_impact_gate_*.json 2>/dev/null | sort | tail -1)
+          if [ -z "$SNAPSHOT" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          elif ! git diff --quiet "$SNAPSHOT"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "snapshot_file=$SNAPSHOT" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit updated data quality snapshot
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          SNAPSHOT="${{ steps.diff.outputs.snapshot_file }}"
+          git add "$SNAPSHOT"
+          git commit -m "chore(impact-gate): update scan-done data quality snapshot"
+          git push
