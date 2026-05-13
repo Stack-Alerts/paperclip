@@ -199,23 +199,35 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
         elif not path.exists():
             missing.append(str(path.relative_to(REPO_ROOT)))
 
-    # Pre-populate MISSING entries so they always appear in output
+    # Pre-populate results for every requested ID.
+    #
+    # Start every entry as "PENDING" — the populate step below overwrites
+    # entries that were actually tested with PASS / FAIL / ERROR from the
+    # JUnit output.  Entries whose test file genuinely does not exist are
+    # promoted to MISSING so that the worker can create a blocking issue
+    # for missing coverage.  When the runner itself errors (timeout, parse
+    # failure) the entries for existing test files stay as PENDING and the
+    # worker will *not* create false-positive blocking issues — the top-level
+    # ERROR status is sufficient to escalate the infrastructure failure.
+    def _result_entry(pid: str, rel: str | None) -> dict:
+        return {"status": "PENDING", "test_file": rel or f"unresolved:{pid}", "tests": []}
+
     fr_results: dict[str, dict] = {
-        fid: {
-            "status": "MISSING",
-            "test_file": str(fr_paths[fid].relative_to(REPO_ROOT)) if fr_paths[fid] else f"unresolved:{fid}",
-            "tests": [],
-        }
+        fid: _result_entry(fid, str(fr_paths[fid].relative_to(REPO_ROOT)) if fr_paths[fid] else None)
         for fid in fr_ids
     }
     bug_results: dict[str, dict] = {
-        bid: {
-            "status": "MISSING",
-            "test_file": str(bug_paths[bid].relative_to(REPO_ROOT)) if bug_paths[bid] else f"unresolved:{bid}",
-            "tests": [],
-        }
+        bid: _result_entry(bid, str(bug_paths[bid].relative_to(REPO_ROOT)) if bug_paths[bid] else None)
         for bid in bug_ids
     }
+
+    # Elevate genuinely missing test files to MISSING for worker action.
+    for fid, path in fr_paths.items():
+        if path is None or not path.exists():
+            fr_results[fid]["status"] = "MISSING"
+    for bid, path in bug_paths.items():
+        if path is None or not path.exists():
+            bug_results[bid]["status"] = "MISSING"
 
     existing_paths = [
         p for p in list(fr_paths.values()) + list(bug_paths.values()) if p is not None and p.exists()
