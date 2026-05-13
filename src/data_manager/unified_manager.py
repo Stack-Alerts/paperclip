@@ -522,7 +522,19 @@ class UnifiedDataManager:
             # Convert tz-aware dates to millisecond epoch timestamps for Binance API
             start_ms = int(start_date.timestamp() * 1000)
             end_ms = int(end_date.timestamp() * 1000)
-            
+
+            # Floor start_ms to the timeframe boundary for coarse timeframes.
+            # Binance API filters by openTime >= startTime, so a mid-bar
+            # start_ms (e.g. 08:45 for 1d bars) would exclude the coarse bar
+            # whose openTime is earlier (e.g. 00:00), causing it to be missing
+            # from the response entirely.
+            if timeframe == '1d':
+                start_ms = int(start_date.replace(hour=0, minute=0, second=0, microsecond=0).timestamp() * 1000)
+            elif timeframe == '4h':
+                start_ms = int(start_date.replace(hour=(start_date.hour // 4) * 4, minute=0, second=0, microsecond=0).timestamp() * 1000)
+            elif timeframe == '1h':
+                start_ms = int(start_date.replace(minute=0, second=0, microsecond=0).timestamp() * 1000)
+
             all_chunks = []
             current_start = start_ms
             max_limit = 1500  # Binance API maximum per request
