@@ -11,6 +11,11 @@ Covers:
 - Unreachable config + JSON still insufficient: returns None (blocks run)
 - Unreachable config + no JSON file: returns None (blocks run) with clear message
 - Unreachable config + JSON name mismatch: returns None (no spurious merge)
+- Empty blocks config: unreachable, returns None
+- Zero-weight signals default to minimum (10pts)
+- Corrupt JSON file: exception caught, run blocked
+- JSON with same blocks as config: no merge needed, run blocked
+- Multiple missing blocks: all restored from JSON
 - ai_request_preview_window: "no signals" warning only fires for in_strategy blocks
 """
 
@@ -189,6 +194,85 @@ class TestRepairIfUnreachable:
         block_names = {b['name'] for b in cfg['blocks']}
         assert 'liquidity_sweep' not in block_names
 
+    def test_empty_blocks_unreachable_returns_none(self, qapp):
+        """Config with zero blocks → max_possible=0 → unreachable → None."""
+        stub = _make_stub()
+        cfg = {'name': 'EmptyStrat', 'confluence_threshold': 10, 'blocks': []}
+
+        with patch('pathlib.Path.exists', return_value=False):
+            result = stub._repair_if_unreachable(cfg)
+
+        assert result is None
+        stub.results_text.setText.assert_called()
+
+    def test_zero_weight_signals_default_to_ten(self, qapp):
+        """Signals with weight=0 get default 10 in max_possible calculation."""
+        stub = _make_stub()
+        cfg = {
+            'name': 'ZeroWeight',
+            'confluence_threshold': 10,
+            'blocks': [
+                {'name': 'block_a', 'signals': [{'weight': 0}]},
+            ],
+        }
+        result = stub._repair_if_unreachable(cfg)
+        assert result is cfg
+        stub.results_text.setText.assert_not_called()
+
+    def test_json_load_exception_falls_back_to_block_run(self, qapp):
+        """Corrupt/malformed JSON → exception caught → run blocked."""
+        stub = _make_stub()
+        cfg = _two_block_config(threshold=40)
+
+        with patch('pathlib.Path.exists', return_value=True), \
+             patch('builtins.open', mock_open(read_data='NOT VALID JSON')):
+            result = stub._repair_if_unreachable(cfg)
+
+        assert result is None
+        stub.results_text.setText.assert_called()
+
+    def test_repair_from_json_no_new_blocks_no_merge(self, qapp):
+        """JSON has same blocks as config → repaired=False → None."""
+        stub = _make_stub()
+        cfg = _two_block_config(threshold=40)
+        ref_json = json.dumps(_two_block_config())
+
+        with patch('pathlib.Path.exists', return_value=True), \
+             patch('builtins.open', mock_open(read_data=ref_json)):
+            result = stub._repair_if_unreachable(cfg)
+
+        assert result is None
+        block_names = {b['name'] for b in cfg['blocks']}
+        assert len(block_names) == 2
+
+    def test_repair_from_json_restores_multiple_missing_blocks(self, qapp):
+        """Multiple blocks missing from config → all restored from JSON."""
+        stub = _make_stub()
+        cfg = {
+            'name': '50% Asia Rejection Simple',
+            'confluence_threshold': 75,
+            'blocks': [
+                {'name': 'asia_session_50_percent', 'signals': [{'weight': 15}]},
+            ],
+        }
+        ref = _three_block_json()
+        ref['blocks'].append({
+            'name': 'volume_confirmation',
+            'logic': 'AND',
+            'signals': [{'name': 'HIGH_VOLUME', 'weight': 30}],
+        })
+        ref_json = json.dumps(ref)
+
+        with patch('pathlib.Path.exists', return_value=True), \
+             patch('builtins.open', mock_open(read_data=ref_json)):
+            result = stub._repair_if_unreachable(cfg)
+
+        assert result is not None
+        block_names = {b['name'] for b in result['blocks']}
+        assert 'liquidity_sweep' in block_names
+        assert 'volume_confirmation' in block_names
+        assert len(result["blocks"]) == 4
+
 
 # ---------------------------------------------------------------------------
 # Test: ai_request_preview_window no-signals warning
@@ -197,7 +281,7 @@ class TestRepairIfUnreachable:
 class TestAIPreviewWindowNoSignalsWarning:
 
     def test_warning_fires_only_for_in_strategy_blocks(self, qapp):
-        """⚠️ 'has NO signals!' warning must only fire for in_strategy=True blocks,
+        """\u26a0\ufe0f 'has NO signals!' warning must only fire for in_strategy=True blocks,
         not for compact-format catalog blocks (in_strategy absent/False)."""
         import logging
         from src.optimizer_v3.core.ai_request_preview_window import AIRequestPreviewWindow
