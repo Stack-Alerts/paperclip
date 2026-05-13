@@ -707,8 +707,8 @@ class TestComputeBugFreshness:
         engine = _make_engine(
             [
                 _make_scalar_result(0),  # COUNT(*)
-                _make_scalar_result(None),  # MIN(closed_at)
-                _make_scalar_result(None),  # MAX(closed_at)
+                _make_scalar_result(None),  # MIN(updated_at)
+                _make_scalar_result(None),  # MAX(updated_at)
                 _make_scalar_result(0),  # stale
             ]
         )
@@ -728,8 +728,8 @@ class TestComputeBugFreshness:
         engine = _make_engine(
             [
                 _make_scalar_result(5),  # COUNT(*)
-                _make_scalar_result(old_dt),  # MIN(closed_at)
-                _make_scalar_result(now),  # MAX(closed_at)
+                _make_scalar_result(old_dt),  # MIN(updated_at)
+                _make_scalar_result(now),  # MAX(updated_at)
                 _make_scalar_result(0),  # stale
             ]
         )
