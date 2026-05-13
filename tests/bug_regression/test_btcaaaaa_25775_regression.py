@@ -33,3 +33,6 @@ from tests.test_touch_index.test_fr_worker import (  # noqa: E402, F401
     TestCatchUpEligibleFrIssues,
     TestEmitJsonSummaryRequiresWorker,
 )
+from tests.test_touch_index.test_validate_fr import (  # noqa: E402, F401
+    TestValidateFR,
+)
