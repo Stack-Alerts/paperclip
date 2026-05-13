@@ -224,6 +224,8 @@ Detects:
 - Null `updated_at` values
 - Duplicate `(file_path, fr_issue_id)` pairs
 - Orphan `fr_issue_id` values (issue no longer exists in Paperclip)
+- **Source distribution** — counts of rows by extraction method
+  (`comments`, `git`, `description`) for monitoring extraction health
 
 ### Quality report structure (JSON)
 

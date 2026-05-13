@@ -54,9 +54,11 @@ class ConsistencyReport:
     duplicate_pairs: int
     unknown_source_rows: int
     orphan_fr_issue_ids: list[str]
+    source_distribution: dict[str, int] | None = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        return d
 
 
 @dataclass
@@ -208,6 +210,19 @@ def check_consistency(engine: Engine) -> ConsistencyReport:
             text("SELECT DISTINCT fr_issue_id FROM touch_index_fr_files")
         ).fetchall()
 
+        # Source distribution — how many rows from each extraction method
+        source_dist: dict[str, int] = {}
+        try:
+            src_rows = conn.execute(
+                text(
+                    'SELECT source, COUNT(*) cnt FROM touch_index_fr_files'
+                    ' GROUP BY source'
+                )
+            ).fetchall()
+            source_dist = {str(r[0]): r[1] for r in src_rows}
+        except Exception:
+            logger.warning('Could not query source distribution')
+
     orphan_ids: list[str] = []
     if orphan_rows:
         db_ids = {str(row[0]) for row in orphan_rows}
@@ -225,6 +240,7 @@ def check_consistency(engine: Engine) -> ConsistencyReport:
         duplicate_pairs=dups,
         unknown_source_rows=unknown_source,
         orphan_fr_issue_ids=orphan_ids,
+        source_distribution=source_dist,
     )
 
 
@@ -293,11 +309,21 @@ def run_quality_checks(
             issues.append(f"{consistency.unknown_source_rows} unknown-source rows")
         if consistency.orphan_fr_issue_ids:
             issues.append(f"{len(consistency.orphan_fr_issue_ids)} orphans")
+        src_dist = consistency.source_distribution or {}
+        src_summary = (
+            ', '.join(f'{k}={v}' for k, v in sorted(src_dist.items()))
+            if src_dist else 'no rows'
+        )
         if issues:
-            logger.warning("CONSISTENCY: %s", "; ".join(issues))
+            logger.warning(
+                "CONSISTENCY: %s | source distribution: %s",
+                "; ".join(issues), src_summary,
+            )
             failures += 1
         else:
-            logger.info("CONSISTENCY: clean")
+            logger.info(
+                "CONSISTENCY: clean | source distribution: %s", src_summary,
+            )
     except Exception:
         logger.exception("Consistency check failed")
         failures += 1

@@ -50,6 +50,7 @@ def _make_fr_report():
             unknown_source_rows = 0
             duplicate_pairs = 0
             orphan_fr_issue_ids = []
+            source_distribution = {}
 
     return MockReport()
 
@@ -190,6 +191,7 @@ class TestBuildFrReport:
                 unknown_source_rows = 0
                 duplicate_pairs = 0
                 orphan_fr_issue_ids = ["orphan-1", "orphan-2"]
+                source_distribution = {}
 
         d = _build_fr_report(MockReport())
         assert d["orphan_count"] == 2

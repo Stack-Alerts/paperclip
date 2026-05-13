@@ -55,6 +55,7 @@ def _build_fr_report(fr_report) -> dict:
         d["unknown_source_rows"] = fr_report.consistency.unknown_source_rows
         d["duplicate_pairs"] = fr_report.consistency.duplicate_pairs
         d["orphan_count"] = len(fr_report.consistency.orphan_fr_issue_ids)
+        d["source_distribution"] = fr_report.consistency.source_distribution or {}
     return d
 
 
