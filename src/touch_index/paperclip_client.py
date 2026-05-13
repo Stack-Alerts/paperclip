@@ -114,6 +114,27 @@ def get_issue_by_id(issue_id: str) -> dict | None:
         return resp.json()
 
 
+def get_issue_status(issue_id: str) -> str | None:
+    """Fetch just the status field for an issue, or None on 404/error.
+
+    Lighter than get_issue_by_id when only the status is needed (e.g. done-guard checks).
+    """
+    try:
+        with _session() as sess:
+            resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=15)
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return (resp.json() or {}).get("status")
+    except Exception:
+        return None
+
+
+def is_issue_done(issue_id: str) -> bool:
+    """Return True if the issue exists and has status 'done'."""
+    return get_issue_status(issue_id) == "done"
+
+
 def get_issue_by_identifier(identifier: str) -> dict | None:
     """Fetch a single issue by its identifier (e.g. 'BTCAAAAA-1085')."""
     issues = _paginate(
@@ -322,8 +343,20 @@ def transition_issue_status_board(issue_id: str, status: str) -> None:
     Bypasses the checkoutRunId validation that would block normal agent
     transitions for ``in_progress`` issues owned by a dead/ghost run.
 
+    Includes a done-guard: refuses to transition a ``done`` issue to a
+    non-``done`` status to prevent agent-comment-triggered reopen loops
+    (BTCAAAAA-25832).  Transitioning TO ``done`` is always allowed.
+
     Requires ``PAPERCLIP_BOARD_API_KEY`` or a board-privileged key.
     """
+    if status != "done" and is_issue_done(issue_id):
+        logger.warning(
+            "transition_issue_status_board: refusing to transition done "
+            "issue %s to %r — done-guard active (BTCAAAAA-25832)",
+            issue_id, status,
+        )
+        return
+
     with _board_session() as sess:
         resp = sess.patch(
             f"{_base()}/api/issues/{issue_id}",

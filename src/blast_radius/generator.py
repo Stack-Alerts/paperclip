@@ -50,6 +50,19 @@ def _get_agent_name(agent_id: str) -> str | None:
 
 
 def _post_comment(issue_id: str, body: str) -> None:
+    """Post a Blast Radius report as a comment.  Silently skips if the
+    issue is done (done-guard, BTCAAAAA-25832)."""
+    try:
+        from touch_index.paperclip_client import is_issue_done
+        if is_issue_done(issue_id):
+            log.info(
+                "_post_comment: issue %s is done — skipping comment (done-guard)",
+                issue_id,
+            )
+            return
+    except Exception:
+        pass
+
     with _session() as sess:
         sess.headers.update(_run_headers())
         resp = sess.post(

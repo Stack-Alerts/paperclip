@@ -110,6 +110,19 @@ def _get_issue(issue_id: str) -> dict:
 
 
 def _post_comment(issue_id: str, body: str) -> bool:
+    """Post a comment on an issue.  Silently skips if the issue is done
+    (done-guard, BTCAAAAA-25832)."""
+    try:
+        from touch_index.paperclip_client import is_issue_done
+        if is_issue_done(issue_id):
+            log.info(
+                "_post_comment: issue %s is done — skipping comment (done-guard)",
+                issue_id,
+            )
+            return False
+    except Exception:
+        pass
+
     try:
         sess = _board_session()
         resp = sess.post(
@@ -371,7 +384,9 @@ def process_issue(
     # Suppress all mutations (comments, transitions, blocking issues)
     # when force-gating already-done issues to avoid triggering the
     # platform's comment-on-done → reopen behaviour (BTCAAAAA-25693).
-    mute = force and not dry_run
+    # Also mute when the issue is already done regardless of force flag
+    # (BTCAAAAA-25832 done-guard).
+    mute = (force and not dry_run) or (status == "done" and not dry_run)
 
     def _save_if_muted(status: str) -> None:
         """Persist muted gate result so future scans skip this issue."""
