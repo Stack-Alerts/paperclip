@@ -478,7 +478,7 @@ class TestHandlerFrWebhook:
             ),
         )
         monkeypatch.setattr(
-            "touch_index.paperclip_client.transition_issue_status",
+            "touch_index.paperclip_client.transition_issue_status_board",
             lambda issue_id, status: None,
         )
 
@@ -621,7 +621,7 @@ class TestHandlerFrWebhook:
             ),
         )
         monkeypatch.setattr(
-            "touch_index.paperclip_client.transition_issue_status",
+            "touch_index.paperclip_client.transition_issue_status_board",
             lambda issue_id, status: None,
         )
 
@@ -661,7 +661,7 @@ class TestHandlerFrWebhook:
             ),
         )
         monkeypatch.setattr(
-            "touch_index.paperclip_client.transition_issue_status",
+            "touch_index.paperclip_client.transition_issue_status_board",
             lambda issue_id, status: None,
         )
         quality_report = MagicMock()
@@ -707,7 +707,7 @@ class TestHandlerFrWebhook:
             ),
         )
         monkeypatch.setattr(
-            "touch_index.paperclip_client.transition_issue_status",
+            "touch_index.paperclip_client.transition_issue_status_board",
             lambda issue_id, status: None,
         )
         quality_report = MagicMock()
@@ -753,7 +753,7 @@ class TestHandlerFrWebhook:
             ),
         )
         monkeypatch.setattr(
-            "touch_index.paperclip_client.transition_issue_status",
+            "touch_index.paperclip_client.transition_issue_status_board",
             lambda issue_id, status: None,
         )
         monkeypatch.setattr(
@@ -797,7 +797,7 @@ class TestHandlerFrWebhook:
             ),
         )
         monkeypatch.setattr(
-            "touch_index.paperclip_client.transition_issue_status",
+            "touch_index.paperclip_client.transition_issue_status_board",
             lambda issue_id, status: None,
         )
         mock_quality = MagicMock()
@@ -842,7 +842,7 @@ class TestHandlerFrWebhook:
             ),
         )
         monkeypatch.setattr(
-            "touch_index.paperclip_client.transition_issue_status",
+            "touch_index.paperclip_client.transition_issue_status_board",
             lambda issue_id, status: None,
         )
         mock_quality = MagicMock()
@@ -859,7 +859,7 @@ class TestHandlerFrWebhook:
         assert "validation_passed" not in args[1]
 
     def test_transition_failure_logged(self, monkeypatch):
-        """When transition_issue_status raises, transitioned_to_done is false."""
+        """When transition_issue_status_board raises, transitioned_to_done is false."""
         payload = {
             "event": "issue_updated",
             "issue": {"id": "fdr-uuid-42"},
@@ -887,7 +887,7 @@ class TestHandlerFrWebhook:
             ),
         )
         monkeypatch.setattr(
-            "touch_index.paperclip_client.transition_issue_status",
+            "touch_index.paperclip_client.transition_issue_status_board",
             lambda issue_id, status: (_ for _ in ()).throw(RuntimeError("API error")),
         )
 
@@ -898,7 +898,7 @@ class TestHandlerFrWebhook:
         assert args[1]["transitioned_to_done"] is False
 
     def test_dry_run_skips_transition(self, monkeypatch):
-        """When dry_run=true, transition_issue_status is not called."""
+        """When dry_run=true, transition_issue_status_board is not called."""
         payload = {
             "event": "issue_created",
             "issue": {"id": "fdr-uuid-42"},
@@ -928,7 +928,7 @@ class TestHandlerFrWebhook:
         )
         mock_transition = MagicMock()
         monkeypatch.setattr(
-            "touch_index.paperclip_client.transition_issue_status",
+            "touch_index.paperclip_client.transition_issue_status_board",
             mock_transition,
         )
 
@@ -1038,7 +1038,7 @@ class TestHandlerBugWebhook:
             ),
         )
         monkeypatch.setattr(
-            "touch_index.paperclip_client.transition_issue_status",
+            "touch_index.paperclip_client.transition_issue_status_board",
             lambda issue_id, status: None,
         )
 
@@ -1082,7 +1082,7 @@ class TestHandlerBugWebhook:
             tracking_process,
         )
         monkeypatch.setattr(
-            "touch_index.paperclip_client.transition_issue_status",
+            "touch_index.paperclip_client.transition_issue_status_board",
             lambda issue_id, status: None,
         )
 

@@ -230,7 +230,7 @@ class _Handler(BaseHTTPRequestHandler):
 
         try:
             from touch_index.fr_worker import process_fr_issue
-            from touch_index.paperclip_client import transition_issue_status
+            from touch_index.paperclip_client import transition_issue_status_board
             from touch_index.quality import run_quality_checks
 
             engine = _get_fr_engine()
@@ -249,7 +249,7 @@ class _Handler(BaseHTTPRequestHandler):
             transitioned = False
             if not dry_run:
                 try:
-                    transition_issue_status(result.issue_id, "done")
+                    transition_issue_status_board(result.issue_id, "done")
                     transitioned = True
                     log.info("FR webhook: marked %s as done", result.issue_identifier)
                 except Exception as exc:
@@ -340,7 +340,7 @@ class _Handler(BaseHTTPRequestHandler):
 
         try:
             from touch_index.bug_worker import process_bug_issue
-            from touch_index.paperclip_client import transition_issue_status
+            from touch_index.paperclip_client import transition_issue_status_board
             from touch_index.quality import run_bug_quality_checks
 
             engine = _get_bug_engine()
@@ -359,7 +359,7 @@ class _Handler(BaseHTTPRequestHandler):
             transitioned = False
             if not dry_run:
                 try:
-                    transition_issue_status(result.issue_id, "done")
+                    transition_issue_status_board(result.issue_id, "done")
                     transitioned = True
                     log.info("Bug webhook: marked %s as done", result.issue_identifier)
                 except Exception as exc:

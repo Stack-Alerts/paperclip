@@ -568,7 +568,7 @@ class TestMain:
             ) as mock_process,
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
             patch(
-                "touch_index.paperclip_client.transition_issue_status"
+                "touch_index.paperclip_client.transition_issue_status_board"
             ) as mock_transition,
         ):
             monkeypatch.setattr(
@@ -654,7 +654,7 @@ class TestMain:
                 return_value=worker_results,
             ) as mock_worker,
             patch(
-                "touch_index.paperclip_client.transition_issue_status",
+                "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
         ):
             monkeypatch.setattr(
@@ -684,7 +684,7 @@ class TestMain:
                 return_value=[],
             ) as mock_worker,
             patch(
-                "touch_index.paperclip_client.transition_issue_status",
+                "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
         ):
             monkeypatch.setattr(
@@ -778,7 +778,7 @@ class TestMain:
             ),
             patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
             patch(
-                "touch_index.paperclip_client.transition_issue_status"
+                "touch_index.paperclip_client.transition_issue_status_board"
             ) as mock_transition,
         ):
             monkeypatch.setattr("sys.argv", ["touch_index"])
@@ -804,7 +804,7 @@ class TestMain:
             ),
             patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
             patch(
-                "touch_index.paperclip_client.transition_issue_status"
+                "touch_index.paperclip_client.transition_issue_status_board"
             ) as mock_transition,
         ):
             monkeypatch.setattr("sys.argv", ["touch_index", "--json-summary"])
@@ -846,7 +846,7 @@ class TestMain:
             patch("touch_index.fr_worker.run_fr_worker", return_value=worker_results),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
             patch(
-                "touch_index.paperclip_client.transition_issue_status",
+                "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
             caplog.at_level(logging.INFO),
         ):
@@ -879,7 +879,7 @@ class TestMain:
             patch("touch_index.fr_worker.run_fr_worker", return_value=worker_results),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
             patch(
-                "touch_index.paperclip_client.transition_issue_status",
+                "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
         ):
             mock_quality.return_value.passed = False
@@ -955,7 +955,7 @@ class TestMain:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=worker_results),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-            patch("touch_index.paperclip_client.transition_issue_status"),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
         ):
             mock_quality.return_value.passed = True
             monkeypatch.setattr(
@@ -1002,7 +1002,7 @@ class TestMain:
             patch("touch_index.fr_worker.process_fr_issue", return_value=result),
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-            patch("touch_index.paperclip_client.transition_issue_status"),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
         ):
             mock_quality.return_value.passed = True
             monkeypatch.setattr(
@@ -1040,7 +1040,7 @@ class TestMain:
             patch("touch_index.fr_worker.process_fr_issue", return_value=result),
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-            patch("touch_index.paperclip_client.transition_issue_status"),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
             caplog.at_level(logging.INFO),
         ):
             mock_quality.return_value.passed = True
@@ -1070,7 +1070,7 @@ class TestMain:
             patch("touch_index.fr_worker.process_fr_issue", return_value=result),
             patch("touch_index.paperclip_client.get_fdr_issues"),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-            patch("touch_index.paperclip_client.transition_issue_status"),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
         ):
             mock_quality.return_value.passed = False
             monkeypatch.setattr(
@@ -1104,7 +1104,7 @@ class TestMain:
             ) as mock_process,
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
             patch(
-                "touch_index.paperclip_client.transition_issue_status"
+                "touch_index.paperclip_client.transition_issue_status_board"
             ) as mock_transition,
         ):
             monkeypatch.setattr(
@@ -1145,7 +1145,7 @@ class TestMain:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=results),
             patch(
-                "touch_index.paperclip_client.transition_issue_status",
+                "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
         ):
             monkeypatch.setattr(
@@ -1185,7 +1185,7 @@ class TestMain:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=results),
             patch(
-                "touch_index.paperclip_client.transition_issue_status",
+                "touch_index.paperclip_client.transition_issue_status_board",
             ),
         ):
             monkeypatch.setattr(
@@ -1236,7 +1236,7 @@ class TestMain:
             patch("touch_index.db.health_check", return_value=True),
             patch("touch_index.fr_worker.process_fr_issue", return_value=None),
             patch("touch_index.paperclip_client.get_fdr_issues"),
-            patch("touch_index.paperclip_client.transition_issue_status"),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
         ):
             monkeypatch.setattr(
                 "sys.argv", ["touch_index", "--issue-id", "missing", "--json-summary"]
@@ -1281,7 +1281,7 @@ class TestMain:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=results),
             patch(
-                "touch_index.paperclip_client.transition_issue_status",
+                "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
             caplog.at_level(logging.INFO),
         ):
@@ -1347,7 +1347,7 @@ class TestMain:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=results),
             patch(
-                "touch_index.paperclip_client.transition_issue_status"
+                "touch_index.paperclip_client.transition_issue_status_board"
             ) as mock_transition,
             caplog.at_level(logging.INFO),
         ):
@@ -1387,7 +1387,7 @@ class TestMain:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=results),
             patch(
-                "touch_index.paperclip_client.transition_issue_status",
+                "touch_index.paperclip_client.transition_issue_status_board",
                 side_effect=RuntimeError("API timeout"),
             ) as mock_transition,
             caplog.at_level(logging.ERROR),
@@ -1419,7 +1419,7 @@ class TestMain:
             patch("touch_index.fr_worker.process_fr_issue", return_value=result),
             patch("touch_index.paperclip_client.get_fdr_issues"),
             patch(
-                "touch_index.paperclip_client.transition_issue_status",
+                "touch_index.paperclip_client.transition_issue_status_board",
                 side_effect=RuntimeError("API timeout"),
             ) as mock_transition,
             caplog.at_level(logging.ERROR),
@@ -1451,7 +1451,7 @@ class TestMainProcessFrIssueError:
             ),
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
             patch(
-                "touch_index.paperclip_client.transition_issue_status"
+                "touch_index.paperclip_client.transition_issue_status_board"
             ) as mock_transition,
         ):
             monkeypatch.setattr(
@@ -1511,7 +1511,7 @@ class TestMainProcessFrIssueError:
             ),
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
             patch(
-                "touch_index.paperclip_client.transition_issue_status"
+                "touch_index.paperclip_client.transition_issue_status_board"
             ) as mock_transition,
         ):
             monkeypatch.setattr(
@@ -1549,7 +1549,7 @@ class TestMainProcessFrIssueError:
             patch("touch_index.fr_worker.process_fr_issue", return_value=result),
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-            patch("touch_index.paperclip_client.transition_issue_status"),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
         ):
             mock_quality.return_value.passed = True
             mock_quality.return_value.to_dict.return_value = {"passed": True}
@@ -1588,7 +1588,7 @@ class TestMainProcessFrIssueError:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=results),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-            patch("touch_index.paperclip_client.transition_issue_status"),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
         ):
             mock_quality.return_value.passed = True
             mock_quality.return_value.to_dict.return_value = {"passed": True}
@@ -1615,7 +1615,7 @@ class TestMainProcessFrIssueError:
             patch("touch_index.db.health_check", return_value=True),
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=[]),
             patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
-            patch("touch_index.paperclip_client.transition_issue_status"),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -1642,7 +1642,7 @@ class TestMainProcessFrIssueError:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=[]),
             patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-            patch("touch_index.paperclip_client.transition_issue_status"),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
         ):
             mock_quality.return_value.passed = True
             mock_quality.return_value.to_dict.return_value = {"passed": True}
@@ -1695,7 +1695,7 @@ class TestMainProcessFrIssueError:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=results),
             patch(
-                "touch_index.paperclip_client.transition_issue_status",
+                "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
         ):
             monkeypatch.setattr(
@@ -1736,7 +1736,7 @@ class TestMainProcessFrIssueError:
             patch("touch_index.fr_worker.process_fr_issue", return_value=result),
             patch("touch_index.paperclip_client.get_fdr_issues") as mock_fetch,
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-            patch("touch_index.paperclip_client.transition_issue_status"),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
         ):
             mock_quality.return_value.passed = False
             mock_quality.return_value.to_dict.return_value = {
@@ -1789,7 +1789,7 @@ class TestMainProcessFrIssueError:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch("touch_index.fr_worker.run_fr_worker", return_value=results),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-            patch("touch_index.paperclip_client.transition_issue_status"),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
         ):
             mock_quality.return_value.passed = False
             mock_quality.return_value.to_dict.return_value = {

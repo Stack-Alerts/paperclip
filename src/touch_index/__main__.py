@@ -49,7 +49,7 @@ def _run_bug_cli() -> None:
     from touch_index.db import get_engine, health_check
     from touch_index.paperclip_client import (
         get_closed_non_fdr_issues,
-        transition_issue_status,
+        transition_issue_status_board,
     )
     from touch_index.quality import run_bug_quality_checks
 
@@ -124,7 +124,7 @@ def _run_bug_cli() -> None:
             )
             if not args.dry_run:
                 try:
-                    transition_issue_status(result.issue_id, "done")
+                    transition_issue_status_board(result.issue_id, "done")
                     logger.info("Marked %s as done", result.issue_identifier)
                 except Exception:
                     logger.exception(
@@ -210,7 +210,7 @@ def _run_bug_cli() -> None:
     else:
         for r in results:
             try:
-                transition_issue_status(r.issue_id, "done")
+                transition_issue_status_board(r.issue_id, "done")
                 logger.info("Marked %s as done", r.issue_identifier)
             except Exception:
                 logger.exception("Failed to mark %s as done", r.issue_identifier)
@@ -294,7 +294,7 @@ def _run_fr_cli() -> None:
 
     from touch_index.db import get_engine, health_check
     from touch_index.fr_worker import process_fr_issue, run_fr_worker
-    from touch_index.paperclip_client import get_fdr_issues, transition_issue_status
+    from touch_index.paperclip_client import get_fdr_issues, transition_issue_status_board
     from touch_index.quality import run_quality_checks
 
     logging.basicConfig(
@@ -368,7 +368,7 @@ def _run_fr_cli() -> None:
             )
             if not args.dry_run:
                 try:
-                    transition_issue_status(result.issue_id, "done")
+                    transition_issue_status_board(result.issue_id, "done")
                     logger.info("Marked %s as done", result.issue_identifier)
                 except Exception:
                     logger.exception(
@@ -436,7 +436,7 @@ def _run_fr_cli() -> None:
     else:
         for r in results:
             try:
-                transition_issue_status(r.issue_id, "done")
+                transition_issue_status_board(r.issue_id, "done")
                 logger.info("Marked %s as done", r.issue_identifier)
             except Exception:
                 logger.exception("Failed to mark %s as done", r.issue_identifier)
