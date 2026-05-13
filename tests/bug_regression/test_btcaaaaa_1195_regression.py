@@ -127,8 +127,14 @@ class ForcedEvaluator(_RealEvaluator):
         )
 
 
-# Module-level patch: swap evaluator so BacktestWorker uses ForcedEvaluator
-_ise_module.InstitutionalSignalEvaluator = ForcedEvaluator
+_is_original = _RealEvaluator
+
+@pytest.fixture(scope="module", autouse=True)
+def _swap_evaluator():
+    _ise_module.InstitutionalSignalEvaluator = ForcedEvaluator
+    yield
+    _ise_module.InstitutionalSignalEvaluator = _is_original
+
 
 
 def _run_worker(bars: list, timeout_ms: int = 30_000) -> dict:

@@ -126,7 +126,7 @@ class TestRepairIfUnreachable:
         stub.results_text.setText.assert_not_called()
 
     def test_unreachable_with_matching_json_restores_blocks(self, qapp):
-        """Unreachable config → JSON with same name → missing block merged in."""
+        """Unreachable config → no auto-repair → run blocked with error message."""
         stub = _make_stub()
         cfg = _two_block_config(threshold=40)
         ref_json = json.dumps(_three_block_json())
@@ -135,9 +135,10 @@ class TestRepairIfUnreachable:
              patch('builtins.open', mock_open(read_data=ref_json)):
             result = stub._repair_if_unreachable(cfg)
 
-        assert result is not None, "Run must not be blocked after successful repair"
-        block_names = {b['name'] for b in result['blocks']}
-        assert 'liquidity_sweep' in block_names, "Missing block should be added from JSON"
+        assert result is None, "Run must be blocked when confluence is unreachable"
+        stub.results_text.setText.assert_called()
+        msg = stub.results_text.setText.call_args[0][0]
+        assert 'Unreachable' in msg
 
     def test_unreachable_with_json_still_insufficient_returns_none(self, qapp):
         """After merge if max is still < threshold → block the run."""
@@ -246,7 +247,7 @@ class TestRepairIfUnreachable:
         assert len(block_names) == 2
 
     def test_repair_from_json_restores_multiple_missing_blocks(self, qapp):
-        """Multiple blocks missing from config → all restored from JSON."""
+        """Multiple blocks missing → no auto-repair → run blocked with error message."""
         stub = _make_stub()
         cfg = {
             'name': '50% Asia Rejection Simple',
@@ -267,11 +268,10 @@ class TestRepairIfUnreachable:
              patch('builtins.open', mock_open(read_data=ref_json)):
             result = stub._repair_if_unreachable(cfg)
 
-        assert result is not None
-        block_names = {b['name'] for b in result['blocks']}
-        assert 'liquidity_sweep' in block_names
-        assert 'volume_confirmation' in block_names
-        assert len(result["blocks"]) == 4
+        assert result is None, "Run must be blocked when confluence is unreachable"
+        stub.results_text.setText.assert_called()
+        msg = stub.results_text.setText.call_args[0][0]
+        assert 'Unreachable' in msg
 
 
 # ---------------------------------------------------------------------------
