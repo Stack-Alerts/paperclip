@@ -158,7 +158,7 @@ ingestion:
 | Check | SLA | Action |
 |-------|-----|--------|
 | Coverage >= 90% | Done non-FDR issues in `touch_index_bug_files` / total done non-FDR issues | Missing issues must be backfilled |
-| Freshness < 30d | All rows have `closed_at` within 30 days | Stale rows indicate pipeline stall |
+| Freshness < 30d | All rows have `updated_at` within 30 days | Stale rows indicate pipeline stall |
 | Consistency | No duplicate `(file_path, bug_issue_id)` pairs | Duplicates break blast radius queries |
 | No orphan `bug_issue_id` | Every `bug_issue_id` resolves in Paperclip | Deleted issues must be purged |
 

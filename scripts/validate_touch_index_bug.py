@@ -68,7 +68,7 @@ def main() -> None:
         "--stale-days",
         type=int,
         default=30,
-        help="Alert if closed_at is older than this many days (default: 30)",
+        help="Alert if updated_at is older than this many days (default: 30)",
     )
     args = parser.parse_args()
 
