@@ -704,6 +704,32 @@ class TestGetClosedBugIssuesExtended:
             result = get_closed_bug_issues(closed_after=cutoff)
         assert len(result) == 0
 
+    def test_includes_recent_completed_at(self):
+        """Issues with completedAt >= cutoff are included (covers ts >= cutoff branch)."""
+        from datetime import datetime, timedelta, timezone
+        from touch_index.paperclip_client import get_closed_bug_issues
+
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=1)
+        issues = [
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-400",
+                "title": "Bug: test issue",
+                "status": "done",
+                "completedAt": (now - timedelta(minutes=5)).isoformat(),
+            }
+        ]
+        with (
+            patch(
+                "touch_index.paperclip_client._paginate",
+                return_value=issues,
+            ),
+            patch("touch_index.paperclip_client._company", return_value="c"),
+        ):
+            result = get_closed_bug_issues(closed_after=cutoff)
+        assert len(result) == 1
+
 
 # ---------------------------------------------------------------------------
 # get_all_done_issues — time filter edge case
@@ -746,6 +772,31 @@ class TestGetAllDoneIssuesExtended:
                 "identifier": "BTCAAAAA-500",
                 "status": "done",
                 "completedAt": "not-a-date",
+            }
+        ]
+        with (
+            patch(
+                "touch_index.paperclip_client._paginate",
+                return_value=issues,
+            ),
+            patch("touch_index.paperclip_client._company", return_value="c"),
+        ):
+            result = get_all_done_issues(completed_after=cutoff)
+        assert len(result) == 1
+
+    def test_includes_recent_completed_at(self):
+        """Issues with completedAt >= cutoff are included (covers ts >= cutoff branch)."""
+        from datetime import datetime, timedelta, timezone
+        from touch_index.paperclip_client import get_all_done_issues
+
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=1)
+        issues = [
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-500",
+                "status": "done",
+                "completedAt": (now - timedelta(minutes=5)).isoformat(),
             }
         ]
         with (
@@ -920,6 +971,86 @@ class TestCompany:
 
         with patch.dict(os.environ, {"PAPERCLIP_COMPANY_ID": "my-company"}, clear=True):
             assert _company() == "my-company"
+
+
+# ---------------------------------------------------------------------------
+# list_live_runs — list live heartbeat runs
+# ---------------------------------------------------------------------------
+
+
+class TestListLiveRuns:
+    def test_returns_live_runs(self):
+        from touch_index.paperclip_client import list_live_runs
+
+        runs = [{"id": "run-1", "status": "running"}, {"id": "run-2", "status": "queued"}]
+        with (
+            patch("touch_index.paperclip_client._session") as mock_session_factory,
+            patch("touch_index.paperclip_client._base", return_value="https://api.x"),
+            patch("touch_index.paperclip_client._company", return_value="c"),
+        ):
+            sess = mock_session_factory.return_value.__enter__.return_value
+            resp = MagicMock()
+            resp.json.return_value = runs
+            sess.get.return_value = resp
+
+            result = list_live_runs()
+
+        assert result == runs
+        sess.get.assert_called_once_with(
+            "https://api.x/api/companies/c/live-runs",
+            params={"minCount": "50", "limit": "50"},
+            timeout=30,
+        )
+
+    def test_default_min_count_and_limit(self):
+        from touch_index.paperclip_client import list_live_runs
+
+        with (
+            patch("touch_index.paperclip_client._session") as mock_session_factory,
+            patch("touch_index.paperclip_client._base", return_value="https://api.x"),
+            patch("touch_index.paperclip_client._company", return_value="c"),
+        ):
+            sess = mock_session_factory.return_value.__enter__.return_value
+            sess.get.return_value = MagicMock(json=lambda: [])
+
+            list_live_runs()
+
+        _, kwargs = sess.get.call_args
+        assert kwargs["params"]["minCount"] == "50"
+        assert kwargs["params"]["limit"] == "50"
+
+    def test_custom_min_count_and_limit(self):
+        from touch_index.paperclip_client import list_live_runs
+
+        with (
+            patch("touch_index.paperclip_client._session") as mock_session_factory,
+            patch("touch_index.paperclip_client._base", return_value="https://api.x"),
+            patch("touch_index.paperclip_client._company", return_value="c"),
+        ):
+            sess = mock_session_factory.return_value.__enter__.return_value
+            sess.get.return_value = MagicMock(json=lambda: [])
+
+            list_live_runs(min_count=10, limit=5)
+
+        _, kwargs = sess.get.call_args
+        assert kwargs["params"]["minCount"] == "10"
+        assert kwargs["params"]["limit"] == "5"
+
+    def test_raises_on_error(self):
+        from touch_index.paperclip_client import list_live_runs
+
+        with (
+            patch("touch_index.paperclip_client._session") as mock_session_factory,
+            patch("touch_index.paperclip_client._base", return_value="https://api.x"),
+            patch("touch_index.paperclip_client._company", return_value="c"),
+        ):
+            sess = mock_session_factory.return_value.__enter__.return_value
+            resp = MagicMock()
+            resp.raise_for_status.side_effect = RuntimeError("API error")
+            sess.get.return_value = resp
+
+            with pytest.raises(RuntimeError):
+                list_live_runs()
 
 
 # ---------------------------------------------------------------------------
