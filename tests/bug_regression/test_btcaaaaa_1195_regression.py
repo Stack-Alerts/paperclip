@@ -96,9 +96,9 @@ class ForcedEvaluator(_RealEvaluator):
     def evaluate_bar(self, current_bar, bar_index: int, lookback_bars, total_bars=None):
         from datetime import datetime, timezone
 
-        ts = datetime.fromtimestamp(
-            current_bar.ts_init / 1e9, tz=timezone.utc
-        ).replace(tzinfo=None)
+        ts = datetime.fromtimestamp(current_bar.ts_init / 1e9, tz=timezone.utc).replace(
+            tzinfo=None
+        )
 
         if not self.current_trade and bar_index == 3:
             return _SignalResult(
@@ -218,3 +218,27 @@ class TestMode2TradesList:
     def test_has_trades_count(self, mode2_results: dict) -> None:
         assert "trades" in mode2_results
         assert mode2_results["trades"] > 0
+
+    def test_trades_count_matches_list_length(self, mode2_results: dict) -> None:
+        assert mode2_results["trades"] == len(mode2_results["trades_list"]), (
+            "trades count must match length of trades_list"
+        )
+
+    def test_tp_adjustments_key_present(self, mode2_results: dict) -> None:
+        assert "tp_adjustments" in mode2_results, (
+            "Mode 2 results missing 'tp_adjustments' key"
+        )
+
+    def test_strategy_config_key_present(self, mode2_results: dict) -> None:
+        assert "strategy_config" in mode2_results, (
+            "Mode 2 results missing 'strategy_config' key"
+        )
+
+    def test_strategy_config_is_dict(self, mode2_results: dict) -> None:
+        cfg = mode2_results.get("strategy_config", {})
+        assert isinstance(cfg, dict), f"strategy_config must be a dict, got {type(cfg)}"
+
+    def test_strategy_config_has_name_key(self, mode2_results: dict) -> None:
+        cfg = mode2_results.get("strategy_config", {})
+        assert "name" in cfg, "strategy_config missing 'name' key"
+        assert cfg["name"] == "QA_1195_TradesList"
