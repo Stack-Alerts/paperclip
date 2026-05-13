@@ -47,6 +47,8 @@ logger = logging.getLogger(__name__)
 MARKER_FR_RE = re.compile(r"fr\s*\(\s*['\"]([^'\"]+)['\"]")
 MARKER_BUG_RE = re.compile(r"bug\s*\(\s*['\"]([^'\"]+)['\"]")
 FILE_FDR_RE = re.compile(r"test_fdr[_\-](\d+)\.py", re.IGNORECASE)
+TEST_ID_RE = re.compile(r"^(.+?)::(.+)$")
+MARKER_DECORATOR_RE = re.compile('@pytest\\.mark\\.(fr|bug)\\s*\\(\\s*["\\x27]([^"\\x27]+)["\\x27]\\)')
 
 
 def _db_url() -> str:
@@ -59,7 +61,7 @@ def _db_url() -> str:
 
 
 def run_collect_tests(test_dir: str) -> list[dict]:
-    """Run pytest --collect-only and parse output into test metadata dicts."""
+    """Run pytest --collect-only -q and parse ::-separated test IDs."""
     test_path = REPO_ROOT / test_dir
     if not test_path.exists():
         logger.warning("Test directory %s does not exist", test_dir)
@@ -68,7 +70,7 @@ def run_collect_tests(test_dir: str) -> list[dict]:
     env = {**os.environ, "PYTHONPATH": f"{REPO_ROOT / 'src'}"}
     try:
         proc = subprocess.run(
-            [sys.executable, "-m", "pytest", "--collect-only", "--quiet", "-q",
+            [sys.executable, "-m", "pytest", "--collect-only", "-q",
              "--override-ini=addopts=", str(test_path)],
             cwd=str(REPO_ROOT),
             capture_output=True, text=True, timeout=120,
@@ -84,66 +86,70 @@ def run_collect_tests(test_dir: str) -> list[dict]:
     output = proc.stdout
     tests: list[dict] = []
 
-    test_line_re = re.compile(r"^\s*(?:<[^>]+>\s*)?(.+?::\w+(?:\[\w+\])?)\s*$")
-
     for line in output.splitlines():
-        if "::" not in line:
+        line = line.strip()
+        m = TEST_ID_RE.match(line)
+        if not m:
             continue
-        # Match either "testfile.py::test_func[param]" or "<Module tests/...>"
-        # Group items
-        m = test_line_re.match(line.rstrip())
-        if m:
-            full_id = m.group(1).strip()
-        else:
-            continue
-
-        if "::" not in full_id:
-            continue
-
-        parts = full_id.split("::", 1)
-        file_part = parts[0]
-        func_part = parts[1]
-
+        file_part = m.group(1).strip()
+        func_part_raw = m.group(2).strip()
         if not file_part.endswith(".py"):
             continue
 
         rel_file = file_part
-        if rel_file.startswith(str(REPO_ROOT) + "/"):
-            rel_file = rel_file[len(str(REPO_ROOT)) + 1:]
 
+        # Split class::function
+        func_parts = func_part_raw.split("::")
         test_class = None
-        func_parts = func_part.split("::")
+        func_part = func_parts[-1]
         if len(func_parts) > 1:
             test_class = func_parts[0]
-            func_part = func_parts[-1]
 
-        marker_raw = ""
-        # Check if the next lines contain markers
-        idx = output.splitlines().index(line)
-        for i in range(idx + 1, min(idx + 5, len(output.splitlines()))):
-            next_line = output.splitlines()[i]
-            if "marker" in next_line.lower() or "markers" in next_line.lower():
-                marker_raw = next_line.strip()
-                break
-
-        markers: list[str] = []
-        fr_matches = MARKER_FR_RE.findall(line + " " + marker_raw)
-        bug_matches = MARKER_BUG_RE.findall(line + " " + marker_raw)
+        # Extract markers by scanning source file
+        markers, fr_refs, bug_refs = _extract_markers_from_file(file_part, func_part)
 
         tests.append({
-            "identifier": full_id,
+            "identifier": f"{file_part}::{func_part_raw}",
             "test_file": rel_file,
             "test_function": func_part,
             "test_class": test_class,
-            "markers": json.dumps(list(fr_matches + bug_matches)) if (fr_matches or bug_matches) else None,
-            "fr_refs": fr_matches,
-            "bug_refs": bug_matches,
+            "markers": json.dumps(markers) if markers else None,
+            "fr_refs": fr_refs,
+            "bug_refs": bug_refs,
             "source": "pytest_collection",
             "language": "python",
         })
 
     logger.info("Collected %d test case(s)", len(tests))
     return tests
+
+
+def _extract_markers_from_file(file_part: str, func_name: str) -> tuple[list[str], list[str], list[str]]:
+    """Scan a test source file for @pytest.mark.fr / @pytest.mark.bug decorators."""
+    src_path = REPO_ROOT / file_part
+    if not src_path.exists():
+        return [], [], []
+
+    try:
+        with open(src_path) as f:
+            source = f.read()
+    except Exception:
+        return [], [], []
+
+    markers: list[str] = []
+    fr_refs: list[str] = []
+    bug_refs: list[str] = []
+
+    for m in MARKER_DECORATOR_RE.finditer(source):
+        mtype, value = m.group(1), m.group(2)
+        markers.append(f"{mtype}({value})")
+        if mtype == "fr":
+            fr_refs.append(value)
+        elif mtype == "bug":
+            bug_refs.append(value)
+
+    return markers, fr_refs, bug_refs
+
 
 
 def upsert_test_cases(engine, tests: list[dict], dry_run: bool = False) -> int:
@@ -190,6 +196,12 @@ def upsert_test_cases(engine, tests: list[dict], dry_run: bool = False) -> int:
 
 def create_marker_links(engine, tests: list[dict], dry_run: bool = False) -> dict[str, int]:
     """Auto-create trace_links from pytest markers (fr/bug)."""
+    if dry_run:
+        verifies = sum(len(t.get("fr_refs", [])) for t in tests)
+        bugs = sum(len(t.get("bug_refs", [])) for t in tests)
+        logger.info("DRY-RUN: would create %d verifies + %d tests links", verifies, bugs)
+        return {"verifies": verifies, "tests": bugs}
+
     created_verifies = 0
     created_tests = 0
 
@@ -290,6 +302,11 @@ def _upsert_link(session, link: TraceLink) -> None:
 
 def create_file_heuristic_links(engine, tests: list[dict], dry_run: bool = False) -> int:
     """Create verifies links based on file-name heuristics (test_fdr_NNN.py → FDR-NNN)."""
+    if dry_run:
+        count = sum(1 for t in tests if FILE_FDR_RE.search(t.get("test_file", "")))
+        logger.info("DRY-RUN: would create %d file-heuristic links", count)
+        return count
+
     created = 0
     with Session(engine) as session:
         for t in tests:
@@ -363,8 +380,11 @@ def run_gap_analysis(engine) -> list[dict]:
 def regenerate_links(engine, tests: list[dict], dry_run: bool = False) -> dict:
     """Drop and recreate all test→requirement/issue links for collected tests."""
     if dry_run:
+        counts = create_marker_links(engine, tests, dry_run=True)
+        heuristic = create_file_heuristic_links(engine, tests, dry_run=True)
         logger.info("DRY-RUN: would drop and recreate all test links")
-        return {"dropped": 0, "verifies": 0, "tests": 0}
+        return {"dropped": 0, "verifies": counts.get("verifies", 0),
+                "tests": counts.get("tests", 0), "heuristic": heuristic}
 
     with Session(engine) as session:
         test_ids = [t["identifier"] for t in tests]
