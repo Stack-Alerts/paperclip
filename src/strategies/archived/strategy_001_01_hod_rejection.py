@@ -250,7 +250,7 @@ class StrategyHodRejection(Strategy):
         self.risk.check_and_submit(
             side=OrderSide.BUY,
             quantity=quantity,
-            price=Price(str(round(current_price, 2))),
+            price=Price.from_str(str(round(current_price, 2))),
             entry_price=current_price,
             instrument_id=self.instrument_id,
             daily_pnl=Money(f"{self.daily_pnl_usd:.2f}", USD),
