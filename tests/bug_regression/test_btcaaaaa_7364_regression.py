@@ -135,6 +135,60 @@ class TestCheckRequiredSignalsUnit:
         result = calc.check_required_signals(_dict_to_obj({"blocks": []}), [])
         assert result is True
 
+    def test_multiple_and_blocks_all_present_returns_true(self):
+        calc = ConfluenceCalculator()
+        config = _dict_to_obj({
+            "blocks": [
+                {
+                    "name": "hod",
+                    "logic": "AND",
+                    "signals": [
+                        {"name": "HOD_REJECTION", "logic": "AND", "weight": 25},
+                        {"name": "BELOW_HOD", "logic": "AND", "weight": 30},
+                    ],
+                },
+                {
+                    "name": "momentum",
+                    "logic": "AND",
+                    "signals": [
+                        {"name": "RSI_DIVERGENCE", "logic": "AND", "weight": 10},
+                    ],
+                },
+            ],
+        })
+        result = calc.check_required_signals(
+            config,
+            ["hod::HOD_REJECTION", "hod::BELOW_HOD", "momentum::RSI_DIVERGENCE"],
+        )
+        assert result is True
+
+    def test_multiple_and_blocks_missing_one_returns_false(self):
+        calc = ConfluenceCalculator()
+        config = _dict_to_obj({
+            "blocks": [
+                {
+                    "name": "hod",
+                    "logic": "AND",
+                    "signals": [
+                        {"name": "HOD_REJECTION", "logic": "AND", "weight": 25},
+                        {"name": "BELOW_HOD", "logic": "AND", "weight": 30},
+                    ],
+                },
+                {
+                    "name": "momentum",
+                    "logic": "AND",
+                    "signals": [
+                        {"name": "RSI_DIVERGENCE", "logic": "AND", "weight": 10},
+                    ],
+                },
+            ],
+        })
+        result = calc.check_required_signals(
+            config,
+            ["hod::HOD_REJECTION", "hod::BELOW_HOD"],
+        )
+        assert result is False
+
 
 # ---------------------------------------------------------------------------
 # Integration: check_required_signals wired into evaluate_bar
