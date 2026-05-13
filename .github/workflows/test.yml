@@ -84,6 +84,7 @@ jobs:
             tests/strategy_builder/core/test_strategy_config_engine.py \
             tests/optimizer_v3/test_error_recovery.py \
             tests/itm/state/ \
+            tests/bug_regression/test_btcaaaaa_79_regression.py \
             tests/bug_regression/test_btcaaaaa_99_regression.py \
             tests/bug_regression/test_btcaaaaa_149_regression.py \
             tests/bug_regression/test_btcaaaaa_182_regression.py  \
@@ -122,6 +123,7 @@ jobs:
             tests/bug_regression/test_btcaaaaa_272_regression.py \
             tests/bug_regression/test_btcaaaaa_327_regression.py  \
             tests/bug_regression/test_btcaaaaa_33_regression.py \
+            tests/bug_regression/test_btcaaaaa_73_regression.py \
             tests/bug_regression/test_btcaaaaa_348_regression.py \
             tests/bug_regression/test_btcaaaaa_356_regression.py \
             tests/bug_regression/test_btcaaaaa_391_regression.py \
