@@ -29,6 +29,7 @@ jobs:
     env:
       PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
       PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
       PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
       POSTGRES_HOST: ${{ secrets.POSTGRES_HOST || 'localhost' }}
       POSTGRES_PORT: ${{ secrets.POSTGRES_PORT || '5432' }}
