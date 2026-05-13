@@ -713,8 +713,8 @@ class TestFindExistingBlockingIssue:
         monkeypatch.setattr("impact_gate.worker._company", lambda: "comp-uuid")
         dedup_key = _build_dedup_key("BTCAAAAA-100", "FDR-850", "fr")
         issues = [
-            {"id": "other", "body": "no match"},
-            {"id": "match-id", "identifier": "BTCAAAAA-500", "body": f"something {dedup_key} else"},
+            {"id": "other", "description": "no match"},
+            {"id": "match-id", "identifier": "BTCAAAAA-500", "description": f"something {dedup_key} else"},
         ]
         monkeypatch.setattr(
             "impact_gate.worker._paginate",
@@ -727,8 +727,8 @@ class TestFindExistingBlockingIssue:
     def test_returns_none_when_no_body_match(self, monkeypatch):
         monkeypatch.setattr("impact_gate.worker._company", lambda: "comp-uuid")
         issues = [
-            {"id": "i1", "body": "some other content"},
-            {"id": "i2", "body": "<!-- dedup:impact-gate:other:thing:bug -->"},
+            {"id": "i1", "description": "some other content"},
+            {"id": "i2", "description": "<!-- dedup:impact-gate:other:thing:bug -->"},
         ]
         monkeypatch.setattr(
             "impact_gate.worker._paginate",
