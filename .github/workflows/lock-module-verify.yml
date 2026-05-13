@@ -1,0 +1,175 @@
+name: lock-module-verify
+
+on:
+  pull_request:
+    branches: ["main", "master"]
+  workflow_dispatch:
+    inputs:
+      diff_file:
+        description: 'Path to diff file (test fixture)'
+        required: false
+        default: ''
+      changed_files:
+        description: 'Comma-separated changed file paths'
+        required: false
+        default: ''
+      touch_index:
+        description: 'Use Touch Index DB for test discovery fallback'
+        required: false
+        default: 'false'
+      dry_run:
+        description: 'Dry run — report only, do not post comment'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: lock-module-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lock Module Requirement Verification
+    runs-on: ubuntu-latest
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies (Qt headless)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-xkb1 \
+            xvfb libgl1-mesa-glx
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install \
+            pytest pytest-cov pytest-qt \
+            PyQt5 PyQt5-Qt5 PyQt5-sip \
+            SQLAlchemy psycopg2-binary \
+            numpy pandas pyarrow \
+            pydantic requests python-dotenv
+
+      - name: Run lock module verification
+        id: verify
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONPATH: src
+        run: |
+          FLAGS="--json"
+          if [ "${{ github.event.inputs.touch_index }}" = "true" ]; then
+            FLAGS="$FLAGS --touch-index"
+          fi
+          if [ -n "${{ github.event.inputs.diff_file }}" ]; then
+            FLAGS="$FLAGS --diff-file ${{ github.event.inputs.diff_file }}"
+          elif [ -n "${{ github.event.inputs.changed_files }}" ]; then
+            FLAGS="$FLAGS --changed-files ${{ github.event.inputs.changed_files }}"
+          fi
+          python scripts/lock_module_verify.py $FLAGS > /tmp/verify-output.json 2>&1
+          rc=$?
+          echo "exit_code=$rc" >> $GITHUB_OUTPUT
+          if [ "$rc" -eq 0 ]; then
+            echo "gate=passed" >> $GITHUB_OUTPUT
+          else
+            echo "gate=failed" >> $GITHUB_OUTPUT
+          fi
+          cat /tmp/verify-output.json
+
+      - name: Generate Markdown report
+        id: report
+        if: always()
+        run: |
+          FLAGS="--markdown"
+          if [ "${{ github.event.inputs.touch_index }}" = "true" ]; then
+            FLAGS="$FLAGS --touch-index"
+          fi
+          if [ -n "${{ github.event.inputs.diff_file }}" ]; then
+            FLAGS="$FLAGS --diff-file ${{ github.event.inputs.diff_file }}"
+          elif [ -n "${{ github.event.inputs.changed_files }}" ]; then
+            FLAGS="$FLAGS --changed-files ${{ github.event.inputs.changed_files }}"
+          fi
+          python scripts/lock_module_verify.py $FLAGS > /tmp/verify-report.md 2>/dev/null || true
+
+      - name: Post PR comment
+        if: github.event_name == 'pull_request' && github.event.inputs.dry_run != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('/tmp/verify-report.md', 'utf8');
+            const summary = fs.readFileSync('/tmp/verify-output.json', 'utf8');
+            let data;
+            try { data = JSON.parse(summary); } catch(e) { data = { overall_status: 'ERROR' }; }
+
+            const affectedCount = (data.affected_modules || []).length;
+            if (affectedCount === 0) {
+              // No locked modules affected — nothing to report
+              return;
+            }
+
+            const gate = data.overall_status === 'PASS' ? '✅' : '❌';
+            const body = `${gate} **Lock Module Verification:** ${data.overall_status}\n\n${report}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Lock Module Verification'));
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
+
+      - name: Upload verification artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lock-module-verify-output
+          path: |
+            /tmp/verify-output.json
+            /tmp/verify-report.md
+          retention-days: 30
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Lock Module Verification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Exit code | ${{ steps.verify.outputs.exit_code }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gate | ${{ steps.verify.outputs.gate }} |" >> $GITHUB_STEP_SUMMARY
+          if [ -f /tmp/verify-report.md ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            cat /tmp/verify-report.md >> $GITHUB_STEP_SUMMARY
+          fi
