@@ -14,6 +14,7 @@ import pytest
 from touch_index.bug_worker import (
     BugIngestionResult,
     _parse_completed_at,
+    catch_up_eligible_bug_issues,
     ingest_bug_issue,
     process_bug_issue,
     run_bug_worker,
@@ -60,13 +61,14 @@ class TestParseCompletedAt:
 
 
 def _mock_engine():
-    """Return a mock SQLAlchemy engine whose context-manager .begin() works."""
+    """Return a mock SQLAlchemy engine whose context-manager .begin() and .connect() work."""
     conn = MagicMock()
     ctx = MagicMock()
     ctx.__enter__ = MagicMock(return_value=conn)
     ctx.__exit__ = MagicMock(return_value=False)
     engine = MagicMock()
     engine.begin = MagicMock(return_value=ctx)
+    engine.connect = MagicMock(return_value=ctx)
     return engine, conn
 
 
@@ -2531,3 +2533,210 @@ class TestEmitJsonSummaryRequiresWorker:
         assert results[1].source == "description"
         assert results[1].files_indexed == 1
         mock_get.assert_called_once_with("id-2")
+
+
+# ---------------------------------------------------------------------------
+# catch_up_eligible_bug_issues — catch-up for eligible issues not yet indexed
+# ---------------------------------------------------------------------------
+
+
+class TestCatchUpEligibleBugIssues:
+    """Tests for catch_up_eligible_bug_issues()."""
+
+    def test_catch_up_indexes_missing_eligible_issues(self):
+        """Issues referenced in git but not in DB are indexed."""
+        engine, conn = _mock_engine()
+        done_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
+            "completedAt": "2026-05-11T12:00:00Z",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                return_value=done_issue,
+            ),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/touch_index/bug_worker.py"],
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch(
+                "touch_index.bug_worker.text",
+            ) as mock_text,
+        ):
+            mock_text.return_value = MagicMock()
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 1
+        assert results[0].issue_identifier == ISSUE_IDENTIFIER
+        assert results[0].files_indexed == 1
+
+    def test_catch_up_skips_already_indexed(self):
+        """Issues already in the DB are skipped."""
+        engine, conn = _mock_engine()
+        done_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                return_value=done_issue,
+            ) as mock_get,
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/x.py"],
+            ) as mock_git,
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = [(ISSUE_IDENTIFIER,)]
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 0
+        mock_get.assert_not_called()
+        mock_git.assert_not_called()
+
+    def test_catch_up_skips_non_done_issues(self):
+        """Issues with status other than 'done' are skipped."""
+        engine, conn = _mock_engine()
+        in_progress_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "in_progress",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                return_value=in_progress_issue,
+            ),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+            ) as mock_git,
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 0
+        mock_git.assert_not_called()
+
+    def test_catch_up_skips_fdr_labelled(self):
+        """FDR-labelled issues are skipped (handled by FR worker)."""
+        engine, conn = _mock_engine()
+        fdr_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
+            "labelIds": ["d523cb2d-acd9-423d-b87a-bb79cee42c40"],
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                return_value=fdr_issue,
+            ),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+            ) as mock_git,
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 0
+        mock_git.assert_not_called()
+
+    def test_catch_up_skips_missing_issues(self):
+        """Issues not found in Paperclip are skipped."""
+        engine, conn = _mock_engine()
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                return_value=None,
+            ),
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 0
+
+    def test_catch_up_returns_empty_when_no_git_ids(self):
+        """When no git issue IDs found, returns empty list."""
+        engine, _ = _mock_engine()
+
+        with patch(
+            "touch_index.bug_worker.get_all_referenced_issue_ids",
+            return_value=set(),
+        ):
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert results == []
+
+    def test_catch_up_continues_after_error(self):
+        """An error indexing one issue does not halt the catch-up."""
+        engine, conn = _mock_engine()
+        done_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
+        }
+        other_id = "BTCAAAAA-999"
+        other_issue = {
+            "id": "cccccccc-0000-0000-0000-999999999999",
+            "identifier": other_id,
+            "status": "done",
+            "completedAt": "2026-05-11T12:00:00Z",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER, other_id},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                side_effect=lambda i: done_issue if i == ISSUE_IDENTIFIER else other_issue,
+            ),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                side_effect=lambda i: ["src/ok.py"] if i == other_id else (_ for _ in ()).throw(RuntimeError("git error")),
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 1
+        assert results[0].issue_identifier == other_id
+        assert results[0].files_indexed == 1

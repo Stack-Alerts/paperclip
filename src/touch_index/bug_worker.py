@@ -26,8 +26,8 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from .comment_extractor import extract_files_from_text, fetch_and_extract
-from .git_extractor import get_files_for_issue
-from .paperclip_client import FDR_LABEL_ID, get_issue_by_id
+from .git_extractor import get_all_referenced_issue_ids, get_files_for_issue
+from .paperclip_client import FDR_LABEL_ID, get_issue_by_id, get_issue_by_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -223,3 +223,58 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def catch_up_eligible_bug_issues(
+    engine: Engine,
+    *,
+    dry_run: bool = False,
+) -> list[BugIngestionResult]:
+    """Scan all git history for eligible done non-FDR issues not yet indexed.
+
+    New commits can reference old issues, making them eligible for indexing
+    even though they were completed outside the worker's lookback window.
+    This catch-up ensures those issues are indexed, keeping eligible coverage
+    consistently above the quality threshold without requiring a full backfill.
+    """
+    all_git_ids = get_all_referenced_issue_ids()
+    if not all_git_ids:
+        return []
+
+    with engine.connect() as conn:
+        indexed_rows = conn.execute(
+            text("SELECT DISTINCT bug_identifier FROM touch_index_bug_files")
+        ).fetchall()
+    indexed_in_db: set[str] = {str(r[0]) for r in indexed_rows}
+
+    results: list[BugIngestionResult] = []
+    for identifier in sorted(all_git_ids):
+        if identifier in indexed_in_db:
+            continue
+        issue = get_issue_by_identifier(identifier)
+        if issue is None:
+            continue
+        if issue.get("status") != "done":
+            continue
+        if FDR_LABEL_ID in (issue.get("labelIds") or []):
+            continue
+        try:
+            result = ingest_bug_issue(
+                engine,
+                issue_id=issue["id"],
+                issue_identifier=identifier,
+                completed_at=_parse_completed_at(issue),
+                description=issue.get("description", "") or "",
+                dry_run=dry_run,
+            )
+            results.append(result)
+        except Exception:
+            logger.exception("Catch-up ingestion error for %s", identifier)
+    if results:
+        logger.info(
+            "Catch-up complete: %d eligible issues processed, %d files indexed, %d skipped",
+            len(results),
+            sum(r.files_indexed for r in results),
+            sum(1 for r in results if r.skipped_no_commits),
+        )
+    return results
