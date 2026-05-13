@@ -59,7 +59,7 @@ jobs:
             PyQt5 PyQt5-Qt5 PyQt5-sip \
             SQLAlchemy alembic psycopg2-binary \
             numpy pandas pyarrow \
-            pydantic
+            pydantic requests python-dotenv
 
       - name: Delete stale .coverage database
         run: rm -f .coverage
@@ -86,6 +86,7 @@ jobs:
             tests/optimizer_v3/test_error_recovery.py \
             tests/itm/state/ \
             tests/qa/ \
+            tests/fr_acceptance/ \
             tests/bug_regression/test_btcaaaaa_14_regression.py \
             tests/bug_regression/test_btcaaaaa_20_regression.py \
             tests/bug_regression/test_btcaaaaa_22_regression.py \
