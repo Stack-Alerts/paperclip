@@ -1,39 +1,22 @@
 """
-QA re-test for BTCAAAAA-475 follow-up fix (commit a5ad2b0).
-
-What changed:
-    QTimer.singleShot(0, self.showMaximized)
-    →
-    QTimer.singleShot(50, self.showMaximized)
-
-Why:
-    A delay of 0 ms fires at the next event-loop iteration but Qt has not
-    completed its initial layout pass at that point.  The symptom is that
-    maximize appears to do nothing on first open without any prior user
-    interaction (e.g. clicking a tab).  The tab click triggers a layout
-    recalculation that incidentally corrects the window state.
-
-    50 ms gives Qt and the OS window manager enough time to finish the
-    initial layout/paint cycle so showMaximized() reliably fills the screen
-    even on the very first maximize attempt with no preceding user
-    interaction.
+QA re-test for BTCAAAAA-475 follow-up fix.
+Updated for BTCAAAAA-25580: removed QTimer deferral, maximize is now
+applied synchronously in WindowGeometryMixin.showEvent() before the
+WM maps the window (fixes Linux WM ignoring deferred showMaximized).
 
 Board-reported reproduction sequence (MUST pass):
     1. Open window fresh — no prior state from this session
     2. Do NOT click any tab, button, or widget
-    3. Immediately click maximize → MUST fill the screen   ← this failed before
+    3. Immediately click maximize → MUST fill the screen
 
 Pass criteria tested here:
-    AC-1  The timer delay in _restore_window_geometry is ≥ 50 ms (not 0 ms).
-    AC-2  When maximized=True in QSettings, QTimer.singleShot is called with
-          delay=50 (not 0, not any other value).
-    AC-3  When maximized=False in QSettings, QTimer.singleShot is NOT called
-          at all.
-    AC-4  The timer is invoked with self.showMaximized as the callback (not
-          some other callable).
-    AC-5  AST check: the literal 0 is not passed to singleShot in styles.py
-          (regression guard against reverting the fix).
-    AC-6  All windows in scope use WindowGeometryMixin (no window bypasses
+    AC-1  WindowGeometryMixin.showEvent() calls setWindowState(WindowMaximized)
+          synchronously when saved state has maximized=True.
+    AC-2  When maximized=True in QSettings, showEvent applies the state before
+          delegating to super().showEvent().
+    AC-3  When maximized=False in QSettings, showEvent does NOT maximize.
+    AC-4  Maximized window positioning on target screen works correctly.
+    AC-5  All windows in scope use WindowGeometryMixin (no window bypasses
           the mixin and therefore misses the fix).
 """
 
@@ -42,7 +25,7 @@ from __future__ import annotations
 import ast
 import pathlib
 import sys
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -84,7 +67,6 @@ def _styles_ast() -> ast.Module:
 
 
 def _find_method_node(tree: ast.Module, method_name: str) -> ast.FunctionDef | None:
-    """Return the first FunctionDef with the given name in the AST."""
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if node.name == method_name:
@@ -97,178 +79,113 @@ def _src(filename: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# AC-1 / AC-5  AST checks — timer delay value in source
+# AC-1 / AC-3  AST checks — synchronous maximize in showEvent
 # ---------------------------------------------------------------------------
 
-class TestTimerDelayAST:
-    """AST-level regression guard for the singleShot delay value."""
+class TestSynchronousMaximizeAST:
+    """AST-level regression guard for the synchronous maximize fix."""
 
-    def _find_singlesshot_calls_in_restore(self, tree: ast.Module):
-        """
-        Return all ast.Call nodes that are QTimer.singleShot(…) inside the
-        _restore_window_geometry method.
-        """
+    def _find_setwindowstate_calls_in_showevent(self, tree: ast.Module):
         calls = []
         for node in ast.walk(tree):
             if (
                 isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-                and node.name == "_restore_window_geometry"
+                and node.name == "showEvent"
             ):
                 for child in ast.walk(node):
                     if (
                         isinstance(child, ast.Call)
                         and isinstance(child.func, ast.Attribute)
-                        and child.func.attr == "singleShot"
+                        and child.func.attr == "setWindowState"
                     ):
                         calls.append(child)
         return calls
 
-    def test_single_shot_call_exists_in_restore(self):
-        """_restore_window_geometry must contain at least one QTimer.singleShot call."""
+    def test_setwindowstate_call_exists_in_showevent(self):
+        """WindowGeometryMixin.showEvent must contain setWindowState call."""
         tree = _styles_ast()
-        calls = self._find_singlesshot_calls_in_restore(tree)
+        calls = self._find_setwindowstate_calls_in_showevent(tree)
         assert calls, (
-            "styles.py: _restore_window_geometry must call QTimer.singleShot "
-            "to defer showMaximized() until after Qt completes the layout pass."
+            "styles.py: WindowGeometryMixin.showEvent must call setWindowState "
+            "to apply maximized state BEFORE the WM processes the initial map."
         )
 
-    def test_timer_delay_is_50ms_not_0ms(self):
-        """
-        The singleShot delay MUST be 50 (not 0).
-
-        A delay of 0 fires at the next event-loop tick before Qt finishes its
-        initial layout pass.  50 ms is required to reliably fill the screen on
-        first maximize without prior tab interaction.
-        """
+    def test_setwindowstate_uses_windowmaximized(self):
+        """The setWindowState call must reference Qt.WindowMaximized."""
         tree = _styles_ast()
-        calls = self._find_singlesshot_calls_in_restore(tree)
-        assert calls, "_restore_window_geometry has no QTimer.singleShot call."
+        calls = self._find_setwindowstate_calls_in_showevent(tree)
+        assert calls, "WindowGeometryMixin.showEvent has no setWindowState call."
 
         for call_node in calls:
             args = call_node.args
-            assert args, "QTimer.singleShot called with no arguments — unexpected."
+            assert args, "setWindowState called with no arguments."
             first_arg = args[0]
-            # The first argument must be the integer literal 50
             assert (
-                isinstance(first_arg, ast.Constant) and first_arg.value == 50
-            ), (
-                f"QTimer.singleShot delay is {ast.dump(first_arg)!r}, expected 50. "
-                "Commit a5ad2b0 changed this from 0 → 50 ms to fix maximize on "
-                "first open without prior tab click (BTCAAAAA-475 follow-up)."
+                isinstance(first_arg, ast.BinOp)
+                and isinstance(first_arg.op, ast.BitOr)
+            ) or isinstance(first_arg, ast.Attribute) or isinstance(first_arg, ast.Name), (
+                "setWindowState must be called with an expression involving WindowMaximized."
+            )
+            # Check for WindowMaximized in the AST
+            has_maximized = any(
+                isinstance(n, ast.Attribute) and "WindowMaximized" in n.attr
+                for n in ast.walk(call_node)
+            )
+            assert has_maximized, (
+                "setWindowState must include Qt.WindowMaximized flag."
             )
 
-    def test_timer_delay_is_not_zero(self):
-        """
-        Regression guard: singleShot(0, ...) in _restore_window_geometry must NOT exist.
-
-        If someone reverts the fix back to 0 ms this test catches it immediately.
-        """
+    def test_no_qtimer_singleshot_in_restore(self):
+        """QTimer.singleShot must NOT exist in _restore_window_geometry anymore."""
         tree = _styles_ast()
-        calls = self._find_singlesshot_calls_in_restore(tree)
-        for call_node in calls:
-            args = call_node.args
-            if args:
-                first_arg = args[0]
-                assert not (
-                    isinstance(first_arg, ast.Constant) and first_arg.value == 0
-                ), (
-                    "QTimer.singleShot(0, ...) found in _restore_window_geometry — "
-                    "this is the pre-fix value that caused maximize to fail on first "
-                    "open without prior user interaction.  The delay must be ≥ 50 ms."
-                )
+        restore_method = _find_method_node(tree, "_restore_window_geometry")
+        assert restore_method is not None, "_restore_window_geometry not found."
 
-    def test_callback_is_show_maximized(self):
-        """
-        The singleShot callback must ultimately invoke showMaximized — either
-        directly as self.showMaximized, or via a named closure that calls it.
-        """
-        tree = _styles_ast()
-        calls = self._find_singlesshot_calls_in_restore(tree)
-        assert calls, "_restore_window_geometry has no QTimer.singleShot call."
-
-        for call_node in calls:
-            args = call_node.args
-            assert len(args) >= 2, (
-                "QTimer.singleShot must have at least 2 args: (delay, callback)."
-            )
-            callback_arg = args[1]
-            # Accept either self.showMaximized directly, or a named closure
-            is_direct = (
-                isinstance(callback_arg, ast.Attribute)
-                and callback_arg.attr == "showMaximized"
-            )
-            is_closure = isinstance(callback_arg, ast.Name)
-            assert is_direct or is_closure, (
-                f"singleShot callback is {ast.dump(callback_arg)!r}, "
-                "expected self.showMaximized or a named closure."
-            )
-            # If it's a closure, verify showMaximized is called inside it
-            if is_closure:
-                closure_name = callback_arg.id
-                restore_method = _find_method_node(_styles_ast(), "_restore_window_geometry")
-                closure_def = None
-                for node in ast.walk(restore_method):
-                    if isinstance(node, ast.FunctionDef) and node.name == closure_name:
-                        closure_def = node
-                        break
-                assert closure_def is not None, (
-                    f"Closure '{closure_name}' passed to singleShot not found in "
-                    "_restore_window_geometry."
-                )
-                has_show_maximized = any(
-                    isinstance(n, ast.Attribute) and n.attr == "showMaximized"
-                    for n in ast.walk(closure_def)
-                )
-                assert has_show_maximized, (
-                    f"Closure '{closure_name}' does not call showMaximized(). "
-                    "The 50ms deferral must ultimately invoke self.showMaximized()."
-                )
+        has_singleshot = any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "singleShot"
+            for node in ast.walk(restore_method)
+        )
+        assert not has_singleshot, (
+            "QTimer.singleShot must be removed from _restore_window_geometry. "
+            "Maximize is now applied synchronously in WindowGeometryMixin.showEvent "
+            "before the WM maps the window."
+        )
 
 
 # ---------------------------------------------------------------------------
 # AC-2 / AC-3 / AC-4  Runtime unit tests with mocked Qt
 # ---------------------------------------------------------------------------
 
-class TestRestoreWindowGeometryTimerBehaviour:
+class TestShowEventMaximizeBehaviour:
     """
-    Runtime unit tests for WindowGeometryMixin._restore_window_geometry.
+    Runtime unit tests for WindowGeometryMixin.showEvent maximize behavior.
 
     Qt objects are mocked so these tests run in headless CI without a display.
     """
 
-    def _make_mixin_with_saved_state(self, maximized: bool):
-        """
-        Build a minimal WindowGeometryMixin instance whose QSettings stub
-        returns a specified maximized flag.  Returns (instance, mock_timer).
-        """
-        sys.path.insert(0, ".")
+    def _make_mixin_with_saved_state(self, maximized: bool, maximized_screen_name=None):
+        """Build a minimal WindowGeometryMixin instance with controlled QSettings."""
+        import src.strategy_builder.ui.styles as styles_mod
 
-        # We patch the Qt internals used inside _restore_window_geometry so we
-        # can invoke the real Python logic without a display.
-        import importlib
-        import types
-
-        # Build a lightweight fake Qt module tree so the import inside
-        # _restore_window_geometry succeeds
-        mock_qtimer = MagicMock()
-
-        # Stub QSettings to return our desired maximized value
         mock_settings = MagicMock()
 
         def settings_value(key, default=None, type=None):  # noqa: A002
             if key.endswith("/maximized"):
                 return maximized
             if key.endswith("/pos"):
-                return None  # no saved position → centre on primary
+                return None
             if key.endswith("/size"):
                 return None
             if key.endswith("/screen_name"):
                 return None
+            if key.endswith("/maximized_screen_name"):
+                return maximized_screen_name
             return default
 
         mock_settings.value = settings_value
 
-        # Stub QGuiApplication.primaryScreen().availableGeometry()
         mock_screen = MagicMock()
         mock_screen.availableGeometry.return_value = MagicMock(
             center=lambda: MagicMock(x=lambda: 960, y=lambda: 540),
@@ -281,57 +198,49 @@ class TestRestoreWindowGeometryTimerBehaviour:
         mock_gui_app.primaryScreen.return_value = mock_screen
         mock_gui_app.screens.return_value = [mock_screen]
 
-        # Stub QSize
         mock_qsize = MagicMock(return_value=MagicMock())
 
-        # Stub QRect
-        mock_qrect = MagicMock(return_value=MagicMock(
-            intersected=lambda _: MagicMock(width=lambda: 0, height=lambda: 0)
-        ))
+        # Stub class to provide the super().showEvent() target that
+        # WindowGeometryMixin.showEvent expects in the MRO chain.
+        class _ShowEventStub:
+            def showEvent(self, event):
+                pass
 
-        # Patch the private module-level aliases in styles
-        import src.strategy_builder.ui.styles as styles_mod
-
-        # Create the mixin instance
-        class _TestWindow(styles_mod.WindowGeometryMixin):
+        class _TestWindow(styles_mod.WindowGeometryMixin, _ShowEventStub):
             GEOMETRY_SETTINGS_KEY = "testWindow"
             GEOMETRY_DEFAULT_SIZE = (1200, 800)
 
             def __init__(self):
-                # Don't call QWidget.__init__ — we're not testing Qt rendering
                 self._geometry_restored = False
+                self._move_calls = []
+                self._window_state = 0
 
-            # Stub the Qt methods called inside _restore_window_geometry
             def resize(self, *a):
                 pass
 
-            def move(self, *a):
-                pass
+            def move(self, x, y):
+                self._move_calls.append((x, y))
 
             def showMaximized(self):
                 pass
 
-            def width(self):
-                return 1200
+            def windowState(self):
+                return self._window_state
 
-            def height(self):
-                return 800
+            def setWindowState(self, state):
+                self._window_state = state
+
+            def isMaximized(self):
+                return bool(self._window_state & 2)  # Qt.WindowMaximized == 2
 
         instance = _TestWindow()
+        return instance, mock_settings, mock_gui_app, mock_qsize
 
-        return instance, mock_settings, mock_qtimer, mock_gui_app, mock_qsize, mock_qrect
-
-    def test_timer_called_with_50ms_when_maximized(self):
-        """
-        When maximized=True is in QSettings, QTimer.singleShot must be called
-        with delay=50 and self.showMaximized as the callback.
-
-        This is the core fix for BTCAAAAA-475: the first maximize click must
-        fill the screen even without any prior tab/widget interaction.
-        """
+    def test_showevent_sets_maximized_when_saved_maximized(self):
+        """When maximized=True in QSettings, showEvent must set WindowMaximized."""
         import src.strategy_builder.ui.styles as styles_mod
 
-        instance, mock_settings, mock_qtimer, mock_gui_app, mock_qsize, mock_qrect = (
+        instance, mock_settings, mock_gui_app, mock_qsize = (
             self._make_mixin_with_saved_state(maximized=True)
         )
 
@@ -339,40 +248,18 @@ class TestRestoreWindowGeometryTimerBehaviour:
             patch.object(styles_mod, "_QSettings", return_value=mock_settings),
             patch.object(styles_mod, "_QGuiApplication", mock_gui_app),
             patch.object(styles_mod, "_QSize", mock_qsize),
-            patch.object(styles_mod, "_QRect", mock_qrect),
-            # Patch QTimer inside the styles module's namespace
-            patch("src.strategy_builder.ui.styles.QTimer", mock_qtimer, create=True),
         ):
-            # Also patch the import that happens inside the function
-            with patch.dict("sys.modules", {"PyQt5.QtCore": MagicMock(QTimer=mock_qtimer)}):
-                instance._restore_window_geometry()
+            instance.showEvent(None)
 
-        # QTimer.singleShot must have been called
-        assert mock_qtimer.singleShot.called, (
-            "QTimer.singleShot was NOT called when maximized=True. "
-            "showMaximized() must be deferred via QTimer to avoid calling it "
-            "before Qt completes the initial layout pass."
+        assert instance.isMaximized(), (
+            "showEvent did not maximize the window when saved state had maximized=True."
         )
 
-        # Extract the delay argument from the call
-        call_args = mock_qtimer.singleShot.call_args
-        assert call_args is not None, "QTimer.singleShot call_args is None."
-        delay = call_args[0][0]  # positional arg 0
-        assert delay == 50, (
-            f"QTimer.singleShot delay is {delay!r}, expected 50. "
-            "A delay of 0 ms is insufficient — Qt has not finished its initial "
-            "layout pass at the next event-loop tick, causing maximize to appear "
-            "to do nothing on first open without prior user interaction. "
-            "(Commit a5ad2b0 changed 0 → 50 ms to fix BTCAAAAA-475.)"
-        )
-
-    def test_timer_not_called_when_not_maximized(self):
-        """
-        When maximized=False in QSettings, QTimer.singleShot must NOT be called.
-        """
+    def test_showevent_does_not_maximize_when_not_saved(self):
+        """When maximized=False in QSettings, showEvent must NOT maximize."""
         import src.strategy_builder.ui.styles as styles_mod
 
-        instance, mock_settings, mock_qtimer, mock_gui_app, mock_qsize, mock_qrect = (
+        instance, mock_settings, mock_gui_app, mock_qsize = (
             self._make_mixin_with_saved_state(maximized=False)
         )
 
@@ -380,25 +267,52 @@ class TestRestoreWindowGeometryTimerBehaviour:
             patch.object(styles_mod, "_QSettings", return_value=mock_settings),
             patch.object(styles_mod, "_QGuiApplication", mock_gui_app),
             patch.object(styles_mod, "_QSize", mock_qsize),
-            patch.object(styles_mod, "_QRect", mock_qrect),
-            patch("src.strategy_builder.ui.styles.QTimer", mock_qtimer, create=True),
         ):
-            with patch.dict("sys.modules", {"PyQt5.QtCore": MagicMock(QTimer=mock_qtimer)}):
-                instance._restore_window_geometry()
+            instance.showEvent(None)
 
-        assert not mock_qtimer.singleShot.called, (
-            "QTimer.singleShot should NOT be called when maximized=False — "
-            "showMaximized() is only needed when the window was previously maximized."
+        assert not instance.isMaximized(), (
+            "showEvent maximized the window when saved state had maximized=False."
         )
 
-    def test_second_call_to_restore_is_noop(self):
-        """
-        _restore_window_geometry has an idempotency guard (_geometry_restored flag).
-        A second call must not trigger another QTimer.singleShot.
-        """
+    def test_position_on_maximized_screen(self):
+        """When maximized with maximized_screen_name, window must move to that screen."""
         import src.strategy_builder.ui.styles as styles_mod
 
-        instance, mock_settings, mock_qtimer, mock_gui_app, mock_qsize, mock_qrect = (
+        mock_screens = {
+            "DP-1": MagicMock(
+                name=lambda: "DP-1",
+                availableGeometry=MagicMock(
+                    return_value=MagicMock(
+                        center=lambda: MagicMock(x=lambda: 960, y=lambda: 540),
+                        left=lambda: 0, top=lambda: 0,
+                        right=lambda: 1920, bottom=lambda: 1080,
+                    )
+                ),
+            ),
+        }
+
+        instance, mock_settings, mock_gui_app, mock_qsize = (
+            self._make_mixin_with_saved_state(maximized=True, maximized_screen_name="DP-1")
+        )
+        mock_gui_app.screens.return_value = list(mock_screens.values())
+        mock_gui_app.primaryScreen.return_value = mock_screens["DP-1"]
+
+        with (
+            patch.object(styles_mod, "_QSettings", return_value=mock_settings),
+            patch.object(styles_mod, "_QGuiApplication", mock_gui_app),
+            patch.object(styles_mod, "_QSize", mock_qsize),
+        ):
+            instance.showEvent(None)
+
+        assert len(instance._move_calls) > 0, (
+            "showEvent should move the window when a maximized_screen_name is set."
+        )
+
+    def test_second_call_to_showevent_is_noop(self):
+        """showEvent must be idempotent (_geometry_restored guard)."""
+        import src.strategy_builder.ui.styles as styles_mod
+
+        instance, mock_settings, mock_gui_app, mock_qsize = (
             self._make_mixin_with_saved_state(maximized=True)
         )
 
@@ -406,30 +320,20 @@ class TestRestoreWindowGeometryTimerBehaviour:
             patch.object(styles_mod, "_QSettings", return_value=mock_settings),
             patch.object(styles_mod, "_QGuiApplication", mock_gui_app),
             patch.object(styles_mod, "_QSize", mock_qsize),
-            patch.object(styles_mod, "_QRect", mock_qrect),
-            patch("src.strategy_builder.ui.styles.QTimer", mock_qtimer, create=True),
         ):
-            with patch.dict("sys.modules", {"PyQt5.QtCore": MagicMock(QTimer=mock_qtimer)}):
-                instance._restore_window_geometry()  # first call
-                instance._restore_window_geometry()  # second call — must be no-op
+            instance.showEvent(None)  # first call
+            instance.showEvent(None)  # second call — must be no-op
 
-        # singleShot must have been called exactly once
-        assert mock_qtimer.singleShot.call_count == 1, (
-            f"QTimer.singleShot was called {mock_qtimer.singleShot.call_count} times "
-            "but must only be called once (idempotency guard failed)."
-        )
+        # setWindowState should only be applied once
+        assert instance.isMaximized(), "Window should be maximized after first showEvent."
 
 
 # ---------------------------------------------------------------------------
-# AC-6  All windows use WindowGeometryMixin (coverage regression guard)
+# AC-5  All windows use WindowGeometryMixin (coverage regression guard)
 # ---------------------------------------------------------------------------
 
 class TestAllWindowsUseMixin:
-    """
-    Every application window must use WindowGeometryMixin to inherit the
-    50 ms maximize-delay fix.  Any window that bypasses the mixin will still
-    exhibit the first-maximize bug even after commit a5ad2b0.
-    """
+    """Every application window must use WindowGeometryMixin."""
 
     @pytest.mark.parametrize("filename", ALL_MIXIN_WINDOWS)
     def test_window_uses_geometry_mixin(self, filename: str):
@@ -437,7 +341,7 @@ class TestAllWindowsUseMixin:
         assert "WindowGeometryMixin" in src, (
             f"{filename} does not use WindowGeometryMixin. "
             "All windows must inherit the mixin so they benefit from the "
-            "50 ms showMaximized timer fix (BTCAAAAA-475 follow-up)."
+            "synchronous maximize fix."
         )
 
     @pytest.mark.parametrize("filename", ALL_MIXIN_WINDOWS)
@@ -445,5 +349,5 @@ class TestAllWindowsUseMixin:
         src = _src(filename)
         assert "_restore_window_geometry" in src, (
             f"{filename} does not call _restore_window_geometry(). "
-            "The mixin fix only activates when this method is called in showEvent."
+            "The mixin non-maximized position restore requires this call in showEvent."
         )

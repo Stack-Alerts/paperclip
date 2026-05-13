@@ -146,6 +146,22 @@ jobs:
           PYEOF
           fi
 
+      - name: Monitor worker output for errors
+        if: always()
+        env:
+          PYTHONPATH: src
+          PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+          PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+          PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
+          PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+        run: |
+          if [ -f /tmp/br-output.json ]; then
+            python scripts/blast_radius_monitor.py \
+              --worker-output /tmp/br-output.json \
+              --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              2>&1 | tee /tmp/br-monitor.log
+          fi
+
       - name: Save worker state cache
         if: always()
         uses: actions/cache/save@v4

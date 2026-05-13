@@ -1759,7 +1759,7 @@ def format_block_name(block_name: str) -> str:
 #       super().closeEvent(event)
 # ---------------------------------------------------------------------------
 
-from PyQt5.QtCore import QSettings as _QSettings, QPoint as _QPoint, QSize as _QSize, QRect as _QRect
+from PyQt5.QtCore import Qt as _Qt, QSettings as _QSettings, QPoint as _QPoint, QSize as _QSize, QRect as _QRect
 from PyQt5.QtWidgets import QApplication as _QApplication
 from PyQt5.QtGui import QGuiApplication as _QGuiApplication
 
@@ -1947,16 +1947,20 @@ class WindowGeometryMixin:
                 _wg_log.debug("[PRE-MAX MOVE] %s: no maximized_screen_name, centering on primary", key)
                 self._center_on_primary(default_w, default_h)
 
-            # showMaximized() must be deferred: 50 ms gives Qt and the OS WM
-            # enough time to process the preceding move() before maximizing.
-            from PyQt5.QtCore import QTimer
-            _wg_log.debug("[TIMER] %s: scheduling showMaximized in 50 ms", key)
+            # Maximize is handled by WindowGeometryMixin.showEvent() BEFORE
+            # super().showEvent() processes the initial map, so the WM sees
+            # the maximize request during the map cycle (fixes Linux WM
+            # ignoring deferred showMaximized on multi-monitor).
 
-            def _do_maximize():
-                _log_pos("MAXIMIZE FIRED")
-                self.showMaximized()
-
-            QTimer.singleShot(50, _do_maximize)
+            # Logging-only: window state after restore
+            try:
+                state_val = int(self.windowState())
+            except (AttributeError, RuntimeError):
+                state_val = -1
+            _wg_log.debug(
+                "[MAX RESTORE] %s: geometry handled by mixin showEvent, state=%s",
+                key, state_val,
+            )
 
         elif saved_pos is not None:
             # Normal (non-maximized) restore: position at the saved normal pos.
@@ -2021,3 +2025,72 @@ class WindowGeometryMixin:
             screen_rect.center().x() - default_w // 2,
             screen_rect.center().y() - default_h // 2,
         )
+
+    def showEvent(self, event):
+        """Apply maximized state BEFORE the WM maps the window.
+
+        Some Linux window managers reject maximize requests that arrive
+        after the window is already mapped. By reading the saved maximized
+        flag and calling setWindowState() before delegating to
+        super().showEvent(), the WM sees the maximize request during the
+        initial map cycle rather than after the window is on screen.
+
+        The non-maximized geometry restore (position/size) continues to
+        be handled by _restore_window_geometry() in the subclass showEvent.
+        """
+        if not getattr(self, "_geometry_restored", False):
+            settings = _QSettings("BTC_Engine", "StrategyBuilder")
+            key = self.GEOMETRY_SETTINGS_KEY
+            maximized = settings.value(f"{key}/maximized", False, type=bool)
+
+            if maximized:
+                import logging as _logging
+                _wg_log = _logging.getLogger("WindowGeometry")
+
+                maximized_screen_name = settings.value(f"{key}/maximized_screen_name", None)
+                saved_size = settings.value(f"{key}/size", None)
+                default_w, default_h = self.GEOMETRY_DEFAULT_SIZE
+                target_size = saved_size if saved_size is not None else _QSize(default_w, default_h)
+
+                if maximized_screen_name:
+                    target_screen = None
+                    for s in _QGuiApplication.screens():
+                        if s.name() == maximized_screen_name:
+                            target_screen = s
+                            break
+                    if target_screen is not None:
+                        screen_rect = target_screen.availableGeometry()
+                        dest_x = screen_rect.center().x() - target_size.width() // 2
+                        dest_y = screen_rect.center().y() - target_size.height() // 2
+                        _wg_log.debug(
+                            "[MIXIN PRE-MAX MOVE] %s: -> (%d,%d) screen=%s rect=%s",
+                            key, dest_x, dest_y, maximized_screen_name, screen_rect,
+                        )
+                        self.move(dest_x, dest_y)
+                    else:
+                        _wg_log.debug(
+                            "[MIXIN PRE-MAX MOVE] %s: screen %s not found, centering on primary",
+                            key, maximized_screen_name,
+                        )
+                        self._center_on_primary(default_w, default_h)
+                else:
+                    _wg_log.debug(
+                        "[MIXIN PRE-MAX MOVE] %s: no maximized_screen_name, centering on primary",
+                        key,
+                    )
+                    self._center_on_primary(default_w, default_h)
+
+                _wg_log.debug("[MIXIN MAXIMIZE] %s: setting WindowMaximized before show", key)
+                self.setWindowState(self.windowState() | _Qt.WindowMaximized)
+                self._geometry_restored = True
+
+        super().showEvent(event)
+
+        if getattr(self, "_geometry_restored", False) and not self.isMaximized():
+            import logging as _logging
+            _logging.getLogger("WindowGeometry").warning(
+                "[MIXIN MAX FALLBACK] %s: isMaximized=False after showEvent, calling showMaximized()",
+                self.GEOMETRY_SETTINGS_KEY,
+            )
+            self.showMaximized()
+

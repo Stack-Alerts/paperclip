@@ -415,11 +415,12 @@ class TestDisconnectedMonitorFallback:
 class TestMaximizeNotRegressed:
     """AC-4: The 50ms QTimer.singleShot(50, showMaximized) must still be in source."""
 
-    def test_50ms_timer_still_present(self):
-        """QTimer.singleShot(50, ...) deferral from BTCAAAAA-474 must be preserved."""
-        assert "QTimer.singleShot(50," in STYLES_SRC, (
-            "The 50ms showMaximized() deferral from BTCAAAAA-474 must not be removed "
-            "by the BTCAAAAA-638 fix."
+    def test_synchronous_maximize_present(self):
+        """setWindowState(WindowMaximized) must be present in WindowGeometryMixin (BTCAAAAA-25580)."""
+        assert "setWindowState" in STYLES_SRC and "WindowMaximized" in STYLES_SRC, (
+            "WindowGeometryMixin must use setWindowState(WindowMaximized) synchronously. "
+            "The QTimer-based showMaximized() deferral was removed in BTCAAAAA-25580 "
+            "because some Linux WMs reject deferred maximize after the window is mapped."
         )
 
     def test_maximized_window_schedules_show_maximized(self):

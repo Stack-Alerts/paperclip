@@ -182,50 +182,39 @@ class TestASTRegressionGuard:
             "It must be called when screenAt() returns None for maximized_screen_name."
         )
 
-    def test_50ms_timer_preserved(self):
-        """AC-8 (AST): QTimer.singleShot(50, ...) deferral must still be present."""
+    def test_synchronous_maximize_in_showevent(self):
+        """AC-8 (AST): showEvent must apply WindowMaximized synchronously."""
         tree = _styles_ast()
-        restore_method = _find_method_node(tree, "_restore_window_geometry")
-        assert restore_method is not None, "_restore_window_geometry not found in styles.py"
+        showevent_method = _find_method_node(tree, "showEvent")
+        assert showevent_method is not None, "showEvent not found in styles.py"
 
-        found_50ms = False
-        for node in ast.walk(restore_method):
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and node.func.attr == "singleShot"
-            ):
-                for arg in node.args:
-                    if isinstance(arg, ast.Constant) and arg.value == 50:
-                        found_50ms = True
-                        break
-
-        assert found_50ms, (
-            "QTimer.singleShot(50, ...) not found in _restore_window_geometry. "
-            "The 50 ms deferral from BTCAAAAA-474/475 must be preserved."
+        has_setwindowstate = any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "setWindowState"
+            for node in ast.walk(showevent_method)
+        )
+        assert has_setwindowstate, (
+            "WindowGeometryMixin.showEvent must call setWindowState() synchronously. "
+            "The QTimer-based deferral was removed in BTCAAAAA-25580 because some "
+            "Linux WMs reject deferred maximize after the window is mapped."
         )
 
-    def test_no_singleshot_with_0ms(self):
-        """AC-8 regression: QTimer.singleShot(0, ...) must NOT appear in restore."""
+    def test_no_singleshot_in_restore(self):
+        """AC-8 regression: no QTimer.singleShot in _restore_window_geometry."""
         tree = _styles_ast()
         restore_method = _find_method_node(tree, "_restore_window_geometry")
         assert restore_method is not None
 
-        found_0ms = False
-        for node in ast.walk(restore_method):
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and node.func.attr == "singleShot"
-            ):
-                for arg in node.args:
-                    if isinstance(arg, ast.Constant) and arg.value == 0:
-                        found_0ms = True
-                        break
-
-        assert not found_0ms, (
-            "QTimer.singleShot(0, ...) found in _restore_window_geometry — "
-            "this is a regression from BTCAAAAA-474/475. Must be 50 ms."
+        has_singleshot = any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "singleShot"
+            for node in ast.walk(restore_method)
+        )
+        assert not has_singleshot, (
+            "QTimer.singleShot found in _restore_window_geometry — the timer-based "
+            "maximize deferral was removed in BTCAAAAA-25580."
         )
 
 
@@ -496,16 +485,18 @@ class TestRestoreMaximizedToCorrectScreen:
         mock_gui = MagicMock()
         mock_gui.screens.return_value = [target_screen]
 
-        mock_qtimer = MagicMock()
+        class _ShowEventStub:
+            def showEvent(self, event):
+                pass
 
-        class TestWindow(styles_mod.WindowGeometryMixin):
+        class TestWindow(styles_mod.WindowGeometryMixin, _ShowEventStub):
             GEOMETRY_SETTINGS_KEY = "testWin"
             GEOMETRY_DEFAULT_SIZE = (800, 600)
-            _move_calls = None
 
             def __init__(self):
                 self._geometry_restored = False
                 self._move_calls = []
+                self._window_state = 0
 
             def resize(self, size):
                 pass
@@ -516,14 +507,20 @@ class TestRestoreMaximizedToCorrectScreen:
             def showMaximized(self):
                 pass
 
+            def setWindowState(self, state):
+                self._window_state = state
+
+            def isMaximized(self):
+                return bool(self._window_state & 2)
+
+            def windowState(self):
+                return self._window_state
+
             def frameGeometry(self):
                 return MagicMock()
 
             def geometry(self):
                 return MagicMock()
-
-            def windowState(self):
-                return 0
 
         win = TestWindow()
 
@@ -535,16 +532,14 @@ class TestRestoreMaximizedToCorrectScreen:
             patch.object(styles_mod, "_QSettings", return_value=mock_settings),
             patch.object(styles_mod, "_QGuiApplication", mock_gui),
             patch.object(styles_mod, "_QSize", MagicMock(return_value=mock_qsize_instance)),
-            patch("src.strategy_builder.ui.styles.QTimer", mock_qtimer, create=True),
         ):
-            with patch.dict("sys.modules", {"PyQt5.QtCore": MagicMock(QTimer=mock_qtimer)}):
-                win._restore_window_geometry()
+            win.showEvent(None)
 
         # Window must have been moved
         assert win._move_calls, (
             "win.move() was never called during restore with maximized=True "
             "and a matching maximized_screen_name. "
-            "Window should be positioned on the saved screen before showMaximized()."
+            "Window should be positioned on the saved screen before maximize."
         )
 
         # The move should be centred on the HDMI-2 screen
@@ -556,9 +551,10 @@ class TestRestoreMaximizedToCorrectScreen:
             "BTCAAAAA-637 fix: must move to saved screen centre before maximize."
         )
 
-        # Timer must have been called (showMaximized deferred)
-        assert mock_qtimer.singleShot.called, (
-            "QTimer.singleShot was NOT called. showMaximized must be deferred."
+        # Window must now show maximized state
+        assert win.isMaximized(), (
+            "showEvent must set WindowMaximized state synchronously. "
+            "QTimer deferral was removed in BTCAAAAA-25580."
         )
 
     def test_restore_fallback_to_primary_when_screen_disconnected(self):
@@ -583,15 +579,19 @@ class TestRestoreMaximizedToCorrectScreen:
         mock_gui.screens.return_value = [primary_screen]
         mock_gui.primaryScreen.return_value = primary_screen
 
-        mock_qtimer = MagicMock()
         center_called = []
 
-        class TestWindowFallback(styles_mod.WindowGeometryMixin):
+        class _ShowEventStub:
+            def showEvent(self, event):
+                pass
+
+        class TestWindowFallback(styles_mod.WindowGeometryMixin, _ShowEventStub):
             GEOMETRY_SETTINGS_KEY = "testWin"
             GEOMETRY_DEFAULT_SIZE = (800, 600)
 
             def __init__(self):
                 self._geometry_restored = False
+                self._window_state = 0
 
             def resize(self, size):
                 pass
@@ -602,6 +602,15 @@ class TestRestoreMaximizedToCorrectScreen:
             def showMaximized(self):
                 pass
 
+            def windowState(self):
+                return self._window_state
+
+            def setWindowState(self, state):
+                self._window_state = state
+
+            def isMaximized(self):
+                return bool(self._window_state & 2)
+
             def _center_on_primary(self, w=None, h=None):
                 center_called.append((w, h))
 
@@ -611,10 +620,8 @@ class TestRestoreMaximizedToCorrectScreen:
             patch.object(styles_mod, "_QSettings", return_value=mock_settings),
             patch.object(styles_mod, "_QGuiApplication", mock_gui),
             patch.object(styles_mod, "_QSize", MagicMock(return_value=MagicMock())),
-            patch("src.strategy_builder.ui.styles.QTimer", mock_qtimer, create=True),
         ):
-            with patch.dict("sys.modules", {"PyQt5.QtCore": MagicMock(QTimer=mock_qtimer)}):
-                win._restore_window_geometry()
+            win.showEvent(None)
 
         # _center_on_primary must have been called as fallback
         assert center_called, (
@@ -635,15 +642,19 @@ class TestRestoreMaximizedToCorrectScreen:
         mock_gui = MagicMock()
         mock_gui.screens.return_value = []
 
-        mock_qtimer = MagicMock()
         center_called = []
 
-        class TestWindowNoHint(styles_mod.WindowGeometryMixin):
+        class _ShowEventStub:
+            def showEvent(self, event):
+                pass
+
+        class TestWindowNoHint(styles_mod.WindowGeometryMixin, _ShowEventStub):
             GEOMETRY_SETTINGS_KEY = "testWin"
             GEOMETRY_DEFAULT_SIZE = (800, 600)
 
             def __init__(self):
                 self._geometry_restored = False
+                self._window_state = 0
 
             def resize(self, size):
                 pass
@@ -654,6 +665,15 @@ class TestRestoreMaximizedToCorrectScreen:
             def showMaximized(self):
                 pass
 
+            def windowState(self):
+                return self._window_state
+
+            def setWindowState(self, state):
+                self._window_state = state
+
+            def isMaximized(self):
+                return bool(self._window_state & 2)
+
             def _center_on_primary(self, w=None, h=None):
                 center_called.append((w, h))
 
@@ -663,10 +683,8 @@ class TestRestoreMaximizedToCorrectScreen:
             patch.object(styles_mod, "_QSettings", return_value=mock_settings),
             patch.object(styles_mod, "_QGuiApplication", mock_gui),
             patch.object(styles_mod, "_QSize", MagicMock(return_value=MagicMock())),
-            patch("src.strategy_builder.ui.styles.QTimer", mock_qtimer, create=True),
         ):
-            with patch.dict("sys.modules", {"PyQt5.QtCore": MagicMock(QTimer=mock_qtimer)}):
-                win._restore_window_geometry()
+            win.showEvent(None)
 
         assert center_called, (
             "_center_on_primary() was NOT called when maximized=True but "
