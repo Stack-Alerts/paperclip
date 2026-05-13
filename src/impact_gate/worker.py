@@ -83,7 +83,7 @@ def _find_existing_blocking_issue(
             page_size=50,
         )
         for issue in issues:
-            body = issue.get("body") or ""
+            body = issue.get("description") or ""
             if dedup_key in body:
                 log.info(
                     "Found existing blocking issue %s for %s/%s — skipping",
