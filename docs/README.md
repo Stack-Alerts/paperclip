@@ -7,7 +7,7 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 
 | Folder | Description |
 |--------|-------------|
-| [`architecture/`](architecture/) | System design, ADRs, data manager docs, database guide, git workflow |
+| [`architecture/`](architecture/) | System design, ADRs, data manager docs, database guide, git workflow — includes ITM Engine (P0), AI Consultant (P1), Impact Gate (P1), Touch Index Quality (P1) |
 | [`building-blocks/`](building-blocks/) | Signal/block reference docs, registry architecture, expert reviews |
 | [`debugger/`](debugger/) | Debugger and logger documentation |
 | [`integrations/`](integrations/) | External API integration docs (LakeAPI, Lake paths) |
@@ -25,9 +25,13 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 - **Optimizer User Guide**: [`optimizer/USER_GUIDE.md`](optimizer/USER_GUIDE.md)
 - **Strategy Builder Architecture**: [`strategy-builder/ARCHITECTURE_V1.0.md`](strategy-builder/ARCHITECTURE_V1.0.md)
 - **Strategy Developer Guide**: [`architecture/data-manager/STRATEGY_DEVELOPER_GUIDE.md`](architecture/data-manager/STRATEGY_DEVELOPER_GUIDE.md)
+- **ITM Engine (P0)**: [`architecture/ITM_ENGINE.md`](architecture/ITM_ENGINE.md) — live execution layer: domain, data, state, orchestrator, risk, engine, dry run
 - **Database Guide**: [`architecture/DATABASE_GUIDE.md`](architecture/DATABASE_GUIDE.md)
+- **AI Consultant (P1)**: [`architecture/AI_CONSULTANT.md`](architecture/AI_CONSULTANT.md) — ReAct agent loop, signal catalog, LLM provider abstraction, audit writer
 - **Git Workflow**: [`architecture/GIT_WORKFLOW.md`](architecture/GIT_WORKFLOW.md)
+- **Impact Gate (P1)**: [`architecture/IMPACT_GATE.md`](architecture/IMPACT_GATE.md) — FR acceptance + bug regression gating for fix/bug issue lifecycle
 - **Touch Index FR Worker**: [`docs/architecture/TOUCH_INDEX_FR_WORKER.md`](architecture/TOUCH_INDEX_FR_WORKER.md) — FR ingestion pipeline architecture, triggers, data quality SLAs, runbooks
+- **Touch Index Quality (P1)**: [`architecture/TOUCH_INDEX_QUALITY.md`](architecture/TOUCH_INDEX_QUALITY.md) — coverage, freshness, consistency monitoring for FR and bug touch index tables
 - **Touch Index Bug Worker**: [`docs/architecture/TOUCH_INDEX_BUG_WORKER.md`](architecture/TOUCH_INDEX_BUG_WORKER.md) — bug-close ingestion worker, file dependency tracking ([`DATABASE_GUIDE §9`](architecture/DATABASE_GUIDE.md#9-touch_index_bug_files), [`Bug CI`](../.github/workflows/touch-index-bug-worker.yml))
 - **Blast Radius Worker**: [`../.github/workflows/blast-radius-worker.yml`](../.github/workflows/blast-radius-worker.yml) — detects fix→in_review transitions and posts Blast Radius Reports ([`src/blast_radius/`](../src/blast_radius/))
 - **Impact Gate Worker**: [`../.github/workflows/impact-gate-worker.yml`](../.github/workflows/impact-gate-worker.yml) — gates in_review fixes through Impact Gate validation ([`src/impact_gate/`](../src/impact_gate/))
