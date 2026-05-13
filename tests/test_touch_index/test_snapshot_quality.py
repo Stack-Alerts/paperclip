@@ -133,6 +133,7 @@ class TestBuildFrReport:
         assert d["coverage_pct"] == 95.2
         assert d["indexed"] == 40
         assert d["total"] == 42
+        assert d["missing_issue_identifiers"] == []
         assert d["total_rows"] == 150
         assert d["stale_rows"] == 0
         assert d["max_age_hours"] == 12.5
@@ -200,6 +201,35 @@ class TestBuildFrReport:
         d = _build_fr_report(MockReport())
         assert d["orphan_count"] == 2
         assert d["pass"] is False
+
+
+    def test_missing_issue_identifiers_populated(self):
+        class MockReport:
+            passed = False
+
+            class coverage:
+                coverage_pct = 88.0
+                indexed_fdr_issues = 35
+                total_fdr_issues = 40
+                missing_issue_identifiers = ['BTCAAAAA-900', 'BTCAAAAA-901']
+
+            class freshness:
+                total_rows = 120
+                stale_rows = 2
+                max_age_hours = 200.0
+
+            class consistency:
+                null_owner_rows = 0
+                null_updated_at_rows = 0
+                unknown_source_rows = 0
+                duplicate_pairs = 0
+                orphan_fr_issue_ids = []
+                source_distribution = {}
+
+        d = _build_fr_report(MockReport())
+        assert d['missing_issue_identifiers'] == ['BTCAAAAA-900', 'BTCAAAAA-901']
+        assert d['pass'] is False
+
 
 
 # ---------------------------------------------------------------------------
