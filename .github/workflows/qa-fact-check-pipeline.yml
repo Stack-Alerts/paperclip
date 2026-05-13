@@ -1,0 +1,85 @@
+name: QA Fact-Check Pipeline
+
+on:
+  schedule:
+    # Daily at 08:00 UTC — pre-business-hours fact-check scan
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    inputs:
+      assignee:
+        description: 'Filter scan to a specific assignee agent ID'
+        required: false
+        default: ''
+
+concurrency:
+  group: qa-fact-check-pipeline
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    name: Fact-check scan (in-progress issues)
+    runs-on: ubuntu-latest
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run fact-check scan
+        id: scan
+        run: |
+          FLAGS=""
+          if [ -n "${{ github.event.inputs.assignee }}" ]; then
+            FLAGS="--assignee ${{ github.event.inputs.assignee }}"
+          fi
+          python scripts/qa_fact_check_pipeline.py scan $FLAGS > /tmp/fact-check-output.json
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          FLAGGED=$(python3 -c "import json; d=json.load(open('/tmp/fact-check-output.json')); print(d.get('flagged', 0))")
+          echo "flagged_count=$FLAGGED" >> "$GITHUB_OUTPUT"
+          if [ "$FLAGGED" -gt 0 ]; then
+            echo "alert_needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "alert_needed=false" >> "$GITHUB_OUTPUT"
+          fi
+          cat /tmp/fact-check-output.json
+
+      - name: Upload scan output artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fact-check-scan-output
+          path: /tmp/fact-check-output.json
+          retention-days: 7
+
+      - name: Write step summary
+        if: always()
+        run: |
+          if [ -f /tmp/fact-check-output.json ]; then
+            python3 >> "$GITHUB_STEP_SUMMARY" << 'PYEOF'
+          import json
+          with open('/tmp/fact-check-output.json') as f:
+              data = json.load(f)
+          scanned = data.get('scanned', 0)
+          flagged = data.get('flagged', 0)
+          items = data.get('items', [])
+          print('## QA Fact-Check Pipeline Summary')
+          print('')
+          print(f'- **Scanned:** {scanned} in-progress issues')
+          print(f'- **Flagged:** {flagged} issues with copy-touch content')
+          print('')
+          if items:
+              print('| Issue | Title | Reviewer |')
+              print('|---|---|---|')
+              for item in items:
+                  reviewer_name = item.get('reviewer', 'N/A')[:8] + '...' if len(item.get('reviewer', '')) > 8 else item.get('reviewer', 'N/A')
+                  print(f'| {item.get("id", "N/A")} | {item.get("title", "N/A")[:60]} | {reviewer_name} |')
+          PYEOF
+          fi
