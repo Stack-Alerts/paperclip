@@ -28,7 +28,8 @@ from touch_index.paperclip_client import (
     _base,
     _company,
     _session,
-    transition_issue_status,
+    _board_session,
+    transition_issue_status_board,
 )
 from blast_radius.report import extract_touched_files
 from blast_radius.query import query_blast_radius
@@ -53,14 +54,14 @@ MIN_TESTS_BAR = 10
 
 
 def _get_issue(issue_id: str) -> dict:
-    sess = _session()
+    sess = _board_session()
     resp = sess.get(f"{_base()}/api/issues/{issue_id}", timeout=15)
     resp.raise_for_status()
     return resp.json()
 
 
 def _post_comment(issue_id: str, body: str) -> None:
-    sess = _session()
+    sess = _board_session()
     resp = sess.post(
         f"{_base()}/api/issues/{issue_id}/comments",
         json={"body": body},
@@ -123,7 +124,7 @@ def _create_blocking_issue(
 def _set_blocked_by(issue_id: str, blocking_ids: list[str]) -> None:
     """Set ``blockedByIssueIds`` on an issue to prevent status promotion."""
     try:
-        sess = _session()
+        sess = _board_session()
         resp = sess.patch(
             f"{_base()}/api/issues/{issue_id}",
             json={"blockedByIssueIds": blocking_ids},
@@ -399,7 +400,7 @@ def process_issue(
                 issue_id,
                 f"## Impact Gate: PASS ✅\n\nIssue **{identifier}** has no FR impact and no regression risk.\n\nGate passed — no tests to run.",
             )
-            transition_issue_status(issue_id, "done")
+            transition_issue_status_board(issue_id, "done")
         return {"issue": identifier, "gate_status": "PASS", "reason": "no tests needed"}
 
     # --- Run Impact Gate tests ---
@@ -448,7 +449,7 @@ def process_issue(
     # --- Act on result ---
     if gate_status == "PASS":
         _post_comment(issue_id, _build_pass_comment(identifier, result))
-        transition_issue_status(issue_id, "done")
+        transition_issue_status_board(issue_id, "done")
         log.info("Gate PASS for %s — transitioned to done", identifier)
         return {
             "issue": identifier,
@@ -502,7 +503,7 @@ def process_issue(
     _post_comment(issue_id, fail_comment)
 
     # Revert to in_progress
-    transition_issue_status(issue_id, "in_progress")
+    transition_issue_status_board(issue_id, "in_progress")
 
     # Set blockedByIssueIds
     blocking_ids = [bi.get("id", "") for bi in blocking_issues if bi.get("id")]
