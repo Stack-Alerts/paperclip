@@ -49,6 +49,11 @@ COMPANY_PREFIX = "BTCAAAAA"
 # acceptance: sufficient coverage to justify promoting a fix to done.
 
 MIN_TESTS_BAR = 10
+# Impact Gate runner retry — transient CI failures can produce false-negative
+# FAIL results.  Retry up to GATE_RETRY_MAX_ATTEMPTS times with exponential
+# backoff before accepting a FAIL verdict and creating blocking issues.
+GATE_RETRY_MAX_ATTEMPTS = 3
+GATE_RETRY_BASE_DELAY = 2.0  # seconds
 
 # Rate limiting between blocking issue API calls to avoid flooding the Paperclip API
 BLOCKING_ISSUE_CREATE_INTERVAL = 1.0  # seconds
@@ -457,12 +462,38 @@ def process_issue(
                 log.warning("Failed to transition %s to done: %s", identifier, exc)
         return {"issue": identifier, "gate_status": "PASS", "reason": "no tests needed"}
 
-    # --- Run Impact Gate tests ---
-    try:
-        result = run_impact_gate(fr_ids, bug_ids)
-    except Exception as exc:
-        log.error("Impact Gate runner failed for %s: %s", identifier, exc)
-        error_msg = f"Impact Gate runner error: {exc}"
+    # --- Run Impact Gate tests (with retry for transient CI failures) ---
+    result = None
+    last_error = None
+    for gate_attempt in range(1, GATE_RETRY_MAX_ATTEMPTS + 1):
+        try:
+            result = run_impact_gate(fr_ids, bug_ids)
+        except Exception as exc:
+            log.error("Impact Gate runner failed for %s (attempt %d/%d): %s",
+                       identifier, gate_attempt, GATE_RETRY_MAX_ATTEMPTS, exc)
+            last_error = f"Impact Gate runner error: {exc}"
+            if gate_attempt < GATE_RETRY_MAX_ATTEMPTS:
+                delay = GATE_RETRY_BASE_DELAY * (2 ** (gate_attempt - 1))
+                log.info("Retrying Impact Gate for %s in %.1fs ...", identifier, delay)
+                time.sleep(delay)
+            continue
+
+        gate_status = result.get("status", "ERROR")
+        if gate_status == "PASS":
+            break  # success — stop retrying
+
+        if gate_attempt < GATE_RETRY_MAX_ATTEMPTS:
+            delay = GATE_RETRY_BASE_DELAY * (2 ** (gate_attempt - 1))
+            log.warning(
+                "Impact Gate for %s returned %s on attempt %d/%d — retrying in %.1fs ...",
+                identifier, gate_status, gate_attempt, GATE_RETRY_MAX_ATTEMPTS, delay,
+            )
+            time.sleep(delay)
+
+    if result is None:
+        log.error("Impact Gate runner exhausted all %d attempts for %s",
+                   GATE_RETRY_MAX_ATTEMPTS, identifier)
+        error_msg = last_error or "Impact Gate runner: all attempts failed"
         if not dry_run:
             _post_comment(issue_id, _build_escalation_comment(identifier, error_msg))
         return {"issue": identifier, "gate_status": "ERROR", "error": error_msg}
