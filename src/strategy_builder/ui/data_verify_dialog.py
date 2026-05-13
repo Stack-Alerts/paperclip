@@ -19,7 +19,7 @@ Author: Strategy Builder Team
 Date: 2026-05-02
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -94,10 +94,10 @@ class DataVerifyThread(QThread):
         try:
             self.progress.emit(10, 100, "Initialising data manager…")
             manager = UnifiedDataManager(mode='live')
-            # horizon_cutoff must be tz-naive UTC to match gap_start timestamps
-            # that are stored as tz-naive in parquet.  Using tz-aware would
-            # raise TypeError: can't compare offset-naive and offset-aware datetimes.
-            horizon_cutoff = datetime.utcnow() - timedelta(days=_BINANCE_HORIZON_DAYS)
+            # horizon_cutoff must be tz-aware UTC to match gap_start timestamps
+            # returned by detect_gaps_in_binance_files (tz-aware since utc=True was
+            # added to pd.to_datetime in unified_manager.py post-bcdf0db).
+            horizon_cutoff = datetime.now(timezone.utc) - timedelta(days=_BINANCE_HORIZON_DAYS)
 
             report: Dict = {}
             steps = len(self._TIMEFRAMES)

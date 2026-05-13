@@ -2080,10 +2080,10 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
             self.last_update_time = datetime.now()
             self._in_quick_retry = False
             self._update_status(
-                f"Data updated at {self.last_update_time.strftime('%H:%M:%S')}"
+                f"[RuntimeUpdate] OK: {message[:120]}"
             )
         else:
-            self._update_status(f"Update failed: {message[:120]}")
+            self._update_status(f"[RuntimeUpdate] FAIL: {message[:120]}")
             if not self._in_quick_retry:
                 self._in_quick_retry = True
                 logger.error("Update failed — scheduling quick retry in 12s...")

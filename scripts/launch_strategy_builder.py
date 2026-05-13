@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 # Root logger: honour LOG_LEVEL env var; default INFO.
 _root_level = getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO)
-logging.basicConfig(
+logging.basicConfig(force=True, 
     level=_root_level,
     format='%(message)s',
     stream=sys.stdout,
