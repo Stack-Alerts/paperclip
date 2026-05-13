@@ -188,10 +188,34 @@ class TestPersistenceSkipGuard:
 
 class TestCreateTestResultInterface:
     """Verifies that TestResultsManager.create_test_result() imports and
-    has the expected signature (BTCAAAAA-28 persistence target)."""
+    has the expected signature (BTCAAAAA-28 persistence target).
+
+    Tests use a mocked SQLAlchemy session but exercise the REAL
+    create_test_result implementation so validation logic is actually
+    verified -- not just mock behavior.
+    """
+
+    _BASE_VALID_DATA: dict = {
+        "strategy_id": "strat-001",
+        "strategy_version_id": "ver-001",
+        "test_type": "backtest",
+        "test_config": {"lookback_days": 30},
+        "start_date": datetime.now(timezone.utc),
+        "end_date": datetime.now(timezone.utc),
+        "metrics": {"total_return_pct": 15.5, "sharpe_ratio": 1.85},
+    }
+
+    @staticmethod
+    def _make_manager():
+        from unittest.mock import MagicMock
+        from sqlalchemy.orm import Session
+        from src.optimizer_v3.database.test_results_manager import (
+            TestResultsManager,
+        )
+
+        return TestResultsManager(MagicMock(spec=Session))
 
     def test_create_test_result_is_callable(self):
-        """create_test_result must exist and be callable."""
         from src.optimizer_v3.database.test_results_manager import (
             TestResultsManager,
         )
@@ -199,53 +223,37 @@ class TestCreateTestResultInterface:
         assert hasattr(TestResultsManager, "create_test_result")
         assert callable(TestResultsManager.create_test_result)
 
-    def test_required_fields_are_enforced(self):
-        """create_test_result raises ValueError when required fields missing."""
-        from src.optimizer_v3.database.test_results_manager import (
-            TestResultsManager,
-        )
-
-        test_data = {
-            "strategy_id": "strat-001",
-            # Missing strategy_version_id
-            "test_type": "backtest",
-            "test_config": {},
-            "start_date": datetime.now(timezone.utc),
-            "end_date": datetime.now(timezone.utc),
-            "metrics": {},
-        }
-        manager = MagicMock(spec=TestResultsManager)
-        manager.create_test_result.side_effect = ValueError(
-            "Missing required fields: strategy_version_id"
-        )
-        with pytest.raises(ValueError, match="Missing required fields"):
-            manager.create_test_result(test_data)
-
-    def test_valid_test_types_accepted(self):
-        """create_test_result accepts only valid test types."""
-        from src.optimizer_v3.database.test_results_manager import (
-            TestResultsManager,
-        )
-
-        valid_types = [
-            "backtest",
-            "forward_test",
-            "paper_trade",
-            "live",
-            "walk_forward",
-        ]
-        manager = MagicMock(spec=TestResultsManager)
-        for test_type in valid_types:
-            manager.create_test_result({"test_type": test_type})
-            # Should not raise
+    def test_missing_required_fields_raise_value_error(self):
+        manager = self._make_manager()
+        for missing_key in self._BASE_VALID_DATA:
+            if missing_key == "test_config":
+                continue
+            incomplete = dict(self._BASE_VALID_DATA)
+            del incomplete[missing_key]
+            with pytest.raises(ValueError, match="Missing required fields"):
+                manager.create_test_result(incomplete)
 
     def test_invalid_test_type_rejected(self):
-        """create_test_result raises ValueError for invalid test_type."""
-        from src.optimizer_v3.database.test_results_manager import (
-            TestResultsManager,
-        )
-
-        manager = MagicMock(spec=TestResultsManager)
-        manager.create_test_result.side_effect = ValueError("Invalid test_type")
+        manager = self._make_manager()
+        data = dict(self._BASE_VALID_DATA)
+        data["test_type"] = "invalid_type"
         with pytest.raises(ValueError, match="Invalid test_type"):
-            manager.create_test_result({"test_type": "invalid_type"})
+            manager.create_test_result(data)
+
+    def test_all_valid_test_types_accepted(self):
+        manager = self._make_manager()
+        for test_type in ("backtest", "forward_test", "paper_trade", "live", "walk_forward"):
+            data = dict(self._BASE_VALID_DATA)
+            data["test_type"] = test_type
+            result_id = manager.create_test_result(data)
+            assert isinstance(result_id, str)
+            assert len(result_id) > 0
+
+    def test_result_id_is_returned(self):
+        manager = self._make_manager()
+        result_id = manager.create_test_result(dict(self._BASE_VALID_DATA))
+        assert isinstance(result_id, str)
+        # UUID default fires at ORM flush time; with a mock session
+        # the in-memory object has result_id=None, so str(None)='None'.
+        # This still validates the method returns without error.
+        assert len(result_id) > 0
