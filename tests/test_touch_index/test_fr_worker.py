@@ -1812,3 +1812,34 @@ class TestMainProcessFrIssueError:
         assert data["quality"]["coverage"]["coverage_pct"] == 80.0
         assert data["issues_processed"] == 1
         assert data["total_files_indexed"] == 3
+
+
+# ---------------------------------------------------------------------------
+# _emit_json_summary — required worker param (regression for BTCAAAAA-4892)
+# ---------------------------------------------------------------------------
+
+
+class TestEmitJsonSummaryRequiresWorker:
+    """_emit_json_summary must reject calls without the worker argument."""
+
+    def test_missing_worker_raises_type_error(self):
+        """Calling _emit_json_summary(args) without worker= raises TypeError."""
+        import argparse
+        from touch_index.__main__ import _emit_json_summary
+
+        args = argparse.Namespace(issue_id=None, dry_run=False)
+        with pytest.raises(TypeError):
+            _emit_json_summary(args)
+
+    def test_worker_fr_succeeds(self, capsys):
+        """Calling _emit_json_summary(args, worker='fr') succeeds."""
+        import argparse
+        from touch_index.__main__ import _emit_json_summary
+
+        args = argparse.Namespace(issue_id=None, dry_run=False)
+        _emit_json_summary(args, worker="fr")
+        captured = capsys.readouterr()
+        import json
+
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "fr"
