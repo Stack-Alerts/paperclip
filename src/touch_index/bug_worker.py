@@ -131,7 +131,9 @@ def _parse_completed_at(issue: dict) -> datetime | None:
     if not isinstance(raw, str):
         logger.warning(
             "Bug issue %s: unexpected completedAt type %s (value=%r)",
-            issue.get("identifier"), type(raw).__name__, raw,
+            issue.get("identifier"),
+            type(raw).__name__,
+            raw,
         )
         return None
     try:

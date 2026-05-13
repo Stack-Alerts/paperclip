@@ -188,7 +188,13 @@ def _run_bug_cli() -> None:
                     _emit_json_summary(
                         args,
                         worker="bug",
-                        results=[],
+                        results=catchup_results if catchup_results is not None else [],
+                        total_files=sum(
+                            r.files_indexed for r in (catchup_results or [])
+                        ),
+                        skipped=sum(
+                            1 for r in (catchup_results or []) if r.skipped_no_commits
+                        ),
                         quality_report=report,
                     )
                 raise SystemExit(1)
@@ -197,7 +203,9 @@ def _run_bug_cli() -> None:
             _emit_json_summary(
                 args,
                 worker="bug",
-                results=[],
+                results=catchup_results if catchup_results is not None else [],
+                total_files=sum(r.files_indexed for r in (catchup_results or [])),
+                skipped=sum(1 for r in (catchup_results or []) if r.skipped_no_commits),
                 quality_report=report,
             )
         return
@@ -444,12 +452,28 @@ def _run_fr_cli() -> None:
                 logger.error("VALIDATION FAILED \u2014 investigate existing data")
                 if args.json_summary:
                     _emit_json_summary(
-                        args, worker="fr", results=[], quality_report=report
+                        args,
+                        worker="fr",
+                        results=catchup_results if catchup_results is not None else [],
+                        total_files=sum(
+                            r.files_indexed for r in (catchup_results or [])
+                        ),
+                        skipped=sum(
+                            1 for r in (catchup_results or []) if r.skipped_no_commits
+                        ),
+                        quality_report=report,
                     )
                 raise SystemExit(1)
             logger.info("VALIDATION PASSED \u2014 existing data clean")
         if args.json_summary:
-            _emit_json_summary(args, worker="fr", results=[], quality_report=report)
+            _emit_json_summary(
+                args,
+                worker="fr",
+                results=catchup_results if catchup_results is not None else [],
+                total_files=sum(r.files_indexed for r in (catchup_results or [])),
+                skipped=sum(1 for r in (catchup_results or []) if r.skipped_no_commits),
+                quality_report=report,
+            )
         return
 
     results = run_fr_worker(engine, issues, dry_run=args.dry_run)
